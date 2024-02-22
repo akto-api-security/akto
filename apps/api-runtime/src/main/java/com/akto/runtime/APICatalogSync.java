@@ -1,8 +1,10 @@
 package com.akto.runtime;
 
+import com.akto.billing.UsageMetricHandler;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -11,14 +13,18 @@ import com.akto.dto.type.SingleTypeInfo.Domain;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.merge.MergeOnHostOnly;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.utils.RedactSampleData;
+import com.google.api.client.util.Charsets;
 import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
@@ -31,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
@@ -50,6 +57,7 @@ public class APICatalogSync {
     public AktoPolicyNew aktoPolicyNew;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
     public static boolean mergeAsyncOutside = true;
+    public BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
 
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this.thresh = thresh;
@@ -1401,7 +1409,7 @@ public class APICatalogSync {
             List<Integer> apiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
             allParams = SingleTypeInfoDao.instance.fetchStiOfCollections(apiCollectionIds);
         }
-        this.dbState = build(allParams);
+        this.dbState = build(allParams, existingAPIsInDb);
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
         List<SensitiveParamInfo> sensitiveParamInfos = SensitiveParamInfoDao.instance.getUnsavedSensitiveParamInfos();
         for (SensitiveParamInfo sensitiveParamInfo: sensitiveParamInfos) {
@@ -1432,6 +1440,11 @@ public class APICatalogSync {
 
     public static void updateApiCollectionCount(APICatalog apiCatalog, int apiCollectionId) {
         Set<String> newURLs = new HashSet<>();
+        
+        if (apiCatalog == null) {
+            return;
+        }
+
         for(URLTemplate url: apiCatalog.getTemplateURLToMethods().keySet()) {
             newURLs.add(url.getTemplateString()+ " "+ url.getMethod().name());
         }
@@ -1550,17 +1563,30 @@ public class APICatalogSync {
     }
 
 
-    private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams) {
+    private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams, BloomFilter<CharSequence> existingAPIsInDb) {
         Map<Integer, APICatalog> ret = new HashMap<>();
         
+        Set<Integer> demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
+        Set<String> keySet = new HashSet<>();
+
+        existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
+        System.out.println("keyset size: " + keySet.size() + " filter size: " + existingAPIsInDb.approximateElementCount());
+
         for (SingleTypeInfo param: allParams) {
             try {
                 buildHelper(param, ret);
+                if (demosAndDeactivatedCollections.contains(param.getApiCollectionId())) {
+                    continue;
+                }
+                String key = param.getApiCollectionId() + " " + param.getUrl() + " " + param.getMethod();
+                existingAPIsInDb.put(key);
+                keySet.add(key);
             } catch (Exception e) {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb("Error while building from db: " + e.getMessage(), LogDb.RUNTIME);
             }
         }
+        System.out.println("keyset size: " + keySet.size() + " filter size: " + existingAPIsInDb.approximateElementCount());
 
         return ret;
     }
@@ -1568,6 +1594,10 @@ public class APICatalogSync {
     int counter = 0;
     
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {
+        syncWithDB(syncImmediately, fetchAllSTI, new SyncLimit(false, 0));
+    }
+
+    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit syncLimit) {
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
         List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData = new ArrayList<>();
         List<WriteModel<TrafficInfo>> writesForTraffic = new ArrayList<>();
@@ -1589,6 +1619,55 @@ public class APICatalogSync {
         counter++;
         for(int apiCollectionId: this.delta.keySet()) {
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
+
+            Set<Integer> demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
+
+            if (!demosAndDeactivatedCollections.contains(apiCollectionId)) {
+
+                System.out.println("before: " + deltaCatalog.getStrictURLToMethods().keySet().size() + " " +deltaCatalog.getTemplateURLToMethods().keySet().size());
+
+                int deltaUsage = 0;
+                Iterator<Entry<URLStatic, RequestTemplate>> staticUrlIterator = deltaCatalog.getStrictURLToMethods().entrySet().iterator();
+                while (staticUrlIterator.hasNext()) {
+                    Entry<URLStatic, RequestTemplate> entry = staticUrlIterator.next();
+                    URLStatic urlStatic = entry.getKey();
+                    String checkString = apiCollectionId + " " + urlStatic.getFullString();
+                    if (syncLimit.checkLimit && !existingAPIsInDb.mightContain(checkString)) {
+                        if (syncLimit.updateUsageLeftAndCheckSkip()) {
+                            staticUrlIterator.remove();
+                        } else {
+                            existingAPIsInDb.put(checkString);
+                            deltaUsage++;
+                        }
+                    }
+                }
+
+                Iterator<Entry<URLTemplate, RequestTemplate>> templateUrlIterator = deltaCatalog.getTemplateURLToMethods().entrySet().iterator();
+                while(templateUrlIterator.hasNext()) {
+                    Entry<URLTemplate, RequestTemplate> entry = templateUrlIterator.next();
+                    URLTemplate urlTemplate = entry.getKey();
+                    String checkString = apiCollectionId + " " + urlTemplate.getTemplateString() + " "
+                            + urlTemplate.getMethod().name();
+                    if (syncLimit.checkLimit && !existingAPIsInDb.mightContain(checkString)) {
+                        if (syncLimit.updateUsageLeftAndCheckSkip()) {
+                            templateUrlIterator.remove();
+                        } else {
+                            existingAPIsInDb.put(checkString);
+                            deltaUsage++;
+                        }
+                    }
+                }
+
+                UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get(), deltaUsage);
+
+                System.out.println("delta added: " + deltaUsage);
+
+                System.out.println("after: " + deltaCatalog.getStrictURLToMethods().keySet().size() + " " +deltaCatalog.getTemplateURLToMethods().keySet().size());
+            }
+
+            // lock
+            //
+
             APICatalog dbCatalog = this.dbState.getOrDefault(apiCollectionId, new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>()));
             boolean redactCollectionLevel = apiCollectionToRedactPayload.getOrDefault(apiCollectionId, false);
             DbUpdateReturn dbUpdateReturn = getDBUpdatesForParams(deltaCatalog, dbCatalog, redact, redactCollectionLevel);

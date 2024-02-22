@@ -44,6 +44,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import com.opensymphony.xwork2.Action;
 import org.bson.conversions.Bson;
@@ -192,10 +193,18 @@ public class ApiCollectionsAction extends UserAction {
         SampleDataDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         SensitiveSampleDataDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         TrafficInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
-        ApiInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
+        DeleteResult apiInfoDeleteResult = ApiInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         SensitiveParamInfoDao.instance.updateMany(filter, update);
 
-        UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get());
+        /*
+         * This delta might not be accurate, since it may also include deletions from
+         * deactivated/demo collections or old collections, which were not being used
+         * for usage calculation
+         * Any inaccuracies here, would be fixed in the next calcUsage cycle (4 hrs)
+         */
+        int deltaUsage = -1 * (int) apiInfoDeleteResult.getDeletedCount();
+        UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get(), deltaUsage);
+
         List<ApiCollection> apiGroups = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
         for(ApiCollection collection: apiGroups){
             List<TestingEndpoints> conditions = collection.getConditions();
@@ -443,30 +452,41 @@ public class ApiCollectionsAction extends UserAction {
         return apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
     }
 
-    private List<ApiCollection> filterDeactivatedCollections(List<ApiCollection> apiCollections) {
+    private List<ApiCollection> filterCollections(List<ApiCollection> apiCollections, boolean deactivated) {
         if (apiCollections == null) {
             return new ArrayList<>();
         }
         List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
+        Bson deactivatedFilter = Filters.eq(ApiCollection._DEACTIVATED, true);
+        if(!deactivated){
+            deactivatedFilter = Filters.or(
+                Filters.exists(ApiCollection._DEACTIVATED, false),
+                Filters.eq(ApiCollection._DEACTIVATED, false)
+            );
+        }
+
         /*
          * The apiCollections from request contain only the IDs,
          * thus we need to fetch the active status from the db.
          */
         return ApiCollectionsDao.instance.findAll(Filters.and(
                 Filters.in(Constants.ID, apiCollectionIds),
-                Filters.eq(ApiCollection._DEACTIVATED, true)));
+                deactivatedFilter));
     }
 
     public String deactivateCollections() {
+        this.apiCollections = filterCollections(this.apiCollections, false);
+        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
+        int deltaUsage = (-1) * this.apiCollections.stream().mapToInt(apiCollection -> apiCollection.getUrlsCount()).sum();
         List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
         ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
                 Updates.set(ApiCollection._DEACTIVATED, true));
-        UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get());
+        UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get(), deltaUsage);
         return Action.SUCCESS.toUpperCase();
     }
 
     public String activateCollections() {
-        this.apiCollections = filterDeactivatedCollections(this.apiCollections);
+        this.apiCollections = filterCollections(this.apiCollections, true);
         if (this.apiCollections.isEmpty()) {
             return Action.SUCCESS.toUpperCase();
         }
@@ -487,9 +507,10 @@ public class ApiCollectionsAction extends UserAction {
             addActionError(errorMessage);
             return Action.ERROR.toUpperCase();
         }
-        UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get());
+        UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get(), count);
         return Action.SUCCESS.toUpperCase();
     }
+
     public String fetchCustomerEndpoints(){
         try {
             ApiCollection juiceShop = ApiCollectionsDao.instance.findByName("juice_shop_demo");

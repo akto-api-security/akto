@@ -1,23 +1,29 @@
 package com.akto.dto.billing;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class SyncLimit {
-    private final boolean checkLimit;
-    private int usageLeft;
+    public final boolean checkLimit;
+    private AtomicInteger usageLeft;
 
     public SyncLimit(boolean checkLimit, int usageLeft) {
         this.checkLimit = checkLimit;
-        this.usageLeft = usageLeft;
+        this.usageLeft = new AtomicInteger(usageLeft);
     }
 
     public boolean updateUsageLeftAndCheckSkip() {
         if (!checkLimit) {
             return false;
         }
-        synchronized (this) {
-            if (usageLeft >= 0) {
-                usageLeft--;
-            }
-            return checkLimit && usageLeft < 0;
+
+        if (usageLeft.get() >= 0) {
+            usageLeft.decrementAndGet();
         }
+
+        return checkLimit && usageLeft.get() < 0;
     }
+
+    public int getUsageLeft() {
+        return usageLeft.get();
+    }
+
 }

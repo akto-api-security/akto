@@ -2,8 +2,6 @@ package com.akto.action.testing;
 
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
-import com.akto.billing.UsageMetricHandler;
-import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -13,7 +11,6 @@ import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
-import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -21,11 +18,11 @@ import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRun.TestingRunType;
 import com.akto.dto.testing.sources.TestSourceConfig;
-import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
+import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -673,12 +670,7 @@ public class StartTestAction extends UserAction {
         int accountId = Context.accountId.get();
         Runnable r = () -> {
             Context.accountId.set(accountId);
-            DeleteTestRunsDao.instance.deleteTestRunsFromDb(DeleteTestRuns);
-            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
-            if (featureAccess.checkBooleanOrUnlimited() || featureAccess.getGracePeriod() > 0) {
-                return;
-            }
-            UsageMetricHandler.calcAndFetchFeatureAccess(MetricTypes.TEST_RUNS, accountId);
+            DeleteTestRunUtils.deleteTestRunsFromDb(DeleteTestRuns);
         };
         executorService.submit(r);
     }

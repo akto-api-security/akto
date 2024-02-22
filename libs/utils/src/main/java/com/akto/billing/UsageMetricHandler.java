@@ -62,39 +62,10 @@ public class UsageMetricHandler {
                     LogDb.DASHBOARD);
 
             String organizationId = organization.getId();
+            String dashboardVersion = accountSettings.getDashboardVersion();
 
             for (MetricTypes metricType : metricTypes) {
-                UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOne(
-                        UsageMetricsDao.generateFilter(organizationId, accountId, metricType));
-
-                if (usageMetricInfo == null) {
-                    usageMetricInfo = new UsageMetricInfo(organizationId, accountId, metricType);
-                    UsageMetricInfoDao.instance.insertOne(usageMetricInfo);
-                }
-
-                int syncEpoch = usageMetricInfo.getSyncEpoch();
-                int measureEpoch = usageMetricInfo.getMeasureEpoch();
-
-                // Reset measureEpoch every month
-                if (Context.now() - measureEpoch > 2629746) {
-                    if (syncEpoch > Context.now() - 86400) {
-                        measureEpoch = Context.now();
-
-                        UsageMetricInfoDao.instance.updateOne(
-                                UsageMetricsDao.generateFilter(organizationId, accountId, metricType),
-                                Updates.set(UsageMetricInfo.MEASURE_EPOCH, measureEpoch));
-                    }
-
-                }
-
-                String dashboardMode = DashboardMode.getDashboardMode().toString();
-                String dashboardVersion = accountSettings.getDashboardVersion();
-
-                calcReturn.measureEpoch = measureEpoch;
-
-                UsageMetric usageMetric = new UsageMetric(
-                        organizationId, accountId, metricType, syncEpoch, measureEpoch,
-                        dashboardMode, dashboardVersion);
+                UsageMetric usageMetric = createUsageMetric(organizationId, accountId, metricType, dashboardVersion);
 
                 // calculate usage for metric
                 UsageMetricCalculator.calculateUsageMetric(usageMetric);
@@ -107,7 +78,7 @@ public class UsageMetricHandler {
                         Filters.and(
                                 UsageMetricsDao.generateFilter(organizationId, accountId, metricType),
                                 Filters.eq(UsageMetric.SYNCED_WITH_AKTO, false),
-                                Filters.eq(UsageMetric.SYNC_EPOCH, syncEpoch)),
+                                Filters.eq(UsageMetric.SYNC_EPOCH, usageMetric.getSyncEpoch())),
                         usageMetric, new FindOneAndReplaceOptions().upsert(true)
                                 .returnDocument(ReturnDocument.AFTER));
 
@@ -127,6 +98,38 @@ public class UsageMetricHandler {
 
         return calcReturn;
 
+    }
+
+    public static UsageMetric createUsageMetric(String organizationId, int accountId, MetricTypes metricType, String dashboardVersion){
+        UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOne(
+                UsageMetricsDao.generateFilter(organizationId, accountId, metricType));
+
+        if (usageMetricInfo == null) {
+            usageMetricInfo = new UsageMetricInfo(organizationId, accountId, metricType);
+            UsageMetricInfoDao.instance.insertOne(usageMetricInfo);
+        }
+
+        int syncEpoch = usageMetricInfo.getSyncEpoch();
+        int measureEpoch = usageMetricInfo.getMeasureEpoch();
+
+        // Reset measureEpoch every month
+        if (Context.now() - measureEpoch > 2629746) {
+            if (syncEpoch > Context.now() - 86400) {
+                measureEpoch = Context.now();
+
+                UsageMetricInfoDao.instance.updateOne(
+                        UsageMetricsDao.generateFilter(organizationId, accountId, metricType),
+                        Updates.set(UsageMetricInfo.MEASURE_EPOCH, measureEpoch));
+            }
+        }
+
+        String dashboardMode = DashboardMode.getDashboardMode().toString();
+
+        UsageMetric usageMetric = new UsageMetric(
+                organizationId, accountId, metricType, syncEpoch, measureEpoch,
+                dashboardMode, dashboardVersion);
+
+        return usageMetric;
     }
 
     public static HashMap<String, FeatureAccess> updateFeatureMapWithLocalUsageMetrics(HashMap<String, FeatureAccess> featureWiseAllowed, String organizationId){
@@ -172,28 +175,52 @@ public class UsageMetricHandler {
                 Updates.set(Organization.FEATURE_WISE_ALLOWED, organization.getFeatureWiseAllowed()));
     }
 
-    // calc this efficiently.
-    public static FeatureAccess calcAndFetchFeatureAccess(MetricTypes metricTypes, int accountId) {
-
+    public static FeatureAccess calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes metricType, int accountId, int deltaUsage) {
         FeatureAccess featureAccess = FeatureAccess.fullAccess;
+
         try {
-            CalcReturn calcReturn = calcAndSaveUsageMetrics(new MetricTypes[] { metricTypes }, accountId);
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                    AccountSettingsDao.generateFilter());
 
-            Organization organization = calcReturn.organization;
-            int measureEpoch = calcReturn.measureEpoch;
+            // Get organization to which account belongs to
+            Organization organization = OrganizationsDao.instance.findOne(
+                    Filters.in(Organization.ACCOUNTS, accountId));
 
-            HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
-            if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
-                throw new Exception("feature map not found or empty for organization " + organization.getId());
+            if (organization == null) {
+                throw new Exception("Organization not found for account: " + accountId);
             }
 
-            String featureLabel = metricTypes.toString();
+            featureAccess = UsageMetricUtils.getFeatureAccess(organization, metricType);
+            int usageBefore = featureAccess.getUsage();
+            int usageAfter = usageBefore + deltaUsage;
+            featureAccess.setUsage(usageAfter);
+            if (!featureAccess.checkBooleanOrUnlimited() &&
+                    featureAccess.getUsage() >= featureAccess.getUsageLimit()) {
+                if (featureAccess.getOverageFirstDetected() == -1) {
+                    featureAccess.setOverageFirstDetected(Context.now());
+                }
+            } else {
+                featureAccess.setOverageFirstDetected(-1);
+            }
+            organization.getFeatureWiseAllowed().put(metricType.name(), featureAccess);
+            
+            String organizationId = organization.getId();
+            String dashboardVersion = accountSettings.getDashboardVersion();            
+            UsageMetric usageMetric = createUsageMetric(organizationId, accountId, metricType, dashboardVersion);
+            usageMetric.setRecordedAt(Context.now());
+            usageMetric.setUsage(usageAfter);
 
-            // if feature not found, then the user is not entitled to access the feature
-            featureAccess = featureWiseAllowed.getOrDefault(featureLabel, FeatureAccess.noAccess);
-            int gracePeriod = organization.getGracePeriod();
-            featureAccess.setGracePeriod(gracePeriod);
-            featureAccess.setMeasureEpoch(measureEpoch);
+            usageMetric = UsageMetricsDao.instance.getMCollection().findOneAndReplace(
+                    Filters.and(
+                            UsageMetricsDao.generateFilter(organizationId, accountId, metricType),
+                            Filters.eq(UsageMetric.SYNCED_WITH_AKTO, false),
+                            Filters.eq(UsageMetric.SYNC_EPOCH, usageMetric.getSyncEpoch())),
+                    usageMetric, new FindOneAndReplaceOptions().upsert(true)
+                            .returnDocument(ReturnDocument.AFTER));
+
+            OrganizationsDao.instance.updateOne(
+                    Filters.eq(Organization.ID, organization.getId()),
+                    Updates.set(Organization.FEATURE_WISE_ALLOWED, organization.getFeatureWiseAllowed()));                
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error while calculating usage limit " + e.toString(), LogDb.DASHBOARD);
