@@ -203,7 +203,8 @@ public class TestEditorEnums {
         REMOVE_AUTH_HEADER,
         REPLACE_AUTH_HEADER,
         REPLACE_BODY,
-        JWT_REPLACE_BODY
+        JWT_REPLACE_BODY,
+        ATTACH_FILE
     }
 
     public enum NonTerminalExecutorDataOperands {
