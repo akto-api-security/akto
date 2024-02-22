@@ -4,6 +4,8 @@ import com.akto.dao.DependencyFlowNodesDao;
 import com.akto.dao.DependencyNodeDao;
 import com.akto.dto.DependencyNode;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.InsertManyOptions;
+
 import org.jgrapht.Graph;
 import org.jgrapht.alg.cycle.SzwarcfiterLauerSimpleCycles;
 import org.jgrapht.graph.DefaultDirectedGraph;
@@ -21,9 +23,10 @@ public class DependencyFlow {
         if (nodes.size() > 0) {
             for (Node node: nodes) {
                 node.fillMaxDepth();
+                node.replaceDots();
             }
             DependencyFlowNodesDao.instance.getMCollection().drop();
-            DependencyFlowNodesDao.instance.insertMany(nodes);
+            DependencyFlowNodesDao.instance.getMCollection().insertMany(nodes, new InsertManyOptions().ordered(false));
         }
     }
 
