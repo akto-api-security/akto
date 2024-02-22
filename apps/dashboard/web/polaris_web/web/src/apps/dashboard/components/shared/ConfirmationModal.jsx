@@ -22,7 +22,7 @@ function ConfirmationModal(props) {
         <Modal
             open={confirmationModalConfig.show}
             onClose={() => closeModal()}
-            title="Are you sure?"
+            title="Are you sure ?"
             primaryAction={{
                 content: primaryActionContent,
                 onAction: () => {

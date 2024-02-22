@@ -7,6 +7,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
@@ -308,7 +309,7 @@ public class InventoryAction extends UserAction {
                 boolean flag = true;
                 for (int i =0; i < q.length; i ++) {
                     if (Objects.equals(q[i], r[i]) ) continue;
-                    if ((Objects.equals(r[i], "STRING") || Objects.equals(r[i], "INTEGER")) && q[i].contains("{")) continue;
+                    if (APICatalog.isTemplateUrl(r[i]) && q[i].contains("{")) continue;
 
                     flag = false;
                     break;

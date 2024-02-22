@@ -24,12 +24,6 @@ import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
-
-import io.micrometer.core.instrument.util.StringUtils;
-import org.apache.commons.codec.digest.HmacAlgorithms;
-import org.apache.commons.codec.digest.HmacUtils;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
@@ -134,8 +128,9 @@ public class ProfileAction extends UserAction {
 
                 organization = InitializerListener.fetchAndSaveFeatureWiseAllowed(organization);
                 gracePeriod = organization.getGracePeriod();
-                if (organization.getFeatureWiseAllowed() != null) {
-                    featureWiseAllowed = organization.getFeatureWiseAllowed();
+                featureWiseAllowed = organization.getFeatureWiseAllowed();
+                if (featureWiseAllowed == null) {
+                    featureWiseAllowed = new HashMap<>();
                 }
 
                 isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
@@ -169,7 +164,7 @@ public class ProfileAction extends UserAction {
             userDetails.append("stiggCustomerId", organizationId);
             userDetails.append("stiggCustomerToken", OrganizationUtils.fetchSignature(organizationId, organization.getAdminEmail()));
             userDetails.append("stiggClientKey", OrganizationUtils.fetchClientKey(organizationId, organization.getAdminEmail()));
-
+            userDetails.append("expired", organization.checkExpirationWithAktoSync());
         }
 
         if (versions.length > 2) {

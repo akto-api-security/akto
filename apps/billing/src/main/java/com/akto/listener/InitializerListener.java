@@ -1,7 +1,5 @@
 package com.akto.listener;
 
-import java.io.IOException;
-import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -17,26 +15,15 @@ import com.akto.dao.billing.OrganizationUsageDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dao.usage.UsageSyncDao;
 import com.akto.dto.billing.Organization;
-import com.akto.dto.billing.OrganizationUsage;
-import com.akto.dto.billing.OrganizationUsage.DataSink;
-import com.akto.dto.usage.MetricTypes;
-import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageSync;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.stigg.StiggReporterClient;
 import com.akto.util.UsageCalculator;
 import com.akto.util.UsageUtils;
 import com.akto.util.tasks.OrganizationTask;
-import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-import org.bson.conversions.Bson;
-import org.mockito.internal.matchers.Or;
-
-import static com.akto.dto.billing.OrganizationUsage.ORG_ID;
-import static com.akto.dto.billing.OrganizationUsage.SINKS;
 
 public class InitializerListener implements ServletContextListener {
     public static boolean connectedToMongo = false;
@@ -129,8 +116,7 @@ public class InitializerListener implements ServletContextListener {
                     OrganizationTask.instance.executeTask(new Consumer<Organization>() {
                         @Override
                         public void accept(Organization o) {
-                            aggregateAndSinkUsageData(o, finalUsageLowerBound, finalUsageUpperBound);
-                        }
+                            aggregateAndSinkUsageData(o, finalUsageLowerBound, finalUsageUpperBound);                        }
                     }, "usage-reporting-scheduler");
 
                     UsageSyncDao.instance.updateOne(

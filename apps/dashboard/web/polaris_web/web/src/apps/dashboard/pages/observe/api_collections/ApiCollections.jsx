@@ -260,7 +260,10 @@ function ApiCollections() {
             actions.push(
                 {
                     content: `Reactivate collection${func.addPlurality(selectedResources.length)}`,
-                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated")
+                    onAction: () =>  {
+                        const message = "Please sync the usage data via Settings > billing after reactivating a collection to resume data ingestion and testing."
+                        func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
+                    }
                 }
             )
         }

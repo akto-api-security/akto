@@ -146,7 +146,7 @@ public class UsageAction extends UserAction {
                             LogDb.DASHBOARD);
                     Context.accountId.set(account.getId());
                     int accountId = account.getId();
-                    UsageMetricHandler.calcAndSyncUsageMetrics(MetricTypes.values(), accountId);
+                    UsageMetricHandler.calcAndSyncAccountUsage(accountId);
                 });
 
                 try {
