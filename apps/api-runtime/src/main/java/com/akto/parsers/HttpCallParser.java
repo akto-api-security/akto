@@ -187,7 +187,6 @@ public class HttpCallParser {
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(Context.accountId.get(), MetricTypes.ACTIVE_ENDPOINTS);
             int usageLeft = Math.max(featureAccess.getUsageLimit() - featureAccess.getUsage(), 0);
             boolean checkLimit = !featureAccess.checkBooleanOrUnlimited();
-            System.out.println("checkLimit: " + checkLimit + " usageLeft: " + usageLeft);
             SyncLimit syncLimit = new SyncLimit(checkLimit, usageLeft);
 
             numberOfSyncs++;

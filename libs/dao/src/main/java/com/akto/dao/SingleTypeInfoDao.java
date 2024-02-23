@@ -313,13 +313,8 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         );
 
         pipeline.add(Aggregates.project(projections));
-
-        pipeline.add(Aggregates.group(groupedId, Accumulators.min(_START_TS, Util.prefixDollar(SingleTypeInfo._TIMESTAMP))));
-        /*
-         * we are sorting in ascending order so that
-         * we can skip the first usageLimit number of endpoints
-         */
-        pipeline.add(Aggregates.sort(Sorts.ascending(_START_TS)));
+        pipeline.add(Aggregates.group(groupedId));
+        pipeline.add(Aggregates.sort(Sorts.ascending(Util.prefixDollar(SingleTypeInfo._TIMESTAMP))));
         return pipeline;
     }
 
@@ -417,39 +412,6 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return countMap;
     }
 
-    static final int COUNT_LIMIT = 10_000;
-    static final int ENDPOINT_LIMIT = 100;
-    static final String _START_TS = "startTs";
-    static final String _COUNT = "count";
-
-    public List<ApiInfoKey> getEndpointsAfterOverage(Bson filters, int usageLimit, int deltaEpoch) {
-
-        List<Bson> pipeline = getPipelineForEndpoints(filters);
-        pipeline.add(Aggregates.skip(usageLimit));
-        pipeline.add(Aggregates.match(Filters.gt(_START_TS, deltaEpoch)));
-        pipeline.add(Aggregates.limit(ENDPOINT_LIMIT));
-
-        return processPipelineForEndpoint(pipeline);
-    }
-
-    public int countEndpoints(Bson filters) {
-        int ret = 0;
-
-        List<Bson> pipeline = getPipelineForEndpoints(filters);
-        pipeline.add(Aggregates.limit(COUNT_LIMIT));
-        pipeline.add(Aggregates.count());
-
-        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class).cursor();
-
-        while (endpointsCursor.hasNext()) {
-            ret = endpointsCursor.next().getInt(_COUNT);
-            break;
-        }
-
-        return ret;
-    }
-
     private List<Bson> generateFilterForSubtypes(List<String> sensitiveParameters, BasicDBObject groupedId, Boolean inResponseOnly){
         int codeValue = inResponseOnly ? 0 : -1 ;
         List<Bson> pipeline = new ArrayList<>();
@@ -495,6 +457,27 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             return 0;
         }
 
+    }
+
+    public static final int LARGE_LIMIT = 10_000;
+    public static final String _COUNT = "count";
+
+    public int countEndpoints(Bson filters) {
+        int ret = 0;
+
+        List<Bson> pipeline = getPipelineForEndpoints(filters);
+        pipeline.add(Aggregates.limit(LARGE_LIMIT));
+        pipeline.add(Aggregates.count());
+
+        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor();
+
+        while (endpointsCursor.hasNext()) {
+            ret = endpointsCursor.next().getInt(_COUNT);
+            break;
+        }
+
+        return ret;
     }
 
     public Map<ApiInfo.ApiInfoKey, List<String>> fetchRequestParameters(List<ApiInfo.ApiInfoKey> apiInfoKeys) {

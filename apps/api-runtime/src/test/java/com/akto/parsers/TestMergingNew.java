@@ -9,6 +9,7 @@ import com.akto.dto.AktoDataType;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.IgnoreData;
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
