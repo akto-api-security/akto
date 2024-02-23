@@ -4,7 +4,6 @@ import settingRequests from "../api";
 import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
 import Store from "../../../store";
-import billingApi from "../billing/api";
 
 const Users = () => {
     const username = Store(state => state.username)
@@ -28,7 +27,6 @@ const Users = () => {
 
     useEffect(() => {
         getTeamData();
-        billingApi.refreshUsageData()
     }, [])
 
     const isLocalDeploy = window.IS_SAAS !== "true" && window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'

@@ -14,9 +14,6 @@ public class FeatureAccess {
     public static final String USAGE = "usage";
 
     @BsonIgnore
-    private int measureEpoch;
-
-    @BsonIgnore
     private int gracePeriod = 0;
 
     public static final FeatureAccess noAccess = new FeatureAccess(false);
@@ -73,14 +70,6 @@ public class FeatureAccess {
     }
     
     public static final String IS_OVERAGE_AFTER_GRACE = "isOverageAfterGrace";
-
-    public int getMeasureEpoch() {
-        return measureEpoch;
-    }
-
-    public void setMeasureEpoch(int measureEpoch) {
-        this.measureEpoch = measureEpoch;
-    }
 
     public int getGracePeriod() {
         return gracePeriod;

@@ -733,9 +733,9 @@
         <action name="api/uploadHar" class="com.akto.action.HarAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <!-- <interceptor-ref name="usageInterceptor">
+            <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">ACTIVE_ENDPOINTS</param>
-            </interceptor-ref> -->
+            </interceptor-ref>
             <result name="SUCCESS"  type="json">
             </result>
             <result name="ERROR" type="json">

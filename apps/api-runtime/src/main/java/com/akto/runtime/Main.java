@@ -217,8 +217,6 @@ public class Main {
 
         long lastSyncOffset = 0;
 
-        Map<Integer, Integer> logSentMap = new HashMap<>();
-
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
             while (true) {

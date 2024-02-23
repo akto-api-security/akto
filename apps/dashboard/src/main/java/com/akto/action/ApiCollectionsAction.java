@@ -308,7 +308,7 @@ public class ApiCollectionsAction extends UserAction {
         ApiCollectionsDao.instance.insertOne(apiCollection);
 
         ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
-        
+
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
 
@@ -334,7 +334,7 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
-
+        
         return SUCCESS.toUpperCase();
     }
 
