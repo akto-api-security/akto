@@ -9,7 +9,7 @@ import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.util.enums.HeaderEnums;
+import com.akto.util.Constants;
 
 import kotlin.Pair;
 import okhttp3.*;
@@ -163,7 +163,7 @@ public class ApiExecutor {
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         Map<String, List<String>> headersMap = request.getHeaders();
         if (headersMap == null) headersMap = new HashMap<>();
-        headersMap.put(HeaderEnums.AKTO_IGNORE_FLAG.getName(), Collections.singletonList("0"));
+        headersMap.put(Constants.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
         for (String headerName: headersMap.keySet()) {
             if (forbiddenHeaders.contains(headerName)) continue;
             List<String> headerValueList = headersMap.get(headerName);
@@ -255,13 +255,13 @@ public class ApiExecutor {
             request.setHeaders(headers);
         }
 
-        if(headers != null && headers.containsKey(HeaderEnums.AKTO_ATTACH_FILE.getName())){
-            String fileUrl = headers.get(HeaderEnums.AKTO_ATTACH_FILE.getName()).get(0);
+        if(headers != null && headers.containsKey(Constants.AKTO_ATTACH_FILE)){
+            String fileUrl = headers.get(Constants.AKTO_ATTACH_FILE).get(0);
             RequestBody requestBody = null;
             requestBody = getFileRequestBody(fileUrl);
         
             builder.post(requestBody);
-            builder.removeHeader(HeaderEnums.AKTO_ATTACH_FILE.getName());
+            builder.removeHeader(Constants.AKTO_ATTACH_FILE);
             Request updatedRequest = builder.build();
 
 
