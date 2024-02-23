@@ -1,7 +1,8 @@
-import { Box, Button, ButtonGroup, Divider, LegacyCard, Page, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, Divider, Form, LegacyCard, Text, TextField, VerticalStack, Tag, HorizontalStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
+import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import settingRequests from '../api'
 
 function About() {
@@ -20,6 +21,8 @@ function About() {
     const [newMerging, setNewMerging] = useState(false)
     const [trafficThreshold, setTrafficThreshold] = useState(trafficAlertDurations[0].value)
     const setupOptions = settingFunctions.getSetupOptions()
+    const [privateCidrList, setPrivateCidrList] = useState([])
+    const [partnerIpsList, setPartnerIpsList] = useState([])
 
     async function fetchDetails(){
         const {arr, resp} = await settingFunctions.fetchAdminInfo()
@@ -28,20 +31,23 @@ function About() {
         setNewMerging(resp.urlRegexMatchingEnabled)
         setTrafficThreshold(resp.trafficAlertThresholdSeconds)
         setObjectArr(arr)
+        setPrivateCidrList(resp.privateCidrList || [])
     }
 
     useEffect(()=>{
         fetchDetails()
     },[])
 
-    const titleComponent = (
-        <Box paddingBlockEnd="4">
-            <Text variant="headingMd">Account Information</Text>
-            <Box paddingBlockStart="2">
-                <Text variant="bodyMd">Take control of your profile, privacy settings, and preferences all in one place.</Text>
+    function TitleComponent ({title,description}) {
+        return(
+            <Box paddingBlockEnd="4">
+                <Text variant="headingMd">{title}</Text>
+                <Box paddingBlockStart="2">
+                    <Text variant="bodyMd">{description}</Text>
+                </Box>
             </Box>
-        </Box>
-    )
+        )
+    }
 
     const infoComponent = (
         <VerticalStack gap={5}>
@@ -92,12 +98,11 @@ function About() {
         )
     }
 
-  return (
-    <Page
-        title="About"
-        divider
-    >
-        <LegacyCard title={titleComponent}>
+    const accountInfoComponent = (
+        <LegacyCard title={<TitleComponent title={"Account Information"}
+            description={"Take control of your profile, privacy settings, and preferences all in one place."} />}
+            key={"accountInfo"}
+        >
             <Divider />
             <LegacyCard.Section>
                 <VerticalStack gap={5}>
@@ -130,8 +135,56 @@ function About() {
                 View our <a href='https://www.akto.io/terms-and-policies' target="_blank">terms of service</a> and <a href='https://www.akto.io/terms/privacy' target="_blank" >privacy policy  </a>
             </LegacyCard.Section>
         </LegacyCard>
-    </Page>
-  )
+    )
+
+    function UpdateIpsComponent({onSubmit, title, labelText, description, ipsList, removeIp}){
+        const [value, setValue] = useState('')
+        return(
+            <LegacyCard title={<TitleComponent title={title} description={description}/>}>
+                <Divider />
+                <LegacyCard.Section>
+                    <VerticalStack gap={"2"}>
+                        <Form onSubmit={() => onSubmit(value)}>
+                            <TextField onChange={setValue} value={value} label={labelText} />
+                        </Form>
+                        <HorizontalStack gap={"2"}>
+                            {ipsList && ipsList.length > 0 && ipsList.map((ip, index) => {
+                                return(
+                                    <Tag key={index} onRemove={() => removeIp(ip)}>
+                                        <Text>{ip}</Text>
+                                    </Tag>
+                                )
+                            })}
+                        </HorizontalStack>
+                    </VerticalStack>
+                </LegacyCard.Section>
+            </LegacyCard>
+        )
+    }
+
+    const components = [accountInfoComponent, 
+                        <UpdateIpsComponent 
+                            key={"cidr"} 
+                            description={"We use these CIDRs to mark the endpoints as PRIVATE"} 
+                            title={"Private CIDRs List"}
+                            labelText="Add CIDR"
+                            ipsList={privateCidrList}
+                        />
+        ]
+
+    return (
+        <PageWithMultipleCards
+            divider={true}
+            components={components}
+            title={
+                <Text variant='headingLg' truncate>
+                    About
+                </Text>
+            }
+            isFirstPage={true}
+
+        />
+    )
 }
 
 export default About

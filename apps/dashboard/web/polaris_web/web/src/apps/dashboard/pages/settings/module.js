@@ -94,10 +94,6 @@ const settingFunctions = {
         }
 
         arr = [
-          // {
-          //   title: 'Organisation',
-          //   text: 'Akto'
-          // },
           {
             title: "Organization ID",
             text: respOrgStr
