@@ -1,7 +1,6 @@
 package com.akto.testing;
 
 import com.akto.dao.context.Context;
-import com.akto.dto.AccountSettings;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.TestingRunConfig;
@@ -10,13 +9,19 @@ import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.Constants;
+
 import kotlin.Pair;
 import okhttp3.*;
+import okio.BufferedSink;
+
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.*;
 
 public class ApiExecutor {
@@ -158,7 +163,7 @@ public class ApiExecutor {
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         Map<String, List<String>> headersMap = request.getHeaders();
         if (headersMap == null) headersMap = new HashMap<>();
-        headersMap.put(AccountSettings.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
+        headersMap.put(Constants.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
         for (String headerName: headersMap.keySet()) {
             if (forbiddenHeaders.contains(headerName)) continue;
             List<String> headerValueList = headersMap.get(headerName);
@@ -201,6 +206,46 @@ public class ApiExecutor {
         return common(okHttpRequest, followRedirects, debug, testLogs);
     }
 
+    public static RequestBody getFileRequestBody(String fileUrl){
+        try {
+            URL sourceFileUrl = new URL(fileUrl);
+            InputStream urlInputStream = sourceFileUrl.openStream();
+            final int CHUNK_SIZE = 1 * 1024 * 1024 ;
+
+            RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("file", "filename", new RequestBody() {
+                    @Override
+                    public MediaType contentType() {
+                        return Utils.getMediaType(fileUrl);
+                    }
+
+                    @Override
+                    public void writeTo(BufferedSink sink) throws IOException {
+                        byte[] chunk = new byte[CHUNK_SIZE];
+                        int bytesRead;
+                        long totalBytesRead = 0; 
+                        long maxBytes = 100L * 1024 * 1024; 
+                        while ((bytesRead = urlInputStream.read(chunk)) != -1) {
+                            totalBytesRead += bytesRead;
+                            if (totalBytesRead > maxBytes) {
+                                loggerMaker.errorAndAddToDb("File size greater than 100mb, breaking loop.", LogDb.TESTING);
+                                break;
+                            }
+                            sink.write(chunk, 0, bytesRead);
+                        }
+                    }
+                })
+                .build();
+
+            return requestBody;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in file upload " + e.getMessage(), LogDb.TESTING);
+            return null;
+        }
+        
+    }
+
 
 
     private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
@@ -209,6 +254,20 @@ public class ApiExecutor {
             headers = new HashMap<>();
             request.setHeaders(headers);
         }
+
+        if(headers != null && headers.containsKey(Constants.AKTO_ATTACH_FILE)){
+            String fileUrl = headers.get(Constants.AKTO_ATTACH_FILE).get(0);
+            RequestBody requestBody = null;
+            requestBody = getFileRequestBody(fileUrl);
+        
+            builder.post(requestBody);
+            builder.removeHeader(Constants.AKTO_ATTACH_FILE);
+            Request updatedRequest = builder.build();
+
+
+            return common(updatedRequest, followRedirects, debug, testLogs);
+        }
+
         String contentType = request.findContentType();
         String payload = request.getBody();
         if (contentType == null ) {

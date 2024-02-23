@@ -18,6 +18,8 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
 
+import okhttp3.MediaType;
+
 public class Utils {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
@@ -255,5 +257,40 @@ public class Utils {
 
         return vulnerable;
     }
+
+    public static MediaType getMediaType(String fileUrl) {
+        String fileExtension = "";
+
+        int dotIndex = fileUrl.lastIndexOf('.');
+        if (dotIndex > 0 && dotIndex < fileUrl.length() - 1) {
+            fileExtension = fileUrl.substring(dotIndex + 1).toLowerCase();
+        }
+        switch (fileExtension) {
+            case "jpg":
+            case "jpeg":
+                return MediaType.parse("image/jpeg");
+            case "png":
+                return MediaType.parse("image/png");
+            case "gif":
+                return MediaType.parse("image/gif");
+            case "txt":
+                return MediaType.parse("text/plain");
+            case "html":
+                return MediaType.parse("text/html");
+            case "pdf":
+                return MediaType.parse("application/pdf");
+            case "doc":
+            case "docx":
+                return MediaType.parse("application/msword");
+            case "xls":
+            case "xlsx":
+                return MediaType.parse("application/vnd.ms-excel");
+            case "json":
+                return MediaType.parse("application/json");
+            default:
+                return MediaType.parse("application/octet-stream"); // Fallback for unknown types
+        }
+    }
+
     
 }

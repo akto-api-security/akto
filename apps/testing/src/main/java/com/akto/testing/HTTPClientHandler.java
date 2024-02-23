@@ -55,11 +55,10 @@ public class HTTPClientHandler {
         @Override
         public @NotNull Response intercept(Chain chain) throws IOException {
             Request request = chain.request();
-
             try {
                 Buffer buffer = new Buffer();
                 RequestBody requestBody = request.body();
-                if (requestBody != null) {
+                if (requestBody != null && requestBody.contentLength() != -1) {
                     requestBody.writeTo(buffer);
                     String requestBodyString = buffer.readUtf8();
                     testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Request Body: " + requestBodyString));
