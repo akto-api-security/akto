@@ -15,7 +15,7 @@ public class TestRunTestsFromEditor extends MongoBasedTest {
     @Test
     public void TestAttachFileOperator() throws Exception{
 
-        String validRemoteUrl = "https://temp-aryan.s3.ap-south-1.amazonaws.com/big_image.jpeg";
+        String validRemoteUrl = "https://akto-setup.s3.amazonaws.com/templates/128x128.png";
         String uploadUrl = "https://juiceshop.akto.io/profile/image/file";
 
         RequestBody requestBody = ApiExecutor.getFileRequestBody(validRemoteUrl);
