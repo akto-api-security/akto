@@ -13,6 +13,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
 import com.akto.util.JSONUtils;
+import com.akto.util.enums.HeaderEnums;
 import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
 import com.mongodb.client.model.*;
@@ -299,7 +300,7 @@ public class HttpCallParser {
 
             if (!cond) continue;
             
-            String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), AccountSettings.AKTO_IGNORE_FLAG);
+            String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), HeaderEnums.AKTO_IGNORE_FLAG.getName());
             if (ignoreAktoFlag != null) continue;
 
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
