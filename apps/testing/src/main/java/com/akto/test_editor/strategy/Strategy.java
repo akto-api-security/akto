@@ -18,7 +18,7 @@ public class Strategy {
     
     private static final String AKTO_DISCOVERED_APIS_COLLECTION = "shadow_apis";
     private static final int AKTO_DISCOVERED_APIS_COLLECTION_ID = 1333333333;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Strategy.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Strategy.class, LogDb.TESTING);
 
     public static void triggerStrategyInstructions(com.akto.dto.test_editor.Strategy strategy, YamlTestResult attempts) {
         
@@ -39,7 +39,7 @@ public class Strategy {
                     try {
                         harPayload = Utils.convertToHarPayload(message, Context.accountId.get(), Context.now(), "", "HAR");
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Error while converting attempt to har payload " + e.getMessage(), LogDb.TESTING);
+                        loggerMaker.errorAndAddToDb("Error while converting attempt to har payload " + e.getMessage());
                     }
                 } else {
                     return;
@@ -60,9 +60,9 @@ public class Strategy {
                 ApiCollectionsDao.instance.insertOne(apiCollection);
             }
 
-            InsertDataUtil.insertDataInApiCollection(AKTO_DISCOVERED_APIS_COLLECTION_ID, harPayload, result, result, false);    
+            InsertDataUtil.insertDataInApiCollection(AKTO_DISCOVERED_APIS_COLLECTION_ID, harPayload, result, result);    
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error in triggerMetaInstructions " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error in triggerMetaInstructions " + e.getMessage());
         }
 
     }

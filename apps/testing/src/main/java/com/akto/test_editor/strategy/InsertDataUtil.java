@@ -19,7 +19,7 @@ public class InsertDataUtil {
     public static Map<Integer, AccountHTTPCallParserAktoPolicyInfo> accountHTTPParserMap = new ConcurrentHashMap<>();
 
 
-    public static void insertDataInApiCollection(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka) throws Exception {
+    public static void insertDataInApiCollection(int apiCollectionId, String topic, List<String> messages, List<String> errors) throws Exception {
         List<HttpResponseParams> responses = new ArrayList<>();
         for (String message: messages){
             HttpResponseParams responseParams =  HttpCallParser.parseKafkaMessage(message);
