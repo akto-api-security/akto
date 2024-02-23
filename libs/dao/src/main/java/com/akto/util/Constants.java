@@ -11,4 +11,7 @@ public class Constants {
 
     public static final int ONE_MONTH_TIMESTAMP = (60 * 60 * 24 * 30) ;
 
+    public static final String AKTO_IGNORE_FLAG = "x-akto-ignore";
+    public static final String AKTO_ATTACH_FILE = "x-akto-attach-file";
+
 }
