@@ -44,7 +44,7 @@ public class ApiInfo {
     }
 
     public enum ApiAccessType {
-        PUBLIC, PRIVATE
+        PUBLIC, PRIVATE, PARTNER
     }
 
     public static class ApiInfoKey {

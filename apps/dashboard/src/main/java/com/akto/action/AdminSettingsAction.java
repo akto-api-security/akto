@@ -9,8 +9,10 @@ import com.akto.runtime.Main;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+
 import org.checkerframework.checker.units.qual.C;
 
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -31,8 +33,11 @@ public class AdminSettingsAction extends UserAction {
 
     public AccountSettings.SetupType setupType;
     public Boolean newMergingEnabled;
+    private List<String> privateCidrList;
 
-    public String updateSetupType() {
+	private List<String> partnerIpList;
+
+	public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.SETUP_TYPE, this.setupType),
@@ -140,6 +145,32 @@ public class AdminSettingsAction extends UserAction {
         );
     }
 
+    public String editPrivateCidrList(){
+
+        try {
+            AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.PRIVATE_CIDR_LIST, privateCidrList)
+            );
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            return ERROR.toUpperCase();
+        }
+
+    }
+
+    public String editPartnerIpList(){
+
+        try {
+            AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.PARTNER_IP_LIST, partnerIpList)
+            );
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            return ERROR.toUpperCase();
+        }
+
+    }
+
     public AccountSettings getAccountSettings() {
         return this.accountSettings;
     }
@@ -175,4 +206,20 @@ public class AdminSettingsAction extends UserAction {
     public Organization getOrganization() {
         return organization;
     }
+
+    public List<String> getPartnerIpList() {
+		return partnerIpList;
+	}
+
+    public void setPartnerIpList(List<String> partnerIpList) {
+		this.partnerIpList = partnerIpList;
+	}
+
+	public void setPrivateCidrList(List<String> privateCidrList) {
+		this.privateCidrList = privateCidrList;
+	}
+
+    public List<String> getPrivateCidrList() {
+		return privateCidrList;
+	}
 }

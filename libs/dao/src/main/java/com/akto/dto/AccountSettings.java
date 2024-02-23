@@ -66,7 +66,10 @@ public class AccountSettings {
     public static final String TEST_LIBRARIES = "testLibraries";
     private List<TestLibrary> testLibraries;
 
-    public AccountSettings() {
+    public static final String PARTNER_IP_LIST = "partnerIpList";
+    private List<String> partnerIpList;
+
+	public AccountSettings() {
     }
 
     public AccountSettings(int id, List<String> privateCidrList, Boolean redactPayload, SetupType setupType) {
@@ -250,4 +253,12 @@ public class AccountSettings {
     public void setConnectionIntegrationsInfo(Map<String, ConnectionInfo> connectionIntegrationsInfo) {
         this.connectionIntegrationsInfo = connectionIntegrationsInfo;
     }
+    
+    public List<String> getPartnerIpList() {
+		return partnerIpList;
+	}
+
+	public void setPartnerIpList(List<String> partnerIpList) {
+		this.partnerIpList = partnerIpList;
+	}
 }

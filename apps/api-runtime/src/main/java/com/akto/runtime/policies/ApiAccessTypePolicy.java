@@ -2,6 +2,7 @@ package com.akto.runtime.policies;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.parsers.HttpCallParser;
 import org.slf4j.Logger;
@@ -13,7 +14,9 @@ import java.util.List;
 
 public class ApiAccessTypePolicy {
     private List<String> privateCidrList;
-    public static final String X_FORWARDED_FOR = "x-forwarded-for";
+    private List<String> partnerIpsList;
+
+	public static final String X_FORWARDED_FOR = "x-forwarded-for";
     private static final Logger logger = LoggerFactory.getLogger(ApiAccessTypePolicy.class);
 
     public ApiAccessTypePolicy(List<String> privateCidrList) {
@@ -21,8 +24,8 @@ public class ApiAccessTypePolicy {
     }
 
 
-    public boolean findApiAccessType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter) {
-        if (privateCidrList == null || privateCidrList.isEmpty()) return false;
+    public void findApiAccessType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter) {
+        if (privateCidrList == null || privateCidrList.isEmpty()) return;
         List<String> ipList = httpResponseParams.getRequestParams().getHeaders().get(X_FORWARDED_FOR);
 
         if (ipList == null) {
@@ -35,23 +38,30 @@ public class ApiAccessTypePolicy {
             ipList.add(sourceIP);
         }
 
+        boolean isAccessTypePartner = false;
+
         for (String ip: ipList) {
            if (ip == null) continue;
            ip = ip.replaceAll(" ", "");
            try {
                 boolean result = ipInCidr(ip);
                 if (!result) {
-                    apiInfo.getApiAccessTypes().add(ApiInfo.ApiAccessType.PUBLIC);
-                    return false;
+                    if(isPartnerIp(ip)){
+                        isAccessTypePartner = true;
+                    }
+                    else{
+                        apiInfo.getApiAccessTypes().add(ApiAccessType.PUBLIC);
+                        return;
+                    }
                 }
            } catch (Exception e) {
-                return false;
+                return;
            }
         }
+        ApiAccessType accessType = isAccessTypePartner ? ApiAccessType.PARTNER : ApiAccessType.PRIVATE;
+        apiInfo.getApiAccessTypes().add(accessType);
 
-        apiInfo.getApiAccessTypes().add(ApiInfo.ApiAccessType.PRIVATE);
-
-        return false;
+        return;
     }
 
     public boolean ipInCidr(String ip) {
@@ -65,7 +75,23 @@ public class ApiAccessTypePolicy {
         return false;
     }
 
+    private boolean isPartnerIp(String ip){
+        if(partnerIpsList == null){
+            return false;
+        }
+        for(String partnerIp: partnerIpsList){
+            if(ip.equals(partnerIp)){
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void setPrivateCidrList(List<String> privateCidrList) {
         this.privateCidrList = privateCidrList;
     }
+
+    public void setPartnerIpsList(List<String> partnerIpsList) {
+		this.partnerIpsList = partnerIpsList;
+	}
 }

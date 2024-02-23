@@ -1203,6 +1203,32 @@
             <result name="SUCCESS"  type="json"/>
         </action>
 
+        <action name="api/updatePrivateCidrIps" class="com.akto.action.AdminSettingsAction" method="editPrivateCidrList">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">privateCidrList</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updatePartnerIps" class="com.akto.action.AdminSettingsAction" method="editPartnerIpList">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">partnerIpList</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
           <action name="api/saveTagConfig" class="com.akto.action.TagConfigsAction" method="saveTagConfig">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

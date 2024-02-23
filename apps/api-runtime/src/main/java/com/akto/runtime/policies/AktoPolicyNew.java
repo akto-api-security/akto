@@ -50,6 +50,12 @@ public class AktoPolicyNew {
             if ( cidrList != null && !cidrList.isEmpty()) {
                 apiAccessTypePolicy.setPrivateCidrList(cidrList);
             }
+
+            List<String> partnerIpsList = accountSettings.getPartnerIpList();
+            if ( partnerIpsList != null && !partnerIpsList.isEmpty()) {
+                apiAccessTypePolicy.setPartnerIpsList(partnerIpsList);
+            }
+            
             redact = accountSettings.isRedactPayload();
         }
 
@@ -181,7 +187,7 @@ public class AktoPolicyNew {
                     break;
                 case DETERMINE_API_ACCESS_TYPE:
                     try {
-                        saveSample = apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo, filter);
+                        apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo, filter);
                     } catch (Exception ignored) {}
                     break;
                 default:
