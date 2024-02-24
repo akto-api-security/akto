@@ -8,6 +8,7 @@ import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
+import com.akto.dto.test_editor.Strategy;
 import com.akto.dto.testing.*;
 import com.akto.log.LoggerMaker;
 import com.akto.rules.TestPlugin;
@@ -24,8 +25,8 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     private final List<CustomAuthType> customAuthTypes;
     public YamlTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode,
                             ExecutorNode executorNode, RawApi rawApi, Map<String, Object> varMap, Auth auth,
-                            AuthMechanism authMechanism, String logId, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes) {
-        super(apiInfoKey, filterNode, validatorNode, executorNode ,rawApi, varMap, auth, authMechanism, logId, testingRunConfig);
+                            AuthMechanism authMechanism, String logId, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes, Strategy strategy) {
+        super(apiInfoKey, filterNode, validatorNode, executorNode ,rawApi, varMap, auth, authMechanism, logId, testingRunConfig, strategy);
         this.customAuthTypes = customAuthTypes;
     }
 
@@ -74,6 +75,11 @@ public class YamlTestTemplate extends SecurityTestTemplate {
                 this.authMechanism, this.validatorNode, this.apiInfoKey, this.testingRunConfig, this.customAuthTypes, debug, testLogs);
         // loggerMaker.infoAndAddToDb("execution result size " + results.size() +  " " + logId, LogDb.TESTING);
         return results;
+    }
+
+    @Override
+    public void triggerMetaInstructions(Strategy strategy, YamlTestResult attempts) {
+        com.akto.test_editor.strategy.Strategy.triggerStrategyInstructions(strategy, attempts);
     }
 
 }
