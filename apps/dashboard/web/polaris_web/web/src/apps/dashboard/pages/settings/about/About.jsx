@@ -165,7 +165,7 @@ function About() {
         </LegacyCard>
     )
 
-    function UpdateIpsComponent({onSubmit, title, labelText, description, ipsList, removeIp, type}){
+    function UpdateIpsComponent({onSubmit, title, labelText, description, ipsList, onRemove, type}){
         const [value, setValue] = useState('')
         const onFormSubmit = (ip) => {
             if(checkError(ip)){
@@ -181,7 +181,6 @@ function About() {
                 return false
             }
             if(type === "cidr"){
-                console.log(value)
                 return isCidr(value) === 0
             }else{
                 return !(isIP(value))
@@ -189,19 +188,18 @@ function About() {
         }
 
         const isError = checkError(type)
-        console.log(isError)
         return(
             <LegacyCard title={<TitleComponent title={title} description={description}/>}>
                 <Divider />
                 <LegacyCard.Section>
                     <VerticalStack gap={"2"}>
                         <Form onSubmit={() => onFormSubmit(value)}>
-                            <TextField onChange={setValue} value={value} label={labelText} {...isError ? {error: "Invalid address"} : {}}/>
+                            <TextField onChange={setValue} value={value} label={<Text color="subdued" fontWeight="medium" variant="bodySm">{labelText}</Text>} {...isError ? {error: "Invalid address"} : {}}/>
                         </Form>
                         <HorizontalStack gap={"2"}>
                             {ipsList && ipsList.length > 0 && ipsList.map((ip, index) => {
                                 return(
-                                    <Tag key={index} onRemove={() => removeIp(ip)}>
+                                    <Tag key={index} onRemove={() => onRemove(ip)}>
                                         <Text>{ip}</Text>
                                     </Tag>
                                 )

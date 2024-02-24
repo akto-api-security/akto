@@ -724,7 +724,9 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
                   access_type = null
               } else if (access_types.indexOf("PUBLIC") !== -1) {
                   access_type = "Public"
-              } else {
+              } else if (access_types.indexOf("PARTNER") !== -1){
+                  access_type = "Partner"
+              }else{
                   access_type = "Private"
               }
           }
