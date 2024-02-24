@@ -272,6 +272,20 @@ const settingRequests = {
             method: 'post',
             data: {trafficAlertThresholdSeconds}
         })
+    },
+    configPrivateCidr(privateCidrList){
+        return request({
+            url: '/api/updatePrivateCidrIps',
+            method: 'post',
+            data: {privateCidrList}
+        })
+    },
+    configPartnerIps(partnerIpList){
+        return request({
+            url: '/api/updatePartnerIps',
+            method: 'post',
+            data: {partnerIpList}
+        })
     }
 }
 

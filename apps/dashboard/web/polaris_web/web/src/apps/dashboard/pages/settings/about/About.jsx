@@ -4,6 +4,9 @@ import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import settingRequests from '../api'
+import { isIP } from "is-ip"
+import isCidr from "is-cidr"
+import func from "@/util/func"
 
 function About() {
 
@@ -32,6 +35,7 @@ function About() {
         setTrafficThreshold(resp.trafficAlertThresholdSeconds)
         setObjectArr(arr)
         setPrivateCidrList(resp.privateCidrList || [])
+        setPartnerIpsList(resp.partnerIpList || [])
     }
 
     useEffect(()=>{
@@ -80,6 +84,30 @@ function About() {
     const handleSelectTraffic = async(val) => {
         setTrafficThreshold(val) ;
         await settingRequests.updateTrafficAlertThresholdSeconds(val);
+    }
+
+    const handleIpsChange = async(ip, isAdded, type) => {
+        if(type === 'cidr'){
+            let updatedIps = []
+            if(isAdded){
+                updatedIps = [...privateCidrList, ip]
+                
+            }else{
+                updatedIps = privateCidrList.filter(item => item !== ip);
+            }
+            setPrivateCidrList(updatedIps)
+            await settingRequests.configPrivateCidr(updatedIps)
+        }else{
+            let updatedIps = []
+            if(isAdded){
+                updatedIps = [...partnerIpsList, ip]
+                
+            }else{
+                updatedIps = partnerIpsList.filter(item => item !== ip);
+            }
+            setPartnerIpsList(updatedIps)
+            await settingRequests.configPartnerIps(updatedIps)
+        }
     }
 
     function ToggleComponent({text,onToggle,initial}){
@@ -137,15 +165,38 @@ function About() {
         </LegacyCard>
     )
 
-    function UpdateIpsComponent({onSubmit, title, labelText, description, ipsList, removeIp}){
+    function UpdateIpsComponent({onSubmit, title, labelText, description, ipsList, removeIp, type}){
         const [value, setValue] = useState('')
+        const onFormSubmit = (ip) => {
+            if(checkError(ip)){
+                func.setToast(true, true, "Invalid ip address")
+            }else{
+                setValue('')
+                onSubmit(ip)
+            }
+        }
+
+        const checkError = () => {
+            if(value.length === 0){
+                return false
+            }
+            if(type === "cidr"){
+                console.log(value)
+                return isCidr(value) === 0
+            }else{
+                return !(isIP(value))
+            }
+        }
+
+        const isError = checkError(type)
+        console.log(isError)
         return(
             <LegacyCard title={<TitleComponent title={title} description={description}/>}>
                 <Divider />
                 <LegacyCard.Section>
                     <VerticalStack gap={"2"}>
-                        <Form onSubmit={() => onSubmit(value)}>
-                            <TextField onChange={setValue} value={value} label={labelText} />
+                        <Form onSubmit={() => onFormSubmit(value)}>
+                            <TextField onChange={setValue} value={value} label={labelText} {...isError ? {error: "Invalid address"} : {}}/>
                         </Form>
                         <HorizontalStack gap={"2"}>
                             {ipsList && ipsList.length > 0 && ipsList.map((ip, index) => {
@@ -166,9 +217,22 @@ function About() {
                         <UpdateIpsComponent 
                             key={"cidr"} 
                             description={"We use these CIDRs to mark the endpoints as PRIVATE"} 
-                            title={"Private CIDRs List"}
+                            title={"Private CIDRs list"}
                             labelText="Add CIDR"
                             ipsList={privateCidrList}
+                            onSubmit={(val) => handleIpsChange(val,true,"cidr")}
+                            onRemove={(val) => handleIpsChange(val, false, "cidr")}
+                            type={"cidr"}
+                        />,
+                        <UpdateIpsComponent
+                            key={"partner"}
+                            description={"We use these IPS to mark the endpoints as PARTNER"} 
+                            title={"Third parties Ips list"}
+                            labelText="Add IP"
+                            ipsList={partnerIpsList}
+                            onSubmit={(val) => handleIpsChange(val,true,"partner")}
+                            onRemove={(val) => handleIpsChange(val, false, "partner")}
+                            type={"partner"}
                         />
         ]
 
