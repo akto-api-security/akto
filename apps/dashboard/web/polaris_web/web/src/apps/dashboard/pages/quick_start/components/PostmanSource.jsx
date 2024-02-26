@@ -131,7 +131,7 @@ function PostmanSource() {
                             <Button icon={CancelMajor} plain onClick={() => setFiles(null)} />
                         </Badge> 
                     : null}
-                    <FileUpload fileType="file" acceptString=".json" setSelectedFile={setFilesCheck} allowMultiple={false} />
+                    <FileUpload fileType="file" acceptString=".json" setSelectedFile={setFilesCheck} allowMultiple={false} allowedSize={20*1024*1024}/>
                 </HorizontalStack>
             </VerticalStack>
         </div>

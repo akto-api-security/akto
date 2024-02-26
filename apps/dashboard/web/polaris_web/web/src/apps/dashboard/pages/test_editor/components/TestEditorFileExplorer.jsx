@@ -26,7 +26,13 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
     const navigate = useNavigate()
 
     const selectedFunc = (val) =>{
-        setSelectedCategory(val)
+        setSelectedCategory((prev) => {
+            if(prev === val){
+                return "none"
+            }else{
+                return val
+            }
+        })
     }
 
     const toggleFunc = (param) =>{

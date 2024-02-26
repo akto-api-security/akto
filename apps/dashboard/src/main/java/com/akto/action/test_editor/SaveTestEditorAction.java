@@ -318,14 +318,15 @@ public class SaveTestEditorAction extends UserAction {
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
         TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
-        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null);
+        List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
+        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs);
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
                     new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(0),
                     Collections.singletonList("failed to execute test"),
                     0, false, TestResult.Confidence.HIGH, null)),
                     false,null,0,Context.now(),
-                    Context.now(), new ObjectId(), null
+                    Context.now(), new ObjectId(), null, testLogs
             );
         }
         testingRunResult.setId(new ObjectId());
