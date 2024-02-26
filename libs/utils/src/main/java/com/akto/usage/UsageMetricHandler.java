@@ -1,5 +1,9 @@
 package com.akto.usage;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.billing.OrganizationsDao;
@@ -7,6 +11,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
@@ -52,7 +57,7 @@ public class UsageMetricHandler {
                 int measureEpoch = usageMetricInfo.getMeasureEpoch();
 
                 // Reset measureEpoch every month
-                if (Context.now() - measureEpoch > 2629746) {
+                if (Context.now() - measureEpoch > UsageMetricInfo.MEASURE_PERIOD) {
                     if (syncEpoch > Context.now() - 86400) {
                         measureEpoch = Context.now();
 
@@ -77,6 +82,7 @@ public class UsageMetricHandler {
 
                 //calculate usage for metric
                 UsageMetricCalculator.calculateUsageMetric(usageMetric);
+                usageMetric.setAktoSaveEpoch(Context.now());
 
                 UsageMetricsDao.instance.insertOne(usageMetric);
                 loggerMaker.infoAndAddToDb("Usage metric inserted: " + usageMetric.getId(), LogDb.DASHBOARD);
@@ -92,5 +98,35 @@ public class UsageMetricHandler {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, String.format("Error while measuring usage for account %d. Error: %s", accountId, e.getMessage()), LogDb.DASHBOARD);
         }
+    }
+
+    public static HashMap<String, FeatureAccess> updateFeatureMapWithLocalUsageMetrics(HashMap<String, FeatureAccess> featureWiseAllowed, Set<Integer> accounts){
+
+        if (featureWiseAllowed == null) {
+            featureWiseAllowed = new HashMap<>();
+        }
+
+        // since an org can have multiple accounts, we need to consolidate the usage.
+        Map<String, FeatureAccess> consolidatedOrgUsage = UsageMetricsDao.instance.findLatestUsageMetricsForOrganization(accounts);
+
+        for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
+            String featureLabel = entry.getKey();
+            FeatureAccess featureAccess = entry.getValue();
+
+            if (consolidatedOrgUsage.containsKey(featureLabel)) {
+                FeatureAccess orgUsage = consolidatedOrgUsage.get(featureLabel);
+                featureAccess.setUsage(orgUsage.getUsage());
+
+                if(!featureAccess.checkBooleanOrUnlimited() && featureAccess.getUsage() >= featureAccess.getUsageLimit()) {
+                    if(featureAccess.getOverageFirstDetected() == -1){
+                        featureAccess.setOverageFirstDetected(orgUsage.getOverageFirstDetected());
+                    }
+                } else {
+                    featureAccess.setOverageFirstDetected(-1);
+                }
+                featureWiseAllowed.put(featureLabel, featureAccess);
+            }
+        }
+        return featureWiseAllowed;
     }
 }

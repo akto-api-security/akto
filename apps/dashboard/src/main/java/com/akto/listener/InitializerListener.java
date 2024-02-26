@@ -2290,6 +2290,8 @@ public class InitializerListener implements ServletContextListener {
             }
         }, "usage-scheduler");
 
+        DeactivateCollections.deactivateCollectionsJob();
+
         isCalcUsageRunning = false;
     }
 
