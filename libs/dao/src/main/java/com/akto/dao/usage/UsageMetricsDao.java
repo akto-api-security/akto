@@ -1,10 +1,13 @@
 package com.akto.dao.usage;
 
 import com.akto.dao.MCollection;
+import com.akto.dao.context.Context;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.bson.conversions.Bson;
 
@@ -35,10 +38,6 @@ public class UsageMetricsDao extends BillingContextDao<UsageMetric>{
             String[] fieldNames = {UsageMetric.SYNCED_WITH_AKTO};
             MCollection.createIndexIfAbsent(instance.getDBName(), instance.getCollName(), fieldNames, true);
         }
-        {
-            String[] fieldNames = { UsageMetric.ORGANIZATION_ID, UsageMetric.ACCOUNT_ID, UsageMetric.METRIC_TYPE };
-            MCollection.createIndexIfAbsent(instance.getDBName(), instance.getCollName(), fieldNames, true);
-        }
     }
 
     @Override
@@ -63,19 +62,31 @@ public class UsageMetricsDao extends BillingContextDao<UsageMetric>{
     private final String TOTAL_USAGE = "totalUsage";
     private final String LAST_MEASURED = "lastMeasured";
 
-    public Map<String, FeatureAccess> findLatestUsageMetricsForOrganization(String organizationId) {
+    public Map<String, FeatureAccess> findLatestUsageMetricsForOrganization(Set<Integer> accounts) {
 
         BasicDBObject groupedId = new BasicDBObject(UsageMetric.METRIC_TYPE, Util.prefixDollar(UsageMetric.METRIC_TYPE))
                 .append(UsageMetric.ACCOUNT_ID, Util.prefixDollar(UsageMetric.ACCOUNT_ID));
 
+        /*
+         * check usage metrics for this measureEpoch only
+         * and since it can only be as big as its period
+         * we check the entire period.
+         */
+        int lastMinMeasureEpoch = Context.now() - (UsageMetricInfo.MEASURE_PERIOD + 86400) ;
+
         List<Bson> pipeline = Arrays.asList(
-                Aggregates.match(Filters.eq(UsageMetric.ORGANIZATION_ID, organizationId)),
-                Aggregates.sort(Sorts.descending(UsageMetric.RECORDED_AT)),
+                Aggregates.match(
+                    Filters.and(
+                        Filters.in(UsageMetric.ACCOUNT_ID, accounts),
+                        Filters.gte(UsageMetric.AKTO_SAVE_EPOCH, lastMinMeasureEpoch)
+                    )
+                ),
+                Aggregates.sort(Sorts.descending(UsageMetric.AKTO_SAVE_EPOCH)),
                 Aggregates.group(groupedId, Accumulators.first(LATEST_DOCUMENT, MCollection.ROOT_ELEMENT)),
                 Aggregates.replaceRoot(Util.prefixDollar(LATEST_DOCUMENT)),
                 Aggregates.group(Util.prefixDollar(UsageMetric.METRIC_TYPE),
                         Accumulators.sum(TOTAL_USAGE, Util.prefixDollar(UsageMetric._USAGE)),
-                        Accumulators.max(LAST_MEASURED, Util.prefixDollar(UsageMetric.RECORDED_AT))));
+                        Accumulators.max(LAST_MEASURED, Util.prefixDollar(UsageMetric.AKTO_SAVE_EPOCH))));
 
         MongoCursor<BasicDBObject> cursor = UsageMetricsDao.instance.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class).cursor();

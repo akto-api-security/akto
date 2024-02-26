@@ -185,9 +185,7 @@ public class HttpCallParser {
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
 
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(Context.accountId.get(), MetricTypes.ACTIVE_ENDPOINTS);
-            int usageLeft = Math.max(featureAccess.getUsageLimit() - featureAccess.getUsage(), 0);
-            boolean checkLimit = !featureAccess.checkBooleanOrUnlimited();
-            SyncLimit syncLimit = new SyncLimit(checkLimit, usageLeft);
+            SyncLimit syncLimit = featureAccess.fetchSyncLimit();
 
             numberOfSyncs++;
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);

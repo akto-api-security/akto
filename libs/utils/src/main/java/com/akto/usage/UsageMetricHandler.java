@@ -1,9 +1,8 @@
 package com.akto.usage;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
@@ -29,14 +28,14 @@ public class UsageMetricHandler {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricHandler.class, LogDb.DASHBOARD);
 
-    public static HashMap<String, FeatureAccess> updateFeatureMapWithLocalUsageMetrics(HashMap<String, FeatureAccess> featureWiseAllowed, String organizationId){
+    public static HashMap<String, FeatureAccess> updateFeatureMapWithLocalUsageMetrics(HashMap<String, FeatureAccess> featureWiseAllowed, Set<Integer> accounts){
 
         if (featureWiseAllowed == null) {
             featureWiseAllowed = new HashMap<>();
         }
 
         // since an org can have multiple accounts, we need to consolidate the usage.
-        Map<String, FeatureAccess> consolidatedOrgUsage = UsageMetricsDao.instance.findLatestUsageMetricsForOrganization(organizationId);
+        Map<String, FeatureAccess> consolidatedOrgUsage = UsageMetricsDao.instance.findLatestUsageMetricsForOrganization(accounts);
 
         for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
             String featureLabel = entry.getKey();
@@ -61,10 +60,9 @@ public class UsageMetricHandler {
 
     private static void updateOrgMeteredUsage(Organization organization) {
 
-        String organizationId = organization.getId();
-
+        Set<Integer> accounts = organization.getAccounts();
         HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
-        featureWiseAllowed = updateFeatureMapWithLocalUsageMetrics(featureWiseAllowed, organizationId);
+        featureWiseAllowed = updateFeatureMapWithLocalUsageMetrics(featureWiseAllowed, accounts);
         organization.setFeatureWiseAllowed(featureWiseAllowed);
 
         OrganizationsDao.instance.updateOne(
@@ -109,6 +107,7 @@ public class UsageMetricHandler {
             UsageMetric usageMetric = createUsageMetric(organizationId, accountId, metricType, dashboardVersion);
             usageMetric.setRecordedAt(Context.now());
             usageMetric.setUsage(usageAfter);
+            usageMetric.setAktoSaveEpoch(Context.now());
 
             usageMetric = UsageMetricsDao.instance.getMCollection().findOneAndReplace(
                     Filters.and(
@@ -142,7 +141,7 @@ public class UsageMetricHandler {
         int measureEpoch = usageMetricInfo.getMeasureEpoch();
 
         // Reset measureEpoch every month
-        if (Context.now() - measureEpoch > 2629746) {
+        if (Context.now() - measureEpoch > UsageMetricInfo.MEASURE_PERIOD) {
             if (syncEpoch > Context.now() - 86400) {
                 measureEpoch = Context.now();
 
@@ -187,6 +186,7 @@ public class UsageMetricHandler {
 
                 //calculate usage for metric
                 UsageMetricCalculator.calculateUsageMetric(usageMetric);
+                usageMetric.setAktoSaveEpoch(Context.now());
 
                 UsageMetricsDao.instance.insertOne(usageMetric);
                 loggerMaker.infoAndAddToDb("Usage metric inserted: " + usageMetric.getId(), LogDb.DASHBOARD);

@@ -226,9 +226,9 @@ public class Main {
                     return;
                 }
 
-                int usageLeft = Math.max(featureAccess.getUsageLimit() - featureAccess.getUsage(), 0);
-                boolean checkLimit = !featureAccess.checkBooleanOrUnlimited();
-                SyncLimit syncLimit = new SyncLimit(checkLimit, usageLeft);
+                SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+                // saving the initial usageLeft, to calc delta later.
+                int usageLeft = syncLimit.getUsageLeft();
 
                 try {
                     setTestingRunConfig(testingRun, trrs);
