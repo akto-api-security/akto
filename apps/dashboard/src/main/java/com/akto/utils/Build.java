@@ -17,8 +17,10 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.policies.AuthPolicy;
 import com.akto.test_editor.execution.Operations;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
+
 import com.akto.util.modifier.SetValueModifier;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -184,9 +186,9 @@ public class Build {
 
                 OriginalHttpResponse response = null;
                 try {
-                    response = ApiExecutor.sendRequest(request,false, testingRunConfig);
+                    response = ApiExecutor.sendRequest(request,false, testingRunConfig, false, new ArrayList<>());
                     apisReplayedSet.add(new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()));
-                    request.getHeaders().remove(AccountSettings.AKTO_IGNORE_FLAG);
+                    request.getHeaders().remove(Constants.AKTO_IGNORE_FLAG);
                     ReverseNode parentToChildNode = parentToChildMap.get(Objects.hash(id.getApiCollectionId()+"", id.getUrl(), id.getMethod().name()));
                     fillReplaceDetailsMap(parentToChildNode, response, replaceDetailsMap);
                     RawApi rawApi = new RawApi(request, response, "");
@@ -299,7 +301,8 @@ public class Build {
                 for (KVPair kvPair: kvPairs) {
                     if (kvPair.isHeader()) {
                         String value = kvPair.getValue()+"";
-                        String headerValue = rawApi.getRequest().findHeaderValue(kvPair.getKey());
+                        String headerValue = rawApi.getRequest().findHeaderValueIncludingInCookie(kvPair.getKey());
+                        if (headerValue == null) continue;
                         String[] headerValueSplit = headerValue.split(" ");
                         if (headerValueSplit.length == 2) {
                             String prefix = headerValueSplit[0];

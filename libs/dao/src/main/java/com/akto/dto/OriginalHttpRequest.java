@@ -95,6 +95,30 @@ public class OriginalHttpRequest {
         return values.get(0);
     }
 
+    public String findHeaderValueIncludingInCookie(String headerName) {
+        String value = findHeaderValue(headerName);
+        if (value != null) return value;
+
+        List<String> cookieList = headers.getOrDefault("cookie", new ArrayList<>());
+        if (cookieList.isEmpty()) return null;
+
+        for (String cookieValues : cookieList) {
+            String[] cookies = cookieValues.split(";");
+            for (String cookie : cookies) {
+                cookie=cookie.trim();
+                String[] cookieFields = cookie.split("=");
+                if (cookieFields.length == 2) {
+                    String cookieKey = cookieFields[0].toLowerCase();
+                    if(cookieKey.equals(headerName.toLowerCase())){
+                        return cookieFields[1];
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
     // queryString2 overrides queryString1 use accordingly
     public static String combineQueryParams(String queryString1, String queryString2) {
         if (queryString1 == null || queryString1.isEmpty()) return queryString2;

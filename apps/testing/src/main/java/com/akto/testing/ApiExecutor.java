@@ -1,21 +1,27 @@
 package com.akto.testing;
 
 import com.akto.dao.context.Context;
-import com.akto.dto.AccountSettings;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.Constants;
+
 import kotlin.Pair;
 import okhttp3.*;
+import okio.BufferedSink;
+
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.*;
 
 public class ApiExecutor {
@@ -24,7 +30,7 @@ public class ApiExecutor {
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
     
-    private static OriginalHttpResponse common(Request request, boolean followRedirects) throws Exception {
+    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
@@ -44,7 +50,10 @@ public class ApiExecutor {
             HTTPClientHandler.initHttpClientHandler(isSaasDeployment);
         }
         
-        OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects);
+        OkHttpClient client = debug ?
+                HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs) :
+                HTTPClientHandler.instance.getHTTPClient(followRedirects);
+
         if (!Main.SKIP_SSRF_CHECK && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
         }
@@ -75,6 +84,13 @@ public class ApiExecutor {
 
         int statusCode = response.code();
         Headers headers = response.headers();
+
+        Map<String, List<String>> responseHeaders = generateHeadersMapFromHeadersObject(headers);
+
+        return new OriginalHttpResponse(body, responseHeaders, statusCode);
+    }
+
+    public static Map<String, List<String>> generateHeadersMapFromHeadersObject(Headers headers) {
         Iterator<Pair<String, String>> headersIterator = headers.iterator();
         Map<String, List<String>> responseHeaders = new HashMap<>();
         while (headersIterator.hasNext()) {
@@ -87,7 +103,7 @@ public class ApiExecutor {
             responseHeaders.get(headerKey).add(headerValue);
         }
 
-        return new OriginalHttpResponse(body, responseHeaders, statusCode);
+        return responseHeaders;
     }
 
     public static String replaceHostFromConfig(String url, TestingRunConfig testingRunConfig) {
@@ -133,7 +149,7 @@ public class ApiExecutor {
         return replaceHostFromConfig(url, testingRunConfig);
     }
 
-    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig) throws Exception {
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
         
         String url = prepareUrl(request, testingRunConfig);
@@ -147,7 +163,7 @@ public class ApiExecutor {
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         Map<String, List<String>> headersMap = request.getHeaders();
         if (headersMap == null) headersMap = new HashMap<>();
-        headersMap.put(AccountSettings.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
+        headersMap.put(Constants.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
         for (String headerName: headersMap.keySet()) {
             if (forbiddenHeaders.contains(headerName)) continue;
             List<String> headerValueList = headersMap.get(headerName);
@@ -166,7 +182,7 @@ public class ApiExecutor {
         switch (method) {
             case GET:
             case HEAD:
-                response = getRequest(request, builder, followRedirects);
+                response = getRequest(request, builder, followRedirects, debug, testLogs);
                 break;
             case POST:
             case PUT:
@@ -175,7 +191,7 @@ public class ApiExecutor {
             case PATCH:
             case TRACK:
             case TRACE:
-                response = sendWithRequestBody(request, builder, followRedirects);
+                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs);
                 break;
             case OTHER:
                 throw new Exception("Invalid method name");
@@ -185,19 +201,73 @@ public class ApiExecutor {
     }
 
 
-    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects)  throws Exception{
+    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs)  throws Exception{
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects);
+        return common(okHttpRequest, followRedirects, debug, testLogs);
+    }
+
+    public static RequestBody getFileRequestBody(String fileUrl){
+        try {
+            URL sourceFileUrl = new URL(fileUrl);
+            InputStream urlInputStream = sourceFileUrl.openStream();
+            final int CHUNK_SIZE = 1 * 1024 * 1024 ;
+
+            RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("file", "filename", new RequestBody() {
+                    @Override
+                    public MediaType contentType() {
+                        return Utils.getMediaType(fileUrl);
+                    }
+
+                    @Override
+                    public void writeTo(BufferedSink sink) throws IOException {
+                        byte[] chunk = new byte[CHUNK_SIZE];
+                        int bytesRead;
+                        long totalBytesRead = 0; 
+                        long maxBytes = 100L * 1024 * 1024; 
+                        while ((bytesRead = urlInputStream.read(chunk)) != -1) {
+                            totalBytesRead += bytesRead;
+                            if (totalBytesRead > maxBytes) {
+                                loggerMaker.errorAndAddToDb("File size greater than 100mb, breaking loop.", LogDb.TESTING);
+                                break;
+                            }
+                            sink.write(chunk, 0, bytesRead);
+                        }
+                    }
+                })
+                .build();
+
+            return requestBody;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in file upload " + e.getMessage(), LogDb.TESTING);
+            return null;
+        }
+        
     }
 
 
 
-    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects) throws Exception {
+    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
         if (headers == null) {
             headers = new HashMap<>();
             request.setHeaders(headers);
         }
+
+        if(headers != null && headers.containsKey(Constants.AKTO_ATTACH_FILE)){
+            String fileUrl = headers.get(Constants.AKTO_ATTACH_FILE).get(0);
+            RequestBody requestBody = null;
+            requestBody = getFileRequestBody(fileUrl);
+        
+            builder.post(requestBody);
+            builder.removeHeader(Constants.AKTO_ATTACH_FILE);
+            Request updatedRequest = builder.build();
+
+
+            return common(updatedRequest, followRedirects, debug, testLogs);
+        }
+
         String contentType = request.findContentType();
         String payload = request.getBody();
         if (contentType == null ) {
@@ -211,6 +281,6 @@ public class ApiExecutor {
         RequestBody body = RequestBody.create(payload, MediaType.parse(contentType));
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects);
+        return common(okHttpRequest, followRedirects, debug, testLogs);
     }
 }
