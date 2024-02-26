@@ -1,6 +1,7 @@
 package com.akto.utils.jobs;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,6 +24,7 @@ import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
+import com.akto.usage.UsageMetricHandler;
 import com.akto.util.Constants;
 import com.akto.util.tasks.OrganizationTask;
 import com.mongodb.client.model.Filters;
@@ -30,7 +32,7 @@ import com.mongodb.client.model.Updates;
 
 public class DeactivateCollections {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(DeactivateCollections.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DeactivateCollections.class, LogDb.DASHBOARD);
 
     final static ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -49,12 +51,18 @@ public class DeactivateCollections {
 
     private static void deactivateCollectionsForOrganization(Organization organization) {
         try {
+            Set<Integer> accounts = organization.getAccounts();
+            HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+            featureWiseAllowed = UsageMetricHandler.updateFeatureMapWithLocalUsageMetrics(featureWiseAllowed, accounts);
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
             if (!featureAccess.checkInvalidAccess()) {
                 return;
             }
             int overage = featureAccess.getUsage() - featureAccess.getUsageLimit();
             String organizationId = organization.getId();
+
+            String infoMessage = String.format("Overage found org: %s , overage: %s , deactivating collections", organizationId, overage);
+            loggerMaker.infoAndAddToDb(infoMessage);
 
             for (int accountId : organization.getAccounts()) {
                 Context.accountId.set(accountId);
@@ -68,7 +76,7 @@ public class DeactivateCollections {
             }
         } catch (Exception e) {
             String errorMessage = String.format("Unable to deactivate collections for %s ", organization.getId());
-            loggerMaker.errorAndAddToDb(e, errorMessage, LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, errorMessage);
         }
     }
 
@@ -120,6 +128,9 @@ public class DeactivateCollections {
 
         ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
                 Updates.set(ApiCollection._DEACTIVATED, true));
+        
+        String infoMessage = String.format("Deactivated collections : %s", apiCollectionIds.toString());
+        loggerMaker.infoAndAddToDb(infoMessage);
 
         // TODO: handle case for API groups.
 
