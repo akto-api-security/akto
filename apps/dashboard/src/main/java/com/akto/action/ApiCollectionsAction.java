@@ -26,7 +26,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
-import com.akto.dto.ApiCollection.DEPLOYMENT_TYPE;
+import com.akto.dto.ApiCollection.ENV_TYPE;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
@@ -37,6 +37,7 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Updates;
@@ -445,15 +446,20 @@ public class ApiCollectionsAction extends UserAction {
         return Action.ERROR.toUpperCase();
     }
 
-    private DEPLOYMENT_TYPE deploymentType;
+    private ENV_TYPE deploymentType;
 
 	public String updateDeploymentType(){
         try {
-            ApiCollectionsDao.instance.updateOne(
-                Filters.eq("_id", apiCollectionId),
-                Updates.set(ApiCollection.USER_DEPLOYMENT_TYPE, deploymentType)
-            );
+            Bson filter =  Filters.eq("_id", apiCollectionId);
+            FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+            updateOptions.upsert(false);
 
+            ApiCollection update = ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(filter,
+                                Updates.set(ApiCollection.USER_ENV_TYPE,deploymentType)
+                        );
+            if(update == null){
+                return Action.ERROR.toUpperCase();
+            }
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();
@@ -541,7 +547,7 @@ public class ApiCollectionsAction extends UserAction {
         this.redacted = redacted;
     }
 
-    public void setDeploymentType(DEPLOYMENT_TYPE deploymentType) {
+    public void setDeploymentType(ENV_TYPE deploymentType) {
 		this.deploymentType = deploymentType;
 	}
 }
