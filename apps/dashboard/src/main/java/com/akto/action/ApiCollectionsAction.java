@@ -446,16 +446,16 @@ public class ApiCollectionsAction extends UserAction {
         return Action.ERROR.toUpperCase();
     }
 
-    private ENV_TYPE deploymentType;
+    private ENV_TYPE envType;
 
-	public String updateDeploymentType(){
+	public String updateEnvType(){
         try {
             Bson filter =  Filters.eq("_id", apiCollectionId);
             FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
             updateOptions.upsert(false);
 
             ApiCollection update = ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(filter,
-                                Updates.set(ApiCollection.USER_ENV_TYPE,deploymentType)
+                                Updates.set(ApiCollection.USER_ENV_TYPE,envType)
                         );
             if(update == null){
                 return Action.ERROR.toUpperCase();
@@ -547,7 +547,7 @@ public class ApiCollectionsAction extends UserAction {
         this.redacted = redacted;
     }
 
-    public void setDeploymentType(ENV_TYPE deploymentType) {
-		this.deploymentType = deploymentType;
+    public void setEnvType(ENV_TYPE envType) {
+		this.envType = envType;
 	}
 }

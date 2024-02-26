@@ -389,7 +389,7 @@ const transform = {
                 sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes),
                 lastTraffic: c.detected,
                 riskScore: c.riskScore,
-                deploymentTypeComp: <Badge size="small" status="info">{func.toSentenceCase(c.deploymentType)}</Badge>
+                envTypeComp: <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge>
             }
         })
 
