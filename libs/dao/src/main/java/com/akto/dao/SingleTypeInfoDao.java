@@ -309,12 +309,12 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         }
 
         Bson projections = Projections.fields(
-                Projections.include("timestamp", "apiCollectionId", "url", "method")
+                Projections.include("timestamp", "lastSeen", "apiCollectionId", "url", "method", SingleTypeInfo._COLLECTION_IDS)
         );
 
         pipeline.add(Aggregates.project(projections));
         pipeline.add(Aggregates.group(groupedId));
-        pipeline.add(Aggregates.sort(Sorts.ascending(Util.prefixDollar(SingleTypeInfo._TIMESTAMP))));
+        pipeline.add(Aggregates.sort(Sorts.ascending(SingleTypeInfo._TIMESTAMP)));
         return pipeline;
     }
 

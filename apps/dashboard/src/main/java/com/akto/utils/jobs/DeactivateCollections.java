@@ -31,7 +31,7 @@ import com.mongodb.client.model.Updates;
 
 public class DeactivateCollections {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(DeactivateCollections.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DeactivateCollections.class, LogDb.DASHBOARD);
 
     final static ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -57,6 +57,8 @@ public class DeactivateCollections {
             int overage = Math.max(featureAccess.getUsage() - featureAccess.getUsageLimit(), 0);
             String organizationId = organization.getId();
 
+            loggerMaker.infoAndAddToDb("overage before deactivating: " + overage);
+
             for (int accountId : organization.getAccounts()) {
                 Context.accountId.set(accountId);
                 UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOne(
@@ -67,6 +69,8 @@ public class DeactivateCollections {
                 }
                 overage = deactivateCollectionsForAccount(overage, measureEpoch);
             }
+
+            loggerMaker.infoAndAddToDb("overage after deactivating: " + overage);
 
             int deltaUsage = (-1) * (Math.max(featureAccess.getUsage() - featureAccess.getUsageLimit(), 0) - overage);
             UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get(), deltaUsage);
@@ -123,6 +127,8 @@ public class DeactivateCollections {
             overage -= apiCollection.getUrlsCount();
             apiCollectionIds.add(apiCollection.getId());
         }
+
+        loggerMaker.infoAndAddToDb("deactivating collections: " + apiCollectionIds.toString());
 
         ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
                 Updates.set(ApiCollection._DEACTIVATED, true));

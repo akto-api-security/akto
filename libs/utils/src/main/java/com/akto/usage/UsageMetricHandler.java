@@ -94,7 +94,7 @@ public class UsageMetricHandler {
                 if (featureAccess.getOverageFirstDetected() == -1) {
                     int now = Context.now();
                     String logMessage = String.format("Overage detected for %s at %s", metricType, now);
-                    loggerMaker.errorAndAddToDb(logMessage);
+                    loggerMaker.infoAndAddToDb(logMessage);
                     featureAccess.setOverageFirstDetected(now);
                 }
             } else {
