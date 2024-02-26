@@ -254,11 +254,12 @@ function ApiCollections() {
     const updateDeploymentType = (apiCollectionId,type) => {
         let copyObj = JSON.parse(JSON.stringify(deploymentTypeMap))
         copyObj[apiCollectionId] = type
-        api.updateDeploymentTypeOfCollection(type, apiCollectionId).then((resp) => {
+        api.updateDeploymentTypeOfCollection(type,apiCollectionId).then((resp) => {
             func.setToast(true, false, "Deployment type updated successfully")
+            setDeploymentTypeMap(copyObj)
+            updateData(copyObj)
         })
-        setDeploymentTypeMap(copyObj)
-        updateData(copyObj)
+        
     }
 
     const promotedBulkActions = (selectedResources) => {

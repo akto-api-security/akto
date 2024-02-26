@@ -42,16 +42,16 @@ public class ApiCollection {
         API_GROUP
     }
 
-    public enum DEPLOYMENT_TYPE {
+    public enum ENV_TYPE {
         STAGING,PRODUCTION
     }
 
     Type type;
     public static final String _TYPE = "type";
     
-    DEPLOYMENT_TYPE userSetDeploymentType;
+    ENV_TYPE userSetDeploymentType;
 
-	public static final String USER_DEPLOYMENT_TYPE = "userSetDeploymentType";
+	public static final String USER_ENV_TYPE = "userSetDeploymentType";
 
     List<TestingEndpoints> conditions;
     public static final String CONDITIONS_STRING = "conditions";
@@ -111,17 +111,17 @@ public class ApiCollection {
         this.urls = urls;
     }
 
-    public DEPLOYMENT_TYPE getDeploymentType(){
+    public ENV_TYPE getDeploymentType(){
         if(this.type != null && this.type == Type.API_GROUP) return null;
         
         if(this.userSetDeploymentType == null){
             if(this.hostName == null){
-                return DEPLOYMENT_TYPE.STAGING;
+                return ENV_TYPE.STAGING;
             }else{
-                if(this.hostName.contains("staging") || this.hostName.contains("demo")){
-                    return DEPLOYMENT_TYPE.STAGING;
+                if (this.hostName.matches(".*(staging|preprod|qa\\.).*")){
+                    return ENV_TYPE.STAGING;
                 }else{
-                    return DEPLOYMENT_TYPE.PRODUCTION;
+                    return ENV_TYPE.PRODUCTION;
                 }
             }
         }else{
@@ -256,11 +256,11 @@ public class ApiCollection {
         this.sampleCollectionsDropped = sampleCollectionsDropped;
     }
 
-    public DEPLOYMENT_TYPE getUserSetDeploymentType() {
+    public ENV_TYPE getUserSetDeploymentType() {
 		return userSetDeploymentType;
 	}
 
-	public void setUserSetDeploymentType(DEPLOYMENT_TYPE userSetDeploymentType) {
+	public void setUserSetDeploymentType(ENV_TYPE userSetDeploymentType) {
 		this.userSetDeploymentType = userSetDeploymentType;
 	}
 }
