@@ -664,7 +664,7 @@
             </result>
         </action>
         
-        <action name="api/updateDeploymentType" class="com.akto.action.ApiCollectionsAction" method="updateDeploymentType">
+        <action name="api/updateEnvType" class="com.akto.action.ApiCollectionsAction" method="updateEnvType">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json"/>

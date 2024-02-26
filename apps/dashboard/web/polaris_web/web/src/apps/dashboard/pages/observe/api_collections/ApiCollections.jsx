@@ -52,8 +52,8 @@ const headers = [
     {
         text: 'Collection type',
         title: 'Collection type',
-        value: 'deploymentTypeComp',
-        filterKey: "deploymentType",
+        value: 'envTypeComp',
+        filterKey: "envType",
         showFilter: true
     },
     {   
@@ -116,7 +116,7 @@ function ApiCollections() {
     const [selected, setSelected] = useState(0)
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(false)
-    const [deploymentTypeMap, setDeploymentTypeMap] = useState({})
+    const [envTypeMap, setEnvTypeMap] = useState({})
     const [refreshData, setRefreshData] = useState(false)
     
     
@@ -188,11 +188,11 @@ function ApiCollections() {
         setCoverageMap(coverageInfo)
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
-        let deploymentTypeObj = {}
+        let envTypeObj = {}
         tmp.forEach((c) => {
-            deploymentTypeObj[c.id] = c.deploymentType
+            envTypeObj[c.id] = c.envType
         })
-        setDeploymentTypeMap(deploymentTypeObj)
+        setEnvTypeMap(envTypeObj)
 
         const issuesObj = await transform.fetchRiskScoreInfo();
         const severityObj = issuesObj.severityObj;
@@ -243,20 +243,20 @@ function ApiCollections() {
         let copyObj = data;
         Object.keys(copyObj).forEach((key) => {
             data[key].length > 0 && data[key].forEach((c) => {
-                c['deploymentType'] = dataMap[c.id]
-                c['deploymentTypeComp'] = <Badge size="small" status="info">{func.toSentenceCase(dataMap[c.id])}</Badge>
+                c['envType'] = dataMap[c.id]
+                c['envTypeComp'] = <Badge size="small" status="info">{func.toSentenceCase(dataMap[c.id])}</Badge>
             })
         })
         setData(copyObj)
         setRefreshData(!refreshData)
     }
 
-    const updateDeploymentType = (apiCollectionId,type) => {
-        let copyObj = JSON.parse(JSON.stringify(deploymentTypeMap))
+    const updateEnvType = (apiCollectionId,type) => {
+        let copyObj = JSON.parse(JSON.stringify(envTypeMap))
         copyObj[apiCollectionId] = type
-        api.updateDeploymentTypeOfCollection(type,apiCollectionId).then((resp) => {
+        api.updateEnvTypeOfCollection(type,apiCollectionId).then((resp) => {
             func.setToast(true, false, "Deployment type updated successfully")
-            setDeploymentTypeMap(copyObj)
+            setEnvTypeMap(copyObj)
             updateData(copyObj)
         })
         
@@ -267,13 +267,13 @@ function ApiCollections() {
             content: `Remove collection${func.addPlurality(selectedResources.length)}`,
             onAction: () => handleRemoveCollections(selectedResources)
         }
-        const toggleType = deploymentTypeMap[selectedResources[0]] === "STAGING" ? "PRODUCTION" : "STAGING"
+        const toggleType = envTypeMap[selectedResources[0]] === "STAGING" ? "PRODUCTION" : "STAGING"
 
-        const toggleDeploymentType = {
+        const toggleEnvType = {
             content: `Change collection type to ${toggleType}`,
-            onAction: () => updateDeploymentType(selectedResources[0], toggleType)
+            onAction: () => updateEnvType(selectedResources[0], toggleType)
         }
-        if(selectedResources.length < 2)return [removeCollectionsObj, toggleDeploymentType]
+        if(selectedResources.length < 2)return [removeCollectionsObj, toggleEnvType]
         else return[removeCollectionsObj];
     }
 

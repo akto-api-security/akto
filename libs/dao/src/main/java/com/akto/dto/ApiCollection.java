@@ -49,9 +49,9 @@ public class ApiCollection {
     Type type;
     public static final String _TYPE = "type";
     
-    ENV_TYPE userSetDeploymentType;
+    ENV_TYPE userSetEnvType;
 
-	public static final String USER_ENV_TYPE = "userSetDeploymentType";
+	public static final String USER_ENV_TYPE = "userSetEnvType";
 
     List<TestingEndpoints> conditions;
     public static final String CONDITIONS_STRING = "conditions";
@@ -111,10 +111,10 @@ public class ApiCollection {
         this.urls = urls;
     }
 
-    public ENV_TYPE getDeploymentType(){
+    public ENV_TYPE getEnvType(){
         if(this.type != null && this.type == Type.API_GROUP) return null;
         
-        if(this.userSetDeploymentType == null){
+        if(this.userSetEnvType == null){
             if(this.hostName == null){
                 return ENV_TYPE.STAGING;
             }else{
@@ -125,7 +125,7 @@ public class ApiCollection {
                 }
             }
         }else{
-            return this.userSetDeploymentType;
+            return this.userSetEnvType;
         }
     }
 
@@ -256,11 +256,12 @@ public class ApiCollection {
         this.sampleCollectionsDropped = sampleCollectionsDropped;
     }
 
-    public ENV_TYPE getUserSetDeploymentType() {
-		return userSetDeploymentType;
+    public ENV_TYPE getUserSetEnvType() {
+		return userSetEnvType;
 	}
 
-	public void setUserSetDeploymentType(ENV_TYPE userSetDeploymentType) {
-		this.userSetDeploymentType = userSetDeploymentType;
+	public void setUserSetEnvType(ENV_TYPE userSetEnvType) {
+		this.userSetEnvType = userSetEnvType;
 	}
+    
 }
