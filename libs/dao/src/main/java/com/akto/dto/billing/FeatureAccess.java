@@ -4,17 +4,20 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import com.akto.dao.context.Context;
 
 public class FeatureAccess {
-    private boolean isGranted;
+    boolean isGranted;
     public static final String IS_GRANTED = "isGranted";
-    private int overageFirstDetected = -1;
+    int overageFirstDetected = -1;
     public static final String OVERAGE_FIRST_DETECTED = "overageFirstDetected";
-    private int usageLimit;
+
+    private static final int STANDARD_GRACE_PERIOD = 0;
+
+    int usageLimit;
     public static final String USAGE_LIMIT = "usageLimit";
-    private int usage;
+    int usage;
     public static final String USAGE = "usage";
 
     @BsonIgnore
-    private int gracePeriod = 0;
+    int gracePeriod = 0;
 
     public static final FeatureAccess noAccess = new FeatureAccess(false);
     public static final FeatureAccess fullAccess = new FeatureAccess(true);
@@ -68,7 +71,7 @@ public class FeatureAccess {
     public boolean checkBooleanOrUnlimited() {
         return usageLimit == -1;
     }
-    
+
     public static final String IS_OVERAGE_AFTER_GRACE = "isOverageAfterGrace";
 
     public int getGracePeriod() {
@@ -99,15 +102,20 @@ public class FeatureAccess {
             overageFirstDetected = -1;
         }
 
-        gracePeriod = Math.max(gracePeriod, 0);
+        if (gracePeriod <= 0) {
+            gracePeriod = STANDARD_GRACE_PERIOD;
+        }
 
         return this.getOverageFirstDetected() != -1 &&
                  !( this.getOverageFirstDetected() + gracePeriod > Context.now() );
     }
 
     public SyncLimit fetchSyncLimit() {
-        return new SyncLimit(!this.checkBooleanOrUnlimited(),
-                Math.max(this.getUsageLimit() - this.getUsage(), 0));
+
+        int usageLeft = Math.max(this.getUsageLimit() - this.getUsage(), 0);
+        boolean checkLimit = !this.checkBooleanOrUnlimited();
+
+        return new SyncLimit(checkLimit, usageLeft);
     }
 
 }

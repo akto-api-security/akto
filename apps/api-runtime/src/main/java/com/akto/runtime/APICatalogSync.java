@@ -1599,11 +1599,6 @@ public class APICatalogSync {
     }
 
     int counter = 0;
-    
-    // should be used only for unit tests. 
-    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {
-        syncWithDB(syncImmediately, fetchAllSTI, new SyncLimit(false, 0));
-    }
 
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit syncLimit) {
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();

@@ -1672,7 +1672,8 @@ public class InitializerListener implements ServletContextListener {
                     organization.getAdminEmail());
 
             featureWiseAllowed = OrganizationUtils.getFeatureWiseAllowed(entitlements);
-            featureWiseAllowed = UsageMetricHandler.updateFeatureMapWithLocalUsageMetrics(featureWiseAllowed, organizationId);
+            Set<Integer> accounts = organization.getAccounts();
+            featureWiseAllowed = UsageMetricHandler.updateFeatureMapWithLocalUsageMetrics(featureWiseAllowed, accounts);
 
             for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
                 String label = entry.getKey();

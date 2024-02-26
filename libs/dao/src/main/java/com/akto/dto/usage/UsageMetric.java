@@ -29,6 +29,7 @@ public class UsageMetric {
     private String ipAddress;
     public static final String SYNC_EPOCH = "syncEpoch";
     private int syncEpoch;
+    public static final String MEASURE_EPOCH = "measureEpoch";
     private int measureEpoch;
     private int aktoSaveEpoch;
     public static final String AKTO_SAVE_EPOCH = "aktoSaveEpoch";

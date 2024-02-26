@@ -5,6 +5,8 @@ public class SyncLimit {
     public final boolean checkLimit;
     private AtomicInteger usageLeft;
 
+    public static final SyncLimit noLimit = new SyncLimit(false, 0);
+
     public SyncLimit(boolean checkLimit, int usageLeft) {
         this.checkLimit = checkLimit;
         this.usageLeft = new AtomicInteger(usageLeft);
