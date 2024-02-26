@@ -74,8 +74,9 @@ public class UsageMetricCalculator {
         return ret;
     }
 
-    public static Bson excludeDemosAndDeactivated(String key){
-        List<Integer> list = new ArrayList<>(getDemosAndDeactivated());
+    public static Bson excludeDemosAndDeactivated(String key) {
+        List<Integer> list = new ArrayList<>(getDemos());
+        list.addAll(getDeactivatedLatest());
         return Filters.nin(key, list);
     }
 
