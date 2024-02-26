@@ -15,6 +15,8 @@ public class UsageMetricInfo {
     private int measureEpoch;
     public static final String MEASURE_EPOCH = "measureEpoch";
 
+    public final static int MEASURE_PERIOD = 2629746; // a month
+
     public UsageMetricInfo() { }
 
     public UsageMetricInfo(String organizationId, int accountId, MetricTypes metricType) {
