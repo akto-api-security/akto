@@ -275,7 +275,8 @@ public class DaoInit {
                 new EnumCodec<>(MetricTypes.class),
                 new EnumCodec<>(User.AktoUIMode.class),
                 new EnumCodec<>(TrafficMetricsAlert.FilterType.class),
-                new EnumCodec<>(KVPair.KVType.class));
+                new EnumCodec<>(KVPair.KVType.class),
+                new EnumCodec<>(ApiCollection.DEPLOYMENT_TYPE.class));
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
                 customEnumCodecs);

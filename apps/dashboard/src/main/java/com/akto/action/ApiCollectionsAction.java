@@ -26,6 +26,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
+import com.akto.dto.ApiCollection.DEPLOYMENT_TYPE;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
@@ -444,6 +445,22 @@ public class ApiCollectionsAction extends UserAction {
         return Action.ERROR.toUpperCase();
     }
 
+    private DEPLOYMENT_TYPE deploymentType;
+
+	public String updateDeploymentType(){
+        try {
+            ApiCollectionsDao.instance.updateOne(
+                Filters.eq("_id", apiCollectionId),
+                Updates.set(ApiCollection.USER_DEPLOYMENT_TYPE, deploymentType)
+            );
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return Action.ERROR.toUpperCase();
+    }
+
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
     }
@@ -523,4 +540,8 @@ public class ApiCollectionsAction extends UserAction {
     public void setRedacted(boolean redacted) {
         this.redacted = redacted;
     }
+
+    public void setDeploymentType(DEPLOYMENT_TYPE deploymentType) {
+		this.deploymentType = deploymentType;
+	}
 }

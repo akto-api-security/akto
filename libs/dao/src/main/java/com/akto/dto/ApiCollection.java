@@ -42,8 +42,16 @@ public class ApiCollection {
         API_GROUP
     }
 
+    public enum DEPLOYMENT_TYPE {
+        STAGING,PRODUCTION
+    }
+
     Type type;
     public static final String _TYPE = "type";
+    
+    DEPLOYMENT_TYPE userSetDeploymentType;
+
+	public static final String USER_DEPLOYMENT_TYPE = "userSetDeploymentType";
 
     List<TestingEndpoints> conditions;
     public static final String CONDITIONS_STRING = "conditions";
@@ -101,6 +109,24 @@ public class ApiCollection {
 
     public void setUrls(Set<String> urls) {
         this.urls = urls;
+    }
+
+    public DEPLOYMENT_TYPE getDeploymentType(){
+        if(this.type != null && this.type == Type.API_GROUP) return null;
+        
+        if(this.userSetDeploymentType == null){
+            if(this.hostName == null){
+                return DEPLOYMENT_TYPE.STAGING;
+            }else{
+                if(this.hostName.contains("staging") || this.hostName.contains("demo")){
+                    return DEPLOYMENT_TYPE.STAGING;
+                }else{
+                    return DEPLOYMENT_TYPE.PRODUCTION;
+                }
+            }
+        }else{
+            return this.userSetDeploymentType;
+        }
     }
 
     @Override
@@ -229,4 +255,12 @@ public class ApiCollection {
     public void setSampleCollectionsDropped(boolean sampleCollectionsDropped) {
         this.sampleCollectionsDropped = sampleCollectionsDropped;
     }
+
+    public DEPLOYMENT_TYPE getUserSetDeploymentType() {
+		return userSetDeploymentType;
+	}
+
+	public void setUserSetDeploymentType(DEPLOYMENT_TYPE userSetDeploymentType) {
+		this.userSetDeploymentType = userSetDeploymentType;
+	}
 }

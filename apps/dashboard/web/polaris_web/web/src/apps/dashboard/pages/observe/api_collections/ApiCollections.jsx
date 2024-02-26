@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box } from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Badge } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
@@ -48,6 +48,13 @@ const headers = [
         title: 'Sensitive data' , 
         text: 'Sensitive data' , 
         value: 'sensitiveSubTypes',
+    },
+    {
+        text: 'Collection type',
+        title: 'Collection type',
+        value: 'deploymentTypeComp',
+        filterKey: "deploymentType",
+        showFilter: true
     },
     {   
         title: 'Last traffic seen', 
@@ -109,6 +116,8 @@ function ApiCollections() {
     const [selected, setSelected] = useState(0)
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(false)
+    const [deploymentTypeMap, setDeploymentTypeMap] = useState({})
+    const [refreshData, setRefreshData] = useState(false)
     
     
     const tableTabs = [
@@ -179,6 +188,11 @@ function ApiCollections() {
         setCoverageMap(coverageInfo)
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
+        let deploymentTypeObj = {}
+        tmp.forEach((c) => {
+            deploymentTypeObj[c.id] = c.deploymentType
+        })
+        setDeploymentTypeMap(deploymentTypeObj)
 
         const issuesObj = await transform.fetchRiskScoreInfo();
         const severityObj = issuesObj.severityObj;
@@ -225,12 +239,42 @@ function ApiCollections() {
         func.setToast(true, false, `${collectionIdList.length} API collection${collectionIdList.length > 1 ? "s" : ""} deleted successfully`)
     }
 
-    const promotedBulkActions = (selectedResources) => [
-        {
-          content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-          onAction: () => handleRemoveCollections(selectedResources)
-        },
-      ];
+    const updateData = (dataMap) => {
+        let copyObj = data;
+        Object.keys(copyObj).forEach((key) => {
+            data[key].length > 0 && data[key].forEach((c) => {
+                c['deploymentType'] = dataMap[c.id]
+                c['deploymentTypeComp'] = <Badge size="small" status="info">{func.toSentenceCase(dataMap[c.id])}</Badge>
+            })
+        })
+        setData(copyObj)
+        setRefreshData(!refreshData)
+    }
+
+    const updateDeploymentType = (apiCollectionId,type) => {
+        let copyObj = JSON.parse(JSON.stringify(deploymentTypeMap))
+        copyObj[apiCollectionId] = type
+        api.updateDeploymentTypeOfCollection(type, apiCollectionId).then((resp) => {
+            func.setToast(true, false, "Deployment type updated successfully")
+        })
+        setDeploymentTypeMap(copyObj)
+        updateData(copyObj)
+    }
+
+    const promotedBulkActions = (selectedResources) => {
+        const removeCollectionsObj = {
+            content: `Remove collection${func.addPlurality(selectedResources.length)}`,
+            onAction: () => handleRemoveCollections(selectedResources)
+        }
+        const toggleType = deploymentTypeMap[selectedResources[0]] === "STAGING" ? "PRODUCTION" : "STAGING"
+
+        const toggleDeploymentType = {
+            content: `Change collection type to ${toggleType}`,
+            onAction: () => updateDeploymentType(selectedResources[0], toggleType)
+        }
+        if(selectedResources.length < 2)return [removeCollectionsObj, toggleDeploymentType]
+        else return[removeCollectionsObj];
+    }
 
     const modalComponent = <CreateNewCollectionModal
         key="modal"
@@ -275,7 +319,7 @@ function ApiCollections() {
 
     const tableComponent = (
         <GithubSimpleTable
-            key="table"
+            key={refreshData}
             pageLimit={100}
             data={data[selectedTab]} 
             sortOptions={sortOptions} 
