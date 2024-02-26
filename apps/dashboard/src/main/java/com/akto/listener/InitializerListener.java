@@ -1585,7 +1585,6 @@ public class InitializerListener implements ServletContextListener {
                         if (DashboardMode.isMetered()) {
                             setupUsageScheduler();
                             setupUsageSyncScheduler();
-                            DeactivateCollections.deactivateCollectionsJob();
                         }
 
                         crons.deleteTestRunsScheduler();
@@ -2132,6 +2131,8 @@ public class InitializerListener implements ServletContextListener {
                 UsageMetricHandler.calcAndSyncAccountUsage(accountId);
             }
         }, "usage-scheduler");
+
+        DeactivateCollections.deactivateCollectionsJob();
 
         isCalcUsageRunning = false;
     }
