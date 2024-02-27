@@ -77,7 +77,7 @@ public class UsageMetricCalculator {
 
     public static List<String> getInvalidTestErrors() {
         List<String> invalidErrors = new ArrayList<String>() {{
-            add(TestResult.TestError.DEACTIVATED_ENDPOINT.toString());
+            add(TestResult.TestError.DEACTIVATED_ENDPOINT.getMessage());
         }};
         return invalidErrors;
     }
