@@ -5,14 +5,17 @@ import com.akto.dao.context.Context;
 public class Tokens {
     
     private String token;
-
+    public static final String TOKEN = "token";
     private String orgId;
-
+    public static final String ORG_ID = "orgId";
     private int accountId;
-
+    public static final String ACCOUNT_ID = "accountId";
     private int createdAt;
-
+    public static final String CREATED_AT = "createdAt";
     private int updatedAt;
+    public static final String UPDATED_AT = "updatedAt";
+
+    private static final int TOKEN_ENPIRY_PERIOD_IN_SECONDS = 4 * 60 * 60;
 
     public Tokens(String token, String orgId, int accountId, int createdAt, int updatedAt) {
         this.token = token;
@@ -66,7 +69,7 @@ public class Tokens {
     }
 
     public boolean isOldToken() {
-        return Context.now() > (this.createdAt + 14400);
+        return Context.now() > (this.createdAt + TOKEN_ENPIRY_PERIOD_IN_SECONDS);
     }
 
 }
