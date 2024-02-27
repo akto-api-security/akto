@@ -3,8 +3,10 @@ package com.akto.utils.billing;
 import java.io.IOException;
 import java.util.*;
 
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.RBACDao;
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.RBAC;
 import com.akto.dto.billing.FeatureAccess;
@@ -103,43 +105,7 @@ public class OrganizationUtils {
         }
         
         return accounts;
-    }
-
-    private static BasicDBObject fetchFromBillingService(String apiName, BasicDBObject reqBody) {
-        String json = reqBody.toJson();
-
-        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-        RequestBody body = RequestBody.create(json, JSON);
-        Request request = new Request.Builder()
-                .url(UsageUtils.getUsageServiceUrl() + "/api/"+apiName)
-                .post(body)
-                .build();
-
-        OkHttpClient client = new OkHttpClient();
-        Response response = null;
-
-        try {
-            response = client.newCall(request).execute();
-            if (!response.isSuccessful()) {
-                throw new IOException("Unexpected code " + response);
-            }
-
-            ResponseBody responseBody = response.body();
-            if (responseBody == null) {
-                return null;
-            }
-
-            return BasicDBObject.parse(responseBody.string());
-
-        } catch (IOException e) {
-            System.out.println("Failed to sync organization with Akto. Error - " +  e.getMessage());
-            return null;
-        } finally {
-            if (response != null) {
-                response.close();
-            }
-        }
-    }
+    }    
 
     private static BasicDBObject fetchFromInternalService(String apiName, BasicDBObject reqBody) {
         String json = reqBody.toJson();
@@ -179,7 +145,7 @@ public class OrganizationUtils {
 
     public static BasicDBObject fetchOrgDetails(String orgId) {
         String orgIdUUID = UUID.fromString(orgId).toString();
-        return fetchFromBillingService("fetchOrgDetails", new BasicDBObject("orgId", orgIdUUID));
+        return UsageMetricUtils.fetchFromBillingService("fetchOrgDetails", new BasicDBObject("orgId", orgIdUUID));
     }
     public static BasicDBObject provisionSubscription(String customerId, String planId, String billingPeriod, String successUrl, String cancelUrl) {
         String orgIdUUID = UUID.fromString(customerId).toString();
@@ -195,7 +161,7 @@ public class OrganizationUtils {
     public static String fetchClientKey(String orgId, String adminEmail) {
         String orgIdUUID = UUID.fromString(orgId).toString();
         BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
-        BasicDBObject respBody = fetchFromBillingService("fetchClientKey", reqBody);
+        BasicDBObject respBody = UsageMetricUtils.fetchFromBillingService("fetchClientKey", reqBody);
         if (respBody == null) return "";
 
         return respBody.getOrDefault("clientKey", "").toString();
@@ -205,7 +171,7 @@ public class OrganizationUtils {
     public static String fetchSignature(String orgId, String adminEmail) {
         String orgIdUUID = UUID.fromString(orgId).toString();
         BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
-        BasicDBObject respBody = fetchFromBillingService("fetchSignature", reqBody);
+        BasicDBObject respBody = UsageMetricUtils.fetchFromBillingService("fetchSignature", reqBody);
 
         if (respBody == null) return "";
 
@@ -273,7 +239,7 @@ public class OrganizationUtils {
     public static BasicDBList fetchEntitlements(String orgId, String adminEmail) {
         String orgIdUUID = UUID.fromString(orgId).toString();
         BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
-        BasicDBObject ret = fetchFromBillingService("fetchEntitlements", reqBody);
+        BasicDBObject ret = UsageMetricUtils.fetchFromBillingService("fetchEntitlements", reqBody);
 
         if (ret == null) {
             return null;
@@ -284,7 +250,7 @@ public class OrganizationUtils {
     public static int fetchOrgGracePeriod(String orgId, String adminEmail) {
         String orgIdUUID = UUID.fromString(orgId).toString();
         BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
-        BasicDBObject ret = fetchFromBillingService("fetchOrgMetaData", reqBody);
+        BasicDBObject ret = UsageMetricUtils.fetchFromBillingService("fetchOrgMetaData", reqBody);
 
         if (ret == null) {
             return 0;
