@@ -60,20 +60,20 @@ public class OrganizationAction {
     public String fetchToken() {
 
         Bson filters = Filters.and(
-            Filters.eq("orgId", orgId),
-            Filters.eq("accountId", accountId)
+            Filters.eq(Tokens.ORG_ID, orgId),
+            Filters.eq(Tokens.ACCOUNT_ID, accountId)
         );
         tokens = TokensDao.instance.findOne(filters);
         Bson updates;
         if (tokens == null) {
             updates = Updates.combine(
-                Updates.set("updatedAt", Context.now()),
-                Updates.setOnInsert("createdAt", Context.now()),
-                Updates.setOnInsert("orgId", orgId),
-                Updates.setOnInsert("accountId", accountId)
+                Updates.set(Tokens.UPDATED_AT, Context.now()),
+                Updates.setOnInsert(Tokens.CREATED_AT, Context.now()),
+                Updates.setOnInsert(Tokens.ORG_ID, orgId),
+                Updates.setOnInsert(Tokens.ACCOUNT_ID, accountId)
             );
         } else {
-            updates = Updates.set("updatedAt", Context.now());
+            updates = Updates.set(Tokens.UPDATED_AT, Context.now());
         }
         if (tokens == null || tokens.isOldToken()) {
             String token = orgId + "_" + accountId + "_" + UUID.randomUUID().toString().replace("-", "");
