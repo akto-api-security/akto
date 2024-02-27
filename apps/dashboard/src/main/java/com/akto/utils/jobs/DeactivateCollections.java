@@ -133,8 +133,6 @@ public class DeactivateCollections {
             apiCollectionIds.add(apiCollection.getId());
         }
 
-        loggerMaker.infoAndAddToDb("deactivating collections: " + apiCollectionIds.toString());
-
         ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
                 Updates.set(ApiCollection._DEACTIVATED, true));
         

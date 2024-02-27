@@ -21,7 +21,7 @@ public class SyncLimit {
             usageLeft.decrementAndGet();
         }
 
-        return checkLimit && usageLeft.get() < 0;
+        return this.getUsageLeft() < 0;
     }
 
     public int getUsageLeft() {

@@ -310,9 +310,6 @@ public class TestExecutor {
         if(totalCountIssues.get(Severity.HIGH.toString()) > 0){
             ActivitiesDao.instance.insertActivity("High Vulnerability detected", totalCountIssues.get(Severity.HIGH.toString()) + " HIGH vulnerabilites detected");
         }
-
-        
-
     }
 
     public static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult){
