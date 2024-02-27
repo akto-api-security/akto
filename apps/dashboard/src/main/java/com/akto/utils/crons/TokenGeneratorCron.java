@@ -98,7 +98,7 @@ public class TokenGeneratorCron {
 
                         UsageUtils.saveToken(organization.getId(), accountId, updates, filters, respToken.getString(Tokens.TOKEN));
                     }
-                }, "sync-cron-info");
+                }, "token-generator-cron");
             }
         }, 0, 4, TimeUnit.HOURS);
     }
