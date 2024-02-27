@@ -1,5 +1,8 @@
 package com.akto.test_editor.execution;
 
+import com.akto.billing.UsageMetricUtils;
+import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
@@ -9,6 +12,8 @@ import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Graph;
+import com.akto.dto.billing.Organization;
+import com.akto.dto.billing.Tokens;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.Confidence;
@@ -23,6 +28,7 @@ import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
+import com.akto.util.UsageUtils;
 import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.util.modifier.JWTPayloadReplacer;
@@ -37,8 +43,13 @@ import java.util.List;
 import java.util.Map;
 
 import org.json.JSONObject;
+
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
 import org.apache.commons.lang3.StringUtils;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 
@@ -446,6 +457,50 @@ public class Executor {
                 }
                 return Operations.replaceBody(rawApi, newPayload);
             case "add_header":
+                if (value.equals("${akto_header}")) {
+                    int accountId = Context.accountId.get();
+                    Organization organization = OrganizationsDao.instance.findOne(
+                            Filters.in(Organization.ACCOUNTS, accountId)
+                    );
+                    if (organization == null) {
+                        return new ExecutorSingleOperationResp(false, "accountId " + accountId + " isn't associated with any organization");
+                    }
+
+                    Tokens tokens;
+                    Bson filters = Filters.and(
+                        Filters.eq("orgId", organization.getId()),
+                        Filters.eq("accountId", accountId)
+                    );
+                    tokens = TokensDao.instance.findOne(filters);
+                    Bson updates = null;
+                    if (tokens == null || tokens.isOldToken()) {
+                        if (tokens == null) {
+                            updates = Updates.combine(
+                                Updates.setOnInsert("createdAt", Context.now()),
+                                Updates.setOnInsert("orgId", organization.getId()),
+                                Updates.setOnInsert("accountId", accountId)
+                            );
+                        }
+                        BasicDBObject reqBody = new BasicDBObject();
+                        reqBody.put("orgId", organization.getId());
+                        reqBody.put("accountId", accountId);
+                        BasicDBObject resp = UsageMetricUtils.fetchFromBillingService("fetchToken", reqBody);
+                        if (resp == null || resp.get("tokens") == null) {
+                            return new ExecutorSingleOperationResp(false, "error generating ${akto_header}");
+                        }
+                        if (updates != null) {
+                            updates = Updates.combine(updates, Updates.set("updatedAt", ((BasicDBObject) resp.get("tokens")).getInt("updatedAt")));
+                        } else {
+                            updates = Updates.set("updatedAt", ((BasicDBObject) resp.get("tokens")).getInt("updatedAt"));
+                        }
+
+                        UsageUtils.saveToken(organization.getId(), accountId, updates, filters, ((BasicDBObject) resp.get("tokens")).getString("token"));
+                        value = ((BasicDBObject) resp.get("tokens")).getString("token");
+                    } else {
+                        value = tokens.getToken();
+                    }
+                }
+
                 return Operations.addHeader(rawApi, key.toString(), value.toString());
             case "modify_header":
                 String keyStr = key.toString();

@@ -1,10 +1,14 @@
 package com.akto.action.billing;
 
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.billing.TokensDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.billing.Tokens;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.stigg.StiggReporterClient;
+import com.akto.util.UsageUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -14,9 +18,13 @@ import org.bson.conversions.Bson;
 import static com.opensymphony.xwork2.Action.ERROR;
 import static com.opensymphony.xwork2.Action.SUCCESS;
 
+import java.util.UUID;
+
 public class OrganizationAction {
 
     private Organization organization;
+    private int accountId;
+    private Tokens tokens;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(OrganizationAction.class);
     
@@ -49,6 +57,33 @@ public class OrganizationAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchToken() {
+
+        Bson filters = Filters.and(
+            Filters.eq("orgId", orgId),
+            Filters.eq("accountId", accountId)
+        );
+        tokens = TokensDao.instance.findOne(filters);
+        Bson updates;
+        if (tokens == null) {
+            updates = Updates.combine(
+                Updates.set("updatedAt", Context.now()),
+                Updates.setOnInsert("createdAt", Context.now()),
+                Updates.setOnInsert("orgId", orgId),
+                Updates.setOnInsert("accountId", accountId)
+            );
+        } else {
+            updates = Updates.set("updatedAt", Context.now());
+        }
+        if (tokens == null || tokens.isOldToken()) {
+            String token = orgId + "_" + accountId + "_" + UUID.randomUUID().toString().replace("-", "");
+            UsageUtils.saveToken(orgId, accountId, updates, filters, token);
+        }
+        tokens = TokensDao.instance.findOne(filters);
+
+        return SUCCESS.toUpperCase();
+    }
+
     private String orgId;
     public String fetchOrgDetails() {
         this.organization = OrganizationsDao.instance.findOne(Organization.ID, orgId);
@@ -69,5 +104,21 @@ public class OrganizationAction {
 
     public void setOrgId(String orgId) {
         this.orgId = orgId;
+    }
+
+    public int getAccountId() {
+        return accountId;
+    }
+
+    public void setAccountId(int accountId) {
+        this.accountId = accountId;
+    }
+
+    public Tokens getTokens() {
+        return tokens;
+    }
+
+    public void setTokens(Tokens tokens) {
+        this.tokens = tokens;
     }
 }
