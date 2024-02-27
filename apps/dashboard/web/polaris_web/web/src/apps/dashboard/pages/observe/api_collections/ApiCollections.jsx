@@ -255,7 +255,7 @@ function ApiCollections() {
         let copyObj = JSON.parse(JSON.stringify(envTypeMap))
         copyObj[apiCollectionId] = type
         api.updateEnvTypeOfCollection(type,apiCollectionId).then((resp) => {
-            func.setToast(true, false, "Deployment type updated successfully")
+            func.setToast(true, false, "ENV type updated successfully")
             setEnvTypeMap(copyObj)
             updateData(copyObj)
         })
