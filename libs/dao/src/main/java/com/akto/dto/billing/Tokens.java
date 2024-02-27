@@ -69,7 +69,7 @@ public class Tokens {
     }
 
     public boolean isOldToken() {
-        return Context.now() > (this.createdAt + TOKEN_ENPIRY_PERIOD_IN_SECONDS);
+        return Context.now() > (this.updatedAt + TOKEN_ENPIRY_PERIOD_IN_SECONDS);
     }
 
 }

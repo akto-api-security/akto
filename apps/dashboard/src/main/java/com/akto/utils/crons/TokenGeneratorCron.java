@@ -1,7 +1,5 @@
 package com.akto.utils.crons;
 
-import java.time.DayOfWeek;
-import java.time.LocalDate;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -20,6 +18,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.task.Cluster;
 import com.akto.util.AccountTask;
+import com.akto.util.DashboardMode;
 import com.akto.util.UsageUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -29,7 +28,7 @@ import static com.akto.task.Cluster.callDibs;
 
 public class TokenGeneratorCron {
     
-    private static final LoggerMaker loggerMaker = new LoggerMaker(SyncCron.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SyncCron.class, LogDb.DASHBOARD);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void tokenGeneratorScheduler() {
@@ -38,9 +37,14 @@ public class TokenGeneratorCron {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
+                        if (!DashboardMode.isOnPremDeployment()) {
+                            loggerMaker.infoAndAddToDb("Skipping tokenGeneratorScheduler, deployment type condition not satisfied");
+                            return;
+                        }
+
                         boolean dibs = callDibs(Cluster.TOKEN_GENERATOR_CRON, 600, 60);
                         if(!dibs){
-                            loggerMaker.infoAndAddToDb("Skipping tokenGeneratorScheduler, lock not acquired", LogDb.DASHBOARD);
+                            loggerMaker.infoAndAddToDb("Skipping tokenGeneratorScheduler, lock not acquired");
                             return;
                         }
 
@@ -49,7 +53,7 @@ public class TokenGeneratorCron {
                             Filters.in(Organization.ACCOUNTS, accountId)
                         );
                         if (organization == null) {
-                            loggerMaker.infoAndAddToDb("Skipping token generation for account " +  accountId + "organization not found", LogDb.DASHBOARD);
+                            loggerMaker.infoAndAddToDb("Skipping token generation for account " +  accountId + "organization not found");
                             return;
                         }
 
@@ -58,18 +62,18 @@ public class TokenGeneratorCron {
                         reqBody.put(Tokens.ACCOUNT_ID, accountId);
                         BasicDBObject resp = UsageMetricUtils.fetchFromBillingService("saveToken", reqBody);
                         if (resp == null || resp.get("tokens") == null || !(resp.get("tokens") instanceof BasicDBObject)) {
-                            loggerMaker.infoAndAddToDb("Skipping token generation for account " +  accountId + "fetch token call failed", LogDb.DASHBOARD);
+                            loggerMaker.infoAndAddToDb("Skipping token generation for account " +  accountId + "fetch token call failed");
                             return;
                         }
                         
                         BasicDBObject respToken = (BasicDBObject) resp.get("tokens");
                         if (respToken.get(Tokens.UPDATED_AT) == null) {
-                            loggerMaker.infoAndAddToDb("Skipping saving token in dashboard for account " +  accountId + "updated at is null", LogDb.DASHBOARD);
+                            loggerMaker.infoAndAddToDb("Skipping saving token in dashboard for account " +  accountId + "updated at is null");
                             return;
                         }
 
                         if (respToken.get(Tokens.TOKEN) == null) {
-                            loggerMaker.infoAndAddToDb("Skipping saving token in dashboard for account " +  accountId + "token received is null", LogDb.DASHBOARD);
+                            loggerMaker.infoAndAddToDb("Skipping saving token in dashboard for account " +  accountId + "token received is null");
                             return;
                         }
                         Bson filters = Filters.and(
@@ -96,7 +100,7 @@ public class TokenGeneratorCron {
                     }
                 }, "sync-cron-info");
             }
-        }, 0, 5, TimeUnit.MINUTES);
+        }, 0, 4, TimeUnit.HOURS);
     }
 
 }
