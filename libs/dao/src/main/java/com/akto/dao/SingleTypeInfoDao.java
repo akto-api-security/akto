@@ -314,7 +314,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         pipeline.add(Aggregates.project(projections));
         pipeline.add(Aggregates.group(groupedId));
-        pipeline.add(Aggregates.sort(Sorts.ascending(SingleTypeInfo._TIMESTAMP)));
+        pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
         return pipeline;
     }
 
