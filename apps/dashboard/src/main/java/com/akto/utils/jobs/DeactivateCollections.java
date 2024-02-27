@@ -1,6 +1,7 @@
 package com.akto.utils.jobs;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -50,6 +51,9 @@ public class DeactivateCollections {
 
     private static void deactivateCollectionsForOrganization(Organization organization) {
         try {
+            Set<Integer> accounts = organization.getAccounts();
+            HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+            featureWiseAllowed = UsageMetricHandler.updateFeatureMapWithLocalUsageMetrics(featureWiseAllowed, accounts);
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
             if (!featureAccess.checkInvalidAccess()) {
                 return;
@@ -57,7 +61,8 @@ public class DeactivateCollections {
             int overage = Math.max(featureAccess.getUsage() - featureAccess.getUsageLimit(), 0);
             String organizationId = organization.getId();
 
-            loggerMaker.infoAndAddToDb("overage before deactivating: " + overage);
+            String infoMessage = String.format("Overage found org: %s , overage: %s , deactivating collections", organizationId, overage);
+            loggerMaker.infoAndAddToDb(infoMessage);
 
             for (int accountId : organization.getAccounts()) {
                 Context.accountId.set(accountId);
@@ -77,7 +82,7 @@ public class DeactivateCollections {
 
         } catch (Exception e) {
             String errorMessage = String.format("Unable to deactivate collections for %s ", organization.getId());
-            loggerMaker.errorAndAddToDb(e, errorMessage, LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, errorMessage);
         }
 
     }
@@ -132,6 +137,9 @@ public class DeactivateCollections {
 
         ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
                 Updates.set(ApiCollection._DEACTIVATED, true));
+        
+        String infoMessage = String.format("Deactivated collections : %s", apiCollectionIds.toString());
+        loggerMaker.infoAndAddToDb(infoMessage);
 
         // TODO: handle case for API groups.
 

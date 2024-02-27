@@ -65,7 +65,7 @@ public class Main {
         OriginalHttpResponse response = null;
 
         try {
-            response = ApiExecutor.sendRequest(request, true, null);
+            response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
         } catch (Exception e) {
             logger.error("api execution failed");
             return "";
@@ -318,7 +318,7 @@ public class Main {
                 TestingRunResult testingRunResult = null;
                 try {
                     testingRunResult = testExecutor.runTestNew(it, null, testingUtil, null, testConfig,
-                            testingRunConfig);
+                            testingRunConfig, false, new ArrayList<>());
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

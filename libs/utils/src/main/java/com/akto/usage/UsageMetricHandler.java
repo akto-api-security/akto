@@ -28,36 +28,6 @@ public class UsageMetricHandler {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricHandler.class, LogDb.DASHBOARD);
 
-    public static HashMap<String, FeatureAccess> updateFeatureMapWithLocalUsageMetrics(HashMap<String, FeatureAccess> featureWiseAllowed, Set<Integer> accounts){
-
-        if (featureWiseAllowed == null) {
-            featureWiseAllowed = new HashMap<>();
-        }
-
-        // since an org can have multiple accounts, we need to consolidate the usage.
-        Map<String, FeatureAccess> consolidatedOrgUsage = UsageMetricsDao.instance.findLatestUsageMetricsForOrganization(accounts);
-
-        for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
-            String featureLabel = entry.getKey();
-            FeatureAccess featureAccess = entry.getValue();
-
-            if (consolidatedOrgUsage.containsKey(featureLabel)) {
-                FeatureAccess orgUsage = consolidatedOrgUsage.get(featureLabel);
-                featureAccess.setUsage(orgUsage.getUsage());
-
-                if(!featureAccess.checkBooleanOrUnlimited() && featureAccess.getUsage() >= featureAccess.getUsageLimit()) {
-                    if(featureAccess.getOverageFirstDetected() == -1){
-                        featureAccess.setOverageFirstDetected(orgUsage.getOverageFirstDetected());
-                    }
-                } else {
-                    featureAccess.setOverageFirstDetected(-1);
-                }
-                featureWiseAllowed.put(featureLabel, featureAccess);
-            }
-        }
-        return featureWiseAllowed;
-    }
-
     private static void updateOrgMeteredUsage(Organization organization) {
 
         Set<Integer> accounts = organization.getAccounts();
@@ -204,5 +174,35 @@ public class UsageMetricHandler {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, String.format("Error while measuring usage for account %d. Error: %s", accountId, e.getMessage()), LogDb.DASHBOARD);
         }
+    }
+
+    public static HashMap<String, FeatureAccess> updateFeatureMapWithLocalUsageMetrics(HashMap<String, FeatureAccess> featureWiseAllowed, Set<Integer> accounts){
+
+        if (featureWiseAllowed == null) {
+            featureWiseAllowed = new HashMap<>();
+        }
+
+        // since an org can have multiple accounts, we need to consolidate the usage.
+        Map<String, FeatureAccess> consolidatedOrgUsage = UsageMetricsDao.instance.findLatestUsageMetricsForOrganization(accounts);
+
+        for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
+            String featureLabel = entry.getKey();
+            FeatureAccess featureAccess = entry.getValue();
+
+            if (consolidatedOrgUsage.containsKey(featureLabel)) {
+                FeatureAccess orgUsage = consolidatedOrgUsage.get(featureLabel);
+                featureAccess.setUsage(orgUsage.getUsage());
+
+                if(!featureAccess.checkBooleanOrUnlimited() && featureAccess.getUsage() >= featureAccess.getUsageLimit()) {
+                    if(featureAccess.getOverageFirstDetected() == -1){
+                        featureAccess.setOverageFirstDetected(orgUsage.getOverageFirstDetected());
+                    }
+                } else {
+                    featureAccess.setOverageFirstDetected(-1);
+                }
+                featureWiseAllowed.put(featureLabel, featureAccess);
+            }
+        }
+        return featureWiseAllowed;
     }
 }
