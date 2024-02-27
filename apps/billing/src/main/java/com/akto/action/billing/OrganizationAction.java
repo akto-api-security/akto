@@ -57,7 +57,7 @@ public class OrganizationAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String fetchToken() {
+    public String saveToken() {
 
         Bson filters = Filters.and(
             Filters.eq(Tokens.ORG_ID, orgId),
@@ -75,10 +75,8 @@ public class OrganizationAction {
         } else {
             updates = Updates.set(Tokens.UPDATED_AT, Context.now());
         }
-        if (tokens == null || tokens.isOldToken()) {
-            String token = orgId + "_" + accountId + "_" + UUID.randomUUID().toString().replace("-", "");
-            UsageUtils.saveToken(orgId, accountId, updates, filters, token);
-        }
+        String token = orgId + "_" + accountId + "_" + UUID.randomUUID().toString().replace("-", "");
+        UsageUtils.saveToken(orgId, accountId, updates, filters, token);
         tokens = TokensDao.instance.findOne(filters);
 
         return SUCCESS.toUpperCase();

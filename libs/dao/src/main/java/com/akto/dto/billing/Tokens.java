@@ -15,7 +15,7 @@ public class Tokens {
     private int updatedAt;
     public static final String UPDATED_AT = "updatedAt";
 
-    private static final int TOKEN_ENPIRY_PERIOD_IN_SECONDS = 4 * 60 * 60;
+    private static final int TOKEN_ENPIRY_PERIOD_IN_SECONDS = 5 * 60 * 60;
 
     public Tokens(String token, String orgId, int accountId, int createdAt, int updatedAt) {
         this.token = token;
