@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.UrlModifierPayload;
 import com.akto.util.JSONUtils;
@@ -574,6 +575,46 @@ public class Utils {
             return currentRes && newVal;
         }
         return currentRes || newVal;
+    }
+
+    public static String convertToHarPayload(String message, int akto_account_id, int time, String type, String source) throws Exception {
+
+        Map<String, Object> json = gson.fromJson(message, Map.class);
+
+        Map<String, Object> req = (Map) json.get("request");
+        Map<String, Object> resp = (Map) json.get("response");
+
+        Map<String, Object> reqHeaders = new HashMap<>();
+        try {
+            reqHeaders = mapper.readValue((String) req.get("headers"), HashMap.class);
+            reqHeaders.remove("x-akto-ignore");
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+
+        String requestHeaders = mapper.writeValueAsString(reqHeaders);
+        String responseHeaders = (String) resp.get("headers");
+
+        String path = OriginalHttpRequest.getFullUrlWithParams((String) req.get("url"), (String) req.get("queryParams"));
+        String contentType = (String) reqHeaders.get("content-type");
+
+        Map<String,String> result = new HashMap<>();
+        result.put("akto_account_id", akto_account_id+"");
+        result.put("path", path);
+        result.put("requestHeaders", requestHeaders);
+        result.put("responseHeaders", responseHeaders);
+        result.put("method", (String) req.get("method"));
+        result.put("requestPayload", (String) req.get("body"));
+        result.put("responsePayload", (String) resp.get("method"));
+        result.put("ip", "");
+        result.put("time",time+"");
+        result.put("statusCode", ((Double) resp.get("statusCode")).intValue()+"");
+        result.put("type", type);
+        result.put("status", null);
+        result.put("contentType", contentType);
+        result.put("source", source);
+
+        return mapper.writeValueAsString(result);
     }
 
 }

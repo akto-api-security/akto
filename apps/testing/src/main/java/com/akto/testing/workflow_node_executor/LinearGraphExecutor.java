@@ -9,11 +9,12 @@ import com.akto.dao.context.Context;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.testing.GraphExecutorRequest;
 import com.akto.dto.testing.GraphExecutorResult;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowTestResult;
 
 public class LinearGraphExecutor extends GraphExecutor {
 
-    public GraphExecutorResult executeGraph(GraphExecutorRequest graphExecutorRequest) {
+    public GraphExecutorResult executeGraph(GraphExecutorRequest graphExecutorRequest, boolean debug, List<TestingRunResult.TestLog> testLogs) {
         List<Node> nodes = graphExecutorRequest.getGraph().sort();
 
         int id = Context.now();
@@ -21,7 +22,7 @@ public class LinearGraphExecutor extends GraphExecutor {
         Map<String, WorkflowTestResult.NodeResult> testResultMap = workflowTestResult.getNodeResultMap();
         for (Node node: nodes) {
             WorkflowTestResult.NodeResult nodeResult;
-            nodeResult = Utils.executeNode(node, graphExecutorRequest.getValuesMap());
+            nodeResult = Utils.executeNode(node, graphExecutorRequest.getValuesMap(), debug, testLogs);
             testResultMap.put(node.getId(), nodeResult);
             if (nodeResult.getErrors().size() > 0) break;
             if (graphExecutorRequest.getSkipIfNotVulnerable() && !nodeResult.isVulnerable()) {

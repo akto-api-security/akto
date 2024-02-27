@@ -1,24 +1,7 @@
 import { Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip} from "@shopify/polaris"
 import {ChevronUpMinor } from "@shopify/polaris-icons"
 
-import { useEffect, useRef, useState } from "react";
-
-import { editor } from "monaco-editor/esm/vs/editor/editor.api"
-import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
-import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
-import 'monaco-editor/esm/vs/editor/contrib/bracketMatching/browser/bracketMatching';
-import 'monaco-editor/esm/vs/editor/contrib/comment/browser/comment';
-import 'monaco-editor/esm/vs/editor/contrib/codelens/browser/codelensController';
-// import 'monaco-editor/esm/vs/editor/contrib/colorPicker/browser/color';
-import 'monaco-editor/esm/vs/editor/contrib/format/browser/formatActions';
-import 'monaco-editor/esm/vs/editor/contrib/lineSelection/browser/lineSelection';
-import 'monaco-editor/esm/vs/editor/contrib/indentation/browser/indentation';
-// import 'monaco-editor/esm/vs/editor/contrib/inlineCompletions/browser/inlineCompletionsController';
-import 'monaco-editor/esm/vs/editor/contrib/snippet/browser/snippetController2'
-import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController';
-import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter';
-import "monaco-editor/esm/vs/language/json/monaco.contribution"
-import "monaco-editor/esm/vs/language/json/json.worker"
+import { useEffect, useState } from "react";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import api from "../../testing/api"
 import testEditorRequests from "../api";
@@ -28,11 +11,12 @@ import "../TestEditor.css"
 import TestRunResultPage from "../../testing/TestRunResultPage/TestRunResultPage";
 import PersistStore from "../../../../main/PersistStore";
 import editorSetup from "./editor_config/editorSetup";
+import SampleData from "../../../components/shared/SampleData";
+import transform from "../../../components/shared/customDiffEditor";
 
 const SampleApi = () => {
 
     const allCollections = PersistStore(state => state.allCollections);
-    const [editorInstance, setEditorInstance] = useState(null);
     const [selected, setSelected] = useState(0);
     const [selectApiActive, setSelectApiActive] = useState(false)
     const [selectedCollectionId, setSelectedCollectionId] = useState(null)
@@ -45,6 +29,7 @@ const SampleApi = () => {
     const [loading, setLoading] = useState(false)
     const [testResult,setTestResult] = useState(null)
     const [showTestResult, setShowTestResult] = useState(false);
+    const [editorData, setEditorData] = useState({message: ''})
 
     const currentContent = TestEditorStore(state => state.currentContent)
     const selectedTest = TestEditorStore(state => state.selectedTest)
@@ -52,26 +37,9 @@ const SampleApi = () => {
     const defaultRequest = TestEditorStore(state => state.defaultRequest)
     const selectedSampleApi = TestEditorStore(state => state.selectedSampleApi)
     const setSelectedSampleApi = TestEditorStore(state => state.setSelectedSampleApi)
-    
-
-    const jsonEditorRef = useRef(null)
 
     const tabs = [{ id: 'request', content: 'Request' }, { id: 'response', content: 'Response'}];
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
-
-    useEffect(() => {
-        const jsonEditorOptions = {
-            language: "json",
-            minimap: { enabled: false },
-            wordWrap: true,
-            automaticLayout: true,
-            colorDecorations: true,
-            scrollBeyondLastLine: false,
-            readOnly: true
-        }
-
-        setEditorInstance(editor.create(jsonEditorRef.current, jsonEditorOptions))    
-    }, [])
 
     useEffect(()=>{
         let testId = selectedTest.value
@@ -103,7 +71,7 @@ const SampleApi = () => {
         if (selectedCollectionId && selectedApiEndpoint) {
             fetchSampleData(selectedCollectionId, func.toMethodUrlObject(selectedApiEndpoint).url, func.toMethodUrlObject(selectedApiEndpoint).method)
         }else{
-            editorInstance?.setValue("")
+            setEditorData({message: ''})
         }
         setTestResult(null)
     }, [selectedApiEndpoint])
@@ -120,12 +88,13 @@ const SampleApi = () => {
     const handleTabChange = (selectedTabIndex) => {
         setSelected(selectedTabIndex)
         if (sampleData) {
-
-            if (selectedTabIndex == 0) {
-                editorInstance.setValue('\n' + sampleData?.requestJson["firstLine"] + '\n\n' + JSON.stringify(sampleData.requestJson["json"], null, 2))
+            let localEditorData = ""
+            if (selectedTabIndex === 0) {
+                localEditorData = transform.formatData(sampleData?.requestJson, "http")
             } else {
-                editorInstance.setValue('\n' + sampleData?.responseJson["firstLine"] + '\n\n' + JSON.stringify(sampleData.responseJson["json"], null, 2))
+                localEditorData = transform.formatData(sampleData?.responseJson, "http")
             }
+            setEditorData({message: localEditorData})
         }
     }
 
@@ -162,10 +131,7 @@ const SampleApi = () => {
                 const requestJson = func.requestJson(sampleDataJson, [])
                 const responseJson = func.responseJson(sampleDataJson, [])
                 setSampleData({ requestJson, responseJson })
-
-                if (editorInstance) {
-                    editorInstance.setValue('\n' + requestJson["firstLine"] + '\n\n' + JSON.stringify(requestJson["json"], null, 2))
-                }
+                setEditorData({message: transform.formatData(requestJson, "http")})
                 setTimeout(()=> {
                     setSampleDataList(sampleDataResponse.sampleDataList)
                 },0)
@@ -279,8 +245,7 @@ const SampleApi = () => {
             </div>
 
             <Divider />
-
-            <Box ref={jsonEditorRef} minHeight="80.3vh"/>
+            <SampleData data={editorData} minHeight="80.3vh"  editorLanguage="custom_http" />
             {resultComponent}
             <Modal
                 open={showTestResult}

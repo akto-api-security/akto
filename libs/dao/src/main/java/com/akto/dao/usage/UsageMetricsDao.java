@@ -2,6 +2,7 @@ package com.akto.dao.usage;
 
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
+import com.akto.dto.billing.FeatureAccess;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -12,7 +13,6 @@ import java.util.Set;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.BillingContextDao;
-import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
@@ -22,8 +22,8 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 
 public class UsageMetricsDao extends BillingContextDao<UsageMetric>{
 
@@ -108,5 +108,4 @@ public class UsageMetricsDao extends BillingContextDao<UsageMetric>{
         return consolidatedUsage;
 
     }
-
 }

@@ -8,13 +8,16 @@ import {
   FlagMajor,
   CreditCardSecureMajor,
   MarketingMajor,
+  ChevronDownMinor,
+  ChevronUpMinor,
   FraudProtectMajor} from '@shopify/polaris-icons';
 import {
   Text,
   Button,
   VerticalStack,
-  HorizontalStack, Icon, LegacyCard
+  HorizontalStack, Icon, LegacyCard, Collapsible, Box, Divider, Scrollable
   } from '@shopify/polaris';
+import { tokens } from "@shopify/polaris-tokens"
 import TestingStore from '../testingStore';
 import api from '../api';
 import transform from '../transform';
@@ -247,6 +250,32 @@ function TestRunResultPage(props) {
     }
     return true;
   }
+  const [testLogsCollapsibleOpen, setTestLogsCollapsibleOpen] = useState(false)
+  const iconSource = testLogsCollapsibleOpen ? ChevronUpMinor : ChevronDownMinor
+  const testLogsComponent = (
+    <LegacyCard key="testLogsComponent">
+      <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued"></Text>}>
+        <HorizontalStack align="space-between">
+          <Text fontWeight="semibold" variant="bodyMd">Test Logs</Text>
+          <Button plain monochrome icon={iconSource} onClick={() => setTestLogsCollapsibleOpen(!testLogsCollapsibleOpen)} />
+        </HorizontalStack>
+          <Collapsible open={testLogsCollapsibleOpen} transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}>
+            <LegacyCard.Subsection>
+              <Box paddingBlockStart={3}><Divider /></Box>
+
+            <Scrollable style={{maxHeight: '40vh'}}>
+              <VerticalStack gap={1}>
+                  
+                    {testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].map((x) => <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
+                      {"[" + x["timestamp"] + "] "+  "[" + x["testLogType"] + "] " +x["message"]}
+                      </div>)}
+              </VerticalStack>
+            </Scrollable>
+            </LegacyCard.Subsection>
+          </Collapsible>
+      </LegacyCard.Section>
+    </LegacyCard>
+  )
 
   const components = loading ? [<SpinnerCentered key="loading" />] : [
       issueDetails.id &&
@@ -257,6 +286,7 @@ function TestRunResultPage(props) {
         <Button plain onClick={() => setFullDescription(!fullDescription)}> {fullDescription ? "Less" : "More"} information</Button>
       </LegacyCard>
     ,
+    (testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].length > 0) ?  testLogsComponent : null,
     ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) ? testErrorComponent : <></>,
     showTestSampleData(selectedTestRunResult) && selectedTestRunResult.testResults &&
     <SampleDataList
