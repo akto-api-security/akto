@@ -13,6 +13,7 @@ import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.upload.FileUploadError;
 import com.akto.listener.KafkaListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
@@ -28,6 +29,7 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
@@ -51,60 +53,57 @@ public class Utils {
             return result;
         }
 
-        try {
-            String authType = auth.get("type").asText().toLowerCase();
 
-            switch (authType) {
-                case "bearer":
-                    ArrayNode authParams = (ArrayNode) auth.get("bearer");
-                    for (JsonNode authHeader : authParams) {
-                        String tokenKey = authHeader.get("key").asText();
-                        if (tokenKey.equals("token")) {
-                            String tokenValue = authHeader.get("value").asText();
-                            String replacedTokenValue = replaceVariables(tokenValue, variableMap);
+        String authType = auth.get("type").asText().toLowerCase();
 
-                            result.put("Authorization", "Bearer " + replacedTokenValue);
+        switch (authType) {
+            case "bearer":
+                ArrayNode authParams = (ArrayNode) auth.get("bearer");
+                for (JsonNode authHeader : authParams) {
+                    String tokenKey = authHeader.get("key").asText();
+                    if (tokenKey.equals("token")) {
+                        String tokenValue = authHeader.get("value").asText();
+                        String replacedTokenValue = replaceVariables(tokenValue, variableMap);
 
-                        }
+                        result.put("Authorization", "Bearer " + replacedTokenValue);
+
                     }
-                    break;
-                case "apikey":
-                    ArrayNode apikeyParams = (ArrayNode) auth.get("apikey");
-                    String authKeyName = "", authValueName = "";
-                    for (JsonNode apikeyHeader : apikeyParams) {
-                        String key = apikeyHeader.get("key").asText();
-                        String value = apikeyHeader.get("value").asText();
+                }
+                break;
+            case "apikey":
+                ArrayNode apikeyParams = (ArrayNode) auth.get("apikey");
+                String authKeyName = "", authValueName = "";
+                for (JsonNode apikeyHeader : apikeyParams) {
+                    String key = apikeyHeader.get("key").asText();
+                    String value = apikeyHeader.get("value").asText();
 
-                        switch (key) {
-                            case "key":
-                                authKeyName = replaceVariables(value, variableMap);
-                                break;
-                            case "value":
-                                authValueName = replaceVariables(value, variableMap);
-                                break;
+                    switch (key) {
+                        case "key":
+                            authKeyName = replaceVariables(value, variableMap);
+                            break;
+                        case "value":
+                            authValueName = replaceVariables(value, variableMap);
+                            break;
 
-                            case "in":
-                                if (!value.equals("header")) {
-                                    throw new IllegalArgumentException("Only header supported in apikey");
-                                }
-                                break;
-                            default:
-                                break;
-                        }
+                        case "in":
+                            if (!value.equals("header")) {
+                                throw new IllegalArgumentException("Only header supported in apikey");
+                            }
+                            break;
+                        default:
+                            break;
                     }
+                }
 
-                    if (authKeyName.isEmpty() || authValueName.isEmpty()) {
-                        throw new IllegalArgumentException(
-                                "One of  kv is empty: key=" + authKeyName + " value=" + authValueName);
-                    } else {
-                        result.put(authKeyName, authValueName);
-                    }
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unsupported auth type: " + authType );
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Unable to parse auth from postman file: " + e.getMessage(), LogDb.DASHBOARD);
+                if (authKeyName.isEmpty() || authValueName.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "One of  kv is empty: key=" + authKeyName + " value=" + authValueName);
+                } else {
+                    result.put(authKeyName, authValueName);
+                }
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported auth type: " + authType );
         }
 
         return result;
@@ -157,7 +156,9 @@ public class Utils {
         return sb.toString();
     }
     
-    public static Map<String, String> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId, boolean allowReplay, Map<String, String> authMap) {
+    public static Pair<Map<String, String>, List<FileUploadError>> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId, boolean allowReplay, Map<String, String> authMap) {
+        Pair<Map<String, String>, List<String>> resp;
+        List<FileUploadError> errors = new ArrayList<>();
         try {
             JsonNode request = apiInfo.get("request");
 
@@ -165,7 +166,12 @@ public class Utils {
 
             JsonNode authApiNode = request.get("auth");
             if (authApiNode != null) {
-                authMap = getAuthMap(authApiNode, variables);
+                try {
+                    authMap = getAuthMap(authApiNode, variables);
+                }catch (Exception e) {
+                    errors.add(new FileUploadError("Error while getting auth map for " + apiName + " : " + e.toString(), FileUploadError.ErrorType.WARNING));
+                    loggerMaker.errorAndAddToDb(e, String.format("Error while getting auth map for %s : %s", apiName, e.toString()), LogDb.DASHBOARD);
+                }
             }
 
             Map<String, String> result = new HashMap<>();
@@ -173,7 +179,10 @@ public class Utils {
             result.put("path", getPath(request, variables));
 
             JsonNode methodObj = request.get("method");
-            if (methodObj == null) throw new Exception("No method field exists");
+            if (methodObj == null){
+                errors.add(new FileUploadError("No method field exists", FileUploadError.ErrorType.ERROR));
+                return Pair.of(null, errors);
+            }
             result.put("method", methodObj.asText());
 
             ArrayNode requestHeadersNode = (ArrayNode) request.get("header");
@@ -210,10 +219,12 @@ public class Utils {
                         status =  "";
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e,"Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), LogDb.DASHBOARD);
-                        return null;
+                        errors.add(new FileUploadError("Error while replaying request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), FileUploadError.ErrorType.ERROR));
+                        return Pair.of(null, errors);
                     }
                 } else {
-                    return null;
+                    errors.add(new FileUploadError("No response field exists", FileUploadError.ErrorType.WARNING));
+                    return Pair.of(null, errors);
                 }
             } else {
                 JsonNode respHeaders = response.get("header");
@@ -249,11 +260,11 @@ public class Utils {
             result.put("time", Context.now()+"");
             result.put("type", "http");
             result.put("source", "POSTMAN");
-
-            return result;
+            return Pair.of(result, errors);
         } catch (Exception e){
             loggerMaker.errorAndAddToDb(e, String.format("Failed to convert postman obj to Akto format : %s", e.toString()), LogDb.DASHBOARD);
-            return null;
+            errors.add(new FileUploadError("Failed to convert postman obj to Akto", FileUploadError.ErrorType.ERROR));
+            return Pair.of(null, errors);
         }
     }
 
@@ -319,6 +330,10 @@ public class Utils {
         return response.get("_postman_previewlanguage").asText();
     }
 
+    public static String getPath(JsonNode request) throws Exception {
+        return getPath(request, new HashMap<>());
+    }
+
     public static String getPath(JsonNode request, Map<String, String> variables) throws Exception {
         JsonNode urlObj = request.get("url");
         if (urlObj == null) throw new Exception("URL field doesn't exists");
@@ -368,6 +383,7 @@ public class Utils {
         return  result;
     }
 
+    //TODO handle item as a json object
     public static void fetchApisRecursively(ArrayNode items, ArrayList<JsonNode> jsonNodes) {
         if(items == null || items.size() == 0){
             return;
