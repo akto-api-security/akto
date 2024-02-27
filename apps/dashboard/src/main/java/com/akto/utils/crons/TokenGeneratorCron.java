@@ -1,0 +1,102 @@
+package com.akto.utils.crons;
+
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+
+import org.bson.conversions.Bson;
+
+import com.akto.billing.UsageMetricUtils;
+import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.billing.TokensDao;
+import com.akto.dao.context.Context;
+import com.akto.dto.Account;
+import com.akto.dto.billing.Organization;
+import com.akto.dto.billing.Tokens;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.task.Cluster;
+import com.akto.util.AccountTask;
+import com.akto.util.UsageUtils;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
+import static com.akto.task.Cluster.callDibs;
+
+public class TokenGeneratorCron {
+    
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SyncCron.class);
+    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+    public void tokenGeneratorScheduler() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        boolean dibs = callDibs(Cluster.TOKEN_GENERATOR_CRON, 600, 60);
+                        if(!dibs){
+                            loggerMaker.infoAndAddToDb("Skipping tokenGeneratorScheduler, lock not acquired", LogDb.DASHBOARD);
+                            return;
+                        }
+
+                        int accountId = Context.accountId.get();
+                        Organization organization = OrganizationsDao.instance.findOne(
+                            Filters.in(Organization.ACCOUNTS, accountId)
+                        );
+                        if (organization == null) {
+                            loggerMaker.infoAndAddToDb("Skipping token generation for account " +  accountId + "organization not found", LogDb.DASHBOARD);
+                            return;
+                        }
+
+                        BasicDBObject reqBody = new BasicDBObject();
+                        reqBody.put(Tokens.ORG_ID, organization.getId());
+                        reqBody.put(Tokens.ACCOUNT_ID, accountId);
+                        BasicDBObject resp = UsageMetricUtils.fetchFromBillingService("saveToken", reqBody);
+                        if (resp == null || resp.get("tokens") == null || !(resp.get("tokens") instanceof BasicDBObject)) {
+                            loggerMaker.infoAndAddToDb("Skipping token generation for account " +  accountId + "fetch token call failed", LogDb.DASHBOARD);
+                            return;
+                        }
+                        
+                        BasicDBObject respToken = (BasicDBObject) resp.get("tokens");
+                        if (respToken.get(Tokens.UPDATED_AT) == null) {
+                            loggerMaker.infoAndAddToDb("Skipping saving token in dashboard for account " +  accountId + "updated at is null", LogDb.DASHBOARD);
+                            return;
+                        }
+
+                        if (respToken.get(Tokens.TOKEN) == null) {
+                            loggerMaker.infoAndAddToDb("Skipping saving token in dashboard for account " +  accountId + "token received is null", LogDb.DASHBOARD);
+                            return;
+                        }
+                        Bson filters = Filters.and(
+                            Filters.eq(Tokens.ACCOUNT_ID, accountId),
+                            Filters.eq(Tokens.ORG_ID, organization.getId())
+                        );
+                        Tokens tokens = TokensDao.instance.findOne(filters);
+
+                        Bson updates;
+                        if (tokens == null) {
+                            updates = Updates.combine(
+                                Updates.setOnInsert(Tokens.CREATED_AT, Context.now()),
+                                Updates.setOnInsert(Tokens.ORG_ID, organization.getId()),
+                                Updates.setOnInsert(Tokens.ACCOUNT_ID, accountId),
+                                Updates.set(Tokens.UPDATED_AT, respToken.getInt(Tokens.UPDATED_AT))
+                            );
+                        } else {
+                            updates = Updates.combine(
+                                Updates.set(Tokens.UPDATED_AT, respToken.getInt(Tokens.UPDATED_AT))
+                            );
+                        }
+
+                        UsageUtils.saveToken(organization.getId(), accountId, updates, filters, respToken.getString(Tokens.TOKEN));
+                    }
+                }, "sync-cron-info");
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
+
+}

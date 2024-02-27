@@ -472,39 +472,13 @@ public class Executor {
                         Filters.eq(Tokens.ACCOUNT_ID, accountId)
                     );
                     tokens = TokensDao.instance.findOne(filters);
-                    Bson updates = null;
-                    if (tokens == null || tokens.isOldToken()) {
-                        if (tokens == null) {
-                            updates = Updates.combine(
-                                Updates.setOnInsert(Tokens.CREATED_AT, Context.now()),
-                                Updates.setOnInsert(Tokens.ORG_ID, organization.getId()),
-                                Updates.setOnInsert(Tokens.ACCOUNT_ID, accountId)
-                            );
-                        }
-                        BasicDBObject reqBody = new BasicDBObject();
-                        reqBody.put(Tokens.ORG_ID, organization.getId());
-                        reqBody.put(Tokens.ACCOUNT_ID, accountId);
-                        BasicDBObject resp = UsageMetricUtils.fetchFromBillingService("fetchToken", reqBody);
-                        if (resp == null || resp.get("tokens") == null) {
-                            return new ExecutorSingleOperationResp(false, "error generating ${akto_header}");
-                        }
-
-                        BasicDBObject respToken = (BasicDBObject) resp.get("tokens");
-                        if (respToken.get(Tokens.UPDATED_AT) == null || respToken.get(Tokens.TOKEN) == null) {
-                            return new ExecutorSingleOperationResp(false, "error extracting ${akto_header}, token missing");
-                        } 
-                        
-                        if (updates != null) {
-                            updates = Updates.combine(updates, Updates.set(Tokens.UPDATED_AT, respToken.getInt(Tokens.UPDATED_AT)));
-                        } else {
-                            updates = Updates.set(Tokens.UPDATED_AT, respToken.getInt(Tokens.UPDATED_AT));
-                        }
-
-                        UsageUtils.saveToken(organization.getId(), accountId, updates, filters, respToken.getString(Tokens.TOKEN));
-                        value = respToken.getString(Tokens.TOKEN);
-                    } else {
-                        value = tokens.getToken();
+                    if (tokens == null) {
+                        return new ExecutorSingleOperationResp(false, "error extracting ${akto_header}, token is missing");
                     }
+                    if (tokens.isOldToken()) {
+                        return new ExecutorSingleOperationResp(false, "error extracting ${akto_header}, token is old");
+                    }
+                    value = tokens.getToken();
                 }
 
                 return Operations.addHeader(rawApi, key.toString(), value.toString());
