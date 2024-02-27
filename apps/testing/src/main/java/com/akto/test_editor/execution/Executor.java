@@ -22,6 +22,7 @@ import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.TestExecutor;
+import com.akto.util.Constants;
 import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.util.modifier.JWTPayloadReplacer;
@@ -420,8 +421,11 @@ public class Executor {
         return null;
     }
 
+
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
         switch (operationType.toLowerCase()) {
+            case "attach_file":
+                return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , key.toString());
             case "add_body_param":
                 return Operations.addBody(rawApi, key.toString(), value);
             case "modify_body_param":

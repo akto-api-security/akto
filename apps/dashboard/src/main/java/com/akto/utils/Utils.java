@@ -95,16 +95,50 @@ public class Utils {
                     }
                 }
 
-                if (authKeyName.isEmpty() || authValueName.isEmpty()) {
+                    if (authKeyName.isEmpty() || authValueName.isEmpty()) {
+                        throw new IllegalArgumentException(
+                                "One of  kv is empty: key=" + authKeyName + " value=" + authValueName);
+                    } else {
+                        result.put(authKeyName, authValueName);
+                    }
+                    break;
+            case "basic":
+                ArrayNode basicParams = (ArrayNode) auth.get("basic");
+                String basicUsername = "", basicPassword = "";
+                for (JsonNode basicKeyHeader : basicParams) {
+                    String key = basicKeyHeader.get("key").asText();
+                    String value = basicKeyHeader.get("value").asText();
+                    switch (key) {
+                        case "username":
+                            basicUsername = replaceVariables(value, variableMap);
+                            break;
+                        case "password":
+                            basicPassword = replaceVariables(value, variableMap);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+
+                if (basicUsername.isEmpty() || basicPassword.isEmpty()) {
                     throw new IllegalArgumentException(
-                            "One of  kv is empty: key=" + authKeyName + " value=" + authValueName);
+                            "One of  username/password is empty: username=" + basicUsername + " password="
+                                    + basicPassword);
                 } else {
-                    result.put(authKeyName, authValueName);
+                    /*
+                     * Base64 implementation ref: https://www.ietf.org/rfc/rfc2617.txt
+                     */
+                    String basicCredentials = basicUsername + ":" + basicPassword;
+                    String basicEncoded = Base64.getEncoder().encodeToString(basicCredentials.getBytes());
+
+                    String basicHeader = "Basic " + basicEncoded;
+                    result.put("Authorization", basicHeader);
                 }
                 break;
-            default:
-                throw new IllegalArgumentException("Unsupported auth type: " + authType );
-        }
+                default:
+                    throw new IllegalArgumentException("Unsupported auth type: " + authType );
+            }
+
 
         return result;
     }
