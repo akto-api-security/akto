@@ -1,0 +1,57 @@
+id: SSRF_DETECTION_TEST
+info:
+  name: "SSRF Attack Detection for GraphQL APIs"
+  description: "Server Side Request Forgery (SSRF) vulnerability in WordPress WPGraphQL Plugin."
+  details: >
+    "This Server Side Request Forgery (SSRF) vulnerability in WordPress WPGraphQL Plugin. This could allow a malicious actor to cause a website to execute website requests to an arbitrary domain of the attacker. This could allow a malicious actor to find sensitive information of other services running on the system. This vulnerability has been fixed in version 1.14.6."
+    "The web server receives a URL or similar request from an upstream component and retrieves the contents of this URL, but it does not sufficiently ensure that the request is being sent to the expected destination."
+  category:
+    name: SSRF
+    shortName: Server Side Request Forgery
+    displayName: Server Side Request Forgery (SSRF)
+  subCategory: SSRF_ON_GRAPHQL
+  severity: MEDIUM
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://www.cvedetails.com/cve/CVE-2023-23684/"
+    - "https://cwe.mitre.org/data/definitions/918.html"
+  cwe:
+    - CWE-918
+  cve:
+    - CVE-2023-23684
+    
+api_selection_filters:
+  response_code:
+    and:
+      gte: 200
+      lt: 205
+  or:
+    - query_param:
+        for_one:
+          key:
+            contains_either:
+                - invoiceId
+            extract: invoiceId
+    - request_payload:
+        for_one:
+          key:
+            contains_either:
+                - invoiceId
+            extract: invoiceId
+
+execute:
+  type: single
+  requests:
+    - req:
+        - modify_query_param:
+            invoiceId: "https://pentesting101.requestcatcher.com/test"
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    regex: "Leaked Admin Token"
