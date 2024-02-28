@@ -5,11 +5,11 @@ import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
+import com.akto.dto.test_editor.Strategy;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.TestError;
 
 import java.util.Collections;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -27,8 +27,9 @@ public abstract class SecurityTestTemplate {
     String logId;
 
     TestingRunConfig testingRunConfig;
+    Strategy strategy;
 
-    public SecurityTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode ,RawApi rawApi, Map<String, Object> varMap, Auth auth, AuthMechanism authMechanism, String logId, TestingRunConfig testingRunConfig) {
+    public SecurityTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode ,RawApi rawApi, Map<String, Object> varMap, Auth auth, AuthMechanism authMechanism, String logId, TestingRunConfig testingRunConfig, Strategy strategy) {
         this.apiInfoKey = apiInfoKey;
         this.filterNode = filterNode;
         this.validatorNode = validatorNode;
@@ -39,6 +40,7 @@ public abstract class SecurityTestTemplate {
         this.authMechanism = authMechanism;
         this.logId = logId;
         this.testingRunConfig = testingRunConfig;
+        this.strategy = strategy;
     }
 
     public abstract boolean filter();
@@ -46,6 +48,8 @@ public abstract class SecurityTestTemplate {
     public abstract boolean checkAuthBeforeExecution(boolean debug, List<TestingRunResult.TestLog> testLogs);
 
     public abstract YamlTestResult  executor(boolean debug, List<TestingRunResult.TestLog> testLogs);
+
+    public abstract void triggerMetaInstructions(Strategy strategy, YamlTestResult attempts);
 
     public YamlTestResult run(boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
@@ -67,6 +71,7 @@ public abstract class SecurityTestTemplate {
             res.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.EXECUTION_FAILED.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
             attempts.setTestResults(res);
         }
+        triggerMetaInstructions(strategy, attempts);
         return attempts;
     }
 

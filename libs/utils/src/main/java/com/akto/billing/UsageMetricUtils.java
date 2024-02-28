@@ -22,6 +22,7 @@ import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.UsageUtils;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
@@ -30,6 +31,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 public class UsageMetricUtils {
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricUtils.class);
@@ -162,6 +164,42 @@ public class UsageMetricUtils {
 
         // allow access by default and in case of errors.
         return false;
+    }
+
+    public static BasicDBObject fetchFromBillingService(String apiName, BasicDBObject reqBody) {
+        String json = reqBody.toJson();
+
+        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+        RequestBody body = RequestBody.create(json, JSON);
+        Request request = new Request.Builder()
+                .url(UsageUtils.getUsageServiceUrl() + "/api/"+apiName)
+                .post(body)
+                .build();
+
+        OkHttpClient client = new OkHttpClient();
+        Response response = null;
+
+        try {
+            response = client.newCall(request).execute();
+            if (!response.isSuccessful()) {
+                throw new IOException("Unexpected code " + response);
+            }
+
+            ResponseBody responseBody = response.body();
+            if (responseBody == null) {
+                return null;
+            }
+
+            return BasicDBObject.parse(responseBody.string());
+
+        } catch (IOException e) {
+            System.out.println("Failed to sync organization with Akto. Error - " +  e.getMessage());
+            return null;
+        } finally {
+            if (response != null) {
+                response.close();
+            }
+        }
     }
 
     public static boolean checkActiveEndpointOverage(int accountId){
