@@ -540,8 +540,10 @@ public class PostmanAction extends UserAction {
         }
 
         uploads = FileUploadLogsDao.instance.getPostmanMCollection().find(Filters.and(filters.toArray(new Bson[0]))).into(new ArrayList<>());
+        int accountId = Context.accountId.get();
 
         new Thread(()-> {
+            Context.accountId.set(accountId);
             loggerMaker.infoAndAddToDb(String.format("Starting thread to import %d postman apis, import type: %s", uploads.size(), importType), LogDb.DASHBOARD);
             String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
             Map<String, List<PostmanUploadLog>> collectionToUploadsMap = new HashMap<>();
