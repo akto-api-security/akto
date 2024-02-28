@@ -11,6 +11,8 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRunConfig;
@@ -19,10 +21,12 @@ import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
+import com.akto.usage.UsageMetricHandler;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
@@ -188,8 +192,6 @@ public class Main {
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
-        Map<Integer, Integer> logSentMap = new HashMap<>();
-
         while (true) {
             AccountTask.instance.executeTask(account -> {
 
@@ -210,13 +212,10 @@ public class Main {
                 }
 
                 int accountId = account.getId();
-                if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
-                    int lastSent = logSentMap.getOrDefault(accountId, 0);
-                    if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
-                        logSentMap.put(accountId, start);
-                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
-                                + " . Failing test run : " + start, LogDb.TESTING);
-                    }
+                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
+
+                if (featureAccess.checkInvalidAccess()) {
+                    loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId + ". Failing test run at " + start, LogDb.TESTING);
                     TestingRunDao.instance.getMCollection().findOneAndUpdate(
                             Filters.eq(Constants.ID, testingRun.getId()),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
@@ -224,9 +223,12 @@ public class Main {
                     TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                             Filters.eq(Constants.ID, summaryId),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
-
                     return;
                 }
+
+                SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+                // saving the initial usageLeft, to calc delta later.
+                int usageLeft = syncLimit.getUsageLeft();
 
                 try {
                     setTestingRunConfig(testingRun, trrs);
@@ -267,7 +269,7 @@ public class Main {
 
                         }
                     }
-                    testExecutor.init(testingRun, summaryId);
+                    testExecutor.init(testingRun, summaryId, syncLimit);
                     raiseMixpanelEvent(summaryId, testingRun);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Error in init " + e, LogDb.TESTING);
@@ -294,6 +296,15 @@ public class Main {
                 }
 
                 loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
+                
+                // update usage after test is completed.
+                int deltaUsage = 0;
+                if(syncLimit.checkLimit){
+                    deltaUsage = usageLeft - syncLimit.getUsageLeft();
+                }
+
+                UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.TEST_RUNS, accountId, deltaUsage);
+
             }, "testing");
             Thread.sleep(1000);
         }

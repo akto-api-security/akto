@@ -53,35 +53,43 @@ public class UsageMetricCalculator {
             return deactivatedCollections;
         }
 
+        deactivatedCollections = getDeactivatedLatest();
+        lastDeactivatedFetched = Context.now();
+        return deactivatedCollections;
+    }
+
+    public static Set<Integer> getDeactivatedLatest(){
         List<ApiCollection> deactivated = ApiCollectionsDao.instance
                 .findAll(Filters.eq(ApiCollection._DEACTIVATED, true));
         Set<Integer> deactivatedIds = new HashSet<>(
                 deactivated.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList()));
 
-        deactivatedCollections = deactivatedIds;
-        lastDeactivatedFetched = Context.now();
-
         return deactivatedIds;
     }
-    
-    public static Bson excludeDemosAndDeactivated(String key){
-        List<Integer> demos = new ArrayList<>(getDemos());
-        List<Integer> deactivated = new ArrayList<>(getDeactivated());
-        deactivated.addAll(demos);
 
-        return Filters.nin(key, deactivated);
+    public static Set<Integer> getDemosAndDeactivated() {
+        Set<Integer> ret = new HashSet<>();
+        ret.addAll(getDeactivated());
+        ret.addAll(getDemos());
+        return ret;
+    }
+
+    public static Bson excludeDemosAndDeactivated(String key) {
+        List<Integer> list = new ArrayList<>(getDemos());
+        list.addAll(getDeactivatedLatest());
+        return Filters.nin(key, list);
     }
 
     public static List<String> getInvalidTestErrors() {
         List<String> invalidErrors = new ArrayList<String>() {{
             add(TestResult.TestError.DEACTIVATED_ENDPOINT.getMessage());
+            add(TestResult.TestError.USAGE_EXCEEDED.getMessage());
         }};
         return invalidErrors;
     }
 
     public static int calculateActiveEndpoints(UsageMetric usageMetric) {
         int measureEpoch = usageMetric.getMeasureEpoch();
-
         int activeEndpoints = SingleTypeInfoDao.instance.countEndpoints(
                 Filters.and(Filters.or(
                         Filters.gt(SingleTypeInfo.LAST_SEEN, measureEpoch),

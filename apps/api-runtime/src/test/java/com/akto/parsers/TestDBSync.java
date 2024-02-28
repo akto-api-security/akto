@@ -16,6 +16,7 @@ import com.akto.dto.AktoDataType;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.User;
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.AccountDataTypesInfo;
@@ -92,8 +93,8 @@ public class TestDBSync extends MongoBasedTest {
             aggr.addURL(TestDump2.createSampleParams("user"+i, url+i));
         }
         sync.computeDelta(aggr, true, 0);
-        sync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123, true);
+        sync.syncWithDB(false, true, SyncLimit.noLimit);
+        APICatalogSync.mergeUrlsAndSave(123, true, sync.existingAPIsInDb);
         sync.buildFromDB(false, true);
 
         assertEquals(0, sync.getDbState(123).getStrictURLToMethods().size());
@@ -139,7 +140,7 @@ public class TestDBSync extends MongoBasedTest {
         parser.syncFunction(responseParams, false, true, null);
         assertTrue(parser.getSyncCount() == 0);
 
-        APICatalogSync.mergeUrlsAndSave(123, true);
+        APICatalogSync.mergeUrlsAndSave(123, true, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
 
         SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
@@ -211,7 +212,7 @@ public class TestDBSync extends MongoBasedTest {
             aggr.addURL(TestDump2.createSampleParams("user"+i, "/payment/id"+i));
         }
         sync.computeDelta(aggr, true, 123);
-        sync.syncWithDB(false, true);
+        sync.syncWithDB(false, true, SyncLimit.noLimit);
 
 
         assertEquals(30, sync.getDbState(123).getStrictURLToMethods().size());
@@ -225,8 +226,8 @@ public class TestDBSync extends MongoBasedTest {
         aggr2.addURL(resp2);
         
         sync.computeDelta(aggr2, true, 123);
-        sync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123, true);
+        sync.syncWithDB(false, true, SyncLimit.noLimit);
+        APICatalogSync.mergeUrlsAndSave(123, true, sync.existingAPIsInDb);
         sync.buildFromDB(false, true);
 
         assertEquals(0, sync.getDbState(123).getStrictURLToMethods().size());
