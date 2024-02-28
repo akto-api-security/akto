@@ -94,7 +94,7 @@ public class TestDBSync extends MongoBasedTest {
         }
         sync.computeDelta(aggr, true, 0);
         sync.syncWithDB(false, true, SyncLimit.noLimit);
-        APICatalogSync.mergeUrlsAndSave(123, true);
+        APICatalogSync.mergeUrlsAndSave(123, true, sync.existingAPIsInDb);
         sync.buildFromDB(false, true);
 
         assertEquals(0, sync.getDbState(123).getStrictURLToMethods().size());
@@ -140,7 +140,7 @@ public class TestDBSync extends MongoBasedTest {
         parser.syncFunction(responseParams, false, true, null);
         assertTrue(parser.getSyncCount() == 0);
 
-        APICatalogSync.mergeUrlsAndSave(123, true);
+        APICatalogSync.mergeUrlsAndSave(123, true, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
 
         SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
@@ -227,7 +227,7 @@ public class TestDBSync extends MongoBasedTest {
         
         sync.computeDelta(aggr2, true, 123);
         sync.syncWithDB(false, true, SyncLimit.noLimit);
-        APICatalogSync.mergeUrlsAndSave(123, true);
+        APICatalogSync.mergeUrlsAndSave(123, true, sync.existingAPIsInDb);
         sync.buildFromDB(false, true);
 
         assertEquals(0, sync.getDbState(123).getStrictURLToMethods().size());

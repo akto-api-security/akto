@@ -451,7 +451,7 @@ public class Utils {
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
-            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true);
+            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, info.getHttpCallParser().apiCatalogSync.existingAPIsInDb);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
             try {
