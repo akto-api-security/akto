@@ -574,7 +574,8 @@ public class PostmanAction extends UserAction {
                     loggerMaker.infoAndAddToDb(String.format("Pushed data in akto collection id %s", aktoCollectionId), LogDb.DASHBOARD);
                 }
                 postmanWorkspaceUpload.setIngestionComplete(true);
-                FileUploadsDao.instance.replaceOne(Filters.eq("_id", new ObjectId(uploadId)), postmanWorkspaceUpload);
+                postmanWorkspaceUpload.setMarkedForDeletion(true);
+                FileUploadsDao.instance.replaceOne(Filters.eq("_id", uploadId), postmanWorkspaceUpload);
                 loggerMaker.infoAndAddToDb("Ingestion complete for " + postmanWorkspaceUpload.getId().toString(), LogDb.DASHBOARD);
 
             } catch (Exception e) {
@@ -690,11 +691,6 @@ public class PostmanAction extends UserAction {
         }
         postmanWorkspaceUpload.setMarkedForDeletion(true);
         FileUploadsDao.instance.replaceOne(Filters.eq("_id", uploadId), postmanWorkspaceUpload);
-        int accountId = Context.accountId.get();
-        new Thread(()-> {
-            loggerMaker.infoAndAddToDb("Starting thread to mark for deletion", LogDb.DASHBOARD);
-            InitializerListener.deleteFileUploads(accountId);
-        }).start();
         return SUCCESS.toUpperCase();
     }
 
