@@ -22,7 +22,7 @@ function PostmanSource() {
     const [uploadObj, setUploadObj] = useState({})
     const [importType, setImportType] = useState('ONLY_SUCCESSFUL_APIS');
     const [uploadId, setUploadId] = useState('');
-    const [intervalId, setIntervalId] = useState('');
+    const [intervalId, setIntervalId] = useState(null);
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -151,21 +151,20 @@ function PostmanSource() {
             setLoading(false)
             setToast(true, false, "Workspace imported successfully")
             setShowImportDetailsModal(true);
-            let intervalId = null;
-            intervalId = setInterval(async () => {
+            
+            const id = setInterval(async () => {
                 api.fetchPostmanImportLogs(uploadId).then(resp => {
-                    if(resp.uploadDetails.uploadStatus === 'SUCCEEDED'){
-                        clearInterval(intervalId)
-                        setUploadObj(resp.uploadDetails)
+                    if(resp.uploadDetails.uploadStatus === 'SUCCEEDED' || resp.uploadDetails.uploadStatus === 'FAILED'){
+                        clearInterval(id);
+                        setIntervalId(null); // Clear interval ID from state
+                        setUploadObj(resp.uploadDetails);
+                        if(resp.uploadDetails.uploadStatus === 'FAILED'){
+                            setUploadId(uploadId);
+                        }
                     }
-                    if(resp.uploadDetails.uploadStatus === 'FAILED'){
-                        clearInterval(intervalId);
-                        setUploadObj(resp.uploadDetails)
-                        setUploadId(uploadId)
-                    }
-                })
-                
-            }, 5000)
+                });
+            }, 5000);
+            setIntervalId(id);
         })
     }
 
@@ -176,23 +175,19 @@ function PostmanSource() {
             setLoading(false)
             setToast(true, false, "File uploaded successfully.")
             setShowImportDetailsModal(true);
-
-            setIntervalId(setInterval(async () => {
+            const id = setInterval(async () => {
                 api.fetchPostmanImportLogs(uploadId).then(resp => {
-                    if(resp.uploadDetails.uploadStatus === 'SUCCEEDED'){
-                        clearInterval(intervalId)
-                        setIntervalId('')
-                        setUploadObj(resp.uploadDetails)
+                    if(resp.uploadDetails.uploadStatus === 'SUCCEEDED' || resp.uploadDetails.uploadStatus === 'FAILED'){
+                        clearInterval(id);
+                        setIntervalId(null); // Clear interval ID from state
+                        setUploadObj(resp.uploadDetails);
+                        if(resp.uploadDetails.uploadStatus === 'FAILED'){
+                            setUploadId(uploadId);
+                        }
                     }
-                    if(resp.uploadDetails.uploadStatus === 'FAILED'){
-                        clearInterval(intervalId);
-                        setIntervalId('')
-                        setUploadObj(resp.uploadDetails)
-                        setUploadId(uploadId)
-                    }
-                })
-                
-            }, 5000));
+                });
+            }, 5000);
+            setIntervalId(id);
         })
     }
 
@@ -202,13 +197,19 @@ function PostmanSource() {
 
     const startImport = async() => {
         setShowImportDetailsModal(false)
+        setUploadObj({})
         api.ingestPostman(uploadObj.uploadId, importType).then(resp => {
             setToast(true, false, "File import has begun, refresh inventory page to view the postman collection")
         })
     }
 
     const closeModal = async() => {
+        console.log("I am called")
         setShowImportDetailsModal(false)
+        if(intervalId != null){
+            clearInterval(this.intervalId)
+            setIntervalId(null)
+        }
         api.deleteImportedPostman(uploadObj.uploadId).then(resp => {
         })
         setUploadObj({})
