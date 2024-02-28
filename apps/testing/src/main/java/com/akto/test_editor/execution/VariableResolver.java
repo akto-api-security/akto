@@ -134,7 +134,9 @@ public class VariableResolver {
                     if (!(val instanceof ArrayList)) {
                         for (int i = 0; i < expressionList.size(); i++) {
                             param = expressionList.get(i).toString();
-                            expressionList.set(i, param.replaceFirst("(\\$\\{[^}]*\\})", val.toString()));
+
+                            String finalVal = (val instanceof String) ? ((String) val) : val.toString();
+                            expressionList.set(i, param.replaceFirst("(\\$\\{[^}]*\\})", Matcher.quoteReplacement(finalVal)));
                         }
                     } else {
                         expressionList.remove(index);
