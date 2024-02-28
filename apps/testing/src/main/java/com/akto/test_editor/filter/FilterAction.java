@@ -714,7 +714,11 @@ public final class FilterAction {
                 val = listVal;  
             }
         } else {
-            val = queryParams;
+            if (queryParams == null) {
+                val = "";
+            } else {
+                val = queryParams;
+            }
         }
 
         if (val != null) {
