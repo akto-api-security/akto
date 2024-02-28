@@ -71,6 +71,7 @@ import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.*;
 import com.akto.util.DashboardMode;
 import com.akto.utils.crons.SyncCron;
+import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
@@ -129,6 +130,7 @@ public class InitializerListener implements ServletContextListener {
     public static boolean connectedToMongo = false;
     
     SyncCron syncCronInfo = new SyncCron();
+    TokenGeneratorCron tokenGeneratorCron = new TokenGeneratorCron();
     UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
 
     private static String domain = null;
@@ -1578,6 +1580,8 @@ public class InitializerListener implements ServletContextListener {
                         setUpTestEditorTemplatesScheduler();
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                         syncCronInfo.setUpUpdateCronScheduler();
+                        tokenGeneratorCron.tokenGeneratorScheduler();
+
                         //fetchGithubZip();
                         updateGlobalAktoVersion();
 
