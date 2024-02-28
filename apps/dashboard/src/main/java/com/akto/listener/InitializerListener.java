@@ -2249,7 +2249,7 @@ public class InitializerListener implements ServletContextListener {
         loggerMaker.infoAndAddToDb(String.format("Deleting %d file uploads", markedForDeletion.size()), LogDb.DASHBOARD);
         for (FileUpload fileUpload : markedForDeletion) {
             loggerMaker.infoAndAddToDb(String.format("Deleting file upload logs for uploadId: %s", fileUpload.getId()), LogDb.DASHBOARD);
-            FileUploadLogsDao.instance.deleteAll(eq("uploadId", fileUpload.getId()));
+            FileUploadLogsDao.instance.deleteAll(eq("uploadId", fileUpload.getId().toString()));
             loggerMaker.infoAndAddToDb(String.format("Deleting file upload: %s", fileUpload.getId()), LogDb.DASHBOARD);
             FileUploadsDao.instance.deleteAll(eq("_id", fileUpload.getId()));
             loggerMaker.infoAndAddToDb(String.format("Deleted file upload: %s", fileUpload.getId()), LogDb.DASHBOARD);

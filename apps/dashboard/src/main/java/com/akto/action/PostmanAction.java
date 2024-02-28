@@ -35,6 +35,7 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.ReplaceOptions;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.result.InsertOneResult;
 import io.swagger.v3.oas.models.OpenAPI;
 import org.apache.commons.lang3.tuple.Pair;
@@ -690,7 +691,7 @@ public class PostmanAction extends UserAction {
             return ERROR.toUpperCase();
         }
         postmanWorkspaceUpload.setMarkedForDeletion(true);
-        FileUploadsDao.instance.replaceOne(Filters.eq("_id", uploadId), postmanWorkspaceUpload);
+        FileUploadsDao.instance.getPostmanMCollection().updateOne(Filters.eq("_id", new ObjectId(uploadId)), new BasicDBObject("$set", new BasicDBObject("markedForDeletion", true)), new UpdateOptions().upsert(false));
         return SUCCESS.toUpperCase();
     }
 
