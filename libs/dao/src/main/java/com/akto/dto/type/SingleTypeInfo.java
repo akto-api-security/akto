@@ -877,4 +877,15 @@ public String composeKeyWithCustomSubType(SubType s) {
     public void setPublicCount(long publicCount) {
         this.publicCount = publicCount;
     }
+
+    public String composeApiInfoKey() {
+        if (this.getMethod() == null) {
+            return null;
+        }
+        if (this.getUrl() == null) {
+            return null;
+        }
+        return this.getApiCollectionId() + " " + this.getUrl() + " " + this.getMethod();
+    }
+
 }

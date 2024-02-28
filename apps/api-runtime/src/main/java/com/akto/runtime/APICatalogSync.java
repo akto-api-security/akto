@@ -245,7 +245,7 @@ public class APICatalogSync {
     }
 
 
-    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
+    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, BloomFilter<CharSequence> existingAPIsInDb) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
         Bson filterQ = null;
@@ -266,12 +266,13 @@ public class APICatalogSync {
         do {
             singleTypeInfos = SingleTypeInfoDao.instance.findAll(filterQ, offset, limit, null, Projections.exclude("values"));
 
-
             Map<String, Set<String>> staticUrlToSti = new HashMap<>();
             Set<String> templateUrlSet = new HashSet<>();
             List<String> templateUrls = new ArrayList<>();
             for(SingleTypeInfo sti: singleTypeInfos) {
                 String key = sti.getMethod() + " " + sti.getUrl();
+                fillExistingAPIsInDb(sti, existingAPIsInDb);
+
                 if (APICatalog.isTemplateUrl(sti.getUrl())) {
                     templateUrlSet.add(key);
                     continue;
@@ -793,11 +794,11 @@ public class APICatalogSync {
         return stiList;
     }
 
-    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
+    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, BloomFilter<CharSequence> existingAPIsInDb) {
 
         if (apiCollectionId == LLM_API_COLLECTION_ID || apiCollectionId == VULNERABLE_API_COLLECTION_ID) return;
 
-        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled);
+        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled, existingAPIsInDb);
         ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSti = new ArrayList<>();
         ArrayList<WriteModel<SampleData>> bulkUpdatesForSampleData = new ArrayList<>();
         ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
@@ -1375,6 +1376,10 @@ public class APICatalogSync {
 
         loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
         boolean mergingCalled = false;
+
+        demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
+        existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
+
         if (mergeAsyncOutside && fetchAllSTI ) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
                 this.lastMergeAsyncOutsideTs = Context.now();
@@ -1397,7 +1402,7 @@ public class APICatalogSync {
                         for(ApiCollection apiCollection: allCollections) {
                             int start = Context.now();
                             loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollection.getId(), LogDb.RUNTIME);
-                            mergeUrlsAndSave(apiCollection.getId(), urlRegexMatchingEnabled);
+                            mergeUrlsAndSave(apiCollection.getId(), urlRegexMatchingEnabled, existingAPIsInDb);
                             loggerMaker.infoAndAddToDb("Finished merging API collection " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                         }
                     } catch (Exception e) {
@@ -1575,20 +1580,25 @@ public class APICatalogSync {
         keyTypes.getOccurrences().put(param.getSubType(), param);
     }
 
+    private static Set<Integer> demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
+
+    private static void fillExistingAPIsInDb(SingleTypeInfo sti, BloomFilter<CharSequence> existingAPIsInDb) {
+        if (demosAndDeactivatedCollections.contains(sti.getApiCollectionId())) {
+            return;
+        }
+        String key = sti.composeApiInfoKey();
+        if (key != null) {
+            existingAPIsInDb.put(key);
+        }
+    }
 
     private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams, BloomFilter<CharSequence> existingAPIsInDb) {
         Map<Integer, APICatalog> ret = new HashMap<>();
         
-        Set<Integer> demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
-
         for (SingleTypeInfo param: allParams) {
             try {
                 buildHelper(param, ret);
-                if (demosAndDeactivatedCollections.contains(param.getApiCollectionId())) {
-                    continue;
-                }
-                String key = param.getApiCollectionId() + " " + param.getUrl() + " " + param.getMethod();
-                existingAPIsInDb.put(key);
+                fillExistingAPIsInDb(param, existingAPIsInDb);
             } catch (Exception e) {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb("Error while building from db: " + e.getMessage(), LogDb.RUNTIME);
