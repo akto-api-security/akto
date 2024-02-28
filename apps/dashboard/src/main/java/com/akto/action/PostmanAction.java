@@ -574,9 +574,7 @@ public class PostmanAction extends UserAction {
                     Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
                     loggerMaker.infoAndAddToDb(String.format("Pushed data in akto collection id %s", aktoCollectionId), LogDb.DASHBOARD);
                 }
-                postmanWorkspaceUpload.setIngestionComplete(true);
-                postmanWorkspaceUpload.setMarkedForDeletion(true);
-                FileUploadsDao.instance.replaceOne(Filters.eq("_id", uploadId), postmanWorkspaceUpload);
+                FileUploadsDao.instance.getPostmanMCollection().updateOne(Filters.eq("_id", new ObjectId(uploadId)), new BasicDBObject("$set", new BasicDBObject("ingestionComplete", true).append("markedForDeletion", true)), new UpdateOptions().upsert(false));
                 loggerMaker.infoAndAddToDb("Ingestion complete for " + postmanWorkspaceUpload.getId().toString(), LogDb.DASHBOARD);
 
             } catch (Exception e) {
