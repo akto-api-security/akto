@@ -1,0 +1,79 @@
+id: INVALID_SSN
+info:
+  name: "Testing for Invalid SSN"
+  description: >
+    "Testing vulnerability by injecting various malicious inputs for SSN 
+    field to check if the application handles them securely."
+  details: >
+    "This security test aims to identify vulnerabilities related to handling invalid SSN inputs in the API.
+     By injecting different types of invalid values, we test the application's ability to handle and reject 
+     these inputs securely, preventing potential exploitation by attackers."
+  impact: > 
+    "An attacker successfully creating or updating an entity with an invalid SSN 
+    could lead to data integrity issues and potential vulnerabilities in the system."
+  category:
+    name: BLE
+    shortName: Business Logic Errors
+    displayName: Business Logic Errors (BLE)
+  subCategory: INVALID_SSN
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP Top 10
+  
+
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  or:
+  - query_param:
+      for_one:
+        value:
+          regex: "^(?!000|666|9\\d{2})\\d{3}-(?!00)\\d{2}-(?!0000)\\d{4}$"
+        key:
+          extract: ssn_query_value
+  - request_payload:
+      for_one:
+        value:
+          regex: "^(?!000|666|9\\d{2})\\d{3}-(?!00)\\d{2}-(?!0000)\\d{4}$"
+        key:
+          extract: ssn_body_value
+
+wordLists:
+  SSNValues:
+  - "$"
+  - "Lorem ipsum dolor sit amet, consectetur adipiscing elit. turpis suscipit. Duis aliquet hendrerit massa"
+  - " "
+  - "000-00-0000"
+  - "-69"
+  - "9223372036854775807"
+  - "0"
+  - "null"
+
+execute:
+  type: single
+  requests:
+  - req:
+    - modify_query_param:
+        ssn_query_value: "${SSNValues}"
+    - modify_body_param:
+        ssn_body_value: "${SSNValues}"
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    percentage_match:
+      gte: 90
+    not_contains_either:
+      - "Invalid SSN format"
+      - "SSN must be 9 digits"
+      - "Invalid SSN value"
+      - "Expected type SSN but found type string"
+      - "Invalid SSN: SSN contains non-numeric characters"
+      - "Invalid SSN: SSN contains less than 9 digits"
+      - "Invalid SSN: SSN contains more than 9 digits"
+      - "Invalid SSN: SSN contains prohibited patterns"
+      - "Invalid SSN: SSN starts with a prohibited digit"

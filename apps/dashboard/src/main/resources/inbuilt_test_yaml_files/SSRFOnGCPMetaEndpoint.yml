@@ -1,0 +1,96 @@
+id: SSRF_ON_GCP_META_ENDPOINT
+info:
+  name: "Sensitive GCP details exposed due to SSRF"
+  description: > 
+    "The endpoint appears to be vulnerable to Server
+    Side Request Forgery attack. The original request was replayed by replacing 
+    the URI parameter with metadata endpoint provided by GCP. The application 
+    responded with 2XX success code and also gave out sensitive GCP information in response."
+  details: > 
+    "The endpoint appears to be vulnerable to Server Side Request Forgery attack. 
+    The original request was replayed by replacing the URI parameter with metadata 
+    endpoint provided by GCP. The application responded with 2XX success code and 
+    also gave out sensitive GCP information in response. Server-Side Request Forgery 
+    (SSRF) flaws occur whenever an API is fetching a remote resource without validating 
+    the user-supplied URL. It allows an attacker to coerce the application to send a 
+    crafted request to an unexpected destination, even when protected by a firewall or a 
+    VPN. Modern concepts in application development make SSRF more common and more dangerous. 
+    More common - the following concepts encourage developers to access an external resource 
+    based on user input: Webhooks, file fetching from URLs, custom SSO, and URL previews. 
+    More dangerous - Modern technologies like cloud providers, Kubernetes, and Docker expose 
+    management and control channels over HTTP on predictable, well-known paths. Those 
+    channels are an easy target for an SSRF attack. It is also more challenging to limit 
+    outbound traffic from your application, because of the connected nature of modern applications.
+    The SSRF risk can not always be completely eliminated. While choosing a protection mechanism, 
+    it is important to consider the business risks and needs."
+  impact: >
+    "Successful exploitation might compromise sensitive GCP information which attacker
+    can use to get unauthorized access to GCP."
+  category:
+    name: SSRF
+    shortName: Server Side Request Forgery
+    displayName: Server Side Request Forgery (SSRF)
+  subCategory: SSRF_ON_GCP_META_ENDPOINT
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - https://cloud.google.com/compute/docs/metadata/overview
+    - https://github.com/OWASP/API-Security/blob/master/2023/en/src/0xa6-server-side-request-forgery.md
+    - https://www.akto.io/blog/how-to-prevent-server-side-request-forgery-ssrf-as-a-developer
+  cwe:
+    - CWE-918
+
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 205
+  or:
+    - query_param:
+        for_one:
+          value:
+            contains_either:
+              - http
+          key:
+            extract: query_url_key
+    - request_payload:
+        for_one:
+          value:
+            contains_either:
+              - http
+          key:
+            extract: body_url_key
+
+wordLists:
+  urls:
+  - http://169.254.169.254/computeMetadata/v1/
+  - http://metadata.google.internal/computeMetadata/v1/
+  - http://metadata/computeMetadata/v1/
+  - http://metadata.google.internal/computeMetadata/v1/instance/hostname
+  - http://metadata.google.internal/computeMetadata/v1/instance/id
+  - http://metadata.google.internal/computeMetadata/v1/project/project-id
+ 
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_query_param:
+          query_url_key: "${urls}"
+      - modify_body_param:
+          body_url_key: "${urls}"
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    contains_either:
+      - image
+      - machine-type
+      - network-interfaces
+      - gateway
+      - ip-aliases
+      - machineType
+      - networkInterfaces
