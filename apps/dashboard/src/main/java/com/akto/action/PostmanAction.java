@@ -315,7 +315,7 @@ public class PostmanAction extends UserAction {
     }
 
     private static void importDataFromPostmanMain(String workspaceId, String apiKey, boolean allowReplay, ObjectId uploadId) {
-        PostmanWorkspaceUpload upload = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", uploadId)).limit(1).first();
+        PostmanWorkspaceUpload upload = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", uploadId)).first();
         if(upload == null){
             loggerMaker.infoAndAddToDb("No upload found with id: " + uploadId, LogDb.DASHBOARD);
             return;
@@ -454,7 +454,7 @@ public class PostmanAction extends UserAction {
             addActionError("Upload id is required");
             return ERROR.toUpperCase();
         }
-        PostmanWorkspaceUpload id = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", new ObjectId(uploadId))).limit(1).first();
+        PostmanWorkspaceUpload id = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", new ObjectId(uploadId))).first();
         if(id == null){
             addActionError("Invalid upload id");
             return ERROR.toUpperCase();
@@ -536,7 +536,7 @@ public class PostmanAction extends UserAction {
             addActionError("Invalid import type or upload id");
             return ERROR.toUpperCase();
         }
-        PostmanWorkspaceUpload postmanWorkspaceUpload = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", new ObjectId(uploadId))).limit(1).first();
+        PostmanWorkspaceUpload postmanWorkspaceUpload = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", new ObjectId(uploadId))).first();
         if(postmanWorkspaceUpload == null){
             addActionError("Invalid upload id");
             return ERROR.toUpperCase();
@@ -601,7 +601,7 @@ public class PostmanAction extends UserAction {
     }
 
     private static void importDataFromPostmanFileMain(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionId, String collectionName, boolean allowReplay, ObjectId uploadId) {
-        PostmanWorkspaceUpload postmanWorkspaceUpload = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", uploadId)).limit(1).first();
+        PostmanWorkspaceUpload postmanWorkspaceUpload = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", uploadId)).first();
         if(postmanWorkspaceUpload == null){
             loggerMaker.infoAndAddToDb("No upload found with id: " + uploadId, LogDb.DASHBOARD);
             return;
@@ -697,7 +697,7 @@ public class PostmanAction extends UserAction {
             addActionError("Upload id is required");
             return ERROR.toUpperCase();
         }
-        PostmanWorkspaceUpload postmanWorkspaceUpload = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", new ObjectId(uploadId))).limit(1).first();
+        PostmanWorkspaceUpload postmanWorkspaceUpload = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", new ObjectId(uploadId))).first();
         if(postmanWorkspaceUpload == null){
             addActionError("Invalid upload id");
             return ERROR.toUpperCase();
