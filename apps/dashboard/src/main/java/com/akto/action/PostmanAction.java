@@ -462,8 +462,7 @@ public class PostmanAction extends UserAction {
         postmanUploadLogs = new ArrayList<>();
         uploadStatus = id.getUploadStatus();
         if(id.getUploadStatus() == FileUpload.UploadStatus.SUCCEEDED){
-            postmanUploadLogs = FileUploadLogsDao.instance.getPostmanMCollection().find(Filters.and(Filters.eq("uploadId", uploadId),
-                    Filters.exists("errors", true))).into(new ArrayList<>());
+            postmanUploadLogs = FileUploadLogsDao.instance.getPostmanMCollection().find(Filters.eq("uploadId", uploadId)).into(new ArrayList<>());
         }
         BasicDBList list = new BasicDBList();
         if(id.getCollectionErrors() != null && !id.getCollectionErrors().isEmpty()){
@@ -482,17 +481,27 @@ public class PostmanAction extends UserAction {
         }
 
         BasicDBList modifiedLogs = new BasicDBList();
+        int correctlyParsedApis = 0;
+        int apisWithErrorsAndParsed = 0;
+        int apisWithErrorsAndCannotBeImported = 0;
         if(postmanUploadLogs != null && !postmanUploadLogs.isEmpty()){
             Map<String, String> map = new HashMap<>();
             map.put("term", "Url");
             map.put("description", "Errors");
             modifiedLogs.add(map);
             for (PostmanUploadLog log : postmanUploadLogs) {
-                BasicDBObject logObj = new BasicDBObject();
-                List<String> errors = log.getErrors().stream().map(FileUploadError::getError).collect(Collectors.toList());
-                logObj.put("term", log.getUrl());
-                logObj.put("description",  String.join(",", errors));
-                modifiedLogs.add(logObj);
+                if(log.getErrors() == null || log.getErrors().isEmpty()){
+                    correctlyParsedApis++;
+                } else {
+                    List<String> errors = log.getErrors().stream().map(FileUploadError::getError).collect(Collectors.toList());
+                    modifiedLogs.add(new BasicDBObject("term", log.getUrl()).append("description", String.join(",", errors)));
+                    if(log.getAktoFormat() == null){
+                        apisWithErrorsAndCannotBeImported++;
+                    } else {
+                        apisWithErrorsAndParsed++;
+                    }
+                }
+
             }
         }
         uploadDetails = new BasicDBObject();
@@ -501,7 +510,10 @@ public class PostmanAction extends UserAction {
         uploadDetails.put("collectionErrors", list);
         uploadDetails.put("logs", modifiedLogs);
         uploadDetails.put("errorCount", modifiedLogs.size());
-        uploadDetails.put("count", id.getCount());
+        uploadDetails.put("totalCount", id.getCount());
+        uploadDetails.put("correctlyParsedApis", correctlyParsedApis);
+        uploadDetails.put("apisWithErrorsAndParsed", apisWithErrorsAndParsed);
+        uploadDetails.put("apisWithErrorsAndCannotBeImported", apisWithErrorsAndCannotBeImported);
         return SUCCESS.toUpperCase();
     }
 

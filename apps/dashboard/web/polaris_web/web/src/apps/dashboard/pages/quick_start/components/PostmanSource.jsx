@@ -1,4 +1,4 @@
-import { Badge, Button, ButtonGroup, Checkbox, HorizontalStack, RadioButton, Text, VerticalStack, Modal, DescriptionList } from '@shopify/polaris'
+import { Badge, Button, ButtonGroup, Checkbox, HorizontalStack, RadioButton, Text, VerticalStack, Modal, DescriptionList, Tooltip, Icon } from '@shopify/polaris'
 import React, { useCallback, useEffect, useState } from 'react'
 import Dropdown from '../../../components/layouts/Dropdown'
 import settingFunctions from '../../settings/module'
@@ -9,7 +9,7 @@ import api from '../api';
 import Store from '../../../store';
 import InformationBannerComponent from "./shared/InformationBannerComponent";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-import {UploadMajor} from "@shopify/polaris-icons"
+import { QuestionMarkMinor } from "@shopify/polaris-icons"
 
 
 function PostmanSource() {
@@ -156,7 +156,7 @@ function PostmanSource() {
                 api.fetchPostmanImportLogs(uploadId).then(resp => {
                     if(resp.uploadDetails.uploadStatus === 'SUCCEEDED' || resp.uploadDetails.uploadStatus === 'FAILED'){
                         clearInterval(id);
-                        setIntervalId(null); // Clear interval ID from state
+                        setIntervalId(null);
                         setUploadObj(resp.uploadDetails);
                         if(resp.uploadDetails.uploadStatus === 'FAILED'){
                             setUploadId(uploadId);
@@ -179,7 +179,7 @@ function PostmanSource() {
                 api.fetchPostmanImportLogs(uploadId).then(resp => {
                     if(resp.uploadDetails.uploadStatus === 'SUCCEEDED' || resp.uploadDetails.uploadStatus === 'FAILED'){
                         clearInterval(id);
-                        setIntervalId(null); // Clear interval ID from state
+                        setIntervalId(null);
                         setUploadObj(resp.uploadDetails);
                         if(resp.uploadDetails.uploadStatus === 'FAILED'){
                             setUploadId(uploadId);
@@ -218,10 +218,34 @@ function PostmanSource() {
 
     let successModalContent = (
         <div>
-            <Text>Total APIs: {uploadObj.count}</Text>
-            <Text>Correctly parsed APIs: {uploadObj.count - uploadObj.errorCount}</Text>
-            {uploadObj.errorCount > 0 &&
-                <Text>Error count: {uploadObj.errorCount} </Text>
+            <Text>Total APIs in the {type==='api' ? 'selected workspace': 'uploaded file'}: {uploadObj.totalCount}</Text>
+            <Text>Total apis parsed correctly by Akto: {uploadObj.correctlyParsedApis}</Text>
+            {
+                uploadObj.apisWithErrorsAndCannotBeImported + uploadObj.apisWithErrorsAndParsed > 0 &&
+                <div>
+                    <Text>Total apis parsed with errors by Akto (can still be imported): {uploadObj.apisWithErrorsAndParsed}</Text>
+                    <Text>Total apis which cannot be imported: {uploadObj.apisWithErrorsAndCannotBeImported}</Text>
+                    { uploadObj.apisWithErrorsAndParsed > 0 && 
+                    <div>
+                        <div style={{display: "flex"}}>
+                            <RadioButton id="forceImport" label="Force import all APIs" checked={importType === "ALL_APIS"} onChange={()=>toggleImport("ALL_APIS")} />
+                            <div style={{margin: "auto 12px"}}>
+                                <Tooltip content={`We will import ${uploadObj.correctlyParsedApis + uploadObj.apisWithErrorsAndParsed} apis i.e. all the apis that have been correctly parsed and apis which have errors and can still be imported`} dismissOnMouseOut width="wide">
+                                    <Icon source={QuestionMarkMinor} color="base" />
+                                </Tooltip>
+                            </div>
+                        </div>
+                        <div style={{display: "flex"}}>
+                            <RadioButton id="successFulApis" label="Import only correctly formatted APIs" checked={importType === "ONLY_SUCCESSFUL_APIS"} onChange={()=>toggleImport("ONLY_SUCCESSFUL_APIS")}/>
+                            <div style={{margin: "auto 12px"}}>
+                                <Tooltip content={`We will import ${uploadObj.correctlyParsedApis} apis i.e. all the apis that have been correctly parsed only`} dismissOnMouseOut width="wide">
+                                    <Icon source={QuestionMarkMinor} color="base" />
+                                </Tooltip>
+                            </div>
+                        </div>
+                    </div>
+                    }
+                </div>
             }
             {uploadObj.collectionErrors > 0 && 
                 <div>
@@ -248,8 +272,7 @@ function PostmanSource() {
                 </div>
             }
 
-                <RadioButton id="forceImport" label="Force import all APIs" checked={importType === "ALL_APIS"} onChange={()=>toggleImport("ALL_APIS")}/>
-                <RadioButton id="successFulApis" label="Import only correctly formatted APIs" checked={importType === "ONLY_SUCCESSFUL_APIS"} onChange={()=>toggleImport("ONLY_SUCCESSFUL_APIS")}/>
+                
             
         </div>
     )
@@ -313,7 +336,7 @@ function PostmanSource() {
                 primaryAction={{
                     content: "Import",
                     onAction: startImport,
-                    disabled: uploadObj.uploadStatus !== 'SUCCEEDED'
+                    disabled: uploadObj.uploadStatus !== 'SUCCEEDED' || ( uploadObj.uploadStatus === 'SUCCEEDED' && (uploadObj.apisWithErrorsAndParsed + uploadObj.correctlyParsedApis === 0))
                 }}
                 secondaryActions={[
                     {
