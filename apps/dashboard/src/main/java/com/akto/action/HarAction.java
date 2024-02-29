@@ -104,7 +104,7 @@ public class HarAction extends UserAction {
             HAR har = new HAR();
             loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
             String zippedString = GzipUtils.zipString(harString);
-            com.akto.dto.files.File file = new com.akto.dto.files.File(HttpResponseParams.Source.HAR,zippedString);
+            com.akto.dto.files.File file = new com.akto.dto.files.File(HttpResponseParams.Source.HAR.toString(),zippedString);
             FilesDao.instance.insertOne(file);
             List<String> messages = har.getMessages(harString, apiCollectionId, Context.accountId.get());
             harErrors = har.getErrors();
