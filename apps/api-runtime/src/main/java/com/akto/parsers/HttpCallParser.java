@@ -294,7 +294,7 @@ public class HttpCallParser {
             }
 
             boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
-            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.POSTMAN)) {
+            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.POSTMAN) && httpResponseParam.getStatusCode() <= 0) {
                 cond = true;
             }
 
