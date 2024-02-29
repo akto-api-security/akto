@@ -251,6 +251,9 @@ public class Utils {
                         responsePayload =  res.getBody();
                         statusCode =  res.getStatusCode()+"";
                         status =  "";
+                        if(res.getStatusCode() < 200 || res.getStatusCode() >=400){
+                            throw new Exception("Found non 2XX response on replaying the API");
+                        }
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e,"Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), LogDb.DASHBOARD);
                         errors.add(new FileUploadError("Error while replaying request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), FileUploadError.ErrorType.ERROR));
