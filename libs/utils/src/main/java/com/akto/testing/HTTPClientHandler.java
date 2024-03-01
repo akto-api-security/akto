@@ -2,7 +2,6 @@ package com.akto.testing;
 
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.rules.TestPlugin;
 import okhttp3.*;
 import okio.Buffer;
 import org.jetbrains.annotations.NotNull;

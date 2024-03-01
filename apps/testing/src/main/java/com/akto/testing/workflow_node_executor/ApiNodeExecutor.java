@@ -16,6 +16,7 @@ import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
+import com.akto.testing.Main;
 import com.akto.testing.Utils;
 import com.akto.utils.RedactSampleData;
 
@@ -70,7 +71,7 @@ public class ApiNodeExecutor extends NodeExecutor {
                     Thread.sleep(sleep);
                 }
 
-                response = ApiExecutor.sendRequest(request, followRedirects, null, debug, testLogs);
+                response = ApiExecutor.sendRequest(request, followRedirects, null, debug, testLogs, Main.SKIP_SSRF_CHECK);
 
                 int statusCode = response.getStatusCode();
 
