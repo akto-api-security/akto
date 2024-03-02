@@ -204,7 +204,6 @@ function PostmanSource() {
     }
 
     const closeModal = async() => {
-        console.log("I am called")
         setShowImportDetailsModal(false)
         if(intervalId != null){
             clearInterval(this.intervalId)
