@@ -7,8 +7,6 @@ public class PostmanUploadLog extends FileUploadLog {
     private String postmanWorkspaceId;
     private String postmanCollectionId;
 
-    private String aktoFormat;
-
     public String getPostmanWorkspaceId() {
         return postmanWorkspaceId;
     }
@@ -23,13 +21,5 @@ public class PostmanUploadLog extends FileUploadLog {
 
     public void setPostmanCollectionId(String postmanCollectionId) {
         this.postmanCollectionId = postmanCollectionId;
-    }
-
-    public String getAktoFormat() {
-        return aktoFormat;
-    }
-
-    public void setAktoFormat(String aktoFormat) {
-        this.aktoFormat = aktoFormat;
     }
 }
