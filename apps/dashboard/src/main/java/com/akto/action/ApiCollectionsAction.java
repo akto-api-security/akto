@@ -446,18 +446,20 @@ public class ApiCollectionsAction extends UserAction {
         return Action.ERROR.toUpperCase();
     }
 
+    List<Integer> apiCollectionIds;
+
     private ENV_TYPE envType;
 
 	public String updateEnvType(){
         try {
-            Bson filter =  Filters.eq("_id", apiCollectionId);
+            Bson filter =  Filters.in("_id", apiCollectionIds);
             FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
             updateOptions.upsert(false);
 
-            ApiCollection update = ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(filter,
-                                Updates.set(ApiCollection.USER_ENV_TYPE,envType)
-                        );
-            if(update == null){
+            UpdateResult result = ApiCollectionsDao.instance.getMCollection().updateMany(filter,
+                                            Updates.set(ApiCollection.USER_ENV_TYPE,envType)
+                                    );;
+            if(result == null){
                 return Action.ERROR.toUpperCase();
             }
             return SUCCESS.toUpperCase();
@@ -550,4 +552,8 @@ public class ApiCollectionsAction extends UserAction {
     public void setEnvType(ENV_TYPE envType) {
 		this.envType = envType;
 	}
+
+    public void setApiCollectionIds(List<Integer> apiCollectionIds) {
+        this.apiCollectionIds = apiCollectionIds;
+    }
 }

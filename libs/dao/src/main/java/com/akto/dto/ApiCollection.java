@@ -115,15 +115,10 @@ public class ApiCollection {
         if(this.type != null && this.type == Type.API_GROUP) return null;
         
         if(this.userSetEnvType == null){
-            if(this.hostName == null){
+            if(this.hostName != null && this.hostName.matches(".*(staging|preprod|qa|demo|dev|test\\.).*")){
                 return ENV_TYPE.STAGING;
-            }else{
-                if (this.hostName.matches(".*(staging|preprod|qa\\.).*")){
-                    return ENV_TYPE.STAGING;
-                }else{
-                    return ENV_TYPE.PRODUCTION;
-                }
             }
+            return null;
         }else{
             return this.userSetEnvType;
         }

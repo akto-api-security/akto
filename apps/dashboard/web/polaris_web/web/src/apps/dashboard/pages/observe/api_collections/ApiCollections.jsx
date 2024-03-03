@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Badge } from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
@@ -118,6 +118,7 @@ function ApiCollections() {
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(false)
     const [envTypeMap, setEnvTypeMap] = useState({})
     const [refreshData, setRefreshData] = useState(false)
+    const [popover,setPopover] = useState(false)
     
     
     const tableTabs = [
@@ -244,17 +245,17 @@ function ApiCollections() {
         Object.keys(copyObj).forEach((key) => {
             data[key].length > 0 && data[key].forEach((c) => {
                 c['envType'] = dataMap[c.id]
-                c['envTypeComp'] = <Badge size="small" status="info">{func.toSentenceCase(dataMap[c.id])}</Badge>
+                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" status="info">{func.toSentenceCase(dataMap[c.id])}</Badge> : null
             })
         })
         setData(copyObj)
         setRefreshData(!refreshData)
     }
 
-    const updateEnvType = (apiCollectionId,type) => {
+    const updateEnvType = (apiCollectionIds,type) => {
         let copyObj = JSON.parse(JSON.stringify(envTypeMap))
-        copyObj[apiCollectionId] = type
-        api.updateEnvTypeOfCollection(type,apiCollectionId).then((resp) => {
+        apiCollectionIds.forEach(id => copyObj[id] = type)
+        api.updateEnvTypeOfCollection(type,apiCollectionIds).then((resp) => {
             func.setToast(true, false, "ENV type updated successfully")
             setEnvTypeMap(copyObj)
             updateData(copyObj)
@@ -267,14 +268,32 @@ function ApiCollections() {
             content: `Remove collection${func.addPlurality(selectedResources.length)}`,
             onAction: () => handleRemoveCollections(selectedResources)
         }
-        const toggleType = envTypeMap[selectedResources[0]] === "STAGING" ? "PRODUCTION" : "STAGING"
+
+        const toggleTypeContent = (
+            <Popover
+                activator={<div onClick={() => setPopover(!popover)}>Set ENV type</div>}
+                onClose={() => setPopover(false)}
+                active={popover}
+                autofocusTarget="first-node"
+            >
+                <Popover.Pane>
+                    <ActionList
+                        actionRole="menuitem"
+                        items={[
+                            {content: 'Staging', onAction: () => updateEnvType(selectedResources, "STAGING")},
+                            {content: 'Production', onAction: () => updateEnvType(selectedResources, "PRODUCTION")},
+                            {content: 'Reset', onAction: () => updateEnvType(selectedResources, null)},
+                        ]}
+                    />
+                </Popover.Pane>
+            </Popover>
+        )
 
         const toggleEnvType = {
-            content: `Change collection type to ${toggleType}`,
-            onAction: () => updateEnvType(selectedResources[0], toggleType)
+            content: toggleTypeContent
         }
-        if(selectedResources.length < 2)return [removeCollectionsObj, toggleEnvType]
-        else return[removeCollectionsObj];
+
+        return [removeCollectionsObj, toggleEnvType]
     }
 
     const modalComponent = <CreateNewCollectionModal
