@@ -615,11 +615,11 @@ export default {
             data:{},
         })
     },
-    async updateEnvTypeOfCollection(envType, apiCollectionId){
+    async updateEnvTypeOfCollection(envType, apiCollectionIds){
         await request({
             url: '/api/updateEnvType',
             method: 'post',
-            data: {envType, apiCollectionId}
+            data: {envType, apiCollectionIds}
         })
     }
 }
