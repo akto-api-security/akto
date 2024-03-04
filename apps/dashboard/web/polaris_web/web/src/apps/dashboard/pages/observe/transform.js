@@ -437,13 +437,15 @@ const transform = {
                         <span style={{color: tranform.getTextColor(method), fontSize: "14px", fontWeight: 500}}>{method}</span>
                     </HorizontalStack>
                 </Box>
-                <Box width="200px" maxWidth="200px">
-                    <HorizontalStack align="space-between">
-                        <Box maxWidth={isNew ? "140px" : '180px'}>
-                            <TooltipText text={this.getTruncatedUrl(url)} tooltip={this.getTruncatedUrl(url)} textProps={{fontWeight: "medium"}} />
+                <Box width="30vw">
+                    <div style={{display: "flex", justifyContent: "space-between"}}>
+                        <Box>
+                            <Text fontWeight="medium" breakWord>{this.getTruncatedUrl(url)}</Text>
                         </Box>
-                        {isNew ? <Badge size="small">New</Badge> : null}
-                    </HorizontalStack>
+                        <Box>
+                            {isNew ? <Badge size="small">New</Badge> : null}
+                        </Box>
+                    </div>
                 </Box>
             </div> 
         )
