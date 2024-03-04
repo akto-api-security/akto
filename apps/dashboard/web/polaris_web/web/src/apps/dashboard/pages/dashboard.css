@@ -100,3 +100,7 @@
 .Polaris-VideoThumbnail__Thumbnail{
     border-radius: 8px !important;
 }
+
+.Polaris-Text--break {
+    white-space: normal !important;
+}
