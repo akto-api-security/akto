@@ -19,6 +19,8 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
+import com.akto.dao.upload.FileUploadLogsDao;
+import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.*;
@@ -44,6 +46,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.upload.FileUpload;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
@@ -71,6 +74,7 @@ import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.*;
 import com.akto.util.DashboardMode;
 import com.akto.utils.crons.SyncCron;
+import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
@@ -129,6 +133,7 @@ public class InitializerListener implements ServletContextListener {
     public static boolean connectedToMongo = false;
     
     SyncCron syncCronInfo = new SyncCron();
+    TokenGeneratorCron tokenGeneratorCron = new TokenGeneratorCron();
     UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
 
     private static String domain = null;
@@ -1578,6 +1583,8 @@ public class InitializerListener implements ServletContextListener {
                         setUpTestEditorTemplatesScheduler();
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                         syncCronInfo.setUpUpdateCronScheduler();
+                        tokenGeneratorCron.tokenGeneratorScheduler();
+
                         //fetchGithubZip();
                         updateGlobalAktoVersion();
 
@@ -2238,6 +2245,19 @@ public class InitializerListener implements ServletContextListener {
                 syncWithAkto();
             }
         }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
+    }
+
+    public static void deleteFileUploads(int accountId){
+        Context.accountId.set(accountId);
+        List<FileUpload> markedForDeletion = FileUploadsDao.instance.findAll(eq("markedForDeletion", true));
+        loggerMaker.infoAndAddToDb(String.format("Deleting %d file uploads", markedForDeletion.size()), LogDb.DASHBOARD);
+        for (FileUpload fileUpload : markedForDeletion) {
+            loggerMaker.infoAndAddToDb(String.format("Deleting file upload logs for uploadId: %s", fileUpload.getId()), LogDb.DASHBOARD);
+            FileUploadLogsDao.instance.deleteAll(eq("uploadId", fileUpload.getId().toString()));
+            loggerMaker.infoAndAddToDb(String.format("Deleting file upload: %s", fileUpload.getId()), LogDb.DASHBOARD);
+            FileUploadsDao.instance.deleteAll(eq("_id", fileUpload.getId()));
+            loggerMaker.infoAndAddToDb(String.format("Deleted file upload: %s", fileUpload.getId()), LogDb.DASHBOARD);
+        }
     }
   
 }
