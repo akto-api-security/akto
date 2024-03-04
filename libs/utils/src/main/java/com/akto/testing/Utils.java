@@ -14,7 +14,6 @@ import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.parsers.HttpCallParser;
 import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
 
