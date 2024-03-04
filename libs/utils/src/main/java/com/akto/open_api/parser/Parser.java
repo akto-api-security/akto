@@ -221,7 +221,7 @@ public class Parser {
                     List<Map<String, String>> responseObjectList = new ArrayList<>();
 
                     try {
-                        loggerMaker.infoAndAddToDb("no responses found for " + path + " " + method + ", replaying request");
+                        loggerMaker.infoAndAddToDb("Replaying request for" + path + " " + method + ", replaying request");
 
                         Map<String, List<String>> modifiedHeaders = new HashMap<>();
                         for (String key : requestHeaders.keySet()) {
@@ -238,7 +238,7 @@ public class Parser {
                             responsePayload =  res.getBody();
                             statusCode =  res.getStatusCode()+"";
                             status =  "";
-                            if(res.getStatusCode() < 200 || res.getStatusCode() >=400){
+                            if(!HttpResponseParams.validHttpResponseCode(res.getStatusCode())){
                                 throw new Exception("Found non 2XX response on replaying the API");
                             }
                             Map<String, String> responseObject = new HashMap<>();
