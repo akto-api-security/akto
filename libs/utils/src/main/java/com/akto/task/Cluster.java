@@ -18,6 +18,7 @@ public class Cluster {
     public static final String RUNTIME_MERGER = "runtime-merger";
     public static final String MAP_SENSITIVE_IN_INFO = "map-sensitiveInfo-in-ApiInfo";
     public static final String SYNC_CRON_INFO = "sync-cron-info";
+    public static final String TOKEN_GENERATOR_CRON = "token-generator-cron";
 
     public static final String winnerId = UUID.randomUUID().toString();
 

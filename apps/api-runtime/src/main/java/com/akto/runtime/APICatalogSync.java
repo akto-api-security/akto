@@ -87,20 +87,19 @@ public class APICatalogSync {
         if (!responseParams.getIsPending()) {
             requestTemplate.processTraffic(responseParams.getTime());
         }
-        if (HttpResponseParams.validHttpResponseCode(statusCode)) {
-            String reqPayload = requestParams.getPayload();
 
-            if (reqPayload == null || reqPayload.isEmpty()) {
-                reqPayload = "{}";
-            }
+        String reqPayload = requestParams.getPayload();
 
-            requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
-            BasicDBObject payload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams);
-            if (payload != null) {
-                deletedInfo.addAll(requestTemplate.process2(payload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
-            }
-            requestTemplate.recordMessage(responseParams.getOrig());
+        if (reqPayload == null || reqPayload.isEmpty()) {
+            reqPayload = "{}";
         }
+
+        requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
+        BasicDBObject requestPayload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams);
+        if (requestPayload != null) {
+            deletedInfo.addAll(requestTemplate.process2(requestPayload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
+        }
+        requestTemplate.recordMessage(responseParams.getOrig());
 
         Map<Integer, RequestTemplate> responseTemplates = requestTemplate.getResponseTemplates();
         
