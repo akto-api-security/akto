@@ -36,6 +36,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.ReplaceOptions;
 import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
 import io.swagger.v3.oas.models.OpenAPI;
 import org.apache.commons.lang3.tuple.Pair;
@@ -697,13 +698,13 @@ public class PostmanAction extends UserAction {
             addActionError("Upload id is required");
             return ERROR.toUpperCase();
         }
-        PostmanWorkspaceUpload postmanWorkspaceUpload = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", new ObjectId(uploadId))).first();
-        if(postmanWorkspaceUpload == null){
+        FileUpload id = FileUploadsDao.instance.findOne(Filters.eq("_id", new ObjectId(uploadId)));
+        if(id == null){
             addActionError("Invalid upload id");
             return ERROR.toUpperCase();
         }
-        postmanWorkspaceUpload.setMarkedForDeletion(true);
-        FileUploadsDao.instance.getPostmanMCollection().updateOne(Filters.eq("_id", new ObjectId(uploadId)), new BasicDBObject("$set", new BasicDBObject("markedForDeletion", true)), new UpdateOptions().upsert(false));
+        id.setMarkedForDeletion(true);
+        FileUploadsDao.instance.updateOneNoUpsert(Filters.eq("_id", new ObjectId(uploadId)), Updates.set("markedForDeletion", true));
         return SUCCESS.toUpperCase();
     }
 
