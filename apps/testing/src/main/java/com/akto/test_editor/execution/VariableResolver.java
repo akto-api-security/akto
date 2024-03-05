@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -104,6 +105,26 @@ public class VariableResolver {
 
     }
 
+    private static boolean isSpecialInstruction(String key){
+        switch (key) {
+            case "${random_uuid}":
+                return true;
+        
+            default:
+                return false;
+        }
+    }
+
+    private static String getSpecialInstructionValue(String key){
+        switch (key) {
+            case "uuid":
+                return UUID.randomUUID().toString();
+        
+            default:
+                return null;
+        }
+    }
+
     public static List<Object> resolveExpression(Map<String, Object> varMap, String expression) {
 
         Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
@@ -119,8 +140,14 @@ public class VariableResolver {
                 String param = expressionList.get(index).toString();
                 try {
                     String match = matcher.group(0);
+                    boolean isSpecialInstruction =  isSpecialInstruction(match);
                     match = match.substring(2, match.length());
                     match = match.substring(0, match.length() - 1);
+
+                    if(isSpecialInstruction && !varMap.containsKey(match)){
+                        varMap.put(match, getSpecialInstructionValue("uuid"));
+                    }
+
                     Object val = getValue(varMap, match);
                     if (val == null) {
                         continue;
