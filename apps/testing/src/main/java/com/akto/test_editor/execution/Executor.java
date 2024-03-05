@@ -433,8 +433,8 @@ public class Executor {
         return null;
     }
 
-    private static Map<String,String> getToken() {
-        Map<String,String> resultMap = new HashMap<>();
+    private static BasicDBObject getBillingTokenForAuth() {
+        BasicDBObject bDObject;
         int accountId = Context.accountId.get();
         Organization organization = OrganizationsDao.instance.findOne(
                 Filters.in(Organization.ACCOUNTS, accountId)
@@ -457,40 +457,30 @@ public class Executor {
             errMessage = "error extracting ${akto_header}, token is old";
         }
         if(errMessage.length() > 0){
-            resultMap.put("error", errMessage);
+            bDObject = new BasicDBObject("error", errMessage);
         }else{
-            resultMap.put("token", tokens.getToken());
+            bDObject = new BasicDBObject("token", tokens.getToken());
         }
-        return resultMap;
-    }
-
-    private static String extractValue(String keyValue, String key) {
-        String result = "";
-        if (keyValue.contains(key)) {
-            result = keyValue.split(key)[1].split("[,}]")[0];
-            result = result.replaceAll("\\}$", "");
-            result = result.trim();
-        }
-        return result;
+        return bDObject;
     }
 
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
         switch (operationType.toLowerCase()) {
             case "send_ssrf_request":
                 String keyValue = key.toString().replaceAll("\\$\\{random_uuid\\}", "");
-                String url = extractValue(keyValue, "url=");
-                String redirectUrl = extractValue(keyValue, "redirect_url=");
+                String url = Utils.extractValue(keyValue, "url=");
+                String redirectUrl = Utils.extractValue(keyValue, "redirect_url=");
                 List<String> uuidList = (List<String>) varMap.getOrDefault("random_uuid", new ArrayList<>());
                 String generatedUUID =  UUID.randomUUID().toString();
                 uuidList.add(generatedUUID);
                 varMap.put("random_uuid", uuidList);
 
-                Map<String,String> response = getToken();
-                if(response.containsKey("token")){
-                    String tokenVal = response.get("token");
-                    return Operations.sendRequestToHostedServer(url + generatedUUID, redirectUrl, tokenVal);
+                BasicDBObject response = getBillingTokenForAuth();
+                if(response.getString("token") != null){
+                    String tokenVal = response.getString("token");
+                    return Utils.sendRequestToHostedServer(url + generatedUUID, redirectUrl, tokenVal);
                 }else{
-                    return new ExecutorSingleOperationResp(false, response.get("error"));
+                    return new ExecutorSingleOperationResp(false, response.getString("error"));
                 }
             case "attach_file":
                 return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , key.toString());
@@ -515,11 +505,11 @@ public class Executor {
                 return Operations.replaceBody(rawApi, newPayload);
             case "add_header":
                 if (value.equals("${akto_header}")) {
-                    Map<String,String> tokenResponse = getToken();
-                    if(tokenResponse.containsKey("token")){
-                        value = tokenResponse.get("token");
+                    BasicDBObject tokenResponse = getBillingTokenForAuth();
+                    if(tokenResponse.getString("token") != null){
+                        value = tokenResponse.getString("token");
                     }else{
-                        return new ExecutorSingleOperationResp(false, tokenResponse.get("error"));
+                        return new ExecutorSingleOperationResp(false, tokenResponse.getString("error"));
                     }
                 }
 

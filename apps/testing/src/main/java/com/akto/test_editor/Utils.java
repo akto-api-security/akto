@@ -15,7 +15,9 @@ import java.util.regex.Pattern;
 
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.UrlModifierPayload;
+import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -26,6 +28,8 @@ import com.fasterxml.jackson.databind.node.TextNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+
+import okhttp3.*;
 
 public class Utils {
 
@@ -615,6 +619,40 @@ public class Utils {
         result.put("source", source);
 
         return mapper.writeValueAsString(result);
+    }
+
+    public static String extractValue(String keyValue, String key) {
+        String result = "";
+        if (keyValue.contains(key)) {
+            result = keyValue.split(key)[1].split("[,}]")[0];
+            result = result.replaceAll("\\}$", "");
+            result = result.trim();
+        }
+        return result;
+    }
+
+    public static ExecutorSingleOperationResp sendRequestToHostedServer(String requestUrl, String redirectUrl, String tokenVal){
+        RequestBody emptyBody = RequestBody.create(new byte[]{}, null);
+        
+        Request request = new Request.Builder()
+            .url(requestUrl)
+            .addHeader("x-akto-redirect-url", redirectUrl)
+            .addHeader(Constants.AKTO_TOKEN_KEY, tokenVal)
+            .post(emptyBody)
+            .build();
+
+        OkHttpClient client = new OkHttpClient();
+        Response okResponse = null;
+    
+        try {
+            okResponse = client.newCall(request).execute();
+            if (!okResponse.isSuccessful()) {
+                return new ExecutorSingleOperationResp(false,"Cannot send request to hosted server");
+            }
+            return new ExecutorSingleOperationResp(true, "");
+        }catch (Exception e){
+            return new ExecutorSingleOperationResp(false, e.getMessage());
+        }
     }
 
 }
