@@ -41,6 +41,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.json.JSONObject;
 
@@ -432,9 +433,65 @@ public class Executor {
         return null;
     }
 
+    private static Map<String,String> getToken() {
+        Map<String,String> resultMap = new HashMap<>();
+        int accountId = Context.accountId.get();
+        Organization organization = OrganizationsDao.instance.findOne(
+                Filters.in(Organization.ACCOUNTS, accountId)
+        );
+        if (organization == null) {
+            
+        }
+
+        Tokens tokens;
+        Bson filters = Filters.and(
+                Filters.eq(Tokens.ORG_ID, organization.getId()),
+                Filters.eq(Tokens.ACCOUNT_ID, accountId)
+        );
+        String errMessage = "";
+        tokens = TokensDao.instance.findOne(filters);
+        if (tokens == null) {
+            errMessage = "error extracting ${akto_header}, token is missing";
+        }
+        if (tokens.isOldToken()) {
+            errMessage = "error extracting ${akto_header}, token is old";
+        }
+        if(errMessage.length() > 0){
+            resultMap.put("error", errMessage);
+        }else{
+            resultMap.put("token", tokens.getToken());
+        }
+        return resultMap;
+    }
+
+    private static String extractValue(String keyValue, String key) {
+        String result = "";
+        if (keyValue.contains(key)) {
+            result = keyValue.split(key)[1].split("[,}]")[0];
+            result = result.replaceAll("\\}$", "");
+            result = result.trim();
+        }
+        return result;
+    }
 
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
         switch (operationType.toLowerCase()) {
+            case "send_ssrf_request":
+                String keyValue = key.toString().replaceAll("\\$\\{random_uuid\\}", "");
+                String url = extractValue(keyValue, "url=");
+                String redirectUrl = extractValue(keyValue, "redirect_url=");
+                List<String> uuidList = (List<String>) varMap.getOrDefault("random_uuid", new ArrayList<>());
+                String generatedUUID =  UUID.randomUUID().toString();
+                uuidList.add(generatedUUID);
+                varMap.put("random_uuid", uuidList);
+
+                Map<String,String> response = getToken();
+                if(response.containsKey("token")){
+                    String tokenVal = response.get("token");
+                    return Operations.sendRequestToHostedServer(url + generatedUUID, redirectUrl, tokenVal);
+                }else{
+                    return new ExecutorSingleOperationResp(false, response.get("error"));
+                }
             case "attach_file":
                 return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , key.toString());
             case "add_body_param":
@@ -458,27 +515,12 @@ public class Executor {
                 return Operations.replaceBody(rawApi, newPayload);
             case "add_header":
                 if (value.equals("${akto_header}")) {
-                    int accountId = Context.accountId.get();
-                    Organization organization = OrganizationsDao.instance.findOne(
-                            Filters.in(Organization.ACCOUNTS, accountId)
-                    );
-                    if (organization == null) {
-                        return new ExecutorSingleOperationResp(false, "accountId " + accountId + " isn't associated with any organization");
+                    Map<String,String> tokenResponse = getToken();
+                    if(tokenResponse.containsKey("token")){
+                        value = tokenResponse.get("token");
+                    }else{
+                        return new ExecutorSingleOperationResp(false, tokenResponse.get("error"));
                     }
-
-                    Tokens tokens;
-                    Bson filters = Filters.and(
-                        Filters.eq(Tokens.ORG_ID, organization.getId()),
-                        Filters.eq(Tokens.ACCOUNT_ID, accountId)
-                    );
-                    tokens = TokensDao.instance.findOne(filters);
-                    if (tokens == null) {
-                        return new ExecutorSingleOperationResp(false, "error extracting ${akto_header}, token is missing");
-                    }
-                    if (tokens.isOldToken()) {
-                        return new ExecutorSingleOperationResp(false, "error extracting ${akto_header}, token is old");
-                    }
-                    value = tokens.getToken();
                 }
 
                 return Operations.addHeader(rawApi, key.toString(), value.toString());
