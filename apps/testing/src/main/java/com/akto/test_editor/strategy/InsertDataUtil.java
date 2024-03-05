@@ -37,9 +37,7 @@ public class InsertDataUtil {
         SingleTypeInfo.fetchCustomDataTypes(accountId);
         HttpCallParser httpCallParser = accountHTTPParserMap.get(accountId);
         if (httpCallParser == null) { // account created after docker run
-            //info = new AccountHTTPCallParserAktoPolicyInfo();
             httpCallParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
-            //info.setHttpCallParser(callParser);
             accountHTTPParserMap.put(accountId, httpCallParser);
         }
 
