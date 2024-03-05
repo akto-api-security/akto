@@ -204,7 +204,8 @@ public class TestEditorEnums {
         REPLACE_AUTH_HEADER,
         REPLACE_BODY,
         JWT_REPLACE_BODY,
-        ATTACH_FILE
+        ATTACH_FILE,
+        SEND_SSRF_REQUEST,
     }
 
     public enum NonTerminalExecutorDataOperands {

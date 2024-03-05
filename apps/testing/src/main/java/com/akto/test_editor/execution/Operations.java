@@ -5,11 +5,16 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.yaml.snakeyaml.scanner.Constant;
+
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.test_editor.Utils;
+import com.akto.util.Constants;
 import com.akto.util.CookieTransformer;
 import com.mongodb.BasicDBObject;
+
+import okhttp3.*;
 
 public class Operations {
     
@@ -156,6 +161,30 @@ public class Operations {
 
         return new ExecutorSingleOperationResp(true, "");
 
+    }
+
+    public static ExecutorSingleOperationResp sendRequestToHostedServer(String requestUrl, String redirectUrl, String tokenVal){
+        RequestBody emptyBody = RequestBody.create(new byte[]{}, null);
+        
+        Request request = new Request.Builder()
+            .url(requestUrl)
+            .addHeader("x-akto-redirect-url", redirectUrl)
+            .addHeader(Constants.AKTO_TOKEN_KEY, tokenVal)
+            .post(emptyBody)
+            .build();
+
+        OkHttpClient client = new OkHttpClient();
+        Response okResponse = null;
+    
+        try {
+            okResponse = client.newCall(request).execute();
+            if (!okResponse.isSuccessful()) {
+                return new ExecutorSingleOperationResp(false,"Cannot send request to hosted server");
+            }
+            return new ExecutorSingleOperationResp(true, "");
+        }catch (Exception e){
+            return new ExecutorSingleOperationResp(false, e.getMessage());
+        }
     }
 
 }
