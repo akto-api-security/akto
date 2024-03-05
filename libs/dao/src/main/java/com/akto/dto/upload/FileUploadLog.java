@@ -24,6 +24,16 @@ public class FileUploadLog {
 
     protected String url;
 
+    private String aktoFormat;
+
+    public String getAktoFormat() {
+        return aktoFormat;
+    }
+
+    public void setAktoFormat(String aktoFormat) {
+        this.aktoFormat = aktoFormat;
+    }
+
     public ObjectId getId() {
         return id;
     }

@@ -30,7 +30,7 @@ public class ApiExecutor {
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
     
-    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
+    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
@@ -49,12 +49,12 @@ public class ApiExecutor {
         if (HTTPClientHandler.instance == null) {
             HTTPClientHandler.initHttpClientHandler(isSaasDeployment);
         }
-        
+
         OkHttpClient client = debug ?
                 HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs) :
                 HTTPClientHandler.instance.getHTTPClient(followRedirects);
 
-        if (!Main.SKIP_SSRF_CHECK && !HostDNSLookup.isRequestValid(request.url().host())) {
+        if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
         }
 
@@ -149,9 +149,9 @@ public class ApiExecutor {
         return replaceHostFromConfig(url, testingRunConfig);
     }
 
-    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
-        
+
         String url = prepareUrl(request, testingRunConfig);
 
         loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
@@ -182,7 +182,7 @@ public class ApiExecutor {
         switch (method) {
             case GET:
             case HEAD:
-                response = getRequest(request, builder, followRedirects, debug, testLogs);
+                response = getRequest(request, builder, followRedirects, debug, testLogs, skipSSRFCheck);
                 break;
             case POST:
             case PUT:
@@ -191,7 +191,7 @@ public class ApiExecutor {
             case PATCH:
             case TRACK:
             case TRACE:
-                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs);
+                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs, skipSSRFCheck);
                 break;
             case OTHER:
                 throw new Exception("Invalid method name");
@@ -199,11 +199,14 @@ public class ApiExecutor {
 
         return response;
     }
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
+        return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, false);
+    }
 
 
-    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs)  throws Exception{
+    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck)  throws Exception{
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck);
     }
 
     public static RequestBody getFileRequestBody(String fileUrl){
@@ -248,7 +251,7 @@ public class ApiExecutor {
 
 
 
-    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
+    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
         if (headers == null) {
             headers = new HashMap<>();
@@ -265,7 +268,7 @@ public class ApiExecutor {
             Request updatedRequest = builder.build();
 
 
-            return common(updatedRequest, followRedirects, debug, testLogs);
+            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck);
         }
 
         String contentType = request.findContentType();
@@ -281,6 +284,6 @@ public class ApiExecutor {
         RequestBody body = RequestBody.create(payload, MediaType.parse(contentType));
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck);
     }
 }

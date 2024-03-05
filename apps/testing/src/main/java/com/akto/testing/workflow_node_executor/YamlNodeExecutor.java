@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.testing.Main;
 import org.json.JSONObject;
 
 import com.akto.dao.context.Context;
@@ -112,7 +113,7 @@ public class YamlNodeExecutor extends NodeExecutor {
             int tsAfterReq = 0;
             try {
                 tsBeforeReq = Context.nowInMillis();
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs);
+                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
                 tsAfterReq = Context.nowInMillis();
                 responseTimeArr.add(tsAfterReq - tsBeforeReq);
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
