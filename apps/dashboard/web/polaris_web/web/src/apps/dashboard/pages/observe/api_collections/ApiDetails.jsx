@@ -11,6 +11,7 @@ import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
 import func from "@/util/func"
 import transform from "../transform";
 import ApiDependency from "./ApiDependency";
+import { ClipboardMinor } from "@shopify/polaris-icons"
 
 function ApiDetails(props) {
 
@@ -23,6 +24,8 @@ function ApiDetails(props) {
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [loading, setLoading] = useState(false)
     const [badgeActive, setBadgeActive] = useState(false)
+
+    const ref = useRef(null)
 
     const fetchData = async() => {
         if(showDetails){
@@ -128,17 +131,28 @@ function ApiDetails(props) {
             />
         </Box>,
     }
-    const components = [
+
+    const headingComp = (
+        <div style={{display: "flex", justifyContent: "space-between"}}  key="heading">
             <GithubCell
-            key="heading"
-            width="30vw"
-            nameWidth="27vw"
-            data={apiDetail}
-            headers={headers}
-            getStatus={getStatus}
-            isBadgeClickable={true}
-            badgeClicked={badgeClicked}
-        />,
+                width="40vw"
+                data={apiDetail}
+                headers={headers}
+                getStatus={getStatus}
+                isBadgeClickable={true}
+                badgeClicked={badgeClicked}
+            />
+            <Box paddingBlockStart={"05"}>
+                <Button plain icon={ClipboardMinor} onClick={() => func.copyToClipboard(apiDetail['endpoint'], ref, "URL copied")}>
+                    <Box ref={ref} />
+                </Button>
+            </Box>
+        </div>
+    )
+
+    const components = [
+        headingComp
+            ,
         <LayoutWithTabs
             key="tabs"
             tabs={[SchemaTab, ValuesTab, DependencyTab]}

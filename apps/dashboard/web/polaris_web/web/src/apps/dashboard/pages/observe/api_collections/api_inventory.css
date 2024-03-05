@@ -6,9 +6,9 @@
 .gpt-button-fixed {
     position: absolute;
     z-index: 400;
-    right: 24px !important;
+    right: 44px !important;
     transition: right 0.3s ease-in-out;
-    top: 60px;
+    top: 12px;
 }
 
 .control-row .Polaris-IndexTable__TableCell {
@@ -30,4 +30,9 @@
     height: 40px ;
     border-radius: 32px;
     box-shadow: 0px 2px 16px 0px rgba(33, 43, 54, 0.08), 0px 0px 0px 1px rgba(6, 44, 82, 0.10);
+}
+
+.full-url{
+    overflow-x: hidden;
+    word-break: break-all;
 }
