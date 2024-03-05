@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Modal } from "@shopify/polaris"
+import { Avatar, Box, Button, Modal, Tooltip } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -11,7 +11,6 @@ import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
 import func from "@/util/func"
 import transform from "../transform";
 import ApiDependency from "./ApiDependency";
-import { ClipboardMinor } from "@shopify/polaris-icons"
 
 function ApiDetails(props) {
 
@@ -143,7 +142,10 @@ function ApiDetails(props) {
                 badgeClicked={badgeClicked}
             />
             <Box paddingBlockStart={"05"}>
-                <Button plain icon={ClipboardMinor} onClick={() => func.copyToClipboard(apiDetail['endpoint'], ref, "URL copied")}>
+                <Button plain onClick={() => func.copyToClipboard(apiDetail['endpoint'], ref, "URL copied")}>
+                    <Tooltip content="Copy endpoint" dismissOnMouseOut>
+                        <Avatar shape="square" size="extraSmall" source='/public/copy_icon.svg' />
+                    </Tooltip>
                     <Box ref={ref} />
                 </Button>
             </Box>
