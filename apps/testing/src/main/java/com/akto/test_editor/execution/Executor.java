@@ -478,7 +478,7 @@ public class Executor {
                 BasicDBObject response = getBillingTokenForAuth();
                 if(response.getString("token") != null){
                     String tokenVal = response.getString("token");
-                    return Utils.sendRequestToHostedServer(url + generatedUUID, redirectUrl, tokenVal);
+                    return Utils.sendRequestToSsrfServer(url + generatedUUID, redirectUrl, tokenVal);
                 }else{
                     return new ExecutorSingleOperationResp(false, response.getString("error"));
                 }
