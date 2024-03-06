@@ -631,7 +631,7 @@ public class Utils {
         return result;
     }
 
-    public static ExecutorSingleOperationResp sendRequestToHostedServer(String requestUrl, String redirectUrl, String tokenVal){
+    public static ExecutorSingleOperationResp sendRequestToSsrfServer(String requestUrl, String redirectUrl, String tokenVal){
         RequestBody emptyBody = RequestBody.create(new byte[]{}, null);
         
         Request request = new Request.Builder()
@@ -647,7 +647,7 @@ public class Utils {
         try {
             okResponse = client.newCall(request).execute();
             if (!okResponse.isSuccessful()) {
-                return new ExecutorSingleOperationResp(false,"Cannot send request to hosted server");
+                return new ExecutorSingleOperationResp(false,"Could not send request to the ssrf server.");
             }
             return new ExecutorSingleOperationResp(true, "");
         }catch (Exception e){
