@@ -22,6 +22,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.DashboardMode;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -475,13 +476,16 @@ public class Utils {
             APICatalogSync.mergeUrlsAndSave(apiCollectionId, true);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
-            // try {
-                // DependencyFlow dependencyFlow = new DependencyFlow();
-                // dependencyFlow.run();
-                // dependencyFlow.syncWithDb();
-            // } catch (Exception e) {
-            //     loggerMaker.errorAndAddToDb(e,"Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
-            // }
+
+            if (!DashboardMode.isSaasDeployment()) {
+                try {
+                    DependencyFlow dependencyFlow = new DependencyFlow();
+                    dependencyFlow.run();
+                    dependencyFlow.syncWithDb();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e,"Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
+                }
+            }
         }
     }
 

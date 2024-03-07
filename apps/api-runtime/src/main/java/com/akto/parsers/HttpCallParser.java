@@ -14,6 +14,7 @@ import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
 import com.akto.util.JSONUtils;
 import com.akto.util.Constants;
+import com.akto.util.DashboardMode;
 import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
 import com.mongodb.client.model.*;
@@ -172,9 +173,11 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-        // for (HttpResponseParams responseParam: filteredResponseParams) {
-        //     dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
-        // }
+        if (Context.accountId.get() == 1_000_000 || Context.accountId.get() == 12389) {
+            for (HttpResponseParams responseParam : filteredResponseParams) {
+                dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+            }
+        }
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
