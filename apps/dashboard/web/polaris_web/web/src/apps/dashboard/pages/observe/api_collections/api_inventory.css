@@ -6,9 +6,9 @@
 .gpt-button-fixed {
     position: absolute;
     z-index: 400;
-    right: 44px !important;
+    right: 48px !important;
     transition: right 0.3s ease-in-out;
-    top: 12px;
+    top: 15px;
 }
 
 .control-row .Polaris-IndexTable__TableCell {
@@ -19,6 +19,7 @@
 .condensed-row .Polaris-IndexTable__TableCell {
     padding-top: 8px !important;
     padding-bottom: 8px !important;
+    vertical-align: text-top !important;
 }
 
 .icons-style {
