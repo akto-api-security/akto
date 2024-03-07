@@ -34,9 +34,12 @@ public class TreeHelper {
                 )
         );
 
-        if (node == null || node.getMaxDepth() == 0) return;
+        if (node == null) return;
 
         result.put(node.hashCode(), node);
+
+        if (node.getMaxDepth() == 0) return; // todo: check implication on front end graph
+
 
         Map<String, Connection> connections = node.getConnections();
         for (Connection connection: connections.values()) {
