@@ -1,4 +1,4 @@
-import { Avatar, Badge, Box, HorizontalStack, Text } from '@shopify/polaris'
+import { Avatar, Badge, Box, HorizontalStack, Text, Tooltip } from '@shopify/polaris'
 import React, { useRef, useState } from 'react'
 import func from '@/util/func'
 import transform from '../onboarding/transform'
@@ -21,7 +21,11 @@ function GetPrettifyEndpoint({method,url, isNew}){
                         </Box>
                         {copyActive ? 
                             <div onClick={(e) => {e.stopPropagation();func.copyToClipboard(url, ref, "URL copied");}}>
-                                <Avatar shape="square" size="extraSmall" source='/public/copy_icon.svg' />
+                                <Tooltip content="Copy endpoint" dismissOnMouseOut>
+                                    <div className="reduce-size">
+                                        <Avatar size="extraSmall" source="/public/copy_icon.svg" />
+                                    </div>
+                                </Tooltip>
                                 <Box ref={ref} />
                             </div>
                         :null}

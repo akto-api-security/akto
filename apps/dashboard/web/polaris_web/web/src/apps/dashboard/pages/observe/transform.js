@@ -41,7 +41,7 @@ const apiDetailsHeaders = [
         value: "parameterisedEndpoint",
         itemOrder: 1,
         showFilter: true,
-        component: (data) => StyledEndpoint(data, null, "headingSm", true, true)
+        component: (data) => StyledEndpoint(data, "14px", "headingSm", true, true)
     },
     {
         text: 'Collection name',
