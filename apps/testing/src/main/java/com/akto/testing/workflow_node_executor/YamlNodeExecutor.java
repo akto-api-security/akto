@@ -8,15 +8,14 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.testing.Main;
+import com.akto.dto.*;
+import com.akto.dto.type.URLMethods;
+import com.akto.test_editor.execution.Memory;
 import org.json.JSONObject;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.CustomAuthType;
-import com.akto.dto.OriginalHttpResponse;
-import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ExecuteAlgoObj;
@@ -48,7 +47,10 @@ public class YamlNodeExecutor extends NodeExecutor {
     
     private static final Gson gson = new Gson();
 
+    static int counter = 0;
+
     public NodeResult processNode(Node node, Map<String, Object> varMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs) {
+        counter++;
         List<String> testErrors = new ArrayList<>();
 
         YamlNodeDetails yamlNodeDetails = (YamlNodeDetails) node.getWorkflowNodeDetails();
@@ -56,9 +58,16 @@ public class YamlNodeExecutor extends NodeExecutor {
         if (yamlNodeDetails.getTestId() != null && yamlNodeDetails.getTestId().length() > 0) {
             return processYamlNode(node, varMap, allowAllStatusCodes, yamlNodeDetails, debug, testLogs);
         }
-        
+
         RawApi rawApi = yamlNodeDetails.getRawApi();
         RawApi sampleRawApi = rawApi.copy();
+        ApiInfo.ApiInfoKey apiInfoKey = counter % 2 != 0 ? new ApiInfo.ApiInfoKey(1709612022, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST) : new ApiInfo.ApiInfoKey(1709612022, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH);
+        System.out.println("*******");
+        System.out.println(apiInfoKey);
+
+        OriginalHttpRequest newRequest = Memory.memory.run(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+        rawApi.setRequest(newRequest);
+
         List<RawApi> rawApis = new ArrayList<>();
         rawApis.add(rawApi.copy());
 
@@ -114,6 +123,8 @@ public class YamlNodeExecutor extends NodeExecutor {
             try {
                 tsBeforeReq = Context.nowInMillis();
                 testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                Memory.memory.fillResponse(testReq.getRequest(), testResponse, apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+                Memory.memory.reset(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
                 tsAfterReq = Context.nowInMillis();
                 responseTimeArr.add(tsAfterReq - tsBeforeReq);
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
