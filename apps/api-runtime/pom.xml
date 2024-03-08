@@ -26,6 +26,11 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.akto.libs.dto</groupId>
+            <artifactId>dto</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>com.akto.libs.utils</groupId>
             <artifactId>utils</artifactId>
             <version>${project.version}</version>

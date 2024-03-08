@@ -5,8 +5,8 @@ import com.akto.dto.CustomAuthType;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.KeyTypes;
-import com.akto.util.JSONUtils;
 
+import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

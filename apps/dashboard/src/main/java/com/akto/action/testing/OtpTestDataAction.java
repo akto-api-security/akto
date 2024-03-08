@@ -10,9 +10,6 @@ import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 public class OtpTestDataAction extends UserAction {
 
     private String regex;

@@ -14,7 +14,6 @@ import java.util.Set;
 import com.akto.MongoBasedTest;
 import com.akto.dao.context.Context;
 import com.akto.dto.type.*;
-import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.HttpResponseParams;
