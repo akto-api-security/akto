@@ -12,11 +12,9 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.*;
-import com.akto.types.CappedSet;
-import com.mongodb.BasicDBObject;
 
+import com.akto.types.CappedSet;
 import com.mongodb.client.model.Updates;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.*;

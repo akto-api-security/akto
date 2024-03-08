@@ -1,14 +1,10 @@
 package com.akto.test_editor.execution;
 
-import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.TokensDao;
 import java.util.*;
 
-import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.test_editor.TestEditorEnums;
-import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
@@ -21,7 +17,6 @@ import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
 import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
-import com.akto.util.enums.LoginFlowEnums.LoginStepTypesEnums;
 import com.akto.utils.RedactSampleData;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.billing.Organization;
@@ -35,11 +30,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.testing.ApiWorkflowExecutor;
-import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
-import com.akto.util.UsageUtils;
-import com.akto.util.enums.LoginFlowEnums;
-import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -466,7 +457,7 @@ public class Executor {
 
                     Map<String, Object> valuesMap = new HashMap<>();
                     valuesMap.put("x1.response.body.token", token);
-        
+
                     for (AuthParam param : authMechanismForRole.getAuthParams()) {
                         try {
                             String value = com.akto.testing.workflow_node_executor.Utils.executeCode(param.getValue(), valuesMap);
@@ -486,14 +477,14 @@ public class Executor {
                             LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null);
                             if (!loginFlowResponse.getSuccess())
                                 throw new Exception(loginFlowResponse.getError());
-    
+
                             authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
                         } catch (Exception e) {
                             return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: " + e.getMessage());
                         }
                     }
                 }
-         
+
                 if (!authMechanismForRole.getType().equalsIgnoreCase(AuthMechanismTypes.HARDCODED.toString())) {
                     return new ExecutorSingleOperationResp(false, "Auth type is not HARDCODED");
                 }

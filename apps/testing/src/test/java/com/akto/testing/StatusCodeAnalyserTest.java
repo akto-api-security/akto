@@ -1,9 +1,5 @@
 package com.akto.testing;
 
-import com.akto.dto.ApiInfo;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
-import com.akto.store.SampleMessageStore;
 import org.junit.Test;
 
 import java.util.*;
