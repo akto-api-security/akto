@@ -117,6 +117,33 @@ function GithubCell(props){
             }
         </HorizontalStack>
         </Box>
+        <HorizontalStack gap={"2"}>
+        {
+            headers?.filter((header) => {
+                return header.itemOrder==4
+            }).filter((header) => {
+                return data[header.value]!=undefined && data[header.value]!="";
+            }).map((header) => {
+                return data?.[header?.value]
+                ?.map((item) =>
+                isBadgeClickable ? 
+                    <div onClick={() =>badgeClicked()} style={{cursor: "pointer"}} key={item}>
+                        <Badge status={getStatus(item)}>
+                            <Text {...header.dataProps}>
+                                {item}
+                            </Text>
+                        </Badge>
+                    </div>
+                    
+                : <Badge key={item} status={getStatus(item)}>
+                    <Text {...header.dataProps}>
+                        {item}
+                    </Text>
+                </Badge>
+                
+            )}) 
+        }
+        </HorizontalStack>
     </VerticalStack>
 </HorizontalStack>
 )
