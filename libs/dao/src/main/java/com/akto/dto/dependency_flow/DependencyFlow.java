@@ -21,7 +21,6 @@ import java.util.*;
 
 public class DependencyFlow {
 
-//    public Map<Integer, ReverseNode> initialNodes = new HashMap<>();
     public Map<ApiInfo.ApiInfoKey, Node> resultNodes = new HashMap<>();
 
     public void syncWithDb() {
@@ -44,28 +43,15 @@ public class DependencyFlow {
         done.add(apiInfoKey);
     }
 
-    public List<ApiInfo.ApiInfoKey> findL0Apis() {
-        int limit = 100;
-        ObjectId lastId = null;
-        Set<ApiInfo.ApiInfoKey> neverL0 = new HashSet<>();
-        Set<ApiInfo.ApiInfoKey> maybeL0 = new HashSet<>();
-        while (true) {
-            Bson filter = lastId == null ? new BasicDBObject() : Filters.gt(ID, lastId);
-            List<DependencyNode> dependencyNodeList = DependencyNodeDao.instance.findAll(filter, 0, limit, Sorts.ascending(ID));
-            for (DependencyNode dependencyNode: dependencyNodeList) {
-                lastId = dependencyNode.getId();
+    public void findL0Apis(Set<ApiInfo.ApiInfoKey> neverL0, Set<ApiInfo.ApiInfoKey> maybeL0, List<DependencyNode> dependencyNodeList) {
+        for (DependencyNode dependencyNode: dependencyNodeList) {
+            ApiInfo.ApiInfoKey req = new ApiInfo.ApiInfoKey(Integer.parseInt(dependencyNode.getApiCollectionIdReq()), dependencyNode.getUrlReq(), URLMethods.Method.fromString(dependencyNode.getMethodReq()));
+            neverL0.add(req);
+            maybeL0.remove(req);
 
-                ApiInfo.ApiInfoKey req = new ApiInfo.ApiInfoKey(Integer.parseInt(dependencyNode.getApiCollectionIdReq()), dependencyNode.getUrlReq(), URLMethods.Method.fromString(dependencyNode.getMethodReq()));
-                neverL0.add(req);
-                maybeL0.remove(req);
-
-                ApiInfo.ApiInfoKey resp = new ApiInfo.ApiInfoKey(Integer.parseInt(dependencyNode.getApiCollectionIdResp()), dependencyNode.getUrlResp(), URLMethods.Method.fromString(dependencyNode.getMethodResp()));
-                if (!neverL0.contains(resp)) maybeL0.add(resp);
-            }
-            if (dependencyNodeList.size() < limit) break;
+            ApiInfo.ApiInfoKey resp = new ApiInfo.ApiInfoKey(Integer.parseInt(dependencyNode.getApiCollectionIdResp()), dependencyNode.getUrlResp(), URLMethods.Method.fromString(dependencyNode.getMethodResp()));
+            if (!neverL0.contains(resp)) maybeL0.add(resp);
         }
-
-        return new ArrayList<>(maybeL0);
     }
 
     static String ID = "_id";
@@ -76,9 +62,13 @@ public class DependencyFlow {
 
         ObjectId lastId = null;
         int limit = 100;
+        Set<ApiInfo.ApiInfoKey> neverL0 = new HashSet<>();
+        Set<ApiInfo.ApiInfoKey> maybeL0 = new HashSet<>();
+
         while (true) {
             Bson filter = lastId == null ? new BasicDBObject() : Filters.gt(ID, lastId);
             List<DependencyNode> dependencyNodeList = DependencyNodeDao.instance.findAll(filter, 0, limit, Sorts.ascending(ID));
+            findL0Apis(neverL0, maybeL0, dependencyNodeList);
             for (DependencyNode dependencyNode: dependencyNodeList) {
                 lastId = dependencyNode.getId();
                 fillResultNodes(dependencyNode); // to fill who is receiving data from whom
@@ -86,7 +76,7 @@ public class DependencyFlow {
             if (dependencyNodeList.size() < limit) break;
         }
 
-        List<ApiInfo.ApiInfoKey> l0Apis = findL0Apis();
+        List<ApiInfo.ApiInfoKey> l0Apis = new ArrayList<>(maybeL0);
 
         // build initial queue
         // depth 0 for initial queue
