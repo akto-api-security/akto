@@ -170,7 +170,7 @@ function ApiDetails(props) {
             className={"gpt-button-fixed"}
             key="akto-gpt"
         >
-            <Button onClick={displayGPT} size="">Ask AktoGPT</Button> 
+            <Button onClick={displayGPT} size="slim">Ask AktoGPT</Button> 
         </div>
     )
 
