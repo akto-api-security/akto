@@ -1,11 +1,8 @@
 package com.akto.test_editor.execution;
 
-import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.test_editor.TestEditorEnums;
-import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
@@ -28,7 +25,6 @@ import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
-import com.akto.util.UsageUtils;
 import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.util.modifier.JWTPayloadReplacer;
@@ -44,9 +40,7 @@ import java.util.Map;
 
 import org.json.JSONObject;
 
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;

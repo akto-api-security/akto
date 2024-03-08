@@ -8,7 +8,6 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
@@ -38,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 
 import static com.akto.util.Constants.ID;
-import static com.akto.util.enums.GlobalEnums.*;
 
 public class IssuesAction extends UserAction {
 

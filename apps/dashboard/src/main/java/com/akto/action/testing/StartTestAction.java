@@ -1,6 +1,5 @@
 package com.akto.action.testing;
 
-import com.akto.DaoInit;
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
@@ -16,10 +15,8 @@ import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
-import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRun.TestingRunType;
-import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -35,7 +32,6 @@ import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.kafka.common.protocol.types.Field.Str;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 

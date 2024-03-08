@@ -1,5 +1,6 @@
 package com.akto.runtime.merge;
 
+import com.akto.types.CappedSet;
 import org.junit.Test;
 
 import com.akto.dao.ApiCollectionsDao;
@@ -17,7 +18,6 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
-import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.InsertOneModel;
 import com.mongodb.client.model.WriteModel;

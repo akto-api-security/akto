@@ -22,7 +22,6 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main;
-import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.util.AccountTask;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.akto.utils.Utils;

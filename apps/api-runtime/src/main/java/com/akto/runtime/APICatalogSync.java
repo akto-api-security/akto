@@ -775,7 +775,7 @@ public class APICatalogSync {
             SubType tokenSubType = KeyTypes.findSubType(word, "", null,true);
             stiId.setSubType(tokenSubType);
             SingleTypeInfo sti = new SingleTypeInfo(
-                stiId, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0, CappedSet.create(i+""), 
+                stiId, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0, CappedSet.create(i+""),
                 SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MIN_VALUE, SingleTypeInfo.ACCEPTED_MAX_VALUE);
 
             stiList.add(sti);

@@ -12,15 +12,14 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
-import com.akto.util.JSONUtils;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
+import com.akto.util.JSONUtils;
 import com.google.gson.Gson;
 import com.mongodb.client.model.*;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 
-import java.net.URL;
 import java.util.*;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;

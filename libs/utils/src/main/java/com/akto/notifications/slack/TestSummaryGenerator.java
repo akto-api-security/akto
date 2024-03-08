@@ -1,6 +1,5 @@
 package com.akto.notifications.slack;
 
-import com.akto.DaoInit;
 import com.akto.calendar.DateUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
@@ -9,14 +8,12 @@ import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;

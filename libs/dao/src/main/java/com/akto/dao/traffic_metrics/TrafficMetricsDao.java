@@ -2,13 +2,11 @@ package com.akto.dao.traffic_metrics;
 
 import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Indexes;
 
 import org.bson.Document;
 import org.bson.conversions.Bson;

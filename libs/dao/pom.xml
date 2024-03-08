@@ -154,6 +154,12 @@
             <artifactId>jgrapht-core</artifactId>
             <version>1.4.0</version>
         </dependency>
+        <!--    DTO dep    -->
+        <dependency>
+            <groupId>com.akto.libs.dto</groupId>
+            <artifactId>dto</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
     <build>
         <plugins>

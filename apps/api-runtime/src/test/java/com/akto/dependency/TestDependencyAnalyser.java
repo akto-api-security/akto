@@ -17,7 +17,6 @@ import com.akto.dto.dependency_flow.Node;
 import com.akto.runtime.APICatalogSync;
 import com.mongodb.BasicDBObject;
 import org.junit.Before;
-import org.junit.Test;
 
 import java.util.*;
 

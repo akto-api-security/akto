@@ -1,23 +1,17 @@
 package com.akto.action.usage;
 
 import java.util.Set;
-import java.util.function.Consumer;
 
 import javax.servlet.http.HttpServletRequest;
 
-import com.akto.util.UsageCalculator;
-import com.akto.util.tasks.OrganizationTask;
 import org.apache.struts2.interceptor.ServletRequestAware;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.usage.UsageMetricsDao;
-import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dto.billing.Organization;
-import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
-import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.dto.usage.metadata.ActiveAccounts;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;

@@ -9,6 +9,7 @@ import java.util.Set;
 
 import com.akto.dto.OriginalHttpResponse;
 
+import com.akto.util.JSONUtils;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.SampleDataDao;
@@ -36,8 +37,6 @@ import com.akto.runtime.policies.AuthPolicy;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.*;
-import com.akto.util.JSONUtils;
-import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;

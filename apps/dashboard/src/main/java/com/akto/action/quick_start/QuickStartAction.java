@@ -14,8 +14,6 @@ import com.akto.utils.cloud.stack.dto.StackState;
 import com.amazonaws.services.cloudformation.model.Tag;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.akto.action.UserAction;
 import com.akto.dao.ApiTokensDao;

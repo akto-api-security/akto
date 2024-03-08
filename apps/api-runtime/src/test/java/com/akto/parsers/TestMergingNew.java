@@ -12,10 +12,8 @@ import com.akto.dto.IgnoreData;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
-import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.junit.Test;
 
