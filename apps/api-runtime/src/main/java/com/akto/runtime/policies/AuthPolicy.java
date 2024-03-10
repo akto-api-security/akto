@@ -5,6 +5,7 @@ import com.akto.dto.CustomAuthType;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.KeyTypes;
+import com.akto.util.runtime.RuntimeUtil;
 
 import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
@@ -33,25 +34,6 @@ public class AuthPolicy {
         return new ArrayList<>();
     }
 
-    public static Map<String,String> parseCookie(List<String> cookieList){
-        Map<String,String> cookieMap = new HashMap<>();
-        if(cookieList==null)return cookieMap;
-        for (String cookieValues : cookieList) {
-            String[] cookies = cookieValues.split(";");
-            for (String cookie : cookies) {
-                cookie=cookie.trim();
-                String[] cookieFields = cookie.split("=");
-                boolean twoCookieFields = cookieFields.length == 2;
-                if (twoCookieFields) {
-                    if(!cookieMap.containsKey(cookieFields[0])){
-                        cookieMap.put(cookieFields[0], cookieFields[1]);
-                    }
-                }
-            }
-        }
-        return cookieMap;
-    }
-
     public static boolean findAuthType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<CustomAuthType> customAuthTypes) {
         Set<Set<ApiInfo.AuthType>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
         if (allAuthTypesFound == null) allAuthTypesFound = new HashSet<>();
@@ -63,7 +45,7 @@ public class AuthPolicy {
         // find Authorization header
         Map<String, List<String>> headers = httpResponseParams.getRequestParams().getHeaders();
         List<String> cookieList = headers.getOrDefault(COOKIE_NAME, new ArrayList<>());
-        Map<String,String> cookieMap = parseCookie(cookieList);
+        Map<String,String> cookieMap = RuntimeUtil.parseCookie(cookieList);
         Set<ApiInfo.AuthType> authTypes = new HashSet<>();
 
         BasicDBObject flattenedPayload = null;

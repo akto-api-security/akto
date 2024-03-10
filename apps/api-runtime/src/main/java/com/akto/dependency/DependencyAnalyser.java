@@ -9,15 +9,12 @@ import com.akto.dto.DependencyNode;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.*;
-import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.URLAggregator;
-import com.akto.runtime.policies.AuthPolicy;
 import com.akto.util.HTTPHeadersExample;
 import com.akto.util.JSONUtils;
 import com.google.common.base.Charsets;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
+import com.akto.util.runtime.RuntimeUtil;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.Document;
@@ -52,16 +49,8 @@ public class DependencyAnalyser {
         this.dbState = dbState;
     }
 
-    public void analyse(String message, int finalApiCollectionId) {
-        HttpResponseParams responseParams;
-
-        // parsing the message again because we want actual data. For example urlParams are eliminated in runtime code
-        try {
-            responseParams = HttpCallParser.parseKafkaMessage(message);
-            responseParams.requestParams.setApiCollectionId(finalApiCollectionId);
-        } catch (Exception e) {
-            return;
-        }
+    public void analyse(HttpResponseParams responseParams, int finalApiCollectionId) {
+        responseParams.requestParams.setApiCollectionId(finalApiCollectionId);
 
         if (!HttpResponseParams.validHttpResponseCode(responseParams.statusCode)) return;
 
@@ -72,7 +61,7 @@ public class DependencyAnalyser {
         String method = requestParams.getMethod();
 
         // get actual url (without any query params)
-        URLStatic urlStatic = URLAggregator.getBaseURL(requestParams.getURL(), method);
+        URLStatic urlStatic = RuntimeUtil.getBaseURL(requestParams.getURL(), method);
         String url = urlStatic.getUrl();
 
         if (url.endsWith(".js") || url.endsWith(".png") || url.endsWith(".css") || url.endsWith(".jpeg") ||
@@ -107,7 +96,7 @@ public class DependencyAnalyser {
         for (String param: responseHeaders.keySet()) {
             List<String> values = responseHeaders.get(param);
             if (param.equalsIgnoreCase("set-cookie")) {
-                Map<String,String> cookieMap = AuthPolicy.parseCookie(values);
+                Map<String,String> cookieMap = RuntimeUtil.parseCookie(values);
                 for (String cookieKey: cookieMap.keySet()) {
                     String cookieVal = cookieMap.get(cookieKey);
                     if (!filterValues(cookieVal)) continue;
@@ -147,7 +136,7 @@ public class DependencyAnalyser {
         if (APICatalog.isTemplateUrl(url)) {
             String ogUrl = urlStatic.getUrl();
             String[] ogUrlSplit = ogUrl.split("/");
-            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.fromString(method));
+            URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(url, URLMethods.Method.fromString(method));
             for (int i = 0; i < urlTemplate.getTypes().length; i++) {
                 SingleTypeInfo.SuperType superType = urlTemplate.getTypes()[i];
                 if (superType == null) continue;
@@ -165,7 +154,7 @@ public class DependencyAnalyser {
             List<String> values = requestHeaders.get(param);
 
             if (param.equals("cookie")) {
-                Map<String,String> cookieMap = AuthPolicy.parseCookie(values);
+                Map<String,String> cookieMap = RuntimeUtil.parseCookie(values);
                 for (String cookieKey: cookieMap.keySet()) {
                     String cookieValue = cookieMap.get(cookieKey);
                     processRequestParam(cookieKey, new HashSet<>(Collections.singletonList(cookieValue)), combinedUrl, false, true);

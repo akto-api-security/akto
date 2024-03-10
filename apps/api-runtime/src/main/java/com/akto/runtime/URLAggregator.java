@@ -8,6 +8,7 @@ import java.util.concurrent.ConcurrentMap;
 import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.HttpResponseParams;
+import com.akto.util.runtime.RuntimeUtil;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,16 +19,6 @@ public class URLAggregator {
 
     ConcurrentMap<URLStatic, Set<HttpResponseParams>> urls;
 
-    public static URLStatic getBaseURL(String url, String method) {
-
-        if (url == null) {
-            return null;
-        }
-
-        return new URLStatic(url.split("\\?")[0], Method.fromString(method));
-    }
-
-
     public URLAggregator() {
         this.urls = new ConcurrentHashMap<>();
     }
@@ -37,7 +28,7 @@ public class URLAggregator {
     }
 
     public void addURL(HttpResponseParams responseParams) {
-        URLStatic url = getBaseURL(responseParams.getRequestParams().getURL(), responseParams.getRequestParams().getMethod());
+        URLStatic url = RuntimeUtil.getBaseURL(responseParams.getRequestParams().getURL(), responseParams.getRequestParams().getMethod());
 
         Set<HttpResponseParams> responses = urls.get(url);
         if (responses == null) {
