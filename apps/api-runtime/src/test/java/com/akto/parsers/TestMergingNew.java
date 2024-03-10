@@ -12,6 +12,7 @@ import com.akto.dto.IgnoreData;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
+import com.akto.util.runtime.RuntimeUtil;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
@@ -139,7 +140,7 @@ public class TestMergingNew extends MongoBasedTest {
         assertEquals(0, getStaticURLsSize(parser));
 
         templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
-        URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(
+        URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(
         url + "STRING" + "/subproduct/" + "STRING" + "/subitem/" + "STRING" + "/id/" + "INTEGER"
         , URLMethods.Method.GET);
         RequestTemplate requestTemplate = templateURLToMethods.get(urlTemplate);
@@ -196,7 +197,7 @@ public class TestMergingNew extends MongoBasedTest {
         assertEquals(0, getStaticURLsSize(parser));
 
         templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
-        URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url+"STRING"+"/received", URLMethods.Method.GET);
+        URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(url+"STRING"+"/received", URLMethods.Method.GET);
         RequestTemplate requestTemplate = templateURLToMethods.get(urlTemplate);
         Map<Integer, KeyTypes> keyTypesMap = requestTemplate.getUrlParams();
         KeyTypes keyTypes = keyTypesMap.get(2);

@@ -10,6 +10,7 @@ import java.util.Set;
 import com.akto.dto.OriginalHttpResponse;
 
 import com.akto.util.JSONUtils;
+import com.akto.util.runtime.RuntimeUtil;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.SampleDataDao;
@@ -32,8 +33,6 @@ import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 import com.akto.parsers.HttpCallParser;
 import com.akto.rules.TestPlugin;
-import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AuthPolicy;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.*;
@@ -547,7 +546,7 @@ public final class FilterAction {
                 
                 if (!res && (key.equals("cookie") || key.equals("set-cookie"))) {
                     List<String> cookieList = headers.getOrDefault(key, new ArrayList<>());
-                    Map<String,String> cookieMap = AuthPolicy.parseCookie(cookieList);
+                    Map<String,String> cookieMap = RuntimeUtil.parseCookie(cookieList);
                     for (String cookieKey : cookieMap.keySet()) {
                         dataOperandFilterRequest = new DataOperandFilterRequest(cookieKey, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
                         res = invokeFilter(dataOperandFilterRequest);
@@ -584,7 +583,7 @@ public final class FilterAction {
 
                 if (!res && (key.equals("cookie") || key.equals("set-cookie"))) {
                     List<String> cookieList = headers.getOrDefault("cookie", new ArrayList<>());
-                    Map<String,String> cookieMap = AuthPolicy.parseCookie(cookieList);
+                    Map<String,String> cookieMap = RuntimeUtil.parseCookie(cookieList);
                     for (String cookieKey : cookieMap.keySet()) {
                         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(cookieMap.get(cookieKey), filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
                         res = invokeFilter(dataOperandFilterRequest);
@@ -1167,10 +1166,10 @@ public final class FilterAction {
         int privateCnt = 0;
         List<BasicDBObject> privateValues = new ArrayList<>();
         if (APICatalog.isTemplateUrl(url)) {
-            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, method);
+            URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(url, method);
             String[] tokens = urlTemplate.getTokens();
 
-            String[] urlWithParamsTokens = APICatalogSync.createUrlTemplate(urlWithParams, method).getTokens();
+            String[] urlWithParamsTokens = RuntimeUtil.createUrlTemplate(urlWithParams, method).getTokens();
             for (int i = 0;i < tokens.length; i++) {
                 if (tokens[i] == null) {
                     SingleTypeInfo singleTypeInfo = querySti(i+"", true,apiInfoKey, false, -1);

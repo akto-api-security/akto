@@ -10,7 +10,6 @@ import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.type.*;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.RelationshipSync;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
@@ -18,6 +17,7 @@ import com.akto.test_editor.filter.Filter;
 import com.akto.testing.StatusCodeAnalyser;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
+import com.akto.util.runtime.RuntimeUtil;
 import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -34,8 +34,6 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static com.akto.runtime.APICatalogSync.trimAndSplit;
 
 
 public abstract class TestPlugin {
@@ -252,9 +250,9 @@ public abstract class TestPlugin {
         // check private resource in
         // 1. url
         if (APICatalog.isTemplateUrl(url)) {
-            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, method);
+            URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(url, method);
             String[] tokens = urlTemplate.getTokens();
-            String[] ogTokens = trimAndSplit(url);
+            String[] ogTokens = RuntimeUtil.trimAndSplit(url);
             for (int i = 0;i < tokens.length; i++) {
                 if (tokens[i] == null) {
                     atLeastOneValueInRequest = true;
@@ -322,7 +320,7 @@ public abstract class TestPlugin {
 
                 if (!APICatalog.isTemplateUrl(apiFromDbUrl)) continue;
                 
-                URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(apiFromDbUrl, apiFromDbMethod);
+                URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(apiFromDbUrl, apiFromDbMethod);
 
                 found = urlTemplate.match(apiUrl, fakeMethod);
 
