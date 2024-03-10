@@ -15,6 +15,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.runtime.APICatalogSync;
+import com.akto.util.runtime.RuntimeUtil;
 import com.mongodb.BasicDBObject;
 import org.junit.Before;
 
@@ -241,10 +242,10 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         Map<Integer, APICatalog> dbState = new HashMap<>();
         APICatalog apiCatalog = new APICatalog();
         Map<URLTemplate, RequestTemplate> templateURLToMethods = new HashMap<>();
-        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/books/INTEGER", URLMethods.Method.GET), null);
-        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/toys/INTEGER", URLMethods.Method.GET), null);
-        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/food/INTEGER", URLMethods.Method.GET), null);
-        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/hotel/INTEGER", URLMethods.Method.POST), null);
+        templateURLToMethods.put(RuntimeUtil.createUrlTemplate("api/books/INTEGER", URLMethods.Method.GET), null);
+        templateURLToMethods.put(RuntimeUtil.createUrlTemplate("api/toys/INTEGER", URLMethods.Method.GET), null);
+        templateURLToMethods.put(RuntimeUtil.createUrlTemplate("api/food/INTEGER", URLMethods.Method.GET), null);
+        templateURLToMethods.put(RuntimeUtil.createUrlTemplate("api/hotel/INTEGER", URLMethods.Method.POST), null);
         apiCatalog.setTemplateURLToMethods(templateURLToMethods);
         dbState.put(1000, apiCatalog);
         DependencyAnalyser dependencyAnalyser = new DependencyAnalyser(dbState, false);

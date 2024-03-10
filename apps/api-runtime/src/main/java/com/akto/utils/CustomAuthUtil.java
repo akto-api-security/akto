@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.ArrayList;
 
+import com.akto.util.runtime.RuntimeUtil;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -18,7 +19,6 @@ import com.akto.dto.CustomAuthType;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.runtime.policies.AuthPolicy;
 
 import static com.akto.dto.ApiInfo.ALL_AUTH_TYPES_FOUND;
 
@@ -97,7 +97,7 @@ public class CustomAuthUtil {
                 }
                 SingleTypeInfo cookieSTI = SingleTypeInfoDao.instance.findOne(getFilters(apiInfo, true, COOKIE_LIST));
                 if(cookieSTI!=null){
-                    Map<String,String> cookieMap = AuthPolicy.parseCookie(new ArrayList<>(cookieSTI.getValues().getElements()));
+                    Map<String,String> cookieMap = RuntimeUtil.parseCookie(new ArrayList<>(cookieSTI.getValues().getElements()));
                     headerAndCookieKeys.addAll(cookieMap.keySet());
                 }
 

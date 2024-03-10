@@ -23,6 +23,7 @@ import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
+import com.akto.util.runtime.RuntimeUtil;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
@@ -93,7 +94,7 @@ public class APICatalogSync {
         HttpRequestParams requestParams = responseParams.getRequestParams();
         String urlWithParams = requestParams.getURL();
         String methodStr = requestParams.getMethod();
-        URLStatic baseURL = URLAggregator.getBaseURL(urlWithParams, methodStr);
+        URLStatic baseURL = RuntimeUtil.getBaseURL(urlWithParams, methodStr);
         responseParams.requestParams.url = baseURL.getUrl();
         int statusCode = responseParams.getStatusCode();
         Method method = Method.fromString(methodStr);
@@ -322,7 +323,7 @@ public class APICatalogSync {
                     Method templateMethod = Method.fromString(templateURL.split(" ")[0]);
                     String templateEndpoint = templateURL.split(" ")[1];
 
-                    URLTemplate urlTemplate = createUrlTemplate(templateEndpoint, templateMethod);
+                    URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(templateEndpoint, templateMethod);
                     if (urlTemplate.match(staticEndpoint, staticMethod)) {
                         finalResult.deleteStaticUrls.add(staticURL);
                         iterator.remove();
@@ -354,7 +355,7 @@ public class APICatalogSync {
             String[] rawUrlPlusMethodSplit = rawURLPlusMethod.split(" ");
             String rawURL = rawUrlPlusMethodSplit.length > 1 ? rawUrlPlusMethodSplit[1] : rawUrlPlusMethodSplit[0];
             Set<String> reqTemplate = catalog.get(rawURLPlusMethod);
-            String url = APICatalogSync.trim(rawURL);
+            String url = RuntimeUtil.trim(rawURL);
             String[] tokens = url.split("/");
             Map<String, Set<String>> urlSet = sizeToURL.get(tokens.length);
             urlSet = sizeToURL.get(tokens.length);
@@ -1065,25 +1066,12 @@ public class APICatalogSync {
         }
     }
 
-    public static String trim(String url) {
-        // if (mergeAsyncOutside) {
-        //     if ( !(url.startsWith("/") ) && !( url.startsWith("http") || url.startsWith("ftp")) ){
-        //         url = "/" + url;
-        //     }
-        // } else {
-            if (url.startsWith("/")) url = url.substring(1, url.length());
-        // }
-        
-        if (url.endsWith("/")) url = url.substring(0, url.length()-1);
-        return url;
-    }
-
     private Map<Integer, Map<URLStatic, RequestTemplate>> groupByTokenSize(APICatalog catalog) {
         Map<Integer, Map<URLStatic, RequestTemplate>> sizeToURL = new HashMap<>();
         for(URLStatic rawURL: catalog.getStrictURLToMethods().keySet()) {
             RequestTemplate reqTemplate = catalog.getStrictURLToMethods().get(rawURL);
             if (reqTemplate.getUserIds().size() < 5) {
-                String url = trim(rawURL.getUrl());
+                String url = RuntimeUtil.trim(rawURL.getUrl());
                 String[] tokens = url.split("/");
                 Map<URLStatic, RequestTemplate> urlSet = sizeToURL.get(tokens.length);
                 urlSet = sizeToURL.get(tokens.length);
@@ -1100,7 +1088,7 @@ public class APICatalogSync {
     }
 
     public static String[] tokenize(String url) {
-        return trim(url).split("/");
+        return RuntimeUtil.trim(url).split("/");
     }
 
     Map<String, SingleTypeInfo> convertToMap(List<SingleTypeInfo> l) {
@@ -1342,40 +1330,6 @@ public class APICatalogSync {
         }
     }
 
-
-    public static String[] trimAndSplit(String url) {
-        return trim(url).split("/");
-    }
-
-    public static URLTemplate createUrlTemplate(String url, Method method) {
-        String[] tokens = trimAndSplit(url);
-        SuperType[] types = new SuperType[tokens.length];
-        for(int i = 0; i < tokens.length; i ++ ) {
-            String token = tokens[i];
-
-            if (token.equals(SuperType.STRING.name())) {
-                tokens[i] = null;
-                types[i] = SuperType.STRING;
-            } else if (token.equals(SuperType.INTEGER.name())) {
-                tokens[i] = null;
-                types[i] = SuperType.INTEGER;
-            } else if (token.equals(SuperType.OBJECT_ID.name())) {
-                tokens[i] = null;
-                types[i] = SuperType.OBJECT_ID;
-            } else if (token.equals(SuperType.FLOAT.name())) {
-                tokens[i] = null;
-                types[i] = SuperType.FLOAT;
-            } else {
-                types[i] = null;
-            }
-
-        }
-
-        URLTemplate urlTemplate = new URLTemplate(tokens, types, method);
-
-        return urlTemplate;
-    }
-
     public static void clearValuesInDB() {
         List<String> rangeSubTypes = new ArrayList<>();
         rangeSubTypes.add(SingleTypeInfo.INTEGER_32.getName());
@@ -1572,7 +1526,7 @@ public class APICatalogSync {
         }
         RequestTemplate reqTemplate;
         if (APICatalog.isTemplateUrl(url)) {
-            URLTemplate urlTemplate = createUrlTemplate(url, Method.fromString(param.getMethod()));
+            URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(url, Method.fromString(param.getMethod()));
             reqTemplate = catalog.getTemplateURLToMethods().get(urlTemplate);
 
             if (reqTemplate == null) {

@@ -14,6 +14,7 @@ import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.*;
 
 import com.akto.types.CappedSet;
+import com.akto.util.runtime.RuntimeUtil;
 import com.mongodb.client.model.Updates;
 import org.junit.Test;
 
@@ -62,7 +63,7 @@ public class TestApiCatalogSync extends MongoBasedTest {
                                           int valuesCount) {
 
         String[] tokenizedUrl = APICatalogSync.tokenize(url);
-        URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(templateUrl, URLMethods.Method.GET);
+        URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(templateUrl, URLMethods.Method.GET);
 
         requestTemplate.fillUrlParams(tokenizedUrl, urlTemplate, 0);
 
