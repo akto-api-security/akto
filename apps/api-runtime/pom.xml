@@ -31,7 +31,7 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.akto.libs.dependency-analyzer</groupId>
+            <groupId>com.akto.libs.dependency-analyser</groupId>
             <artifactId>dependency-analyser</artifactId>
             <version>${project.version}</version>
         </dependency>
