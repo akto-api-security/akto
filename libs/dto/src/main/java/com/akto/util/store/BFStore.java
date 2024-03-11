@@ -1,8 +1,9 @@
-package com.akto.dependency.store;
+package com.akto.util.store;
 
+import com.akto.util.store.Store;
 import com.google.common.hash.BloomFilter;
 
-public class BFStore extends Store{
+public class BFStore extends Store {
 
     BloomFilter<CharSequence> bf;
 
