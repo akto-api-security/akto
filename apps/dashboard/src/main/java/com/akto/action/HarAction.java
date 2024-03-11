@@ -48,7 +48,7 @@ public class HarAction extends UserAction {
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
         Context.accountId.set(1_000_000);
 
-        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1709612022, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH);
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1710156663, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH);
 
         SampleData sampleData = SampleDataDao.instance.findOne(
                 Filters.and(
@@ -75,6 +75,10 @@ public class HarAction extends UserAction {
         for (TestingRunResult.TestLog testLog: testingRunResult.getTestLogs()) {
             System.out.println(testLog.getMessage());
         }
+    }
+
+    public static void main1(String[] args) {
+        System.out.println(testContent);
     }
 
 
@@ -140,6 +144,7 @@ public class HarAction extends UserAction {
             "  type: multiple\n" +
             "  requests:\n" +
             "  - req:\n" +
+            "    - api: AVNEESH\n" +
             "    - add_header:\n" +
             "        dummy_Header_Key: \"dummyValue\"\n" +
             "    - validate:\n" +
@@ -149,6 +154,7 @@ public class HarAction extends UserAction {
             "    - failure: exit\n" +
             "\n" +
             "  - req:\n" +
+            "    - api: AVNEESH\n" +
             "    - add_header:\n" +
             "        dummy_Header_Key: \"dummyValue\"\n" +
             "    - validate:\n" +
@@ -158,6 +164,7 @@ public class HarAction extends UserAction {
             "    - failure: exit\n" +
             "\n" +
             "  - req:\n" +
+            "    - api: AVNEESH\n" +
             "    - add_header:\n" +
             "        dummy_Header_Key: \"dummyValue\"\n" +
             "    - validate:\n" +
@@ -167,6 +174,7 @@ public class HarAction extends UserAction {
             "    - failure: exit\n" +
             "\n" +
             "  - req:\n" +
+            "    - api: AVNEESH\n" +
             "    - add_header:\n" +
             "        dummy_Header_Key: \"dummyValue\"\n" +
             "    - validate:\n" +

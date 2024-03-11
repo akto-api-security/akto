@@ -33,8 +33,8 @@ public class Memory {
 
     public static Memory memory = new Memory(
             Arrays.asList(
-                    new ApiInfo.ApiInfoKey(1709612022, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH),
-                    new ApiInfo.ApiInfoKey(1709612022, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST)
+                    new ApiInfo.ApiInfoKey(1710156663, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH),
+                    new ApiInfo.ApiInfoKey(1710156663, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST)
             ), new HashMap<>()
     );
 
@@ -46,40 +46,40 @@ public class Memory {
 
 //        https://juiceshop.akto.io/rest/user/login
         List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
-        apiInfoKeys.add(new ApiInfo.ApiInfoKey(1709612022, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH));
-        apiInfoKeys.add(new ApiInfo.ApiInfoKey(1709612022, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST));
+        apiInfoKeys.add(new ApiInfo.ApiInfoKey(1710156663, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH));
+        apiInfoKeys.add(new ApiInfo.ApiInfoKey(1710156663, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST));
 
         Memory memory = new Memory(apiInfoKeys, new HashMap<>());
 
-        OriginalHttpRequest req1 = memory.run(1709612022, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST.name());
+        OriginalHttpRequest req1 = memory.run(1710156663, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST.name());
         System.out.println("new");
         OriginalHttpResponse resp1 = ApiExecutor.sendRequest(req1, true, null, false, new ArrayList<>());
-        memory.fillResponse(req1, resp1, 1709612022, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST.name());
-        memory.reset(1709612022, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST.name());
+        memory.fillResponse(req1, resp1, 1710156663, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST.name());
+        memory.reset(1710156663, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST.name());
         System.out.println("done");
 
 
-        OriginalHttpRequest req2 = memory.run(1709612022, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH.name());
+        OriginalHttpRequest req2 = memory.run(1710156663, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH.name());
         System.out.println("new");
         OriginalHttpResponse resp2 = ApiExecutor.sendRequest(req2, true, null, false, new ArrayList<>());
-        memory.fillResponse(req2, resp2, 1709612022, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH.name());
-        memory.reset(1709612022, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH.name());
+        memory.fillResponse(req2, resp2, 1710156663, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH.name());
+        memory.reset(1710156663, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH.name());
         System.out.println("done");
 
 
-        OriginalHttpRequest req3 = memory.run(1709612022, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST.name());
+        OriginalHttpRequest req3 = memory.run(1710156663, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST.name());
         System.out.println("new");
         OriginalHttpResponse resp3 = ApiExecutor.sendRequest(req3, true, null, false, new ArrayList<>());
-        memory.fillResponse(req3, resp3, 1709612022, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST.name());
-        memory.reset(1709612022, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST.name());
+        memory.fillResponse(req3, resp3, 1710156663, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST.name());
+        memory.reset(1710156663, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST.name());
         System.out.println("done");
 
 
-        OriginalHttpRequest req4 = memory.run(1709612022, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH.name());
+        OriginalHttpRequest req4 = memory.run(1710156663, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH.name());
         System.out.println("new");
         OriginalHttpResponse resp4 = ApiExecutor.sendRequest(req4, true, null, false, new ArrayList<>());
-        memory.fillResponse(req4, resp4, 1709612022, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH.name());
-        memory.reset(1709612022, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH.name());
+        memory.fillResponse(req4, resp4, 1710156663, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH.name());
+        memory.reset(1710156663, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH.name());
         System.out.println("done");
 
 
