@@ -172,9 +172,9 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-        // for (HttpResponseParams responseParam: filteredResponseParams) {
-        //     dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
-        // }
+         for (HttpResponseParams responseParam: filteredResponseParams) {
+             dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+         }
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;

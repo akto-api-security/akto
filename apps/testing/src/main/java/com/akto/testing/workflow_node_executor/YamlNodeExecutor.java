@@ -47,10 +47,8 @@ public class YamlNodeExecutor extends NodeExecutor {
     
     private static final Gson gson = new Gson();
 
-    static int counter = 0;
 
     public NodeResult processNode(Node node, Map<String, Object> varMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs) {
-        counter++;
         List<String> testErrors = new ArrayList<>();
 
         YamlNodeDetails yamlNodeDetails = (YamlNodeDetails) node.getWorkflowNodeDetails();
@@ -61,12 +59,6 @@ public class YamlNodeExecutor extends NodeExecutor {
 
         RawApi rawApi = yamlNodeDetails.getRawApi();
         RawApi sampleRawApi = rawApi.copy();
-        ApiInfo.ApiInfoKey apiInfoKey = counter % 2 != 0 ? new ApiInfo.ApiInfoKey(1709612022, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST) : new ApiInfo.ApiInfoKey(1709612022, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH);
-        System.out.println("*******");
-        System.out.println(apiInfoKey);
-
-        OriginalHttpRequest newRequest = Memory.memory.run(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
-        rawApi.setRequest(newRequest);
 
         List<RawApi> rawApis = new ArrayList<>();
         rawApis.add(rawApi.copy());
@@ -74,8 +66,25 @@ public class YamlNodeExecutor extends NodeExecutor {
         Executor executor = new Executor();
         ExecutorNode executorNode = yamlNodeDetails.getExecutorNode();
         FilterNode validatorNode = yamlNodeDetails.getValidatorNode();
+        List<ExecutorNode> childNodes = executorNode.getChildNodes();
 
-        for (ExecutorNode execNode: executorNode.getChildNodes()) {
+        String api = null;
+        ExecutorNode firstChildNode = childNodes.get(0); // todo check for length
+        if (firstChildNode.getOperationType().equals("API")) {
+            api = firstChildNode.getValues().toString();
+            childNodes.remove(0);
+        }
+
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1710156663, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST);
+
+        OriginalHttpRequest newRequest = Memory.memory.run(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+        rawApi.setRequest(newRequest);
+
+        if (api != null) {
+//            ApiInfo.ApiInfoKey apiInfoKey = counter % 2 != 0 ? new ApiInfo.ApiInfoKey(1710156663, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST) : new ApiInfo.ApiInfoKey(1710156663, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH);
+        }
+
+        for (ExecutorNode execNode: childNodes) {
             if (execNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ValidateExecutorDataOperands.Validate.toString())) {
                 validatorNode = (FilterNode) execNode.getChildNodes().get(0).getValues();
             }
