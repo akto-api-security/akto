@@ -1,4 +1,4 @@
-package com.akto.dependency.store;
+package com.akto.util.store;
 
 public abstract class Store {
 

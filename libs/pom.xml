@@ -19,5 +19,6 @@
         <module>dto</module>
         <module>utils</module>
         <module>integrations</module>
+        <module>dependency-analyser</module>
     </modules>
 </project>

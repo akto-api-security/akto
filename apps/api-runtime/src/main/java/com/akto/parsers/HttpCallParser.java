@@ -75,7 +75,7 @@ public class HttpCallParser {
         this.sync_threshold_time = sync_threshold_time;
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
-        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
+        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState);
     }
     
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {

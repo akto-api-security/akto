@@ -1,4 +1,4 @@
-package com.akto.dependency.store;
+package com.akto.util.store;
 
 import java.util.HashSet;
 import java.util.Set;
