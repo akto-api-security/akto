@@ -1,4 +1,4 @@
-import { Avatar, Box, Button, Frame, HorizontalStack, Page, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Avatar, Box, Button, Form, Frame, HorizontalStack, Page, Text, TextField, VerticalStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import SSOTextfield from './SSOTextfield'
 import PasswordTextField from '../../dashboard/components/layouts/PasswordTextField'
@@ -92,26 +92,34 @@ function SignUp() {
     headingText: "Welcome back",
     buttonText: "Sign in",
     linkText: "Sign up",
-    descriptonText: "Need to create a new organization?"
+    descriptionText: "Need to create a new organization?"
   }
 
   const signupObject = {
     headingText: "Create new account",
     buttonText: "Sign up",
     linkText: "Sign in",
-    descriptonText: "Already using Akto?"
+    descriptionText: "Already using Akto?"
   }
 
   const activeObject = loginActive ? loginObject : signupObject
 
+
   const signupEmailCard = (
     <VerticalStack gap={4}>
-      <TextField onChange={setEmail} value={email} label="Email" placeholder="name@workemail.com" monospaced={true}/>
-      <PasswordTextField setField={(val) => setPassword(val)} onFunc={true} field={password} label="Password" monospaced={true}/>
-
-      <Button fullWidth primary onClick={loginFunc} loading={loading}>{activeObject.buttonText}</Button>
+      <Form onSubmit={loginFunc}>
+        <VerticalStack gap={4}>
+          <div className='form-class'>
+            <TextField onChange={setEmail} value={email} label="Email" placeholder="name@workemail.com" monospaced={true}/>
+          </div>
+          <div className='form-class'>
+            <PasswordTextField setField={(val) => setPassword(val)} onFunc={true} field={password} label="Password" monospaced={true}/>
+          </div>
+          <Button fullWidth primary onClick={loginFunc} size="large" loading={loading}>{activeObject.buttonText}</Button>
+        </VerticalStack>
+      </Form>
       <HorizontalStack align="center" gap={1}>
-        <Text>{activeObject.descriptonText}</Text>
+        <Text>{activeObject.descriptionText}</Text>
         <Button plain onClick={() => setLoginActive(!loginActive)}>{activeObject.linkText}</Button>
       </HorizontalStack>
     </VerticalStack>
