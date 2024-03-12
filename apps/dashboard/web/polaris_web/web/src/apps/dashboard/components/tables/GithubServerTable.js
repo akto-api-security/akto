@@ -102,7 +102,7 @@ function GithubServerTable(props) {
   }
 
   const getSortedChoices = (choices) => {
-    return choices.sort((a,b) => a.label.localeCompare(b.label));
+    return choices.sort((a, b) => (a?.label || a) - (b?.label || b));
   }
 
   let filters = formatFilters(props.filters)

@@ -395,6 +395,7 @@ const transform = {
                 sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes),
                 lastTraffic: c.detected,
                 riskScore: c.riskScore,
+                envTypeComp: c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null
             }
         })
 
