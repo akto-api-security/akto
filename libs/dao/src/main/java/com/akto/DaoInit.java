@@ -281,6 +281,7 @@ public class DaoInit {
                 new EnumCodec<>(User.AktoUIMode.class),
                 new EnumCodec<>(TrafficMetricsAlert.FilterType.class),
                 new EnumCodec<>(KVPair.KVType.class),
+                new EnumCodec<>(ApiCollection.ENV_TYPE.class),
                 new EnumCodec<>(FileUpload.UploadType.class),
                 new EnumCodec<>(FileUpload.UploadStatus.class),
                 new EnumCodec<>(FileUploadLog.UploadLogStatus.class)
