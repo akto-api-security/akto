@@ -6,7 +6,7 @@ import func from "@/util/func";
 import api from '../api';
 import transform from '../transform';
 import DetailsPage from '../../../components/DetailsPage';
-import {produce} from "immer"
+import {produce, current} from "immer"
 import HardCoded from '../user_config/HardCoded';
 import LoginStepBuilder from '../user_config/LoginStepBuilder';
 import { ChevronRightMinor, ChevronDownMinor, InfoMinor } from '@shopify/polaris-icons';
@@ -165,7 +165,7 @@ function TestRoleSettings() {
                     draft[action.index].operator = func.getConditions(selectOptions, action.obj.type)[0].label
                 }
                 draft[action.index] = {...draft[action.index], ...action.obj}; break;
-            case "delete": draft = draft.filter((item, index) => index !== action.index);
+            case "delete": return draft.filter((item, index) => index !== action.index);
             default: break;
         }
     }
