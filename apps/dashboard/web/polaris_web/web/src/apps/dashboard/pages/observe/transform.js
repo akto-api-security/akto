@@ -523,22 +523,32 @@ const transform = {
     async fetchRiskScoreInfo(){
         let tempRiskScoreObj = lastFetchedResp
         let tempSeverityObj = lastFetchedSeverityResp
-        api.lastUpdatedInfo().then(async(resp) => {
+        await api.lastUpdatedInfo().then(async(resp) => {
             if(resp.lastUpdatedSeverity >= lastFetchedInfo.lastRiskScoreInfo || resp.lastUpdatedSensitiveMap >= lastFetchedInfo.lastSensitiveInfo){
-                await api.getRiskScoreInfo().then((res) =>{
-                    const newObj = {
-                        criticalUrls: res.criticalEndpointsCount,
-                        riskScoreMap: res.riskScoreOfCollectionsMap, 
-                    }
-                    tempRiskScoreObj = JSON.parse(JSON.stringify(newObj));
-                    setLastFetchedResp(newObj);
-                })
+                try {
+                    await api.getRiskScoreInfo().then((res) =>{
+                        const newObj = {
+                            criticalUrls: res.criticalEndpointsCount,
+                            riskScoreMap: res.riskScoreOfCollectionsMap, 
+                        }
+                        tempRiskScoreObj = JSON.parse(JSON.stringify(newObj));
+                        setLastFetchedResp(newObj);
+                    })
+                } catch (error) {
+                    func.setToast(true, false, error.message)
+                }
+                
             }
             if(resp.lastUpdatedSeverity >= lastFetchedInfo.lastRiskScoreInfo){
-                await api.getSeverityInfoForCollections().then((resp) => {
-                    tempSeverityObj = JSON.parse(JSON.stringify(resp))
-                    setLastFetchedSeverityResp(resp)
-                })
+                try {
+                    await api.getSeverityInfoForCollections().then((resp) => {
+                        tempSeverityObj = JSON.parse(JSON.stringify(resp))
+                        setLastFetchedSeverityResp(resp)
+                    })
+                } catch (error) {
+                    func.setToast(true, false, error.message)
+                }
+                
             }
             setLastFetchedInfo({
                 lastRiskScoreInfo: func.timeNow() >= resp.lastUpdatedSeverity ? func.timeNow() : resp.lastUpdatedSeverity,
@@ -555,15 +565,20 @@ const transform = {
     async fetchSensitiveInfo(){
         let tempSensitiveInfo = lastFetchedSensitiveResp
         if((func.timeNow() - (5 * 60)) >= lastCalledSensitiveInfo){
-            await api.getSensitiveInfoForCollections().then((resp) => {
-                const sensitiveObj = {
-                    sensitiveUrls: resp.sensitiveUrlsInResponse,
-                    sensitiveInfoMap: resp.sensitiveSubtypesInCollection
-                }
-                setLastCalledSensitiveInfo(func.timeNow())
-                setLastFetchedSensitiveResp(sensitiveObj)
-                tempSensitiveInfo = JSON.parse(JSON.stringify(sensitiveObj))
-            })
+            try {
+                await api.getSensitiveInfoForCollections().then((resp) => {
+                    const sensitiveObj = {
+                        sensitiveUrls: resp.sensitiveUrlsInResponse,
+                        sensitiveInfoMap: resp.sensitiveSubtypesInCollection
+                    }
+                    setLastCalledSensitiveInfo(func.timeNow())
+                    setLastFetchedSensitiveResp(sensitiveObj)
+                    tempSensitiveInfo = JSON.parse(JSON.stringify(sensitiveObj))
+                })
+            } catch (error) {
+                return tempSensitiveInfo
+            }
+            
         }
         return tempSensitiveInfo; 
     }

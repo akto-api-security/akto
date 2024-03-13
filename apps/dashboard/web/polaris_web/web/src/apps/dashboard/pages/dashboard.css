@@ -105,3 +105,11 @@
     white-space: normal !important;
     word-break: break-all !important;
 }
+
+.Polaris-Frame__Skip{
+    visibility: hidden !important;
+}
+
+.form-class .Polaris-Label{
+    color: #202223 !important;
+}
