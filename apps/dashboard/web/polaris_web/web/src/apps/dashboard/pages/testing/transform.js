@@ -654,6 +654,93 @@ getInfoSectionsHeaders(){
     }
   ]
   return moreInfoSections
+},
+getUrlComp(url){
+  let arr = url.split(' ')
+  const method = arr[0]
+  const endpoint = arr[1]
+
+  return(
+    <HorizontalStack gap={1}>
+      <Box width="54px">
+        <HorizontalStack align="end">
+          <Text variant="bodyMd" color="subdued">{method}</Text>
+        </HorizontalStack>
+      </Box>
+      <Text variant="bodyMd">{endpoint}</Text>
+    </HorizontalStack>
+  )
+},
+
+getCollapsibleRow(urls){
+  return(
+    <tr style={{background: "#EDEEEF"}}>
+      <td colSpan={7}>
+        <Box paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
+          <VerticalStack gap={2}>
+            {urls.map((ele,index)=>{
+              return(
+                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline key={index}>
+                  {this.getUrlComp(ele.url)}
+                </Link>
+              )
+            })}
+          </VerticalStack>
+        </Box>
+      </td>
+    </tr>
+  )
+},
+
+getPrettifiedTestRunResults(testRunResults){
+  let testRunResultsObj = {}
+  testRunResults.forEach((test)=>{
+    const key = test.name + ': ' + test.vulnerable
+    if(testRunResultsObj.hasOwnProperty(key)){
+      let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
+      let urls = testRunResultsObj[key].urls
+      urls.push({url: test.url, nextUrl: test.nextUrl})
+      let obj = {
+        ...test,
+        urls: urls,
+        endTimestamp: endTimestamp
+      }
+      delete obj["nextUrl"]
+      delete obj["url"]
+      testRunResultsObj[key] = obj
+    }else{
+      let urls = [{url: test.url, nextUrl: test.nextUrl}]
+      let obj={
+        ...test,
+        urls:urls,
+      }
+      delete obj["nextUrl"]
+      delete obj["url"]
+      testRunResultsObj[key] = obj
+    }
+  })
+  let prettifiedResults = []
+  Object.keys(testRunResultsObj).forEach((key)=>{
+    let obj = testRunResultsObj[key]
+    let prettifiedObj = {
+      ...obj,
+      nameComp: <Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box>,
+      severityComp: obj?.vulnerable === true ? <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge> : <Text>-</Text>,
+      cweDisplayComp: obj?.cweDisplay?.length > 0 ? <HorizontalStack gap={1}>
+        {obj.cweDisplay.map((ele,index)=>{
+          return(
+            <Badge size="small" status={func.getTestResultStatus(ele)} key={index}>{ele}</Badge>
+          )
+        })}
+      </HorizontalStack> : <Text>-</Text>,
+      totalUrls: obj.urls.length,
+      scanned_time_comp: <Text variant="bodyMd">{func.prettifyEpoch(obj?.endTimestamp)}</Text>,
+      collapsibleRow: this.getCollapsibleRow(obj.urls),
+      urlFilters: obj.urls.map((ele) => ele.url)
+    }
+    prettifiedResults.push(prettifiedObj)
+  })
+  return prettifiedResults
 }
 }
 

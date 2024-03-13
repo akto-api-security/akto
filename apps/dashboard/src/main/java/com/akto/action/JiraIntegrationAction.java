@@ -73,7 +73,7 @@ public class JiraIntegrationAction extends UserAction {
         headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "GET", null, headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("error while testing jira integration, url not accessible", LoggerMaker.LogDb.DASHBOARD);
@@ -138,7 +138,9 @@ public class JiraIntegrationAction extends UserAction {
 
     public String fetchIntegration() {
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-        jiraIntegration.setApiToken("****************************");
+        if(jiraIntegration != null){
+            jiraIntegration.setApiToken("****************************");
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -191,7 +193,7 @@ public class JiraIntegrationAction extends UserAction {
         headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() > 201 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("error while testing jira integration, url not accessible", LoggerMaker.LogDb.DASHBOARD);
@@ -331,10 +333,6 @@ public class JiraIntegrationAction extends UserAction {
 
     public void setUserEmail(String userEmail) {
         this.userEmail = userEmail;
-    }
-
-    public String getApiToken() {
-        return apiToken;
     }
 
     public void setApiToken(String apiToken) {
