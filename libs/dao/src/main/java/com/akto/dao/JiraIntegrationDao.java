@@ -2,7 +2,7 @@ package com.akto.dao;
 
 import com.akto.dto.JiraIntegration;
 
-public class JiraIntegrationDao extends CommonContextDao<JiraIntegration> {
+public class JiraIntegrationDao extends AccountsContextDao<JiraIntegration> {
     
     public static final JiraIntegrationDao instance = new JiraIntegrationDao();
 

@@ -177,7 +177,7 @@ function SingleTestRunPage() {
     })
     
     fillData(transform.getPrettifiedTestRunResults(testRunResults), 'vulnerable')
-    await api.fetchTestingRunResults(summaryHexId).then(({ testingRunResults }) => {
+    await api.fetchTestingRunResults(summaryHexId, false).then(({ testingRunResults }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
     })
     fillData(transform.getPrettifiedTestRunResults(testRunResults), 'all')
@@ -422,7 +422,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
                   No test run data found
                 </Text>
               </HorizontalStack>
-              <Text variant="bodyMd">
+              <Text variant="bodyMd" alignment="center">
                 The next summary will be ready with the upcoming test.
               </Text>
             </VerticalStack>
@@ -477,7 +477,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
       func.downloadAsCSV((testRunResults[selectedTab]), selectedTestRun)
       }>Export</Button></Box>: undefined}
       secondaryActions={!workflowTest ? <Button onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button> : undefined}
-      components={components}
+      components={useComponents}
     />
   );
 }
