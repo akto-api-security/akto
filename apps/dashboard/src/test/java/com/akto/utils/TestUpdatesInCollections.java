@@ -81,7 +81,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         ApiInfoKey apiInfoKey = apiInfo.getId();
 
         TestingIssuesId testingIssuesId = new TestingIssuesId(apiInfoKey, GlobalEnums.TestErrorSource.AUTOMATED_TESTING ,testSubCategory);
-        TestingRunIssues testingRunIssues = new TestingRunIssues(testingIssuesId, severity, GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(), new ObjectId(new Date()), Context.now());
+        TestingRunIssues testingRunIssues = new TestingRunIssues(testingIssuesId, severity, GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(), new ObjectId(new Date()), Context.now(), null);
 
         return testingRunIssues;
     }
