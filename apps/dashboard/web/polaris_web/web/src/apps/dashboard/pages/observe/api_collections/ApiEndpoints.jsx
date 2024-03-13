@@ -245,7 +245,7 @@ function ApiEndpoints() {
     useEffect(() => {
         fetchData()
         checkGptActive()
-    }, [])
+    }, [apiCollectionId])
 
     const resourceName = {
         singular: 'endpoint',
