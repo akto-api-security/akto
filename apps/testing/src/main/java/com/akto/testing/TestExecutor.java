@@ -42,6 +42,7 @@ import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
+import com.mongodb.MongoInterruptedException;
 import org.apache.commons.lang3.StringUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
@@ -58,7 +59,7 @@ import java.util.concurrent.*;
 
 public class TestExecutor {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class, LogDb.TESTING);
     public static long acceptableSizeInBytes = 5_000_000;
     private static final Gson gson = new Gson();
 
@@ -211,6 +212,8 @@ public class TestExecutor {
             }
         }
 
+        final int maxRunTime = testingRun.getTestRunTime() < 0 ? 30*60 : testingRun.getTestRunTime(); // if nothing specified wait for 30 minutes
+
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
                 hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
@@ -225,7 +228,7 @@ public class TestExecutor {
                          () -> startWithLatch(apiInfoKey,
                                  testingRun.getTestIdConfig(),
                                  testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
-                                 accountId, latch, now, testingRun.getTestRunTime(), testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs));
+                                 accountId, latch, now, maxRunTime, testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs));
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
@@ -236,10 +239,16 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("Waiting...", LogDb.TESTING);
 
         try {
-            int maxRunTime = testingRun.getTestRunTime();
-            if (maxRunTime < 0) maxRunTime = 30*60; // if nothing specified wait for 30 minutes
             boolean awaitResult = latch.await(maxRunTime, TimeUnit.SECONDS);
             loggerMaker.infoAndAddToDb("Await result: " + awaitResult, LogDb.TESTING);
+
+            if (!awaitResult) { // latch countdown didn't reach 0
+                for (Future<Void> future : futureTestingRunResults) {
+                    future.cancel(true);
+                }
+                loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
+            }
+
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -479,24 +488,17 @@ public class TestExecutor {
     public Void startWithLatch(
             ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
             TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime,
-            int timeToKill, Map<String, TestConfig> testConfigMap, TestingRun testingRun, 
+            int maxRunTime, Map<String, TestConfig> testConfigMap, TestingRun testingRun,
             ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
             boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
         Context.accountId.set(accountId);
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
 
-        
-        int now = Context.now();
-        if ( timeToKill <= 0 || now - startTime <= timeToKill) {
-            try {
-                // todo: commented out older one
-//                testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
-                startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs);
-            } catch (Exception e) {
-                e.printStackTrace();
-                loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);
-            }
+        try {
+            startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, maxRunTime);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
         }
 
         latch.countDown();
@@ -559,12 +561,16 @@ public class TestExecutor {
                                                TestingRunConfig testingRunConfig, TestingUtil testingUtil,
                                                ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap,
                                                ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
-                                               boolean debug, List<TestingRunResult.TestLog> testLogs) {
+                                               boolean debug, List<TestingRunResult.TestLog> testLogs, int startTime, int timeToKill) {
 
         List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
 
         int countSuccessfulTests = 0;
         for (String testSubCategory: testSubCategories) {
+            if (Context.now() - startTime > timeToKill) {
+                loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
+                return;
+            }
             List<TestingRunResult> testingRunResults = new ArrayList<>();
 
             TestConfig testConfig = testConfigMap.get(testSubCategory);
