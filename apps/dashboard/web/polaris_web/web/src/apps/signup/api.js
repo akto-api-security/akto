@@ -53,5 +53,14 @@ export default {
                 newAccountName
             }
         })
+    },
+    signupUser: function(email, password, invitationCode){
+        return request({
+            url: '/signup-email',
+            method: 'post',
+            data: {
+                email, password, invitationCode
+            }
+        })
     }
 }
