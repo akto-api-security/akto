@@ -24,11 +24,12 @@ public class TestingRunIssues {
     private String ignoreReason;
     public static final String LAST_UPDATED = "lastUpdated";
     private int lastUpdated;
+    private String jiraIssueUrl;
 
     private List<Integer> collectionIds;
 
     public TestingRunIssues(TestingIssuesId id, GlobalEnums.Severity severity, GlobalEnums.TestRunIssueStatus status,
-                            int creationTime, int lastSeen, ObjectId latestTestingRunSummaryId, int lastUpdated) {
+                            int creationTime, int lastSeen, ObjectId latestTestingRunSummaryId, int lastUpdated, String jiraIssueUrl) {
         this.creationTime = creationTime;
         this.lastSeen = lastSeen;
         this.id = id;
@@ -39,6 +40,7 @@ public class TestingRunIssues {
         this.testRunIssueStatus = status;
         this.latestTestingRunSummaryId = latestTestingRunSummaryId;
         this.lastUpdated = lastUpdated;
+        this.jiraIssueUrl = jiraIssueUrl;
     }
 
     public TestingRunIssues() {
@@ -118,4 +120,12 @@ public class TestingRunIssues {
     public void setLastUpdated(int lastUpdated) {
         this.lastUpdated = lastUpdated;
     }
+    public String getJiraIssueUrl() {
+        return jiraIssueUrl;
+    }
+
+    public void setJiraIssueUrl(String jiraIssueUrl) {
+        this.jiraIssueUrl = jiraIssueUrl;
+    }
+
 }
