@@ -2,15 +2,19 @@ import { Avatar, Box, Button, Form, Frame, HorizontalStack, Page, Text, TextFiel
 import React, { useEffect, useState } from 'react'
 import SSOTextfield from './SSOTextfield'
 import PasswordTextField from '../../dashboard/components/layouts/PasswordTextField'
+import { useLocation, useNavigate } from "react-router-dom"
 import api from '../api'
 import func from '@/util/func'
 import "../styles.css"
 
 function SignUp() {
+
+  const location = useLocation()
+
   const [ssoList, setSsoList] = useState([])
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [loginActive, setLoginActive] = useState(true)
+  const [loginActive, setLoginActive] = useState(location.pathname.includes("login"))
   const [loading, setLoading] = useState(false)
 
   const oktaUrl = window.OKTA_AUTH_URL
@@ -86,8 +90,13 @@ function SignUp() {
       }
     }else{
       try {
-        await api.signupUser(email, password, window.SIGNUP_INVITATION_CODE)
-        window.location.href= "/dashboard/onboarding"
+        api.signupUser(email, password, window.SIGNUP_INVITATION_CODE).then((resp)=> {
+          if (resp && resp.indexOf("<")== -1) {
+            func.setToast(true, true, "Signup error " + resp)
+          }else{
+            navigate('/dashboard/onboarding')
+          }
+        })
       } catch (error) {
         func.setToast(true, true, "Signup error " + error)
       }
@@ -99,18 +108,20 @@ function SignUp() {
     headingText: "Welcome back",
     buttonText: "Sign in",
     linkText: "Sign up",
-    descriptionText: "Need to create a new organization?"
+    descriptionText: "Need to create a new organization?",
+    targetUrl: '/signup'
   }
 
   const signupObject = {
     headingText: "Create new account",
     buttonText: "Sign up",
     linkText: "Sign in",
-    descriptionText: "Already using Akto?"
+    descriptionText: "Already using Akto?",
+    targetUrl: '/login'
   }
 
   const activeObject = loginActive ? loginObject : signupObject
-
+  const navigate = useNavigate()
 
   const signupEmailCard = (
     <VerticalStack gap={4}>
@@ -127,7 +138,7 @@ function SignUp() {
       </Form>
       <HorizontalStack align="center" gap={1}>
         <Text>{activeObject.descriptionText}</Text>
-        <Button plain onClick={() => setLoginActive(!loginActive)}>{activeObject.linkText}</Button>
+        <Button plain onClick={() => {setLoginActive(!loginActive); navigate(activeObject.targetUrl)}}>{activeObject.linkText}</Button>
       </HorizontalStack>
     </VerticalStack>
   )
