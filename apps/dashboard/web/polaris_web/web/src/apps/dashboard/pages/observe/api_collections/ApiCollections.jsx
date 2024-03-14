@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box } from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
@@ -48,6 +48,13 @@ const headers = [
         title: 'Sensitive data' , 
         text: 'Sensitive data' , 
         value: 'sensitiveSubTypes',
+    },
+    {
+        text: 'Collection type',
+        title: 'Collection type',
+        value: 'envTypeComp',
+        filterKey: "envType",
+        showFilter: true
     },
     {   
         title: 'Last traffic seen', 
@@ -109,6 +116,9 @@ function ApiCollections() {
     const [selected, setSelected] = useState(0)
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(false)
+    const [envTypeMap, setEnvTypeMap] = useState({})
+    const [refreshData, setRefreshData] = useState(false)
+    const [popover,setPopover] = useState(false)
     
     
     const tableTabs = [
@@ -179,6 +189,11 @@ function ApiCollections() {
         setCoverageMap(coverageInfo)
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
+        let envTypeObj = {}
+        tmp.forEach((c) => {
+            envTypeObj[c.id] = c.envType
+        })
+        setEnvTypeMap(envTypeObj)
 
         const issuesObj = await transform.fetchRiskScoreInfo();
         const severityObj = issuesObj.severityObj;
@@ -225,12 +240,61 @@ function ApiCollections() {
         func.setToast(true, false, `${collectionIdList.length} API collection${collectionIdList.length > 1 ? "s" : ""} deleted successfully`)
     }
 
-    const promotedBulkActions = (selectedResources) => [
-        {
-          content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-          onAction: () => handleRemoveCollections(selectedResources)
-        },
-      ];
+    const updateData = (dataMap) => {
+        let copyObj = data;
+        Object.keys(copyObj).forEach((key) => {
+            data[key].length > 0 && data[key].forEach((c) => {
+                c['envType'] = dataMap[c.id]
+                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" status="info">{func.toSentenceCase(dataMap[c.id])}</Badge> : null
+            })
+        })
+        setData(copyObj)
+        setRefreshData(!refreshData)
+    }
+
+    const updateEnvType = (apiCollectionIds,type) => {
+        let copyObj = JSON.parse(JSON.stringify(envTypeMap))
+        apiCollectionIds.forEach(id => copyObj[id] = type)
+        api.updateEnvTypeOfCollection(type,apiCollectionIds).then((resp) => {
+            func.setToast(true, false, "ENV type updated successfully")
+            setEnvTypeMap(copyObj)
+            updateData(copyObj)
+        })
+        
+    }
+
+    const promotedBulkActions = (selectedResources) => {
+        const removeCollectionsObj = {
+            content: `Remove collection${func.addPlurality(selectedResources.length)}`,
+            onAction: () => handleRemoveCollections(selectedResources)
+        }
+
+        const toggleTypeContent = (
+            <Popover
+                activator={<div onClick={() => setPopover(!popover)}>Set ENV type</div>}
+                onClose={() => setPopover(false)}
+                active={popover}
+                autofocusTarget="first-node"
+            >
+                <Popover.Pane>
+                    <ActionList
+                        actionRole="menuitem"
+                        items={[
+                            {content: 'Staging', onAction: () => updateEnvType(selectedResources, "STAGING")},
+                            {content: 'Production', onAction: () => updateEnvType(selectedResources, "PRODUCTION")},
+                            {content: 'Reset', onAction: () => updateEnvType(selectedResources, null)},
+                        ]}
+                    />
+                </Popover.Pane>
+            </Popover>
+        )
+
+        const toggleEnvType = {
+            content: toggleTypeContent
+        }
+
+        return [removeCollectionsObj, toggleEnvType]
+    }
 
     const modalComponent = <CreateNewCollectionModal
         key="modal"
@@ -275,7 +339,7 @@ function ApiCollections() {
 
     const tableComponent = (
         <GithubSimpleTable
-            key="table"
+            key={refreshData}
             pageLimit={100}
             data={data[selectedTab]} 
             sortOptions={sortOptions} 
