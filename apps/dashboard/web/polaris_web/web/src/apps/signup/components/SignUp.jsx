@@ -1,4 +1,4 @@
-import { Avatar, Box, Button, Form, Frame, HorizontalStack, Page, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Avatar, Box, Button, Form, Frame, HorizontalStack, Page, Text, TextField, Toast, VerticalStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import SSOTextfield from './SSOTextfield'
 import PasswordTextField from '../../dashboard/components/layouts/PasswordTextField'
@@ -76,14 +76,21 @@ function SignUp() {
       </VerticalStack>
   )
 
-  const loginFunc = () => {
+  const loginFunc = async() => {
     setLoading(true)
-    try {
-      api.login(email, password).then((resp) => {
-
-      })
-    } catch (error) {
-      func.setToast(true, true, "Email or password incorrect. Please login again.")
+    if(loginActive){
+      try {
+        await api.login(email, password)
+      } catch {
+        func.setToast(true, true, "Email or password incorrect. Please login again.")
+      }
+    }else{
+      try {
+        await api.signupUser(email, password, window.SIGNUP_INVITATION_CODE)
+        window.location.href= "/dashboard/onboarding"
+      } catch (error) {
+        func.setToast(true, true, "Signup error " + error)
+      }
     }
     setLoading(false)
   }
