@@ -343,7 +343,7 @@ const transform = {
 
   fillMoreInformation(category, moreInfoSections, affectedEndpoints, jiraIssueUrl, createJiraTicket) {
     var key = /[^/]*$/.exec(jiraIssueUrl)[0];
-    const jiraComponent = jiraIssueUrl.length > 0 ? (
+    const jiraComponent = jiraIssueUrl?.length > 0 ? (
       <Box>
               <Tag>
                   <HorizontalStack gap={1}>
@@ -680,7 +680,7 @@ getCollapsibleRow(urls){
           <VerticalStack gap={2}>
             {urls.map((ele,index)=>{
               return(
-                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline key={index}>
+                <Link monochrome onClick={() => window.open(ele.nextUrl, "_blank")} removeUnderline key={index}>
                   {this.getUrlComp(ele.url)}
                 </Link>
               )
