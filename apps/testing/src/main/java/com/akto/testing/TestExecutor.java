@@ -16,10 +16,7 @@ import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Graph;
-import com.akto.dto.test_editor.Auth;
-import com.akto.dto.test_editor.ExecutorNode;
-import com.akto.dto.test_editor.FilterNode;
-import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
@@ -99,7 +96,7 @@ public class TestExecutor {
             Graph graph = new Graph();
             graph.buildGraph(workflowTest);
             GraphExecutorRequest graphExecutorRequest = new GraphExecutorRequest(graph, workflowTest, testingRun.getId(), summaryId, valuesMap, false, "linear");
-            GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest, debug, testLogs);
+            GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest, debug, testLogs, null, null);
             WorkflowTestResultsDao.instance.insertOne(graphExecutorResult.getWorkflowTestResult());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while executing workflow test " + e, LogDb.TESTING);
@@ -638,6 +635,7 @@ public class TestExecutor {
         }
 
         FilterNode filterNode = testConfig.getApiSelectionFilters().getNode();
+        Map<String, ConfigParserResult> workFlowSelectionFilters = testConfig.getWorkFlowSelectionFilters();
         FilterNode validatorNode = null;
         if (testConfig.getValidation() != null) {
             validatorNode = testConfig.getValidation().getNode();
@@ -661,7 +659,7 @@ public class TestExecutor {
 
         List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
-                rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
+                rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy(), workFlowSelectionFilters);
         YamlTestResult testResults = yamlTestTemplate.run(debug, testLogs);
         if (testResults == null || testResults.getTestResults().isEmpty()) {
             List<GenericTestResult> res = new ArrayList<>();

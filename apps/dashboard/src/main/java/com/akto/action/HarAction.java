@@ -83,35 +83,12 @@ public class HarAction extends UserAction {
 
 
     public static String testContent = "id: REPORT_GENERATION_DOS\n" +
+            "\n" +
             "info:\n" +
             "  name: \"Denial of Service Test on Report Generation Endpoint\"\n" +
-            "  description: \"A Denial of Service (DoS) test on a report generation endpoint involves \n" +
-            "  overwhelming the system with a high volume of requests to assess its \n" +
-            "  resilience under heavy load. By bombarding the endpoint with \n" +
-            "  numerous simultaneous requests for report generation, testers \n" +
-            "  evaluate how well the system handles the load and whether it \n" +
-            "  remains responsive. This testing helps identify potential bottlenecks \n" +
-            "  or vulnerabilities in the report generation process, enabling \n" +
-            "  proactive measures to fortify the system's defenses against \n" +
-            "  DoS attacks targeting this endpoint.\"\n" +
-            "  details: \"In this test, the report generation endpoint is bombarded with an \n" +
-            "  excessive number of requests, aiming to simulate real-world peak \n" +
-            "  loads and stress the system. Testers assess how the endpoint \n" +
-            "  responds to this influx of requests, evaluating its ability \n" +
-            "  to maintain responsiveness and generate reports efficiently. \n" +
-            "  Through this process, potential weaknesses in scalability \n" +
-            "  and performance are identified, enabling organizations to \n" +
-            "  fortify their systems against Denial of Service (DoS) attacks \n" +
-            "  on report generation functionalities.\"\n" +
-            "  impact: \"A successful Denial of Service (DoS) test on a report generation endpoint \n" +
-            "  can have significant consequences. It may lead to system slowdowns, \n" +
-            "  unavailability, or crashes, hindering users' access to vital reports \n" +
-            "  and disrupting business operations. Additionally, prolonged \n" +
-            "  service disruptions can tarnish the organization's reputation, \n" +
-            "  eroding user trust and potentially resulting in financial \n" +
-            "  losses. Identifying and addressing vulnerabilities in the \n" +
-            "  report generation process is crucial for maintaining system \n" +
-            "  reliability and resilience against DoS attacks.\"\n" +
+            "  description: \"A Denial of Service (DoS) test\"\n" +
+            "  details: \"In this test.\"\n" +
+            "  impact: \"A\"\n" +
             "  category:\n" +
             "    name: RL\n" +
             "    shortName: Lack of Resources & Rate Limiting\n" +
@@ -129,13 +106,28 @@ public class HarAction extends UserAction {
             "  cve:\n" +
             "    - CVE-2023-4647\n" +
             "    - CVE-2023-38254\n" +
+            "\n" +
+            "workflow_selection_filters:\n" +
+            "  API_1:\n" +
+            "    response_code:\n" +
+            "      gte: 200\n" +
+            "      lt: 300\n" +
+            "    url:\n" +
+            "      contains_either:\n" +
+            "        - rest/user/login\n" +
+            "  API_2:\n" +
+            "    response_code:\n" +
+            "      gte: 200\n" +
+            "      lt: 300\n" +
+            "    url:\n" +
+            "      contains_either:\n" +
+            "        - rest/products/reviews\n" +
+            "\n" +
             "api_selection_filters:\n" +
             "  response_code:\n" +
             "    gte: 200\n" +
             "    lt: 300\n" +
-            "  url:\n" +
-            "    contains_either:\n" +
-            "      - a\n" +
+            "\n" +
             "wordLists:\n" +
             "  dummyHeaders:\n" +
             "    - a\n" +
@@ -144,44 +136,45 @@ public class HarAction extends UserAction {
             "  type: multiple\n" +
             "  requests:\n" +
             "  - req:\n" +
-            "    - api: AVNEESH\n" +
+            "    - api: API_1\n" +
             "    - add_header:\n" +
-            "        dummy_Header_Key: \"dummyValue\"\n" +
+            "        dummy_Header_Key1: \"dummyValue\"\n" +
             "    - validate:\n" +
             "        percentage_match:\n" +
             "          gte: 90\n" +
             "    - success: x2\n" +
-            "    - failure: exit\n" +
+            "    - failure: x2\n" +
             "\n" +
             "  - req:\n" +
-            "    - api: AVNEESH\n" +
+            "    - api: API_2\n" +
             "    - add_header:\n" +
-            "        dummy_Header_Key: \"dummyValue\"\n" +
+            "        dummy_Header_Key2: \"dummyValue\"\n" +
             "    - validate:\n" +
             "        percentage_match:\n" +
             "          gte: 90\n" +
             "    - success: x3\n" +
-            "    - failure: exit\n" +
+            "    - failure: x3\n" +
             "\n" +
             "  - req:\n" +
-            "    - api: AVNEESH\n" +
+            "    - api: API_1\n" +
             "    - add_header:\n" +
-            "        dummy_Header_Key: \"dummyValue\"\n" +
+            "        dummy_Header_Key3: \"dummyValue\"\n" +
             "    - validate:\n" +
             "        percentage_match:\n" +
             "          gte: 90\n" +
             "    - success: x4\n" +
-            "    - failure: exit\n" +
+            "    - failure: x4\n" +
             "\n" +
             "  - req:\n" +
-            "    - api: AVNEESH\n" +
+            "    - api: API_2\n" +
             "    - add_header:\n" +
-            "        dummy_Header_Key: \"dummyValue\"\n" +
+            "        dummy_Header_Key4: \"dummyValue\"\n" +
             "    - validate:\n" +
             "        percentage_match:\n" +
             "          gte: 90\n" +
             "    - success: x5\n" +
-            "    - failure: exit\n" +
+            "    - failure: x5\n" +
+            "\n" +
             "\n" +
             "validate:\n" +
             "  and:\n" +

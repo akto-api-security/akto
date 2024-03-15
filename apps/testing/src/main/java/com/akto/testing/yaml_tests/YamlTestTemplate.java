@@ -1,21 +1,25 @@
 package com.akto.testing.yaml_tests;
 
+import com.akto.dao.SampleDataDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
-import com.akto.dto.test_editor.Auth;
-import com.akto.dto.test_editor.ExecutionResult;
-import com.akto.dto.test_editor.ExecutorNode;
-import com.akto.dto.test_editor.FilterNode;
-import com.akto.dto.test_editor.Strategy;
+import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.*;
+import com.akto.dto.traffic.SampleData;
 import com.akto.log.LoggerMaker;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.auth.AuthValidator;
 import com.akto.test_editor.execution.Executor;
+import com.akto.test_editor.execution.Memory;
 import com.akto.testing.StatusCodeAnalyser;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,8 +29,9 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     private final List<CustomAuthType> customAuthTypes;
     public YamlTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode,
                             ExecutorNode executorNode, RawApi rawApi, Map<String, Object> varMap, Auth auth,
-                            AuthMechanism authMechanism, String logId, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes, Strategy strategy) {
-        super(apiInfoKey, filterNode, validatorNode, executorNode ,rawApi, varMap, auth, authMechanism, logId, testingRunConfig, strategy);
+                            AuthMechanism authMechanism, String logId, TestingRunConfig testingRunConfig,
+                            List<CustomAuthType> customAuthTypes, Strategy strategy, Map<String, ConfigParserResult> workFlowSelectionFilters) {
+        super(apiInfoKey, filterNode, validatorNode, executorNode ,rawApi, varMap, auth, authMechanism, logId, testingRunConfig, strategy, workFlowSelectionFilters);
         this.customAuthTypes = customAuthTypes;
     }
 
@@ -52,6 +57,37 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     }
 
     @Override
+    public boolean workflowFilter() {
+        Map<String, ApiInfo.ApiInfoKey> result = new HashMap<>();
+        int skip = 0;
+        int limit = 1000;
+        while (true) {
+            List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject(), skip, limit, Sorts.ascending("_id.url"));// todo: can be improved
+            for (SampleData sampleData: sampleDataList) {
+                RawApi localRawApi = RawApi.buildFromMessage(sampleData.getSamples().get(0));
+                ApiInfo.ApiInfoKey localApiInfoKey = new ApiInfo.ApiInfoKey(sampleData.getId().getApiCollectionId(), sampleData.getId().getUrl(), sampleData.getId().getMethod());
+                for (String key: this.workFlowSelectionFilters.keySet()) {
+                    if (result.containsKey(key)) continue;
+                    ConfigParserResult configParserResult = this.workFlowSelectionFilters.get(key);
+                    FilterNode localFilterNode = configParserResult.getNode();
+                    boolean isValid = TestPlugin.validateFilter(localFilterNode, localRawApi, localApiInfoKey, this.varMap, this.logId);
+                    if (isValid) {
+                        result.put(key, localApiInfoKey);
+                        break;
+                    }
+                }
+                if (result.size() == this.workFlowSelectionFilters.size()) break;
+            }
+
+            if (sampleDataList.size() < limit || result.size() == this.workFlowSelectionFilters.size()) break;
+        }
+
+        memory = new Memory(new ArrayList<>(result.values()), new HashMap<>());
+        this.apiNameToApiInfoKey = result;
+        return true;
+    }
+
+    @Override
     public boolean checkAuthBeforeExecution(boolean debug, List<TestingRunResult.TestLog> testLogs) {
         if (this.auth != null && this.auth.getAuthenticated() != null && this.auth.getAuthenticated() == true) {
             // loggerMaker.infoAndAddToDb("running noAuth check " + logId, LogDb.TESTING);
@@ -72,7 +108,8 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     public YamlTestResult executor(boolean debug, List<TestingRunResult.TestLog> testLogs) {
         // loggerMaker.infoAndAddToDb("executor started" + logId, LogDb.TESTING);
         YamlTestResult results = new Executor().execute(this.executorNode, this.rawApi, this.varMap, this.logId,
-                this.authMechanism, this.validatorNode, this.apiInfoKey, this.testingRunConfig, this.customAuthTypes, debug, testLogs);
+                this.authMechanism, this.validatorNode, this.apiInfoKey, this.testingRunConfig, this.customAuthTypes,
+                debug, testLogs, memory, apiNameToApiInfoKey);
         // loggerMaker.infoAndAddToDb("execution result size " + results.size() +  " " + logId, LogDb.TESTING);
         return results;
     }

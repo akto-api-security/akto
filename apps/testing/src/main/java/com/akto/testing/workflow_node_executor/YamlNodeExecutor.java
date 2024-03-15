@@ -48,7 +48,7 @@ public class YamlNodeExecutor extends NodeExecutor {
     private static final Gson gson = new Gson();
 
 
-    public NodeResult processNode(Node node, Map<String, Object> varMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs) {
+    public NodeResult processNode(Node node, Map<String, Object> varMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, Map<String, ApiInfo.ApiInfoKey> apiNameToApiInfoKey) {
         List<String> testErrors = new ArrayList<>();
 
         YamlNodeDetails yamlNodeDetails = (YamlNodeDetails) node.getWorkflowNodeDetails();
@@ -58,31 +58,26 @@ public class YamlNodeExecutor extends NodeExecutor {
         }
 
         RawApi rawApi = yamlNodeDetails.getRawApi();
-        RawApi sampleRawApi = rawApi.copy();
-
-        List<RawApi> rawApis = new ArrayList<>();
-        rawApis.add(rawApi.copy());
 
         Executor executor = new Executor();
         ExecutorNode executorNode = yamlNodeDetails.getExecutorNode();
         FilterNode validatorNode = yamlNodeDetails.getValidatorNode();
         List<ExecutorNode> childNodes = executorNode.getChildNodes();
 
-        String api = null;
+        ApiInfo.ApiInfoKey apiInfoKey = null;
         ExecutorNode firstChildNode = childNodes.get(0); // todo check for length
         if (firstChildNode.getOperationType().equals("API")) {
-            api = firstChildNode.getValues().toString();
+            String api = firstChildNode.getValues().toString();
+            apiInfoKey = apiNameToApiInfoKey.get(api);
+            OriginalHttpRequest newRequest = memory.run(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+            rawApi.setRequest(newRequest);
             childNodes.remove(0);
         }
 
-        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1710156663, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST);
+        RawApi sampleRawApi = rawApi.copy();
 
-        OriginalHttpRequest newRequest = Memory.memory.run(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
-        rawApi.setRequest(newRequest);
-
-        if (api != null) {
-//            ApiInfo.ApiInfoKey apiInfoKey = counter % 2 != 0 ? new ApiInfo.ApiInfoKey(1710156663, "https://juiceshop.akto.io/rest/user/login", URLMethods.Method.POST) : new ApiInfo.ApiInfoKey(1710156663, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH);
-        }
+        List<RawApi> rawApis = new ArrayList<>();
+        rawApis.add(rawApi.copy());
 
         for (ExecutorNode execNode: childNodes) {
             if (execNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ValidateExecutorDataOperands.Validate.toString())) {
@@ -132,8 +127,10 @@ public class YamlNodeExecutor extends NodeExecutor {
             try {
                 tsBeforeReq = Context.nowInMillis();
                 testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
-                Memory.memory.fillResponse(testReq.getRequest(), testResponse, apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
-                Memory.memory.reset(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+                if (apiInfoKey != null) {
+                    memory.fillResponse(testReq.getRequest(), testResponse, apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+                    memory.reset(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+                }
                 tsAfterReq = Context.nowInMillis();
                 responseTimeArr.add(tsAfterReq - tsBeforeReq);
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
