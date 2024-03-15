@@ -3087,26 +3087,6 @@
         }
     },
     {
-        "id": "SSL_ENABLE_CHECK",
-        "sampleData": {
-            "method": "POST",
-            "requestPayload": "",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "Password Reset Successful",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/password-reset"
-        },
-        "testData": {
-            "method": "POST",
-            "url": "/api/college/password-reset",
-            "responsePayload": "Password Reset Successful",
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
         "id": "JWT_HEADER_PARAM_INJECTION_JWK",
         "sampleData": {
             "method": "POST",
@@ -3210,7 +3190,7 @@
         "id": "AUTH_BYPASS_SQL_INJECTION",
         "sampleData": {
             "method": "POST",
-            "requestPayload": "{\"username\": \"PHY-3453\", \"password\":\"secretPass\"}",
+            "requestPayload": "{\"username\": \"PHY-3453\", \"password\":\"pass1234\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responsePayload": "User authentication failed",
             "responseHeaders": "",
@@ -3224,6 +3204,260 @@
             "responsePayload": "MySQLSyntaxErrorException",
             "responseHeaders": {},
             "statusCode": 200
+        }
+    },
+    {
+        "id": "AUTH_BYPASS_LDAP",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"username\": \"STUD-6543\", \"password\":\"password\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Login successful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/erp/auth"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/erp/auth",
+            "responsePayload": {
+                "status": "Login successful"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "TEST_PASSWD_CHANGE",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"username\": \"STUD-6543\", \"password\":\"password\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "Password change unsuccessful",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/erp/change-password"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/erp/change-password",
+            "responsePayload": "Password change successful",
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "BYPASS_2FA_BRUTE_FORCE",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"2fa-code\": \"345897\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "Login unsuccessful",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/sac/access"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/sac/access",
+            "responsePayload": "Login successful",
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "USER_AGENT_CSRF",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"User-agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0\", \"cookie\": \"intercom-device-id-xjvl0z2h=25750e91-1931-42e2-a319-25dsSDF8hfds93b\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Login successful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/research/access"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/research/access",
+            "responsePayload": {
+                "status": "Login successful"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "EXPIRES_MAX_AGE_CHECK",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "User Access Denied",
+            "responseHeaders": "{\"Set-Cookie\": \"Max-Age=25920099\"}",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/faq"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/faq",
+            "responsePayload": "Successful",
+            "responseHeaders": { "Set-Cookie": "Max-Age=25920099" },
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "AUTH_BYPASS_BLANK_PASSWORD",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"username\": \"STUD-0923\", \"password\":\"password\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Login successful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/gallery/login"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/gallery/login",
+            "responsePayload": {
+                "status": "Login successful"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "USER_ENUM_FOLDER_ACCESS",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Login successful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/files"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/files",
+            "responsePayload": {
+                "status": "Login successful"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "PASSWD_RESET_POISON_MIDDLEWARE",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "Account Recovery Unsuccessful",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/account/recover"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/account/recover",
+            "responsePayload": "Account Recovery Successful",
+            "responseHeaders": {"host": "evil.com"},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "PASSWD_CHANGE_BRUTE_FORCE",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"username\": \"STUD-9965\", \"password\":\"qwerty123\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Password change successful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/erp/login/change-password"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/erp/login/change-password",
+            "responsePayload": {
+                "status": "Password change successful"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "JWT_NONE_ALGO",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"username\": \"STUD-9965\", \"password\":\"qwerty123\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Login successful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/erp/register"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/erp/register",
+            "responsePayload": {
+                "status": "Login successful"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "AUTH_BYPASS_PASSWORD_RESET",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"username\": \"STUD-8908\", \"password\":\"password\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "Password reset unsuccessful",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/erp/password-reset"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/erp/password-reset",
+            "responsePayload": "Password reset successful",
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "LDAP_ERRORS",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"username\": \"STUD-8543\", \"password\":\"passsecret\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Login successful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/funds/login"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/funds/login",
+            "responsePayload": {
+                "status": "LDAP query syntax error"
+            },
+            "responseHeaders": {},
+            "statusCode": 400
         }
     }
 ]
