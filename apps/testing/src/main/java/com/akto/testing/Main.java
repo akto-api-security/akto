@@ -306,8 +306,7 @@ public class Main {
                     testExecutor.init(testingRun, summaryId);
                     raiseMixpanelEvent(summaryId, testingRun);
                 } catch (Exception e) {
-                    e.printStackTrace();
-                    loggerMaker.errorAndAddToDb("Error in init " + e, LogDb.TESTING);
+                    loggerMaker.errorAndAddToDb(e, "Error in init " + e);
                 }
                 Bson completedUpdate = Updates.combine(
                         Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
