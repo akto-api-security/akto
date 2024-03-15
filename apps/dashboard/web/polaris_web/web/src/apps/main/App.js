@@ -9,8 +9,6 @@ import SensitiveDataExposure from "../dashboard/pages/observe/SensitiveDataExpos
 import SingleRequest from "../dashboard/pages/observe/SingleRequest/SingleRequest";
 import PageObserve from "../dashboard/pages/observe/PageObserve"
 import PageTesting from "../dashboard/pages/testing/PageTesting";
-import { AppProvider } from "@shopify/polaris"
-import SignUp from "../signup/pages/SignUp"
 import {
   createBrowserRouter,
   RouterProvider,
@@ -60,6 +58,7 @@ import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
 import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
 import { useStiggContext } from '@stigg/react-sdk';
 import DependencyTable from "../dashboard/pages/testing/DependencyTable/DependencyTable";
+import SignupPage from "../signup/pages/SignupPage";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -285,13 +284,17 @@ const router = createBrowserRouter([
     ],
     errorElement: <ErrorComponent/>
   },
-{
-  path: "/login",
-    element: <SignUp />,
-},
-{
-  path: "/",
-    element: <Navigate to="/login" />,
+  {
+      path: "/login",
+      element: <SignupPage />,
+  },
+  {
+      path: "/",
+      element: <Navigate to="/login" />,
+  },
+  {
+    path: "/signup",
+    element: <SignupPage />,
   },
 ])
 
