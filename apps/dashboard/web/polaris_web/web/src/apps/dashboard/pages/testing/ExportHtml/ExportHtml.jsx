@@ -12,39 +12,8 @@ function ExportHtml() {
     const params = useParams();
     const testingRunSummaryId = params.summaryId
     const issuesFilter = params.issuesFilter
-    const moreInfoSections = [
-        {
-            icon: InfoMinor,
-            title: "Description",
-            content: ""
-        },
-        {
-            icon: FlagMajor,
-            title: "Impact",
-            content: ""
-        },
-        {
-            icon: CollectionsMajor,
-            title: "Tags",
-            content: ""
-        },
-        {
-            icon: CreditCardSecureMajor,
-            title: "CWE",
-            content: ""
-        },
-        {
-            icon: FraudProtectMajor,
-            title: "CVE",
-            content: ""
-        },
-        {
-            icon: ResourcesMajor,
-            title: "References",
-            content: ""
-        }
-    ]
-
+    let  moreInfoSections = transform.getInfoSectionsHeaders().filter(item => item.title !== 'Jira')
+    
     const [vulnerableResultsMap, setVulnerableResultsMap] = useState([]);
     const [dataToCurlObj, setDataToCurlObj] = useState({});
     const [severitiesCount, setSeveritiesCount] = useState({ HIGH: 0, MEDIUM: 0, LOW: 0 });
@@ -315,10 +284,9 @@ function VulnerableMultiStepTestDetails(props) {
                     let nodeResultMap = props.testingRun.testResults[0].nodeResultMap[stepId]
                     if (nodeResultMap.message !== '[]') {
                         let attempt = nodeResultMap.message
-                        console.log(attempt)
                         return (
-                            <div>
-                                <div className="row-div-1" key={index}>
+                            <div key={index}>
+                                <div className="row-div-1">
                                     <HorizontalStack gap={1}>
                                         <span className="api-text">
                                             Vulnerable endpoint:
