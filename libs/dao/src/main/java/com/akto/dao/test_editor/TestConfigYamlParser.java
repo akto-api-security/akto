@@ -1,5 +1,6 @@
 package com.akto.dao.test_editor;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,21 +57,33 @@ public class TestConfigYamlParser {
             Parser authParser = new Parser();
             auth = authParser.parse(authMap);
             if (auth == null) {
-                return new TestConfig(id, info, null, null, null, null, null, null);
+                return new TestConfig(id, info, null, null, null, null, null, null, null);
             }
         }
 
         Object filterMap = config.get("api_selection_filters");
         if (filterMap == null) {
             // todo: should not be null, throw error
-            return new TestConfig(id, info, auth, null, null, null, null, null);
+            return new TestConfig(id, info, auth, null, null, null, null, null, null);
         }
-        
+
+        Object workflowSelectionFilterObj = config.get("workflow_selection_filters");
+        Map<String, ConfigParserResult> workFlowSelectionFilters = new HashMap<>();
+        if (workflowSelectionFilterObj != null) {
+            Map<String, Object> workflowSelectionFilterMap = (Map<String, Object>) workflowSelectionFilterObj;
+            for (String apiName: workflowSelectionFilterMap.keySet()) {
+                Object o = workflowSelectionFilterMap.get(apiName);
+                ConfigParserResult childFilter = new ConfigParser().parse(o);
+                workFlowSelectionFilters.put(apiName, childFilter);
+            }
+            // todo: should not be null, throw error
+        }
+
         ConfigParser configParser = new ConfigParser();
         ConfigParserResult filters = configParser.parse(filterMap);
         if (filters == null) {
             // todo: throw error
-            new TestConfig(id, info, auth, null, null, null, null, null);
+            new TestConfig(id, info, auth, null, null, null, null, null, workFlowSelectionFilters);
         }
 
         Map<String, List<String>> wordListMap = new HashMap<>();
@@ -79,44 +92,44 @@ public class TestConfigYamlParser {
                 wordListMap = (Map) config.get("wordLists");
             }
         } catch (Exception e) {
-            return new TestConfig(id, info, null, null, null, null, null, null);
+            return new TestConfig(id, info, null, null, null, null, null, null, workFlowSelectionFilters);
         }
 
         Object executionMap = config.get("execute");
         if (executionMap == null) {
             // todo: should not be null, throw error
-            return new TestConfig(id, info, auth, filters, wordListMap, null, null, null);
+            return new TestConfig(id, info, auth, filters, wordListMap, null, null, null, workFlowSelectionFilters);
         }
         
         com.akto.dao.test_editor.executor.ConfigParser executorConfigParser = new com.akto.dao.test_editor.executor.ConfigParser();
         ExecutorConfigParserResult executeOperations = executorConfigParser.parseConfigMap(executionMap);
         if (executeOperations == null) {
             // todo: throw error
-            new TestConfig(id, info, auth, filters, wordListMap, null, null, null);
+            new TestConfig(id, info, auth, filters, wordListMap, null, null, null, workFlowSelectionFilters);
         }
 
         Object validationMap = config.get("validate");
         if (validationMap == null) {
             // todo: should not be null, throw error
-            return new TestConfig(id, info, auth, filters, wordListMap, executeOperations, null, null);
+            return new TestConfig(id, info, auth, filters, wordListMap, executeOperations, null, null, workFlowSelectionFilters);
         }
 
         ConfigParserResult validations = configParser.parse(validationMap);
         if (validations == null) {
             // todo: throw error
-            new TestConfig(id, info, auth, filters, wordListMap, executeOperations, null, null);
+            new TestConfig(id, info, auth, filters, wordListMap, executeOperations, null, null, workFlowSelectionFilters);
         }
 
         Object strategyObject = config.get("strategy");
         if (strategyObject == null) {
-            return new TestConfig(id, info, auth, filters, wordListMap, executeOperations, validations, null);
+            return new TestConfig(id, info, auth, filters, wordListMap, executeOperations, validations, null, workFlowSelectionFilters);
         }
 
         StrategyParser strategyParser = new StrategyParser();
 
         Strategy strategy = strategyParser.parse(strategyObject);
 
-        testConfig = new TestConfig(id, info, auth, filters, wordListMap, executeOperations, validations, strategy);
+        testConfig = new TestConfig(id, info, auth, filters, wordListMap, executeOperations, validations, strategy, workFlowSelectionFilters);
         return testConfig;
     }
 
