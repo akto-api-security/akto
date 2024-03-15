@@ -343,7 +343,7 @@ const transform = {
 
   fillMoreInformation(category, moreInfoSections, affectedEndpoints, jiraIssueUrl, createJiraTicket) {
     var key = /[^/]*$/.exec(jiraIssueUrl)[0];
-    const jiraComponent = jiraIssueUrl.length > 0 ? (
+    const jiraComponent = jiraIssueUrl?.length > 0 ? (
       <Box>
               <Tag>
                   <HorizontalStack gap={1}>
