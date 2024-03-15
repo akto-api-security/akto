@@ -43,35 +43,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public class Main {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.TESTING);
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     public static final boolean SKIP_SSRF_CHECK = "true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK"));
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
-
-    private static ObjectId createTRRSummaryIfAbsent(TestingRun testingRun, int start){
-        ObjectId summaryId = new ObjectId();
-        try {
-            ObjectId testingRunId = new ObjectId(testingRun.getHexId());
-            TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(
-                Filters.and(
-                    Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
-                    Filters.eq(TestingRunResultSummary.STATE,TestingRun.State.SCHEDULED)
-                )
-            );
-            summaryId = testingRunResultSummary.getId();
-            TestingRunResultSummariesDao.instance.updateOne(
-                    Filters.eq(TestingRunResultSummary.ID, summaryId),
-                    Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING));
-        } catch (Exception e){
-            TestingRunResultSummary summary = new TestingRunResultSummary(start, 0, new HashMap<>(),
-            0, testingRun.getId(), testingRun.getId().toHexString(), 0, 0);
-
-            summaryId = TestingRunResultSummariesDao.instance.insertOne(summary).getInsertedId().asObjectId().getValue();
-        }
-        return summaryId;
-    }
 
     private static void setupRateLimitWatcher () {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -96,45 +73,23 @@ public class Main {
 
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
 
-    private static TestingRun findPendingTestingRun() {
-        int delta = Context.now() - 20*60;
-
-        Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
-        );
-        Bson filter2 = Filters.and(
-                Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, delta)
-        );
-
-        Bson update = Updates.combine(
-                Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
-                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
-        );
-
-        return TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                Filters.or(filter1,filter2), update);
-    }
-
     private static TestingRunResultSummary findPendingTestingRunResultSummary() {
-        int delta = Context.now() - 20*60;
-
         Bson filter1 = Filters.and(
             Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
-            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, Context.now()),
-            Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
+            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, Context.now())
         );
+
+        int now = Context.now();
 
         Bson filter2 = Filters.and(
             Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-            Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
+            Filters.lt(TestingRunResultSummary.START_TIMESTAMP, now - 5*60),
+            Filters.gt(TestingRunResultSummary.START_TIMESTAMP, now - 60)
         );
 
         Bson update = Updates.set(TestingRun.STATE, TestingRun.State.RUNNING);
 
-        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(Filters.or(filter1,filter2), update);
-
-        return trrs;
+        return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(Filters.or(filter1,filter2), update);
     }
 
     private static void setTestingRunConfig(TestingRun testingRun, TestingRunResultSummary trrs) {
@@ -163,6 +118,26 @@ public class Main {
         }
 
         System.out.println(testingRun.getTestingRunConfig());
+    }
+
+    static void markFailedIfNotRunningByAnotherProcess(TestingRunResultSummary testingRunResultSummary, String testingRunHexId) {
+
+        List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), 1);
+
+        if (testingRunResults != null && !testingRunResults.isEmpty()) {
+            TestingRunResult testingRunResult = testingRunResults.get(0);
+            if (Context.now() - testingRunResult.getEndTimestamp() < LAST_TEST_RUN_EXECUTION_DELTA) {
+                loggerMaker.infoAndAddToDb("Skipping test run as it was executed recently, TRR_ID:"
+                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRunHexId, LogDb.TESTING);
+            } else {
+                loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
+                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRunHexId, LogDb.TESTING);
+                TestingRunResultSummariesDao.instance.updateOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()), Updates.set(TestingRunResultSummary.STATE, TestingRun.State.SCHEDULED));
+            }
+        } else {
+            loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRunHexId, LogDb.TESTING);
+            TestingRunResultSummariesDao.instance.updateOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()), Updates.set(TestingRunResultSummary.STATE, State.SCHEDULED));
+        }
     }
 
     public static void main(String[] args) throws InterruptedException {
@@ -195,106 +170,73 @@ public class Main {
 
                 int start = Context.now();
 
-                TestingRunResultSummary trrs = findPendingTestingRunResultSummary();
-                TestingRun testingRun;
-                ObjectId summaryId = null;
-                if (trrs == null) {
-                    testingRun = findPendingTestingRun();
-                } else {
-                    summaryId = trrs.getId();
-                    testingRun = TestingRunDao.instance.findOne("_id", trrs.getTestingRunId());
-                }
+                // find scheduled summary or recently running summary and mark it as running
+                TestingRunResultSummary testingRunResultSummary = findPendingTestingRunResultSummary();
+                if (testingRunResultSummary == null) return;
 
-                if (testingRun == null) {
-                    return;
-                }
+                // find corresponding test run
+                ObjectId summaryId = testingRunResultSummary.getId();
+                TestingRun testingRun = TestingRunDao.instance.findOne("_id", testingRunResultSummary.getTestingRunId());
+                if (testingRun == null) return;
 
-                int accountId = account.getId();
-                if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
-                    int lastSent = logSentMap.getOrDefault(accountId, 0);
-                    if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
-                        logSentMap.put(accountId, start);
-                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
-                                + " . Failing test run : " + start, LogDb.TESTING);
-                    }
-                    TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                            Filters.eq(Constants.ID, testingRun.getId()),
-                            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+                loggerMaker.infoAndAddToDb("Starting test for accountID: " + account.getId());
 
-                    TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
-                            Filters.eq(Constants.ID, summaryId),
-                            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
-
-                    return;
-                }
-
+                // check usage
                 try {
-                    setTestingRunConfig(testingRun, trrs);
-
-                    if (summaryId == null) {
-                        if (testingRun.getState().equals(TestingRun.State.RUNNING)) {
-                            Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRun.getId()));
-                            TestingRunResultSummary testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
-                            List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), 1);
-                            if (testingRunResults != null && !testingRunResults.isEmpty()) {
-                                TestingRunResult testingRunResult = testingRunResults.get(0);
-                                if (Context.now() - testingRunResult.getEndTimestamp() < LAST_TEST_RUN_EXECUTION_DELTA) {
-                                    loggerMaker.infoAndAddToDb("Skipping test run as it was executed recently, TRR_ID:"
-                                            + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                                    return;
-                                } else {
-                                    loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
-                                            + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                                    TestingRunResultSummariesDao.instance.updateOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()), Updates.set(TestingRunResultSummary.STATE, TestingRun.State.FAILED));
-                                    TestingRunResultSummary runResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()));
-                                    GithubUtils.publishGithubComments(runResultSummary);
-                                }
-                            } else {
-                                loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                                TestingRunResultSummariesDao.instance.updateOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()), Updates.set(TestingRunResultSummary.STATE, TestingRun.State.FAILED));
-                                TestingRunResultSummary runResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()));
-                                GithubUtils.publishGithubComments(runResultSummary);
-                            }
+                    int accountId = account.getId();
+                    if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
+                        int lastSent = logSentMap.getOrDefault(accountId, 0);
+                        if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
+                            logSentMap.put(accountId, start);
+                            loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
+                                    + " . Failing test run : " + start, LogDb.TESTING);
                         }
 
-                        summaryId = createTRRSummaryIfAbsent(testingRun, start);
-                    }
-                    TestExecutor testExecutor = new TestExecutor();
-                    if (trrs != null && trrs.getState() == State.SCHEDULED) {
-                        if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
-                            //case of github status push
-                            GithubUtils.publishGithubStatus(trrs);
+                        TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                                Filters.eq(Constants.ID, summaryId),
+                                Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
 
-                        }
+                        return;
                     }
-                    testExecutor.init(testingRun, summaryId);
-                    raiseMixpanelEvent(summaryId, testingRun);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error in init " + e, LogDb.TESTING);
+                    loggerMaker.errorAndAddToDb(e, "Error while running usage metrics check " + e.getMessage());
                 }
-                Bson completedUpdate = Updates.combine(
-                        Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
-                        Updates.set(TestingRun.END_TIMESTAMP, Context.now())
-                );
 
+                if (!testingRunResultSummary.getState().equals(State.SCHEDULED)) {
+                    markFailedIfNotRunningByAnotherProcess(testingRunResultSummary, testingRun.getHexId());
+                    return;
+                }
+
+                // execute
+                setTestingRunConfig(testingRun, testingRunResultSummary);
+
+                if (testingRunResultSummary.getMetadata()!= null && testingRunResultSummary.getMetadata().containsKey("pull_request_id") && testingRunResultSummary.getMetadata().containsKey("commit_sha_head") ) { //case of Github status push
+                    GithubUtils.publishGithubStatus(testingRunResultSummary);
+                }
+
+                TestExecutor testExecutor = new TestExecutor();
+                testExecutor.init(testingRun, summaryId);
+                raiseMixpanelEvent(summaryId, testingRun);
+
+                // find testing run which has periodInSeconds > 0
                 if (testingRun.getPeriodInSeconds() > 0 ) {
-                    completedUpdate = Updates.combine(
-                            Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                            Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
-                            Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds())
-                    );
+                    int newTs = Context.now() + testingRun.getPeriodInSeconds();
+                    TestingRunResultSummary summary = new TestingRunResultSummary(newTs, 0, new HashMap<>(),
+                            0, testingRun.getId(), testingRun.getId().toHexString(), 0, 0);
+                    summary.setState(TestingRun.State.SCHEDULED);
+
+                    summaryId = TestingRunResultSummariesDao.instance.insertOne(summary).getInsertedId().asObjectId().getValue();
+                    loggerMaker.infoAndAddToDb("Created new scheduled testingRunSummary " + summaryId + "for testRunId" + testingRun.getId());
                 }
 
-                TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                        Filters.eq("_id", testingRun.getId()),  completedUpdate
-                );
-
-                if(summaryId != null && testingRun.getTestIdConfig() != 1){
+                // mark summary as complete
+                if(testingRun.getTestIdConfig() != 1) {
                     TestExecutor.updateTestSummary(summaryId);
                 }
 
                 loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
             }, "testing");
+
             Thread.sleep(1000);
         }
     }
