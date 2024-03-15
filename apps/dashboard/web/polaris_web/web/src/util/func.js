@@ -730,6 +730,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           }
 
           let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
+          let authTypeTag = authType.replace(",", "");
           let score = apiInfoMap[key] ? apiInfoMap[key]?.severityScore : 0
           let isSensitive = apiInfoMap[key] ? apiInfoMap[key]?.isSensitive : false
 
@@ -755,6 +756,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               auth_type: (authType || "").toLowerCase(),
               sensitiveTags: [...this.convertSensitiveTags(x.sensitive)],
+              authTypeTag: (authTypeTag || "").toLowerCase(),
               collectionIds: apiInfoMap[key] ? apiInfoMap[key]?.collectionIds.filter(x => {
                 return Object.keys(apiGroupsMap).includes(x) || Object.keys(apiGroupsMap).includes(x.toString())
               }).map( x => {
