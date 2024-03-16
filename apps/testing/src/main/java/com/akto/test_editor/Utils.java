@@ -657,7 +657,12 @@ public class Utils {
         }
     }
 
-    public static Boolean sendRequestToSsrfServer(String requestUrl){
+    public static Boolean sendRequestToSsrfServer(String url){
+        String requestUrl = "";
+        if(!(url.startsWith("http"))){
+            requestUrl = "http://ssrf.akto.io/validate/" + url;
+        }
+        
         Request request = new Request.Builder()
             .url(requestUrl)
             .get()
