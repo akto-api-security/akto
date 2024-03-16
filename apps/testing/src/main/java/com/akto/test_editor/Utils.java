@@ -662,7 +662,7 @@ public class Utils {
         if(!(url.startsWith("http"))){
             requestUrl = "http://ssrf.akto.io/validate/" + url;
         }
-        
+
         Request request = new Request.Builder()
             .url(requestUrl)
             .get()
@@ -676,7 +676,9 @@ public class Utils {
             if (!okResponse.isSuccessful()) {
                 return false;
             }else{
-                return okResponse.code() == 202;
+                ResponseBody responseBody = okResponse.body();
+                BasicDBObject bd = BasicDBObject.parse(responseBody.string());
+                return bd.getBoolean("url-hit");
             }
         }catch (Exception e){
             return false;
