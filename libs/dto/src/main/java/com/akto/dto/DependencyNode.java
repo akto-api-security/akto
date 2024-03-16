@@ -123,6 +123,17 @@ public class DependencyNode {
         public ParamInfo copy() {
             return new ParamInfo(requestParam, responseParam, count, isUrlParam, isHeader);
         }
+
+        @Override
+        public String toString() {
+            return "ParamInfo {" +
+                    "requestParam='" + requestParam + '\'' +
+                    ", isUrlParam=" + isUrlParam +
+                    ", isHeader=" + isHeader +
+                    ", responseParam='" + responseParam + '\'' +
+                    ", count=" + count +
+                    '}';
+        }
     }
 
 
@@ -263,5 +274,24 @@ public class DependencyNode {
 
     public void setLastUpdated(int lastUpdated) {
         this.lastUpdated = lastUpdated;
+    }
+
+    @Override
+    public String toString() {
+        return "apiCollectionIdResp: " + apiCollectionIdResp  + "\n" +
+                "hexId: " + hexId + "\n" +
+                "API_COLLECTION_ID_RESP: "+ API_COLLECTION_ID_RESP + "\n" +
+                "urlResp: " + urlResp + "\n" +
+                "URL_RESP: " + URL_RESP + "\n" +
+                "methodResp: " + methodResp + "\n" +
+                "apiCollectionIdReq: " + apiCollectionIdReq + "\n" +
+                "API_COLLECTION_ID_REQ: " + API_COLLECTION_ID_REQ + "\n" +
+                "urlReq: " + urlReq + "\n" +
+                "URL_REQ: " + URL_REQ + "\n" +
+                "methodReq: " + methodReq + "\n" +
+                "paramInfos : " + paramInfos.toString() + "\n" +
+                "PARAM_INFOS: " + PARAM_INFOS  + "\n" +
+                "lastUpdated: " + lastUpdated + "\n" +
+                "LAST_UPDATED: " + LAST_UPDATED;
     }
 }
