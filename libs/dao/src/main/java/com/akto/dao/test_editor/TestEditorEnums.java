@@ -40,7 +40,8 @@ public class TestEditorEnums {
     public enum PredicateOperator {
         AND,
         OR,
-        COMPARE_GREATER
+        COMPARE_GREATER,
+        SSRF_URL_HIT
     }
 
     public enum KeyValOperator {
