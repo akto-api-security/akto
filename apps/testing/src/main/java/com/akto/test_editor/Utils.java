@@ -13,6 +13,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.bouncycastle.jce.provider.JDKDSASigner.stdDSA;
+
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
@@ -652,6 +654,27 @@ public class Utils {
             return new ExecutorSingleOperationResp(true, "");
         }catch (Exception e){
             return new ExecutorSingleOperationResp(false, e.getMessage());
+        }
+    }
+
+    public static Boolean sendRequestToSsrfServer(String requestUrl){
+        Request request = new Request.Builder()
+            .url(requestUrl)
+            .get()
+            .build();
+
+            OkHttpClient client = new OkHttpClient();
+            Response okResponse = null;
+        
+        try {
+            okResponse = client.newCall(request).execute();
+            if (!okResponse.isSuccessful()) {
+                return false;
+            }else{
+                return okResponse.code() == 202;
+            }
+        }catch (Exception e){
+            return false;
         }
     }
 
