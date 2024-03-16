@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Modal } from "@shopify/polaris"
+import { Avatar, Box, Button, Icon, Modal, Tooltip } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -11,6 +11,7 @@ import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
 import func from "@/util/func"
 import transform from "../transform";
 import ApiDependency from "./ApiDependency";
+import { copy_icon } from "../../../components/icons";
 
 function ApiDetails(props) {
 
@@ -23,6 +24,8 @@ function ApiDetails(props) {
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [loading, setLoading] = useState(false)
     const [badgeActive, setBadgeActive] = useState(false)
+
+    const ref = useRef(null)
 
     const fetchData = async() => {
         if(showDetails){
@@ -128,17 +131,33 @@ function ApiDetails(props) {
             />
         </Box>,
     }
-    const components = [
+
+    const headingComp = (
+        <div style={{display: "flex", justifyContent: "space-between"}}  key="heading">
             <GithubCell
-            key="heading"
-            width="30vw"
-            nameWidth="27vw"
-            data={apiDetail}
-            headers={headers}
-            getStatus={getStatus}
-            isBadgeClickable={true}
-            badgeClicked={badgeClicked}
-        />,
+                width="40vw"
+                data={apiDetail}
+                headers={headers}
+                getStatus={getStatus}
+                isBadgeClickable={true}
+                badgeClicked={badgeClicked}
+            />
+            <Box paddingBlockStart={"05"}>
+                <Button plain onClick={() => func.copyToClipboard(apiDetail['endpoint'], ref, "URL copied")}>
+                    <Tooltip content="Copy endpoint" dismissOnMouseOut>
+                        <div className="reduce-size">
+                            <Avatar size="extraSmall" source="/public/copy_icon.svg" />
+                        </div>
+                    </Tooltip>
+                    <Box ref={ref} />
+                </Button>
+            </Box>
+        </div>
+    )
+
+    const components = [
+        headingComp
+            ,
         <LayoutWithTabs
             key="tabs"
             tabs={[SchemaTab, ValuesTab, DependencyTab]}
@@ -151,7 +170,7 @@ function ApiDetails(props) {
             className={"gpt-button-fixed"}
             key="akto-gpt"
         >
-            <Button onClick={displayGPT}>Ask AktoGPT</Button> 
+            <Button onClick={displayGPT} size="slim">Ask AktoGPT</Button> 
         </div>
     )
 
