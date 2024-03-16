@@ -680,7 +680,7 @@ getCollapsibleRow(urls){
           <VerticalStack gap={2}>
             {urls.map((ele,index)=>{
               return(
-                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline key={index}>
+                <Link monochrome onClick={() => history.navigate(ele.nextUrl, {state: {showDetails: true}})} removeUnderline key={index}>
                   {this.getUrlComp(ele.url)}
                 </Link>
               )
