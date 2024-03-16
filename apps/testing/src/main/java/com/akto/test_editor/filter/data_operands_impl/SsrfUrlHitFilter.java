@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.akto.dto.test_editor.DataOperandFilterRequest;
+import com.akto.test_editor.Utils;
 
 public class SsrfUrlHitFilter extends DataOperandsImpl {
 
@@ -21,8 +22,10 @@ public class SsrfUrlHitFilter extends DataOperandsImpl {
         }
 
         for (String queryString: querySet) {
-            System.out.println(queryString);
-            // trigger function here
+            if(Utils.sendRequestToSsrfServer(queryString)){
+                result = true;
+                break;
+            }
         }
 
         return result;
