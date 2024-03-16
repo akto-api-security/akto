@@ -8,6 +8,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.parsers.HttpCallParser;
+import com.akto.util.parsers.HttpCallParserHelper;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -209,7 +210,7 @@ public class ExportSampleDataAction extends UserAction {
     public static String getCurl(String sampleData) throws IOException {
         HttpResponseParams httpResponseParams;
         try {
-            httpResponseParams = HttpCallParser.parseKafkaMessage(sampleData);
+            httpResponseParams = HttpCallParserHelper.parseKafkaMessage(sampleData);
         } catch (Exception e) {
             try {
                 OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();

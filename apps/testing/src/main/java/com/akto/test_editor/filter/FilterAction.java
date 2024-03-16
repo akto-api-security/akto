@@ -10,6 +10,7 @@ import java.util.Set;
 import com.akto.dto.OriginalHttpResponse;
 
 import com.akto.util.JSONUtils;
+import com.akto.util.parsers.HttpCallParserHelper;
 import com.akto.util.runtime.RuntimeUtil;
 import org.bson.conversions.Bson;
 
@@ -1201,7 +1202,7 @@ public final class FilterAction {
                         }
                         for (String sample: sd.getSamples()) {
                             try {
-                                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                                HttpResponseParams httpResponseParams = HttpCallParserHelper.parseKafkaMessage(sample);
                                 String sUrl = httpResponseParams.getRequestParams().getURL();
                                 String[] sUrlTokens = sUrl.split("/");
                                 String[] origUrlTokens = urlWithParams.split("/");
@@ -1257,7 +1258,7 @@ public final class FilterAction {
                     String key = SingleTypeInfo.findLastKeyFromParam(param);
                     BasicDBObject payloadObj = new BasicDBObject();
                     try {
-                        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                        HttpResponseParams httpResponseParams = HttpCallParserHelper.parseKafkaMessage(sample);
                         payloadObj = RequestTemplate.parseRequestPayload(httpResponseParams.getRequestParams().getPayload(), null);
                     } catch (Exception e) {
                         // TODO: handle exception

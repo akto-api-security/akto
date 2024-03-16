@@ -16,6 +16,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.runtime.APICatalogSync;
+import com.akto.util.parsers.HttpCallParserHelper;
 import com.akto.util.runtime.RuntimeUtil;
 import com.mongodb.BasicDBObject;
 import org.junit.Before;
@@ -41,7 +42,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         List<HttpResponseParams> httpResponseParamsList = new ArrayList<>();
         for (String message: messages) {
             try {
-                HttpResponseParams responseParams = HttpCallParser.parseKafkaMessage(message);
+                HttpResponseParams responseParams = HttpCallParserHelper.parseKafkaMessage(message);
                 httpResponseParamsList.add(responseParams);
             } catch (Exception e) {
                 e.printStackTrace();
