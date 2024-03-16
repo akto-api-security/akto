@@ -83,6 +83,24 @@ export default {
             }
         })
     },
+    createJiraTicket(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId) {
+        return request({
+            url: '/api/createJiraIssue',
+            method: 'post',
+            data: {
+                hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId
+            }
+        })
+    },
+    attachFileToIssue(origReq, testReq, issueId) {
+        return request({
+            url: '/api/attachFileToIssue',
+            method: 'post',
+            data: {
+                origReq, testReq, issueId
+            }
+        })
+    },
     async fetchCollectionWiseApiEndpoints (apiCollectionId) {
         const resp = await request({
             url: '/api/fetchCollectionWiseApiEndpoints',

@@ -1,15 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import SummaryCardInfo from '../../components/shared/SummaryCardInfo';
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Badge, Box, Card, Divider, HorizontalGrid, HorizontalStack, Scrollable, Text, VerticalStack } from '@shopify/polaris';
+import { Box, Card, HorizontalGrid, HorizontalStack, Scrollable, Text, VerticalStack } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import transform from './transform';
 import StackedChart from '../../components/charts/StackedChart';
-import HighchartsReact from 'highcharts-react-official';
-import Highcharts from "highcharts"
 import ChartypeComponent from '../testing/TestRunsPage/ChartypeComponent';
 import testingApi from "../testing/api"
 import testingFunc from "../testing/transform"
@@ -20,7 +18,7 @@ import Pipeline from './components/Pipeline';
 import ActivityTracker from './components/ActivityTracker';
 import NullData from './components/NullData';
 import {DashboardBanner} from './components/DashboardBanner';
-import SpinnerCentered from '../../components/progress/SpinnerCentered';
+import RiskScoreTrend from './components/RiskScoreTrend';
 
 function HomeDashboard() {
 
@@ -42,8 +40,6 @@ function HomeDashboard() {
 
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
-
-    const riskScoreTrendRef = useRef(null)
 
     const fetchData = async() =>{
         setLoading(true)
@@ -160,37 +156,8 @@ function HomeDashboard() {
             status: 'new',
         }
     ]
-
     const riskScoreTrendComp = (
-        (Object.keys(riskScoreRangeMap).length === 0) ? <NullData text={"APIS by risk score"} url={"/dashboard/observe/inventory"} urlText={"to create a collection and upload traffic in it."} description={"No apis found."} key={"riskScoreNullTrend"}/>
-        :
-        <Card key="scoreTrend">
-            <VerticalStack gap={5}>
-                <Text variant="bodyLg" fontWeight="semibold">APIS by risk score</Text>
-                <HorizontalGrid columns={2} gap={5}>
-                <HighchartsReact
-                    highcharts={Highcharts}
-                    options={transform.getRiskScoreTrendOptions(riskScoreRangeMap)}
-                    ref={riskScoreTrendRef}
-                />
-                <Box paddingInlineEnd={4} paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
-                    <VerticalStack gap={3}>
-                        {riskScoreRanges.map((range)=>{
-                            return(
-                                <VerticalStack gap={1} key={range.text}>
-                                    <HorizontalStack align="space-between">
-                                        <Text variant="bodyMd">{range.text}</Text>
-                                        <Badge status={range.status}>{range.range}</Badge>
-                                    </HorizontalStack>
-                                    <Divider />
-                                </VerticalStack>
-                            )
-                        })}
-                    </VerticalStack>
-                </Box>
-                </HorizontalGrid>
-            </VerticalStack>
-        </Card>
+        <RiskScoreTrend  key={"risk-score-trend"} riskScoreRangeMap={riskScoreRangeMap} riskScoreRanges={riskScoreRanges} />
     )
 
     const sensitiveDataTrendComp = (
