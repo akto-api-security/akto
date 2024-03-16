@@ -75,6 +75,7 @@ import com.akto.util.Pair;
 import com.akto.util.UsageUtils;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
+import com.akto.util.parsers.HttpCallParserHelper;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.*;
 import com.akto.util.DashboardMode;
@@ -632,7 +633,7 @@ public class InitializerListener implements ServletContextListener {
                                                 boolean allMatchDefault = true;
 
                                                 for (String sample : samples) {
-                                                    HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                                                    HttpResponseParams httpResponseParams = HttpCallParserHelper.parseKafkaMessage(sample);
                                                     if (!matchesDefaultPayload(httpResponseParams, defaultPayloadMap)) {
                                                         allMatchDefault = false;
                                                         break;
