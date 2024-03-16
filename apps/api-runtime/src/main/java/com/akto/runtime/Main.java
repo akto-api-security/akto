@@ -18,6 +18,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.util.AccountTask;
+import com.akto.util.parsers.HttpCallParserHelper;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -243,7 +244,7 @@ public class Main {
                 } catch (Exception e) {
                     throw e;
                 }
-                
+
                 // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String,String> r: records) {
@@ -261,7 +262,8 @@ public class Main {
                             continue;
                         }
 
-                        httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
+                        httpResponseParams = HttpCallParserHelper.parseKafkaMessage(r.value());
+                         
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e, LogDb.RUNTIME);
                         continue;

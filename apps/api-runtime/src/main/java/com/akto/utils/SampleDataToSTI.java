@@ -15,6 +15,7 @@ import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.type.APICatalog;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
+import com.akto.util.parsers.HttpCallParserHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -114,7 +115,7 @@ public class SampleDataToSTI {
         boolean flag = false;
 
         try {
-            httpResponseParams = HttpCallParser.parseKafkaMessage(dataString);
+            httpResponseParams = HttpCallParserHelper.parseKafkaMessage(dataString);
         } catch (Exception e) {
             flag = true;
             logger.error(e.getMessage());

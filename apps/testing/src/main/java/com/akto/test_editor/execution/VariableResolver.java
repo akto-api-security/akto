@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.akto.util.parsers.HttpCallParserHelper;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.SampleDataDao;
@@ -679,7 +680,7 @@ public class VariableResolver {
             HttpResponseParams httpResponseParams;
             HttpRequestParams httpRequestParams;
             try {
-                httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                httpResponseParams = HttpCallParserHelper.parseKafkaMessage(sample);
                 httpRequestParams = httpResponseParams.getRequestParams();
                 if (location == null || location.equals("header")) {
                     Map<String, List<String>> headers = httpResponseParams.getHeaders();

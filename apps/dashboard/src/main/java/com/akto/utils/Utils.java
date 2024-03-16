@@ -19,6 +19,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.parsers.HttpCallParserHelper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -443,7 +444,7 @@ public class Utils {
                 if (!skipKafka) {
                     KafkaListener.kafka.send(message,"har_" + topic);
                 } else {
-                    HttpResponseParams responseParams =  HttpCallParser.parseKafkaMessage(message);
+                    HttpResponseParams responseParams =  HttpCallParserHelper.parseKafkaMessage(message);
                     responseParams.getRequestParams().setApiCollectionId(apiCollectionId);
                     responses.add(responseParams);
                 }
