@@ -1,12 +1,18 @@
 import func from "@/util/func";
 import api from "./api";
 import React, {  } from 'react'
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Button, ButtonGroup} from '@shopify/polaris';
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Button, ButtonGroup, Tag} from '@shopify/polaris';
 import { history } from "@/util/history";
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
 import { circle_cancel, circle_tick_minor } from "../../components/icons";
+import {ResourcesMajor,
+  CollectionsMajor,
+  FlagMajor,
+  CreditCardSecureMajor,
+  MarketingMajor,
+  FraudProtectMajor} from '@shopify/polaris-icons';
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -335,8 +341,24 @@ const transform = {
     return details.replace(/{{percentageMatch}}/g, func.prettifyShort(percentageMatch))
   },
 
-  fillMoreInformation(category, moreInfoSections, affectedEndpoints) {
-
+  fillMoreInformation(category, moreInfoSections, affectedEndpoints, jiraIssueUrl, createJiraTicket) {
+    var key = /[^/]*$/.exec(jiraIssueUrl)[0];
+    const jiraComponent = jiraIssueUrl?.length > 0 ? (
+      <Box>
+              <Tag>
+                  <HorizontalStack gap={1}>
+                    <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
+                    <Link url={jiraIssueUrl}>
+                      <Text>
+                        {key}
+                      </Text>
+                    </Link>
+                  </HorizontalStack>
+                </Tag>
+          </Box>
+    ) : <Text> No Jira ticket created. Click on the top right button to create a new ticket.</Text>
+    
+    //<Box width="300px"><Button onClick={createJiraTicket} plain disabled={window.JIRA_INTEGRATED != "true"}>Click here to create a new ticket</Button></Box>
     let filledSection = []
     moreInfoSections.forEach((section) => {
       let sectionLocal = {}
@@ -344,11 +366,9 @@ const transform = {
       sectionLocal.title = section.title
       switch (section.title) {
         case "Description":
-
-          if (category?.issueDetails == null || category?.issueDetails == undefined) {
-            return;
-          }
-
+        if(category?.issueDetails == null || category?.issueDetails == undefined){
+          return;
+        }
           sectionLocal.content = (
             <Text color='subdued'>
               {transform.replaceTags(category?.issueDetails, category?.vulnerableTestingRunResults) || "No impact found"}
@@ -356,11 +376,9 @@ const transform = {
           )
           break;
         case "Impact":
-
-          if (category?.issueImpact == null || category?.issueImpact == undefined) {
+          if(category?.issueImpact == null || category?.issueImpact == undefined){
             return;
           }
-
           sectionLocal.content = (
             <Text color='subdued'>
               {category?.issueImpact || "No impact found"}
@@ -371,7 +389,6 @@ const transform = {
           if (category?.issueTags == null || category?.issueTags == undefined || category?.issueTags.length == 0) {
             return;
           }
-
           sectionLocal.content = (
             <HorizontalStack gap="2">
               {
@@ -379,7 +396,6 @@ const transform = {
               }
             </HorizontalStack>
           )
-
           break;
         case "CWE":
           if (category?.cwe == null || category?.cwe == undefined || category?.cwe.length == 0) {
@@ -406,11 +422,9 @@ const transform = {
           )
           break;
         case "References":
-
           if (category?.references == null || category?.references == undefined || category?.references.length == 0) {
             return;
           }
-
           sectionLocal.content = (
             <List type='bullet' spacing="extraTight">
               {
@@ -430,11 +444,9 @@ const transform = {
           )
           break;
         case "API endpoints affected":
-
           if (affectedEndpoints == null || affectedEndpoints == undefined || affectedEndpoints.length == 0) {
             return;
           }
-
           sectionLocal.content = (
             <List type='bullet'>
               {
@@ -450,12 +462,14 @@ const transform = {
             </List>
           )
           break;
+          case "Jira":
+              sectionLocal.content = jiraComponent
+              break;
           default:
-            break;
+            sectionLocal.content = section.content
       }
       filledSection.push(sectionLocal)
     })
-
     return filledSection;
   },
 
@@ -562,7 +576,6 @@ convertSubIntoSubcategory(resp){
   }
   const subCategoryMap = PersistStore.getState().subCategoryMap
   Object.keys(resp).forEach((key)=>{
-
     const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.shortName : key;
     if(obj.hasOwnProperty(objectKey)){
       let tempObj =  JSON.parse(JSON.stringify(obj[objectKey]));
@@ -602,6 +615,46 @@ convertSubIntoSubcategory(resp){
 
 },
 
+getInfoSectionsHeaders(){
+  let moreInfoSections = [
+    {
+      icon: FlagMajor,
+      title: "Impact",
+      content: ""
+    },
+    {
+      icon: CollectionsMajor,
+      title: "Tags",
+      content: ""
+    },
+    {
+      icon: CreditCardSecureMajor,
+      title: "CWE",
+      content: ""
+    },
+    {
+      icon: FraudProtectMajor,
+      title: "CVE",
+      content: ""
+    },
+    {
+      icon: MarketingMajor,
+      title: "API endpoints affected",
+      content: ""
+    },
+    {
+      icon: ResourcesMajor,
+      title: "References",
+      content: ""
+    },
+    {
+      icon: ResourcesMajor,
+      title: "Jira",
+      content: ""
+    }
+  ]
+  return moreInfoSections
+},
 getUrlComp(url){
   let arr = url.split(' ')
   const method = arr[0]

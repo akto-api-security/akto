@@ -31,11 +31,13 @@ const headings = [
         text: "Endpoint",
         value: "endpointComp",
         title: "Api endpoints",
+        textValue: "endpoint"
     },
     {
         text: "Risk score",
         title: "Risk score",
         value: "riskScoreComp",
+        textValue: "riskScore"
     },
     {
         text: "Hostname",
@@ -56,20 +58,22 @@ const headings = [
         title: 'Auth type',
         value: 'auth_type',
         showFilter: true,
-        type: CellType.TEXT,
+        textValue: 'authTypeTag'
     },
     {
         text: 'Sensitive Params',
         title: 'Sensitive params',
         value: 'sensitiveTagsComp',
         filterKey: 'sensitiveTags',
-        showFilter: true
+        showFilter: true,
+        textValue: "sensitiveDataTags"
     },
     {
         text: 'Last Seen',
         title: 'Last seen',
         value: 'last_seen',
         isText: true,
+        type: CellType.TEXT
     }
 ]
 
@@ -77,7 +81,8 @@ let headers = JSON.parse(JSON.stringify(headings))
 headers.push({
     text: 'Method',
     filterKey: 'method',
-    showFilter: true
+    showFilter: true,
+    textValue: 'method',
 })
 
 
@@ -245,7 +250,7 @@ function ApiEndpoints() {
     useEffect(() => {
         fetchData()
         checkGptActive()
-    }, [])
+    }, [apiCollectionId])
 
     const resourceName = {
         singular: 'endpoint',
@@ -322,7 +327,7 @@ function ApiEndpoints() {
 
     function exportCsv() {
         if (!loading) {
-            let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
+            let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.type === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0].length > 0));
 
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
             const allEndpoints = endpointData['All']

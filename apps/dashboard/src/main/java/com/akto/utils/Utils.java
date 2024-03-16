@@ -475,13 +475,13 @@ public class Utils {
             APICatalogSync.mergeUrlsAndSave(apiCollectionId, true);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
-            try {
-                DependencyFlow dependencyFlow = new DependencyFlow();
-                dependencyFlow.run();
-                dependencyFlow.syncWithDb();
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e,"Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
-            }
+            // try {
+                // DependencyFlow dependencyFlow = new DependencyFlow();
+                // dependencyFlow.run();
+                // dependencyFlow.syncWithDb();
+            // } catch (Exception e) {
+            //     loggerMaker.errorAndAddToDb(e,"Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
+            // }
         }
     }
 

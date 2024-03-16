@@ -40,6 +40,12 @@ function DropdownSearch(props) {
             }
             return deselectedOptions;
         })
+
+        if(allowMultiple){
+            if(preSelected.length === deselectedOptions.length){
+                setChecked(true)
+            }
+        }
     }, [deselectedOptions, value, preSelected])
 
     const updateText = useCallback(

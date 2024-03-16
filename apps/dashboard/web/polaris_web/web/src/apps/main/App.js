@@ -9,8 +9,6 @@ import SensitiveDataExposure from "../dashboard/pages/observe/SensitiveDataExpos
 import SingleRequest from "../dashboard/pages/observe/SingleRequest/SingleRequest";
 import PageObserve from "../dashboard/pages/observe/PageObserve"
 import PageTesting from "../dashboard/pages/testing/PageTesting";
-import { AppProvider } from "@shopify/polaris"
-import SignUp from "../signup/pages/SignUp"
 import {
   createBrowserRouter,
   RouterProvider,
@@ -21,6 +19,7 @@ import Integrations from "../dashboard/pages/settings/integrations/Integrations"
 import Settings from "../dashboard/pages/settings/Settings";
 import Users from "../dashboard/pages/settings/users/Users";
 import Postman from "../dashboard/pages/settings/integrations/Postman";
+import Jira from "../dashboard/pages/settings/integrations/Jira";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
 import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
 import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
@@ -59,6 +58,7 @@ import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
 import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
 import { useStiggContext } from '@stigg/react-sdk';
 import DependencyTable from "../dashboard/pages/testing/DependencyTable/DependencyTable";
+import SignupPage from "../signup/pages/SignupPage";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -188,6 +188,10 @@ const router = createBrowserRouter([
             element: <Postman />,
           },
           {
+            path: "integrations/jira",
+            element: <Jira />,
+          },
+          {
             path: "integrations/akto_apis",
             element: <ApiTokens />,
           },
@@ -280,13 +284,17 @@ const router = createBrowserRouter([
     ],
     errorElement: <ErrorComponent/>
   },
-{
-  path: "/login",
-    element: <SignUp />,
-},
-{
-  path: "/",
-    element: <Navigate to="/login" />,
+  {
+      path: "/login",
+      element: <SignupPage />,
+  },
+  {
+      path: "/",
+      element: <Navigate to="/login" />,
+  },
+  {
+    path: "/signup",
+    element: <SignupPage />,
   },
 ])
 
