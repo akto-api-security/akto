@@ -1,5 +1,6 @@
 package com.akto.dependency;
 
+import com.akto.DependencyAnalyserHelper;
 import com.akto.MongoBasedTest;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
@@ -15,9 +16,10 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.runtime.APICatalogSync;
+import com.akto.util.parsers.HttpCallParserHelper;
+import com.akto.util.runtime.RuntimeUtil;
 import com.mongodb.BasicDBObject;
 import org.junit.Before;
-import org.junit.Test;
 
 import java.util.*;
 
@@ -40,7 +42,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         List<HttpResponseParams> httpResponseParamsList = new ArrayList<>();
         for (String message: messages) {
             try {
-                HttpResponseParams responseParams = HttpCallParser.parseKafkaMessage(message);
+                HttpResponseParams responseParams = HttpCallParserHelper.parseKafkaMessage(message);
                 httpResponseParamsList.add(responseParams);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -242,29 +244,29 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         Map<Integer, APICatalog> dbState = new HashMap<>();
         APICatalog apiCatalog = new APICatalog();
         Map<URLTemplate, RequestTemplate> templateURLToMethods = new HashMap<>();
-        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/books/INTEGER", URLMethods.Method.GET), null);
-        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/toys/INTEGER", URLMethods.Method.GET), null);
-        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/food/INTEGER", URLMethods.Method.GET), null);
-        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/hotel/INTEGER", URLMethods.Method.POST), null);
+        templateURLToMethods.put(RuntimeUtil.createUrlTemplate("api/books/INTEGER", URLMethods.Method.GET), null);
+        templateURLToMethods.put(RuntimeUtil.createUrlTemplate("api/toys/INTEGER", URLMethods.Method.GET), null);
+        templateURLToMethods.put(RuntimeUtil.createUrlTemplate("api/food/INTEGER", URLMethods.Method.GET), null);
+        templateURLToMethods.put(RuntimeUtil.createUrlTemplate("api/hotel/INTEGER", URLMethods.Method.POST), null);
         apiCatalog.setTemplateURLToMethods(templateURLToMethods);
         dbState.put(1000, apiCatalog);
-        DependencyAnalyser dependencyAnalyser = new DependencyAnalyser(dbState);
-        dependencyAnalyser.nodes = nodes;
+        DependencyAnalyserHelper dependencyAnalyserHelper = new DependencyAnalyserHelper(dbState);
+        dependencyAnalyserHelper.setNode(nodes);
 
-        assertEquals(6, dependencyAnalyser.nodes.size());
-        dependencyAnalyser.mergeNodes();
-        assertEquals(3, dependencyAnalyser.nodes.size());
+        assertEquals(6, dependencyAnalyserHelper.getNodes().size());
+        dependencyAnalyserHelper.mergeNodes();
+        assertEquals(3, dependencyAnalyserHelper.getNodes().size());
 
 
-        DependencyNode dependencyNode1New = dependencyAnalyser.nodes.get(Objects.hash("1000", "api/books/INTEGER", "GET","1000", "/api/cars", "POST"));
+        DependencyNode dependencyNode1New = dependencyAnalyserHelper.getNodes().get(Objects.hash("1000", "api/books/INTEGER", "GET","1000", "/api/cars", "POST"));
         assertEquals(1, dependencyNode1New.getParamInfos().size());
         assertEquals(3, dependencyNode1New.getParamInfos().get(0).getCount());
 
-        DependencyNode dependencyNode2New = dependencyAnalyser.nodes.get(Objects.hash("1000", "api/toys/INTEGER", "GET","1000", "/api/bus", "POST"));
+        DependencyNode dependencyNode2New = dependencyAnalyserHelper.getNodes().get(Objects.hash("1000", "api/toys/INTEGER", "GET","1000", "/api/bus", "POST"));
         assertEquals(1, dependencyNode2New.getParamInfos().size());
         assertEquals(2, dependencyNode2New.getParamInfos().get(0).getCount());
 
-        DependencyNode dependencyNode3New = dependencyAnalyser.nodes.get(Objects.hash("1000", "api/food/INTEGER", "GET","1000", "api/hotel/INTEGER", "POST"));
+        DependencyNode dependencyNode3New = dependencyAnalyserHelper.getNodes().get(Objects.hash("1000", "api/food/INTEGER", "GET","1000", "api/hotel/INTEGER", "POST"));
         assertEquals(1, dependencyNode3New.getParamInfos().size());
         assertEquals(4, dependencyNode3New.getParamInfos().get(0).getCount());
     }

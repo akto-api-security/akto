@@ -1,9 +1,6 @@
 package com.akto.utils;
 
-import com.akto.DaoInit;
 import com.akto.dao.DependencyFlowNodesDao;
-import com.akto.dao.ModifyHostDetailsDao;
-import com.akto.dao.ReplaceDetailsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -13,18 +10,16 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
-import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.policies.AuthPolicy;
 import com.akto.test_editor.execution.Operations;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
-import com.akto.util.JSONUtils;
 
+import com.akto.util.JSONUtils;
 import com.akto.util.modifier.SetValueModifier;
+import com.akto.util.runtime.RuntimeUtil;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import joptsimple.internal.Strings;
 import org.bson.conversions.Bson;
@@ -373,7 +368,7 @@ public class Build {
             if (values == null) continue;
 
             if (headerKey.equalsIgnoreCase("set-cookie")) {
-                Map<String, String> cookieMap = AuthPolicy.parseCookie(values);
+                Map<String, String> cookieMap = RuntimeUtil.parseCookie(values);
                 for (String cookieKey : cookieMap.keySet()) {
                     String cookieVal = cookieMap.get(cookieKey);
                     valuesMap.put(cookieKey, new HashSet<>(Collections.singletonList(cookieVal)));

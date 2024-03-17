@@ -9,7 +9,6 @@ import com.akto.runtime.Main;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
-import org.checkerframework.checker.units.qual.C;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;

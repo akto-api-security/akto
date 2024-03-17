@@ -61,18 +61,12 @@ import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
 import com.akto.testing.workflow_node_executor.Utils;
-import com.akto.util.AccountTask;
-import com.akto.util.ConnectionInfo;
-import com.akto.util.EmailAccountName;
-import com.akto.util.Constants;
-import com.akto.util.JSONUtils;
-import com.akto.util.Pair;
-import com.akto.util.UsageUtils;
+import com.akto.util.*;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
+import com.akto.util.parsers.HttpCallParserHelper;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.*;
-import com.akto.util.DashboardMode;
 import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
@@ -646,7 +640,7 @@ public class InitializerListener implements ServletContextListener {
                                                 boolean allMatchDefault = true;
 
                                                 for (String sample : samples) {
-                                                    HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                                                    HttpResponseParams httpResponseParams = HttpCallParserHelper.parseKafkaMessage(sample);
                                                     if (!matchesDefaultPayload(httpResponseParams, defaultPayloadMap)) {
                                                         allMatchDefault = false;
                                                         break;

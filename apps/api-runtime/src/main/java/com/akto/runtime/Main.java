@@ -20,6 +20,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.util.AccountTask;
+import com.akto.util.parsers.HttpCallParserHelper;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -242,7 +243,7 @@ public class Main {
                             continue;
                         }
 
-                        httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
+                        httpResponseParams = HttpCallParserHelper.parseKafkaMessage(r.value());
                          
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e, LogDb.RUNTIME);

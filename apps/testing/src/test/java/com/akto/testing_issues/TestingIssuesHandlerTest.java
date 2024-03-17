@@ -2,29 +2,16 @@ package com.akto.testing_issues;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.sources.TestSourceConfigsDao;
-import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.GenericTestResult;
-import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.URLMethods;
-import com.akto.util.enums.GlobalEnums;
-import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
 import org.bson.types.ObjectId;
-import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Random;
-
-import static com.akto.util.Constants.ID;
-import static org.junit.Assert.*;
 
 public class TestingIssuesHandlerTest extends MongoBasedTest {
 

@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.akto.types.CappedSet;
 import org.junit.Test;
 
 import com.akto.MongoBasedTest;
@@ -18,7 +19,6 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
-import com.akto.types.CappedSet;
 
 public class CustomAuthUtilTest extends MongoBasedTest{
 

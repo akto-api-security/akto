@@ -16,6 +16,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static com.akto.dao.MCollection.createCollectionIfAbsent;
+import static com.akto.dao.MCollection.createIndexIfAbsent;
+
 public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
 
     public static final TestingRunResultDao instance = new TestingRunResultDao();
@@ -90,10 +93,10 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         Bson summaryIndex = Indexes.descending(Arrays.asList(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, Constants.ID));
         createIndexIfAbsent(dbName, getCollName(), summaryIndex, new IndexOptions().name("testRunResultSummaryId_-1__id_-1"));
 
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+        createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, Constants.ID }, false);
 
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{TestingRunResult.END_TIMESTAMP}, false);
+        createIndexIfAbsent(getDBName(), getCollName(), new String[]{TestingRunResult.END_TIMESTAMP}, false);
     }
 
     public void convertToCappedCollection() {

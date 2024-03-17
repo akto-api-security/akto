@@ -3,7 +3,6 @@ package com.akto.testing;
 import com.akto.dao.ActivitiesDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
-import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -47,7 +46,6 @@ import org.apache.commons.lang3.StringUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.mortbay.util.ajax.JSON;

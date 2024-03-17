@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.util.parsers.HttpCallParserHelper;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -28,7 +29,6 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.log.LoggerMaker;
-import com.akto.parsers.HttpCallParser;
 import com.akto.testing.ApiExecutor;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -237,7 +237,7 @@ public class JiraIntegrationAction extends UserAction {
 
             origCurl = ExportSampleDataAction.getCurl(origReq);
             testCurl = ExportSampleDataAction.getCurl(testReq);
-            HttpResponseParams origObj = HttpCallParser.parseKafkaMessage(origReq);
+            HttpResponseParams origObj = HttpCallParserHelper.parseKafkaMessage(origReq);
             BasicDBObject respObj = BasicDBObject.parse(testReq);
             BasicDBObject respPayloaObj = BasicDBObject.parse(respObj.getString("response"));
             String resp = respPayloaObj.getString("body");

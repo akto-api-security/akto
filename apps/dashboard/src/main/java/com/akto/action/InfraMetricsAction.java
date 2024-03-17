@@ -16,8 +16,6 @@ import org.apache.struts2.interceptor.ServletResponseAware;
 import org.bson.Document;
 
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class InfraMetricsAction implements Action,ServletResponseAware, ServletRequestAware  {

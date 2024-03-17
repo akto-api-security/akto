@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.akto.util.parsers.HttpCallParserHelper;
 import org.apache.commons.lang3.StringUtils;
 
 import com.akto.dao.context.Context;
@@ -21,7 +22,7 @@ public class InsertDataUtil {
     public static void insertDataInApiCollection(int apiCollectionId, String topic, List<String> messages, List<String> errors) throws Exception {
         List<HttpResponseParams> responses = new ArrayList<>();
         for (String message: messages){
-            HttpResponseParams responseParams =  HttpCallParser.parseKafkaMessage(message);
+            HttpResponseParams responseParams =  HttpCallParserHelper.parseKafkaMessage(message);
             responseParams.getRequestParams().setApiCollectionId(apiCollectionId);
             responses.add(responseParams);
         }

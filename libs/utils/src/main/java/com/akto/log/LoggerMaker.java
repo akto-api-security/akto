@@ -61,7 +61,7 @@ public class LoggerMaker  {
     private LogDb db;
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING
+        TESTING,RUNTIME,DASHBOARD,DEPENDENCY_SERVICE,BILLING
     }
 
     @Deprecated
@@ -184,6 +184,9 @@ public class LoggerMaker  {
                 case BILLING:
                     BillingLogsDao.instance.insertOne(log);
                     break;
+                case DEPENDENCY_SERVICE:
+                    DependencyServiceLogsDao.instance.insertOne(log);
+                    break;
                 default:
                     break;
             }
@@ -215,6 +218,9 @@ public class LoggerMaker  {
                 break;
             case BILLING:
                 logs = BillingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
+            case DEPENDENCY_SERVICE:
+                logs = DependencyServiceLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
                 break;
             default:
                 break;

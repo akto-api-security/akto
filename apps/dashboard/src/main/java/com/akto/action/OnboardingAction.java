@@ -1,7 +1,6 @@
 package com.akto.action;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import com.akto.dto.testing.TestSuite;

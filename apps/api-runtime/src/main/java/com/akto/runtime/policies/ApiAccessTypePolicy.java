@@ -3,7 +3,6 @@ package com.akto.runtime.policies;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.runtime_filters.RuntimeFilter;
-import com.akto.parsers.HttpCallParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;

@@ -13,16 +13,13 @@ import com.akto.dto.type.URLTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
+import com.akto.util.runtime.RuntimeUtil;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 import java.util.*;
-
-import static com.akto.runtime.APICatalogSync.createUrlTemplate;
 
 public class AktoPolicyNew {
 
@@ -112,7 +109,7 @@ public class AktoPolicyNew {
         PolicyCatalog policyCatalog = new PolicyCatalog(apiInfo, filterSampleDataMap);
 
         if (APICatalog.isTemplateUrl(apiInfoKey.url)) {
-            URLTemplate urlTemplate = createUrlTemplate(apiInfoKey.url, apiInfoKey.method);
+            URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(apiInfoKey.url, apiInfoKey.method);
             Map<URLTemplate, PolicyCatalog> templateURLToMethods = apiInfoCatalog.getTemplateURLToMethods();
             templateURLToMethods.putIfAbsent(urlTemplate, policyCatalog);
         } else {

@@ -4,11 +4,9 @@ import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
-import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
-import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
@@ -20,8 +18,8 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.parsers.HttpCallParserHelper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -442,7 +440,7 @@ public class Utils {
                 if (!skipKafka) {
                     KafkaListener.kafka.send(message,"har_" + topic);
                 } else {
-                    HttpResponseParams responseParams =  HttpCallParser.parseKafkaMessage(message);
+                    HttpResponseParams responseParams =  HttpCallParserHelper.parseKafkaMessage(message);
                     responseParams.getRequestParams().setApiCollectionId(apiCollectionId);
                     responses.add(responseParams);
                 }

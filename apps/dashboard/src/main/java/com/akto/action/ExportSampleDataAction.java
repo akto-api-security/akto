@@ -1,27 +1,19 @@
 package com.akto.action;
 
-import com.akto.DaoInit;
-import com.akto.action.test_editor.SaveTestEditorAction;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
-import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.URLMethods;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.parsers.HttpCallParser;
+import com.akto.util.parsers.HttpCallParserHelper;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
-import com.mongodb.client.model.Filters;
-import com.sun.jndi.toolkit.url.Uri;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.URI;
@@ -218,7 +210,7 @@ public class ExportSampleDataAction extends UserAction {
     public static String getCurl(String sampleData) throws IOException {
         HttpResponseParams httpResponseParams;
         try {
-            httpResponseParams = HttpCallParser.parseKafkaMessage(sampleData);
+            httpResponseParams = HttpCallParserHelper.parseKafkaMessage(sampleData);
         } catch (Exception e) {
             try {
                 OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();

@@ -10,8 +10,6 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.CustomAuthType;
 import com.akto.log.LoggerMaker;
-import com.akto.testing.ApiExecutor;
-import com.akto.util.AccountTask;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;

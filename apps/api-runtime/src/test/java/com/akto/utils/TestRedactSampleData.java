@@ -1,13 +1,10 @@
 package com.akto.utils;
 
-import com.akto.dao.CustomDataTypeDao;
-import com.akto.dto.CustomDataType;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
-import com.akto.parsers.HttpCallParser;
+import com.akto.util.parsers.HttpCallParserHelper;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -207,7 +204,7 @@ public class TestRedactSampleData {
 
         String redactedValue = RedactSampleData.redact(httpResponseParams, true);
 
-        HttpResponseParams redactedHttpResponseParams = HttpCallParser.parseKafkaMessage(redactedValue);
+        HttpResponseParams redactedHttpResponseParams = HttpCallParserHelper.parseKafkaMessage(redactedValue);
 
         assertEquals(2, redactedHttpResponseParams.requestParams.getHeaders().size());
         assertEquals(1, redactedHttpResponseParams.getHeaders().size());
@@ -270,12 +267,12 @@ public class TestRedactSampleData {
         );
 
         String originalString = RedactSampleData.convertHttpRespToOriginalString(httpResponseParams);
-        HttpResponseParams originalHttpResponseParams = HttpCallParser.parseKafkaMessage(originalString);
+        HttpResponseParams originalHttpResponseParams = HttpCallParserHelper.parseKafkaMessage(originalString);
 
 
         String redactedValue = RedactSampleData.redact(httpResponseParams, true);
 
-        HttpResponseParams redactedHttpResponseParams = HttpCallParser.parseKafkaMessage(redactedValue);
+        HttpResponseParams redactedHttpResponseParams = HttpCallParserHelper.parseKafkaMessage(redactedValue);
 
         try {
             boolean result = testRedactDoneCorrect(originalHttpResponseParams, redactedHttpResponseParams);
