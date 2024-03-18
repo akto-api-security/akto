@@ -660,7 +660,11 @@ public class Utils {
     public static Boolean sendRequestToSsrfServer(String url){
         String requestUrl = "";
         if(!(url.startsWith("http"))){
-            requestUrl = "http://ssrf.akto.io/validate/" + url;
+            String hostName ="https://test-services.akto.io/";
+            if(System.getenv("SSRF_SERVICE_NAME") != null && System.getenv("SSRF_SERVICE_NAME").length() > 0){
+                hostName = System.getenv("SSRF_SERVICE_NAME");
+            }
+            requestUrl = hostName + url;
         }
 
         Request request = new Request.Builder()
