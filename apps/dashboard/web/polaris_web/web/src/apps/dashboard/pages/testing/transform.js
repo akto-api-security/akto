@@ -1,7 +1,7 @@
 import func from "@/util/func";
 import api from "./api";
 import React, {  } from 'react'
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Button, ButtonGroup, Tag} from '@shopify/polaris';
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Tag} from '@shopify/polaris';
 import { history } from "@/util/history";
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
@@ -680,7 +680,7 @@ getCollapsibleRow(urls){
           <VerticalStack gap={2}>
             {urls.map((ele,index)=>{
               return(
-                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline key={index}>
+                <Link monochrome onClick={() => history.navigate(ele.nextUrl, {state: {showDetails: true}})} removeUnderline key={index}>
                   {this.getUrlComp(ele.url)}
                 </Link>
               )
@@ -741,6 +741,19 @@ getPrettifiedTestRunResults(testRunResults){
     prettifiedResults.push(prettifiedObj)
   })
   return prettifiedResults
+},
+getTestingRunResult(testingResult){
+  let finalObj = {
+    ...testingResult
+  }
+  let urlString = testingResult.url
+  const methodObj = func.toMethodUrlObject(urlString)
+  const hostName = observeFunc.getHostName(methodObj.url)
+  const truncatedUrl = observeFunc.getTruncatedUrl(methodObj.url)
+  
+  finalObj['url'] = methodObj.method + " " + truncatedUrl
+  finalObj['hostName'] = hostName
+  return finalObj
 }
 }
 

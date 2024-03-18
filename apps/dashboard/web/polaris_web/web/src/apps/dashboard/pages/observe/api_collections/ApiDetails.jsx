@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Avatar, Box, Button, Icon, Modal, Tooltip } from "@shopify/polaris"
+import { Avatar, Box, Button, Modal, Tooltip } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -11,7 +11,6 @@ import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
 import func from "@/util/func"
 import transform from "../transform";
 import ApiDependency from "./ApiDependency";
-import { copy_icon } from "../../../components/icons";
 
 function ApiDetails(props) {
 
