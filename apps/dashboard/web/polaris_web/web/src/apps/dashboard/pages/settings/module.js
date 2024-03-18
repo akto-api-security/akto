@@ -139,7 +139,28 @@ const settingFunctions = {
 
     getSetupOptions: function(){
       return setupOptions;
-    }
+    },
+    
+    testJiraIntegration: async function(userEmail, apiToken, baseUrl, projId){
+      let issueType = ""
+      await settingRequests.testJiraIntegration(userEmail, apiToken, baseUrl, projId).then((resp)=>{
+        issueType = resp.issueType
+      })
+      return issueType
+    },
+    fetchJiraIntegration: async function(){
+      let jiraInteg = {}
+      await settingRequests.fetchJiraIntegration().then((resp)=>{
+        jiraInteg = resp.jiraIntegration
+      })
+      return jiraInteg
+    },
+    addJiraIntegration: async function(userEmail, apiToken, baseUrl, projId, issueType){
+      let trafficData = {}
+      await settingRequests.addJiraIntegration(userEmail, apiToken, baseUrl, projId, issueType).then((resp)=>{
+      })
+      return trafficData
+    },
 }
 
 export default settingFunctions

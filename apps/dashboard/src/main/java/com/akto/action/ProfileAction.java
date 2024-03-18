@@ -4,11 +4,13 @@ package com.akto.action;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
+import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.JiraIntegration;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
 import com.akto.dto.ApiToken.Utility;
@@ -104,6 +106,15 @@ public class ProfileAction extends UserAction {
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
 
+        boolean jiraIntegrated = false;
+        try {
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+            if (jiraIntegration != null) {
+                jiraIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
         userDetails.append("accounts", accounts)
                 .append("username",username)
                 .append("avatar", "dummy")
@@ -113,7 +124,8 @@ public class ProfileAction extends UserAction {
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
                 .append("cloudType", Utils.getCloudType())
                 .append("accountName", accountName)
-                .append("aktoUIMode", userFromDB.getAktoUIMode().name());
+                .append("aktoUIMode", userFromDB.getAktoUIMode().name())
+                .append("jiraIntegrated", jiraIntegrated);;
 
         // only external API calls have non-null "utility"
         if (DashboardMode.isMetered() &&  utility == null) {

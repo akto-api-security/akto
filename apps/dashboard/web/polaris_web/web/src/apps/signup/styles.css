@@ -1,0 +1,12 @@
+.akto-logo .Polaris-Avatar__Image{
+    height: unset !important;
+}
+
+.akto-logo .Polaris-Avatar__size2xl--experimental {
+    width: 117px !important;
+    height: 38px !important;
+}
+
+.login-page .Polaris-Frame__Main{
+    background: var(--white) !important;
+}

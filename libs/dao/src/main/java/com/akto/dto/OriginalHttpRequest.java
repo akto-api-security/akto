@@ -34,8 +34,14 @@ public class OriginalHttpRequest {
     }
 
     public OriginalHttpRequest copy() {
+        Map<String, List<String>> headersCopy = new HashMap<>();
+        for(Map.Entry<String, List<String>> headerKV: this.headers.entrySet()) {
+            ArrayList<String> headerValues = new ArrayList<>();
+            headerValues.addAll(headerKV.getValue());
+            headersCopy.put(headerKV.getKey(), headerValues);
+        }
         return new OriginalHttpRequest(
-                this.url, this.queryParams, this.method, this.body, new HashMap<>(this.headers), this.type
+                this.url, this.queryParams, this.method, this.body, headersCopy, this.type
         );
     }
 

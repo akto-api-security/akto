@@ -26,6 +26,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
+import com.akto.dto.ApiCollection.ENV_TYPE;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
@@ -36,6 +37,7 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Updates;
@@ -444,6 +446,29 @@ public class ApiCollectionsAction extends UserAction {
         return Action.ERROR.toUpperCase();
     }
 
+    List<Integer> apiCollectionIds;
+
+    private ENV_TYPE envType;
+
+	public String updateEnvType(){
+        try {
+            Bson filter =  Filters.in("_id", apiCollectionIds);
+            FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+            updateOptions.upsert(false);
+
+            UpdateResult result = ApiCollectionsDao.instance.getMCollection().updateMany(filter,
+                                            Updates.set(ApiCollection.USER_ENV_TYPE,envType)
+                                    );;
+            if(result == null){
+                return Action.ERROR.toUpperCase();
+            }
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return Action.ERROR.toUpperCase();
+    }
+
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
     }
@@ -522,5 +547,13 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setRedacted(boolean redacted) {
         this.redacted = redacted;
+    }
+
+    public void setEnvType(ENV_TYPE envType) {
+		this.envType = envType;
+	}
+
+    public void setApiCollectionIds(List<Integer> apiCollectionIds) {
+        this.apiCollectionIds = apiCollectionIds;
     }
 }
