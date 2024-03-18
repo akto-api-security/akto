@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -121,6 +122,7 @@ public class VariableResolver {
                     String match = matcher.group(0);
                     match = match.substring(2, match.length());
                     match = match.substring(0, match.length() - 1);
+
                     Object val = getValue(varMap, match);
                     if (val == null) {
                         continue;
