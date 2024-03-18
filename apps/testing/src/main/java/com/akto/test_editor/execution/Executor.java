@@ -440,7 +440,7 @@ public class Executor {
                 Filters.in(Organization.ACCOUNTS, accountId)
         );
         if (organization == null) {
-            
+            return new BasicDBObject("error", "organization not found");
         }
 
         Tokens tokens;
@@ -466,7 +466,7 @@ public class Executor {
 
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
         switch (operationType.toLowerCase()) {
-            case "send_ssrf_request":
+            case "send_ssrf_req":
                 String keyValue = key.toString().replaceAll("\\$\\{random_uuid\\}", "");
                 String url = Utils.extractValue(keyValue, "url=");
                 String redirectUrl = Utils.extractValue(keyValue, "redirect_url=");
