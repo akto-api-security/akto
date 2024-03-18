@@ -35,12 +35,12 @@ public class CreateDependencyGraphAction {
         this.swaggerSchema = swaggerSchema;
     }
 
-    private List<Map<Integer, DependencyNode>> nodes = new ArrayList<>();
+    private Map<Integer, DependencyNode> nodes = new HashMap<>();
 
     public String getSwaggerSchema() {
         return swaggerSchema;
     }
-    public void setNodes(List<Map<Integer, DependencyNode>> nodes) {
+    public void setNodes(Map<Integer, DependencyNode> nodes) {
         this.nodes = nodes;
     }
 
@@ -59,8 +59,9 @@ public class CreateDependencyGraphAction {
 
             for(int i = 0; i < httpResponseParamsList.size(); i++) {
                 dependencyAnalyserHelper.analyse(httpResponseParamsList.get(i), i);
-                nodes.add(dependencyAnalyserHelper.getNodes());
             }
+
+            nodes = dependencyAnalyserHelper.getNodes();
 
         } catch (Exception e) {
             job_id.put("error", e.getMessage());
