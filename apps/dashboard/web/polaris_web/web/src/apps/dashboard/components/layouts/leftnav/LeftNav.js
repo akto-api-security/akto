@@ -119,9 +119,9 @@ export default function LeftNav(){
                     selected: leftNavSelected === 'dashboard_testing_roles'
                   },
                   {
-                    label: 'User config',
+                    label: 'Configurations',
                     onClick: ()=>{
-                      navigate('/dashboard/testing/user-config')
+                      navigate('/dashboard/testing/configurations')
                       handleSelect('dashboard_testing_user_config')
                       setActive('active')
                     },

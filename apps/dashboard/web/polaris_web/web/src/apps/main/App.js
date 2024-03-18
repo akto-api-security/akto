@@ -37,6 +37,7 @@ import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
 import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
 import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
 import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
+import Configurations from "../dashboard/pages/testing/configurations/Configurations";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import DefaultPayloads from "../dashboard/pages/settings/default_payloads/DefaultPayloads";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
@@ -100,6 +101,10 @@ const router = createBrowserRouter([
               {
                 path:"roles/details",
                 element:<TestRoleSettings/>
+              },
+              {
+                path:"configurations",
+                element:<Configurations/>
               },
               {
                 path:"user-config",
