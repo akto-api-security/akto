@@ -13,7 +13,6 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 import com.akto.parsers.HttpCallParser;
-import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.runtime.APICatalogSync;
 import com.akto.util.parsers.HttpCallParserHelper;
