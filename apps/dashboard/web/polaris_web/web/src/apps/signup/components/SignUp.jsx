@@ -56,7 +56,7 @@ function SignUp() {
     setSsoList(copySsoList)
 
     if (window.IS_SAAS && window.IS_SAAS === "true") {
-      window.location.href = "/";
+      navigate('/dashboard/observe/inventory');
     }
   }, [])
 
