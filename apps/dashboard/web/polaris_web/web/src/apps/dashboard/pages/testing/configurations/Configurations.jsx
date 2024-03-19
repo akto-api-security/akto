@@ -9,6 +9,7 @@ import TestingStore from "../testingStore";
 import Automated from "./Automated";
 import Store from "../../../store";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
+import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 
 const headers = [
     {
@@ -41,7 +42,12 @@ function Configurations() {
     const [isLoading, setIsLoading] = useState(true)
     const [hardcodedOpen, setHardcodedOpen] = useState(true);
 
-    const handleToggleHardcodedOpen = () => setHardcodedOpen((prev) => !prev)
+
+    async function fetchAllSubCategories() {
+        setIsLoading(true)
+        const allSubCategoriesResponse =  await api.fetchAllSubCategories(true)
+        setIsLoading(false)
+    }
 
     async function fetchAuthMechanismData() {
         setIsLoading(true)
@@ -56,7 +62,7 @@ function Configurations() {
     }
 
     useEffect(() => {
-        fetchAuthMechanismData()
+        fetchAllSubCategories()
     }, [])
 
     async function handleStopAlltests() {
@@ -65,54 +71,14 @@ function Configurations() {
     }
 
     const bodyComponent = (
-        <LegacyCard sectioned title="Choose auth token configuration" key="bodyComponent">
-            <Divider />
-            <LegacyCard.Section>
-                <LegacyStack vertical>
-                    <Button
-                        id={"hardcoded-token-expand-button"}
-                        onClick={handleToggleHardcodedOpen}
-                        ariaExpanded={hardcodedOpen}
-                        icon={hardcodedOpen ? ChevronDownMinor : ChevronRightMinor}
-                        ariaControls="hardcoded"
-                    >
-                        Hard coded
-                    </Button>
-                    <Collapsible
-                        open={hardcodedOpen}
-                        id="hardcoded"
-                        transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}
-                        expandOnPrint
-                    >
-                        <HardCoded />
-                    </Collapsible>
-                </LegacyStack>
-            </LegacyCard.Section>
-
-
-            <LegacyCard.Section>
-                <LegacyStack vertical>
-                    <Button
-                        id={"automated-token-expand-button"}
-                        onClick={handleToggleHardcodedOpen}
-                        ariaExpanded={!hardcodedOpen}
-                        icon={!hardcodedOpen ? ChevronDownMinor : ChevronRightMinor}
-                        ariaControls="automated"
-                    >
-                        Automated
-                    </Button>
-                    <Collapsible
-                        open={!hardcodedOpen}
-                        id="automated"
-                        transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}
-                        expandOnPrint
-                    >
-                        <Automated /> 
-                    </Collapsible>
-                </LegacyStack>
-            </LegacyCard.Section>
-
-        </LegacyCard>
+        <GithubSimpleTable
+            filters={[]}
+            headers={headers}
+            selectable={true}
+            headings={headers}
+            useNewRow={true}
+            condensedHeight={true}
+        />
     )
 
     const components = [bodyComponent]
@@ -125,7 +91,7 @@ function Configurations() {
                 divider={true}
                 title ={
                     <Text variant="headingLg">
-                        User config
+                        Configurations
                     </Text>
                 }
                 primaryAction={{ content: 'Stop all tests', onAction: handleStopAlltests }}
