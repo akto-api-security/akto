@@ -27,6 +27,12 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.apache.tomcat</groupId>
+            <artifactId>tomcat-catalina</artifactId>
+            <version>7.0.42</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.akto.libs.dependency-analyser</groupId>
             <artifactId>dependency-analyser</artifactId>
             <version>${project.version}</version>

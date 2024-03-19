@@ -1,14 +1,17 @@
 package com.akto.action;
 
 import com.akto.DependencyAnalyserHelper;
+import com.akto.DependencyFlowHelper;
 import com.akto.dao.context.Context;
 import com.akto.dto.DependencyNode;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.upload.SwaggerUploadLog;
 import com.akto.open_api.parser.Parser;
 import com.akto.open_api.parser.ParserResult;
 import com.akto.util.parsers.HttpCallParserHelper;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import io.swagger.parser.OpenAPIParser;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -25,21 +28,20 @@ import static com.opensymphony.xwork2.Action.SUCCESS;
 
 public class CreateDependencyGraphAction {
 
-    private final BasicDBObject job_id = new BasicDBObject();
-    public BasicDBObject getJob_id() {
-        return job_id;
+    private final BasicDBObject dependency_graph_status = new BasicDBObject();
+    public BasicDBObject getDependency_graph_status() {
+        return dependency_graph_status;
     }
 
     private String swaggerSchema;
     public void setSwaggerSchema(String swaggerSchema) {
         this.swaggerSchema = swaggerSchema;
     }
-
-    private Map<Integer, DependencyNode> nodes = new HashMap<>();
-
     public String getSwaggerSchema() {
         return swaggerSchema;
     }
+
+    private Map<Integer, DependencyNode> nodes = new HashMap<>();
     public void setNodes(Map<Integer, DependencyNode> nodes) {
         this.nodes = nodes;
     }
@@ -52,6 +54,8 @@ public class CreateDependencyGraphAction {
         Map<Integer, APICatalog> dbState = new HashMap<>();
         DependencyAnalyserHelper dependencyAnalyserHelper = new DependencyAnalyserHelper(dbState);
 
+        StringBuilder swaggerJson = new StringBuilder();
+
         try {
             for(String aktoMsg : aktoMsgList) {
                 httpResponseParamsList.add(HttpCallParserHelper.parseKafkaMessage(aktoMsg));
@@ -62,14 +66,21 @@ public class CreateDependencyGraphAction {
             }
 
             nodes = dependencyAnalyserHelper.getNodes();
+            List<DependencyNode> dependencyNodeList = new ArrayList<>(nodes.values());
+            DependencyFlowHelper dependencyFlowHelper = new DependencyFlowHelper(dependencyNodeList);
+            dependencyFlowHelper.run();
+
+            Map<Integer, Node> resultNodes = dependencyFlowHelper.resultNodes;
+            List<Node> nodeList = new ArrayList<>(resultNodes.values());
+            Gson gson = new Gson();
+            swaggerJson.append(gson.toJson(nodeList));
 
         } catch (Exception e) {
-            job_id.put("error", e.getMessage());
-            System.out.println(e.getMessage());
+            dependency_graph_status.put("error", e.getMessage());
             return ERROR.toUpperCase();
         }
 
-        job_id.put("job_id", "1234567890"); // Demo ID for a new job.
+        dependency_graph_status.put("swaggerJson", swaggerJson.toString());
 
         return SUCCESS.toUpperCase();
     }
