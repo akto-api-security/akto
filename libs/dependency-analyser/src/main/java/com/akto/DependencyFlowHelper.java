@@ -1,11 +1,7 @@
-package com.akto.dto.dependency_flow;
+package com.akto;
 
-import com.akto.dao.DependencyFlowNodesDao;
-import com.akto.dao.DependencyNodeDao;
 import com.akto.dto.DependencyNode;
-import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.InsertManyOptions;
-
+import com.akto.dto.dependency_flow.*;
 import org.jgrapht.Graph;
 import org.jgrapht.alg.cycle.SzwarcfiterLauerSimpleCycles;
 import org.jgrapht.graph.DefaultDirectedGraph;
@@ -15,23 +11,17 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
-public class DependencyFlow {
+public class DependencyFlowHelper {
+
+    private final List<DependencyNode> dependencyNodeList;
+    public DependencyFlowHelper(List<DependencyNode> dependencyNodeList) {
+        this.dependencyNodeList = dependencyNodeList;
+    }
 
     private static final Logger logger = LoggerFactory.getLogger(DependencyFlow.class);
     public Map<Integer, ReverseNode> initialNodes = new HashMap<>();
     public Map<Integer, Node> resultNodes = new HashMap<>();
 
-    public void syncWithDb() {
-        List<Node> nodes = new ArrayList<>(resultNodes.values());
-        if (nodes.size() > 0) {
-            for (Node node: nodes) {
-                node.fillMaxDepth();
-                node.replaceDots();
-            }
-            DependencyFlowNodesDao.instance.getMCollection().drop();
-            DependencyFlowNodesDao.instance.getMCollection().insertMany(nodes, new InsertManyOptions().ordered(false));
-        }
-    }
 
     Queue<Integer> queue = new LinkedList<>();
     Set<Integer> done = new HashSet<>();
@@ -46,8 +36,6 @@ public class DependencyFlow {
         resultNodes = new HashMap<>();
         queue = new LinkedList<>();
         done = new HashSet<>();
-
-        List<DependencyNode> dependencyNodeList = DependencyNodeDao.instance.findAll(new BasicDBObject());
 
         for (DependencyNode dependencyNode: dependencyNodeList) {
             fillNodes(dependencyNode); // to fill who is giving data to whom
@@ -76,6 +64,7 @@ public class DependencyFlow {
         }
     }
 
+
     public void parseTree() {
         // pop queue until empty
         while (!queue.isEmpty()) {
@@ -91,7 +80,7 @@ public class DependencyFlow {
             nodeFromQueue.fillMaxDepth();
             int depth = nodeFromQueue.getMaxDepth();
 
-            Map<String,ReverseConnection>  reverseConnections = reverseNode.getReverseConnections();
+            Map<String, ReverseConnection>  reverseConnections = reverseNode.getReverseConnections();
             for (ReverseConnection reverseConnection: reverseConnections.values()) {
                 for (ReverseEdge reverseEdge: reverseConnection.getReverseEdges()) {
                     // resultNode is basically find which node is receiving the data and fill the edge with that particular parameter
