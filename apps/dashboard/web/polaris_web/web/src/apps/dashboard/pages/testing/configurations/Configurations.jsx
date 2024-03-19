@@ -34,7 +34,7 @@ const headers = [
 ]
 
 
-function UserConfig() {
+function Configurations() {
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setAuthMechanism = TestingStore(state => state.setAuthMechanism)
@@ -134,4 +134,4 @@ function UserConfig() {
     )
 }
 
-export default UserConfig
+export default Configurations
