@@ -59,7 +59,6 @@ import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
 import { useStiggContext } from '@stigg/react-sdk';
 import DependencyTable from "../dashboard/pages/testing/DependencyTable/DependencyTable";
 import SignupPage from "../signup/pages/SignupPage";
-import TokenValidator from "./TokenValidator";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -297,6 +296,14 @@ const router = createBrowserRouter([
     path: "/signup",
     element: <SignupPage />,
   },
+  {
+    path: "/check-inbox",
+    element: <PageCheckInbox />
+  },
+  {
+    path: "/business-email",
+    element: <PageBusinessEmail />
+  }
 ])
 
 function App() {
