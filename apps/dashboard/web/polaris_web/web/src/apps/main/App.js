@@ -59,6 +59,8 @@ import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
 import { useStiggContext } from '@stigg/react-sdk';
 import DependencyTable from "../dashboard/pages/testing/DependencyTable/DependencyTable";
 import SignupPage from "../signup/pages/SignupPage";
+import PageCheckInbox from "../signup/pages/PageCheckInbox"
+import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
