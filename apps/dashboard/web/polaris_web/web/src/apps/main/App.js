@@ -61,6 +61,7 @@ import DependencyTable from "../dashboard/pages/testing/DependencyTable/Dependen
 import SignupPage from "../signup/pages/SignupPage";
 import PageCheckInbox from "../signup/pages/PageCheckInbox"
 import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
+import TokenValidator from "../main/TokenValidator"
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
