@@ -292,7 +292,7 @@ const router = createBrowserRouter([
   },
   {
       path: "/",
-      element: <Navigate to="/login" />,
+      element: <TokenValidator />,
   },
   {
     path: "/signup",
