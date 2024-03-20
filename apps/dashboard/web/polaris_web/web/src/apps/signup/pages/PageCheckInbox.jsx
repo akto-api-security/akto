@@ -4,8 +4,8 @@ import Auth0Redirects from '../components/Auth0Redirects'
 function PageCheckInbox() {
     return (
         <Auth0Redirects
-            errorText={"Please sign up with a business email only"}
-            bodyText={"Try again with a different email id"}
+            errorText={"Check your email"}
+            bodyText={"We sent you a temporary verification link to your email. Please click on the link to activate your account."}
         />
     )
 }
