@@ -631,7 +631,7 @@ public class TestExecutor {
             );
         }
 
-        String message = messages.get(0);
+        String message = messages.get(messages.size() - 1);
 
         RawApi rawApi = RawApi.buildFromMessage(message);
         int startTime = Context.now();
