@@ -11,15 +11,15 @@ public class HashSetStore extends Store {
         this.maxCount = maxCount;
     }
 
-    private final Set<String> set = new HashSet<>();
+    private final Set<Integer> set = new HashSet<>();
     @Override
     public boolean contains(String val) {
-        return set.contains(val);
+        return set.contains(val.hashCode());
     }
 
     @Override
     public boolean add(String val) {
         if (set.size() >= maxCount) return false;
-        return set.add(val);
+        return set.add(val.hashCode());
     }
 }
