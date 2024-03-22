@@ -17,7 +17,7 @@
             <interceptor name="json" class="org.apache.struts2.json.JSONInterceptor"/>
         </interceptors>
 
-        <action name="api/health" class="com.akto.action.HealthAction" method="health">
+        <action name="api/dependency-graph-health" class="com.akto.action.DependencyGraphHealthAction" method="health">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
