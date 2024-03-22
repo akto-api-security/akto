@@ -4,7 +4,7 @@ import com.mongodb.BasicDBObject;
 
 import static com.opensymphony.xwork2.Action.SUCCESS;
 
-public class HealthAction {
+public class DependencyGraphHealthAction {
 
     private final BasicDBObject graph_health = new BasicDBObject();
     public String health() {
