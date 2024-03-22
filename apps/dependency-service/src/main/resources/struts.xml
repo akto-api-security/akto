@@ -23,8 +23,10 @@
             <result name="SUCCESS" type="json">
                 <param name="root">graph_health</param>
             </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
+            <result name="ERROR" type="json">
+                <param name="statusCode">500</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 
@@ -32,21 +34,25 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
-                <param name="root">dependency_graph_status</param>
+                <param name="root">job_id</param>
             </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
+            <result name="ERROR" type="json">
+                <param name="statusCode">400</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 
-        <action name="api/job-status" class="com.akto.action.JobStatusAction" method="getDependencyGraph">
+        <action name="api/dependency-graph-status" class="com.akto.action.DependencyGraphStatusAction" method="dependencyGraphStatus">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
-                <param name="root">dependency_graph</param>
+                <param name="root">dependency_graph_status</param>
             </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
+            <result name="ERROR" type="json">
+                <param name="statusCode">400</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
     </package>
