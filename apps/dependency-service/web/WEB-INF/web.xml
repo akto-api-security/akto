@@ -60,7 +60,7 @@
     </filter-mapping>
 
     <listener>
-        <listener-class>com.akto.listener.HealthListener</listener-class>
+        <listener-class>com.akto.listener.DependencyGraphHealthListener</listener-class>
     </listener>
 
    
