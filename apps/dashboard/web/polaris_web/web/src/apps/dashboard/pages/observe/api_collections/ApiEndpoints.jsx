@@ -317,7 +317,7 @@ function ApiEndpoints() {
 
             if (!lastFetchedUrl || !lastFetchedMethod) break;
         }
-        func.setToast(true, false, "OpenAPI spec downloaded successfully")
+        func.setToast(true, false, <div data-testid="openapi_spec_download_message">OpenAPI spec downloaded successfully</div>)
     }
 
     function exportCsv() {
@@ -333,7 +333,7 @@ function ApiEndpoints() {
                 type: "application/csvcharset=UTF-8"
             });
             saveAs(blob, ("All endopints") + ".csv");
-            func.setToast(true, false, "CSV exported successfully")
+            func.setToast(true, false, <div data-testid="csv_download_message">CSV exported successfully</div>)
         }
     }
 
@@ -426,7 +426,7 @@ function ApiEndpoints() {
                 active={exportOpen}
                 activator={(
                     <Button onClick={() => setExportOpen(true)} disclosure>
-                        More Actions
+                        <div data-testid="more_actions_button">More Actions</div>
                     </Button>
                 )}
                 autofocusTarget="first-node"
@@ -465,13 +465,13 @@ function ApiEndpoints() {
                         <VerticalStack gap={2}>
                             <Text>Export as</Text>
                                 <VerticalStack gap={1}>
-                                <div onClick={exportOpenApi} style={{cursor: 'pointer'}}>
+                                <div data-testid="openapi_spec_option" onClick={exportOpenApi} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">OpenAPI spec</Text>
                                 </div>
-                                <div onClick={exportPostman} style={{cursor: 'pointer'}}>
+                                <div data-testid="postman_option" onClick={exportPostman} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">Postman</Text>
                                 </div>
-                                <div onClick={exportCsv} style={{cursor: 'pointer'}}>
+                                <div data-testid="csv_option" onClick={exportCsv} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">CSV</Text>
                                 </div>
                             </VerticalStack>
@@ -552,7 +552,7 @@ function ApiEndpoints() {
             )
         } else {
             ret.push({
-                content: 'Add to API group',
+                content: <div data-testid="add_to_api_group_button">Add to API group</div>,
                 onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
             })
         }
