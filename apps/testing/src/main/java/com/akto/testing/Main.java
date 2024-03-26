@@ -190,6 +190,7 @@ public class Main {
 
         while (true) {
             AccountTask.instance.executeTask(account -> {
+                int accountId = account.getId();
 
                 int start = Context.now();
 
@@ -201,6 +202,7 @@ public class Main {
                     testingRun = findPendingTestingRun();
                 } else {
                     summaryId = trrs.getId();
+                    loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);
                     testingRun = TestingRunDao.instance.findOne("_id", trrs.getTestingRunId());
                 }
 
@@ -208,9 +210,10 @@ public class Main {
                     return;
                 }
 
+                loggerMaker.infoAndAddToDb("Starting test for accountID: " + accountId);
+
                 boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
 
-                int accountId = account.getId();
                 if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
                     int lastSent = logSentMap.getOrDefault(accountId, 0);
                     if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
@@ -233,6 +236,7 @@ public class Main {
                     setTestingRunConfig(testingRun, trrs);
 
                     if (isSummaryRunning || isTestingRunRunning) {
+                        loggerMaker.infoAndAddToDb("TRRS or TR is in running state, checking if it should run it or not");
                         Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRun.getId()));
                         TestingRunResultSummary testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
                         if (testingRunResultSummary != null) {
@@ -287,6 +291,8 @@ public class Main {
                                 trrs = createTRRSummaryIfAbsent(testingRun, start);
                                 summaryId = trrs.getId();
                             }
+                        } else {
+                            loggerMaker.infoAndAddToDb("No summary found. Let's run it as usual");
                         }
                     }
 
@@ -329,7 +335,7 @@ public class Main {
                     TestExecutor.updateTestSummary(summaryId);
                 }
 
-                loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds for account: " + accountId, LogDb.TESTING);
             }, "testing");
             Thread.sleep(1000);
         }

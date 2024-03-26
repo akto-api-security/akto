@@ -132,8 +132,10 @@
                     script.type = "text/javascript"
                     if (window.RELEASE_VERSION_GLOBAL == '' || window.RELEASE_VERSION_GLOBAL == 'akto-release-version') {// Case when akto version is not available
                         script.src = "/polaris_web/web/dist/main.js";
-                    } else {
+                    } else if (window.RELEASE_VERSION == '' || window.RELEASE_VERSION == 'akto-release-version') {
                         script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION_GLOBAL + "/dist/main.js";;
+                    } else {
+                        script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION + "/dist/main.js";;
                     }
                     document.body.appendChild(script);
                 </script>
