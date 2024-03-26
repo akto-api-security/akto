@@ -19,8 +19,8 @@ public class DependencyBucketS3Util {
         s3Client = S3Client.builder().build();
     }
 
-    public void uploadSwaggerSchema(String jobId, String swaggerSchema) {
-        String key = jobId+"/SwaggerSchema.yml";
+    public void uploadSwaggerSchema(String jobId, String swaggerSchema, boolean isJson) {
+        String key = jobId+"/SwaggerSchema" + (isJson ? ".json" : ".yml");
         uploadData(key, swaggerSchema);
     }
 
@@ -29,13 +29,13 @@ public class DependencyBucketS3Util {
         return getData(key);
     }
 
-    public void uploadSwaggerResultJson(String jobId, String swaggerResultJson) {
-        String key = jobId+"/SwaggerResultJson.json";
-        uploadData(key, swaggerResultJson);
+    public void uploadApiResultJson(String jobId, String apiResultJson) {
+        String key = jobId+"/ApiResultJson.json";
+        uploadData(key, apiResultJson);
     }
 
-    public String getSwaggerResultJson(String jobId) {
-        String key = jobId+"/SwaggerResultJson.json";
+    public String getApiResultJson(String jobId) {
+        String key = jobId+"/ApiResultJson.json";
         return getData(key);
     }
 
@@ -81,21 +81,7 @@ public class DependencyBucketS3Util {
     public String getErrorMessages(String jobId) {
         String key = jobId+"/ErrorMessages.txt";
 
-        try {
-            ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObject(GetObjectRequest.builder()
-                    .bucket(BUCKET_NAME)
-                    .key(key)
-                    .build(), ResponseTransformer.toBytes());
-
-            byte[] content = objectBytes.asByteArray();
-
-            return new String(content, StandardCharsets.UTF_8);
-        } catch(NoSuchKeyException noSuchKeyException) {
-            return null;
-        } catch(Exception e) {
-            System.err.println(e.getMessage());
-            return e.getMessage();
-        }
+        return getData(key);
     }
 
     public void close() {

@@ -2,120 +2,107 @@ package com.akto.action;
 
 import com.akto.DependencyAnalyserHelper;
 import com.akto.DependencyFlowHelper;
-import com.akto.dao.context.Context;
 import com.akto.dto.DependencyNode;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.type.APICatalog;
-import com.akto.dto.upload.SwaggerUploadLog;
-import com.akto.open_api.parser.Parser;
-import com.akto.open_api.parser.ParserResult;
 import com.akto.util.parsers.HttpCallParserHelper;
+import com.akto.utils.DataDetector;
 import com.akto.utils.DependencyBucketS3Util;
+import com.akto.utils.SwaggerYmlProcessUtil;
 import com.google.gson.Gson;
 import com.opensymphony.xwork2.ActionSupport;
-import io.swagger.parser.OpenAPIParser;
-import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.parser.core.models.ParseOptions;
-import io.swagger.v3.parser.core.models.SwaggerParseResult;
 
 import java.util.*;
-import java.util.concurrent.*;
-
-import static com.opensymphony.xwork2.Action.ERROR;
-import static com.opensymphony.xwork2.Action.SUCCESS;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class CreateDependencyGraphAction extends ActionSupport {
-    private String swaggerSchema;
-    private Map<Integer, DependencyNode> nodes = new HashMap<>();
+    private String apiData;
     private final Map<String, String> job_id = new HashMap<>();
-    private final StringBuilder swaggerResultJson = new StringBuilder();
+    private final StringBuilder apiResultJson = new StringBuilder();
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private final DependencyBucketS3Util s3Util = new DependencyBucketS3Util();
+    private static boolean ERRORED = false;
 
     public String createDependencyGraph() {
-        String jobId = UUID.randomUUID().toString();
-        job_id.put("jobId", jobId);
-
-        if(swaggerSchema == null || swaggerSchema.isEmpty()) {
-            addActionError("Invalid Swagger Schema");
+        if(apiData == null || apiData.isEmpty()) {
+            addActionError("Invalid Schema");
             return ERROR.toUpperCase();
         }
+
+        String jobId = UUID.randomUUID().toString();
+        job_id.put("jobId", jobId);
 
         executorService.schedule(new Runnable() {
             @Override
             public void run() {
-                s3Util.uploadSwaggerSchema(jobId, swaggerSchema);
 
-                List<SwaggerUploadLog> swaggerToSwaggerLogsList = swaggerToSwaggerLogs();
-                List<String> aktoMsgList = swaggerLogsToAktoMsg(swaggerToSwaggerLogsList);
+                List<String> aktoMessages = null;
 
-                List<HttpResponseParams> httpResponseParamsList = new ArrayList<>();
-                Map<Integer, APICatalog> dbState = new HashMap<>();
-                DependencyAnalyserHelper dependencyAnalyserHelper = new DependencyAnalyserHelper(dbState);
+                boolean isJson = DataDetector.isJSON(apiData);
+                boolean isYaml = DataDetector.isYAML(apiData);
 
-                try {
-                    for(String aktoMsg : aktoMsgList) {
-                        httpResponseParamsList.add(HttpCallParserHelper.parseKafkaMessage(aktoMsg));
-                    }
-
-                    for(int i = 0; i < httpResponseParamsList.size(); i++) {
-                        dependencyAnalyserHelper.analyse(httpResponseParamsList.get(i), i);
-                    }
-
-                    nodes = dependencyAnalyserHelper.getNodes();
-                    List<DependencyNode> dependencyNodeList = new ArrayList<>(nodes.values());
-                    DependencyFlowHelper dependencyFlowHelper = new DependencyFlowHelper(dependencyNodeList);
-                    dependencyFlowHelper.run();
-
-                    Map<Integer, Node> resultNodes = dependencyFlowHelper.resultNodes;
-                    List<Node> nodeList = new ArrayList<>(resultNodes.values());
-                    Gson gson = new Gson();
-                    swaggerResultJson.append(gson.toJson(nodeList));
-
-                    s3Util.uploadSwaggerResultJson(jobId, swaggerResultJson.toString());
+                if(isJson || isYaml) {
+                    s3Util.uploadSwaggerSchema(jobId, apiData, isJson);
+                    SwaggerYmlProcessUtil swaggerYmlProcessUtil = new SwaggerYmlProcessUtil();
+                    aktoMessages = swaggerYmlProcessUtil.processSwaggerYml(apiData);
+                } else {
+                    s3Util.uploadErrorMessages(jobId, "For now, we only accept Swagger JSON and YAML schema.");
                     s3Util.close();
-                } catch (Exception e) {
-                    System.err.println(e.getMessage());
-
-                    addActionError(e.getMessage());
-                    s3Util.uploadErrorMessages(jobId, e.getMessage());
-                    s3Util.close();
+                    ERRORED = true;
                 }
+
+                if(aktoMessages == null || aktoMessages.isEmpty()) {
+                    ERRORED = true;
+                    s3Util.uploadErrorMessages(jobId, "Invalid schema");
+                }
+
+                processAktoFormat(aktoMessages);
+                s3Util.close();
             }
         }, 0, TimeUnit.SECONDS);
 
-        return SUCCESS.toUpperCase();
+        return ERRORED ?
+                ERROR.toUpperCase() :
+                SUCCESS.toUpperCase();
     }
 
-    private List<SwaggerUploadLog> swaggerToSwaggerLogs() {
-        Context.accountId.set(1000000);
+    private void processAktoFormat(List<String> aktoMsgList) {
+        String jobId = job_id.get("jobId");
+        List<HttpResponseParams> httpResponseParamsList = new ArrayList<>();
+        Map<Integer, APICatalog> dbState = new HashMap<>();
+        DependencyAnalyserHelper dependencyAnalyserHelper = new DependencyAnalyserHelper(dbState);
 
-        String fileUploadId = "demoFileUploadId";
-        ParseOptions options = new ParseOptions();
-        options.setResolve(true);
-        options.setResolveFully(true);
-        SwaggerParseResult result = new OpenAPIParser().readContents(swaggerSchema, null, options);
-        OpenAPI openAPI = result.getOpenAPI();
-        ParserResult parsedSwagger = Parser.convertOpenApiToAkto(openAPI, fileUploadId);
+        try {
+            for (String aktoMsg : aktoMsgList) {
+                httpResponseParamsList.add(HttpCallParserHelper.parseKafkaMessage(aktoMsg));
+            }
 
-        return parsedSwagger.getUploadLogs();
-    }
+            for (int i = 0; i < httpResponseParamsList.size(); i++) {
+                dependencyAnalyserHelper.analyse(httpResponseParamsList.get(i), i);
+            }
 
-    private List<String> swaggerLogsToAktoMsg(List<SwaggerUploadLog> swaggerUploadLogs) {
-        List<String> aktoMessages = new ArrayList<>();
+            Map<Integer, DependencyNode> nodes = dependencyAnalyserHelper.getNodes();
+            List<DependencyNode> dependencyNodeList = new ArrayList<>(nodes.values());
+            DependencyFlowHelper dependencyFlowHelper = new DependencyFlowHelper(dependencyNodeList);
+            dependencyFlowHelper.run();
 
-        for(int i = 0; i < swaggerUploadLogs.size(); i++) {
-            String aktoFormat = swaggerUploadLogs.get(i).getAktoFormat();
-            aktoMessages.add(aktoFormat);
+            Map<Integer, Node> resultNodes = dependencyFlowHelper.resultNodes;
+            List<Node> nodeList = new ArrayList<>(resultNodes.values());
+            Gson gson = new Gson();
+            apiResultJson.append(gson.toJson(nodeList));
+
+            s3Util.uploadApiResultJson(jobId, apiResultJson.toString());
+        } catch(Exception e) {
+            System.out.println(e.getMessage());
+            s3Util.uploadErrorMessages(jobId, e.getMessage());
         }
-
-        return aktoMessages;
     }
 
-
-    public void setSwaggerSchema(String swaggerSchema) {
-        this.swaggerSchema = swaggerSchema;
+    public void setApiData(String apiData) {
+        this.apiData = apiData;
     }
     public Map<String, String> getJob_id() {
         return job_id;
