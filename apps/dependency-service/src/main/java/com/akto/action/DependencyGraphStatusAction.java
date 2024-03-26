@@ -15,14 +15,16 @@ public class DependencyGraphStatusAction extends ActionSupport {
         String error = s3Util.getErrorMessages(jobId);
         if(error != null && !error.isEmpty()) {
             addActionError(error);
+            s3Util.close();
             return ERROR.toUpperCase();
         } else {
-            String status = s3Util.getSwaggerResultJson(jobId);
+            String apiResultJson = s3Util.getApiResultJson(jobId);
 
-            if(status != null && !status.isEmpty()) {
-                dependency_graph_status.put("dependencyGraph", status);
+            if(apiResultJson != null && !apiResultJson.isEmpty()) {
+                dependency_graph_status.put("dependencyGraph", apiResultJson);
             } else {
                 addActionError("NOT_FOUND");
+                s3Util.close();
                 return ERROR.toUpperCase();
             }
         }
