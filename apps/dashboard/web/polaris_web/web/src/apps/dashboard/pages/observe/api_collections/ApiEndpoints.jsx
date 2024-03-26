@@ -1,11 +1,12 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, LegacyStack } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {useLocation, useParams } from "react-router-dom"
 import { saveAs } from 'file-saver'
+import { useNavigate } from "react-router-dom"
 
 import "./api_inventory.css"
 import ApiDetails from "./ApiDetails"
@@ -31,13 +32,11 @@ const headings = [
         text: "Endpoint",
         value: "endpointComp",
         title: "Api endpoints",
-        textValue: "endpoint"
     },
     {
         text: "Risk score",
         title: "Risk score",
         value: "riskScoreComp",
-        textValue: "riskScore"
     },
     {
         text: "Hostname",
@@ -58,22 +57,20 @@ const headings = [
         title: 'Auth type',
         value: 'auth_type',
         showFilter: true,
-        textValue: 'authTypeTag'
+        type: CellType.TEXT,
     },
     {
         text: 'Sensitive Params',
         title: 'Sensitive params',
         value: 'sensitiveTagsComp',
         filterKey: 'sensitiveTags',
-        showFilter: true,
-        textValue: "sensitiveDataTags"
+        showFilter: true
     },
     {
         text: 'Last Seen',
         title: 'Last seen',
         value: 'last_seen',
         isText: true,
-        type: CellType.TEXT
     }
 ]
 
@@ -81,8 +78,7 @@ let headers = JSON.parse(JSON.stringify(headings))
 headers.push({
     text: 'Method',
     filterKey: 'method',
-    showFilter: true,
-    textValue: 'method',
+    showFilter: true
 })
 
 
@@ -105,6 +101,7 @@ function ApiEndpoints() {
 
     const params = useParams()
     const location = useLocation()
+    const navigate = useNavigate();
     const apiCollectionId = params.apiCollectionId
 
     const showDetails = ObserveStore(state => state.inventoryFlyout)
@@ -136,6 +133,9 @@ function ApiEndpoints() {
     const [isGptActive, setIsGptActive] = useState(false)
     const [redacted, setIsRedacted] = useState(false)
     const [showRedactModal, setShowRedactModal] = useState(false)
+    const [showEnvModal, setShowEnvModal] = useState(false);
+    const [envType, setEnvType] = useState("");
+    const [selectedRadio, setSelectedRadio] = useState(null);
 
     const queryParams = new URLSearchParams(location.search);
     const selectedUrl = queryParams.get('selected_url')
@@ -327,7 +327,7 @@ function ApiEndpoints() {
 
     function exportCsv() {
         if (!loading) {
-            let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.type === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0].length > 0));
+            let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
 
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
             const allEndpoints = endpointData['All']
@@ -424,18 +424,27 @@ function ApiEndpoints() {
         const activePrompts = dashboardFunc.getPrompts(requestObj)
         setPrompts(activePrompts)
     }
+
+    async function handleRemove(){
+        const response = await api.deleteCollection(apiCollectionId); 
+        func.setToast(true, false, `1 API collection deleted successfully`)
+        navigate("/dashboard/observe/inventory");
+    }
+
     const secondaryActionsComponent = (
         <HorizontalStack gap="2">
 
             <Popover
                 active={exportOpen}
                 activator={(
-                    <Button onClick={() => setExportOpen(true)} disclosure>
+                    <Button onClick={() => setExportOpen(!exportOpen)} disclosure>
                         More Actions
                     </Button>
                 )}
                 autofocusTarget="first-node"
-                onClose={() => { setExportOpen(false) }}
+                onClose={() => { 
+                    setExportOpen(false);
+                }}
                 preferredAlignment="right"
             >
                 <Popover.Pane fixed>
@@ -469,7 +478,7 @@ function ApiEndpoints() {
                     <Popover.Section>
                         <VerticalStack gap={2}>
                             <Text>Export as</Text>
-                                <VerticalStack gap={1}>
+                            <VerticalStack gap={1}>
                                 <div onClick={exportOpenApi} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">OpenAPI spec</Text>
                                 </div>
@@ -500,6 +509,20 @@ function ApiEndpoints() {
                                 <Text fontWeight="regular" variant="bodyMd">
                                     {`${showWorkflowTests ? "Hide" : "Show"} workflow tests`}
                                 </Text>
+                            </div>
+                        </VerticalStack>
+                    </Popover.Section>
+                    <Popover.Section>
+                        <VerticalStack gap={2}>
+                            <div onClick={handleRemove} style={{cursor: 'pointer'}}>
+                                <Text fontWeight="regular" variant="bodyMd">Remove Collection</Text>
+                            </div>
+                        </VerticalStack>
+                    </Popover.Section>
+                    <Popover.Section>
+                        <VerticalStack gap={2}>
+                            <div onClick={()=>setShowEnvModal(true)} style={{cursor: 'pointer'}}>
+                                <Text fontWeight="regular" variant="bodyMd">Set ENV type</Text>
                             </div>
                         </VerticalStack>
                     </Popover.Section>
@@ -581,6 +604,58 @@ function ApiEndpoints() {
         </Modal>
     )
 
+    async function handleEnvType(){
+        if(selectedRadio!=null){
+            const id = [apiCollectionId];
+            await api.updateEnvTypeOfCollection(envType,id);
+            func.setToast(true, false, "ENV type updated successfully");
+            setShowEnvModal(false);
+            setSelectedRadio(null);
+        }
+    }
+    function handleCancel(){
+        setShowEnvModal(false);
+        setSelectedRadio(null);
+    }
+
+    const handleRadioChange = (event) => {
+        setSelectedRadio(event.target.value);
+    };
+    const envModal = (
+        <Modal
+            open={showEnvModal}
+            onClose={handleCancel}
+            title="Set ENV type"
+            primaryAction={{
+                content: "Confirm",
+                onAction: handleEnvType
+            }}
+            secondaryActions={[
+                {
+                  content: 'Cancel',
+                  onAction: handleCancel,
+                },
+            ]}
+        >
+            <Modal.Section>
+                <LegacyStack vertical>
+                    <label>
+                        <input type="radio" value="STAGING" checked={selectedRadio === 'STAGING'} onChange={handleRadioChange} onClick={()=>setEnvType("STAGING")}/>
+                        Staging
+                    </label>
+                    <label>
+                        <input type="radio" value="PRODUCTION" checked={selectedRadio === 'PRODUCTION'} onChange={handleRadioChange} onClick={()=>setEnvType("PRODUCTION")}/>
+                        Production
+                    </label>
+                    <label>
+                        <input type="radio" value="" checked={selectedRadio === ""} onChange={handleRadioChange} onClick={()=>setEnvType(null)}/>
+                        Reset
+                    </label>
+                </LegacyStack>
+            </Modal.Section>
+        </Modal>
+    )
+
       const components = [
         loading ? [<SpinnerCentered key="loading" />] : (
             showWorkflowTests ? [
@@ -647,7 +722,8 @@ function ApiEndpoints() {
                       currentApiGroupName={pageTitle}
                       fetchData={fetchData}
                   />,
-                  modal
+                  modal,
+                  envModal
             ]
         )
       ]
