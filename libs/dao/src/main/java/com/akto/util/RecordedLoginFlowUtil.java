@@ -37,7 +37,7 @@ public class RecordedLoginFlowUtil {
     public static void triggerFlow(String tokenFetchCommand, String payload, String outputFilePath, String errorFilePath, int userId) throws Exception {
 
         try {
-            String url = System.getenv("PUPPETEER_REPLAY_SERVICE_URL");
+            String url = System.getenv("PUPPETEER_REPLAY_SERVICE_URL") + "/replay";
             JSONObject requestBody = new JSONObject();
             requestBody.put("replayJson", payload);
             requestBody.put("command", tokenFetchCommand);
