@@ -130,8 +130,6 @@ let promotedBulkActions = (selectedResources) => {
 
 function SensitiveDataExposure() {
     const [loading, setLoading] = useState(true);
-    const [mapData, setMapData] = useState({});
-
     const params = useParams()
     const subType = params.subType;
     const apiCollectionMap = PersistStore(state => state.collectionsMap)
@@ -190,31 +188,12 @@ function SensitiveDataExposure() {
         })
         return {value:ret , total:total};
     }
-    
-    async function fetchMapData(){
-        let mapDataToKey = {};
-        await api.fetchDataTypes().then((res) => {
-            res.dataTypes.aktoDataTypes.forEach((type) => {
-                mapDataToKey[type.name] = type;
-            });
-            res.dataTypes.customDataTypes.forEach((type) => {
-                mapDataToKey[type.name] = type;
-            });
-            setMapData(mapDataToKey)
-        });
-        console.log("map data",mapData)
-    }
 
-    const navigate = useNavigate();
+const navigate = useNavigate();
 
-    const handleRedirect = () => {
-        navigate("/dashboard/observe/data-types")
-    }
-
-    const handleEdit = async () => {
-        await fetchMapData();
-        navigate("/dashboard/observe/data-types", {state: {name: subType, dataObj: undefined, type: "Akto"}});
-    }
+const handleRedirect = () => {
+    navigate("/dashboard/observe/data-types")
+}
 
     return (
         <PageWithMultipleCards
@@ -225,7 +204,6 @@ function SensitiveDataExposure() {
         }
         backUrl="/dashboard/observe/sensitive"
         primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
-        secondaryActions={<Button onClick={handleEdit}>Edit</Button>}
         components = {[
             <GithubServerTable
                 key="table"
