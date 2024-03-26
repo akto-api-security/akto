@@ -2916,6 +2916,18 @@
             </result>
         </action>
 
+
+        <action name="api/syncExtractedAPIs" class="com.akto.action.CodeAnalysisAction" method="syncExtractedAPIs" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+        </action>
+
     </package>
 
 </struts>
