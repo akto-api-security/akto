@@ -41,6 +41,7 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.ExecutorAlgorithm;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
+import com.akto.util.Constants;
 import com.akto.utils.RedactSampleData;
 import com.google.gson.Gson;
 
@@ -103,6 +104,9 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<Integer> responseLenArr = new ArrayList<>();
 
         for (RawApi testReq: rawApis) {
+            Map<String, List<String>> headers = testReq.fetchReqHeaders();
+            headers.put(Constants.AKTO_NODE_ID, Collections.singletonList(node.getId()));
+            testReq.modifyReqHeaders(headers);
             if (vulnerable) {
                 break;
             }
