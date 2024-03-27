@@ -24,7 +24,6 @@ public class CreateDependencyGraphAction extends ActionSupport {
     private final StringBuilder apiResultJson = new StringBuilder();
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private final DependencyBucketS3Util s3Util = new DependencyBucketS3Util();
-    private static boolean ERRORED = false;
 
     public String createDependencyGraph() {
         if(apiData == null || apiData.isEmpty()) {
@@ -51,12 +50,12 @@ public class CreateDependencyGraphAction extends ActionSupport {
                 } else {
                     s3Util.uploadErrorMessages(jobId, "For now, we only accept Swagger JSON and YAML schema.");
                     s3Util.close();
-                    ERRORED = true;
                 }
 
                 if(aktoMessages == null || aktoMessages.isEmpty()) {
-                    ERRORED = true;
                     s3Util.uploadErrorMessages(jobId, "Invalid schema");
+                    s3Util.close();
+                    return;
                 }
 
                 processAktoFormat(aktoMessages);
@@ -64,9 +63,7 @@ public class CreateDependencyGraphAction extends ActionSupport {
             }
         }, 0, TimeUnit.SECONDS);
 
-        return ERRORED ?
-                ERROR.toUpperCase() :
-                SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
     }
 
     private void processAktoFormat(List<String> aktoMsgList) {
