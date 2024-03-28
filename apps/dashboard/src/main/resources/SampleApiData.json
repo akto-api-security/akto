@@ -4034,26 +4034,6 @@
         }
     },
     {
-        "id": "JWT_NONE_ALGO",
-        "sampleData": {
-            "method": "POST",
-            "requestPayload": "",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User Access Denied",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/phy/research"
-        },
-        "testData": {
-            "method": "POST",
-            "url": "/api/college/phy/research",
-            "responsePayload": "Successful",
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
         "id": "USER_ENUM_INVALID_CAPTCHA",
         "sampleData": {
             "method": "POST",
