@@ -1229,7 +1229,7 @@
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
-            "path": "/api/v2/feePayment "
+            "path": "/api/v2/feePayment"
         },
         "testData": {
             "method": "GET",
@@ -2697,22 +2697,22 @@
             "method": "GET",
             "requestPayload": "",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User Access Denied",
+            "responsePayload": "{\"status\": \"User Access Denied\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
             "path": "/api/college/electronics/marks"
         },
         "testData": {
-            "method": "GET",
-            "url": "/api/college/electronics/marks",
-            "responsePayload": {
-                "name": "James",
-                "roll_no": "34563",
-                "marks": "65"
-            },
-            "responseHeaders": {},
-            "statusCode": 200
+            "x2": {
+                "method": "GET",
+                "url": "/api/&/electronics/marks",
+                "responsePayload": {
+                    "status": "User Access Granted"
+                },
+                "responseHeaders": {},
+                "statusCode": 200
+            }
         }
     },
     {
@@ -2776,11 +2776,13 @@
             "path": "/api/college/electronics"
         },
         "testData": {
-            "method": "GET",
-            "url": "/api/college/1",
-            "responsePayload": "Successful",
-            "responseHeaders": {},
-            "statusCode": 200
+            "x2": {
+                "method": "GET",
+                "url": "/api/1/electronics",
+                "responsePayload": "Successful",
+                "responseHeaders": {},
+                "statusCode": 200
+            }
         }
     },
     {
@@ -2796,11 +2798,13 @@
             "path": "/api/college/cse/students"
         },
         "testData": {
-            "method": "GET",
-            "url": "/api/college/cse/students/1",
-            "responsePayload": "Successful",
-            "responseHeaders": {},
-            "statusCode": 200
+            "x5": {
+                "method": "GET",
+                "url": "/api/college/cse/students/1",
+                "responsePayload": "Successful",
+                "responseHeaders": {},
+                "statusCode": 200
+            }
         }
     },
     {
@@ -2896,11 +2900,13 @@
             "path": "/api/college/phy/students"
         },
         "testData": {
-            "method": "POST",
-            "url": "/api/college/phy/students/johndoe",
-            "responsePayload": "Successful",
-            "responseHeaders": {},
-            "statusCode": 200
+            "x2": {
+                "method": "POST",
+                "url": "/api/STUD-5902/college/phy/students",
+                "responsePayload": "Successful",
+                "responseHeaders": {},
+                "statusCode": 200
+            }
         }
     },
     {
@@ -2916,11 +2922,13 @@
             "path": "/api/college/chem/students"
         },
         "testData": {
-            "method": "POST",
-            "url": "/api/college/chem/johndoe",
-            "responsePayload": "Successful",
-            "responseHeaders": {},
-            "statusCode": 200
+            "x2": {
+                "method": "POST",
+                "url": "/api/STUD-5902/chem/students",
+                "responsePayload": "Successful",
+                "responseHeaders": {},
+                "statusCode": 200
+            }
         }
     },
     {
@@ -2996,11 +3004,13 @@
             "path": "/api/college/acad/calendar"
         },
         "testData": {
-            "method": "GET",
-            "url": "/api/college/acad/calendar/!",
-            "responsePayload": "No events today",
-            "responseHeaders": {},
-            "statusCode": 200
+            "x2": {
+                "method": "GET",
+                "url": "/api/&/college/acad/calendar",
+                "responsePayload": "No events today",
+                "responseHeaders": {},
+                "statusCode": 200
+            }
         }
     },
     {
@@ -4516,6 +4526,120 @@
                 "statusCode": 506,
                 "medianResponseTime": 3002
             }
+        }
+    },
+    {
+        "id": "REPLACE_AUTH_TOKEN",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "{\"user_id\": \"12345\", \"email\": \"user1@example.com\",\"role\": \"user\"}",
+            "responsePayload": "{\"grade\": \"B+\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/grades/32456"
+        },
+        "testData": {
+            "method": "GET",
+            "url": "/api/college/grades/32456",
+            "responsePayload": {
+                "grade": "B+"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "BOLA_URL_REPLACE_API_VERSION",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "{\"user_id\": \"12345\", \"email\": \"user1@example.com\",\"role\": \"user\"}",
+            "responsePayload": "{\"budget\": \"324584\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/budget/5432890"
+        },
+        "testData": {
+            "x2": {
+                "method": "GET",
+                "url": "/api/v1/budget/5432890",
+                "responsePayload": {
+                    "budget": "324584"
+                },
+                "responseHeaders": {},
+                "statusCode": 200
+            }
+        }
+    },
+    {
+        "id": "PARAMETER_POLLUTION",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "{\"user_id\": \"243323\", \"email\": \"user3@example.com\",\"role\": \"user\"}",
+            "responsePayload": "{\"status\": \"Unauthorized Access\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCS435Sgjs3kfg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/docs/423883"
+        },
+        "testData": {
+            "method": "GET",
+            "url": "/api/college/docs/423883",
+            "responsePayload": {
+                "status": "Authorized Access"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "BOLA_URL_INSERT_API_VERSION",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "{\"user_id\": \"72346\", \"email\": \"user4@example.com\",\"role\": \"user\"}",
+            "responsePayload": "{\"budget\": \"43563\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/sac/budget/984576"
+        },
+        "testData": {
+            "x2": {
+                "method": "GET",
+                "url": "/api/v2/college/sac/budget/984576",
+                "responsePayload": {
+                    "budget": "324584"
+                },
+                "responseHeaders": {},
+                "statusCode": 200
+            }
+        }
+    },
+    {
+        "id": "BOLA_STRING_PARAM",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "{\"email\": \"user5@example.com\", \"user_id\": \"85676\", \"role\": \"user\"}",
+            "responsePayload": "{\"marks\": \"41\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/sac/results/578463"
+        },
+        "testData": {
+            "method": "GET",
+            "url": "/api/college/sac/results/578463",
+            "responsePayload": {
+                "marks": "73"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
         }
     }
 ]
