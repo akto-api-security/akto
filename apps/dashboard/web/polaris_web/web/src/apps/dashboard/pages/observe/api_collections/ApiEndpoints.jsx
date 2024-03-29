@@ -224,35 +224,39 @@ function ApiEndpoints() {
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, null)
 
         const codeAnalysisCollection = apiCollectionData.codeAnalysisCollection
-        const codeAnalysisEndpoints = codeAnalysisCollection.urlsMap
-        let shadowEndpoints = { ...codeAnalysisEndpoints }
+        let shadowEndpoints = []
 
-        // Find shadow endpoints and map api endpoint location
-        allEndpoints.forEach(url => {
-            const method_endpoint = url.method + " " + transform.getTruncatedUrl(url.endpoint)
-            if(Object.hasOwn(codeAnalysisEndpoints, method_endpoint)){
-                url.discovered_in = codeAnalysisEndpoints[method_endpoint]
-                delete shadowEndpoints[method_endpoint]
-            } else {
-                url.discovered_in = ""
-            }
-        })
+        if (codeAnalysisCollection) {
+            const codeAnalysisEndpoints = codeAnalysisCollection.urlsMap
+            shadowEndpoints = { ...codeAnalysisEndpoints }
 
-        shadowEndpoints = Object.entries(shadowEndpoints).map(([ method_endpoint, location ]) => {
-            const [ method, endpoint ] = method_endpoint.split(" ")
+            // Find shadow endpoints and map api endpoint location
+            allEndpoints.forEach(url => {
+                const method_endpoint = url.method + " " + transform.getTruncatedUrl(url.endpoint)
+                if(Object.hasOwn(codeAnalysisEndpoints, method_endpoint)){
+                    url.discovered_in = codeAnalysisEndpoints[method_endpoint]
+                    delete shadowEndpoints[method_endpoint]
+                } else {
+                    url.discovered_in = ""
+                }
+            })
 
-            return {
-                endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={false} />,
-                riskScore: 0,
-                hostName: "",
-                access_type: "",
-                auth_type: "",
-                sensitiveTagsComp: "",
-                last_seen: "",
-                codeAnalysisEndpoint: true,
-                discovered_in: location,  
-            }
-        })
+            shadowEndpoints = Object.entries(shadowEndpoints).map(([ method_endpoint, location ]) => {
+                const [ method, endpoint ] = method_endpoint.split(" ")
+
+                return {
+                    endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={false} />,
+                    riskScore: 0,
+                    hostName: "",
+                    access_type: "",
+                    auth_type: "",
+                    sensitiveTagsComp: "",
+                    last_seen: "",
+                    codeAnalysisEndpoint: true,
+                    discovered_in: location,  
+                }
+            })
+        }
 
         const prettifyData = transform.prettifyEndpointsData(allEndpoints)
         data['All'] = [ ...prettifyData, ...shadowEndpoints ]

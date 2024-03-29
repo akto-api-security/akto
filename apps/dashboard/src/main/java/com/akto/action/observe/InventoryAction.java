@@ -14,6 +14,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.google.protobuf.Api;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
@@ -349,9 +350,13 @@ public class InventoryAction extends UserAction {
         response.put("unusedEndpoints", unused);
 
         // Attach code analysis collection
-        CodeAnalysisCollection codeAnalysisCollection = CodeAnalysisCollectionDao.instance.findOne(
-            Filters.eq("name", "juice_shop")
-        );
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
+        CodeAnalysisCollection codeAnalysisCollection = null;
+        if (apiCollection != null) {
+            codeAnalysisCollection = CodeAnalysisCollectionDao.instance.findOne(
+                Filters.eq("name", apiCollection.getName())
+            );
+        }
         response.put("codeAnalysisCollection", codeAnalysisCollection);
 
         return Action.SUCCESS.toUpperCase();
