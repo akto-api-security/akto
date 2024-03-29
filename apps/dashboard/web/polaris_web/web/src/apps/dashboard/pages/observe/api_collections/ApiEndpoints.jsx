@@ -25,6 +25,7 @@ import TooltipText from "../../../components/shared/TooltipText"
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
 import { ENDPOINTS_PAGE_DOCS_URL } from "../../../../main/onboardingData"
 import {TestrunsBannerComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
+import GetPrettifyEndpoint from "../GetPrettifyEndpoint"
 
 const headings = [
     {
@@ -72,6 +73,13 @@ const headings = [
         text: 'Last Seen',
         title: 'Last seen',
         value: 'last_seen',
+        isText: true,
+        type: CellType.TEXT
+    },
+    {
+        text: 'Discovered in',
+        title: 'Discovered in',
+        value: 'discovered_in',
         isText: true,
         type: CellType.TEXT
     }
@@ -176,6 +184,13 @@ function ApiEndpoints() {
             onAction: ()=> {setSelectedTab('No_auth')},
             id: 'No_auth'
         },
+        {
+            content: 'Shadow',
+            index: 4,
+            badge: endpointData["Shadow"]?.length?.toString(),
+            onAction: ()=> {setSelectedTab('Shadow')},
+            id: 'Shadow'
+        },
     ]
 
     async function fetchData() {
@@ -207,12 +222,47 @@ function ApiEndpoints() {
 
         let data = {}
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, null)
+
+        const codeAnalysisCollection = apiCollectionData.codeAnalysisCollection
+        const codeAnalysisEndpoints = codeAnalysisCollection.urlsMap
+        let shadowEndpoints = { ...codeAnalysisEndpoints }
+
+        // Find shadow endpoints and map api endpoint location
+        allEndpoints.forEach(url => {
+            const method_endpoint = url.method + " " + transform.getTruncatedUrl(url.endpoint)
+            if(Object.hasOwn(codeAnalysisEndpoints, method_endpoint)){
+                url.discovered_in = codeAnalysisEndpoints[method_endpoint]
+                delete shadowEndpoints[method_endpoint]
+            } else {
+                url.discovered_in = ""
+            }
+        })
+
+        shadowEndpoints = Object.entries(shadowEndpoints).map(([ method_endpoint, location ]) => {
+            const [ method, endpoint ] = method_endpoint.split(" ")
+
+            return {
+                endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={false} />,
+                riskScore: 0,
+                hostName: "",
+                access_type: "",
+                auth_type: "",
+                sensitiveTagsComp: "",
+                last_seen: "",
+                codeAnalysisEndpoint: true,
+                discovered_in: location,  
+            }
+        })
+
         const prettifyData = transform.prettifyEndpointsData(allEndpoints)
-        data['All'] = prettifyData
+        data['All'] = [ ...prettifyData, ...shadowEndpoints ]
         data['Sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0)
         data['Risk'] = prettifyData.filter(x=> x.riskScore >= 4)
         data['New'] = prettifyData.filter(x=> x.isNew)
         data['No_auth'] = prettifyData.filter(x => x.open)
+
+        data['Shadow'] = shadowEndpoints
+
         setEndpointData(data)
         setSelectedTab("All")
         setSelected(0)
@@ -262,7 +312,12 @@ function ApiEndpoints() {
     }
 
     function handleRowClick(data) {
+        // Don't show api details for Code analysis endpoints
+        if (data.codeAnalysisEndpoint) 
+            return
+        
         let tmp = { ...data, endpointComp: "", sensitiveTagsComp: "" }
+        
         const sameRow = func.deepComparison(apiDetail, tmp);
         if (!sameRow) {
             setShowDetails(true)

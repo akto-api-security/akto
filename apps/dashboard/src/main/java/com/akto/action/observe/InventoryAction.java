@@ -345,7 +345,14 @@ public class InventoryAction extends UserAction {
         if (unused == null) {
             unused = new HashSet<>();
         }
+        
         response.put("unusedEndpoints", unused);
+
+        // Attach code analysis collection
+        CodeAnalysisCollection codeAnalysisCollection = CodeAnalysisCollectionDao.instance.findOne(
+            Filters.eq("name", "juice_shop")
+        );
+        response.put("codeAnalysisCollection", codeAnalysisCollection);
 
         return Action.SUCCESS.toUpperCase();
     }
