@@ -39,7 +39,7 @@ public class Parser {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Parser.class, LogDb.DASHBOARD);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    public static ParserResult convertOpenApiToAkto(OpenAPI openAPI, String uploadId) {
+    public static ParserResult convertOpenApiToAkto(OpenAPI openAPI, String uploadId, boolean doReplay) {
 
         List<FileUploadError> fileLevelErrors = new ArrayList<>();
         List<SwaggerUploadLog> uploadLogs = new ArrayList<>();
@@ -221,91 +221,41 @@ public class Parser {
                     List<Map<String, String>> responseObjectList = new ArrayList<>();
 
                     try {
-                        loggerMaker.infoAndAddToDb("Replaying request for" + path + " " + method + ", replaying request");
+                        if(doReplay) {
+                            loggerMaker.infoAndAddToDb("Replaying request for" + path + " " + method + ", replaying request");
 
-                        Map<String, List<String>> modifiedHeaders = new HashMap<>();
-                        for (String key : requestHeaders.keySet()) {
-                            modifiedHeaders.put(key, Collections.singletonList(requestHeaders.get(key)));
-                        }
-                        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(path, "", method.toString(), requestString, modifiedHeaders, "http");
-                        String responseHeadersString;
-                        String responsePayload;
-                        String statusCode;
-                        String status;
-                        try {
-                            OriginalHttpResponse res = ApiExecutor.sendRequest(originalHttpRequest, true, null, false, new ArrayList<>());
-                            responseHeadersString = convertHeaders(res.getHeaders());
-                            responsePayload =  res.getBody();
-                            statusCode =  res.getStatusCode()+"";
-                            status =  "";
-                            if(!HttpResponseParams.validHttpResponseCode(res.getStatusCode())){
-                                throw new Exception("Found non 2XX response on replaying the API");
+                            Map<String, List<String>> modifiedHeaders = new HashMap<>();
+                            for (String key : requestHeaders.keySet()) {
+                                modifiedHeaders.put(key, Collections.singletonList(requestHeaders.get(key)));
                             }
-                            Map<String, String> responseObject = new HashMap<>();
-                            responseObject.put(mKeys.responsePayload, responsePayload);
-                            responseObject.put(mKeys.responseHeaders, responseHeadersString);
-                            responseObject.put(mKeys.status, status);
-                            responseObject.put(mKeys.statusCode, statusCode);
-                            responseObjectList.add(responseObject);
-                        } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e,"Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.getMessage(), LogDb.DASHBOARD);
-                            ApiResponses responses = operation.getResponses();
-                            if (responses != null) {
-                                for (String responseCode : responses.keySet()) {
+                            OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(path, "", method.toString(), requestString, modifiedHeaders, "http");
+                            String responseHeadersString;
+                            String responsePayload;
+                            String statusCode;
+                            String status;
 
-                                    if (responseCode.equals(ApiResponses.DEFAULT))
-                                        continue;
-
-                                    int statusCodeInt = Integer.parseInt(responseCode);
-                                    if (HttpResponseParams.validHttpResponseCode(statusCodeInt)) {
-
-                                        String responseString = "";
-                                        responseHeadersString = "";
-                                        Map<String, String> responseObject = new HashMap<>();
-
-                                        ApiResponse response = responses.get(responseCode);
-
-                                        responseObject.put(mKeys.statusCode, responseCode);
-                                        Status statusObj = Status.fromStatusCode(statusCodeInt);
-                                        if (statusObj != null) {
-                                            responseObject.put(mKeys.status, statusObj.getReasonPhrase());
-                                        }
-
-                                        Content content = response.getContent();
-
-                                        Map<String, Header> headers = response.getHeaders();
-                                        Map<String, String> responseHeaders = new HashMap<>();
-                                        if (headers != null) {
-                                            responseHeaders = HeaderParser.buildResponseHeaders(headers);
-                                        }
-
-                                        if (content != null) {
-                                            Pair<String, String> example = ContentParser.getExampleFromContent(content);
-                                            if (!(example.getFirst().isEmpty())) {
-                                                responseHeaders.put("Content-Type", example.getFirst());
-                                            }
-                                            responseString = example.getSecond();
-                                        }
-
-                                        try {
-                                            responseHeadersString = mapper.writeValueAsString(responseHeaders);
-                                        } catch (Exception e1) {
-                                            loggerMaker.infoAndAddToDb("unable to handle response headers for " + path + " "
-                                                    + method + " " + e1.getMessage());
-                                            apiLevelErrors.add(new FileUploadError("Replaying the request failed, reason: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
-                                            apiLevelErrors.add(new FileUploadError("Error while converting response headers to string from example: " +e1.getMessage(),FileUploadError.ErrorType.ERROR));
-                                        }
-
-                                        responseObject.put(mKeys.responsePayload, responseString);
-                                        responseObject.put(mKeys.responseHeaders, responseHeadersString);
-                                        responseObjectList.add(responseObject);
-                                    }
+                            try {
+                                OriginalHttpResponse res = ApiExecutor.sendRequest(originalHttpRequest, true, null, false, new ArrayList<>());
+                                responseHeadersString = convertHeaders(res.getHeaders());
+                                responsePayload =  res.getBody();
+                                statusCode =  res.getStatusCode()+"";
+                                status =  "";
+                                if(!HttpResponseParams.validHttpResponseCode(res.getStatusCode())){
+                                    throw new Exception("Found non 2XX response on replaying the API");
                                 }
+                                Map<String, String> responseObject = new HashMap<>();
+                                responseObject.put(mKeys.responsePayload, responsePayload);
+                                responseObject.put(mKeys.responseHeaders, responseHeadersString);
+                                responseObject.put(mKeys.status, status);
+                                responseObject.put(mKeys.statusCode, statusCode);
+                                responseObjectList.add(responseObject);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e,"Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.getMessage(), LogDb.DASHBOARD);
+                                processFromExamples(doReplay, e.getMessage(), operation, apiLevelErrors, responseObjectList, path, method);
                             }
-                            else {
-                                apiLevelErrors.add(new FileUploadError("Replaying the request failed, reason: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
-                                apiLevelErrors.add(new FileUploadError("No example responses found for the API in the uploaded file", FileUploadError.ErrorType.ERROR));
-                            }
+                        } else {
+                            loggerMaker.infoAndAddToDb("Using examples from the OpenAPI schema for " + path + " " + method + ", fake replaying request");
+                            processFromExamples(doReplay, "", operation, apiLevelErrors, responseObjectList, path, method);
                         }
 
                     } catch (Exception e) {
@@ -371,6 +321,70 @@ public class Parser {
         parserResult.setUploadLogs(uploadLogs);
         parserResult.setTotalCount(count);
         return parserResult;
+    }
+
+    private static void processFromExamples(boolean doReplay, String err, Operation operation, List<FileUploadError> apiLevelErrors, List<Map<String, String>> responseObjectList, String path, PathItem.HttpMethod method) {
+        ApiResponses responses = operation.getResponses();
+        if (responses != null) {
+            for (String responseCode : responses.keySet()) {
+
+                if (responseCode.equals(ApiResponses.DEFAULT))
+                    continue;
+
+                int statusCodeInt = Integer.parseInt(responseCode);
+                if (HttpResponseParams.validHttpResponseCode(statusCodeInt)) {
+
+                    String responseString = "";
+                    String responseHeadersString = "";
+                    Map<String, String> responseObject = new HashMap<>();
+
+                    ApiResponse response = responses.get(responseCode);
+
+                    responseObject.put(mKeys.statusCode, responseCode);
+                    Status statusObj = Status.fromStatusCode(statusCodeInt);
+                    if (statusObj != null) {
+                        responseObject.put(mKeys.status, statusObj.getReasonPhrase());
+                    }
+
+                    Content content = response.getContent();
+
+                    Map<String, Header> headers = response.getHeaders();
+                    Map<String, String> responseHeaders = new HashMap<>();
+                    if (headers != null) {
+                        responseHeaders = HeaderParser.buildResponseHeaders(headers);
+                    }
+
+                    if (content != null) {
+                        Pair<String, String> example = ContentParser.getExampleFromContent(content);
+                        if (!(example.getFirst().isEmpty())) {
+                            responseHeaders.put("Content-Type", example.getFirst());
+                        }
+                        responseString = example.getSecond();
+                    }
+
+                    try {
+                        responseHeadersString = mapper.writeValueAsString(responseHeaders);
+                    } catch (Exception e1) {
+                        loggerMaker.infoAndAddToDb("unable to handle response headers for " + path + " "
+                                + method + " " + e1.getMessage());
+                        if(doReplay) {
+                            apiLevelErrors.add(new FileUploadError("Replaying the request failed, reason: " + err, FileUploadError.ErrorType.ERROR));
+                        }
+                        apiLevelErrors.add(new FileUploadError("Error while converting response headers to string from example: " +e1.getMessage(),FileUploadError.ErrorType.ERROR));
+                    }
+
+                    responseObject.put(mKeys.responsePayload, responseString);
+                    responseObject.put(mKeys.responseHeaders, responseHeadersString);
+                    responseObjectList.add(responseObject);
+                }
+            }
+        }
+        else {
+            if(doReplay) {
+                apiLevelErrors.add(new FileUploadError("Replaying the request failed, reason: " + err, FileUploadError.ErrorType.ERROR));
+            }
+            apiLevelErrors.add(new FileUploadError("No example responses found for the API in the uploaded file", FileUploadError.ErrorType.ERROR));
+        }
     }
 
     // message keys for akto format.

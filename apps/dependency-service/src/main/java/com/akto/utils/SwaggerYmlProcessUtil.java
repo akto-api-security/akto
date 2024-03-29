@@ -30,7 +30,7 @@ public class SwaggerYmlProcessUtil {
 
         if(openAPI == null) return null;
 
-        ParserResult parsedSwagger = Parser.convertOpenApiToAkto(openAPI, fileUploadId);
+        ParserResult parsedSwagger = Parser.convertOpenApiToAkto(openAPI, fileUploadId, false);
 
         return parsedSwagger.getUploadLogs();
     }
