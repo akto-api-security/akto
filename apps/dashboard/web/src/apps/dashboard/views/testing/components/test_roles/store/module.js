@@ -32,6 +32,14 @@ const test_roles = {
         updateTestRoleWithNewRole(state, {selectedRole}) {
             state.testRoles.push(selectedRole)
         },
+        UPDATE_TESTROLES(state, {selectedRole}){
+            state.testRoles.forEach((testRole,i) => {
+                if(JSON.stringify(testRole.id)===JSON.stringify(selectedRole.id)){
+                    state.testRoles[i]=selectedRole;
+                }
+            })
+            state.testRoles = [...state.testRoles]
+        },        
         SAVE_CREATE_NEW(state, {createNew}) {
             state.createNew = createNew;
         },
@@ -55,9 +63,9 @@ const test_roles = {
                 state.loading = false
             })
         },
-        addTestRoles ({commit}, {roleName, andConditions, orConditions}) {
+        addTestRoles ({commit}, {roleName, andConditions, orConditions, authParamData}) {
             state.loading = true
-            api.addTestRoles(roleName, andConditions, orConditions).then((resp) => {
+            api.addTestRoles(roleName, andConditions, orConditions, authParamData).then((resp) => {
                 commit('SAVE_SELECTED_ROLE', resp)
                 commit('updateTestRoleWithNewRole', resp)
                 commit('SAVE_CREATE_NEW', {createNew: false})
@@ -67,9 +75,11 @@ const test_roles = {
                 state.loading = false
             })
         },
-        updateTestRoles ({commit}, {roleName, andConditions, orConditions}) {
+        updateTestRoles ({commit}, {roleName, andConditions, orConditions, authParamData}) {
             state.loading = true
-            api.updateTestRoles(roleName, andConditions, orConditions).then((resp) => {
+            api.updateTestRoles(roleName, andConditions, orConditions, authParamData).then((resp) => {
+                commit('SAVE_SELECTED_ROLE', resp);
+                commit('UPDATE_TESTROLES', resp);
                 state.loading = false
 
             }).catch(() => {
@@ -88,7 +98,22 @@ const test_roles = {
                     this.loading = false
                 })
                 }
-        }
+        },
+        async addAuthToRole({commit}, {roleName, apiCond, authParamData, authAutomationType, reqData}) {
+            state.loading = true
+            let resp = await api.addAuthToRole(roleName, apiCond, authParamData, authAutomationType, reqData)
+            commit('SAVE_SELECTED_ROLE', resp);
+            commit('UPDATE_TESTROLES', resp);
+
+            state.loading = false
+        },
+        async deleteAuthFromRole({commit}, {roleName, index}) {
+            state.loading = true
+            let resp = await api.deleteAuthFromRole(roleName, index)
+            commit('SAVE_SELECTED_ROLE', resp);
+            commit('UPDATE_TESTROLES', resp);
+            state.loading = false
+        }        
     },
     getters: {
         getLoading: (state) => state.loading,

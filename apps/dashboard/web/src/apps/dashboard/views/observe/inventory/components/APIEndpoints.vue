@@ -530,16 +530,16 @@ export default {
                 }
             })
         },
-        async startTest({recurringDaily, startTimestamp, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl}) {
+        async startTest({recurringDaily, startTimestamp, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId}) {
             let apiInfoKeyList = this.toApiInfoKeyList(this.filteredItemsForScheduleTest)
             let filtersSelected = this.filteredItemsForScheduleTest.length === this.allEndpoints.length
             let store = this.$store
             let apiCollectionId = this.apiCollectionId
             
             if (filtersSelected) {
-                await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl})
+                await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId})
             } else {
-                await store.dispatch('testing/scheduleTestForCustomEndpoints', {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source: "TESTING_UI"})
+                await store.dispatch('testing/scheduleTestForCustomEndpoints', {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source: "TESTING_UI", testRoleId})
             }
             
             this.showTestSelectorDialog = false            
