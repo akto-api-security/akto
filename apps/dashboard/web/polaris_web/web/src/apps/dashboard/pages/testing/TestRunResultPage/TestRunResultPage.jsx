@@ -15,7 +15,7 @@ import { tokens } from "@shopify/polaris-tokens"
 import TestingStore from '../testingStore';
 import api from '../api';
 import transform from '../transform';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import func from "@/util/func"
 import parse from 'html-react-parser';
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";

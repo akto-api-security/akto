@@ -1,0 +1,120 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "This template does a simple setup for all Akto modules. It sets up all modules on a single instance. If you want a scalable and flexible setup, please contact support@akto.io.",
+  "Resources":
+    {
+      "DashboardInstanceRefreshHandler":
+        {
+          "Type": "AWS::Lambda::Function",
+          "Properties":
+            {
+              "Handler": "index.handler",
+              "FunctionName": "DashboardInstanceRefreshHandler",
+              "Runtime": "nodejs12.x",
+              "Timeout": 30,
+              "Role":
+                { "Fn::GetAtt": ["InstanceRefreshHandlerLambdaRole", "Arn"] },
+              "Code":
+                {
+                  "ZipFile": "var aws = require('aws-sdk'); var autoscaling = new aws.AutoScaling(); exports.handler = function(event, context) {\n  var params = {\n    AutoScalingGroupName: 'AktoDashboardAutoScalingGroup', \n    Preferences: {\n      InstanceWarmup: 200, \n      MinHealthyPercentage: 0\n    }\n  };\n  \n  autoscaling.startInstanceRefresh(params, function(err, data) {\n    if(err) { console.log(err) }\n    else { console.log(data) }\n  })\n};\n",
+                }
+            }
+        },
+      "InstanceRefreshHandlerLambdaRole":
+        {
+          "Type": "AWS::IAM::Role",
+          "Properties":
+            {
+              "AssumeRolePolicyDocument":
+                {
+                  "Version": "2012-10-17",
+                  "Statement":
+                    [
+                      {
+                        "Effect": "Allow",
+                        "Principal": { "Service": ["lambda.amazonaws.com"] },
+                        "Action": ["sts:AssumeRole"],
+                      }
+                    ]
+                },
+              "Path": "/service-role/",
+              "Policies":
+                [
+                  {
+                    "PolicyName": "lambdaExecution-DashboardInstanceRefreshHandler",
+                    "PolicyDocument":
+                      {
+                        "Version": "2012-10-17",
+                        "Statement":
+                          [
+                            {
+                              "Effect": "Allow",
+                              "Action": ["logs:CreateLogGroup"],
+                              "Resource": "*",
+                            },
+                            {
+                              "Effect": "Allow",
+                              "Action":
+                                ["logs:CreateLogStream", "logs:PutLogEvents"],
+                              "Resource": "*",
+                            },
+                            {
+                              "Effect": "Allow",
+                              "Action":
+                                [
+                                  "autoscaling:StartInstanceRefresh",
+                                  "autoscaling:Describe*",
+                                  "autoscaling:UpdateAutoScalingGroup",
+                                  "ec2:CreateLaunchTemplateVersion",
+                                  "ec2:DescribeLaunchTemplates",
+                                  "ec2:RunInstances",
+                                ],
+                              "Resource": "*",
+                            }
+                          ]
+                      }
+                  }
+                ]
+            }
+        },
+      "PeriodicEventRule":
+        {
+          "Type": "AWS::Events::Rule",
+          "Properties":
+            {
+              "Description": "Generate an event periodically",
+              "Name":
+                {
+                  "Fn::Join":
+                    ["", [{ "Ref": "AWS::StackName" }, "-", "PeriodicRule"]],
+                },
+              "ScheduleExpression": "rate(15 minutes)",
+              "State": "ENABLED",
+              "Targets":
+                [
+                  {
+                    "Arn":
+                      {
+                        "Fn::GetAtt":
+                          ["DashboardInstanceRefreshHandler", "Arn"],
+                      },
+                    "Id": { "Ref": "DashboardInstanceRefreshHandler" },
+                  }
+                ]
+            }
+        },
+      "PeriodicEventPermission":
+        {
+          "Type": "AWS::Lambda::Permission",
+          "Properties":
+            {
+              "FunctionName":
+                { "Fn::GetAtt": ["DashboardInstanceRefreshHandler", "Arn"] },
+              "Action": "lambda:InvokeFunction",
+              "Principal": "events.amazonaws.com",
+              "SourceAccount": { "Ref": "AWS::AccountId" },
+              "SourceArn": { "Fn::GetAtt": ["PeriodicEventRule", "Arn"] },
+            }
+        }
+    }
+}
