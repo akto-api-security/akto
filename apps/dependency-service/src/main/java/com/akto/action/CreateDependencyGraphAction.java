@@ -78,7 +78,8 @@ public class CreateDependencyGraphAction extends ActionSupport {
             }
 
             for (int i = 0; i < httpResponseParamsList.size(); i++) {
-                dependencyAnalyserHelper.analyse(httpResponseParamsList.get(i), i);
+                dependencyAnalyserHelper.analyse(httpResponseParamsList.get(i), i, false);
+                dependencyAnalyserHelper.analyse(httpResponseParamsList.get(i), i, true);
             }
 
             Map<Integer, DependencyNode> nodes = dependencyAnalyserHelper.getNodes();

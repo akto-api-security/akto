@@ -195,7 +195,7 @@ public class DependencyAnalyserHelper {
 
     }
 
-    public void analyse(HttpResponseParams responseParams, int finalApiCollectionId) {
+    public void analyse(HttpResponseParams responseParams, int finalApiCollectionId, boolean keyChecker) {
         responseParams.requestParams.setApiCollectionId(finalApiCollectionId);
 
         if (!HttpResponseParams.validHttpResponseCode(responseParams.statusCode)) return;
@@ -226,6 +226,14 @@ public class DependencyAnalyserHelper {
         // Store response params in store
         String respPayload = responseParams.getPayload();
         Map<String, Set<Object>> respFlattened = extractValuesFromPayload(respPayload);
+        if(keyChecker) {
+            for(String respKey : respFlattened.keySet()) {
+                Set<Object> respKeySet = new HashSet<>();
+                Object lastKey = SingleTypeInfo.findLastKeyFromParam(respKey);
+                respKeySet.add(lastKey);
+                respFlattened.put(respKey, respKeySet);
+            }
+        }
 
         Set<String> paramSet = urlsToResponseParam.getOrDefault(combinedUrl, new HashSet<>());
         for (String param: respFlattened.keySet()) {
@@ -244,7 +252,7 @@ public class DependencyAnalyserHelper {
             if (param.equalsIgnoreCase("set-cookie")) {
                 Map<String,String> cookieMap = RuntimeUtil.parseCookie(values);
                 for (String cookieKey: cookieMap.keySet()) {
-                    String cookieVal = cookieMap.get(cookieKey);
+                    String cookieVal = keyChecker ? cookieKey : cookieMap.get(cookieKey);
                     if (!filterValues(cookieVal)) continue;
                     paramSet.add(cookieKey);
                     valueStore.add(cookieVal);
@@ -252,6 +260,9 @@ public class DependencyAnalyserHelper {
                     urlParamValueStore.add(combinedUrl + "$" + cookieKey + "$" + cookieVal);
                 }
             } else {
+                if(keyChecker) {
+                    values = Collections.singletonList(param);
+                }
                 for (String val: values) {
                     if (!filterValues(val) || param.startsWith(":") || HTTPHeadersExample.responseHeaders.contains(param)) continue;
                     paramSet.add(param);
@@ -274,6 +285,14 @@ public class DependencyAnalyserHelper {
         // analyse request payload
         BasicDBObject reqPayload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams); // using urlWithParams to extract any query parameters
         Map<String, Set<Object>> reqFlattened = JSONUtils.flatten(reqPayload);
+        if(keyChecker) {
+            for(String reqKey : reqFlattened.keySet()) {
+                Set<Object> reqKeySet = new HashSet<>();
+                Object lastKey = SingleTypeInfo.findLastKeyFromParam(reqKey);
+                reqKeySet.add(lastKey);
+                reqFlattened.put(reqKey, reqKeySet);
+            }
+        }
 
         for (String requestParam: reqFlattened.keySet()) {
             processRequestParam(requestParam, reqFlattened.get(requestParam), combinedUrl, false, false);
@@ -302,10 +321,13 @@ public class DependencyAnalyserHelper {
             if (param.equals("cookie")) {
                 Map<String,String> cookieMap = RuntimeUtil.parseCookie(values);
                 for (String cookieKey: cookieMap.keySet()) {
-                    String cookieValue = cookieMap.get(cookieKey);
+                    String cookieValue = keyChecker ? cookieKey : cookieMap.get(cookieKey);
                     processRequestParam(cookieKey, new HashSet<>(Collections.singletonList(cookieValue)), combinedUrl, false, true);
                 }
             } else {
+                if(keyChecker) {
+                    values = Collections.singletonList(param);
+                }
                 Set<Object> valuesSet = new HashSet<>();
                 for (String v: values) {
                     String[] vArr = v.split(" ");
