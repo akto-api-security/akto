@@ -23,7 +23,7 @@ public class DependencyAnalyser {
     }
 
     public void analyse(HttpResponseParams responseParams, int finalApiCollectionId) {
-        dependencyAnalyserHelper.analyse(responseParams, finalApiCollectionId);
+        dependencyAnalyserHelper.analyse(responseParams, finalApiCollectionId, false);
     }
 
     public void syncWithDb() {
