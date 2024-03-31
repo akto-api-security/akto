@@ -387,10 +387,12 @@ const SummaryCardComponent = () =>{
   const promotedBulkActions = (selectedTestRuns) => { 
     return [
     {
-      content: `Delete ${selectedTestRuns.length} test run${selectedTestRuns.length==1 ? '' : 's'}`,
+      // content: `Delete ${selectedTestRuns.length} test run${selectedTestRuns.length==1 ? '' : 's'}`,
+      content: <div data-testid="delete_result_button">{`Delete ${selectedTestRuns.length} test run${selectedTestRuns.length==1 ? '' : 's'}`}</div>,
       onAction: async() => {
         await api.deleteTestRuns(selectedTestRuns);
-        func.setToast(true, false, `${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`)
+        // func.setToast(true, false, `${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`)
+        func.setToast(true, false, <div data-testid="delete_success_message">{`${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`}</div>),
         window.location.reload();
       },
     },
