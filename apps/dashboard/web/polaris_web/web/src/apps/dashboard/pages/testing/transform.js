@@ -56,17 +56,23 @@ function getTotalSeverityTestRunResult(severity) {
 function getRuntime(scheduleTimestamp, endTimestamp, state) {
   let status = getStatus(state);
   if (status === 'RUNNING') {
-    return "Currently running";
+    // return "Currently running";
+    return <div data-testid="test_run_status">Currently running</div>;
   }
   const currTime = Date.now();
   if (endTimestamp <= 0) {
     if (currTime > scheduleTimestamp) {
-      return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
+      // return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
+      return <div data-testid="test_run_status">Was scheduled for {func.prettifyEpoch(scheduleTimestamp)}</div>;
+
     } else {
-      return "Next run in " + func.prettifyEpoch(scheduleTimestamp)
+      // return "Next run in " + func.prettifyEpoch(scheduleTimestamp)
+      return <div data-testid="test_run_status">Next run in {func.prettifyEpoch(scheduleTimestamp)}</div>;
     }
   }
-  return 'Last run ' + func.prettifyEpoch(endTimestamp);
+  // return 'Last run ' + func.prettifyEpoch(endTimestamp);
+  return <div data-testid="test_run_status">Last run {func.prettifyEpoch(endTimestamp)}</div>;
+
 }
 
 function getAlternateTestsInfo(state) {
