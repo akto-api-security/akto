@@ -223,6 +223,7 @@ function ApiEndpoints() {
         let data = {}
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, null)
 
+        // handle code analysis endpoints
         const codeAnalysisCollection = apiCollectionData.codeAnalysisCollection
         let shadowEndpoints = []
 
@@ -231,13 +232,16 @@ function ApiEndpoints() {
             shadowEndpoints = { ...codeAnalysisEndpoints }
 
             // Find shadow endpoints and map api endpoint location
-            allEndpoints.forEach(url => {
-                const method_endpoint = url.method + " " + transform.getTruncatedUrl(url.endpoint)
-                if(Object.hasOwn(codeAnalysisEndpoints, method_endpoint)){
-                    url.discovered_in = codeAnalysisEndpoints[method_endpoint]
-                    delete shadowEndpoints[method_endpoint]
-                } else {
-                    url.discovered_in = ""
+            allEndpoints.forEach(allEndpointUrl => {
+                const method_endpoint = allEndpointUrl.method + " " + transform.getTruncatedUrl(allEndpointUrl.endpoint)
+                const method_endpoint_without_slash = method_endpoint.endsWith("/") ? method_endpoint.slice(0, -1) : method_endpoint
+
+                if (Object.hasOwn(codeAnalysisEndpoints, method_endpoint_without_slash)) {
+                    allEndpointUrl.discovered_in = codeAnalysisEndpoints[method_endpoint_without_slash]
+                    delete shadowEndpoints[method_endpoint_without_slash]
+                }
+                else {
+                    allEndpointUrl.discovered_in = ""
                 }
             })
 
@@ -259,12 +263,12 @@ function ApiEndpoints() {
         }
 
         const prettifyData = transform.prettifyEndpointsData(allEndpoints)
+        // append shadow endpoints to all endpoints
         data['All'] = [ ...prettifyData, ...shadowEndpoints ]
         data['Sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0)
         data['Risk'] = prettifyData.filter(x=> x.riskScore >= 4)
         data['New'] = prettifyData.filter(x=> x.isNew)
         data['No_auth'] = prettifyData.filter(x => x.open)
-
         data['Shadow'] = shadowEndpoints
 
         setEndpointData(data)
