@@ -2,70 +2,87 @@ package com.akto.action;
 
 import com.akto.DependencyAnalyserHelper;
 import com.akto.DependencyFlowHelper;
-import com.akto.dao.context.Context;
 import com.akto.dto.DependencyNode;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.type.APICatalog;
-import com.akto.dto.upload.SwaggerUploadLog;
-import com.akto.open_api.parser.Parser;
-import com.akto.open_api.parser.ParserResult;
 import com.akto.util.parsers.HttpCallParserHelper;
+import com.akto.utils.DataDetector;
+import com.akto.utils.DependencyBucketS3Util;
+import com.akto.utils.SwaggerYmlProcessUtil;
 import com.google.gson.Gson;
-import com.mongodb.BasicDBObject;
-import io.swagger.parser.OpenAPIParser;
-import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.parser.core.models.ParseOptions;
-import io.swagger.v3.parser.core.models.SwaggerParseResult;
+import com.opensymphony.xwork2.ActionSupport;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
-import static com.opensymphony.xwork2.Action.ERROR;
-import static com.opensymphony.xwork2.Action.SUCCESS;
-
-public class CreateDependencyGraphAction {
-
-    private final BasicDBObject dependency_graph_status = new BasicDBObject();
-    public BasicDBObject getDependency_graph_status() {
-        return dependency_graph_status;
-    }
-
-    private String swaggerSchema;
-    public void setSwaggerSchema(String swaggerSchema) {
-        this.swaggerSchema = swaggerSchema;
-    }
-    public String getSwaggerSchema() {
-        return swaggerSchema;
-    }
-
-    private Map<Integer, DependencyNode> nodes = new HashMap<>();
-    public void setNodes(Map<Integer, DependencyNode> nodes) {
-        this.nodes = nodes;
-    }
+public class CreateDependencyGraphAction extends ActionSupport {
+    private String apiData;
+    private final Map<String, String> job_id = new HashMap<>();
+    private final StringBuilder apiResultJson = new StringBuilder();
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private final DependencyBucketS3Util s3Util = new DependencyBucketS3Util();
 
     public String createDependencyGraph() {
-        List<SwaggerUploadLog> swaggerToSwaggerLogsList = swaggerToSwaggerLogs();
-        List<String> aktoMsgList = swaggerLogsToAktoMsg(swaggerToSwaggerLogsList);
+        if(apiData == null || apiData.isEmpty()) {
+            addActionError("Invalid Schema");
+            return ERROR.toUpperCase();
+        }
 
+        String jobId = UUID.randomUUID().toString();
+        job_id.put("jobId", jobId);
+
+        executorService.schedule(new Runnable() {
+            @Override
+            public void run() {
+
+                List<String> aktoMessages = null;
+
+                boolean isJson = DataDetector.isJSON(apiData);
+                boolean isYaml = DataDetector.isYAML(apiData);
+
+                if(isJson || isYaml) {
+                    s3Util.uploadSwaggerSchema(jobId, apiData, isJson);
+                    SwaggerYmlProcessUtil swaggerYmlProcessUtil = new SwaggerYmlProcessUtil();
+                    aktoMessages = swaggerYmlProcessUtil.processSwaggerYml(apiData);
+                } else {
+                    s3Util.uploadErrorMessages(jobId, "For now, we only accept Swagger JSON and YAML schema.");
+                    s3Util.close();
+                }
+
+                if(aktoMessages == null || aktoMessages.isEmpty()) {
+                    s3Util.uploadErrorMessages(jobId, "Invalid schema");
+                    s3Util.close();
+                    return;
+                }
+
+                processAktoFormat(aktoMessages);
+                s3Util.close();
+            }
+        }, 0, TimeUnit.SECONDS);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    private void processAktoFormat(List<String> aktoMsgList) {
+        String jobId = job_id.get("jobId");
         List<HttpResponseParams> httpResponseParamsList = new ArrayList<>();
         Map<Integer, APICatalog> dbState = new HashMap<>();
         DependencyAnalyserHelper dependencyAnalyserHelper = new DependencyAnalyserHelper(dbState);
 
-        StringBuilder swaggerJson = new StringBuilder();
-
         try {
-            for(String aktoMsg : aktoMsgList) {
+            for (String aktoMsg : aktoMsgList) {
                 httpResponseParamsList.add(HttpCallParserHelper.parseKafkaMessage(aktoMsg));
             }
 
-            for(int i = 0; i < httpResponseParamsList.size(); i++) {
-                dependencyAnalyserHelper.analyse(httpResponseParamsList.get(i), i);
+            for (int i = 0; i < httpResponseParamsList.size(); i++) {
+                dependencyAnalyserHelper.analyse(httpResponseParamsList.get(i), i, false);
+                dependencyAnalyserHelper.analyse(httpResponseParamsList.get(i), i, true);
             }
 
-            nodes = dependencyAnalyserHelper.getNodes();
+            Map<Integer, DependencyNode> nodes = dependencyAnalyserHelper.getNodes();
             List<DependencyNode> dependencyNodeList = new ArrayList<>(nodes.values());
             DependencyFlowHelper dependencyFlowHelper = new DependencyFlowHelper(dependencyNodeList);
             dependencyFlowHelper.run();
@@ -73,41 +90,19 @@ public class CreateDependencyGraphAction {
             Map<Integer, Node> resultNodes = dependencyFlowHelper.resultNodes;
             List<Node> nodeList = new ArrayList<>(resultNodes.values());
             Gson gson = new Gson();
-            swaggerJson.append(gson.toJson(nodeList));
+            apiResultJson.append(gson.toJson(nodeList));
 
-        } catch (Exception e) {
-            dependency_graph_status.put("error", e.getMessage());
-            return ERROR.toUpperCase();
+            s3Util.uploadApiResultJson(jobId, apiResultJson.toString());
+        } catch(Exception e) {
+            System.out.println(e.getMessage());
+            s3Util.uploadErrorMessages(jobId, e.getMessage());
         }
-
-        dependency_graph_status.put("swaggerJson", swaggerJson.toString());
-
-        return SUCCESS.toUpperCase();
     }
 
-    private List<SwaggerUploadLog> swaggerToSwaggerLogs() {
-        Context.accountId.set(1000000);
-
-        String fileUploadId = "demoFileUploadId";
-        ParseOptions options = new ParseOptions();
-        options.setResolve(true);
-        options.setResolveFully(true);
-        SwaggerParseResult result = new OpenAPIParser().readContents(swaggerSchema, null, options);
-        OpenAPI openAPI = result.getOpenAPI();
-        ParserResult parsedSwagger = Parser.convertOpenApiToAkto(openAPI, fileUploadId);
-
-        return parsedSwagger.getUploadLogs();
+    public void setApiData(String apiData) {
+        this.apiData = apiData;
     }
-
-    private List<String> swaggerLogsToAktoMsg(List<SwaggerUploadLog> swaggerUploadLogs) {
-        List<String> aktoMessages = new ArrayList<>();
-
-        for(int i = 0; i < swaggerUploadLogs.size(); i++) {
-            String aktoFormat = swaggerUploadLogs.get(i).getAktoFormat();
-            aktoMessages.add(aktoFormat);
-        }
-
-        return aktoMessages;
+    public Map<String, String> getJob_id() {
+        return job_id;
     }
-
 }

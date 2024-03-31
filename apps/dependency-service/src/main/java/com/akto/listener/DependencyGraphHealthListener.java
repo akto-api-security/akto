@@ -15,9 +15,9 @@ import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import java.io.File;
 
-public class HealthListener implements ServletContextListener {
+public class DependencyGraphHealthListener implements ServletContextListener {
     public static PrometheusMeterRegistry registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(HealthListener.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DependencyGraphHealthListener.class);
     @Override
     public void contextInitialized(ServletContextEvent servletContextEvent) {
         try {
