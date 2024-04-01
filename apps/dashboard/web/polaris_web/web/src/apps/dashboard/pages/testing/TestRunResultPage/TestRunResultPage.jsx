@@ -9,6 +9,8 @@ import PersistStore from '../../../../main/PersistStore';
 import Store from '../../../store';
 import TestRunResultFull from './TestRunResultFull';
 import TestRunResultFlyout from './TestRunResultFlyout';
+import SingleTestRunPage from '../SingleTestRunPage/SingleTestRunPage';
+import IssuesPage from '../../issues/IssuesPage/IssuesPage';
 
 let headerDetails = [
   {
@@ -64,7 +66,6 @@ function TestRunResultPage(props) {
   let {testingRunResult, runIssues, testSubCategoryMap} = props;
 
   const location = useLocation()
-  const state = (location.state && location.state.showDetails === true) ? true : false  
   const selectedTestRunResult = TestingStore(state => state.selectedTestRunResult);
   const setSelectedTestRunResult = TestingStore(state => state.setSelectedTestRunResult);
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
@@ -77,6 +78,8 @@ function TestRunResultPage(props) {
   const [infoState, setInfoState] = useState([])
   const [loading, setLoading] = useState(true);
   const [showDetails, setShowDetails] = useState(true)
+
+  const useFlyout = location.pathname.includes("test-editor") ? false : true
 
   const setToastConfig = Store(state => state.setToastConfig)
   const setToast = (isActive, isError, message) => {
@@ -203,10 +206,31 @@ function TestRunResultPage(props) {
 
   useEffect(() => {
     fetchData();
-  }, [subCategoryMap, subCategoryFromSourceConfigMap, props])
+    setShowDetails(true)
+  }, [subCategoryMap, subCategoryFromSourceConfigMap, props, hexId2])
 
   return (
+    useFlyout ?
+    <>
+    {location.pathname.includes("issues") ? <IssuesPage /> :<SingleTestRunPage />}
     <TestRunResultFlyout
+      selectedTestRunResult={selectedTestRunResult} 
+      testingRunResult={testingRunResult} 
+      loading={loading} 
+      issueDetails={issueDetails} 
+      getDescriptionText={getDescriptionText} 
+      infoState={infoState} 
+      headerDetails={[...headerDetails, ...hostNameObj]} 
+      createJiraTicket={createJiraTicket} 
+      jiraIssueUrl={jiraIssueUrl} 
+      hexId={hexId} 
+      source={props?.source}
+      setShowDetails={setShowDetails}
+      showDetails={showDetails}
+    />
+    </>
+    :
+    <TestRunResultFull
       selectedTestRunResult={selectedTestRunResult} 
       testingRunResult={testingRunResult} 
       loading={loading} 
