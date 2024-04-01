@@ -409,12 +409,12 @@ public class VariableResolver {
             return wordList;
         }
 
-        List<String> result = new ArrayList<>();
+        List<Object> result = new ArrayList<>();
         for (Object word: wordList) {
             result.add(expression.replace(wordListKey, word.toString()));
         }
 
-        return wordList;
+        return result;
     }
 
     public static Map<String, List<String>> resolveWordList(Map<String, List<String>> wordListsMap, ApiInfo.ApiInfoKey infoKey, Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap) {
