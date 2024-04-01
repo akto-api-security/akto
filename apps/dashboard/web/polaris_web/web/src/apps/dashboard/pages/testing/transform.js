@@ -9,10 +9,10 @@ import TooltipText from "../../components/shared/TooltipText";
 import { circle_cancel, circle_tick_minor } from "../../components/icons";
 import {ResourcesMajor,
   CollectionsMajor,
-  FlagMajor,
   CreditCardSecureMajor,
   MarketingMajor,
-  FraudProtectMajor} from '@shopify/polaris-icons';
+  FraudProtectMajor, RiskMajor} from '@shopify/polaris-icons';
+import { useLocation } from "react-router-dom"
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -380,7 +380,7 @@ const transform = {
             return;
           }
           sectionLocal.content = (
-            <Text color='subdued'>
+            <Text>
               {category?.issueImpact || "No impact found"}
             </Text>
           )
@@ -432,7 +432,7 @@ const transform = {
                   return (
                     <List.Item key={reference}>
                       <Link key={reference} url={reference} monochrome removeUnderline target="_blank">
-                        <Text color='subdued'>
+                        <Text>
                           {reference}
                         </Text>
                       </Link>
@@ -453,9 +453,7 @@ const transform = {
                 affectedEndpoints?.map((item, index) => {
                   return (
                     <List.Item key={index}>
-                      <Text color='subdued'>
-                        {item.id.apiInfoKey.method} {item.id.apiInfoKey.url}
-                      </Text>
+                      <TooltipText text={item.id.apiInfoKey.method + " "  + item.id.apiInfoKey.url}  tooltip={item.id.apiInfoKey.method + " "  + item.id.apiInfoKey.url} />
                     </List.Item>)
                 })
               }
@@ -618,7 +616,7 @@ convertSubIntoSubcategory(resp){
 getInfoSectionsHeaders(){
   let moreInfoSections = [
     {
-      icon: FlagMajor,
+      icon: RiskMajor,
       title: "Impact",
       content: ""
     },
@@ -680,7 +678,7 @@ getCollapsibleRow(urls){
           <VerticalStack gap={2}>
             {urls.map((ele,index)=>{
               return(
-                <Link monochrome onClick={() => history.navigate(ele.nextUrl, {state: {showDetails: true}})} removeUnderline key={index}>
+                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline key={index}>
                   {this.getUrlComp(ele.url)}
                 </Link>
               )
@@ -754,6 +752,78 @@ getTestingRunResult(testingResult){
   finalObj['url'] = methodObj.method + " " + truncatedUrl
   finalObj['hostName'] = hostName
   return finalObj
+},
+getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
+  let auth_type = apiInfo["allAuthTypesFound"].join(", ")
+  let access_type = null
+  let access_types = apiInfo["apiAccessTypes"]
+  if (!access_types || access_types.length == 0) {
+      access_type = "none"
+  } else if (access_types.indexOf("PUBLIC") !== -1) {
+      access_type = "Public"
+  } else {
+      access_type = "Private"
+  }
+
+  function TextComp ({value}) {
+    return <Text fontWeight="semibold">{value}</Text>
+  }
+  const key = /[^/]*$/.exec(jiraIssueUrl)[0];
+  const jiraComponent = jiraIssueUrl?.length > 0 ? (
+    <Box>
+      <Tag>
+          <HorizontalStack gap={1}>
+            <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
+            <Link url={jiraIssueUrl}>
+              <Text>
+                {key}
+              </Text>
+            </Link>
+          </HorizontalStack>
+        </Tag>
+    </Box>
+  ) : <TextComp value="No Jira ticket created. Click on the top right button to create a new ticket." />
+
+  const rowItems = [
+    {
+      title: 'Severity',
+      value: <Text fontWeight="semibold" color={observeFunc.getColor(severity)}>{severity}</Text>
+    },
+    {
+      title: "API",
+      value: (
+        <HorizontalStack gap={"1"}>
+          <Text color="subdued" fontWeight="semibold">{apiInfo.id.method}</Text>
+          <TextComp value={observeFunc.getTruncatedUrl(apiInfo.id.url)} />
+        </HorizontalStack>
+      )
+    },
+    {
+      title: 'Hostname',
+      value: <TextComp value={observeFunc.getHostName(apiInfo.id.url)} />
+    },
+    {
+      title: "Auth type",
+      value:<TextComp value={(auth_type || "").toLowerCase()} />
+    },
+    {
+      title: "Access type",
+      value: <TextComp value={access_type} />
+    },
+    {
+      title: "Sensitive Data",
+      value: <TextComp value={sensitiveData} />
+    },
+    {
+      title: "Detected",
+      value: <TextComp value={func.prettifyEpoch(apiInfo.lastSeen)} />
+    },
+    {
+      title: "Jira",
+      value: jiraComponent
+    }
+  ]
+  return rowItems
 }
 }
 

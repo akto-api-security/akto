@@ -616,10 +616,21 @@ export default {
         })
     },
     async updateEnvTypeOfCollection(envType, apiCollectionIds){
-        await request({
+        return await request({
             url: '/api/updateEnvType',
             method: 'post',
             data: {envType, apiCollectionIds}
+        })
+    },
+    fetchEndpoint(apiInfoKey){
+        return request({
+            url: '/api/getSingleEndpoint',
+            method: 'post',
+            data: {
+                url: apiInfoKey.url,
+                method: apiInfoKey.method,
+                apiCollectionId: apiInfoKey.apiCollectionId
+            }
         })
     }
 }
