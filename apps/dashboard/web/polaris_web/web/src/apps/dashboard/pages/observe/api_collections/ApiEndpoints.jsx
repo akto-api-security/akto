@@ -233,8 +233,9 @@ function ApiEndpoints() {
 
             // Find shadow endpoints and map api endpoint location
             allEndpoints.forEach(allEndpointUrl => {
-                const method_endpoint = allEndpointUrl.method + " " + transform.getTruncatedUrl(allEndpointUrl.endpoint)
-                const method_endpoint_without_slash = method_endpoint.endsWith("/") ? method_endpoint.slice(0, -1) : method_endpoint
+                const truncatedUrl = transform.getTruncatedUrl(allEndpointUrl.endpoint)
+                const method_endpoint = allEndpointUrl.method + " " + truncatedUrl
+                const method_endpoint_without_slash = truncatedUrl !== "/" && method_endpoint.endsWith("/") ? method_endpoint.slice(0, -1) : method_endpoint
 
                 if (Object.hasOwn(codeAnalysisEndpoints, method_endpoint_without_slash)) {
                     allEndpointUrl.discovered_in = codeAnalysisEndpoints[method_endpoint_without_slash]
@@ -250,6 +251,8 @@ function ApiEndpoints() {
 
                 return {
                     endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={false} />,
+                    method: method,
+                    endpoint: endpoint,
                     riskScore: 0,
                     hostName: "",
                     access_type: "",
