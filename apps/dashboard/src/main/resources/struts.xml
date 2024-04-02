@@ -1015,6 +1015,17 @@
             </result>
         </action>
 
+        <action name="api/getSingleEndpoint" class="com.akto.action.ApiInfoAction" method="fetchApiInfo">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">apiInfo</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/fetchFilters" class="com.akto.action.FilterAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
