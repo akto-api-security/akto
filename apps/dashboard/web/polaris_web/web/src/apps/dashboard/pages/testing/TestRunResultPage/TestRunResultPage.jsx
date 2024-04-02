@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import {CircleTickMajor,ArchiveMinor,LinkMinor, GlobeMinor} from '@shopify/polaris-icons';
+import {CircleTickMajor,ArchiveMinor,LinkMinor} from '@shopify/polaris-icons';
 import TestingStore from '../testingStore';
 import api from '../api';
 import transform from '../transform';
@@ -52,14 +52,6 @@ let headerDetails = [
     icon: LinkMinor
   },
 ]
-
-const hostNameObj = [{
-  text: 'host',
-  value: 'hostName',
-  itemOrder:3,
-  dataProps:{fontWeight:'regular'},
-  icon: GlobeMinor
-}]
 
 function TestRunResultPage(props) {
 
@@ -220,7 +212,6 @@ function TestRunResultPage(props) {
       issueDetails={issueDetails} 
       getDescriptionText={getDescriptionText} 
       infoState={infoState} 
-      headerDetails={[...headerDetails, ...hostNameObj]} 
       createJiraTicket={createJiraTicket} 
       jiraIssueUrl={jiraIssueUrl} 
       hexId={hexId} 
@@ -237,7 +228,7 @@ function TestRunResultPage(props) {
       issueDetails={issueDetails} 
       getDescriptionText={getDescriptionText} 
       infoState={infoState} 
-      headerDetails={[...headerDetails, ...hostNameObj]} 
+      headerDetails={headerDetails}
       createJiraTicket={createJiraTicket} 
       jiraIssueUrl={jiraIssueUrl} 
       hexId={hexId} 

@@ -1,4 +1,4 @@
-import { Button, HorizontalStack, Text, VerticalStack, Box, Spinner, Divider, Popover } from "@shopify/polaris"
+import { Button, HorizontalStack, Text, VerticalStack, Box, Spinner, Divider } from "@shopify/polaris"
 import {
     CancelMajor
 } from '@shopify/polaris-icons';
@@ -6,7 +6,7 @@ import "./style.css"
 
 function FlyLayout(props) {
 
-    const { title, show, setShow, components,loading, showDivider} = props
+    const { title, show, setShow, components,loading, showDivider, newComp} = props
     return (
         <div className={"flyLayout " + (show ? "show" : "")}>
             <div className="innerFlyLayout">
@@ -28,9 +28,13 @@ function FlyLayout(props) {
                                 components.map((component, index) => {
                                     return (
                                         <Box key={index}>                                        
-                                            <Box padding={"4"} paddingBlockStart={"0"} paddingBlockEnd={"0"}>
+                                            {newComp ? <Box>
+                                                {component}
+                                            </Box>:
+                                            <Box paddingInlineEnd={"4"} paddingInlineStart={"4"}>
                                                 {component}
                                             </Box>
+                                            }
                                             {(showDivider && index !== components.length - 1) ? <Divider /> : null}
                                         </Box>
                                     )

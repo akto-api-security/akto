@@ -740,18 +740,13 @@ getPrettifiedTestRunResults(testRunResults){
   })
   return prettifiedResults
 },
-getTestingRunResult(testingResult){
-  let finalObj = {
-    ...testingResult
-  }
+getTestingRunResultUrl(testingResult){
   let urlString = testingResult.url
   const methodObj = func.toMethodUrlObject(urlString)
-  const hostName = observeFunc.getHostName(methodObj.url)
   const truncatedUrl = observeFunc.getTruncatedUrl(methodObj.url)
   
-  finalObj['url'] = methodObj.method + " " + truncatedUrl
-  finalObj['hostName'] = hostName
-  return finalObj
+  return methodObj.method + " " + truncatedUrl
+  
 },
 getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
   let auth_type = apiInfo["allAuthTypesFound"].join(", ")
@@ -766,7 +761,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
   }
 
   function TextComp ({value}) {
-    return <Text fontWeight="semibold">{value}</Text>
+    return <Text variant="bodyMd">{value}</Text>
   }
   const key = /[^/]*$/.exec(jiraIssueUrl)[0];
   const jiraComponent = jiraIssueUrl?.length > 0 ? (
@@ -782,7 +777,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
           </HorizontalStack>
         </Tag>
     </Box>
-  ) : <TextComp value="No Jira ticket created. Click on the top right button to create a new ticket." />
+  ) : null
 
   const rowItems = [
     {
