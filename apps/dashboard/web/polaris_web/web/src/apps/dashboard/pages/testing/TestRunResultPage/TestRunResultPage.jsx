@@ -9,7 +9,7 @@ import {
   Text,
   Button,
   VerticalStack,
-  HorizontalStack, Icon, LegacyCard, Collapsible, Box, Divider, Scrollable
+  HorizontalStack, Icon, LegacyCard, Collapsible, Box, Divider, Scrollable, Modal, LegacyStack
   } from '@shopify/polaris';
 import { tokens } from "@shopify/polaris-tokens"
 import TestingStore from '../testingStore';
@@ -24,6 +24,7 @@ import GithubCell from '../../../components/tables/cells/GithubCell';
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import PersistStore from '../../../../main/PersistStore';
 import Store from '../../../store';
+import {default as issues_api} from "../../issues/api";
 
 const headerDetails = [
   {
@@ -113,6 +114,10 @@ function TestRunResultPage(props) {
   const [infoState, setInfoState] = useState([])
   const [fullDescription, setFullDescription] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showIgnoreModal, setShowIgnoreModal] = useState(false);
+  const [selectedRadio, setSelectedRadio] = useState(null);
+  const [ignoreReason, setIgnoreReason] = useState("");
+  const [refetch, setRefetch] = useState(false);
 
   const setToastConfig = Store(state => state.setToastConfig)
   const setToast = (isActive, isError, message) => {
@@ -240,7 +245,7 @@ function TestRunResultPage(props) {
 
   useEffect(() => {
     fetchData();
-  }, [subCategoryMap, subCategoryFromSourceConfigMap, props])
+  }, [subCategoryMap, subCategoryFromSourceConfigMap, refetch, props])
 
   const testErrorComponent = (
     <LegacyCard title="Errors" sectioned key="test-errors">
@@ -281,6 +286,59 @@ function TestRunResultPage(props) {
     </LegacyCard>
   )
 
+  function handleIgnoreModal(){
+    if(selectedRadio!=null){
+      const selectedResources = [issueDetails.id];
+      issues_api.bulkUpdateIssueStatus(selectedResources,"IGNORED",ignoreReason);
+      func.setToast(true,false,"Issue ignored");
+      setRefetch(!refetch);
+      setShowIgnoreModal(false);
+      setSelectedRadio(null);
+    }
+  }
+  function handleCancel(){
+    setShowIgnoreModal(false);
+    setSelectedRadio(null);
+  }
+
+  const handleRadioChange = (event) => {
+    setSelectedRadio(event.target.value);
+  }
+  const ignoreModal = (
+    <Modal
+      open={showIgnoreModal}
+      onClose={handleCancel}
+      title="Select Ignore Reason"
+      primaryAction={{
+        content: "Confirm",
+        onAction: handleIgnoreModal
+      }}
+      secondaryActions={[
+        {
+          content: 'Cancel',
+          onAction: handleCancel,
+        },
+      ]}
+    >
+      <Modal.Section>
+        <LegacyStack vertical>
+          <label>
+              <input type="radio" value="false" checked={selectedRadio === 'false'} onChange={handleRadioChange} onClick={()=>setIgnoreReason("False positive")}/>
+              False Positive
+          </label>
+          <label>
+              <input type="radio" value="acceptable" checked={selectedRadio === 'acceptable'} onChange={handleRadioChange} onClick={()=>setIgnoreReason("Acceptable risk")}/>
+              Acceptable risk
+          </label>
+          <label>
+              <input type="radio" value="notime" checked={selectedRadio === "notime"} onChange={handleRadioChange} onClick={()=>setIgnoreReason("No time to fix")}/>
+              No time to fix
+          </label>
+        </LegacyStack>
+      </Modal.Section>
+    </Modal>
+  )
+
   const components = loading ? [<SpinnerCentered key="loading" />] : [
       issueDetails.id &&
       <LegacyCard title="Description" sectioned key="description">
@@ -307,8 +365,17 @@ function TestRunResultPage(props) {
       <MoreInformationComponent
         key="info"
         sections={infoState}
-      />
+      />,
+      ignoreModal
   ]
+
+  function handleReopenClicked(){
+    const selectedResources=[issueDetails.id];
+    issues_api.bulkUpdateIssueStatus(selectedResources,"OPEN","");
+    func.setToast(true,false,"Issue re-opened");
+
+    setRefetch(!refetch);
+  }
 
   return (
     <PageWithMultipleCards
@@ -326,6 +393,16 @@ function TestRunResultPage(props) {
     backUrl = {props?.source == "editor" ? undefined : (hexId=="issues" ? "/dashboard/issues" : `/dashboard/testing/${hexId}`)}
     isFirstPage = {props?.source == "editor"}
     primaryAction = {<Button primary onClick={()=>createJiraTicket(issueDetails)} disabled={jiraIssueUrl != "" || window.JIRA_INTEGRATED != "true"} >Create Jira Ticket</Button>}
+    secondaryActions = {
+      issueDetails.testRunIssueStatus === "OPEN" ? 
+      <Button onClick={()=>setShowIgnoreModal(true)}>
+        Ignore
+      </Button>
+      :
+      <Button onClick={handleReopenClicked}>
+        Reopen
+      </Button>
+    }
     // secondaryActions = {props.source == "editor" ? "" : <Button disclosure>Dismiss alert</Button>}
     components = {components}
     />

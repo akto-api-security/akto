@@ -189,11 +189,21 @@ function SensitiveDataExposure() {
         return {value:ret , total:total};
     }
 
-const navigate = useNavigate();
-
-const handleRedirect = () => {
-    navigate("/dashboard/observe/data-types")
-}
+    const navigate = useNavigate();
+    
+    async function handleEdit(){
+        let mapDataToKey = {};
+        await api.fetchDataTypes().then((res) => {
+            res.dataTypes.aktoDataTypes.forEach((type) => {
+                mapDataToKey[type.name] = type;
+            });
+            res.dataTypes.customDataTypes.forEach((type) => {
+                mapDataToKey[type.name] = type;
+            });
+        });
+        
+        navigate("/dashboard/observe/data-types", {state: {name: subType, dataObj: mapDataToKey[subType]}});
+    }
 
     return (
         <PageWithMultipleCards
@@ -203,7 +213,7 @@ const handleRedirect = () => {
           </Text>
         }
         backUrl="/dashboard/observe/sensitive"
-        primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
+        secondaryActions={<Button onClick={handleEdit}>Edit</Button>}
         components = {[
             <GithubServerTable
                 key="table"

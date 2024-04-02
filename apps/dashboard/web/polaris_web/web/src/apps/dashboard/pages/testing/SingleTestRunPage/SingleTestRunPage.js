@@ -10,6 +10,7 @@ import {
   Tooltip,
   LegacyCard,
   IndexFiltersMode,
+  Popover,
 } from '@shopify/polaris';
 
 import {
@@ -134,6 +135,8 @@ function SingleTestRunPage() {
   const [selectedTab, setSelectedTab] = useState("vulnerable")
   const [selected, setSelected] = useState(0)
   const [workflowTest, setWorkflowTest ] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+
   const refreshId = useRef(null);
   const hexId = params.hexId;
 
@@ -434,6 +437,65 @@ const promotedBulkActions = (selectedDataHexIds) => {
 
   const useComponents = (!workflowTest && testRunResults.all.length === 0) ? [<EmptyData key="empty"/>] : components
 
+  const handleAddToCICD = () => {
+    window.open('https://docs.akto.io/testing/run-tests-in-cicd', '_blank');
+  }
+
+  const handleStopTest = () => {
+    api.stopTest(hexId).then((resp) => {
+      func.setToast(true, false, "Test run stopped")
+    }).catch((resp) => {
+      func.setToast(true, true, "Unable to stop test run")
+    });
+  }
+
+  const secondaryActionsComponent = (
+    <HorizontalStack gap="2">
+      <Popover
+        active={moreOpen}
+        activator={(
+          <Button onClick={()=>setMoreOpen(!moreOpen)} disclosure>
+            More Actions
+          </Button>
+        )}
+        autofocusTarget="first-node"
+        onClose={()=>{
+          setMoreOpen(false);
+        }}
+        preferredAlignment="right"
+      >
+        <Popover.Pane fixed>
+          <Popover.Section>
+            <VerticalStack gap={2}>
+              {
+                !workflowTest ? 
+                  <div onClick={() => openVulnerabilityReport()} style={{cursor: "pointer"}}>
+                    <Text fontWeight="regular" variant="bodyMd">Export vulnerability report</Text>
+                  </div>
+                  :
+                  null
+              }
+            </VerticalStack>
+          </Popover.Section>
+          <Popover.Section>
+            <VerticalStack gap={2}>
+              <div onClick={handleAddToCICD} style={{cursor: "pointer"}}>
+                  <Text fontWeight="regular" variant="bodyMd">Add to CD/CD pipeline</Text>
+              </div>
+            </VerticalStack>
+          </Popover.Section>
+          <Popover.Section>
+            <VerticalStack gap={2}>
+              <div onClick={handleStopTest} style={{cursor: "pointer"}}>
+                  <Text fontWeight="regular" variant="bodyMd">Stop</Text>
+              </div>
+            </VerticalStack>
+          </Popover.Section>
+        </Popover.Pane>
+      </Popover>
+    </HorizontalStack>
+  )
+
   return (
     <PageWithMultipleCards
     title={
@@ -476,7 +538,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() => 
       func.downloadAsCSV((testRunResults[selectedTab]), selectedTestRun)
       }>Export</Button></Box>: undefined}
-      secondaryActions={!workflowTest ? <Button onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button> : undefined}
+      secondaryActions={secondaryActionsComponent}
       components={useComponents}
     />
   );
