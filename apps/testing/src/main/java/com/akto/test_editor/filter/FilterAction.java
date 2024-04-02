@@ -61,6 +61,7 @@ public final class FilterAction {
         put("contains_jwt", new ContainsJwt());
         put("cookie_expire_filter", new CookieExpireFilter());
         put("datatype", new DatatypeFilter());
+        put("ssrf_url_hit", new SsrfUrlHitFilter());
     }};
 
     public FilterAction() { }

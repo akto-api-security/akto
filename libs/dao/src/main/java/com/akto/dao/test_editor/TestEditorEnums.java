@@ -40,7 +40,8 @@ public class TestEditorEnums {
     public enum PredicateOperator {
         AND,
         OR,
-        COMPARE_GREATER
+        COMPARE_GREATER,
+        SSRF_URL_HIT
     }
 
     public enum KeyValOperator {
@@ -204,7 +205,8 @@ public class TestEditorEnums {
         REPLACE_AUTH_HEADER,
         REPLACE_BODY,
         JWT_REPLACE_BODY,
-        ATTACH_FILE
+        ATTACH_FILE,
+        SEND_SSRF_REQ,
     }
 
     public enum NonTerminalExecutorDataOperands {
