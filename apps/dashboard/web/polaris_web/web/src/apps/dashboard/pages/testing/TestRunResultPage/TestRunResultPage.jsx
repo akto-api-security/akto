@@ -199,6 +199,10 @@ function TestRunResultPage(props) {
   useEffect(() => {
     fetchData();
     setShowDetails(true)
+    setLoading(true)
+    setTimeout(() => {
+      setLoading(false)
+    },200)
   }, [subCategoryMap, subCategoryFromSourceConfigMap, props, hexId2])
 
   return (

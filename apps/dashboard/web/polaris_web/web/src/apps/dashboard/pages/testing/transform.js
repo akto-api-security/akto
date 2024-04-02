@@ -761,7 +761,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
   }
 
   function TextComp ({value}) {
-    return <Text variant="bodyMd">{value}</Text>
+    return <Text breakWord variant="bodyMd">{value}</Text>
   }
   const key = /[^/]*$/.exec(jiraIssueUrl)[0];
   const jiraComponent = jiraIssueUrl?.length > 0 ? (

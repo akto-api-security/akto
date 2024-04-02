@@ -20,26 +20,28 @@ function TestRunResultFlyout(props) {
     const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
     const fetchApiInfo = async(apiInfoKey) => {
         let apiInfo = {}
-        await api.fetchEndpoint(apiInfoKey).then((res) => {
-            apiInfo = JSON.parse(JSON.stringify(res))
-        })
-        let sensitiveParam = ""
-        await api.loadSensitiveParameters(apiInfoKey.apiCollectionId,apiInfoKey.url, apiInfo.method).then((resp) => {
-            resp?.data?.endpoints.forEach((x, index) => {
-                sensitiveParam += x.subTypeString.toUpperCase()
-                if(index !== resp?.data?.endpoints.length - 1){
-                    sensitiveParam += ", "
-                }
+        if(apiInfoKey !== null){
+            await api.fetchEndpoint(apiInfoKey).then((res) => {
+                apiInfo = JSON.parse(JSON.stringify(res))
             })
-        })
-        setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,jiraIssueUrl,sensitiveParam))
+            let sensitiveParam = ""
+            await api.loadSensitiveParameters(apiInfoKey.apiCollectionId,apiInfoKey.url, apiInfo.method).then((resp) => {
+                resp?.data?.endpoints.forEach((x, index) => {
+                    sensitiveParam += x.subTypeString.toUpperCase()
+                    if(index !== resp?.data?.endpoints.length - 1){
+                        sensitiveParam += ", "
+                    }
+                })
+            })
+            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam))
+        }
     }
 
     useEffect(() => {
-       if(issueDetails && Object.keys(issueDetails).length > 0){
+       if(issueDetails && Object.keys(issueDetails).length > 0){       
             fetchApiInfo(issueDetails.id.apiInfoKey)
        }
-    },[issueDetails])
+    },[selectedTestRunResult,issueDetails])
 
     function ignoreAction(ignoreReason){
         issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason ).then((res) => {
@@ -87,7 +89,7 @@ function TestRunResultFlyout(props) {
                 <Popover.Section>
                     <VerticalStack gap={"4"}>
                         <Text variant="headingSm">Create</Text>
-                        <Button plain monochrome removeUnderline onClick={()=>createJiraTicket(issueDetails)} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>
+                        <Button plain monochrome removeUnderline onClick={()=>{createJiraTicket(issueDetails)}} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>
                             <HorizontalStack gap={"2"}>
                                 <Avatar shape="square" size="extraSmall" source="/public/logo_jira.svg"/>
                                 <Text>Jira Ticket</Text>
@@ -163,7 +165,7 @@ function TestRunResultFlyout(props) {
                             </HorizontalStack>
                             {item?.content}
                         </VerticalStack>
-                        <Divider />
+                        {index !== infoStateFlyout.length - 1 ? <Divider /> : null}
                     </VerticalStack>
                 )
             })}
