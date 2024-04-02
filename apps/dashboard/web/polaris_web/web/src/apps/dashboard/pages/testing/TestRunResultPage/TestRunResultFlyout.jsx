@@ -1,25 +1,21 @@
 import React, { useEffect, useState } from 'react'
 import FlyLayout from '../../../components/layouts/FlyLayout'
-import GithubCell from '../../../components/tables/cells/GithubCell'
 import func from '@/util/func'
 import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Avatar, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack } from '@shopify/polaris'
+import { Avatar, Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack } from '@shopify/polaris'
 import api from '../../observe/api'
+import issuesApi from "../../issues/api"
 import GridRows from '../../../components/shared/GridRows'
 
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, headerDetails, createJiraTicket, jiraIssueUrl, hexId, source, showDetails, setShowDetails} = props
-
-    const [testRunResult, setTestRunResult] = useState(selectedTestRunResult)
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails} = props
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
     const [popoverActive, setPopoverActive] = useState(false)
-
-    headerDetails[1]['dataProps'] = {variant: 'headingSm'}
     // modify testing run result and headers
     const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
     const fetchApiInfo = async(apiInfoKey) => {
@@ -39,10 +35,6 @@ function TestRunResultFlyout(props) {
         setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,jiraIssueUrl,sensitiveParam))
     }
 
-    useEffect(()=> {
-        setTestRunResult(transform.getTestingRunResult(selectedTestRunResult))
-    },[selectedTestRunResult])
-
     useEffect(() => {
        if(issueDetails && Object.keys(issueDetails).length > 0){
             fetchApiInfo(issueDetails.id.apiInfoKey)
@@ -50,12 +42,18 @@ function TestRunResultFlyout(props) {
     },[issueDetails])
 
     function ignoreAction(ignoreReason){
-        api.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason ).then((res) => {
+        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason ).then((res) => {
             func.setToast(true, false, `Issue ignored`)
         })
     }
+
+    function reopenAction(){
+        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "OPEN", "" ).then((res) => {
+            func.setToast(true, false, "Issue re-opened")
+        })
+    }
     
-    let issues = [{
+    const issues = [{
         content: 'False positive',
         onAction: () => { ignoreAction("False positive") }
     },
@@ -68,7 +66,15 @@ function TestRunResultFlyout(props) {
         onAction: () => { ignoreAction("No time to fix") }
     }]
 
-    const actionsComp = (
+    const  reopen =  [{
+        content: 'Reopen',
+        onAction: () => { reopenAction() }
+    }]
+    
+    function ActionsComp (){
+        const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
+        return(
+            issueDetails?.id &&
         <Popover
             activator={<Button disclosure plain onClick={() => setPopoverActive(!popoverActive)}>Actions</Button>}
             active={popoverActive}
@@ -81,7 +87,7 @@ function TestRunResultFlyout(props) {
                 <Popover.Section>
                     <VerticalStack gap={"4"}>
                         <Text variant="headingSm">Create</Text>
-                        <Button plain monochrome removeUnderline>
+                        <Button plain monochrome removeUnderline onClick={()=>createJiraTicket(issueDetails)} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>
                             <HorizontalStack gap={"2"}>
                                 <Avatar shape="square" size="extraSmall" source="/public/logo_jira.svg"/>
                                 <Text>Jira Ticket</Text>
@@ -92,38 +98,45 @@ function TestRunResultFlyout(props) {
                 <Popover.Section>
                     <VerticalStack gap={"4"}>
                         <Text variant="headingSm">Ignore</Text>
-                        {issues.map((issue, index) => {
+                        {issuesActions.map((issue, index) => {
                             return(
-                                <Button plain removeUnderline monochrome onClick={() => issue.onAction()} key={index}>
+                                <div style={{cursor: 'pointer'}} onClick={() => issue.onAction()} key={index}>
                                     {issue.content}
-                                </Button>
+                                </div>
                             )
                         })}
                     </VerticalStack>
                 </Popover.Section>
             </Popover.Pane>
         </Popover>
-    )
-
-    const titleComponent = (
-        <div style={{display: 'flex', justifyContent: "space-between", gap:"8px"}}>
-            <GithubCell
-                key="heading"
-                width="35vw"
-                data={testRunResult}
-                headers={headerDetails}
-                getStatus={func.getTestResultStatus}
-                moreActions={actionsComp}
-            />
-            {actionsComp}
-        </div>
-    )
+    )}
+    function TitleComponent() {
+        const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? selectedTestRunResult.severity[0] : ""
+        return(
+            <div style={{display: 'flex', justifyContent: "space-between", gap:"24px", padding: "16px", paddingTop: '0px'}}>
+                <VerticalStack gap={"2"}>
+                    <Box width="100%">
+                        <div style={{display: 'flex', gap: '4px'}}>
+                            <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
+                            {severity.length > 0 ? <Box><Badge size="small" status={func.getTestResultStatus(severity)}>{severity}</Badge></Box> : null}
+                        </div>
+                    </Box>
+                    <HorizontalStack gap={"2"}>
+                        <Text color="subdued" variant="bodySm">{transform.getTestingRunResultUrl(selectedTestRunResult)}</Text>
+                        <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
+                        <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
+                    </HorizontalStack>
+                </VerticalStack>
+                <ActionsComp />
+            </div>
+        )
+    }
 
     const ValuesTab = {
         id: 'values',
         content: "Values",
-        component: selectedTestRunResult && selectedTestRunResult.testResults && 
-        <Box paddingBlockStart={3} ><SampleDataList
+        component: (!(selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 && selectedTestRunResult.errors[0].endsWith("skipping execution"))) && selectedTestRunResult.testResults &&
+        <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
             key="Sample values"
             heading={"Attempt"}
             minHeight={"30vh"}
@@ -135,7 +148,7 @@ function TestRunResultFlyout(props) {
             vulnerable={selectedTestRunResult?.vulnerable}
             isVulnerable={selectedTestRunResult.vulnerable}
         />
-        </Box>
+        </Box> 
     }
     const moreInfoComponent = (
         infoStateFlyout.length > 0 ?
@@ -161,10 +174,12 @@ function TestRunResultFlyout(props) {
     function RowComp ({cardObj}){
         const {title, value} = cardObj
         return(
-            <VerticalStack gap={"2"}>
-                <Text variant="bodyMd" fontWeight="semibold" color="subdued">{title}</Text>
-                {value}
-            </VerticalStack>
+            value ? <Box width="224px">
+                <VerticalStack gap={"2"}>
+                    <Text variant="bodyMd" fontWeight="semibold" color="subdued">{title}</Text>
+                    {value}
+                </VerticalStack>
+            </Box>: null
         )
     }
 
@@ -173,7 +188,7 @@ function TestRunResultFlyout(props) {
     )
 
     const overviewComp = (
-        <Box paddingBlockStart={"4"}>
+        <Box padding={"4"}>
             <VerticalStack gap={"5"}>
                 <VerticalStack gap={"2"}>
                     <Text variant="bodyMd" fontWeight="semibold" color="subdued">
@@ -193,23 +208,38 @@ function TestRunResultFlyout(props) {
             </VerticalStack>
         </Box>
     )
-
     const overviewTab = {
         id: "overview",
         content: 'Overview',
-        component: overviewComp
+        component: issueDetails.id && overviewComp
     }
+
+    const errorTab = {
+        id: "error",
+        content: "Attempt",
+        component:  ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) && <Box padding={"4"}>
+            {
+            selectedTestRunResult?.errors?.map((error, i) => {
+              return (
+                <Text key={i}>{error}</Text>
+              )
+            })
+          }
+        </Box>
+    }
+
+    const attemptTab =  ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) ? errorTab : ValuesTab
 
     const tabsComponent = (
         <LayoutWithTabs
             key="tab-comp"
-            tabs={[overviewTab,ValuesTab]}
+            tabs={issueDetails?.id ? [overviewTab,ValuesTab]: [attemptTab]}
             currTab = {() => {}}
         />
     )
 
     const currentComponents = [
-        titleComponent, tabsComponent
+        <TitleComponent/>, tabsComponent
     ]
 
     return (
@@ -220,6 +250,7 @@ function TestRunResultFlyout(props) {
             components={currentComponents}
             loading={loading}
             showDivider={true}
+            newComp={true}
         />
     )
 }
