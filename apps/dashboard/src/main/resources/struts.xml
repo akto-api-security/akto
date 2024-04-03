@@ -1022,7 +1022,7 @@
                 <param name="root">apiInfo</param>
             </result>
             <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
+                <param name="status">422</param>
             </result>
         </action>
 
