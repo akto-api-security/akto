@@ -37,7 +37,7 @@ public class TokenGeneratorCron {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        if (!DashboardMode.isOnPremDeployment()) {
+                        if (!DashboardMode.isOnPremDeployment() && !DashboardMode.isSaasDeployment()) {
                             loggerMaker.infoAndAddToDb("Skipping tokenGeneratorScheduler, deployment type condition not satisfied");
                             return;
                         }

@@ -100,9 +100,23 @@ const api = {
             data: {uploadId},
         })
     },
+    fetchSwaggerImportLogs(uploadId){
+        return request({
+            url: '/api/fetchSwaggerImportLogs',
+            method: 'post',
+            data: {uploadId},
+        })
+    },
     ingestPostman(uploadId, importType){
         return request({
             url: '/api/ingestPostman',
+            method: 'post',
+            data: {uploadId, importType},
+        })
+    },
+    ingestSwagger(uploadId, importType){
+        return request({
+            url: '/api/importSwaggerLogs',
             method: 'post',
             data: {uploadId, importType},
         })

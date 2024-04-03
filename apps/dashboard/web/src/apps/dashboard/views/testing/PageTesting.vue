@@ -117,11 +117,9 @@
             </div>
         </template>
         <template slot="Roles">
-            <test-roles title="Roles" :testRoles="testRoles">
+            <test-roles title="Roles" :testRoles="testRoles" @refreshRoles="refreshRoles">
                 <template #details-container="{}">
-                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
-                        <test-roles-config-details></test-roles-config-details>
-                    </a-card>
+                    <test-roles-config-details></test-roles-config-details>
                 </template>
             </test-roles>
         </template>
@@ -148,7 +146,6 @@
 
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
-import ACard from '@/apps/dashboard/shared/components/ACard'
 import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import TestRoles from './components/test_roles/TestRoles'
@@ -175,7 +172,6 @@ export default {
     components: {
         SimpleTable,
         SensitiveChipGroup,
-        ACard,
         SampleData,
         LayoutWithTabs,
         LayoutWithLeftPane,
@@ -242,8 +238,11 @@ export default {
         async saveTestRoles() {
             if (this.testRoleName && this.testLogicalGroupRegex) {
                 await this.$store.dispatch('testing/addTestRoles', { roleName: this.testRoleName, regex: this.testLogicalGroupRegex })
-                this.$store.dispatch('testing/loadTestRoles')
+                this.$store.dispatch('test_roles/loadTestRoles')
             }
+        },
+        refreshRoles() {
+            this.$store.dispatch('test_roles/loadTestRoles')
         },
         prepareItemForTable(x) {
             return {
@@ -272,7 +271,15 @@ export default {
         toggleLoginStepBuilder() {
             this.showTokenAutomation = !this.showTokenAutomation
         },
-        toggleOriginalStateDb() {
+        toggleOriginalStateDb({reqData, authParamsList}) {
+            let result = api.addAuthMechanism("LOGIN_REQUEST", reqData, authParamsList)
+            result.then((resp) => {
+                func.showSuccessSnackBar("Login Flow saved successfully!")
+                
+            }).catch((err) => {
+                console.log(err);
+            })
+
             console.log('got db state event')
             this.fetchAuthMechanismData()
         },

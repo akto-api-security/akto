@@ -57,6 +57,8 @@ import com.mongodb.client.model.Updates;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -73,6 +75,7 @@ public class SaveTestEditorAction extends UserAction {
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private static final LoggerMaker loggerMaker = new LoggerMaker(SaveTestEditorAction.class);
+    private static final Logger logger = LoggerFactory.getLogger(SaveTestEditorAction.class);
 
     @Override
     public String execute() throws Exception {
@@ -332,7 +335,7 @@ public class SaveTestEditorAction extends UserAction {
         testingRunResult.setId(new ObjectId());
         if (testingRunResult.isVulnerable()) {
             TestingIssuesId issuesId = new TestingIssuesId(infoKey, GlobalEnums.TestErrorSource.TEST_EDITOR, testConfig.getId(), null);
-            testingRunIssues = new TestingRunIssues(issuesId, GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity()), GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(),null, Context.now());
+            testingRunIssues = new TestingRunIssues(issuesId, GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity()), GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(),null, null, Context.now());
         }
         BasicDBObject infoObj = IssuesAction.createSubcategoriesInfoObj(testConfig);
         subCategoryMap = new HashMap<>();
@@ -520,7 +523,7 @@ public class SaveTestEditorAction extends UserAction {
         List<String> files = new ArrayList<>();
         Files.walk(dir).forEach(path -> showFile(path.toFile(), files));
         for (String filePath : files) {
-            System.out.println(filePath);
+            logger.info(filePath);
             List<String> lines = Files.readAllLines(Paths.get(filePath));
             String content  = String.join("\n", lines);
             SaveTestEditorAction saveTestEditorAction = new SaveTestEditorAction();
@@ -531,7 +534,7 @@ public class SaveTestEditorAction extends UserAction {
             session.put("user",user);
             saveTestEditorAction.setSession(session);
             String success = SUCCESS.toUpperCase();
-            System.out.println(success);
+            logger.info(success);
         }
     }
 
