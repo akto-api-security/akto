@@ -11,6 +11,8 @@ import HardCoded from '../user_config/HardCoded';
 import LoginStepBuilder from '../user_config/LoginStepBuilder';
 import { ChevronRightMinor, ChevronDownMinor, InfoMinor } from '@shopify/polaris-icons';
 import ParamsCard from './ParamsCard';
+import JsonRecording from '../user_config/JsonRecording';
+import Dropdown from '../../../components/layouts/Dropdown';
 
 const selectOptions = [
     {
@@ -56,8 +58,14 @@ function TestRoleSettings() {
     const [deletedIndex, setDeletedIndex] = useState(-1);
     const [headerKey, setHeaderKey] = useState('') ;
     const [headerValue, setHeaderValue] = useState('');
+    const [automationType, setAutomationType] = useState("LOGIN_STEP_BUILDER")
 
     const authWithCondList = isNew ? null : location.state.authWithCondList;
+    const automationOptions = [
+        { label: "Login Step Builder", value: "LOGIN_STEP_BUILDER" },
+        { label: "JSON Recording", value: "RECORDED_FLOW" },
+    ]
+
     const resetFunc = () => {
         setChange(false);
         setRoleName(initialItems.name ? initialItems.name : "");
@@ -77,6 +85,10 @@ function TestRoleSettings() {
 
     const compareFunc = () => {
         return !change
+    }
+
+    const handleSelectAutomationType = async(type) => {
+        setAutomationType(type)
     }
 
     const saveAction = async (updatedAuth=false, authWithCondLists = null) => {
@@ -102,7 +114,6 @@ function TestRoleSettings() {
                 }).catch((err) => {
                     func.setToast(true, true, "Unable to update test role")
                 })
-
                 if(!updatedAuth){
                     func.setToast(true, false, "Test role updated successfully.")
                 }
@@ -199,7 +210,7 @@ function TestRoleSettings() {
     )
 
     const savedParamComponent = (
-        authWithCondList ?
+        authWithCondList ? 
         <LegacyCard title={<Text variant="headingMd">Configured auth details</Text>} key={"savedAuth"}>
             <br/>
             <Divider />
@@ -227,7 +238,7 @@ function TestRoleSettings() {
             steps: obj.steps,
             authParams: obj.authParams
         }))
-
+    
     }
 
     const addAuthButton = (
@@ -251,10 +262,23 @@ function TestRoleSettings() {
             const automationType = "HardCoded";
             const authParamData = [{key: hardCodeAuthInfo.authHeaderKey, value: hardCodeAuthInfo.authHeaderValue, where: "HEADER"}]
             resp = await api.addAuthToRole(initialItems.name, apiCond, authParamData, automationType, null)
-
+            
         }else{
             const automationType = "LOGIN_REQUEST";
-            resp = await api.addAuthToRole(initialItems.name, apiCond, currentInfo.authParams, automationType, currentInfo.steps)
+            
+            let recordedLoginFlowInput = null;
+            if(currentInfo.steps && currentInfo.steps.length > 0){
+                if (currentInfo.steps[0].type === "RECORDED_FLOW") {
+                    recordedLoginFlowInput = {
+                        content: currentInfo.steps[0].content,
+                        tokenFetchCommand: currentInfo.steps[0].tokenFetchCommand,
+                        outputFilePath: null,
+                        errorFilePath: null,
+                    }
+                }
+            }
+
+            resp = await api.addAuthToRole(initialItems.name, apiCond, currentInfo.authParams, automationType, currentInfo.steps, recordedLoginFlowInput)
         }
         handleCancel()
         await saveAction(true, resp.selectedRole.authWithCondList)
@@ -282,7 +306,7 @@ function TestRoleSettings() {
                                 value={headerKey}
                                 onChange={setHeaderKey}
                                 />
-                            <TextField
+                            <TextField 
                                 id={"auth-header-value-field"}
                                 label={(
                                     <HorizontalStack gap="2">
@@ -320,7 +344,7 @@ function TestRoleSettings() {
                             <HardCoded showOnlyApi={true} extractInformation={true} setInformation={setHardCodedInfo}/>
                         </Collapsible>
                     </LegacyStack>
-
+                
                     <LegacyStack vertical>
                         <Button
                             id={"automated-token-expand-button"}
@@ -337,7 +361,19 @@ function TestRoleSettings() {
                             transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}
                             expandOnPrint
                         >
-                            <LoginStepBuilder extractInformation = {true} showOnlyApi={true} setStoreData={handleLoginInfo}/>
+
+                            <div style={{ display: "grid", gridTemplateColumns: "max-content max-content", gap: "10px", alignItems: "center" }}>
+                                <Text>Select automation type:</Text>
+                                <Dropdown
+                                    selected={handleSelectAutomationType}
+                                    menuItems={automationOptions}
+                                    initial={automationType}
+                                />
+                            </div>
+                            <br />
+
+                            { automationType === "LOGIN_STEP_BUILDER" && <LoginStepBuilder extractInformation = {true} showOnlyApi={true} setStoreData={handleLoginInfo}/> }
+                            { automationType === "RECORDED_FLOW" && <JsonRecording extractInformation = {true} showOnlyApi={true} setStoreData={handleLoginInfo}/> }
                         </Collapsible>
                     </LegacyStack>
                 </LegacyCard.Section>

@@ -13,7 +13,8 @@
                         :items="[
                             {text: 'TESTING', value: 'TESTING'},
                             {text: 'RUNTIME', value: 'RUNTIME'},
-                            {text: 'DASHBOARD', value: 'DASHBOARD'} 
+                            {text: 'DASHBOARD', value: 'DASHBOARD'},
+                            {text: 'ANALYSER', value: 'ANALYSER'}
                         ]"
                         v-model="logGroupName"
                         label="Select log group"

@@ -47,7 +47,7 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
     const [isLoading, setIsLoading] = useState(false)
 
     useEffect(() => {
-
+        
         if(!extractInformation){
             setIsLoading(true)
             if (authMechanism && authMechanism.type === "LOGIN_REQUEST" && authMechanism.requestData[0].type !== "RECORDED_FLOW") {
