@@ -5,13 +5,14 @@ import api from "../api"
 import Store from "../../../store"
 import AuthParams from "./AuthParams"
 
-function JsonRecording() {
+function JsonRecording({extractInformation, showOnlyApi, setStoreData}) {
 
     const fileInputRef = useRef("")
 
     const authMechanism = TestingStore(state => state.authMechanism)
     const setToastConfig = Store(state => state.setToastConfig)
     const [tokenFetchCommand, setTokenFetchCommand] = useState('"Bearer " + JSON.parse(Object.values(window.localStorage).find(x => x.indexOf("access_token")> -1)).body.access_token')
+    const [content, setContent] = useState("")
     const [extractedToken, setExtractedToken] = useState("")
     const [showVerify, setShowVerify] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
@@ -24,11 +25,15 @@ function JsonRecording() {
     }])
 
     useEffect(() => {
-        if (authMechanism && authMechanism.type === "LOGIN_REQUEST" && authMechanism.requestData[0].type === "JSON_RECORDING") {
-            setTokenFetchCommand(authMechanism.requestData[0].tokenFetchCommand)
-            setAuthParams(authMechanism.authParams)
-            setShowVerify(true)
-            pollExtractedToken()
+        if (!extractInformation) {
+            if (authMechanism && authMechanism.type === "LOGIN_REQUEST" && authMechanism.requestData[0].type === "RECORDED_FLOW") {
+                setTokenFetchCommand(authMechanism.requestData[0].tokenFetchCommand)
+                setAuthParams(authMechanism.authParams)
+                setShowVerify(true)
+                pollExtractedToken()
+            }
+        } else {
+            return;
         }
     }, [])
 
@@ -61,10 +66,12 @@ function JsonRecording() {
             let result = api.fetchRecordedLoginFlow("x1")
 
             result.then((resp) => {
-                setToastConfig({ isActive: true, isError: false, message: "Verify extracted token" })
-                setExtractedToken(JSON.stringify(resp))
-                success = true
-                setIsLoading(false)
+                if (!resp.tokenFetchInProgress) {
+                    setExtractedToken(resp.token)
+                    success = true
+                    setIsLoading(false)
+                    setToastConfig({ isActive: true, isError: false, message: "Verify extracted token" })
+                }
             }).catch((err) => {
             })
         }
@@ -84,6 +91,7 @@ function JsonRecording() {
         reader.readAsText(fileObj)
 
         reader.onload = () => {
+            setContent(reader.result)
             const result = api.uploadRecordedLoginFlow(reader.result, tokenFetchCommand)
 
             result.then((resp) => {
@@ -105,6 +113,23 @@ function JsonRecording() {
         await api.addAuthMechanism('LOGIN_REQUEST', [...steps], authParams)
         setToastConfig({ isActive: true, isError: false, message: "JSON recording flow saved successfully!" })
     }
+
+    useEffect(() => {
+        if(extractInformation){
+            const steps = [{
+                tokenFetchCommand: tokenFetchCommand,
+                content: content,
+                type: "RECORDED_FLOW"
+            }]
+
+            setStoreData({
+                steps:steps,
+                authParams: authParams,
+            })
+        }else{
+            return;
+        }
+    },[content, tokenFetchCommand, authParams])
 
     return (
         <div>
@@ -157,7 +182,7 @@ function JsonRecording() {
             <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
 
             <br />
-            <Button id={"save-token"} onClick={handleSave} primary>Save changes</Button>
+            { showOnlyApi ? null : <Button id={"save-token"} onClick={handleSave} primary>Save changes</Button> }
         </div>
     )
 }

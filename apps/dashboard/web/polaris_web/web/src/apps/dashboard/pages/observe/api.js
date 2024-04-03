@@ -608,6 +608,14 @@ export default {
             data: {}
         })
     },
+    
+    async deMergeApi(apiCollectionId, url, method){
+        return await request({
+            url: '/api/deMergeApi',
+            method: 'post',
+            data: {apiCollectionId, url, method}
+        })
+    },
     async getUserEndpoints(){
         return await request({
             url: '/api/getCustomerEndpoints',
@@ -615,4 +623,11 @@ export default {
             data:{},
         })
     },
+    async updateEnvTypeOfCollection(envType, apiCollectionIds){
+        await request({
+            url: '/api/updateEnvType',
+            method: 'post',
+            data: {envType, apiCollectionIds}
+        })
+    }
 }

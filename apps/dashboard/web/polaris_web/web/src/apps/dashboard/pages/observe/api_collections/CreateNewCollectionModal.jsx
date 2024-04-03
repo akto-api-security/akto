@@ -36,7 +36,10 @@ function CreateNewCollectionModal(props) {
     }
 
     const createNewCollection = async () => {
-
+        if(newCollectionName.length === 0){
+            func.setToast(true,true, "Collection name cannot be empty")
+            return
+        }
         if (showApiSelector) {
             let dt = prepareData();
             await api.createCustomCollection(newCollectionName, dt);
@@ -128,6 +131,7 @@ function CreateNewCollectionModal(props) {
                         <Text>{newCollectionName.length}/24</Text>
                     )}
                     autoFocus
+                    {...newCollectionName.length === 0 ? {error: "Collection name cannot be empty"} : {}}
                 />
                 <span>
                     <Button plain onClick={() => setShowApiSelector(!showApiSelector)}>

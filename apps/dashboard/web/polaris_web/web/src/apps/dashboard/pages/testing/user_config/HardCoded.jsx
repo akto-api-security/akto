@@ -54,7 +54,7 @@ function HardCoded({showOnlyApi, extractInformation, setInformation}) {
             }]
         )
         setToastConfig({ isActive: true, isError: false, message: "Hard coded auth token saved successfully!" })
-    }
+    }       
 
     return (
         <div>
@@ -72,8 +72,8 @@ function HardCoded({showOnlyApi, extractInformation, setInformation}) {
                             </Tooltip>
                         </HorizontalStack>
                     )}
-                    value={userConfig.authHeaderKey} placeholder='' onChange={(authHeaderKey) => updateUserConfig("authHeaderKey", authHeaderKey)} />
-                <TextField
+                    value={userConfig.authHeaderKey} placeholder='' onChange={(authHeaderKey) => updateUserConfig("authHeaderKey", authHeaderKey)} />   
+                <TextField 
                     id={"auth-header-value-field"}
                     label={(
                         <HorizontalStack gap="2">

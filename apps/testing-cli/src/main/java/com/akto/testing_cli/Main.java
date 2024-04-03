@@ -129,13 +129,13 @@ public class Main {
         if (version == null || accountVersion == null) {
             String versionError = ColorConstants.RED + "Unable to find testing cli tool version."
                     + ColorConstants.RESET;
-            System.out.println(versionError);
+            logger.info(versionError);
         } else if (!version.equals(accountVersion)) {
             String versionError = ColorConstants.RED + "Please update your testing cli tool [ " + version
                     + " ] to the latest version [ " + accountVersion + " ] on akto dashboard\n" +
                     ColorConstants.GREEN + "You can do a docker pull to update the testing cli tool."
                     + ColorConstants.RESET;
-            System.out.println(versionError);
+            logger.info(versionError);
         }
 
         res = callDashboardApi("api/fetchAllSubCategories", body);
@@ -180,7 +180,9 @@ public class Main {
                 String content = testConfigMap.get(obj).getContent();
                 if(content.contains(ContextOperator.ENDPOINT_IN_TRAFFIC_CONTEXT.toString().toLowerCase()) 
                     || content.contains(ContextOperator.PARAM_CONTEXT.toString().toLowerCase())
-                    || content.contains(ContextOperator.PRIVATE_VARIABLE_CONTEXT.toString().toLowerCase())){
+                    || content.contains(ContextOperator.PRIVATE_VARIABLE_CONTEXT.toString().toLowerCase())
+                    || content.contains(ContextOperator.INCLUDE_ROLES_ACCESS.toString().toLowerCase())
+                    || content.contains(ContextOperator.EXCLUDE_ROLES_ACCESS.toString().toLowerCase())){
                         String info = "Cannot run context tests. Skipping " + obj;
                         logger.info(info);
                         return false;
@@ -333,21 +335,21 @@ public class Main {
             }
         }
 
-        System.out.println("\n");
+        logger.info("\n");
         testingRunResults.sort(
                 (a, b) -> {
                     return a.compareTo(b);
                 });
 
-        System.out.println(ColorConstants.YELLOW + "API collection: " + apiCollectionId + " "
+        logger.info(ColorConstants.YELLOW + "API collection: " + apiCollectionId + " "
                 + apiCollection.getDisplayName() + "\n" + ColorConstants.RESET);
-        
-        System.out.println("Tested " + apiInfoKeys.size() + " API" + (apiInfoKeys.size()==1 ? "" : "s") + "\n");
-        
-        System.out.println(ColorConstants.RED + "Total vulnerabilities: " + totalVulnerabilities + "\n" + ColorConstants.RESET);
+
+        logger.info("Tested " + apiInfoKeys.size() + " API" + (apiInfoKeys.size()==1 ? "" : "s") + "\n");
+
+        logger.info(ColorConstants.RED + "Total vulnerabilities: " + totalVulnerabilities + "\n" + ColorConstants.RESET);
         if(totalVulnerabilities>0){
             for (Map.Entry<String, Integer> entry : severityMap.entrySet()) {
-            System.out.println(ColorConstants.RED + entry.getKey() + ": " + entry.getValue() + "\n" + ColorConstants.RESET);
+                logger.info(ColorConstants.RED + entry.getKey() + ": " + entry.getValue() + "\n" + ColorConstants.RESET);
             }
         }
 
@@ -362,7 +364,7 @@ public class Main {
                 vulnerableTestToApiMap.put(it.getTestSubType(), tmp);
             }
             String output = it.toConsoleString(severity);
-            System.out.println(output);
+            logger.info(output);
         }
 
         OUTPUT_LEVEL outputLevel = OUTPUT_LEVEL.SUMMARY;
@@ -374,7 +376,7 @@ public class Main {
         }
 
         if(outputLevel.equals(OUTPUT_LEVEL.NONE)){
-            return;
+            System.exit(0);
         }
 
         String fileDir = "../out/";
@@ -434,10 +436,13 @@ public class Main {
                     writer.write(output);
                 }
             }
-            System.out.println("Detailed result is written to output.txt");
+            logger.info("Detailed result is written to output.txt");
         } catch (Exception e) {
             String error = "Error writing to file " + filePath + " due to " + e.getMessage();
             logger.error(error);
         }
+
+        System.exit(0);
+
     }
 }
