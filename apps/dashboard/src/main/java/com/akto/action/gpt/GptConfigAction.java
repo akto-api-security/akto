@@ -6,6 +6,7 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dto.gpt.AktoGptConfig;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.gpt.AktoGptConfigState;
+import com.akto.listener.InitializerListener;
 import com.mongodb.BasicDBObject;
 
 import java.util.*;
@@ -20,7 +21,7 @@ public class GptConfigAction extends UserAction {
 
     private List<BasicDBObject> currentState;
 
-    public static final AktoGptConfigState DEFAULT_STATE = AktoGptConfigState.ENABLED;
+    public static final AktoGptConfigState DEFAULT_STATE = InitializerListener.isSaas ? AktoGptConfigState.ENABLED : AktoGptConfigState.DISABLED;
 
     private static final Logger logger = LoggerFactory.getLogger(GptConfigAction.class);
 
