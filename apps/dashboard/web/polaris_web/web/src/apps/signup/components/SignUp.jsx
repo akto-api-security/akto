@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from "react-router-dom"
 import api from '../api'
 import func from '@/util/func'
 import "../styles.css"
+import Store from '../../dashboard/store'
 
 function SignUp() {
 
@@ -142,6 +143,22 @@ function SignUp() {
       </HorizontalStack>
     </VerticalStack>
   )
+
+  const toastConfig = Store(state => state.toastConfig)
+  const setToastConfig = Store(state => state.setToastConfig)
+
+  const disableToast = () => {
+    setToastConfig({
+      isActive: false,
+      isError: false,
+      message: ""
+    })
+  }
+
+  const toastMarkup = toastConfig.isActive ? (
+    <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableToast} duration={2000} />
+  ) : null;
+  
   return (
     <div className='login-page'>
       <Frame >
@@ -177,6 +194,7 @@ function SignUp() {
             </div>
           </Box>
         </Page>
+        {toastMarkup}
       </Frame>
     </div>
   )

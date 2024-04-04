@@ -40,7 +40,7 @@ const fargateObj = {
     label: 'AWS Fargate',
     text: "AWS Fargate allows you to use Amazon ECS to run containers without having to manage servers or clusters of Amazon EC2 instances.", 
     docsUrl: 'https://docs.akto.io/traffic-connections/aws-fargate',
-    component: <FargateSource docsUrl='https://docs.akto.io/traffic-connections/aws-fargate' bannerTitle="Setup using Fargate"/>,
+    component: <FargateSource docsUrl='https://docs.akto.io/traffic-connections/aws-fargate' bannerTitle="Setup using Fargate" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/aws-fargate#add-akto-traffic-collector-container"/>,
     key: "FARGATE"
 }
 
@@ -58,7 +58,7 @@ const dockerObj = {
     label: "Docker",
     text: "This setup is recommended only if other setups for AWS or GCP don't work.",
     docsUrl: 'https://docs.akto.io/traffic-connections/docker',
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/docker" bannerTitle="Setup using Docker" />,
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/docker" bannerTitle="Setup using Docker"innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/docker#adding-akto-docker-service"/>,
     key: "DOCKER"
 }
 
@@ -68,7 +68,7 @@ const envoyObj = {
     text: 'Akto-Envoy setup is recommended if your APIs are routed by Envoy.',
     docsUrl: 'https://docs.akto.io/traffic-connections/envoy',
     key: "ENVOY",
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/envoy" bannerTitle="Setup using Envoy" />,
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/envoy" bannerTitle="Setup using Envoy" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/envoy#adding-akto-traffic-collector"/>,
 }
 
 const ebpfObj = {
@@ -125,7 +125,7 @@ const nginxObj = {
     text: 'This setup is recommended if your APIs are routed by NGINX.',
     docsUrl: 'https://docs.akto.io/traffic-connections/nginx',
     key: "NGINX",
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/nginx" bannerTitle="Setup using NGINX" />
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/nginx" bannerTitle="Setup using NGINX" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/nginx#add-nginx-module"/>
 }
 
 const postmanObj = {
@@ -152,7 +152,7 @@ const tcpObj = {
     text: ' This setup is recommended only if other setups for AWS or GCP do not work.',
     docsUrl: 'https://docs.akto.io/traffic-connections/tcp-agent',
     key: "NGINX",
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/tcp-agent" bannerTitle="Setup using TCP Agent" />
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/tcp-agent" bannerTitle="Setup using TCP Agent" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/tcp-agent#adding-akto-traffic-collector-container" />
 }
 
 const quick_start_policy_lines= [
@@ -787,8 +787,7 @@ const quickStartFunc = {
     getDesiredSteps: function(url) {
         const steps = [
             {
-              text: "Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking ",
-              textComponent: <a target='_blank' href={url}>here</a>, 
+              textComponent: <span>Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking <a target='_blank' href={url}>here</a>.</span>, 
             },
             {
               text: "We will create an inline policy, navigate to JSON tab and paste the copied JSON here."

@@ -3,7 +3,7 @@
     text-overflow: ellipsis; 
     white-space: nowrap
 }
-.gpt-button-fixed {
+.button-fixed {
     position: absolute;
     z-index: 400;
     right: 48px !important;

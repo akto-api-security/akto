@@ -74,7 +74,9 @@ public class TestEditorEnums {
     public enum ContextOperator {
         PRIVATE_VARIABLE_CONTEXT,
         PARAM_CONTEXT,
-        ENDPOINT_IN_TRAFFIC_CONTEXT
+        ENDPOINT_IN_TRAFFIC_CONTEXT,
+        INCLUDE_ROLES_ACCESS,
+        EXCLUDE_ROLES_ACCESS
     }
 
 
@@ -204,6 +206,7 @@ public class TestEditorEnums {
         REMOVE_AUTH_HEADER,
         REPLACE_AUTH_HEADER,
         REPLACE_BODY,
+        DELETE_GRAPHQL_FIELD,
         JWT_REPLACE_BODY,
         ATTACH_FILE,
         SEND_SSRF_REQ,
@@ -215,7 +218,9 @@ public class TestEditorEnums {
         ADD_QUERY_PARAM,
         MODIFY_HEADER,
         MODIFY_BODY_PARAM,
-        MODIFY_QUERY_PARAM
+        MODIFY_QUERY_PARAM,
+        ADD_GRAPHQL_FIELD,
+        MODIFY_GRAPHQL_FIELD
     }
 
     public enum TerminalNonExecutableDataOperands {
