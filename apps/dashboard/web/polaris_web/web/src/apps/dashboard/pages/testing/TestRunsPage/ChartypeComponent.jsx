@@ -30,7 +30,8 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
       }, {}) : data
 
     const chartComponent = (
-        isNormal ? <DonutChart data={chartData} title="" size={210}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
+
+        isNormal ? <DonutChart data={chartData}  title=""  type={title} size={210}/> : <ConcentricCirclesChart data={chartData} type={title} title={charTitle} size={210} subtitle={chartSubtitle} />
     )
 
     return (

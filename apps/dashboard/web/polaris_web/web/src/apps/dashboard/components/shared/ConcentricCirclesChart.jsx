@@ -2,10 +2,14 @@ import React from 'react'
 import HighchartsReact from "highcharts-react-official"
 import Highcharts from "highcharts"
 import { useRef } from "react";
+import { useNavigate } from "react-router-dom"
 
-function ConcentricCirclesChart({data,title,size,subtitle}) {
+
+function ConcentricCirclesChart({data,title,size,subtitle,type}) {
 
     const chartComponentRef = useRef(null)
+    const navigate = useNavigate()
+
     let seriesData = []
     let startSize = size
     Object.keys(data).forEach((ele)=>{
@@ -61,7 +65,20 @@ function ConcentricCirclesChart({data,title,size,subtitle}) {
                         opacity: 1
                     }
                 }
+            },
+            point: {
+                events: {
+                    click: (event) => {
+                        const { point } = event;
+                        navigate(`/dashboard/observe/sensitive/${point.name}?filter=${type.toLowerCase()}`);
+                      }
+
+                    // click: function(){
+                    //     navigate(`/dashboard/observe/sensitive/${this.name}?filter=${type.toLowerCase()}`)
+                    // }
+                }
             }
+
         }
         
     }

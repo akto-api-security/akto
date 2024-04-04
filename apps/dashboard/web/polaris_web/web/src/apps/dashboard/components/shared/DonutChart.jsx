@@ -2,9 +2,13 @@ import React from 'react'
 import HighchartsReact from "highcharts-react-official"
 import Highcharts from "highcharts"
 import { useRef } from "react";
+import { useNavigate } from "react-router-dom"
 
-function DonutChart({data, title, size}) {
+
+function DonutChart({data, title, size,type}) {
     const chartComponentRef = useRef(null)
+    const navigate = useNavigate()
+
 
     let seriesData = []
     if(data && Object.keys(data).length > 0){
@@ -40,6 +44,8 @@ function DonutChart({data, title, size}) {
                     [1, '#E0E0E0']
                 ]
             },
+            headerFormat: '',
+            pointFormat: '<b>{point.name} </b> {point.y}',
             borderWidth: 1,
             borderColor: '#AAA'
         },
@@ -50,6 +56,18 @@ function DonutChart({data, title, size}) {
               dataLabels: {
                 enabled: false
               }
+            },
+            series: {
+                point: {
+                    events: {
+
+                        click: (event) => {
+                            const { point } = event;
+                            navigate(`/dashboard/observe/sensitive/${point.name}?filter=${type.toLowerCase()}`);
+                          }
+                    }
+                }
+
             }
         },
         series:[{
