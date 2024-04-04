@@ -322,7 +322,7 @@ public class SaveTestEditorAction extends UserAction {
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
         TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
         List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
-        Integer lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
+        int lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
         testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs);
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
