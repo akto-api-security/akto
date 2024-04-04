@@ -168,8 +168,8 @@ function HomeDashboard() {
             <VerticalStack gap={5}>
                 <Text variant="bodyLg" fontWeight="semibold">Sensitive Data</Text>
                 <HorizontalGrid gap={5} columns={2}>
-                    <ChartypeComponent data={sensitiveData.request} title={"Request"} isNormal={true} boxHeight={'100px'}/>
-                    <ChartypeComponent data={sensitiveData.response} title={"Response"} isNormal={true} boxHeight={'100px'}/>
+                    <ChartypeComponent navurl={"/dashboard/observe/sensitive/"} data={sensitiveData.request} title={"Request"} isNormal={true} boxHeight={'100px'}/>
+                    <ChartypeComponent navurl={"/dashboard/observe/sensitive/"} data={sensitiveData.response} title={"Response"} isNormal={true} boxHeight={'100px'}/>
                 </HorizontalGrid>
             </VerticalStack>
         </Card>
