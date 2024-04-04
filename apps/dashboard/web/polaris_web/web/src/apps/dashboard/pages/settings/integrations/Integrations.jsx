@@ -62,21 +62,36 @@ function Integrations() {
       id: 'jira',
       name:'Jira',
       source: '/public/logo_jira.svg'
-  }
+    }
 
+    let oktaSsoObj={
+      id: 'okta_sso',
+      name: 'Okta SSO',
+      source: '/public/okta_logo.svg'
+    }
+    let azureAdSsoObj={
+      id: 'azure_sso',
+      name: 'Azure AD SSO',
+      source: '/public/azure_logo.svg'
+    }
     let githubAppObj = {
       id: 'github_app',
       name: 'Github App',
       source: '/public/github_icon.svg'
     }
 
-    let allItems = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj,githubSsoObj, githubAppObj, jiraObj]
+    let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, githubAppObj]
+
+    let allItems = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj, jiraObj]
+    if (window.DASHBOARD_MODE === "ON_PREM") {
+        allItems = [...allItems, ...ssoItems]
+    }
     let currObjs = allItems
     const [currItems , setCurrentItems] = useState(currObjs)
     const tabs = [
         {
             id: 'all',
-            content: <span>All <Badge status='new'>10</Badge></span>,
+            content: <span>All <Badge status='new'>12</Badge></span>,
             component: <TabsList />
         },
         {
@@ -101,7 +116,7 @@ function Integrations() {
         },
         {
           id: 'sso',
-          content: <span>SSO <Badge status='new'>1</Badge></span>,
+          content: <span>SSO <Badge status='new'>3</Badge></span>,
           component: <TabsList />
         },
         {
@@ -129,7 +144,7 @@ function Integrations() {
                 break;
 
             case 'sso':
-                currObjs= [githubSsoObj]
+                currObjs= [githubSsoObj, oktaSsoObj, azureAdSsoObj]
                 setCurrentItems(currObjs)
                 break;
 

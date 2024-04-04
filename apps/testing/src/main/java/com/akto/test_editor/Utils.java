@@ -1,5 +1,6 @@
 package com.akto.test_editor;
 
+import java.util.*;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -31,6 +32,7 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
+import static com.akto.rules.TestPlugin.extractAllValuesFromPayload;
 import okhttp3.*;
 
 public class Utils {
@@ -243,6 +245,59 @@ public class Utils {
                 return false;
         }
         return result;
+    }
+
+
+    public static Set<String> headerValuesUnchanged(Map<String, List<String>> originalRequestHeaders, Map<String, List<String>> testRequestHeaders) {
+        Set<String> diff = new HashSet<>();
+        if (originalRequestHeaders == null) return diff;
+        for (String key: testRequestHeaders.keySet()) {
+            List<String> originalHeaderValues = originalRequestHeaders.get(key);
+            List<String> testHeaderValues = testRequestHeaders.get(key);
+            if (originalHeaderValues == null || testHeaderValues == null) continue;
+            if (areListsEqual(originalHeaderValues, testHeaderValues)) {
+                diff.add(key);
+            }
+        }
+
+        return diff;
+    }
+
+    public static boolean areListsEqual(List<String> list1, List<String> list2) {
+        if (list1.size() != list2.size()) {
+            return false;
+        }
+
+        List<String> copyOfList1 = new ArrayList<>(list1);
+        List<String> copyOfList2 = new ArrayList<>(list2);
+
+        Collections.sort(copyOfList1);
+        Collections.sort(copyOfList2);
+
+        return copyOfList1.equals(copyOfList2);
+    }
+
+    public static Set<String> bodyValuesUnchanged(String originalPayload, String testPayload) {
+        Set<String> diff = new HashSet<>();
+
+        Map<String, Set<String>> originalRequestParamMap = new HashMap<>();
+        Map<String, Set<String>> testRequestParamMap= new HashMap<>();
+        try {
+            extractAllValuesFromPayload(originalPayload, originalRequestParamMap);
+            extractAllValuesFromPayload(testPayload, testRequestParamMap);
+        } catch (Exception e) {
+        }
+
+        for (String key: testRequestParamMap.keySet()) {
+            Set<String> testValues = testRequestParamMap.get(key);
+            Set<String> originalValues = originalRequestParamMap.get(key);
+            if (testValues == null) continue;
+            String[] keySplit = key.split("\\.");
+            String finalKey = keySplit[keySplit.length - 1];
+            if (testValues.equals(originalValues)) diff.add(finalKey); // todo: check null
+        }
+
+        return diff;
     }
 
     public static BasicDBObject fetchJsonObjForString(Object val) {
@@ -664,7 +719,7 @@ public class Utils {
             if(System.getenv("SSRF_SERVICE_NAME") != null && System.getenv("SSRF_SERVICE_NAME").length() > 0){
                 hostName = System.getenv("SSRF_SERVICE_NAME");
             }
-            requestUrl = hostName + url;
+            requestUrl = hostName + "validate/" + url;
         }
 
         Request request = new Request.Builder()

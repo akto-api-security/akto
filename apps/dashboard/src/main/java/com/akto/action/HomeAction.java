@@ -2,8 +2,10 @@ package com.akto.action;
 
 import com.akto.listener.InitializerListener;
 import com.akto.utils.Auth0;
+import com.akto.utils.AzureLogin;
 import com.akto.util.DashboardMode;
 import com.akto.utils.GithubLogin;
+import com.akto.utils.OktaLogin;
 import com.auth0.AuthorizeUrl;
 import com.auth0.SessionUtils;
 import com.mongodb.BasicDBObject;
@@ -11,6 +13,8 @@ import com.opensymphony.xwork2.Action;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
 import org.apache.struts2.interceptor.SessionAware;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -28,6 +32,7 @@ import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 public class HomeAction implements Action, SessionAware, ServletResponseAware, ServletRequestAware {
 
     protected HttpServletResponse servletResponse;
+    private static final Logger logger = LoggerFactory.getLogger(LoginAction.class);
 
     @Override
     public void setServletResponse(HttpServletResponse httpServletResponse) {
@@ -46,17 +51,23 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
         if (GithubLogin.getClientId() != null) {
             servletRequest.setAttribute("githubClientId", new String(Base64.getEncoder().encode(GithubLogin.getClientId().getBytes())));
         }
+        if(OktaLogin.getAuthorisationUrl() != null){
+            servletRequest.setAttribute("oktaAuthUrl", new String(Base64.getEncoder().encode(OktaLogin.getAuthorisationUrl().getBytes())));
+        }
+        if(AzureLogin.getSamlSettings() != null){
+            servletRequest.setAttribute("azureRequestUrl", new String(Base64.getEncoder().encode((AzureLogin.getInstance().getAzureConfig().getApplicationIdentifier() + "/signup-azure-request").getBytes())));
+        }
         if (InitializerListener.aktoVersion != null && InitializerListener.aktoVersion.contains("akto-release-version")) {
             servletRequest.setAttribute("AktoVersionGlobal", "");
         } else {
             servletRequest.setAttribute("AktoVersionGlobal", InitializerListener.aktoVersion);
         }
-        System.out.println("in Home::execute: settings IS_SAAS to " + InitializerListener.isSaas);
+        logger.info("in Home::execute: settings IS_SAAS to " + InitializerListener.isSaas);
         if(DashboardMode.isSaasDeployment()){
             //Use Auth0
             return redirectToAuth0(servletRequest, servletResponse, accessToken, new BasicDBObject());
 //            if (SUCCESS1 != null) return SUCCESS1;
-//            System.out.println("Executed home action for auth0");
+//            logger.info("Executed home action for auth0");
 //            return "SUCCESS";
         }
         // Use existing flow

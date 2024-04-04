@@ -26,6 +26,8 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
     public static ApiInfoDao instance = new ApiInfoDao();
 
+    public static final String ID = "_id.";
+
     public void createIndicesIfAbsent() {
 
         boolean exists = false;
@@ -40,10 +42,16 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
 
-        String[] fieldNames = {ApiInfo.ID_URL};
+        String[] fieldNames = {"_id." + ApiInfo.ApiInfoKey.API_COLLECTION_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        fieldNames = new String[]{ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL};
+        fieldNames = new String[]{"_id." + ApiInfo.ApiInfoKey.URL};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL }, true);
+        
+        fieldNames = new String[]{"_id." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, "_id." + ApiInfo.ApiInfoKey.URL};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
         fieldNames = new String[]{ApiInfo.ID_API_COLLECTION_ID, ApiInfo.LAST_SEEN};
@@ -58,6 +66,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] {ApiInfo.SEVERITY_SCORE }, false);
     }
+    
 
     public void updateLastTestedField(ApiInfoKey apiInfoKey){
         instance.getMCollection().updateOne(
