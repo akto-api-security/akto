@@ -1,5 +1,10 @@
 import func from "@/util/func";
 import api from "./api";
+import {ResourcesMajor,
+  CollectionsMajor,
+  CreditCardSecureMajor,
+  MarketingMajor,
+  FraudProtectMajor, RiskMajor} from '@shopify/polaris-icons';
 import React, {  } from 'react'
 import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Tag} from '@shopify/polaris';
 import { history } from "@/util/history";
@@ -7,12 +12,6 @@ import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
 import { circle_cancel, circle_tick_minor } from "../../components/icons";
-import {ResourcesMajor,
-  CollectionsMajor,
-  CreditCardSecureMajor,
-  MarketingMajor,
-  FraudProtectMajor, RiskMajor} from '@shopify/polaris-icons';
-import { useLocation } from "react-router-dom"
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -564,6 +563,47 @@ const transform = {
       }
     })
     return summaries;
+},
+
+getInfoSectionsHeaders(){
+  let moreInfoSections = [
+    {
+      icon: RiskMajor,
+      title: "Impact",
+      content: ""
+    },
+    {
+      icon: CollectionsMajor,
+      title: "Tags",
+      content: ""
+    },
+    {
+      icon: CreditCardSecureMajor,
+      title: "CWE",
+      content: ""
+    },
+    {
+      icon: FraudProtectMajor,
+      title: "CVE",
+      content: ""
+    },
+    {
+      icon: MarketingMajor,
+      title: "API endpoints affected",
+      content: ""
+    },
+    {
+      icon: ResourcesMajor,
+      title: "References",
+      content: ""
+    },
+    {
+      icon: ResourcesMajor,
+      title: "Jira",
+      content: ""
+    }
+  ]
+  return moreInfoSections
   },
 convertSubIntoSubcategory(resp){
   let obj = {}
@@ -611,47 +651,6 @@ convertSubIntoSubcategory(resp){
     countMap: countObj
   }
 
-},
-
-getInfoSectionsHeaders(){
-  let moreInfoSections = [
-    {
-      icon: RiskMajor,
-      title: "Impact",
-      content: ""
-    },
-    {
-      icon: CollectionsMajor,
-      title: "Tags",
-      content: ""
-    },
-    {
-      icon: CreditCardSecureMajor,
-      title: "CWE",
-      content: ""
-    },
-    {
-      icon: FraudProtectMajor,
-      title: "CVE",
-      content: ""
-    },
-    {
-      icon: MarketingMajor,
-      title: "API endpoints affected",
-      content: ""
-    },
-    {
-      icon: ResourcesMajor,
-      title: "References",
-      content: ""
-    },
-    {
-      icon: ResourcesMajor,
-      title: "Jira",
-      content: ""
-    }
-  ]
-  return moreInfoSections
 },
 getUrlComp(url){
   let arr = url.split(' ')
