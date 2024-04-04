@@ -48,17 +48,28 @@ function TestRolesPage(){
         navigate("details")
     }
 
+
     const getActions = (item) => {
+
         return [{
             items: [
-            {
-                content: 'Edit',
-                onAction: () => navigate("details", {state: {
-                    name: item.name,
-                    endpoints: item.endpointLogicalGroup.testingEndpoints,
-                    authWithCondList: item.authWithCondList
-                }})
-            }]
+                {
+                    content: 'Edit',
+                    onAction: () => navigate("details", {state: {
+                        name: item.name,
+                        endpoints: item.endpointLogicalGroup.testingEndpoints,
+                        authWithCondList: item.authWithCondList
+                    }})
+                },
+                {
+                    content: 'Access matrix',
+                    onAction: () => navigate("access-matrix", {state: {
+                        name: item.name,
+                        endpoints: item.endpointLogicalGroup.testingEndpoints,
+                        authWithCondList: item.authWithCondList
+                    }})
+                }
+            ]
         }]
     }
 

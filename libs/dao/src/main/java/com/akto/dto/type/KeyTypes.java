@@ -49,7 +49,7 @@ public class KeyTypes {
 
     public void process(String url, String method, int responseCode, boolean isHeader, String param, Object object,
                         String userId, int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap,
-                        boolean isUrlParam) {
+                        boolean isUrlParam, int timestamp) {
 
         String key = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
         String[] keyArr = key.split("\\.");
@@ -68,12 +68,12 @@ public class KeyTypes {
             Set<String> userIds = new HashSet<>();
             userIds.add(userId);
             paramId.setSubType(subType);
-            singleTypeInfo = new SingleTypeInfo(paramId, examples, userIds, 0, Context.now(), 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
+            singleTypeInfo = new SingleTypeInfo(paramId, examples, userIds, 0, timestamp, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
 
             occurrences.put(subType, singleTypeInfo);
         }
 
-        singleTypeInfo.setLastSeen(Context.now());
+        singleTypeInfo.setLastSeen(timestamp);
         singleTypeInfo.updateMinMaxValues(object);
 
         SingleTypeInfo.Domain domain = singleTypeInfo.getDomain();

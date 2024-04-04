@@ -15,12 +15,17 @@ import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.type.APICatalog;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SampleDataToSTI {
 
     // url -> method -> response code -> list(singleTypeInfo)
     private Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = new HashMap<>();
     private List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
+
+    private static final Logger logger = LoggerFactory.getLogger(SampleDataToSTI.class);
+
 
     public SampleDataToSTI(){
 
@@ -113,7 +118,7 @@ public class SampleDataToSTI {
             httpResponseParams = HttpCallParser.parseKafkaMessage(dataString);
         } catch (Exception e) {
             flag = true;
-
+            logger.error(e.getMessage());
         }
 
         if (flag) {
