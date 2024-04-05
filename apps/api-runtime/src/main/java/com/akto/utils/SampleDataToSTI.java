@@ -33,14 +33,13 @@ public class SampleDataToSTI {
 
     public void setSampleDataToSTI(List<SampleData> allData) {
 
-        HttpCallParser parse = new HttpCallParser("", 0, 0, 0, true);
         for (SampleData sampleData : allData) {
 
             Method method = sampleData.getId().getMethod();
             String url = sampleData.getId().getUrl();
             List<SingleTypeInfo> singleTypeInfoPerURL = new ArrayList<>();
             for (String dataString : sampleData.getSamples()) {
-                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url,parse));
+                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url));
             }
             Map<Integer, List<SingleTypeInfo>> responseCodeToSTI = new HashMap<>();
             for(SingleTypeInfo singleTypeInfo:singleTypeInfoPerURL){
@@ -74,7 +73,7 @@ public class SampleDataToSTI {
             String url = sensitiveSampleData.getId().getUrl();
             List<SingleTypeInfo> singleTypeInfoPerURL = new ArrayList<>();
             for (String dataString : sensitiveSampleData.getSampleData()) {
-                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url,parse));
+                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url));
             }
             Map<Integer, List<SingleTypeInfo>> responseCodeToSTI = new HashMap<>();
             for(SingleTypeInfo singleTypeInfo:singleTypeInfoPerURL){
@@ -107,7 +106,7 @@ public class SampleDataToSTI {
         return this.singleTypeInfos;
     }
 
-    private List<SingleTypeInfo> getSampleDataToSTIUtil(String dataString, String url,HttpCallParser parse) {
+    private List<SingleTypeInfo> getSampleDataToSTIUtil(String dataString, String url) {
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
 
@@ -125,20 +124,19 @@ public class SampleDataToSTI {
             return singleTypeInfos;
         }
 
+        if (!HttpResponseParams.validHttpResponseCode(httpResponseParams.getStatusCode())) return singleTypeInfos;
+
         List<HttpResponseParams> responseParams = new ArrayList<>();
         responseParams.add(httpResponseParams);
-        List<HttpResponseParams> filteredResponseParams = parse.filterHttpResponseParams(responseParams);
         Map<Integer, URLAggregator> aggregatorMap = new HashMap<>();
-        parse.setAggregatorMap(aggregatorMap);
-        parse.aggregate(filteredResponseParams);
-        aggregatorMap = parse.getAggregatorMap();
-        parse.apiCatalogSync = new APICatalogSync("0",0, true);
+        HttpCallParser.aggregate(responseParams, aggregatorMap);
+        APICatalogSync apiCatalogSync = new APICatalogSync("0",0, true,false);
         for (int apiCollectionId : aggregatorMap.keySet()) {
             URLAggregator aggregator = aggregatorMap.get(apiCollectionId);
-            parse.apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
-            for (Integer key : parse.apiCatalogSync.delta.keySet()) {
-                APICatalog apiCatlog = parse.apiCatalogSync.delta.get(key);
-                singleTypeInfos.addAll(apiCatlog.getAllTypeInfo());
+            apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
+            for (Integer key : apiCatalogSync.delta.keySet()) {
+                APICatalog apiCatalog = apiCatalogSync.delta.get(key);
+                singleTypeInfos.addAll(apiCatalog.getAllTypeInfo());
             }
         }
 
