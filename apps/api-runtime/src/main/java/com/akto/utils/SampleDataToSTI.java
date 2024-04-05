@@ -124,8 +124,6 @@ public class SampleDataToSTI {
             return singleTypeInfos;
         }
 
-        if (!HttpResponseParams.validHttpResponseCode(httpResponseParams.getStatusCode())) return singleTypeInfos;
-
         List<HttpResponseParams> responseParams = new ArrayList<>();
         responseParams.add(httpResponseParams);
         Map<Integer, URLAggregator> aggregatorMap = new HashMap<>();
