@@ -10,7 +10,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -26,6 +27,7 @@ import java.util.regex.Pattern;
 
 public class OtpAction extends UserAction {
 
+    private static final Logger logger = LoggerFactory.getLogger(OtpAction.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(OtpAction.class);
 
     private String from;
@@ -81,6 +83,10 @@ public class OtpAction extends UserAction {
         BasicDBObject result;
         try {
             result = makeRequestToMySms();
+            logger.info("****");
+            logger.info(String.valueOf(result));
+            logger.info("****");
+
             List<Map> messages = (List<Map>) result.get("messages");
             if (messages.size() == 0) return SUCCESS.toUpperCase();
 
@@ -96,6 +102,10 @@ public class OtpAction extends UserAction {
     public String fetchOtpFromMySms() {
         try {
             BasicDBObject result = makeRequestToMySms();
+
+            logger.info("((((");
+            logger.info(String.valueOf(result));
+            logger.info("((((");
 
             List<Map> messages = (List<Map>) result.get("messages");
 
@@ -142,6 +152,7 @@ public class OtpAction extends UserAction {
             os.write(json.getBytes(StandardCharsets.UTF_8));
         }
 
+        logger.info(String.valueOf(http.getResponseCode()));
         InputStream inputStream = http.getInputStream();
 
 

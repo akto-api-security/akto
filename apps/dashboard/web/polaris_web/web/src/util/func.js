@@ -13,9 +13,9 @@ import inventoryApi from "../apps/dashboard/pages/observe/api"
 import { isValidElement } from 'react';
 import Store from '../apps/dashboard/store';
 import { current } from 'immer';
+import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
-import homeFunctions from '../apps/dashboard/pages/home/module';
 
 const func = {
   setToast (isActive, isError, message) {
@@ -257,8 +257,8 @@ prettifyEpoch(epoch) {
       let a = testSubType.superCategory["severity"]["_name"]
       return a
     }
-  }
-  ,
+  },
+
   copyToClipboard(text, ref, toastMessage) {
     if (!navigator.clipboard) {
       // Fallback for older browsers (e.g., Internet Explorer)
@@ -724,7 +724,9 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
                   access_type = null
               } else if (access_types.indexOf("PUBLIC") !== -1) {
                   access_type = "Public"
-              } else {
+              } else if (access_types.indexOf("PARTNER") !== -1){
+                  access_type = "Partner"
+              }else{
                   access_type = "Private"
               }
           }
@@ -1292,6 +1294,13 @@ mapCollectionIdToHostName(apiCollections){
       funcToCall();
     }
   },
+  async refreshApiCollections() {
+    let apiCollections = await homeFunctions.getAllCollections()
+    const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
+
+    PersistStore.getState().setAllCollections(apiCollections);
+    PersistStore.getState().setCollectionsMap(allCollectionsMap);
+  },
 
   convertParamToDotNotation(str) {
     return str.replace(/[#\$]+/g, '.');;
@@ -1347,8 +1356,16 @@ mapCollectionIdToHostName(apiCollections){
     transformedString = segments.join('/');
     transformedString = transformedString.replace(/[/|-]/g, '_');
     return transformedString;
-}
-
+  },
+  hashCode(str) {
+    var hash = 0;
+    for (var i = 0; i < str.length; i++) {
+        var character = str.charCodeAt(i);
+        hash = ((hash<<5)-hash)+character;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    return hash;
+  },
 }
 
 export default func
