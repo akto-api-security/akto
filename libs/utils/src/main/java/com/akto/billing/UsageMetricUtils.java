@@ -32,8 +32,11 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class UsageMetricUtils {
+    private static final Logger logger = LoggerFactory.getLogger(UsageMetricUtils.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricUtils.class);
     private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(UsageMetricUtils.class);
 
@@ -119,7 +122,7 @@ public class UsageMetricUtils {
             props.put("Organization Name", organization.getName());
             props.put("Source", "Dashboard");
 
-            System.out.println("Sending event to mixpanel: " + eventName);
+            logger.info("Sending event to mixpanel: " + eventName);
 
             AktoMixpanel aktoMixpanel = new AktoMixpanel();
             aktoMixpanel.sendEvent(distinct_id, eventName, props);
@@ -158,7 +161,7 @@ public class UsageMetricUtils {
                     || featureAccess.checkOverageAfterGrace(gracePeriod);
 
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Failed to check metered overage. Error - " + e.getMessage(),
+            loggerMaker.errorAndAddToDb(e, "Failed to check metered overage. Error - " + e.getMessage(),
                     LogDb.DASHBOARD);
         }
 
@@ -193,7 +196,7 @@ public class UsageMetricUtils {
             return BasicDBObject.parse(responseBody.string());
 
         } catch (IOException e) {
-            System.out.println("Failed to sync organization with Akto. Error - " +  e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Failed to sync organization with Akto. Error - " +  e.getMessage(), LogDb.DASHBOARD);
             return null;
         } finally {
             if (response != null) {

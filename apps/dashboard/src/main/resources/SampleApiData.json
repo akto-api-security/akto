@@ -1229,7 +1229,7 @@
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
-            "path": "/api/v2/feePayment "
+            "path": "/api/v2/feePayment"
         },
         "testData": {
             "method": "GET",

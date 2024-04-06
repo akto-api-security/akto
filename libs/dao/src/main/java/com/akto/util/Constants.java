@@ -5,6 +5,8 @@ public class Constants {
 
     public static final String ID = "_id";
 
+    public static final String TIMESTAMP = "timestamp";
+
     public static final String AWS_REGION = "AWS_REGION";
 
     public static final String AWS_ACCOUNT_ID = "AWS_ACCOUNT_ID";
@@ -13,5 +15,6 @@ public class Constants {
 
     public static final String AKTO_IGNORE_FLAG = "x-akto-ignore";
     public static final String AKTO_ATTACH_FILE = "x-akto-attach-file";
+    public static final String AKTO_TOKEN_KEY = "x-akto-key";
 
 }
