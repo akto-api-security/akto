@@ -251,6 +251,19 @@ public class Main {
                     return;
                 }
 
+                if (testingRun.getState().equals(State.STOPPED)) {
+                    loggerMaker.infoAndAddToDb("Testing run stopped");
+                    if (trrs != null) {
+                        loggerMaker.infoAndAddToDb("Stopping TRRS: " + trrs.getId());
+                        TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                                Filters.eq(Constants.ID, trrs.getId()),
+                                Updates.set(TestingRunResultSummary.STATE, State.STOPPED)
+                        );
+                        loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
+                    }
+                    return;
+                }
+
                 loggerMaker.infoAndAddToDb("Starting test for accountID: " + accountId);
 
                 boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
@@ -278,8 +291,14 @@ public class Main {
 
                     if (isSummaryRunning || isTestingRunRunning) {
                         loggerMaker.infoAndAddToDb("TRRS or TR is in running state, checking if it should run it or not");
-                        Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRun.getId()));
-                        TestingRunResultSummary testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
+                        TestingRunResultSummary testingRunResultSummary;
+                        if (trrs != null) {
+                            testingRunResultSummary = trrs;
+                        } else {
+                            Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRun.getId()));
+                            testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
+                        }
+
                         if (testingRunResultSummary != null) {
                             List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), 1);
                             if (testingRunResults != null && !testingRunResults.isEmpty()) {

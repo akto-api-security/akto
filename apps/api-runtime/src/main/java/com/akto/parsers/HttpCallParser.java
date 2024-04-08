@@ -197,7 +197,7 @@ public class HttpCallParser {
             filteredResponseParams = filterDefaultPayloads(filteredResponseParams, accountSettings.getDefaultPayloads());
         }
         filteredResponseParams = filterHttpResponseParams(filteredResponseParams);
-        boolean isHarOrPcap = aggregate(filteredResponseParams);
+        boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
 
         for (int apiCollectionId: aggregatorMap.keySet()) {
             URLAggregator aggregator = aggregatorMap.get(apiCollectionId);
@@ -445,7 +445,7 @@ public class HttpCallParser {
         return this.aggregatorMap;
     }
 
-    public boolean aggregate(List<HttpResponseParams> responses) {
+    public static boolean aggregate(List<HttpResponseParams> responses, Map<Integer, URLAggregator> aggregatorMap) {
         int count = 0;
         boolean ret = false;
         Set<String> urlSet= new HashSet<>();
