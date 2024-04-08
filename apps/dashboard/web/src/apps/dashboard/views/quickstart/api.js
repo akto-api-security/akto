@@ -37,11 +37,11 @@ export default{
             return resp
         })
     },
-    fetchLBs(){
+    fetchLBs(data){
         return request({
             url: '/api/fetchLoadBalancers',
             method: 'post',
-            data: {}
+            data: data
         })
     },
     saveLBs(selectedLBs){
@@ -51,11 +51,11 @@ export default{
             data: {selectedLBs}
         })
     },
-    fetchStackCreationStatus(){
+    fetchStackCreationStatus(data){
         return request({
             url: 'api/checkStackCreationProgress',
             method: 'post',
-            data: {}
+            data
         })
     },
     getPostmanCredentials() {
@@ -126,6 +126,15 @@ export default{
             url: '/api/fetchBurpCredentials',
             method: 'post',
             data: {},
+        }).then((resp) => {
+            return resp
+        })
+    },
+    createRuntimeStack(deploymentMethod) {
+        return request({
+            url: '/api/createRuntimeStack',
+            method: 'post',
+            data: {deploymentMethod}
         }).then((resp) => {
             return resp
         })
