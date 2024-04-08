@@ -58,13 +58,20 @@ public class APICatalogSync {
     public static boolean mergeAsyncOutside = true;
 
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
+        this(userIdentifier, thresh, fetchAllSTI, true);
+    }
+
+    // New overloaded constructor
+    public APICatalogSync(String userIdentifier, int thresh, boolean fetchAllSTI, boolean buildFromDb) {
         this.thresh = thresh;
         this.userIdentifier = userIdentifier;
         this.dbState = new HashMap<>();
         this.delta = new HashMap<>();
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
         this.aktoPolicyNew = new AktoPolicyNew();
-        buildFromDB(false, fetchAllSTI);
+        if (buildFromDb) {
+            buildFromDB(false, fetchAllSTI);
+        }
     }
 
     public static final int STRING_MERGING_THRESHOLD = 10;
