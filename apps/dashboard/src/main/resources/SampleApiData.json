@@ -373,26 +373,6 @@
         }
     },
     {
-        "id": "DOCKERFILE_HIDDEN_DISCLOSURE",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "",
-            "responsePayload": "12 found",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/employee/Deans-body"
-        },
-        "testData": {
-            "method": "GET",
-            "url": "/api/college/employee/Deans-body/.Dockerfile",
-            "responsePayload": "FROM someimage RUN echo \"Hello, world!\" ADD app.jar /app/ WORKDIR /app ENV JAVA_HOME /usr/lib/jvm/java-11 EXPOSE 8080",
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
         "id": "ESMTPRC_CONFIG",
         "sampleData": {
             "method": "GET",
@@ -1575,36 +1555,6 @@
         }
     },
     {
-        "id": "CONTENT_TYPE_HEADER_MISSING",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "",
-            "responsePayload": "{\"courses\": [{\"courseId\": \"CS101\", \"name\": \"Computer Science\", \"duration\": \"4 years\", \"faculty\": \"PROF-404\", \"description\": \"This course provides in-depth knowledge of computer science principles and applications.\"}, {\"courseId\": \"ENG201\", \"name\": \"English\", \"duration\": \"3 years\", \"faculty\": \"PROF-202\", \"description\": \"Explore the world of literature and develop critical thinking and analytical skills.\"}, {\"courseId\": \"MAT301\", \"name\": \"Mathematics\", \"duration\": \"3 years\", \"faculty\": \"PROF-505\", \"description\": \"Study advanced mathematical concepts and their real-world applications.\"}]}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/course-list"
-        },
-        "testData": {
-            "method": "GET",
-            "url": "/api/college/course-list",
-            "responsePayload": {
-                "courses": {
-                    "courseId_1": "CS101",
-                    "courseId_2": "CS102",
-                    "courseId_3": "CS103",
-                    "courseId_4": "CS104",
-                    "courseId_5": "CS105"
-                }
-            },
-            "responseHeaders": {
-                "Server": "Apache/2.4.18 (Ubuntu)"
-            },
-            "statusCode": 200
-        }
-    },
-    {
         "id": "SERVER_VERSION_EXPOSED_VIA_RESPONSE_HEADER",
         "sampleData": {
             "method": "GET",
@@ -1780,56 +1730,6 @@
         }
     },
     {
-        "id": "SSRF_ON_LOCALHOST_DNS_PINNING",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "",
-            "responsePayload": "{\"message\": \"Welcome to the Library Homepage\"}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/library/homepage?redirect=http://college.com/library/homepage"
-        },
-        "testData": {
-            "method": "GET",
-            "url": "/api/college/library/homepage",
-            "responsePayload": {
-                "role": "admin",
-                "message": "Welcome Admin",
-                "action1": "Issue Book",
-                "action2": "Add Books"
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "SSRF_ON_LOCALHOST",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "",
-            "responsePayload": "{\"message\":\"Welcome to the library of computer science department. Here you can access all the books and research journals related to the world of computers\"}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/library/depart/cse?redirect=http://college.com/library/depart/cse"
-        },
-        "testData": {
-            "method": "GET",
-            "url": "/api/college/library/depart/cse",
-            "responsePayload": {
-                "role": "admin",
-                "message": "Welcome HOD of CSE Department",
-                "action1": "Issue Book",
-                "action2": "Add Books"
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
         "id": "SSRF_ON_XML_UPLOAD",
         "sampleData": {
             "method": "POST",
@@ -1847,31 +1747,6 @@
             "responsePayload": {
                 "ami-id": "ami-234456871",
                 "ami-launch-index": 7
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "SSRF_ON_LOCALHOST_ENCODED",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "",
-            "responsePayload": "{\"message\":\"Welcome to the digital library of electronic and electrical department. Here you can access all the books and research journals related to the world of electronic and electrical circuits\"}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/library/depart/books/eee?redirect=http://college.com/library/depart/books-journals/eee"
-        },
-        "testData": {
-            "method": "GET",
-            "url": "/api/college/library/depart/books/eee",
-            "responsePayload": {
-                "role": "admin",
-                "message": "Welcome HOD of EEE Department",
-                "action1": "Issue Book",
-                "action2": "Add Books"
             },
             "responseHeaders": {},
             "statusCode": 200
@@ -2586,39 +2461,6 @@
         }
     },
     {
-        "id": "FIREBASE_UNAUTHENTICATED",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "",
-            "responsePayload": "{\"d1\" : \"CSE\", \"d2\": \"ECE\", \"d3\": \"IT\"}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/info/departments/branch"
-        },
-        "testData": {
-            "method": "GET",
-            "url": "/api/college/info/departments/branch.json",
-            "responsePayload": {
-                "d1": {
-                    "id": "CSE",
-                    "name": "Computer Science"
-                },
-                "d2": {
-                    "id": "ECE",
-                    "name": "Electronics and Communication"
-                },
-                "d3": {
-                    "id": "IT",
-                    "name": "Information Technology"
-                }
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
         "id": "ID_WRAP_ARRAY_OF_PARAMS_JSON_BODY_INTEGER_VAL",
         "sampleData": {
             "method": "POST",
@@ -2937,26 +2779,6 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/warden/files",
-            "responsePayload": "Successful",
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "BOLA_ADD_CUSTOM_HEADER",
-        "sampleData": {
-            "method": "POST",
-            "requestPayload": "",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User Access Denied",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/bio/students"
-        },
-        "testData": {
-            "method": "POST",
-            "url": "/api/college/bio/students",
             "responsePayload": "Successful",
             "responseHeaders": {},
             "statusCode": 200
@@ -3358,28 +3180,6 @@
             "url": "/api/college/account/recover",
             "responsePayload": "Account Recovery Successful",
             "responseHeaders": { "host": "evil.com" },
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "PASSWD_CHANGE_BRUTE_FORCE",
-        "sampleData": {
-            "method": "POST",
-            "requestPayload": "{\"username\": \"STUD-9965\", \"password\":\"qwerty123\"}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "{\"status\": \"Password change successful\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/erp/login/change-password"
-        },
-        "testData": {
-            "method": "POST",
-            "url": "/api/college/erp/login/change-password",
-            "responsePayload": {
-                "status": "Password change successful"
-            },
-            "responseHeaders": {},
             "statusCode": 200
         }
     },
@@ -4591,73 +4391,6 @@
         }
     },
     {
-        "id": "BOLA_COOKIE_FUZZING",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "{\"email\": \"user6@example.com\",\"role\": \"user\"}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"cookie\": \"refreshToken=eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVasdkSDG3jsnVlIiwidjknbjhksd8757dfsjkgDFG93nQGFrdG8uaW8iLCJpYXQiOjE2ODk2OTg0MDgsImV4cCI6MTY5MDIxNjgwOH0.i4YOfDCn4W3weTYqU5M3zaB37L4DHRUaFc91XVzD0_WOYRlTETrzFyLRpMETP7GrttSE79DyFDIN9nVgtuiAOrcLafyZUZsbV9oqLaNxEHx3vcyOQpg7Br7AUPxzqnIyZs_vxdmnkewRoxaeMifhlXuhIvORCoLZRHBgLX66CuJNqBwQy6zO3W0DcdgFN0DOWeQulYN2m8KLuNVDzHswq0s9jOWLPEwVBwlQc-sdf3sFKAoe9rewKNMSA4ptWOds6tqphBs0RYyaE4S_HFywT8mmMb8mer7fdzFqTEXfyKFzEFbI2M9k2_kpASyd6uvl_Cdk22QSIZBzjRMVo3VOLWgg; intercom-device-id-xjvl0z2h=25750e91-1931-42e2-a319-8b7289df6800\"}",
-            "responsePayload": "{\"flower\": \"Lilium\", \"number\": \"274\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/garden/123653"
-        },
-        "testData": {
-            "method": "GET",
-            "url": "/api/college/garden/123653",
-            "responsePayload": {
-                "flower": "Lilium",
-                "number": "274"
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "HEAD_METHOD_TEST",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "",
-            "responsePayload": "{\"message\": \"Redirecting...\"}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\", \"X-CSRF-Token\": \"abcdef1234567890\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "302",
-            "path": "/api/college/head-endpoint"
-        },
-        "testData": {
-            "method": "HEAD",
-            "url": "/api/college/head-endpoint",
-            "responsePayload": {
-                "message": "Welcome to the collegeXYZ Portal"
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "RANDOM_METHOD_TEST",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "",
-            "responsePayload": "{\"message\": \"Redirecting...\"}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\", \"X-CSRF-Token\": \"abcdef1234567890\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "302",
-            "path": "/api/college/random-endpoint"
-        },
-        "testData": {
-            "method": "TestMethod",
-            "url": "/api/college/random-endpoint",
-            "responsePayload": {
-                "message": "Welcome to the collegeXYZ Portal"
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
         "id": "JWT_MODIFY_BODY",
         "sampleData": {
             "method": "GET",
@@ -4677,105 +4410,6 @@
             },
             "responseHeaders": {},
             "statusCode": 200
-        }
-    },
-    {
-        "id": "2FA_BROKEN_LOGIC_AUTH_TOKEN_TEST",
-        "sampleData": {
-            "method": "POST",
-            "requestPayload": "",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "{\"status\": \"Login successful\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/grants/access"
-        },
-        "testData": {
-            "method": "POST",
-            "url": "/api/college/grants/access",
-            "responsePayload": {
-                "status": "Login successful"
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "LOGOUT_AUTH_TOKEN_TEST",
-        "sampleData": {
-            "method": "POST",
-            "requestPayload": "",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "{\"status\": \"Login successful\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/budget/access"
-        },
-        "testData": {
-            "method": "POST",
-            "url": "/api/college/budget/access",
-            "responsePayload": {
-                "status": "Login successful"
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "AUTH_BYPASS_LOCKED_ACCOUNT_TOKEN_ROLE",
-        "sampleData": {
-            "method": "POST",
-            "requestPayload": "",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "{\"status\": \"Login successful\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/patents/access"
-        },
-        "testData": {
-            "method": "POST",
-            "url": "/api/college/patents/access",
-            "responsePayload": {
-                "status": "Login successful"
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "USER_ENUM_ACCOUNT_LOCK",
-        "sampleData": {
-            "method": "POST",
-            "requestPayload": "{\"username\": \"STUD-5534\", \"password\":\"passpass\"}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "{\"status\": \"Login unsuccessful\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/mech/students"
-        },
-        "testData": {
-            "x1": {
-                "method": "POST",
-                "url": "/api/college/mech/students",
-                "responsePayload": {
-                    "status": "Login unsuccessful"
-                },
-                "responseHeaders": {},
-                "statusCode": 400
-            },
-            "x2": {
-                "method": "POST",
-                "url": "/api/college/mech/students",
-                "responsePayload": {
-                    "status": "STUD-2897 STUD-2346 STUD-8975 STUD-9823 ... dummyUser not found"
-                },
-                "responseHeaders": {},
-                "statusCode": 400
-            }
         }
     },
     {
