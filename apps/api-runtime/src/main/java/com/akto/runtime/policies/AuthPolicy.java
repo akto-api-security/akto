@@ -27,6 +27,7 @@ public class AuthPolicy {
         } else if (twoFields && value.substring(0, Math.min(5, value.length())).equalsIgnoreCase("basic")) {
             return Collections.singletonList(ApiInfo.AuthType.BASIC);
         } else if (header.equals(AUTHORIZATION_HEADER_NAME) || header.equals("auth")) {
+            // todo: check jwt first and then this
             return Collections.singletonList(ApiInfo.AuthType.AUTHORIZATION_HEADER);
         }
         return new ArrayList<>();
@@ -55,6 +56,7 @@ public class AuthPolicy {
         Set<Set<ApiInfo.AuthType>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
         if (allAuthTypesFound == null) allAuthTypesFound = new HashSet<>();
 
+        // TODO: from custom api-token
         // NOTE: custom api-token can be in multiple headers. For example twitter api sends 2 headers access-key and access-token
 
 

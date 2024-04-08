@@ -3,7 +3,7 @@ import React from 'react'
 import DonutChart from '../../../components/shared/DonutChart'
 import ConcentricCirclesChart from '../../../components/shared/ConcentricCirclesChart'
 
-function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight}) {
+function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navurl}) {
     const maxBoxHeight = boxHeight || '200px'
     let tableRows = []
     if(data && Object.keys(data).length > 0)
@@ -30,7 +30,8 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
       }, {}) : data
 
     const chartComponent = (
-        isNormal ? <DonutChart data={chartData} title="" size={210}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
+
+        isNormal ? <DonutChart navurl={navurl} data={chartData}  title=""  type={title} size={210}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
     )
 
     return (

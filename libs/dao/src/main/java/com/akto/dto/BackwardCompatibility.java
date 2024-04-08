@@ -38,6 +38,8 @@ public class BackwardCompatibility {
     public static final String ENABLE_NEW_MERGING = "enableNewMerging";
     private int enableNewMerging;
 
+    public static final String ENABLE_ASYNC_MERGE_OUTSIDE = "enableMergeAsyncOutside";
+    private int enableMergeAsyncOutside;
     public static final String LOAD_TEMPLATES_FILES_FROM_DIRECTORY = "loadTemplateFilesFromDirectory";
 
     public static final String DEFAULT_NEW_UI = "aktoDefaultNewUI";
@@ -50,9 +52,12 @@ public class BackwardCompatibility {
 
     public static final String ORGS_IN_BILLING = "orgsInBilling";
     private int orgsInBilling;
-    
+
     public static final String DELETE_LAST_CRON_RUN_INFO= "deleteLastCronRunInfo";
     private int deleteLastCronRunInfo;
+
+    public static final String DEFAULT_TELEMETRY_SETTINGS = "defaultTelemetrySettings";
+    private int defaultTelemetrySettings;
 
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
@@ -72,6 +77,7 @@ public class BackwardCompatibility {
         this.deleteAccessListFromApiToken = deleteAccessListFromApiToken;
         this.deleteNullSubCategoryIssues = deleteNullSubCategoryIssues;
         this.enableNewMerging = enableNewMerging;
+        this.enableMergeAsyncOutside = enableMergeAsyncOutside;
         this.aktoDefaultNewUI = aktoDefaultNewUI;
         this.computeIntegratedConnections = computeIntegratedConnections;
         this.initializeOrganizationAccountBelongsTo = initializeOrganizationAccountBelongsTo;
@@ -186,6 +192,14 @@ public class BackwardCompatibility {
         this.enableNewMerging = enableNewMerging;
     }
 
+    public int getEnableMergeAsyncOutside() {
+        return enableMergeAsyncOutside;
+    }
+
+    public void setEnableMergeAsyncOutside(int enableMergeAsyncOutside) {
+        this.enableMergeAsyncOutside = enableMergeAsyncOutside;
+    }
+
     public int getAktoDefaultNewUI() {
         return aktoDefaultNewUI;
     }
@@ -201,7 +215,7 @@ public class BackwardCompatibility {
     public void setComputeIntegratedConnections(int computeIntegratedConnections) {
         this.computeIntegratedConnections = computeIntegratedConnections;
     }
-    
+
     public int getInitializeOrganizationAccountBelongsTo() {
         return initializeOrganizationAccountBelongsTo;
     }
@@ -224,5 +238,13 @@ public class BackwardCompatibility {
 
     public void setDeleteLastCronRunInfo(int deleteLastCronRunInfo) {
         this.deleteLastCronRunInfo = deleteLastCronRunInfo;
+    }
+
+    public int getDefaultTelemetrySettings() {
+        return defaultTelemetrySettings;
+    }
+
+    public void setDefaultTelemetrySettings(int defaultTelemetrySettings) {
+        this.defaultTelemetrySettings = defaultTelemetrySettings;
     }
 }

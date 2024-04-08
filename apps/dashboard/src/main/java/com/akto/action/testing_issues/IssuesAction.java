@@ -31,6 +31,8 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,7 +45,7 @@ import static com.akto.util.enums.GlobalEnums.*;
 public class IssuesAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(IssuesAction.class);
-
+    private static final Logger logger = LoggerFactory.getLogger(IssuesAction.class);
     private List<TestingRunIssues> issues;
     private TestingIssuesId issueId;
     private List<TestingIssuesId> issueIdArray;
@@ -254,6 +256,9 @@ public class IssuesAction extends UserAction {
             throw new IllegalStateException();
         }
 
+        logger.info("Issue id from db to be updated " + issueId);
+        logger.info("status id from db to be updated " + statusToBeUpdated);
+        logger.info("status reason from db to be updated " + ignoreReason);
         Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
                                         Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
 
@@ -274,6 +279,9 @@ public class IssuesAction extends UserAction {
             throw new IllegalStateException();
         }
 
+        logger.info("Issue id from db to be updated " + issueIdArray);
+        logger.info("status id from db to be updated " + statusToBeUpdated);
+        logger.info("status reason from db to be updated " + ignoreReason);
         Bson update = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated);
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored

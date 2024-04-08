@@ -1,8 +1,8 @@
 package com.akto.utils;
 
-import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.HttpResponseParams;
@@ -20,7 +20,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.testing.ApiExecutor;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -102,39 +101,39 @@ public class Utils {
                         result.put(authKeyName, authValueName);
                     }
                     break;
-            case "basic":
-                ArrayNode basicParams = (ArrayNode) auth.get("basic");
-                String basicUsername = "", basicPassword = "";
-                for (JsonNode basicKeyHeader : basicParams) {
-                    String key = basicKeyHeader.get("key").asText();
-                    String value = basicKeyHeader.get("value").asText();
-                    switch (key) {
-                        case "username":
-                            basicUsername = replaceVariables(value, variableMap);
-                            break;
-                        case "password":
-                            basicPassword = replaceVariables(value, variableMap);
-                            break;
-                        default:
-                            break;
+                case "basic":
+                    ArrayNode basicParams = (ArrayNode) auth.get("basic");
+                    String basicUsername = "", basicPassword = "";
+                    for (JsonNode basicKeyHeader : basicParams) {
+                        String key = basicKeyHeader.get("key").asText();
+                        String value = basicKeyHeader.get("value").asText();
+                        switch (key) {
+                            case "username":
+                                basicUsername = replaceVariables(value, variableMap);
+                                break;
+                            case "password":
+                                basicPassword = replaceVariables(value, variableMap);
+                                break;
+                            default:
+                                break;
+                        }
                     }
-                }
 
-                if (basicUsername.isEmpty() || basicPassword.isEmpty()) {
-                    throw new IllegalArgumentException(
-                            "One of  username/password is empty: username=" + basicUsername + " password="
-                                    + basicPassword);
-                } else {
-                    /*
-                     * Base64 implementation ref: https://www.ietf.org/rfc/rfc2617.txt
-                     */
-                    String basicCredentials = basicUsername + ":" + basicPassword;
-                    String basicEncoded = Base64.getEncoder().encodeToString(basicCredentials.getBytes());
+                    if (basicUsername.isEmpty() || basicPassword.isEmpty()) {
+                        throw new IllegalArgumentException(
+                                "One of  username/password is empty: username=" + basicUsername + " password="
+                                        + basicPassword);
+                    } else {
+                        /*
+                         * Base64 implementation ref: https://www.ietf.org/rfc/rfc2617.txt
+                         */
+                        String basicCredentials = basicUsername + ":" + basicPassword;
+                        String basicEncoded = Base64.getEncoder().encodeToString(basicCredentials.getBytes());
 
-                    String basicHeader = "Basic " + basicEncoded;
-                    result.put("Authorization", basicHeader);
-                }
-                break;
+                        String basicHeader = "Basic " + basicEncoded;
+                        result.put("Authorization", basicHeader);
+                    }
+                    break;
                 default:
                     throw new IllegalArgumentException("Unsupported auth type: " + authType );
             }
@@ -438,7 +437,11 @@ public class Utils {
     public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka) throws Exception {
         List<HttpResponseParams> responses = new ArrayList<>();
         for (String message: messages){
-            if (message.length() < 0.8 * KafkaListener.BATCH_SIZE_CONFIG) {
+            int messageLimit = (int) Math.round(0.8 * KafkaListener.BATCH_SIZE_CONFIG);
+            if (skipKafka) {
+                messageLimit = messageLimit * 2;
+            }
+            if (message.length() < messageLimit) {
                 if (!skipKafka) {
                     KafkaListener.kafka.send(message,"har_" + topic);
                 } else {
@@ -451,6 +454,7 @@ public class Utils {
             }
         }
 
+        //todo:shivam handle resource analyser in AccountHTTPCallParserAktoPolicyInfo
         if(skipKafka) {
             String accountIdStr = responses.get(0).accountId;
             if (!StringUtils.isNumeric(accountIdStr)) {
@@ -469,10 +473,10 @@ public class Utils {
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
-
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, accountSettings);
             info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
-            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true);
+            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, false);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
              try {

@@ -26,6 +26,9 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.Utils;
+import com.google.gson.Gson;
+import com.google.gson.JsonParser;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -70,9 +73,11 @@ public class StartTestAction extends UserAction {
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
-    private String testRoleId;
 
-    private static List<ObjectId> getTestingRunListFromSummary(Bson filters) {
+    private String testRoleId;
+    private static final Gson gson = new Gson();
+
+    private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
         Bson projections = Projections.fields(
                 Projections.excludeId(),
                 Projections.include(TestingRunResultSummary.TESTING_RUN_ID));
@@ -142,8 +147,7 @@ public class StartTestAction extends UserAction {
         }
         if (this.selectedTests != null) {
             int id = UUID.randomUUID().hashCode() & 0xfffffff;
-            TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests,
-                    authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId);
+            TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -201,9 +205,8 @@ public class StartTestAction extends UserAction {
                             Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)));
 
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
-                int id = UUID.randomUUID().hashCode() & 0xfffffff;
-                TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null,
-                        this.overriddenTestAppUrl, this.testRoleId);
+                int id = UUID.randomUUID().hashCode() & 0xfffffff ;
+                TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
             }
@@ -480,28 +483,60 @@ public class StartTestAction extends UserAction {
             List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
             Map<String, String> sampleDataVsCurlMap = new HashMap<>();
             for (TestingRunResult runResult: testingRunResultList) {
-                List<GenericTestResult> testResults = new ArrayList<>();
-                // todo: fix
+                WorkflowTest workflowTest = runResult.getWorkflowTest();
                 for (GenericTestResult tr : runResult.getTestResults()) {
-                    TestResult testResult = (TestResult) tr;
-                    if (testResult.isVulnerable()) {
-                        testResults.add(testResult);
-                        sampleDataVsCurlMap.put(testResult.getMessage(),
-                                ExportSampleDataAction.getCurl(testResult.getMessage()));
-                        sampleDataVsCurlMap.put(testResult.getOriginalMessage(),
-                                ExportSampleDataAction.getCurl(testResult.getOriginalMessage()));
+                    if (tr.isVulnerable()) {
+                        if (tr instanceof TestResult) {
+                            TestResult testResult = (TestResult) tr;
+                            sampleDataVsCurlMap.put(testResult.getMessage(),
+                                    ExportSampleDataAction.getCurl(testResult.getMessage()));
+                            sampleDataVsCurlMap.put(testResult.getOriginalMessage(),
+                                    ExportSampleDataAction.getCurl(testResult.getOriginalMessage()));
+                        } else if (tr instanceof MultiExecTestResult){
+                            MultiExecTestResult testResult = (MultiExecTestResult) tr;
+                            Map<String, WorkflowTestResult.NodeResult> nodeResultMap = testResult.getNodeResultMap();
+                            for (String order : nodeResultMap.keySet()) {
+                                WorkflowTestResult.NodeResult nodeResult = nodeResultMap.get(order);
+                                String nodeResultLastMessage = getNodeResultLastMessage(nodeResult.getMessage());
+                                if (nodeResultLastMessage != null) {
+                                    nodeResult.setMessage(nodeResultLastMessage);
+                                    sampleDataVsCurlMap.put(nodeResultLastMessage,
+                                            ExportSampleDataAction.getCurl(nodeResultLastMessage));
+                                }
+                            }
+                        }
                     }
                 }
-                runResult.setTestResults(testResults);
+                if (workflowTest != null) {
+                    Map<String, WorkflowNodeDetails> nodeDetailsMap = workflowTest.getMapNodeIdToWorkflowNodeDetails();
+                    for (String nodeName: nodeDetailsMap.keySet()) {
+                        if (nodeDetailsMap.get(nodeName) instanceof YamlNodeDetails) {
+                            YamlNodeDetails details = (YamlNodeDetails) nodeDetailsMap.get(nodeName);
+                            sampleDataVsCurlMap.put(details.getOriginalMessage(),
+                                    ExportSampleDataAction.getCurl(details.getOriginalMessage()));
+                        }
+
+                    }
+                }
             }
             this.testingRunResults = testingRunResultList;
             this.sampleDataVsCurlMap = sampleDataVsCurlMap;
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while executing test run summary" + e.getMessage(), LogDb.DASHBOARD);
             addActionError("Invalid test summary id");
             return ERROR.toUpperCase();
         }
 
         return SUCCESS.toUpperCase();
+    }
+
+    private String getNodeResultLastMessage(String message) {
+        if (StringUtils.isEmpty(message) || "[]".equals(message)) {
+            return null;
+        }
+        List listOfMessage = gson.fromJson(message, List.class);
+        Object vulnerableMessage = listOfMessage.get(listOfMessage.size() - 1);
+        return gson.toJson(vulnerableMessage);
     }
 
     private String testingRunResultHexId;
@@ -1038,7 +1073,6 @@ public class StartTestAction extends UserAction {
             return AKTO_GPT.equals(this);
         }
     }
-
 
     public String getTestRoleId() {
         return testRoleId;

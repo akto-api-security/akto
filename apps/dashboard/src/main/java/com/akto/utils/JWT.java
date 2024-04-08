@@ -1,13 +1,12 @@
 package com.akto.utils;
 
+import com.akto.onprem.Constants;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
 
 import java.io.*;
 import java.security.KeyFactory;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -19,24 +18,6 @@ import java.util.Calendar;
 import java.util.Map;
 
 public class JWT {
-
-    private static final byte[] privateKey, publicKey;
-
-    static {
-        KeyPairGenerator kpg;
-        KeyPair kp = null;
-        try {
-            kpg = KeyPairGenerator.getInstance("RSA");
-            kpg.initialize(2048);
-            kp = kpg.generateKeyPair();
-
-        } catch (NoSuchAlgorithmException e) {
-            ;
-        } 
-
-        privateKey = kp == null ? null : kp.getPrivate().getEncoded();
-        publicKey = kp == null ? null : kp.getPublic().getEncoded();
-    }
 
     public static String createJWT(String privateKeyPath, Map<String, Object> claims,
                                    String issuer, String subject, int expiryUnit, int expiryDuration)
@@ -75,14 +56,20 @@ public class JWT {
 
 
     private static PrivateKey getPrivateKey(String privateKeyPath) throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
+
+        byte[] privateKey = Constants.getPrivateKey();
         PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privateKey);
         KeyFactory kf = KeyFactory.getInstance("RSA");
+
         return kf.generatePrivate(keySpec);
     }
 
     private static PublicKey getPublicKey(String publicKeyPath) throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
+
+        byte[] publicKey = Constants.getPublicKey();
         X509EncodedKeySpec keySpec = new X509EncodedKeySpec(publicKey);
         KeyFactory kf = KeyFactory.getInstance("RSA");
+
         return kf.generatePublic(keySpec);
     }
 

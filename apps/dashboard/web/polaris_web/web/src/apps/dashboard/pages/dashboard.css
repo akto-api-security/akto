@@ -100,3 +100,24 @@
 .Polaris-VideoThumbnail__Thumbnail{
     border-radius: 8px !important;
 }
+
+.Polaris-Frame__Skip{
+    visibility: hidden !important;
+}
+
+.form-class .Polaris-Label{
+    color: #202223 !important;
+}
+
+.Polaris-Text--break {
+    white-space: normal !important;
+    word-break: break-all !important;
+}
+
+.Polaris-Frame__Skip{
+    visibility: hidden !important;
+}
+
+.form-class .Polaris-Label{
+    color: #202223 !important;
+}

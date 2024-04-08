@@ -30,7 +30,7 @@ public class MongoConnectCheckFilter implements Filter {
         String uri = httpServletRequest.getRequestURI();
         String mongoErrorString = "/mongo-error";
         boolean isMongoErrorPath = uri.equals(mongoErrorString);
-        boolean shouldFilter = !uri.startsWith("/public");
+        boolean shouldFilter = !(uri.startsWith("/public")  || uri.startsWith("/metrics"));
 
         if (shouldFilter) {
             if (!InitializerListener.connectedToMongo && !isMongoErrorPath) {
