@@ -49,7 +49,7 @@ function SingleRequest(){
                 setEndpointData(transform.prepareEndpointData(collectionsMap, res));
             })
             await api.fetchSensitiveSampleData(url, apiCollectionId, method).then(async(res) => {
-                if(res.sampleDataList && Object.keys(res.sampleDataList).length > 0){
+                if(res.sensitiveSampleData && Object.keys(res.sensitiveSampleData).length > 0){
                     setSampleData(transform.prepareSampleData(res, subType))
                 }else{
                     await api.fetchSampleData(url, apiCollectionId, method).then((resp) => {
