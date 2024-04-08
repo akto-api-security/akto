@@ -6,6 +6,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.util.Constants;
+import com.akto.util.DbMode;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -100,7 +101,7 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     }
 
     public void convertToCappedCollection() {
-        if (this.isCapped()) return;
+        if (DbMode.allowCappedCollections() || this.isCapped()) return;
         this.convertToCappedCollection(sizeInBytes);
         this.createIndicesIfAbsent();
     }

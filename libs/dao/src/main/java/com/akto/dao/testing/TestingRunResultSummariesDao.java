@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.MCollection;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -104,6 +105,13 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
         
         Bson testingRunIndex = Indexes.ascending(TestingRunResultSummary.TESTING_RUN_ID);
         createIndexIfAbsent(dbName, getCollName(), testingRunIndex, new IndexOptions().name("testingRunId_1"));
+
+        String[] fieldNames = {TestingRunResultSummary.START_TIMESTAMP};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
+
+        fieldNames = new String[]{TestingRunResultSummary.END_TIMESTAMP};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
+
 
         IndexOptions sparseIndex = new IndexOptions().sparse(true);
 

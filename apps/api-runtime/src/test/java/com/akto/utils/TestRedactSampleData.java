@@ -103,13 +103,16 @@ public class TestRedactSampleData {
         Set<String> redactedReqKeys = extractKeys(redacted.requestParams.getPayload());
         Set<String> originalReqKeys = extractKeys(original.requestParams.getPayload());
         if (!redactedReqKeys.equals(originalReqKeys)) {
+            System.out.println(redactedReqKeys);
+            System.out.println(originalReqKeys);
             return false;
         }
 
         Set<String> redactedRespKeys = extractKeys(redacted.getPayload());
         Set<String> originalRespKeys = extractKeys(original.getPayload());
         if (!redactedRespKeys.equals(originalRespKeys)) {
-
+            System.out.println(redactedRespKeys);
+            System.out.println(originalRespKeys);
             return false;
         }
 
@@ -278,7 +281,7 @@ public class TestRedactSampleData {
             boolean result = testRedactDoneCorrect(originalHttpResponseParams, redactedHttpResponseParams);
             Assertions.assertTrue(result);
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
             Assertions.fail();
         }
 

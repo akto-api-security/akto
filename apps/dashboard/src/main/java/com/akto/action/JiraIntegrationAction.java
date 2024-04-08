@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
@@ -73,8 +74,9 @@ public class JiraIntegrationAction extends UserAction {
         headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "GET", null, headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
             String responsePayload = response.getBody();
+            loggerMaker.errorAndAddToDb("triggered meta api for test integration step, requestbody " + request.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode() + " ,url " + url, LoggerMaker.LogDb.DASHBOARD);
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("error while testing jira integration, url not accessible", LoggerMaker.LogDb.DASHBOARD);
                 return Action.ERROR.toUpperCase();
@@ -86,17 +88,21 @@ public class JiraIntegrationAction extends UserAction {
                 for (Object projObj: projects) {
                     BasicDBObject obj = (BasicDBObject) projObj;
                     String key = obj.getString("key");
-                    if (!key.equals(projId)) {
+                    loggerMaker.errorAndAddToDb("evaluating issuetype for project key " + key + " ,actualProjId " + projId, LoggerMaker.LogDb.DASHBOARD);
+                    if (!key.equalsIgnoreCase(projId)) {
                         continue;
                     }
+                    loggerMaker.errorAndAddToDb("evaluating issuetype for project key " + key + ", project json obj " + obj, LoggerMaker.LogDb.DASHBOARD);
                     BasicDBList issueTypes = (BasicDBList) obj.get("issuetypes");
-                    for (Object issueObj: issueTypes) {
-                        BasicDBObject obj2 = (BasicDBObject) issueObj;
-                        String issueName = obj2.getString("name");
-                        if (!issueName.equalsIgnoreCase("TASK")) {
-                            continue;
-                        }
-                        issueType = obj2.getString("id");
+                    issueType = determineIssueType(issueTypes, "TASK");
+                    loggerMaker.infoAndAddToDb("evaluated issue type for TASK type " + issueType, LoggerMaker.LogDb.DASHBOARD);
+                    if (issueType == null) {
+                        issueType = determineIssueType(issueTypes, "BUG");
+                        loggerMaker.infoAndAddToDb("evaluated issue type for BUG type " + issueType, LoggerMaker.LogDb.DASHBOARD);
+                    }
+                    if (issueType == null) {
+                        issueType = determineIssueType(issueTypes, "");
+                        loggerMaker.infoAndAddToDb("evaluated issue type for ANY type " + issueType, LoggerMaker.LogDb.DASHBOARD);
                     }
                 }
                 if (issueType == null) {
@@ -112,6 +118,20 @@ public class JiraIntegrationAction extends UserAction {
         }
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String determineIssueType(BasicDBList issueTypes, String jiraIssueType) {
+
+        String issueType = null;
+        for (Object issueObj: issueTypes) {
+            BasicDBObject obj2 = (BasicDBObject) issueObj;
+            String issueName = obj2.getString("name");
+            if (!jiraIssueType.equals("") && !issueName.equalsIgnoreCase(jiraIssueType)) {
+                continue;
+            }
+            issueType = obj2.getString("id");
+        }
+        return issueType;
     }
 
     public String addIntegration() {
@@ -150,7 +170,7 @@ public class JiraIntegrationAction extends UserAction {
         BasicDBObject fields = new BasicDBObject();
 
         // issue title
-        fields.put("summary", "Akto Content - " + issueTitle);
+        fields.put("summary", "Akto Report - " + issueTitle);
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
         Bson filters = Filters.and(
             Filters.eq("_id.apiInfoKey.apiCollectionId", testingIssueId.getApiInfoKey().getApiCollectionId()),
@@ -193,10 +213,26 @@ public class JiraIntegrationAction extends UserAction {
         headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
             String responsePayload = response.getBody();
             if (response.getStatusCode() > 201 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("error while testing jira integration, url not accessible", LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("error while creating jira issue, url not accessible, requestbody " + request.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
+                if (responsePayload != null) {
+                    try {
+                        BasicDBObject obj = BasicDBObject.parse(responsePayload);
+                        List<String> errorMessages = (List) obj.get("errorMessages");
+                        String error;
+                        if (errorMessages.size() == 0) {
+                            BasicDBObject errObj = BasicDBObject.parse(obj.getString("errors"));
+                            error = errObj.getString("project");
+                        } else {
+                            error = errorMessages.get(0);
+                        }
+                        addActionError(error);
+                    } catch (Exception e) {
+                        // TODO: handle exception
+                    }
+                }
                 return Action.ERROR.toUpperCase();
             }
             BasicDBObject payloadObj;
@@ -205,6 +241,7 @@ public class JiraIntegrationAction extends UserAction {
                 jiraTicketKey = payloadObj.getString("key");
                 jiraTicketUrl = jiraIntegration.getBaseUrl() + "/browse/" + jiraTicketKey;
             } catch(Exception e) {
+                loggerMaker.errorAndAddToDb(e, "error making jira issue url " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
                 return null;
             }
         } catch(Exception e) {

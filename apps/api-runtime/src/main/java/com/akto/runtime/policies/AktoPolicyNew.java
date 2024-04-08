@@ -33,12 +33,14 @@ public class AktoPolicyNew {
 
     public void fetchFilters() {
         this.filters = RuntimeFilterDao.instance.findAll(new BasicDBObject());
+        loggerMaker.infoAndAddToDb("Fetched " + filters.size() + " filters from db", LogDb.RUNTIME);
     }
 
     public AktoPolicyNew() {
     }
 
     public void buildFromDb(boolean fetchAllSTI) {
+        loggerMaker.infoAndAddToDb("AktoPolicyNew.buildFromDB(), fetchAllSti: " + fetchAllSTI, LogDb.RUNTIME);
         fetchFilters();
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
@@ -80,7 +82,7 @@ public class AktoPolicyNew {
                 loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause(), LogDb.RUNTIME);
             }
         }
-
+        loggerMaker.infoAndAddToDb("Built AktoPolicyNew", LogDb.RUNTIME);
     }
 
     public void syncWithDb() {
@@ -122,6 +124,7 @@ public class AktoPolicyNew {
 
     public void main(List<HttpResponseParams> httpResponseParamsList) throws Exception {
         if (httpResponseParamsList == null) httpResponseParamsList = new ArrayList<>();
+        loggerMaker.infoAndAddToDb("AktoPolicy main: httpResponseParamsList size: " + httpResponseParamsList.size(), LogDb.RUNTIME);
         for (HttpResponseParams httpResponseParams: httpResponseParamsList) {
             try {
                 process(httpResponseParams);
@@ -150,7 +153,15 @@ public class AktoPolicyNew {
         List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(Integer.parseInt(httpResponseParams.getAccountId()));
         ApiInfo.ApiInfoKey apiInfoKey = generateFromHttpResponseParams(httpResponseParams);
         PolicyCatalog policyCatalog = getApiInfoFromMap(apiInfoKey);
+        policyCatalog.setSeenEarlier(true);
         ApiInfo apiInfo = policyCatalog.getApiInfo();
+
+        List<String> partnerIpsList = new ArrayList<>();
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
+        if(accountSettings != null){
+            partnerIpsList = accountSettings.getPartnerIpList();
+        }
 
         Map<Integer, FilterSampleData> filterSampleDataMap = policyCatalog.getFilterSampleDataMap();
         if (filterSampleDataMap == null) {
@@ -159,7 +170,7 @@ public class AktoPolicyNew {
         }
 
         int statusCode = httpResponseParams.getStatusCode();
-        if (!HttpResponseParams.validHttpResponseCode(statusCode)) return; 
+        if (!HttpResponseParams.validHttpResponseCode(statusCode)) return; //todo: why?
 
         for (RuntimeFilter filter: filters) {
 
@@ -178,7 +189,7 @@ public class AktoPolicyNew {
                     break;
                 case DETERMINE_API_ACCESS_TYPE:
                     try {
-                        saveSample = apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo, filter);
+                        apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo, filter, partnerIpsList);
                     } catch (Exception ignored) {}
                     break;
                 default:
@@ -196,7 +207,7 @@ public class AktoPolicyNew {
             }
         }
 
-        apiInfo.setLastSeen(Context.now());
+        apiInfo.setLastSeen(httpResponseParams.getTimeOrNow());
 
     }
 
@@ -257,6 +268,7 @@ public class AktoPolicyNew {
             policyCatalogList.addAll(templateURLToMethods.values());
 
             for (PolicyCatalog policyCatalog: policyCatalogList) {
+                if (!policyCatalog.isSeenEarlier()) continue;
                 ApiInfo apiInfo = policyCatalog.getApiInfo();
                 if (apiInfo != null) {
                     apiInfoList.add(apiInfo);

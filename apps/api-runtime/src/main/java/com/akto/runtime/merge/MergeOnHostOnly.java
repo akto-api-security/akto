@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.akto.log.LoggerMaker;
+import com.mongodb.client.model.Projections;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.ApiCollectionsDao;
@@ -29,6 +31,8 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.InsertManyOptions;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MergeOnHostOnly {
 
@@ -40,9 +44,13 @@ public class MergeOnHostOnly {
      * delete in case the _id exists ( i.e. the apicollection already contains this url+method)
      */
 
+    private static final Logger logger = LoggerFactory.getLogger(MergeOnHostOnly.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(MergeOnHostOnly.class);
+
     public MergeOnHostOnly() {} 
 
     public void updateAllCollections(int oldId, int newId) {
+        loggerMaker.infoAndAddToDb("starting updateAllCollections " + oldId + " - " + newId, LoggerMaker.LogDb.RUNTIME);
 
         InsertManyOptions options = new InsertManyOptions();
         options.ordered(false);
@@ -57,10 +65,11 @@ public class MergeOnHostOnly {
             try{
                 ApiInfoDao.instance.getMCollection().insertMany(apiInfos,options);
             } catch(Exception e){
-
+                logger.error(e.getMessage());
             }
             ApiInfoDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
+        loggerMaker.infoAndAddToDb("Updated api info", LoggerMaker.LogDb.RUNTIME);
 
         List<SampleData> sampleDatas =  SampleDataDao.instance.findAll("_id.apiCollectionId", oldId);
         if(sampleDatas!=null && sampleDatas.size()>0){
@@ -71,10 +80,12 @@ public class MergeOnHostOnly {
             try{
                 SampleDataDao.instance.getMCollection().insertMany(sampleDatas,options);
             } catch(Exception e){
-
+                logger.error(e.getMessage());
             }
             SampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
+        loggerMaker.infoAndAddToDb("Updated sample data", LoggerMaker.LogDb.RUNTIME);
+
 
         List<SensitiveSampleData> sensitiveSampleDatas =  SensitiveSampleDataDao.instance.findAll("_id.apiCollectionId", oldId);
         if(sensitiveSampleDatas!=null && sensitiveSampleDatas.size()>0){
@@ -85,10 +96,12 @@ public class MergeOnHostOnly {
             try{
                 SensitiveSampleDataDao.instance.getMCollection().insertMany(sensitiveSampleDatas,options);
             } catch(Exception e){
-
+                logger.error(e.getMessage());
             }
             SensitiveSampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
+        loggerMaker.infoAndAddToDb("Updated sensitive sample data", LoggerMaker.LogDb.RUNTIME);
+
 
         List<TrafficInfo> trafficInfos =  TrafficInfoDao.instance.findAll("_id.apiCollectionId", oldId);
         if(trafficInfos!=null && trafficInfos.size()>0){
@@ -99,13 +112,20 @@ public class MergeOnHostOnly {
             try{
                 TrafficInfoDao.instance.getMCollection().insertMany(trafficInfos,options);
             } catch(Exception e){
-
+                logger.error(e.getMessage());
             }
             TrafficInfoDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
 
+        loggerMaker.infoAndAddToDb("Updated traffic info", LoggerMaker.LogDb.RUNTIME);
+
         SensitiveParamInfoDao.instance.getMCollection().deleteMany(Filters.eq("apiCollectionId", oldId));
+
+        loggerMaker.infoAndAddToDb("Deleted sensitive param", LoggerMaker.LogDb.RUNTIME);
+
         FilterSampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiInfoKey.apiCollectionId", oldId));
+
+        loggerMaker.infoAndAddToDb("Deleted filter sample data", LoggerMaker.LogDb.RUNTIME);
     }
 
     public void updateSTI(int oldId, int newId) {
@@ -147,7 +167,7 @@ public class MergeOnHostOnly {
         Set<String> ret = new HashSet<>();
         
         Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
-        List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filterQ);
+        List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filterQ, Projections.include(SingleTypeInfo._URL));
 
         for(SingleTypeInfo s: singleTypeInfos){
             // urls will be merged without method: might result in some data loss
@@ -157,6 +177,7 @@ public class MergeOnHostOnly {
     }
 
     public void mergeHostUtil(String host, List<Integer> apiCollectionIds) {
+        loggerMaker.infoAndAddToDb("host: " + host  + " , apiCollectionIds: " + apiCollectionIds, LoggerMaker.LogDb.RUNTIME);
         if (apiCollectionIds.size() == 0) return;
 
         int newApiCollectionId = host.hashCode();
@@ -170,6 +191,7 @@ public class MergeOnHostOnly {
 
             try {
                 ApiCollectionsDao.instance.insertOne(new ApiCollection(newApiCollectionId, null, old.getStartTs(), new HashSet<>(), host, 0, false, true));
+                loggerMaker.infoAndAddToDb("Finished inserting original host collection: " + newApiCollectionId, LoggerMaker.LogDb.RUNTIME);
             } catch (Exception e) {
                 return;
             }
@@ -177,23 +199,28 @@ public class MergeOnHostOnly {
             int currOldId = apiCollectionIds.get(0);
 
             ApiCollectionsDao.instance.getMCollection().deleteOne(Filters.eq( "_id", currOldId));
+            loggerMaker.infoAndAddToDb("Finished deleting duplicate collection: " + currOldId, LoggerMaker.LogDb.RUNTIME);
 
             updateSTI(currOldId, newApiCollectionId);
             updateAllCollections(currOldId, newApiCollectionId);
 
             apiCollectionIds.remove(0);
+
+            loggerMaker.infoAndAddToDb("Original done", LoggerMaker.LogDb.RUNTIME);
         }
 
         try {
 
             Set<String> urls = getUrlList(host, newApiCollectionId);
-            for (int i = 0; i < apiCollectionIds.size(); i++) {    
-    
+            loggerMaker.infoAndAddToDb("Initial Collection id: " + newApiCollectionId +  " urls count: " + urls.size(), LoggerMaker.LogDb.RUNTIME);
+
+            for (int i = 0; i < apiCollectionIds.size(); i++) {
                 List<String> urlList = new ArrayList<>(urls);
                 int sz = urlList.size();
                 int j = 0;
                 int currOldId = apiCollectionIds.get(i);
-                do { 
+                loggerMaker.infoAndAddToDb("Collection id: " + currOldId +  " urls count: " + urls.size(), LoggerMaker.LogDb.RUNTIME);
+                do {
                     deleteFromAllCollections(currOldId, urlList.subList(j, Math.min(j + 1000, sz)));
                     j += 1000;
                 } while (j < sz);
@@ -203,11 +230,11 @@ public class MergeOnHostOnly {
                 ApiCollectionsDao.instance.getMCollection().deleteOne(Filters.eq("_id", currOldId));
                 updateSTI(currOldId, newApiCollectionId);
                 updateAllCollections(currOldId, newApiCollectionId);
+                loggerMaker.infoAndAddToDb("DONE!!!", LoggerMaker.LogDb.RUNTIME);
             }
 
         } catch (Exception e) {
-            
-            
+            logger.error("unable to update apiCollectionId, trying again with" + newApiCollectionId);
         }
 
     }
@@ -232,6 +259,7 @@ public class MergeOnHostOnly {
             apiCollectionIds.add(it.getId());
         }
 
+        loggerMaker.infoAndAddToDb("hostToApiCollectionId map: " + hostToApiCollectionId, LoggerMaker.LogDb.RUNTIME);
         for (String host : hostToApiCollectionId.keySet()) {
             mergeHostUtil(host, hostToApiCollectionId.get(host));
         }

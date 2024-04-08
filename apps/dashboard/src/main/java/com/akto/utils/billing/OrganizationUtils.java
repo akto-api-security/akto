@@ -20,9 +20,12 @@ import com.mongodb.client.model.Updates;
 
 import okhttp3.*;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class OrganizationUtils {
 
+    private static final Logger logger = LoggerFactory.getLogger(OrganizationUtils.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(OrganizationUtils.class);
     public static boolean isOverage(HashMap<String, FeatureAccess> featureWiseAllowed) {
 
@@ -100,11 +103,11 @@ public class OrganizationUtils {
                 accounts.add(accountRbac.getAccountId());
             }
         } catch (Exception e) {
-            System.out.println("Failed to find accounts belonging to organization. Error - " + e.getMessage());
+            logger.info("Failed to find accounts belonging to organization. Error - " + e.getMessage());
         }
         
         return accounts;
-    }    
+    }
 
     private static BasicDBObject fetchFromInternalService(String apiName, BasicDBObject reqBody) {
         String json = reqBody.toJson();
@@ -133,7 +136,7 @@ public class OrganizationUtils {
             return BasicDBObject.parse(responseBody.string());
 
         } catch (IOException e) {
-            System.out.println("Failed to sync organization with Akto. Error - " +  e.getMessage());
+            logger.info("Failed to sync organization with Akto. Error - " +  e.getMessage());
             return null;
         } finally {
             if (response != null) {
@@ -205,7 +208,7 @@ public class OrganizationUtils {
                 Updates.set(Organization.SYNCED_WITH_AKTO, true)
             );
         } catch (IOException e) {
-            System.out.println("Failed to sync organization with Akto. Error - " +  e.getMessage());
+            logger.info("Failed to sync organization with Akto. Error - " +  e.getMessage());
             return false;
         } finally {
             if (response != null) {
@@ -246,16 +249,8 @@ public class OrganizationUtils {
         return (BasicDBList) (ret.get("entitlements"));
     }
 
-    public static int fetchOrgGracePeriod(String orgId, String adminEmail) {
-        String orgIdUUID = UUID.fromString(orgId).toString();
-        BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
-        BasicDBObject ret = UsageMetricUtils.fetchFromBillingService("fetchOrgMetaData", reqBody);
-
-        if (ret == null) {
-            return 0;
-        }
-
-        BasicDBObject additionalMetaData = (BasicDBObject) ret.getOrDefault("additionalMetaData", new BasicDBObject());
+    public static int fetchOrgGracePeriodFromMetaData(BasicDBObject metadata) {
+        BasicDBObject additionalMetaData = (BasicDBObject) metadata.getOrDefault("additionalMetaData", new BasicDBObject());
         String gracePeriodStr = (String) additionalMetaData.getOrDefault("GRACE_PERIOD_END_EPOCH", "");
 
         int gracePeriod = 0;
@@ -263,17 +258,31 @@ public class OrganizationUtils {
         if(gracePeriodStr.isEmpty()) {
             return 0;
         }
-
         try {
             gracePeriod = Integer.parseInt(gracePeriodStr);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Failed to parse grace period for orgId: " + orgId + " adminEmail: " + adminEmail + " gracePeriodStr: " + gracePeriodStr, LoggerMaker.LogDb.DASHBOARD);   
+            loggerMaker.errorAndAddToDb("Failed to parse grace period" + gracePeriodStr, LoggerMaker.LogDb.DASHBOARD);
         }
-
         if(gracePeriod <= 0) {
             return 0;
         }
-
         return gracePeriod;
+    }
+
+    public static BasicDBObject fetchOrgMetaData(String orgId, String adminEmail) {
+        String orgIdUUID = UUID.fromString(orgId).toString();
+        BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
+        BasicDBObject orgMetaData = UsageMetricUtils.fetchFromBillingService("fetchOrgMetaData", reqBody);
+        return orgMetaData == null ? new BasicDBObject() : orgMetaData;
+    }
+
+    public static String fetchHotjarSiteId(BasicDBObject metadata) {
+        BasicDBObject additionalMetaData = (BasicDBObject) metadata.getOrDefault("additionalMetaData", new BasicDBObject());
+        return additionalMetaData.getString("HOTJAR_SITE_ID", "");
+    }
+
+    public static boolean fetchTelemetryEnabled(BasicDBObject metadata) {
+        BasicDBObject additionalMetaData = (BasicDBObject) metadata.getOrDefault("additionalMetaData", new BasicDBObject());
+        return additionalMetaData.getString("ENABLE_TELEMETRY", "NA").equalsIgnoreCase("ENABLED");
     }
 }

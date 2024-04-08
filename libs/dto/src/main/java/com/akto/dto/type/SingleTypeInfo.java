@@ -14,6 +14,7 @@ import io.swagger.v3.oas.models.media.*;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.codecs.pojo.annotations.BsonProperty;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,7 +141,7 @@ public class SingleTypeInfo {
     }
 
     public enum SuperType {
-        BOOLEAN, INTEGER, FLOAT, STRING, NULL, OTHER, CUSTOM, OBJECT_ID
+        BOOLEAN, INTEGER, FLOAT, STRING, OBJECT_ID, NULL, OTHER, CUSTOM
     }
 
     public enum Position {
@@ -390,6 +391,7 @@ public class SingleTypeInfo {
                 if (customDataType != null) {
                     this.subType = customDataType.toSubType();
                 } else {
+                    // TODO:
                     this.subType = GENERIC;
                 }
             }
@@ -427,6 +429,7 @@ public class SingleTypeInfo {
         }
     }
 
+    ObjectId id;
     public static final String _URL = "url";
     String url;
     public static final String _METHOD = "method";
@@ -751,6 +754,7 @@ public String composeKeyWithCustomSubType(SubType s) {
             if (customDataType != null) {
                 this.subType = customDataType.toSubType();
             } else {
+                // TODO:
                 this.subType = GENERIC;
             }
         }
@@ -875,5 +879,13 @@ public String composeKeyWithCustomSubType(SubType s) {
 
     public void setPublicCount(long publicCount) {
         this.publicCount = publicCount;
+    }
+
+    public ObjectId getId() {
+        return id;
+    }
+
+    public void setId(ObjectId id) {
+        this.id = id;
     }
 }

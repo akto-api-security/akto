@@ -7,6 +7,7 @@ import org.bson.types.ObjectId;
 import java.util.List;
 import java.util.Map;
 
+
 public class TestingRunConfig {
 
     @BsonId
@@ -15,9 +16,8 @@ public class TestingRunConfig {
     private List<String> testSubCategoryList;
     private ObjectId authMechanismId;
 
-    private String overriddenTestAppUrl;
     private String testRoleId;
-
+    private String overriddenTestAppUrl;
     public TestingRunConfig() {}
     public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
                             List<String> testSubCategoryList,
@@ -69,13 +69,6 @@ public class TestingRunConfig {
     public void setOverriddenTestAppUrl(String overriddenTestAppUrl) {
         this.overriddenTestAppUrl = overriddenTestAppUrl;
     }
-    public String getTestRoleId() {
-        return testRoleId;
-    }
-
-    public void setTestRoleId(String testRoleId) {
-        this.testRoleId = testRoleId;
-    }
 
     public void rebaseOn(TestingRunConfig that) {
         if (that == null) return;
@@ -101,5 +94,13 @@ public class TestingRunConfig {
         if(this.testRoleId == null) {
             this.testRoleId = that.testRoleId;
         }
+    }
+
+    public String getTestRoleId() {
+        return testRoleId;
+    }
+
+    public void setTestRoleId(String testRoleId) {
+        this.testRoleId = testRoleId;
     }
 }

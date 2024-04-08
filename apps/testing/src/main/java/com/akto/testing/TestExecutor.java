@@ -5,6 +5,7 @@ import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
@@ -44,11 +45,18 @@ import com.google.gson.Gson;
 import com.mongodb.MongoInterruptedException;
 import org.apache.commons.lang3.StringUtils;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.*;
 
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.mortbay.util.ajax.JSON;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -57,7 +65,9 @@ import java.util.concurrent.*;
 
 public class TestExecutor {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class, LogDb.TESTING);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
+    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
+
     public static long acceptableSizeInBytes = 5_000_000;
     private static final Gson gson = new Gson();
 
@@ -126,7 +136,7 @@ public class TestExecutor {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
-        sampleMessageStore.fetchSampleMessages();
+        sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(testingRun.getTestingEndpoints().returnApis()));
         AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
@@ -135,7 +145,7 @@ public class TestExecutor {
 
         sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
-        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
+        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();;
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false);
 
@@ -629,7 +639,7 @@ public class TestExecutor {
             );
         }
 
-        String message = messages.get(0);
+        String message = messages.get(messages.size() - 1);
 
         RawApi rawApi = RawApi.buildFromMessage(message);
         int startTime = Context.now();
@@ -664,6 +674,8 @@ public class TestExecutor {
             testSubType + "logId" + testExecutionLogId, LogDb.TESTING);
 
         List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
+        // TestingUtil -> authMechanism
+        // TestingConfig -> auth
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
                 rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
         YamlTestResult testResults = yamlTestTemplate.run(debug, testLogs);

@@ -118,7 +118,6 @@ public class JSONUtils {
             }
             return new Gson().toJson(modifiedPayload);
         } catch (Exception e) {
-            ;
             return jsonBody;
         }
     }

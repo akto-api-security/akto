@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-18.04
     name: Sends message
     steps:
+      - name: Setup Bolt
+        uses: koalalab-inc/bolt@v1
       - name: Sending message
         uses: nhevia/discord-styled-releases@main
         with:

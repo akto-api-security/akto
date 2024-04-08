@@ -16,13 +16,13 @@ import com.google.api.client.json.jackson2.JacksonFactory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-import static com.mongodb.client.model.Filters.and;
-import static com.mongodb.client.model.Filters.eq;
-
 public class GoogleAuthAction extends UserAction {
+    private static final Logger logger = LoggerFactory.getLogger(GoogleAuthAction.class);
 
     private BasicDBObject googleConfigResult;
     public String retrieveGoogleConfig() {
@@ -78,7 +78,8 @@ public class GoogleAuthAction extends UserAction {
             this.code = userId;
 
         } catch (IOException e) {
-            ;
+            logger.error(e.getMessage());
+            e.printStackTrace();
             return Action.ERROR.toUpperCase();
         }
 

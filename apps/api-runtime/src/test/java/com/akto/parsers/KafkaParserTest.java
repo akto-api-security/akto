@@ -20,7 +20,7 @@ public class KafkaParserTest {
             httpResponseParams = HttpCallParserHelper.parseKafkaMessage(message);
             assertEquals("/api/books",httpResponseParams.getRequestParams().getURL());
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
         }
         assertNotNull(httpResponseParams);
         assertEquals(1, httpResponseParams.getHeaders().size());
@@ -36,7 +36,7 @@ public class KafkaParserTest {
             httpResponseParams = HttpCallParserHelper.parseKafkaMessage(message);
             assertEquals(0,httpResponseParams.getRequestParams().getHeaders().keySet().size());
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
         }
         assertNotNull(httpResponseParams);
 
@@ -50,12 +50,12 @@ public class KafkaParserTest {
             httpResponseParams = HttpCallParserHelper.parseKafkaMessage(message);
             String payload = httpResponseParams.getRequestParams().getPayload();
             Map<String, Object> json = gson.fromJson(payload, Map.class);
-
+            System.out.println(json);
             assertEquals("a", json.get("name"));
             assertEquals("available", json.get("status"));
 
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
         }
         assertNotNull(httpResponseParams);
 

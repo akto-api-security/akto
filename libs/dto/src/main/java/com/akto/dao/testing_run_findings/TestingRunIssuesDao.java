@@ -36,8 +36,11 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
         if (!exists) {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
+
+        String[] fieldNames = {TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.CREATION_TIME};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
         
-        String[] fieldNames = {TestingRunIssues.TEST_RUN_ISSUES_STATUS, "_id.apiInfoKey.apiCollectionId"};
+        fieldNames = new String[]{TestingRunIssues.TEST_RUN_ISSUES_STATUS, "_id.apiInfoKey.apiCollectionId"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);    
         
         fieldNames = new String[]{TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.LAST_SEEN};
@@ -117,7 +120,7 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
         pipeline.add(Aggregates.match(Filters.gte(TestingRunIssues.LAST_SEEN, startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte(TestingRunIssues.LAST_SEEN, endTimestamp)));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$lastSeen", 86400}))));
-        pipeline.add(Aggregates.project(Projections.computed("dayOfYear", new BasicDBObject("$trunc", new Object[]{"$dayOfYearFloat", 0}))));
+        pipeline.add(Aggregates.project(Projections.computed("dayOfYear", new BasicDBObject("$floor", new Object[]{"$dayOfYearFloat"}))));
 
         BasicDBObject groupedId = new BasicDBObject("dayOfYear", "$dayOfYear").append("subCategory", "$_id.testSubCategory");
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));

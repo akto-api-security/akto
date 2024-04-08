@@ -41,6 +41,13 @@ public class Filter {
                 Boolean res = filterAction.invokeFilter(dataOperandFilterRequest);
                 return new DataOperandsFilterResponse(res, matchingKeySet, contextEntities, null);
             }
+            if (node.getOperand().equalsIgnoreCase(TestEditorEnums.PredicateOperator.SSRF_URL_HIT.toString())) {
+                Object updatedQuerySet = filterAction.resolveQuerySetValues(null, node.fetchNodeValues(), varMap);
+                List<Object> val = (List<Object>) updatedQuerySet;
+                DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(null, val, "ssrf_url_hit");
+                Boolean res = filterAction.invokeFilter(dataOperandFilterRequest);
+                return new DataOperandsFilterResponse(res, matchingKeySet, contextEntities, null);
+            }
             if (! (node.getNodeType().toLowerCase().equals(OperandTypes.Data.toString().toLowerCase()) || node.getNodeType().toLowerCase().equals(OperandTypes.Extract.toString().toLowerCase()) || node.getNodeType().toLowerCase().equals(OperandTypes.Context.toString().toLowerCase() ))) {
                 return new DataOperandsFilterResponse(false, null, null, null);
             }

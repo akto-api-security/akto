@@ -8,7 +8,13 @@ import java.util.Map;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.testing.AuthParam;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class TokenPayloadModifier {
+
+    private static final Logger logger = LoggerFactory.getLogger(TokenPayloadModifier.class);
+
 
     public static Boolean tokenPayloadModifier(OriginalHttpRequest request, String key, String value, AuthParam.Location where) {
         if (where.toString().equals(AuthParam.Location.BODY.toString())) {
@@ -16,6 +22,7 @@ public class TokenPayloadModifier {
                 String resp = JsonStringPayloadModifier.jsonStringPayloadModifier(request.getBody(), key, value);
                 request.setBody(resp);
             } catch(Exception e) {
+                logger.info("error adding auth param to body" + e.getMessage());
                 return false;
             }
         }

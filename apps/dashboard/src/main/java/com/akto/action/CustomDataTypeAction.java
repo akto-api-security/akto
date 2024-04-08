@@ -439,7 +439,7 @@ public class CustomDataTypeAction extends UserAction{
                     boolean skip4 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD) ) ? forPayload(httpResponseParams.requestParams.getPayload(), customDataType, apiKey) : false;
                     skip = skip1 || skip2 || skip3 || skip4;
                 } catch (Exception e) {
-                    ;
+                    e.printStackTrace();
                 }
 
                 if (skip) break;
@@ -521,6 +521,7 @@ public class CustomDataTypeAction extends UserAction{
     }
 
     public CustomDataType generateCustomDataType(int userId) throws AktoCustomException {
+        // TODO: handle errors
         if (name == null || name.length() == 0) throw new AktoCustomException("Name cannot be empty");
         int maxChars = 25;
         if (name.length() > maxChars) throw new AktoCustomException("Maximum length allowed is "+maxChars+" characters");

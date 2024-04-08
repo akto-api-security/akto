@@ -81,9 +81,11 @@ public class StandardHeaders {
         add("X-Correlation-ID");
         add("Save-Data");
 
+        // mpl
         add("sec-ch-ua");
         add("x-amzn-trace-id");
 
+        // todo:
         add("idempotency-key");
 
     }

@@ -54,14 +54,18 @@ import { generateSearchData } from "@/util/searchItems"
 import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
+import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
+import AzureSso from "../dashboard/pages/settings/integrations/AzureSso";
+
 import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
 import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
 import { useStiggContext } from '@stigg/react-sdk';
 import DependencyTable from "../dashboard/pages/testing/DependencyTable/DependencyTable";
+import TestRoleAccessMatrix from "../dashboard/pages/testing/TestRoleAccessMatrix/TestRoleAccessMatrix";
 import SignupPage from "../signup/pages/SignupPage";
 import PageCheckInbox from "../signup/pages/PageCheckInbox"
 import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
-import TokenValidator from "../main/TokenValidator"
+import TokenValidator from "./TokenValidator"
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -103,6 +107,10 @@ const router = createBrowserRouter([
               {
                 path:"roles/details",
                 element:<TestRoleSettings/>
+              },
+              {
+                path:"roles/access-matrix",
+                element:<TestRoleAccessMatrix/>
               },
               {
                 path:"user-config",
@@ -205,6 +213,14 @@ const router = createBrowserRouter([
           {
             path: "integrations/github_sso",
             element: <GithubSso />
+          },
+          {
+            path: "integrations/okta_sso",
+            element: <OktaIntegration />
+          },
+          {
+            path: "integrations/azure_sso",
+            element: <AzureSso />
           },
           {
             path: "integrations/github_app",
