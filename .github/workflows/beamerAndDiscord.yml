@@ -20,35 +20,36 @@ jobs:
           repo_owner = 'akto-api-security'
           repo_name = 'akto'
           headers = {'Authorization': f'Bearer {github_token}'}
-          url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/v1.34.10'
-          response = requests.get(url, headers=headers)
-          data = response.json()
-
-          tag_name = data.get('tag_name')
-          description = data.get('body')
-          description_lines = description.split('\n') if description else []
-          description_lines = [line.strip() for line in description_lines if line.strip()]
-
-          release_notes = '<ul>'
-          if description_lines:
-              first_line = description_lines[0].lstrip('#').strip()
-              release_notes += f'<h3>{first_line}</h3>'
-              for line in description_lines[1:-1]:  # Exclude the last line
-                  if 'by' in line:
-                      line = line.split('by', 1)[0].strip()
-                  release_notes += f'<li>{line[1:]}</li>'
-          release_notes += '</ul>'
-          release_notes2 = '<p>'
-          release_notes2 += '<a href=https://discord.com/invite/Wpc6xVME4s >'
-          release_notes2 += '</a>'
-          release_notes2 += '</p>'
-          release_notes2 += 'Have questions? Ask on <a href=https://discord.com/invite/Wpc6xVME4s >Discord</a> or our <a href=https://community.akto.io >Community page</a>'
-          release_notes = release_notes+release_notes2
-      
-          
-          print(f"::set-output name=tag_name::{tag_name}")
-          print(f"::set-output name=release_notes::{release_notes}")
-          EOF
+          for tag_num in ["34.11", "35.0", "35.1", "35.2", "35.3", "35.4", "35.5", "35.6", "35.7", "35.8", "35.9", "35.10", "35.11", "35.12", "35.13", "35.14", "36.0", "36.1", "36.2", "36.3", "36.4", "36.5", "36.6", "36.7", "36.8", "36.9", "37.0", "37.1", "37.2" ]):
+            url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/v1.{tag_num}'
+            response = requests.get(url, headers=headers)
+            data = response.json()
+  
+            tag_name = data.get('tag_name')
+            description = data.get('body')
+            description_lines = description.split('\n') if description else []
+            description_lines = [line.strip() for line in description_lines if line.strip()]
+  
+            release_notes = '<ul>'
+            if description_lines:
+                first_line = description_lines[0].lstrip('#').strip()
+                release_notes += f'<h3>{first_line}</h3>'
+                for line in description_lines[1:-1]:  # Exclude the last line
+                    if 'by' in line:
+                        line = line.split('by', 1)[0].strip()
+                    release_notes += f'<li>{line[1:]}</li>'
+            release_notes += '</ul>'
+            release_notes2 = '<p>'
+            release_notes2 += '<a href=https://discord.com/invite/Wpc6xVME4s >'
+            release_notes2 += '</a>'
+            release_notes2 += '</p>'
+            release_notes2 += 'Have questions? Ask on <a href=https://discord.com/invite/Wpc6xVME4s >Discord</a> or our <a href=https://community.akto.io >Community page</a>'
+            release_notes = release_notes+release_notes2
+        
+            
+            print(f"::set-output name=tag_name::{tag_name}")
+            print(f"::set-output name=release_notes::{release_notes}")
+            EOF
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -93,25 +94,26 @@ jobs:
           repo_owner = 'akto-api-security'
           repo_name = 'akto'
           headers = {'Authorization': f'Bearer {github_token}'}
-          url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/v1.34.10'
-          response = requests.get(url, headers=headers)
-          data = response.json()
-          tag = data.get('tag_name')
-          description = data.get('body')
-          # Replace anything after "by" in each line with a "."
-          if description:
-              description_lines = description.split('\n')
-              for i in range(len(description_lines)):
-                  if 'by' in description_lines[i]:
-                      description_lines[i] = description_lines[i].split('by', 1)[0].strip() + '.'
-                  if "'" in description_lines[i]:
-                      description_lines[i] = description_lines[i].replace("'", "''")
-              # Remove the last line from the description
-              description_lines = description_lines[:-1]
-              description = '\n'.join(description_lines) 
-          print(f"::set-output name=tag::{tag}")
-          print(f"::set-output name=description::{json.dumps(description)}")
-          EOF
+          for tag_num in ["34.11", "35.0", "35.1", "35.2", "35.3", "35.4", "35.5", "35.6", "35.7", "35.8", "35.9", "35.10", "35.11", "35.12", "35.13", "35.14", "36.0", "36.1", "36.2", "36.3", "36.4", "36.5", "36.6", "36.7", "36.8", "36.9", "37.0", "37.1", "37.2" ]):
+            url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/v1.{tag_num}'          
+            response = requests.get(url, headers=headers)
+            data = response.json()
+            tag = data.get('tag_name')
+            description = data.get('body')
+            # Replace anything after "by" in each line with a "."
+            if description:
+                description_lines = description.split('\n')
+                for i in range(len(description_lines)):
+                    if 'by' in description_lines[i]:
+                        description_lines[i] = description_lines[i].split('by', 1)[0].strip() + '.'
+                    if "'" in description_lines[i]:
+                        description_lines[i] = description_lines[i].replace("'", "''")
+                # Remove the last line from the description
+                description_lines = description_lines[:-1]
+                description = '\n'.join(description_lines) 
+            print(f"::set-output name=tag::{tag}")
+            print(f"::set-output name=description::{json.dumps(description)}")
+            EOF
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -144,30 +146,31 @@ jobs:
           repo_owner = 'akto-api-security'
           repo_name = 'akto'
           headers = {'Authorization': f'Bearer {github_token}'}
-          url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/v1.34.10'
-          response = requests.get(url, headers=headers)
-          data = response.json()
-
-          tag_name = data.get('tag_name')
-          description = data.get('body').replace("'", "")
-          print("description", description)
-          description_lines = description.split('\n') if description else []
-          description_lines = [line.strip() for line in description_lines if line.strip()]
-          
-          slack_message_body = "{ 'blocks': [ { 'type': 'header', 'text': { 'type': 'plain_text', 'text': '"
-          slack_message_body += repo_name
-          slack_message_body += "' } }, { 'type': 'section', 'text': { 'type': 'mrkdwn', 'text': '"
-          slack_message_body += tag_name
-          slack_message_body += "' } }, { 'type': 'section', 'text': { 'type': 'mrkdwn', 'text': '"
-          slack_message_body += ('%0A'.join(description_lines))[:2000]
-          slack_message_body += "' } } ] }"
-          slack_message_body = slack_message_body.replace("'", "\"")
-
-          print("slack_message_body", slack_message_body)
-          
-          print(f"::set-output name=tag_name::{tag_name}")
-          print(f"::set-output name=slack_message_body::{slack_message_body}")
-          EOF
+          for tag_num in ["34.11", "35.0", "35.1", "35.2", "35.3", "35.4", "35.5", "35.6", "35.7", "35.8", "35.9", "35.10", "35.11", "35.12", "35.13", "35.14", "36.0", "36.1", "36.2", "36.3", "36.4", "36.5", "36.6", "36.7", "36.8", "36.9", "37.0", "37.1", "37.2" ]):
+            url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/v1.{tag_num}'
+            response = requests.get(url, headers=headers)
+            data = response.json()
+  
+            tag_name = data.get('tag_name')
+            description = data.get('body').replace("'", "")
+            print("description", description)
+            description_lines = description.split('\n') if description else []
+            description_lines = [line.strip() for line in description_lines if line.strip()]
+            
+            slack_message_body = "{ 'blocks': [ { 'type': 'header', 'text': { 'type': 'plain_text', 'text': '"
+            slack_message_body += repo_name
+            slack_message_body += "' } }, { 'type': 'section', 'text': { 'type': 'mrkdwn', 'text': '"
+            slack_message_body += tag_name
+            slack_message_body += "' } }, { 'type': 'section', 'text': { 'type': 'mrkdwn', 'text': '"
+            slack_message_body += ('%0A'.join(description_lines))[:2000]
+            slack_message_body += "' } } ] }"
+            slack_message_body = slack_message_body.replace("'", "\"")
+  
+            print("slack_message_body", slack_message_body)
+            
+            print(f"::set-output name=tag_name::{tag_name}")
+            print(f"::set-output name=slack_message_body::{slack_message_body}")
+            EOF
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
