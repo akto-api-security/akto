@@ -13,7 +13,7 @@
 
     <package name="user" namespace="" extends="struts-default, json-default">
         <interceptors>
-        <!-- The feature labels for the usage interceptor are defined in stigg feature -> metadata. -->
+            <!-- The feature labels for the usage interceptor are defined in stigg feature -> metadata. -->
             <interceptor name="usageInterceptor" class="com.akto.interceptor.UsageInterceptor" />
         </interceptors>
 
@@ -28,6 +28,9 @@
         </action>
 
         <action name="metrics" class="com.akto.action.InfraMetricsAction">
+        </action>
+
+        <action name="detailedMetrics" class="com.akto.action.InfraMetricsAction" method="detailedMetrics">
         </action>
 
         <action name="mongo-error" class="com.akto.action.HomeAction" method="error">
@@ -219,6 +222,16 @@
             </result>
         </action>
 
+        <action name="api/makeAdmin" class="com.akto.action.TeamAction" method="makeAdmin">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
 
         <action name="signup-email" class="com.akto.action.SignupAction" method="registerViaEmail">
             <interceptor-ref name="json"/>
@@ -240,6 +253,33 @@
 
 
         <action name="signup-github" class="com.akto.action.SignupAction" method="registerViaGithub">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="root">code</param>
+            </result>
+        </action>
+
+        <action name="authorization-code/callback" class="com.akto.action.SignupAction" method="registerViaOkta">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="root">code</param>
+            </result>
+        </action>
+
+        <action name="signup-azure-request" class="com.akto.action.SignupAction" method="sendRequestToAzure">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="root">code</param>
+            </result>
+        </action>
+
+        <action name="signup-azure-saml" class="com.akto.action.SignupAction" method="registerViaAzure">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"   type="json"/>
@@ -297,6 +337,104 @@
             </result>
         </action>
 
+        <action name="api/addOktaSso" class="com.akto.action.user.OktaSsoAction" method="addOktaSso">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AKTO_SSO</param>
+            </interceptor-ref>
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/deleteOktaSso" class="com.akto.action.user.OktaSsoAction" method="deleteOktaSso">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AKTO_SSO</param>
+            </interceptor-ref>
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+         <action name="api/fetchOktaSso" class="com.akto.action.user.OktaSsoAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/addAzureSso" class="com.akto.action.user.AzureSsoAction" method="addAzureSsoInfo">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AKTO_SSO</param>
+            </interceptor-ref>
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/deleteAzureSso" class="com.akto.action.user.AzureSsoAction" method="deleteAzureSso">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AKTO_SSO</param>
+            </interceptor-ref>
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+         <action name="api/fetchAzureSso" class="com.akto.action.user.AzureSsoAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+        
         <action name="api/fetchGithubAppId" class="com.akto.action.user.GithubSsoAction" method="fetchGithubAppId">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -499,6 +637,94 @@
             </result>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/inviteUsers" class="com.akto.action.InviteUserAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAccessMatrixTaskInfos" class="com.akto.action.testing.AccessMatrixTaskAction" method="fetchAccessMatrixTaskInfos">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/analyzeApiSamples" class="com.akto.action.testing.AccessMatrixTaskAction" method="analyzeApiSamples">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAccessMatrixUrlToRoles" class="com.akto.action.testing.AccessMatrixTaskAction" method="fetchAccessMatrixUrlToRoles">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updateAccessMatrixTask" class="com.akto.action.testing.AccessMatrixTaskAction" method="updateAccessMatrixTask">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/createMultipleAccessMatrixTasks" class="com.akto.action.testing.AccessMatrixTaskAction" method="createMultipleAccessMatrixTasks">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+        <action name="api/deleteAccessMatrix" class="com.akto.action.testing.AccessMatrixTaskAction" method="deleteAccessMatrix">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/deleteAccessMatrixTask" class="com.akto.action.testing.AccessMatrixTaskAction" method="deleteAccessMatrixTask">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 
@@ -1015,6 +1241,19 @@
             </result>
         </action>
 
+        <action name="api/getSingleEndpoint" class="com.akto.action.ApiInfoAction" method="fetchApiInfo">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">apiInfo</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchFilters" class="com.akto.action.FilterAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1022,6 +1261,18 @@
             </result>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/convertSampleDataToCurl" class="com.akto.action.ExportSampleDataAction" method="generateCurl">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 
@@ -1252,6 +1503,32 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json"/>
+        </action>
+
+        <action name="api/updatePrivateCidrIps" class="com.akto.action.AdminSettingsAction" method="editPrivateCidrList">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">privateCidrList</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updatePartnerIps" class="com.akto.action.AdminSettingsAction" method="editPartnerIpList">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">partnerIpList</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
         </action>
 
           <action name="api/saveTagConfig" class="com.akto.action.TagConfigsAction" method="saveTagConfig">
@@ -1533,6 +1810,17 @@
             </result>
         </action>
 
+        <action name="api/toggleTelemetry" class="com.akto.action.AdminSettingsAction" method="toggleTelemetry">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchParamsStatus" class="com.akto.action.ParamStateAction" method="fetchParamsStatus">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1624,6 +1912,17 @@
             </result>
         </action>
 
+        <action name="api/deleteTestRole" class="com.akto.action.testing.TestRolesAction" method="deleteTestRole">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/updateTestRoles" class="com.akto.action.testing.TestRolesAction" method="updateTestRoles">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1656,7 +1955,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
+        
         <action name="api/fetchTestingRunResult" class="com.akto.action.testing_issues.IssuesAction" method="fetchTestingRunResult">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1767,6 +2066,17 @@
         </action>
 
         <action name="send_otp" class="com.akto.action.misc.OtpAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/convertSamleDataToBurpRequest" class="com.akto.action.ExportSampleDataAction" method="generateBurpRequest">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -2126,6 +2436,25 @@
             </result>
         </action>
 
+        <action name="api/createRuntimeStack" class="com.akto.action.quick_start.QuickStartAction" method="createRuntimeStack">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">ADVANCED_TRAFFIC_CONNECTORS</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json"/>
+            <result name= "ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchEndpointsBasedOnHostName" class="com.akto.action.observe.InventoryAction" method="fetchEndpointsBasedOnHostName">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2221,9 +2550,7 @@
         <action name="api/fetchRecordedFlowOutput" class="com.akto.action.testing.LoginRecorderAction" method="fetchRecordedFlowOutput">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json">
-                <param name="includeProperties">^token</param>
-            </result>
+            <result name="SUCCESS" type="json" />
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -2391,7 +2718,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
+        
         <action name="api/fetchTrafficMetricsDesciptions" class="com.akto.action.traffic_metrics.TrafficMetricsAction" method="fetchTrafficMetricsDesciptions">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2573,6 +2900,50 @@
             </result>
         </action>
 
+
+        <action name="api/toggleDebugLogsFeature" class="com.akto.action.AdminSettingsAction" method="toggleDebugLogsFeature">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/addFilterHeaderValueMap" class="com.akto.action.AdminSettingsAction" method="addFilterHeaderValueMap">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/addApiCollectionNameMapper" class="com.akto.action.AdminSettingsAction" method="addApiCollectionNameMapper">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+        <action name="api/deleteApiCollectionNameMapper" class="com.akto.action.AdminSettingsAction" method="deleteApiCollectionNameMapper">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/runTestForGivenTemplate" class="com.akto.action.test_editor.SaveTestEditorAction" method="runTestForGivenTemplate">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2639,6 +3010,17 @@
             </result>
         </action>
 
+        <action name="api/deMergeApi" class="com.akto.action.observe.InventoryAction" method="deMergeApi">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
         <action name="tools/addLLmData" class="com.akto.action.ExportSampleDataAction" method="insertLlmData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2651,6 +3033,76 @@
             </result>
         </action>
 
+        <action name="api/testIntegration" class="com.akto.action.JiraIntegrationAction" method="testIntegration" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">JIRA_INTEGRATION</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/addIntegration" class="com.akto.action.JiraIntegrationAction" method="addIntegration" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">JIRA_INTEGRATION</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchIntegration" class="com.akto.action.JiraIntegrationAction" method="fetchIntegration" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+        </action>
+
+        <action name="api/createJiraIssue" class="com.akto.action.JiraIntegrationAction" method="createIssue" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+        </action>
+
+        <action name="api/attachFileToIssue" class="com.akto.action.JiraIntegrationAction" method="attachFileToIssue" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+        </action>
         <action name="api/fetchApiDependencies" class="com.akto.action.DependencyAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2848,71 +3300,6 @@
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/fetchValuesForParameters" class="com.akto.action.DependencyAction" method="fetchValuesForParameters">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"  type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-        <action name="api/testIntegration" class="com.akto.action.JiraIntegrationAction" method="testIntegration" >
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
-            </result>
-        </action>
-
-        <action name="api/addIntegration" class="com.akto.action.JiraIntegrationAction" method="addIntegration" >
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
-            </result>
-        </action>
-
-        <action name="api/fetchIntegration" class="com.akto.action.JiraIntegrationAction" method="fetchIntegration" >
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
-            </result>
-        </action>
-
-        <action name="api/createJiraIssue" class="com.akto.action.JiraIntegrationAction" method="createIssue" >
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
-            </result>
-        </action>
-
-        <action name="api/attachFileToIssue" class="com.akto.action.JiraIntegrationAction" method="attachFileToIssue" >
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
             </result>
         </action>
 

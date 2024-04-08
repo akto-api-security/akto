@@ -90,10 +90,10 @@ public class TestInitializerListener extends MongoBasedTest {
         TestingRunIssuesDao.instance.getMCollection().drop();
 
         ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(0, "url1", URLMethods.Method.GET);
-        TestingRunIssues testingRunIssues1 = new TestingRunIssues(new TestingIssuesId(apiInfoKey1, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,null, "something"), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId(), 0, null);
+        TestingRunIssues testingRunIssues1 = new TestingRunIssues(new TestingIssuesId(apiInfoKey1, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,null, "something"), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId(),null, 0);
 
         ApiInfo.ApiInfoKey apiInfoKey2 = new ApiInfo.ApiInfoKey(0, "url2", URLMethods.Method.GET);
-        TestingRunIssues testingRunIssues2 = new TestingRunIssues(new TestingIssuesId(apiInfoKey2, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,"BFLA", null), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId(), 0, null);
+        TestingRunIssues testingRunIssues2 = new TestingRunIssues(new TestingIssuesId(apiInfoKey2, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,"BFLA", null), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId(), null, 0);
 
         TestingRunIssuesDao.instance.insertMany(Arrays.asList(testingRunIssues1, testingRunIssues2));
 

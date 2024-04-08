@@ -4,6 +4,7 @@ import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
@@ -19,9 +20,7 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
 import org.bson.conversions.Bson;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class TestRolesAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestRolesAction.class);
@@ -35,6 +34,8 @@ public class TestRolesAction extends UserAction {
     private Map<String, String> apiCond;
     private String authAutomationType;
     private ArrayList<RequestData> reqData;
+    private RecordedLoginFlowInput recordedLoginFlowInput;
+
     public static class RolesConditionUtils {
         private Operator operator;
         private List<BasicDBObject> predicates;
@@ -75,7 +76,7 @@ public class TestRolesAction extends UserAction {
     }
 
     public void addAuthMechanism(TestRoles role){
-        if (authParamData != null) {
+        if (authParamData != null) {            
             List<AuthParam> authParams = new ArrayList<>();
 
             for (AuthParamData authParamDataElem : authParamData) {
@@ -89,7 +90,7 @@ public class TestRolesAction extends UserAction {
             }
 
             AuthMechanism authM = new AuthMechanism(authParams, this.reqData, authAutomationType);
-            AuthWithCond authWithCond = new AuthWithCond(authM, apiCond);
+            AuthWithCond authWithCond = new AuthWithCond(authM, apiCond, recordedLoginFlowInput);
             TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.push(TestRoles.AUTH_WITH_COND_LIST, authWithCond));
         }
     }
@@ -120,16 +121,17 @@ public class TestRolesAction extends UserAction {
         Bson roleFilterQ = Filters.eq(TestRoles.NAME, roleName);
         DeleteResult delete = TestRolesDao.instance.deleteAll(roleFilterQ);
         loggerMaker.infoAndAddToDb("Deleted role: " + roleName + " : " + delete, LoggerMaker.LogDb.DASHBOARD);
+
+        AccessMatrixTaskAction accessMatrixTaskAction = new AccessMatrixTaskAction();
+        accessMatrixTaskAction.setRoleName(roleName);
+        accessMatrixTaskAction.deleteAccessMatrix();
+
         return SUCCESS.toUpperCase();
     }
-    public String updateTestRoles() {
-        if (roleName == null) {
-            addActionError("Test role id is empty");
-            return ERROR.toUpperCase();
-        }
 
-        TestRoles role = TestRolesDao.instance.findOne(Filters.eq(TestRoles.NAME, roleName));
-        if (role == null) {//Role doesn't exists
+    public String updateTestRoles() {
+        TestRoles role = getRole();
+        if (role == null) {
             addActionError("Role doesn't exists");
             return ERROR.toUpperCase();
         }
@@ -153,6 +155,8 @@ public class TestRolesAction extends UserAction {
             EndpointLogicalGroupDao.instance.updateLogicalGroup(logicalGroup, andConditions, orConditions);
         }
         role.setLastUpdatedTs(Context.now());
+        this.selectedRole = role;
+        this.selectedRole.setEndpointLogicalGroup(logicalGroup);        
         TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.set(TestRoles.LAST_UPDATED_TS, Context.now()));
         return SUCCESS.toUpperCase();
     }
@@ -292,5 +296,13 @@ public class TestRolesAction extends UserAction {
 
     public void setAuthAutomationType(String authAutomationType) {
         this.authAutomationType = authAutomationType;
+    }
+
+    public RecordedLoginFlowInput getRecordedLoginFlowInput() {
+        return recordedLoginFlowInput;
+    }
+
+    public void setRecordedLoginFlowInput(RecordedLoginFlowInput recordedLoginFlowInput) {
+        this.recordedLoginFlowInput = recordedLoginFlowInput;
     }
 }

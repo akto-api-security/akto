@@ -102,6 +102,7 @@ export default {
     }
   },
   mounted() {
+    // TODO: get postman creds
     api.getPostmanCredentials().then((resp) => {
       if (resp.postmanCred.api_key !== null) {
         this.postman_api_key = resp.postmanCred.api_key

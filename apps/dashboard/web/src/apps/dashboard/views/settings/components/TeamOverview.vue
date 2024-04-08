@@ -3,6 +3,49 @@
         <div v-if="isLocalDeploy && !isSaas">
             <banner-vertical class="ma-3"></banner-vertical>
         </div>
+
+        <v-dialog v-model="showInviteCodeDialog" width="500" persistent>
+            <v-card>
+                <v-card-title class="">
+                Copy invite link
+                </v-card-title>
+
+                <v-card-text style="font-size: 14px;">
+                    Your invitation emails have been successfully sent. Alternatively, you can copy the links provided and share them directly with your invitees.
+                </v-card-text>
+
+                <div style="padding: 8px 24px 0px 24px">
+                    <div v-for="(inviteCode, email)  in inviteCodes" :key="email">
+                        <div class="invitation-text" id="inviteCodeId">
+                            <v-text-field
+                                :label="email"
+                                dense
+                                readonly
+                                outlined
+                                :value="inviteCode"
+                            >
+                                <template v-slot:append>
+                                    <v-icon @click="copyInviteCode(inviteCode)">$fas_copy</v-icon>
+                                </template>
+                            </v-text-field>
+                        </div>
+                    </div>
+                </div>
+
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn
+                        color="primary"
+                        text
+                        @click="showInviteCodeDialog = false"
+                    >
+                        Done
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+
         <a-card title="Members" icon="$fas_users" color="var(--rgbaColor2)">
             <div v-if="isAdmin && !(isLocalDeploy && !isSaas)" class="email-invite-container">
                 <v-combobox
@@ -34,7 +77,7 @@
                         </v-chip>
                     </template>
                 </v-combobox>
-                <v-btn 
+                <v-btn
                     @click="sendInvitationEmails"
                     :disabled="!allEmails || allEmails.length == 0"
                     dark
@@ -46,17 +89,17 @@
                 >
                     Invite
                 </v-btn>
-            
+
             </div>
             <div class="team-overview-card">
                 <template v-for="user in users">
-                    <v-hover 
-                        v-slot="{ hover }" 
+                    <v-hover
+                        v-slot="{ hover }"
                         :key="user.email"
                         class="user-details d-flex justify-space-between pa-4"
                     >
                         <div style="position: relative">
-                            
+
                             <owner-name
                                     :owner-name="user.name"
                                     :owner-id="user.id"
@@ -70,11 +113,11 @@
                             <div class="user-details-type">
                                 {{user.role || '-'}}
                             </div>
-                            <actions-tray  
-                                v-if="hover && isAdmin" 
-                                class="table-row-actions" 
-                                :actions="actions || []" 
-                                :subject=user 
+                            <actions-tray
+                                v-if="hover && isAdmin"
+                                class="table-row-actions"
+                                :actions="actions || []"
+                                :subject=user
                             />
                         </div>
                     </v-hover>
@@ -91,6 +134,7 @@
     import api from "../api"
     import ActionsTray from '@/apps/dashboard/shared/components/ActionsTray'
     import BannerVertical from "../../../shared/components/BannerVertical.vue"
+    import func from "@/util/func"
 
     export default {
         name: "TeamOverview",
@@ -122,16 +166,30 @@
                         func: item => this.removeUser(item),
                         success: (resp, item) => this.removedSuccess(resp, item),
                         failure: (err, item) => this.removedFailure(err, item)
+                    },
+                    {
+                        isValid: item => item.login != window.USER_NAME && ( item.role.toUpperCase() === "MEMBER" ) ,
+                        icon: item => '$fas_bolt',
+                        text: item => 'Make admin',
+                        func: item => this.makeAdmin(item),
+                        success: (resp, item) => func.showSuccessSnackBar(`${item.login} made admin successfully!`),
+                        failure: (err, item) => func.showErrorSnackBar(`Unable to make ${item.login} admin`)
                     }
                 ],
                 isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() == 'local_deploy',
                 isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
+                inviteCodes: {},
+                showInviteCodeDialog: false
             }
         },
         mounted() {
             this.$store.dispatch('team/getTeamData')
         },
         methods: {
+            async copyInviteCode(inviteCode) {
+                let domElement = document.getElementById("inviteCodeId")
+                func.copyToClipboard(inviteCode, 'copied to clipboard', domElement)
+            },
             inviteNewMember(email) {
                 let spec = {
                     inviteeName: "there",
@@ -141,6 +199,9 @@
                 return api.inviteUsers(spec)
             },
             async sendInvitationEmails () {
+                this.inviteCodes = {}
+                this.showInviteCodeDialog = false
+
                 let _inviteNewMember = this.inviteNewMember
                 let countEmails = 0
                 this.allEmails = this.allEmails ? this.allEmails : []
@@ -149,6 +210,8 @@
                     if (this.usernameRules[0](email)) {
                         let resp = await _inviteNewMember(email)
                         console.log(resp.finalInviteCode);
+                        this.inviteCodes[email] = resp.finalInviteCode
+                        this.inviteCodes = {...this.inviteCodes}
                         countEmails++;
                     }
 
@@ -171,12 +234,16 @@
                         })
                     }
                         this.$store.dispatch('team/getTeamData')
+                        this.showInviteCodeDialog = true
                     }
                     this.allEmails = []
                 }
             },
             removeUser (user) {
                 return this.$store.dispatch('team/removeUser', user)
+            },
+            makeAdmin (user) {
+                return this.$store.dispatch('team/makeAdmin', user)
             },
             removedSuccess (resp, user) {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
@@ -197,7 +264,7 @@
             ...mapState('team', ['users']),
             isAdmin() {
                 return true
-            }            
+            }
         }
     }
 </script>
@@ -345,4 +412,10 @@
     padding: 8px 16px !important
     margin: auto
 
+</style>
+
+<style scoped>
+.invitation-text>>>.v-text-field input {
+    font-size: 16px !important;
+}
 </style>
