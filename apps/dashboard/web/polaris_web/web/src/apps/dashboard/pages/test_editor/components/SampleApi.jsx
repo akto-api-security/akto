@@ -127,7 +127,7 @@ const SampleApi = () => {
         if (sampleDataResponse) {
             if (sampleDataResponse.sampleDataList.length > 0 && sampleDataResponse.sampleDataList[0].samples && sampleDataResponse.sampleDataList[0].samples.length > 0) {
                 setSampleDataList(null)
-                const sampleDataJson = JSON.parse(sampleDataResponse.sampleDataList[0].samples[0])
+                const sampleDataJson = JSON.parse(sampleDataResponse.sampleDataList[0].samples[sampleDataResponse.sampleDataList[0].samples.length - 1])
                 const requestJson = func.requestJson(sampleDataJson, [])
                 const responseJson = func.responseJson(sampleDataJson, [])
                 setSampleData({ requestJson, responseJson })

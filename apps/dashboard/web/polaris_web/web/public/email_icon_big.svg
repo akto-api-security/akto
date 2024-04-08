@@ -1,0 +1,13 @@
+<svg width="64" height="65" viewBox="0 0 64 65" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="email_major" clip-path="url(#clip0_7639_55607)">
+<g id="Primary fill">
+<path d="M0 17.4927V50.0545C0 52.7055 2.14903 54.8545 4.8 54.8545H59.2C61.851 54.8545 64 52.7055 64 50.0545V17.4924L33.6121 35.2187C32.6158 35.7999 31.3837 35.7999 30.3874 35.2187L0 17.4927Z" fill="#5C5F62"/>
+<path d="M62.2186 11.1223C61.394 10.4545 60.3437 10.0545 59.2 10.0545H4.8C3.6562 10.0545 2.60584 10.4546 1.78122 11.1224L31.9997 28.7499L62.2186 11.1223Z" fill="#5C5F62"/>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_7639_55607">
+<rect width="64" height="64" fill="white" transform="translate(0 0.454529)"/>
+</clipPath>
+</defs>
+</svg>

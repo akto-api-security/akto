@@ -157,7 +157,7 @@ public class Utils {
         return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
     }
 
-    private static String fetchToken(RecordedLoginFlowInput recordedLoginFlowInput, int retries) {
+    public static String fetchToken(RecordedLoginFlowInput recordedLoginFlowInput, int retries) {
 
         String token = null;
         for (int i=0; i<retries; i++) {

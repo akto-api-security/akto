@@ -9,6 +9,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Setup Bolt
+        uses: koalalab-inc/bolt@v1
       - uses: actions/checkout@v2
       - name: Generate Akto OpenAPI specication file
         working-directory: ./.github/scripts

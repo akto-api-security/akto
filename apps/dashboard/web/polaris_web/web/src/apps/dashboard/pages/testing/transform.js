@@ -1,7 +1,12 @@
 import func from "@/util/func";
 import api from "./api";
+import {ResourcesMajor,
+  CollectionsMajor,
+  CreditCardSecureMajor,
+  MarketingMajor,
+  FraudProtectMajor, RiskMajor} from '@shopify/polaris-icons';
 import React, {  } from 'react'
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Button, ButtonGroup} from '@shopify/polaris';
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Tag} from '@shopify/polaris';
 import { history } from "@/util/history";
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
@@ -335,8 +340,24 @@ const transform = {
     return details.replace(/{{percentageMatch}}/g, func.prettifyShort(percentageMatch))
   },
 
-  fillMoreInformation(category, moreInfoSections, affectedEndpoints) {
-
+  fillMoreInformation(category, moreInfoSections, affectedEndpoints, jiraIssueUrl, createJiraTicket) {
+    var key = /[^/]*$/.exec(jiraIssueUrl)[0];
+    const jiraComponent = jiraIssueUrl?.length > 0 ? (
+      <Box>
+              <Tag>
+                  <HorizontalStack gap={1}>
+                    <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
+                    <Link url={jiraIssueUrl}>
+                      <Text>
+                        {key}
+                      </Text>
+                    </Link>
+                  </HorizontalStack>
+                </Tag>
+          </Box>
+    ) : <Text> No Jira ticket created. Click on the top right button to create a new ticket.</Text>
+    
+    //<Box width="300px"><Button onClick={createJiraTicket} plain disabled={window.JIRA_INTEGRATED != "true"}>Click here to create a new ticket</Button></Box>
     let filledSection = []
     moreInfoSections.forEach((section) => {
       let sectionLocal = {}
@@ -344,11 +365,9 @@ const transform = {
       sectionLocal.title = section.title
       switch (section.title) {
         case "Description":
-
-          if (category?.issueDetails == null || category?.issueDetails == undefined) {
-            return;
-          }
-
+        if(category?.issueDetails == null || category?.issueDetails == undefined){
+          return;
+        }
           sectionLocal.content = (
             <Text color='subdued'>
               {transform.replaceTags(category?.issueDetails, category?.vulnerableTestingRunResults) || "No impact found"}
@@ -356,13 +375,11 @@ const transform = {
           )
           break;
         case "Impact":
-
-          if (category?.issueImpact == null || category?.issueImpact == undefined) {
+          if(category?.issueImpact == null || category?.issueImpact == undefined){
             return;
           }
-
           sectionLocal.content = (
-            <Text color='subdued'>
+            <Text>
               {category?.issueImpact || "No impact found"}
             </Text>
           )
@@ -371,7 +388,6 @@ const transform = {
           if (category?.issueTags == null || category?.issueTags == undefined || category?.issueTags.length == 0) {
             return;
           }
-
           sectionLocal.content = (
             <HorizontalStack gap="2">
               {
@@ -379,7 +395,6 @@ const transform = {
               }
             </HorizontalStack>
           )
-
           break;
         case "CWE":
           if (category?.cwe == null || category?.cwe == undefined || category?.cwe.length == 0) {
@@ -406,11 +421,9 @@ const transform = {
           )
           break;
         case "References":
-
           if (category?.references == null || category?.references == undefined || category?.references.length == 0) {
             return;
           }
-
           sectionLocal.content = (
             <List type='bullet' spacing="extraTight">
               {
@@ -418,7 +431,7 @@ const transform = {
                   return (
                     <List.Item key={reference}>
                       <Link key={reference} url={reference} monochrome removeUnderline target="_blank">
-                        <Text color='subdued'>
+                        <Text>
                           {reference}
                         </Text>
                       </Link>
@@ -430,32 +443,30 @@ const transform = {
           )
           break;
         case "API endpoints affected":
-
           if (affectedEndpoints == null || affectedEndpoints == undefined || affectedEndpoints.length == 0) {
             return;
           }
-
           sectionLocal.content = (
             <List type='bullet'>
               {
                 affectedEndpoints?.map((item, index) => {
                   return (
                     <List.Item key={index}>
-                      <Text color='subdued'>
-                        {item.id.apiInfoKey.method} {item.id.apiInfoKey.url}
-                      </Text>
+                      <TooltipText text={item.id.apiInfoKey.method + " "  + item.id.apiInfoKey.url}  tooltip={item.id.apiInfoKey.method + " "  + item.id.apiInfoKey.url} />
                     </List.Item>)
                 })
               }
             </List>
           )
           break;
+          case "Jira":
+              sectionLocal.content = jiraComponent
+              break;
           default:
-            break;
+            sectionLocal.content = section.content
       }
       filledSection.push(sectionLocal)
     })
-
     return filledSection;
   },
 
@@ -552,6 +563,47 @@ const transform = {
       }
     })
     return summaries;
+},
+
+getInfoSectionsHeaders(){
+  let moreInfoSections = [
+    {
+      icon: RiskMajor,
+      title: "Impact",
+      content: ""
+    },
+    {
+      icon: CollectionsMajor,
+      title: "Tags",
+      content: ""
+    },
+    {
+      icon: CreditCardSecureMajor,
+      title: "CWE",
+      content: ""
+    },
+    {
+      icon: FraudProtectMajor,
+      title: "CVE",
+      content: ""
+    },
+    {
+      icon: MarketingMajor,
+      title: "API endpoints affected",
+      content: ""
+    },
+    {
+      icon: ResourcesMajor,
+      title: "References",
+      content: ""
+    },
+    {
+      icon: ResourcesMajor,
+      title: "Jira",
+      content: ""
+    }
+  ]
+  return moreInfoSections
   },
 convertSubIntoSubcategory(resp){
   let obj = {}
@@ -562,7 +614,6 @@ convertSubIntoSubcategory(resp){
   }
   const subCategoryMap = PersistStore.getState().subCategoryMap
   Object.keys(resp).forEach((key)=>{
-
     const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.shortName : key;
     if(obj.hasOwnProperty(objectKey)){
       let tempObj =  JSON.parse(JSON.stringify(obj[objectKey]));
@@ -601,7 +652,6 @@ convertSubIntoSubcategory(resp){
   }
 
 },
-
 getUrlComp(url){
   let arr = url.split(' ')
   const method = arr[0]
@@ -688,6 +738,86 @@ getPrettifiedTestRunResults(testRunResults){
     prettifiedResults.push(prettifiedObj)
   })
   return prettifiedResults
+},
+getTestingRunResultUrl(testingResult){
+  let urlString = testingResult.url
+  const methodObj = func.toMethodUrlObject(urlString)
+  const truncatedUrl = observeFunc.getTruncatedUrl(methodObj.url)
+  
+  return methodObj.method + " " + truncatedUrl
+  
+},
+getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
+  let auth_type = apiInfo["allAuthTypesFound"].join(", ")
+  let access_type = null
+  let access_types = apiInfo["apiAccessTypes"]
+  if (!access_types || access_types.length == 0) {
+      access_type = "none"
+  } else if (access_types.indexOf("PUBLIC") !== -1) {
+      access_type = "Public"
+  } else {
+      access_type = "Private"
+  }
+
+  function TextComp ({value}) {
+    return <Text breakWord variant="bodyMd">{value}</Text>
+  }
+  const key = /[^/]*$/.exec(jiraIssueUrl)[0];
+  const jiraComponent = jiraIssueUrl?.length > 0 ? (
+    <Box>
+      <Tag>
+          <HorizontalStack gap={1}>
+            <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
+            <Link url={jiraIssueUrl}>
+              <Text>
+                {key}
+              </Text>
+            </Link>
+          </HorizontalStack>
+        </Tag>
+    </Box>
+  ) : null
+
+  const rowItems = [
+    {
+      title: 'Severity',
+      value: <Text fontWeight="semibold" color={observeFunc.getColor(severity)}>{severity}</Text>
+    },
+    {
+      title: "API",
+      value: (
+        <HorizontalStack gap={"1"}>
+          <Text color="subdued" fontWeight="semibold">{apiInfo.id.method}</Text>
+          <TextComp value={observeFunc.getTruncatedUrl(apiInfo.id.url)} />
+        </HorizontalStack>
+      )
+    },
+    {
+      title: 'Hostname',
+      value: <TextComp value={observeFunc.getHostName(apiInfo.id.url)} />
+    },
+    {
+      title: "Auth type",
+      value:<TextComp value={(auth_type || "").toLowerCase()} />
+    },
+    {
+      title: "Access type",
+      value: <TextComp value={access_type} />
+    },
+    {
+      title: "Sensitive Data",
+      value: <TextComp value={sensitiveData} />
+    },
+    {
+      title: "Detected",
+      value: <TextComp value={func.prettifyEpoch(apiInfo.lastSeen)} />
+    },
+    {
+      title: "Jira",
+      value: jiraComponent
+    }
+  ]
+  return rowItems
 }
 }
 

@@ -51,6 +51,11 @@ const Users = () => {
         func.setToast(true, false, "User removed successfully")
     }
 
+    const handleMakeAdmin = async (login) => {
+        await settingRequests.makeAdmin(login)
+        func.setToast(true, false, "User " + login + " made admin successfully")
+    }
+
     return (
         <Page
             title="Users"
@@ -90,8 +95,13 @@ const Users = () => {
                             const shortcutActions = username !== login && isAdmin  ? 
                                 [
                                     {
-                                        content: 'Remove User',
+                                        content: 'Remove user',
                                         onAction: () => {handleRemoveUser(login)},
+                                    },
+                                    ( role.toUpperCase() === "MEMBER" ) &&
+                                    {
+                                        content: 'Make admin',
+                                        onAction: () => {handleMakeAdmin(login)},
                                     }
                                 ] : []
 
