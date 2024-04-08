@@ -279,7 +279,9 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/employee/config.json",
-            "responsePayload": "{\"api_keys\":{\"key1\":\"value1\",\"key2\":\"value2\"}}",
+            "responsePayload": {
+                "api_keys": { "key1": "value1", "key2": "value2" }
+            },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -385,10 +387,8 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/employee/Deans-body/.Dockerfile",
-            "responsePayload": "FROM someimage \n RUN echo \"Hello, world!\" \n ADD app.jar /app/ \n WORKDIR /app \n ENV JAVA_HOME /usr/lib/jvm/java-11 \n EXPOSE 8080",
-            "responseHeaders": {
-                "Content-Type": "application/json"
-            },
+            "responsePayload": "FROM someimage RUN echo \"Hello, world!\" ADD app.jar /app/ WORKDIR /app ENV JAVA_HOME /usr/lib/jvm/java-11 EXPOSE 8080",
+            "responseHeaders": {},
             "statusCode": 200
         }
     },
@@ -405,17 +405,19 @@
             "path": "/api/college/employee/non-teaching-staffs"
         },
         "testData": {
-            "method": "GET",
-            "url": "/api/college/employee/non-teaching-staffs/.esmtprc",
-            "responsePayload": {
-                "hostname": "gycjyw",
-                "username": "hjjhcvejh",
-                "password": "63Gdvy6@3#"
-            },
-            "responseHeaders": {
-                "Content-Type": "text/html"
-            },
-            "statusCode": 200
+            "x2": {
+                "method": "GET",
+                "url": "/api/college/employee/non-teaching-staffs/.esmtprc",
+                "responsePayload": {
+                    "hostname": "gycjyw",
+                    "username": "hjjhcvejh",
+                    "password": "63Gdvy6@3#"
+                },
+                "responseHeaders": {
+                    "Content-Type": "text/html"
+                },
+                "statusCode": 200
+            }
         }
     },
     {
@@ -580,11 +582,13 @@
             "path": "/api/college/chem-dept"
         },
         "testData": {
-            "method": "GET",
-            "url": "/api/college/chem-dept/.env.production.local",
-            "responsePayload": "APP_NAME=MyAppAPP_ENV=productionAPP_KEY=abc123DEBUG=trueDB_HOST=localhostDB_PASSWORD=secure_passwordDB_DATABASE=my_databaseURL=https://example.comDB_PORT=3306",
-            "responseHeaders": {},
-            "statusCode": 200
+            "x2": {
+                "method": "GET",
+                "url": "/api/college/chem-dept/.env.production.local",
+                "responsePayload": "APP_NAME=MyAppAPP_ENV=productionAPP_KEY=abc123DEBUG=trueDB_HOST=localhostDB_PASSWORD=secure_passwordDB_DATABASE=my_databaseURL=https://example.comDB_PORT=3306",
+                "responseHeaders": {},
+                "statusCode": 200
+            }
         }
     },
     {
@@ -1213,7 +1217,7 @@
         },
         "testData": {
             "method": "GET",
-            "url": "/api/college/exams/it/has%20been%20changed%20to%20https%3A%2F%2Fwww.fakewebsite.com.%20so%20please%20visit%20https%3A%2F%2Fwww.fakewebsite.com%20as%20your%20requested%20link",
+            "url": "/api/college/exams/it/has been changed to https://www.fakewebsite.com. so please visit https://www.fakewebsite.com as your requested link",
             "responsePayload": "Page not found. The page has been changed to https://www.fakewebsite.com. so please visit https://www.fakewebsite.com as your requested link",
             "responseHeaders": {},
             "statusCode": 200
@@ -1422,7 +1426,7 @@
             "method": "GET",
             "requestPayload": "",
             "responsePayload": "{\"message\": \"Welcome to the collegeXYZ Portal\"}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\", \"X-CSRF-Token\": \"abcdef1234567890\", \"new_test_header\": \"test_val\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\", \"X-CSRF-Token\": \"abcdef1234567890\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -1576,7 +1580,7 @@
             "method": "GET",
             "requestPayload": "",
             "responsePayload": "{\"courses\": [{\"courseId\": \"CS101\", \"name\": \"Computer Science\", \"duration\": \"4 years\", \"faculty\": \"PROF-404\", \"description\": \"This course provides in-depth knowledge of computer science principles and applications.\"}, {\"courseId\": \"ENG201\", \"name\": \"English\", \"duration\": \"3 years\", \"faculty\": \"PROF-202\", \"description\": \"Explore the world of literature and develop critical thinking and analytical skills.\"}, {\"courseId\": \"MAT301\", \"name\": \"Mathematics\", \"duration\": \"3 years\", \"faculty\": \"PROF-505\", \"description\": \"Study advanced mathematical concepts and their real-world applications.\"}]}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Length\": \"2\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -1598,32 +1602,6 @@
                 "Server": "Apache/2.4.18 (Ubuntu)"
             },
             "statusCode": 200
-        }
-    },
-    {
-        "id": "UNWANTED_RESPONSE_HEADERS",
-        "sampleData": {
-            "method": "GET",
-            "requestPayload": "",
-            "responsePayload": "{\"roll\":\"182\", \"name\": \"STUD-921\", \"branch\": \"CSE\"}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/get-stud-details"
-        },
-        "testData": {
-            "method": "GET",
-            "url": "/api/college/get-stud-details",
-            "responsePayload": {
-                "roll": "182",
-                "name": "STUD-921",
-                "branch": "CSE"
-            },
-            "responseHeaders": {
-                "Content-Type": "application/json",
-                "X-Powered-By": "ASP.NET"
-            }
         }
     },
     {
@@ -2058,8 +2036,8 @@
     {
         "id": "LARAVEL_DEBUG_MODE_ENABLED",
         "sampleData": {
-            "method": "DELETE",
-            "requestPayload": "",
+            "method": "POST",
+            "requestPayload": "{\"username\": \"STD-23849\"}",
             "responsePayload": "{\"roll\": \"BTECH195\",\"name\": \"STUD-01\", \"branch\":\"ECE\", \"year\": \"3\", \"city\": \"Mumbai\", \"phone\":\"000000123\", \"email\": \"btech195@college.com\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
@@ -2080,7 +2058,7 @@
                     "#4 {main}"
                 ]
             },
-            "responseHeaders": "",
+            "responseHeaders": {},
             "statusCode": 200
         }
     },
@@ -2190,7 +2168,7 @@
         },
         "testData": {
             "method": "GET",
-            "url": "/api/cse-user21/courses/cy8Ku20LH6V6Yc0q0pJX",
+            "url": "/api/cse-stud21/courses/cy8Ku20LH6V6Yc0q0pJX",
             "responsePayload": {
                 "debug_info": {
                     "Rails.root": "/path/to/rails/app",
@@ -2520,7 +2498,7 @@
             "requestPayload": "",
             "responsePayload": "{\"message\": \"Welcome to the homepage of BIO-TECH department\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
-            "responseHeaders": "{\"Set-Cookie\":\"sessionid=abc123\"}",
+            "responseHeaders": "{\"Set-Cookie\": \"sessionId=a1b2c3d4e5f6g7h8i9j0; secure; httponly;\"}",
             "status": "OK",
             "statusCode": "200",
             "path": "/api/college/branches/bio-tech"
@@ -2532,7 +2510,7 @@
                 "message": "Welcome to the homepage of BIO-TECH department"
             },
             "responseHeaders": {
-                "Set-Cookie": "sessionid=abc123"
+                "Set-Cookie": "sessionid=abc123; secure; httponly; samesite;"
             },
             "statusCode": 200
         }
@@ -2622,7 +2600,20 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/info/departments/branch.json",
-            "responsePayload": "{\"departments\": [{\"id\": 1,\"name\": \"Computer Science\",\"students\": 150},{\"id\": 2,\"name\": \"Electrical Engineering\",\"students\": 120},{\"id\": 3,\"name\": \"Mechanical Engineering\",\"students\": 180},{\"id\": 4,\"name\": \"Civil Engineering\",\"students\": 100},{\"id\": 5,\"name\": \"Chemical Engineering\",\"students\": 90},{\"id\": 6,\"name\": \"Biomedical Engineering\",\"students\": 80},{\"id\": 7,\"name\": \"Aerospace Engineering\",\"students\": 70}]}",
+            "responsePayload": {
+                "d1": {
+                    "id": "CSE",
+                    "name": "Computer Science"
+                },
+                "d2": {
+                    "id": "ECE",
+                    "name": "Electronics and Communication"
+                },
+                "d3": {
+                    "id": "IT",
+                    "name": "Information Technology"
+                }
+            },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2812,7 +2803,7 @@
         "sampleData": {
             "method": "POST",
             "requestPayload": "{\"file\": \"sunflower.jpg\"}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"cookie\": \"refreshToken=eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVkVXAiOiJ0cnVlIiwidjknbjhksd8757dfsjkgDFG93nQGFrdG8uaW8iLCJpYXQiOjE2ODk2OTg0MDgsImV4cCI6MTY5MDIxNjgwOH0.i4YOfDCn4W3weTYqU5M3zaB37L4DHRUaFc91XVzD0_WOYRlTETrzFyLRpMETP7GrttSE79DyFDIN9nVgtuiAOrcLafyZUZsbV9oqLaNxEHx3vcyOQpg7Br7AUPxzqnIyZs_vxdmnkewRoxaeMifhlXuhIvORCoLZRHBgLX66CuJNqBwQy6zO3W0DcdgFN0DOWeQulYN2m8KLuNVDzHswq0s9jOWLPEwVBwlQc-sdf3sFKAoe9rewKNMSA4ptWOds6tqphBs0RYyaE4S_HFywT8mmMb8mer7fdzFqTEXfyKFzEFbI2M9k2_kpASyd6uvl_Cdk22QSIZBzjRMVo3VOLWgg; intercom-device-id-xjvl0z2h=25750e91-1931-42e2-a319-8b7289df6800\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"X-User-Hash\": \"982734\", \"HOST\": \"vulnerableapi.com\", \"cookie\": \"refreshToken=eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVkVXAiOiJ0cnVlIiwidjknbjhksd8757dfsjkgDFG93nQGFrdG8uaW8iLCJpYXQiOjE2ODk2OTg0MDgsImV4cCI6MTY5MDIxNjgwOH0.i4YOfDCn4W3weTYqU5M3zaB37L4DHRUaFc91XVzD0_WOYRlTETrzFyLRpMETP7GrttSE79DyFDIN9nVgtuiAOrcLafyZUZsbV9oqLaNxEHx3vcyOQpg7Br7AUPxzqnIyZs_vxdmnkewRoxaeMifhlXuhIvORCoLZRHBgLX66CuJNqBwQy6zO3W0DcdgFN0DOWeQulYN2m8KLuNVDzHswq0s9jOWLPEwVBwlQc-sdf3sFKAoe9rewKNMSA4ptWOds6tqphBs0RYyaE4S_HFywT8mmMb8mer7fdzFqTEXfyKFzEFbI2M9k2_kpASyd6uvl_Cdk22QSIZBzjRMVo3VOLWgg; intercom-device-id-xjvl0z2h=25750e91-1931-42e2-a319-8b7289df6800\"}",
             "responsePayload": "User Access Denied",
             "responseHeaders": "{\"Content-Type\": \"image/jpeg\"}",
             "status": "OK",
@@ -2833,7 +2824,7 @@
             "method": "POST",
             "requestPayload": "{\"username\": \"EC21009\", \"password\":\"secretPass\"}",
             "responsePayload": "User authentication failed",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"X-Subscriber-ID\": \"64350\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2853,7 +2844,7 @@
             "method": "POST",
             "requestPayload": "{\"username\": \"MH21009\", \"password\":\"secretPass\"}",
             "responsePayload": "User authentication failed",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"X-Account-ID\": \"90234\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2873,7 +2864,7 @@
             "method": "POST",
             "requestPayload": "{\"username\": \"AS21023\", \"password\":\"secretPass\"}",
             "responsePayload": "User authentication failed",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"X-Client-ID\": \"90834\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2892,7 +2883,7 @@
         "sampleData": {
             "method": "POST",
             "requestPayload": "",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"X-Customer-ID\": \"8389457\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responsePayload": "User Access Denied",
             "responseHeaders": "",
             "status": "OK",
@@ -2914,7 +2905,7 @@
         "sampleData": {
             "method": "POST",
             "requestPayload": "",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"X-Member-ID\": \"27394\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responsePayload": "User Access Denied",
             "responseHeaders": "",
             "status": "OK",
@@ -2936,7 +2927,7 @@
         "sampleData": {
             "method": "POST",
             "requestPayload": "{\"file\": \"rooms.docx\"}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"X-User-ID\": \"398457\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responsePayload": "Access Denied",
             "responseHeaders": "",
             "status": "OK",
@@ -3670,29 +3661,6 @@
             "responsePayload": {
                 "key3": "admin",
                 "key4": "customer"
-            },
-            "responseHeaders": {},
-            "statusCode": 200
-        }
-    },
-    {
-        "id": "STRING_MASS_ASSIGN_EXPLOIT",
-        "sampleData": {
-            "method": "POST",
-            "requestPayload": "{\"key1\": \"user\", \"key2\": \"pass\"}",
-            "responsePayload": "{\"key3\": 90854, \"key4\": 23746}",
-            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responseHeaders": "",
-            "status": "OK",
-            "statusCode": "200",
-            "path": "/api/college/mun"
-        },
-        "testData": {
-            "method": "GET",
-            "url": "/api/college/mun",
-            "responsePayload": {
-                "key3": 90854,
-                "key4": 23746
             },
             "responseHeaders": {},
             "statusCode": 200
@@ -4617,6 +4585,238 @@
             "url": "/api/college/sac/results/578463",
             "responsePayload": {
                 "marks": "73"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "BOLA_COOKIE_FUZZING",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "{\"email\": \"user6@example.com\",\"role\": \"user\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"cookie\": \"refreshToken=eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVasdkSDG3jsnVlIiwidjknbjhksd8757dfsjkgDFG93nQGFrdG8uaW8iLCJpYXQiOjE2ODk2OTg0MDgsImV4cCI6MTY5MDIxNjgwOH0.i4YOfDCn4W3weTYqU5M3zaB37L4DHRUaFc91XVzD0_WOYRlTETrzFyLRpMETP7GrttSE79DyFDIN9nVgtuiAOrcLafyZUZsbV9oqLaNxEHx3vcyOQpg7Br7AUPxzqnIyZs_vxdmnkewRoxaeMifhlXuhIvORCoLZRHBgLX66CuJNqBwQy6zO3W0DcdgFN0DOWeQulYN2m8KLuNVDzHswq0s9jOWLPEwVBwlQc-sdf3sFKAoe9rewKNMSA4ptWOds6tqphBs0RYyaE4S_HFywT8mmMb8mer7fdzFqTEXfyKFzEFbI2M9k2_kpASyd6uvl_Cdk22QSIZBzjRMVo3VOLWgg; intercom-device-id-xjvl0z2h=25750e91-1931-42e2-a319-8b7289df6800\"}",
+            "responsePayload": "{\"flower\": \"Lilium\", \"number\": \"274\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/garden/123653"
+        },
+        "testData": {
+            "method": "GET",
+            "url": "/api/college/garden/123653",
+            "responsePayload": {
+                "flower": "Lilium",
+                "number": "274"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "HEAD_METHOD_TEST",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "",
+            "responsePayload": "{\"message\": \"Redirecting...\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\", \"X-CSRF-Token\": \"abcdef1234567890\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "302",
+            "path": "/api/college/head-endpoint"
+        },
+        "testData": {
+            "method": "HEAD",
+            "url": "/api/college/head-endpoint",
+            "responsePayload": {
+                "message": "Welcome to the collegeXYZ Portal"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "RANDOM_METHOD_TEST",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "",
+            "responsePayload": "{\"message\": \"Redirecting...\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\", \"X-CSRF-Token\": \"abcdef1234567890\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "302",
+            "path": "/api/college/random-endpoint"
+        },
+        "testData": {
+            "method": "TestMethod",
+            "url": "/api/college/random-endpoint",
+            "responsePayload": {
+                "message": "Welcome to the collegeXYZ Portal"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "JWT_MODIFY_BODY",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "{\"email\": \"user7@example.com\",\"role\": \"user\"}",
+            "responsePayload": "{\"revenue\": \"5324584\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/revenue/32483"
+        },
+        "testData": {
+            "method": "GET",
+            "url": "/api/college/revenue/32483",
+            "responsePayload": {
+                "revenue": "5324584"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "2FA_BROKEN_LOGIC_AUTH_TOKEN_TEST",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Login successful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/grants/access"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/grants/access",
+            "responsePayload": {
+                "status": "Login successful"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "LOGOUT_AUTH_TOKEN_TEST",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Login successful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/budget/access"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/budget/access",
+            "responsePayload": {
+                "status": "Login successful"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "AUTH_BYPASS_LOCKED_ACCOUNT_TOKEN_ROLE",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Login successful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/patents/access"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/patents/access",
+            "responsePayload": {
+                "status": "Login successful"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "USER_ENUM_ACCOUNT_LOCK",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"username\": \"STUD-5534\", \"password\":\"passpass\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Login unsuccessful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/mech/students"
+        },
+        "testData": {
+            "x1": {
+                "method": "POST",
+                "url": "/api/college/mech/students",
+                "responsePayload": {
+                    "status": "Login unsuccessful"
+                },
+                "responseHeaders": {},
+                "statusCode": 400
+            },
+            "x2": {
+                "method": "POST",
+                "url": "/api/college/mech/students",
+                "responsePayload": {
+                    "status": "STUD-2897 STUD-2346 STUD-8975 STUD-9823 ... dummyUser not found"
+                },
+                "responseHeaders": {},
+                "statusCode": 400
+            }
+        }
+    },
+    {
+        "id": "MASS_ASSIGNMENT_CHANGE_ROLE",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"name\": \"User435\",\"email\": \"user435@example.com\"}",
+            "responsePayload": "{\"role\": \"admin\", \"account\": \"6723784\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/music/auth"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/music/auth",
+            "responsePayload": {
+                "role": "user"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "MASS_ASSIGNMENT_CHANGE_ACCOUNT",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"name\": \"User435\",\"email\": \"user435@example.com\"}",
+            "responsePayload": "{\"account\": \"348059\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/prof/auth"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/prof/auth",
+            "responsePayload": {
+                "account": "6723784"
             },
             "responseHeaders": {},
             "statusCode": 200
