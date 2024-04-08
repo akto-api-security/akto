@@ -20,7 +20,7 @@ jobs:
           repo_owner = 'akto-api-security'
           repo_name = 'akto'
           headers = {'Authorization': f'Bearer {github_token}'}
-          tag_num = "36.7"
+          tag_num = "36.8"
           url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/v1.{tag_num}'
           response = requests.get(url, headers=headers)
           data = response.json()
@@ -94,7 +94,7 @@ jobs:
           repo_owner = 'akto-api-security'
           repo_name = 'akto'
           headers = {'Authorization': f'Bearer {github_token}'}
-          tag_num = "36.7"
+          tag_num = "36.8"
           url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/v1.{tag_num}'          
           response = requests.get(url, headers=headers)
           data = response.json()
@@ -146,7 +146,7 @@ jobs:
           repo_owner = 'akto-api-security'
           repo_name = 'akto'
           headers = {'Authorization': f'Bearer {github_token}'}
-          tag_num = "36.7"
+          tag_num = "36.8"
           url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/v1.{tag_num}'
           response = requests.get(url, headers=headers)
           data = response.json()
