@@ -20,7 +20,7 @@ jobs:
           repo_owner = 'akto-api-security'
           repo_name = 'akto'
           headers = {'Authorization': f'Bearer {github_token}'}
-          for tag_num in ["34.11", "35.0", "35.1", "35.2", "35.3", "35.4", "35.5", "35.6", "35.7", "35.8", "35.9", "35.10", "35.11", "35.12", "35.13", "35.14", "36.0", "36.1", "36.2", "36.3", "36.4", "36.5", "36.6", "36.7", "36.8", "36.9", "37.0", "37.1", "37.2" ]):
+          for tag_num in ["34.11"]):
             url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/v1.{tag_num}'
             response = requests.get(url, headers=headers)
             data = response.json()
@@ -94,7 +94,7 @@ jobs:
           repo_owner = 'akto-api-security'
           repo_name = 'akto'
           headers = {'Authorization': f'Bearer {github_token}'}
-          for tag_num in ["34.11", "35.0", "35.1", "35.2", "35.3", "35.4", "35.5", "35.6", "35.7", "35.8", "35.9", "35.10", "35.11", "35.12", "35.13", "35.14", "36.0", "36.1", "36.2", "36.3", "36.4", "36.5", "36.6", "36.7", "36.8", "36.9", "37.0", "37.1", "37.2" ]):
+          for tag_num in ["34.11"]):
             url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/v1.{tag_num}'          
             response = requests.get(url, headers=headers)
             data = response.json()
@@ -146,7 +146,7 @@ jobs:
           repo_owner = 'akto-api-security'
           repo_name = 'akto'
           headers = {'Authorization': f'Bearer {github_token}'}
-          for tag_num in ["34.11", "35.0", "35.1", "35.2", "35.3", "35.4", "35.5", "35.6", "35.7", "35.8", "35.9", "35.10", "35.11", "35.12", "35.13", "35.14", "36.0", "36.1", "36.2", "36.3", "36.4", "36.5", "36.6", "36.7", "36.8", "36.9", "37.0", "37.1", "37.2" ]):
+          for tag_num in ["34.11"]):
             url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/v1.{tag_num}'
             response = requests.get(url, headers=headers)
             data = response.json()
