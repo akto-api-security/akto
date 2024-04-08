@@ -4,7 +4,7 @@
               <div v-for="(key, index) in authParamsList" :key="index">
                 <div class="input-value flex-padding">
 
-                   <v-btn-toggle style="margin 20px"
+                   <v-btn-toggle style="margin: 20px"
                         v-model="reqToggle"
                         mandatory >
                             <v-btn value="req" :class="authParamsList[index].showHeader ? 'sensitive-text true' : 'sensitive-text inactive'"
@@ -421,7 +421,7 @@ export default {
     color: var(--themeColorDark) !important
     background-color: var(--white) !important
     padding: 0 6px
-    height:50px
+    height: 50px
     width: 86px
     opacity: 1 !important
     &.true
