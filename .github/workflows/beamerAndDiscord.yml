@@ -40,11 +40,7 @@ jobs:
                       line = line.split('by', 1)[0].strip()
                   release_notes += f'<li>{line[1:]}</li>'
           release_notes += '</ul>'
-          release_notes2 = '<p>'
-          release_notes2 += '<a href=https://discord.com/invite/Wpc6xVME4s >'
-          release_notes2 += '</a>'
-          release_notes2 += '</p>'
-          release_notes2 += 'Have questions? Ask on <a href=https://discord.com/invite/Wpc6xVME4s >Discord</a> or our <a href=https://community.akto.io >Community page</a>'
+          release_notes2 += '<p></p>Have questions? Ask on <a href=https://discord.com/invite/Wpc6xVME4s >Discord</a> or our <a href=https://community.akto.io >Community page</a>'
           release_notes = release_notes+release_notes2
       
           
