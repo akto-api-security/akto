@@ -327,7 +327,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
         id: 'skipped',
     },
     {
-        content: 'Secured',
+        content: 'No vulnerability found',
         index: 2,
         badge: testRunResults["secured"]?.length?.toString(),
         onAction: ()=> {setSelectedTab('secured')},
