@@ -81,7 +81,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/activity-board",
-            "responsePayload": "hello world",
+            "responsePayload": { "message": "hello world" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -91,7 +91,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "hii",
+            "responsePayload": "{\"message\": \"hii\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -101,7 +101,9 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/resources",
-            "responsePayload": "hello world",
+            "responsePayload": {
+                "message": "hello world"
+            },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -133,7 +135,9 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to TNP",
+            "responsePayload": {
+                "message": "Welcome to TNP"
+            },
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -156,7 +160,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "0 internships available now.",
+            "responsePayload": "{\"message\": \"0 internships available now.\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -179,7 +183,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "25 jobs available check them out.",
+            "responsePayload": "{\"message\": \"25 jobs available check them out.\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -201,7 +205,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "2 months intern at akto.io.",
+            "responsePayload": "{\"message\": \"2 months intern at akto.io.\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -225,7 +229,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Akto.io Full Time SDE Role",
+            "responsePayload": "{\"message\": \"Akto.io Full Time SDE Role\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -249,7 +253,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Indian Institute of Technology ,Ranchi is a public institute of technology research university established by the Government of India in ranchi, jharkhand, India. Established in 1951, the institute is the first of the IITs to be established and is recognised as an Institute of National Importance.",
+            "responsePayload": "{\"message\": \"Indian Institute of Technology ,Ranchi is a public institute of technology research university established by the Government of India in ranchi, jharkhand, India. Established in 1951, the institute is the first of the IITs to be established and is recognised as an Institute of National Importance.\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -269,7 +273,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "10 found",
+            "responsePayload": "{\"message\": \"10 found\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -291,7 +295,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "23 found",
+            "responsePayload": "{\"message\": \"23 found\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -314,7 +318,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "20 found",
+            "responsePayload": "{\"message\": \"20 found\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -324,7 +328,9 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/employee/professors/config/",
-            "responsePayload": "When accessing the server, you will see the 'Index of /configs' page, which serves as the 'Parent Directory' for all configuration files.",
+            "responsePayload": {
+                "message": "When accessing the server, you will see the 'Index of /configs' page, which serves as the 'Parent Directory' for all configuration files."
+            },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -334,7 +340,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "30 found",
+            "responsePayload": "{\"message\": \"30 found\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -357,7 +363,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "60 found",
+            "responsePayload": "{\"message\": \"60 found\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -367,7 +373,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/employee/assistant/docker-compose.production.yml",
-            "responsePayload": "version: 2.0.3, services: lookup",
+            "responsePayload": { "version": "2.0.3", "services": "lookup" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -377,7 +383,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "5 found",
+            "responsePayload": "{\"message\": \"5 found\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -405,7 +411,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to Cse Dept",
+            "responsePayload": "{\"message\": \"Welcome to Cse Dept\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -430,7 +436,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to IT space",
+            "responsePayload": "{\"message\": \"Welcome to IT space\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -440,7 +446,11 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/it-dept/ftpsync.settings",
-            "responsePayload": "FTPSync: true\noverwrite_newer_prevention: true\ndefault_folder_permissions: 0755\n",
+            "responsePayload": {
+                "FTPSync": "true",
+                "overwrite_newer_prevention": "true",
+                "default_folder_permissions": "0755"
+            },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -450,7 +460,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to world of electronics",
+            "responsePayload": "{\"message\": \"Welcome to world of electronics\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -470,7 +480,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Hello tech geeks",
+            "responsePayload": "{\"message\": \"Hello tech geeks\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -490,7 +500,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Hello lets make Car",
+            "responsePayload": "{\"message\": \"Hello lets make Car\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -512,7 +522,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to Civil Land",
+            "responsePayload": "{\"message\": \"Welcome to Civil Land\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -532,7 +542,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to Prod Dept",
+            "responsePayload": "{\"message\": \"Welcome to Prod Dept\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -554,7 +564,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to Chemical Dept",
+            "responsePayload": "{\"message\": \"Welcome to Chemical Dept\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -576,7 +586,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Hello to all bio geek",
+            "responsePayload": "{\"message\": \"Hello to all bio geek\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -586,7 +596,11 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/bio-dept/images/json",
-            "responsePayload": "{\"ParentId\":\"1234567890\",\"Container\":\"my-container\",\"Labels\":{\"key1\":\"value1\",\"key2\":\"value2\"}}",
+            "responsePayload": {
+                "ParentId": "1234567890",
+                "Container": "my-container",
+                "Labels": { "key1": "value1", "key2": "value2" }
+            },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -596,7 +610,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to Pharma Space",
+            "responsePayload": "{\"message\": \"Welcome to Pharma Space\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -618,7 +632,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to MNC",
+            "responsePayload": "{\"message\": \"Welcome to MNC\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -638,7 +652,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Hello this is IPH Space",
+            "responsePayload": "{\"message\": \"Hello this is IPH Space\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -660,7 +674,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Hello this is ICH space",
+            "responsePayload": "{\"message\": \"Hello this is ICH space\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -680,7 +694,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to IET",
+            "responsePayload": "{\"message\": \"Welcome to IET\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -700,7 +714,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to IEEE",
+            "responsePayload": "{\"message\": \"Welcome to IEEE\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -722,7 +736,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to EDC",
+            "responsePayload": "{\"message\": \"Welcome to EDC\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -744,7 +758,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to NAPS",
+            "responsePayload": "{\"message\": \"Welcome to NAPS\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -764,7 +778,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to FAS",
+            "responsePayload": "{\"message\": \"Welcome to FAS\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -774,7 +788,12 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/clubs/fas/sftp-config.json",
-            "responsePayload": "{\"host\":\"example.com\",\"user\":\"username\",\"password\":\"secretpassword\",\"remote_path\":\"/path/to/files\"}",
+            "responsePayload": {
+                "host": "example.com",
+                "user": "username",
+                "password": "secretpassword",
+                "remote_path": "/path/to/files"
+            },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -806,7 +825,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to Dhwani",
+            "responsePayload": "{\"message\": \"Welcome to Dhwani\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -826,7 +845,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to ACM",
+            "responsePayload": "{\"message\": \"Welcome to ACM\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -846,7 +865,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to Finance Club",
+            "responsePayload": "{\"message\": \"Welcome to Finance Club\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -866,7 +885,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to NCC",
+            "responsePayload": "{\"message\": \"Welcome to NCC\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -888,7 +907,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to NSS",
+            "responsePayload": "{\"message\": \"Welcome to NSS\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -898,7 +917,12 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/society/nss/wp-config.php-backup",
-            "responsePayload": "{\"access-key-id\":\"gghs64hvhsh\",\"secret-access-key\":\"jgfhsvhsjbeeu7t73tffbsdvsnbh\",\"DB_NAME\":\"my_database\",\"DB_PASSWORD\":\"ggyyGH@#hbhv12\"}",
+            "responsePayload": {
+                "access-key-id": "gghs64hvhsh",
+                "secret-access-key": "jgfhsvhsjbeeu7t73tffbsdvsnbh",
+                "DB_NAME": "my_database",
+                "DB_PASSWORD": "ggyyGH@#hbhv12"
+            },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -1068,7 +1092,7 @@
         "sampleData": {
             "method": "POST",
             "requestPayload": "{\"book\": \"coursebook\"}",
-            "responsePayload": "Your book is coursebook",
+            "responsePayload": "{\"message\": \"Your book is coursebook\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -1078,7 +1102,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/library/cs",
-            "responsePayload": "Your book is 7777777",
+            "responsePayload": { "message": "Your book is 7777777" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -1088,7 +1112,7 @@
         "sampleData": {
             "method": "POST",
             "requestPayload": "{\"book\": \"coursebook\"}",
-            "responsePayload": "Your book is coursebook",
+            "responsePayload": "{\"message\": \"Your book is coursebook\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -1098,7 +1122,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/library/mech",
-            "responsePayload": "Your book is 8099",
+            "responsePayload": { "message": "Your book is 8099" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -1108,7 +1132,7 @@
         "sampleData": {
             "method": "POST",
             "requestPayload": "{\"book\": \"coursebook\"}",
-            "responsePayload": "Your book is coursebook",
+            "responsePayload": "{\"message\": \"Your book is coursebook\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -1118,7 +1142,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/library/civil",
-            "responsePayload": "Your book is 8099",
+            "responsePayload": { "message": "Your book is 8099" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -1996,7 +2020,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/default-page",
-            "responsePayload": "Welcome to nginx!",
+            "responsePayload": { "message": "Welcome to nginx!" },
             "responseHeaders": {
                 "Content-Type": "text/html"
             },
@@ -2261,7 +2285,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "Welcome to College Events!!",
+            "responsePayload": "{\"message\": \"Welcome to College Events!!\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\":\"application/json\",\"HOST\":\"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -2271,7 +2295,9 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/events",
-            "responsePayload": "Connection to MongoDB refused due to timeout, status=rejected",
+            "responsePayload": {
+                "message": "Connection to MongoDB refused due to timeout, status=rejected"
+            },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2281,7 +2307,7 @@
         "sampleData": {
             "method": "GET",
             "requestPayload": "",
-            "responsePayload": "20 available networks for students ,connect to any using roll no as user id and phone number as password",
+            "responsePayload": "{\"message\": \"20 available networks for students ,connect to any using roll no as user id and phone number as password\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\":\"application/json\",\"HOST\":\"vulnerableapi.com\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -2291,7 +2317,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/network-info",
-            "responsePayload": "Ubuntu",
+            "responsePayload": { "message": "Ubuntu" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2312,7 +2338,9 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/depart/prod-dept/nginx_status",
-            "responsePayload": "Active connections: Connection on port 8080, Status Code-200 ",
+            "responsePayload": {
+                "message": "Active connections: Connection on port 8080, Status Code-200"
+            },
             "responseHeaders": {
                 "Content-Type": "text/html"
             },
@@ -2465,7 +2493,7 @@
         "sampleData": {
             "method": "POST",
             "requestPayload": "{\"username\": \"STUD-0145\", \"password\":\"secretPass\"}",
-            "responsePayload": "Authentication failed",
+            "responsePayload": "{\"message\": \"Authentication failed\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -2475,7 +2503,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/info/results/signin",
-            "responsePayload": "Login successful",
+            "responsePayload": { "message": "Login successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2485,7 +2513,7 @@
         "sampleData": {
             "method": "POST",
             "requestPayload": "{\"username\": \"CS22199\", \"password\":\"secretPass\"}",
-            "responsePayload": "Authentication failed",
+            "responsePayload": "{\"message\": \"Authentication failed\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -2495,7 +2523,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/students/signin",
-            "responsePayload": "Login successful",
+            "responsePayload": { "message": "Login successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2602,7 +2630,7 @@
             "method": "GET",
             "requestPayload": "",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User Access Denied",
+            "responsePayload": "{\"message\": \"User Access Denied\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2612,7 +2640,7 @@
             "x2": {
                 "method": "GET",
                 "url": "/api/1/electronics",
-                "responsePayload": "Successful",
+                "responsePayload": { "message": "Successful" },
                 "responseHeaders": {},
                 "statusCode": 200
             }
@@ -2624,7 +2652,7 @@
             "method": "GET",
             "requestPayload": "",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User Access Denied",
+            "responsePayload": "{\"message\": \"User Access Denied\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2634,7 +2662,7 @@
             "x5": {
                 "method": "GET",
                 "url": "/api/college/cse/students/1",
-                "responsePayload": "Successful",
+                "responsePayload": { "message": "Successful" },
                 "responseHeaders": {},
                 "statusCode": 200
             }
@@ -2646,7 +2674,7 @@
             "method": "POST",
             "requestPayload": "{\"file\": \"sunflower.jpg\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"X-User-Hash\": \"982734\", \"HOST\": \"vulnerableapi.com\", \"cookie\": \"refreshToken=eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVkVXAiOiJ0cnVlIiwidjknbjhksd8757dfsjkgDFG93nQGFrdG8uaW8iLCJpYXQiOjE2ODk2OTg0MDgsImV4cCI6MTY5MDIxNjgwOH0.i4YOfDCn4W3weTYqU5M3zaB37L4DHRUaFc91XVzD0_WOYRlTETrzFyLRpMETP7GrttSE79DyFDIN9nVgtuiAOrcLafyZUZsbV9oqLaNxEHx3vcyOQpg7Br7AUPxzqnIyZs_vxdmnkewRoxaeMifhlXuhIvORCoLZRHBgLX66CuJNqBwQy6zO3W0DcdgFN0DOWeQulYN2m8KLuNVDzHswq0s9jOWLPEwVBwlQc-sdf3sFKAoe9rewKNMSA4ptWOds6tqphBs0RYyaE4S_HFywT8mmMb8mer7fdzFqTEXfyKFzEFbI2M9k2_kpASyd6uvl_Cdk22QSIZBzjRMVo3VOLWgg; intercom-device-id-xjvl0z2h=25750e91-1931-42e2-a319-8b7289df6800\"}",
-            "responsePayload": "User Access Denied",
+            "responsePayload": "{\"message\": \"User Access Denied\"}",
             "responseHeaders": "{\"Content-Type\": \"image/jpeg\"}",
             "status": "OK",
             "statusCode": "200",
@@ -2655,7 +2683,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/garden/sunflower",
-            "responsePayload": "Sunflower",
+            "responsePayload": { "image": "Sunflower" },
             "responseHeaders": { "Content-Type": "image/jpeg" },
             "statusCode": 200
         }
@@ -2665,7 +2693,7 @@
         "sampleData": {
             "method": "POST",
             "requestPayload": "{\"username\": \"EC21009\", \"password\":\"secretPass\"}",
-            "responsePayload": "User authentication failed",
+            "responsePayload": "{\"message\": \"User authentication failed\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"X-Subscriber-ID\": \"64350\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -2675,7 +2703,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/students/ece/",
-            "responsePayload": "Login successful",
+            "responsePayload": { "message": "Login successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2685,7 +2713,7 @@
         "sampleData": {
             "method": "POST",
             "requestPayload": "{\"username\": \"MH21009\", \"password\":\"secretPass\"}",
-            "responsePayload": "User authentication failed",
+            "responsePayload": "{\"message\": \"User authentication failed\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"X-Account-ID\": \"90234\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -2695,7 +2723,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/students/mech/",
-            "responsePayload": "Login successful",
+            "responsePayload": { "message": "Login successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2705,7 +2733,7 @@
         "sampleData": {
             "method": "POST",
             "requestPayload": "{\"username\": \"AS21023\", \"password\":\"secretPass\"}",
-            "responsePayload": "User authentication failed",
+            "responsePayload": "{\"message\": \"User authentication failed\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"X-Client-ID\": \"90834\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -2715,7 +2743,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/students/astro/",
-            "responsePayload": "Login successful",
+            "responsePayload": { "message": "Login successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2726,7 +2754,7 @@
             "method": "POST",
             "requestPayload": "",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"X-Customer-ID\": \"8389457\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User Access Denied",
+            "responsePayload": "{\"message\": \"User Access Denied\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2736,7 +2764,7 @@
             "x2": {
                 "method": "POST",
                 "url": "/api/STUD-5902/college/phy/students",
-                "responsePayload": "Successful",
+                "responsePayload": { "message": "Successful" },
                 "responseHeaders": {},
                 "statusCode": 200
             }
@@ -2748,7 +2776,7 @@
             "method": "POST",
             "requestPayload": "",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"X-Member-ID\": \"27394\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User Access Denied",
+            "responsePayload": "{\"message\": \"User Access Denied\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2758,7 +2786,7 @@
             "x2": {
                 "method": "POST",
                 "url": "/api/STUD-5902/chem/students",
-                "responsePayload": "Successful",
+                "responsePayload": { "message": "Successful" },
                 "responseHeaders": {},
                 "statusCode": 200
             }
@@ -2770,7 +2798,7 @@
             "method": "POST",
             "requestPayload": "{\"file\": \"rooms.docx\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"X-User-ID\": \"398457\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "Access Denied",
+            "responsePayload": "{\"message\": \"Access Denied\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2779,7 +2807,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/warden/files",
-            "responsePayload": "Successful",
+            "responsePayload": { "message": "Successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2789,7 +2817,7 @@
         "sampleData": {
             "method": "POST",
             "requestPayload": "",
-            "responsePayload": "Authentication failed",
+            "responsePayload": "{\"message\": \"Authentication failed\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
             "responseHeaders": "",
             "status": "OK",
@@ -2799,7 +2827,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/students",
-            "responsePayload": "Login successful",
+            "responsePayload": { "message": "Login successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2810,7 +2838,7 @@
             "method": "GET",
             "requestPayload": "",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User Access Denied",
+            "responsePayload": "{\"message\": \"User Access Denied\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2820,7 +2848,7 @@
             "x2": {
                 "method": "GET",
                 "url": "/api/&/college/acad/calendar",
-                "responsePayload": "No events today",
+                "responsePayload": { "message": "No events today" },
                 "responseHeaders": {},
                 "statusCode": 200
             }
@@ -2832,7 +2860,7 @@
             "method": "POST",
             "requestPayload": "",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User Access Denied",
+            "responsePayload": "{\"message\": \"User Access Denied\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2841,7 +2869,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/eco/students",
-            "responsePayload": "Successful",
+            "responsePayload": { "message": "Successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2852,7 +2880,7 @@
             "method": "GET",
             "requestPayload": "{\"username\": \"MF23453\", \"password\":\"secretPass\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User Access Denied",
+            "responsePayload": "{\"message\": \"User Access Denied\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2861,7 +2889,7 @@
         "testData": {
             "method": "GET",
             "url": "/api/college/manufacturing",
-            "responsePayload": "Successful",
+            "responsePayload": { "message": "Successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2872,7 +2900,7 @@
             "method": "POST",
             "requestPayload": "",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User Access Denied",
+            "responsePayload": "{\"message\": \"User Access Denied\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2881,7 +2909,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/contents",
-            "responsePayload": "Successful",
+            "responsePayload": { "message": "Successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2892,7 +2920,7 @@
             "method": "POST",
             "requestPayload": "",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User Access Denied",
+            "responsePayload": "{\"message\": \"User Access Denied\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2901,7 +2929,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/news",
-            "responsePayload": "Successful",
+            "responsePayload": { "message": "Successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2912,7 +2940,7 @@
             "method": "POST",
             "requestPayload": "",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User Access Denied",
+            "responsePayload": "{\"message\": \"User Access Denied\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2921,7 +2949,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/cs/research",
-            "responsePayload": "Successful",
+            "responsePayload": { "message": "Successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2932,7 +2960,7 @@
             "method": "POST",
             "requestPayload": "",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User Access Denied",
+            "responsePayload": "{\"message\": \"User Access Denied\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2941,7 +2969,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/bio/research",
-            "responsePayload": "Successful",
+            "responsePayload": { "message": "Successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2952,7 +2980,7 @@
             "method": "POST",
             "requestPayload": "{\"username\": \"STUD-0295\", \"password\":\"secretPass\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User authentication failed",
+            "responsePayload": "{\"message\": \"User authentication failed\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2961,7 +2989,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/auth",
-            "responsePayload": "Successful",
+            "responsePayload": { "message": "Successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2972,7 +3000,7 @@
             "method": "POST",
             "requestPayload": "{\"username\": \"STUD-1953\", \"password\":\"secretPass\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User authentication failed",
+            "responsePayload": "{\"message\": \"User authentication failed\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -2981,7 +3009,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/authenticate",
-            "responsePayload": "Successful",
+            "responsePayload": { "message": "Successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -2992,7 +3020,7 @@
             "method": "POST",
             "requestPayload": "{\"username\": \"PHY-3453\", \"password\":\"pass1234\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User authentication failed",
+            "responsePayload": "{\"message\": \"User authentication failed\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -3001,7 +3029,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/faculty/auth",
-            "responsePayload": "MySQLSyntaxErrorException",
+            "responsePayload": { "message": "MySQLSyntaxErrorException" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -3034,7 +3062,7 @@
             "method": "POST",
             "requestPayload": "{\"username\": \"STUD-6543\", \"password\":\"password\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "Password change unsuccessful",
+            "responsePayload": "{\"message\": \"Password change unsuccessful\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -3043,7 +3071,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/erp/change-password",
-            "responsePayload": "Password change successful",
+            "responsePayload": { "message": "Password change successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -3054,7 +3082,7 @@
             "method": "POST",
             "requestPayload": "{\"2fa-code\": \"345897\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "Login unsuccessful",
+            "responsePayload": "{\"message\": \"Login unsuccessful\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -3063,7 +3091,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/sac/access",
-            "responsePayload": "Login successful",
+            "responsePayload": { "message": "Login successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -3105,7 +3133,7 @@
             "method": "POST",
             "requestPayload": "",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "User Access Denied",
+            "responsePayload": "{\"message\": \"User Access Denied\"}",
             "responseHeaders": "{\"Set-Cookie\": \"Max-Age=25920099\"}",
             "status": "OK",
             "statusCode": "200",
@@ -3114,7 +3142,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/faq",
-            "responsePayload": "Successful",
+            "responsePayload": { "message": "Successful" },
             "responseHeaders": { "Set-Cookie": "Max-Age=25920099" },
             "statusCode": 200
         }
@@ -3169,7 +3197,7 @@
             "method": "POST",
             "requestPayload": "",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "Account Recovery Unsuccessful",
+            "responsePayload": "{\"message\": \"Account Recovery Unsuccessful\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -3178,7 +3206,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/account/recover",
-            "responsePayload": "Account Recovery Successful",
+            "responsePayload": { "message": "Account Recovery Successful" },
             "responseHeaders": { "host": "evil.com" },
             "statusCode": 200
         }
@@ -3211,7 +3239,7 @@
             "method": "POST",
             "requestPayload": "{\"username\": \"STUD-8908\", \"password\":\"password\"}",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "Password reset unsuccessful",
+            "responsePayload": "{\"message\": \"Password reset unsuccessful\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -3220,7 +3248,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/erp/password-reset",
-            "responsePayload": "Password reset successful",
+            "responsePayload": { "message": "Password reset successful" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -3253,7 +3281,7 @@
             "method": "POST",
             "requestPayload": "",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "Login Unsuccessful",
+            "responsePayload": "{\"message\": \"Login Unsuccessful\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -3262,7 +3290,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/graphql",
-            "responsePayload": "Did you mean",
+            "responsePayload": { "message": "Did you mean" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -3273,7 +3301,7 @@
             "method": "POST",
             "requestPayload": "",
             "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
-            "responsePayload": "jwt.encode('1234325')",
+            "responsePayload": "{\"command\":\"jwt.encode('1234325')\"}",
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
@@ -3282,7 +3310,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/research/login",
-            "responsePayload": "jwt.encode('1234325')",
+            "responsePayload": { "command": "jwt.encode('1234325')" },
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -3370,7 +3398,7 @@
         "testData": {
             "method": "POST",
             "url": "/api/college/graphiql",
-            "responsePayload": "GraphQL Console",
+            "responsePayload": { "message": "GraphQL Console" },
             "responseHeaders": {},
             "statusCode": 200
         }
