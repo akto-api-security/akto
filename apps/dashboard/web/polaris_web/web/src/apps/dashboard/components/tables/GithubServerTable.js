@@ -19,8 +19,14 @@ import { produce } from "immer"
 import values from "@/util/values"
 import transform from '../../pages/observe/transform';
 import DropdownSearch from '../shared/DropdownSearch';
+import PersistStore from '../../../main/PersistStore';
+import tableFunc from './transform';
 
 function GithubServerTable(props) {
+
+  const filtersMap = PersistStore(state => state.filtersMap)
+  const setFiltersMap = PersistStore(state => state.setFiltersMap)
+  const initialStateFilters = tableFunc.mergeFilters(props.appliedFilters || [], ((filtersMap[window.location.href] && filtersMap[window.location.href]['filters']) ? filtersMap[window.location.href]['filters'] : []),props.disambiguateLabel)
 
   const { mode, setMode } = useSetIndexFiltersMode(props?.mode ? props.mode : IndexFiltersMode.Filtering);
   const [sortSelected, setSortSelected] = useState(props?.sortOptions?.length > 0 ? [props.sortOptions[0].value] : []);
@@ -28,11 +34,20 @@ function GithubServerTable(props) {
   const [total, setTotal] = useState([]);
   const [page, setPage] = useState(0);
   const pageLimit = props?.pageLimit || 20;
-  const [appliedFilters, setAppliedFilters] = useState(props.appliedFilters || []);
+  const [appliedFilters, setAppliedFilters] = useState(initialStateFilters);
   const [queryValue, setQueryValue] = useState('');
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.value] = 'OR'; return map }, {})
 
   const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
+
+  const handleSelectedTab = (x) => {
+    const tableTabs = props.tableTabs ? props.tableTabs : props.tabs
+    if(tableTabs){
+      const primitivePath = window.location.origin + window.location.pathname
+      const newUrl = primitivePath + "#" +  tableTabs[x].content
+      window.history.replaceState(null, null, newUrl)
+    } 
+  }
 
   useEffect(() => {
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
@@ -45,6 +60,7 @@ function GithubServerTable(props) {
       tempData ? setData([...tempData.value]) : setData([])
       tempData ? setTotal(tempData.total) : setTotal(0)
     }
+    handleSelectedTab(props?.selected)
     fetchData();
   }, [sortSelected, appliedFilters, queryValue, page])
 
@@ -54,21 +70,24 @@ function GithubServerTable(props) {
       return filter.key != key
     })
     props?.appliedFilters?.forEach((defaultAppliedFilter) => {
-      if (key == defaultAppliedFilter.key) {
+      if (key === defaultAppliedFilter.key) {
         temp.push(defaultAppliedFilter)
       }
     })
-    if (key == "dateRange") {
+    if (key === "dateRange") {
       getDate({ type: "update", period: values.ranges[3] });
     } else {
       setAppliedFilters(temp);
+      let tempFilters = filtersMap
+      tempFilters[window.location.href]['filters'] = temp
+      setFiltersMap(tempFilters)
     }
   }
 
   const changeAppliedFilters = (key, value) => {
     let temp = appliedFilters
     temp = temp.filter((filter) => {
-      return filter.key != key
+      return filter.key !== key
     })
     if (value.length > 0 || Object.keys(value).length > 0) {
       temp.push({
@@ -79,6 +98,9 @@ function GithubServerTable(props) {
       })
     }
     setPage(0);
+    let tempFilters = filtersMap
+    tempFilters[window.location.href]['filters'] = temp
+    setFiltersMap(tempFilters)
     setAppliedFilters(temp);
   };
 
@@ -164,8 +186,11 @@ function GithubServerTable(props) {
   }
 
   const handleFiltersClearAll = useCallback(() => {
+    setFiltersMap([])
+    if(appliedFilters.length > 0 && appliedFilters.filter((x) => x.key === 'dateRange')){
+      getDate({ type: "update", period: values.ranges[3] });
+    }
     setAppliedFilters(props.appliedFilters || [])
-    getDate({ type: "update", period: values.ranges[3] });
   }, []);
 
   const resourceIDResolver = (data) => {
@@ -222,11 +247,10 @@ function GithubServerTable(props) {
 
   let tableHeightClass = props.increasedHeight ? "control-row" : (props.condensedHeight ? "condensed-row" : '') 
   let tableClass = props.useNewRow ? "new-table" : (props.selectable ? "removeHeaderColor" : "hideTableHead")
-
   return (
     <div className={tableClass}>
       <LegacyCard>
-        {props.tabs && <Tabs tabs={props.tabs} selected={props.selected} onSelect={props.onSelect}></Tabs>}
+        {props.tabs && <Tabs tabs={props.tabs} selected={props.selected} onSelect={(x) => {props?.onSelect(x); handleSelectedTab(x)}}></Tabs>}
         {props.tabs && props.tabs[props.selected].component ? props.tabs[props.selected].component :
           <div>
             <LegacyCard.Section flush>
@@ -252,7 +276,7 @@ function GithubServerTable(props) {
                 setMode={setMode}
                 loading={props.loading || false}
                 selected={props?.selected}
-                onSelect={props?.onSelect}
+                onSelect={(x) => {props?.onSelect(x); handleSelectedTab(x)}}
               />
               <div className={tableHeightClass}>
               <IndexTable

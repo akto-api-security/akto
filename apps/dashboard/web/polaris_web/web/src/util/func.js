@@ -1071,6 +1071,9 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 },
 
 convertToDisambiguateLabelObj(value, convertObj, maxAllowed){
+  if(!value || value.length  === 0 || !Array.isArray(value)){
+    return ""
+  }
   if (value.length > maxAllowed) {
       return `${value.slice(0, maxAllowed)
                      .map(val => convertObj ? convertObj[val] : val)
