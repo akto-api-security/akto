@@ -30,9 +30,6 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: '17'
-      - name: Prepare Dashboard UI
-        working-directory: ./apps/dashboard/
-        run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
       - name: Prepare Dashboard polaris UI
         working-directory: ./apps/dashboard/web/polaris_web
         run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
