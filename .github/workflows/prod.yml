@@ -38,9 +38,6 @@ jobs:
           wget -O fintech.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json
           wget -O filetypes.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json
 
-      - name: Prepare Dashboard UI
-        working-directory: ./apps/dashboard/
-        run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
       - name: Prepare Dashboard polaris UI
         working-directory: ./apps/dashboard/web/polaris_web
         run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
