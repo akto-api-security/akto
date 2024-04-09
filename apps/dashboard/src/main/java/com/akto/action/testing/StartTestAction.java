@@ -449,6 +449,10 @@ public class StartTestAction extends UserAction {
     String testingRunResultSummaryHexId;
     List<TestingRunResult> testingRunResults;
     private boolean fetchOnlyVulnerable;
+    public enum QueryMode {
+        VULNERABLE, SECURED, SKIPPED_EXEC_NEED_CONFIG, SKIPPED_EXEC_NO_ACTION, SKIPPED_EXEC, ALL;
+    }
+    private QueryMode queryMode;
 
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
@@ -461,11 +465,27 @@ public class StartTestAction extends UserAction {
 
         List<Bson> testingRunResultFilters = new ArrayList<>();
 
-        if (fetchOnlyVulnerable) {
-            testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, true));
-        }
-
         testingRunResultFilters.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
+
+        if (queryMode == null) {
+            if (fetchOnlyVulnerable) {
+                testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, true));
+            }
+        } else {
+            switch (queryMode) {
+                case VULNERABLE:
+                    testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, true));
+                    break;
+                case SKIPPED_EXEC:
+                    testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
+                    testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
+                    break;
+                case SECURED:
+                    testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
+                    testingRunResultFilters.add(Filters.nin(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
+                    break;
+            }
+        }
 
         this.testingRunResults = TestingRunResultDao.instance
                 .fetchLatestTestingRunResult(Filters.and(testingRunResultFilters));
@@ -1011,6 +1031,10 @@ public class StartTestAction extends UserAction {
 
     public void setFetchOnlyVulnerable(boolean fetchOnlyVulnerable) {
         this.fetchOnlyVulnerable = fetchOnlyVulnerable;
+    }
+
+    public void setQueryMode(QueryMode queryMode) {
+        this.queryMode = queryMode;
     }
 
     public Map<String, Set<String>> getMetadataFilters() {
