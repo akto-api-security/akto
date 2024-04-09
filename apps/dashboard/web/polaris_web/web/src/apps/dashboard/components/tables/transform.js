@@ -61,7 +61,46 @@ const tableFunc = {
           let finalData = props.useModifiedData ? props.modifyData(tempData,filters) : tempData
   
           return {value:finalData,total:tempData.length}
-    }
+    },
+    mergeFilters(filterArray1, filterArray2, labelFunc){
+      const combined = [...filterArray1, ...filterArray2];
+      const mergedByKey = combined.reduce((acc, {key, value}) => {
+        if (acc[key]) {
+          if(key === 'dateRange'){
+            acc[key].value = this.mergeTimeRanges(acc[key].value, value)
+          }else{
+            acc[key].value = [...new Set([...acc[key].value, ...value])];
+          }
+        } else {
+          if(key === 'dateRange'){
+            acc[key] = {key, value}
+          }else{
+            acc[key] = { key, value: [...value] };
+          } 
+        }
+        return acc;
+      }, {});
+
+      return Object.keys(mergedByKey).map((key) => {
+        const obj = mergedByKey[key]
+        return {
+          ...obj,
+          label: labelFunc(obj.key, obj.value)
+        }
+      })
+    },
+    mergeTimeRanges(obj1, obj2) {
+      const sinceEpoch1 = Date.parse(obj1.since);
+      const untilEpoch1 = Date.parse(obj1.until);
+      const sinceEpoch2 = Date.parse(obj2.since);
+      const untilEpoch2 = Date.parse(obj2.until);
+      const minSinceEpoch = Math.min(sinceEpoch1, sinceEpoch2);
+      const maxUntilEpoch = Math.max(untilEpoch1, untilEpoch2);
+      const since = new Date(minSinceEpoch).toISOString();
+      const until = new Date(maxUntilEpoch).toISOString();
+  
+      return { since, until };
+  }
 }
 
 export default tableFunc;
