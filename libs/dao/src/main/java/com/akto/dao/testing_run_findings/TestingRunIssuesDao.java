@@ -53,6 +53,20 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
         fieldNames = new String[] {TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+        fieldNames = new String[] { TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.CREATION_TIME,
+                "collectionIds", TestingRunIssues.KEY_SEVERITY, "_id.testSubCategory" };
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[] { TestingRunIssues.LAST_SEEN };
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+        fieldNames = new String[] { TestingRunIssues.LAST_UPDATED };
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+        fieldNames = new String[] { TestingRunIssues.TEST_RUN_ISSUES_STATUS, "collectionIds", "_id.testErrorSource",
+                TestingRunIssues.CREATION_TIME };
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     
     }
 

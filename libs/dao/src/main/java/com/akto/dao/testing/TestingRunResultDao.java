@@ -95,6 +95,9 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
                 new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, Constants.ID }, false);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{TestingRunResult.END_TIMESTAMP}, false);
+
+        String[] fieldnames = new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.TEST_SUB_TYPE };
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldnames, false);
     }
 
     public void convertToCappedCollection() {
