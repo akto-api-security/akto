@@ -82,7 +82,7 @@ public class YamlNodeExecutor extends NodeExecutor {
 
         ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes);
         Map<Integer, ExecuteAlgoObj> algoMap = new HashMap<>();
-        ExecutorSingleRequest singleReq = executorAlgorithm.execute(executorNodes, 0, algoMap, rawApis, false, 0);
+        ExecutorSingleRequest singleReq = executorAlgorithm.execute(executorNodes, 0, algoMap, rawApis, false, 0, yamlNodeDetails.getApiInfoKey());
 
         if (!singleReq.getSuccess()) {
             rawApis = new ArrayList<>();
@@ -104,9 +104,11 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<Integer> responseLenArr = new ArrayList<>();
 
         for (RawApi testReq: rawApis) {
-            Map<String, List<String>> headers = testReq.fetchReqHeaders();
-            headers.put(Constants.AKTO_NODE_ID, Collections.singletonList(node.getId()));
-            testReq.modifyReqHeaders(headers);
+            if (yamlNodeDetails.getApiCollectionId() == 1111111111) {
+                Map<String, List<String>> headers = testReq.fetchReqHeaders();
+                headers.put(Constants.AKTO_NODE_ID, Collections.singletonList(node.getId()));
+                testReq.modifyReqHeaders(headers);
+            }
             if (vulnerable) {
                 break;
             }
