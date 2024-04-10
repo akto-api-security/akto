@@ -70,7 +70,7 @@ public class HAR {
         String responseHeaders = mapper.writeValueAsString(responseHeaderMap);
         String method = request.getMethod().toString();
         String responsePayload = response.getContent().getText();;
-        String ip = "null"; 
+        String ip = "null"; // TODO:
         String time = (int) (dateTime.getTime() / 1000) + "";
         String statusCode = response.getStatus() + "";
         String type = request.getHttpVersion();
@@ -126,6 +126,7 @@ public class HAR {
      }
 
     public static void addQueryStringToMap(List<HarQueryParam> params, Map<String,Object> paramsMap) {
+        // TODO: which will take preference querystring or post value
         for (HarQueryParam param: params) {
             paramsMap.put(param.getName(), param.getValue());
         }
