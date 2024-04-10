@@ -77,9 +77,9 @@ const headings = [
         type: CellType.TEXT
     },
     {
-        text: 'Discovered in',
-        title: 'Discovered in',
-        value: 'discovered_in',
+        text: 'Source location',
+        title: 'Source location',
+        value: 'source_location',
         isText: true,
         type: CellType.TEXT
     }
@@ -225,31 +225,37 @@ function ApiEndpoints() {
 
         // handle code analysis endpoints
         const codeAnalysisCollection = apiCollectionData.codeAnalysisCollection
-        let shadowEndpoints = []
+        let shadowApis = []
 
         if (codeAnalysisCollection) {
-            const codeAnalysisEndpoints = codeAnalysisCollection.urlsMap
-            shadowEndpoints = { ...codeAnalysisEndpoints }
+            const codeAnalysisApisMap = codeAnalysisCollection.codeAnalysisApisMap
+            shadowApis = { ...codeAnalysisApisMap }
 
             // Find shadow endpoints and map api endpoint location
-            allEndpoints.forEach(allEndpointUrl => {
-                const truncatedUrl = transform.getTruncatedUrl(allEndpointUrl.endpoint)
-                const method_endpoint = allEndpointUrl.method + " " + truncatedUrl
-                const method_endpoint_without_slash = truncatedUrl !== "/" && method_endpoint.endsWith("/") ? method_endpoint.slice(0, -1) : method_endpoint
+            allEndpoints.forEach(api => {
+                let apiEndpoint = transform.getTruncatedUrl(api.endpoint)
+                // ensure apiEndpoint does not end with a slash
+                if (apiEndpoint !== "/" && apiEndpoint.endsWith("/")) 
+                    apiEndpoint = apiEndpoint.slice(0, -1)
 
-                if (Object.hasOwn(codeAnalysisEndpoints, method_endpoint_without_slash)) {
-                    allEndpointUrl.discovered_in = codeAnalysisEndpoints[method_endpoint_without_slash]
-                    delete shadowEndpoints[method_endpoint_without_slash]
+                const apiKey = api.method + " " + apiEndpoint
+
+                if (Object.hasOwn(codeAnalysisApisMap, apiKey)) {
+                    const codeAnalysisApi = codeAnalysisApisMap[apiKey]
+                    api.source_location = codeAnalysisApi.location.filepath
+
+                    delete shadowApis[apiKey]
                 }
                 else {
-                    allEndpointUrl.discovered_in = ""
+                    api.source_location = ""
                 }
             })
 
-            shadowEndpoints = Object.entries(shadowEndpoints).map(([ method_endpoint, location ]) => {
-                const [ method, endpoint ] = method_endpoint.split(" ")
+            shadowApis = Object.entries(shadowApis).map(([ codeAnalysisApiKey, codeAnalysisApi ]) => {
+                const { method, endpoint, location } = codeAnalysisApi
 
                 return {
+                    id: codeAnalysisApiKey,
                     endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={false} />,
                     method: method,
                     endpoint: endpoint,
@@ -260,19 +266,19 @@ function ApiEndpoints() {
                     sensitiveTagsComp: "",
                     last_seen: "",
                     codeAnalysisEndpoint: true,
-                    discovered_in: location,  
+                    source_location: location.filepath,  
                 }
             })
         }
 
         const prettifyData = transform.prettifyEndpointsData(allEndpoints)
         // append shadow endpoints to all endpoints
-        data['All'] = [ ...prettifyData, ...shadowEndpoints ]
+        data['All'] = [ ...prettifyData, ...shadowApis ]
         data['Sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0)
         data['Risk'] = prettifyData.filter(x=> x.riskScore >= 4)
         data['New'] = prettifyData.filter(x=> x.isNew)
         data['No_auth'] = prettifyData.filter(x => x.open)
-        data['Shadow'] = shadowEndpoints
+        data['Shadow'] = [ ...shadowApis ]
 
         setEndpointData(data)
         setSelectedTab("All")
