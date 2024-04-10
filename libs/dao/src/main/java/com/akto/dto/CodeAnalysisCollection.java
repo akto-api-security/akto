@@ -7,8 +7,8 @@ public class CodeAnalysisCollection {
     private String name;
     public static final String NAME = "name";
 
-    private Map<String, String> urlsMap;
-    public static final String URLS_MAP = "urlsMap";
+    private Map<String, CodeAnalysisApi> codeAnalysisApisMap;
+    public static final String CODE_ANALYSIS_APIS_MAP = "codeAnalysisApisMap";
 
     private String projectDir;
     public static final String PROJECT_DIR = "projectDir";
@@ -16,9 +16,9 @@ public class CodeAnalysisCollection {
     public CodeAnalysisCollection() {
     }
 
-    public CodeAnalysisCollection(String name, Map<String, String> urlsMap, String projectDir) {
+    public CodeAnalysisCollection(String name, Map<String, CodeAnalysisApi> codeAnalysisApisMap, String projectDir) {
         this.name = name;
-        this.urlsMap = urlsMap;
+        this.codeAnalysisApisMap = codeAnalysisApisMap;
         this.projectDir = projectDir;
     }
 
@@ -30,12 +30,12 @@ public class CodeAnalysisCollection {
         this.name = name;
     }
 
-    public Map<String, String> getUrlsMap() {
-        return urlsMap;
+    public Map<String, CodeAnalysisApi> getCodeAnalysisApisMap() {
+        return codeAnalysisApisMap;
     }
 
-    public void setUrlsMap(Map<String, String> urlsMap) {
-        this.urlsMap = urlsMap;
+    public void setCodeAnalysisApisMap(Map<String, CodeAnalysisApi> codeAnalysisApisMap) {
+        this.codeAnalysisApisMap = codeAnalysisApisMap;
     }
 
     public String getProjectDir() {
