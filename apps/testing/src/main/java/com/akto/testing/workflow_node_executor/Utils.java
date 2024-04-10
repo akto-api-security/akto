@@ -236,10 +236,15 @@ public class Utils {
         
         Map<String, Object> valuesMap = constructValueMap(loginFlowParams);
 
+        int index = 0;
         for (Node node: nodes) {
+            boolean allowAllStatusCodes = false;
             WorkflowTestResult.NodeResult nodeResult;
             try {
-                nodeResult = processNode(node, valuesMap, false, false, new ArrayList<>());
+                if (authMechanism.getRequestData() != null && authMechanism.getRequestData().size() > 0 && authMechanism.getRequestData().get(index).getAllowAllStatusCodes()) {
+                    allowAllStatusCodes = authMechanism.getRequestData().get(0).getAllowAllStatusCodes();
+                }
+                nodeResult = processNode(node, valuesMap, allowAllStatusCodes, false, new ArrayList<>());
             } catch (Exception e) {
                 ;
                 List<String> testErrors = new ArrayList<>();
@@ -261,6 +266,7 @@ public class Utils {
                     saveValueMapData(loginFlowParams, valuesMap);
                 }
             }
+            index++;
 
         }
 
