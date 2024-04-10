@@ -193,7 +193,7 @@ public class ConfigParser {
         }
 
         // 5. Last Node should always be a data/extract node
-        if (! (curNodeType.equals(OperandTypes.Data.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Extract.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Context.toString().toLowerCase()) || curNode.getOperand().equalsIgnoreCase(TestEditorEnums.PredicateOperator.COMPARE_GREATER.toString()) || curNode.getOperand().equalsIgnoreCase(TestEditorEnums.PredicateOperator.COMPARE_GREATER.toString()))) {
+        if (! (curNodeType.equals(OperandTypes.Data.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Extract.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Context.toString().toLowerCase()) || curNode.getOperand().equalsIgnoreCase(TestEditorEnums.PredicateOperator.COMPARE_GREATER.toString()) || curNode.getOperand().equalsIgnoreCase(TestEditorEnums.PredicateOperator.SSRF_URL_HIT.toString()))) {
             if (isString(values) || isListOfString(values)) {
                 configParserValidationResult.setIsValid(false);
                 configParserValidationResult.setErrMsg("Last Node should always be a data/extract node");

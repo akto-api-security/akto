@@ -34,6 +34,7 @@ public class ApiExecutor {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
+            int i = 0;
             boolean rateLimitHit = true;
             while (RateLimitHandler.getInstance(accountId).shouldWait(request)) {
                 if(rateLimitHit){
@@ -41,6 +42,11 @@ public class ApiExecutor {
                 }
                 rateLimitHit = false;
                 Thread.sleep(1000);
+                i++;
+
+                if (i%30 == 0) {
+                    loggerMaker.infoAndAddToDb("waiting for rate limit availability", LogDb.TESTING);
+                }
             }
         }
 
@@ -196,6 +202,7 @@ public class ApiExecutor {
             case OTHER:
                 throw new Exception("Invalid method name");
         }
+        loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
 
         return response;
     }
