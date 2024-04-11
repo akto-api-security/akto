@@ -65,6 +65,7 @@ let headers = [
     title: 'Status',
     itemOrder: 3,
     type: CellType.TEXT,
+    sortActive: true
   },
   {
     title: '',
@@ -73,8 +74,8 @@ let headers = [
 ]
 
 const sortOptions = [
-  { label: 'Run time', value: 'endTimestamp asc', directionLabel: 'Newest run', sortKey: 'endTimestamp' },
-  { label: 'Run time', value: 'endTimestamp desc', directionLabel: 'Oldest run', sortKey: 'endTimestamp' }
+  { label: 'Run time', value: 'endTimestamp asc', directionLabel: 'Newest run', sortKey: 'endTimestamp', columnIndex: 4 },
+  { label: 'Run time', value: 'endTimestamp desc', directionLabel: 'Oldest run', sortKey: 'endTimestamp', columnIndex: 4 }
 ];
 
 const resourceName = {

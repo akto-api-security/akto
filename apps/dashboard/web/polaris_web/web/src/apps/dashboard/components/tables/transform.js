@@ -100,6 +100,39 @@ const tableFunc = {
       const until = new Date(maxUntilEpoch).toISOString();
   
       return { since, until };
+  },
+  getSortableChoices(sortOptions){
+    if(!sortOptions || sortOptions === undefined || sortOptions.length === 0){
+      return []
+    }
+
+    let sortableColumns = []
+    sortOptions.forEach((opt) => {
+      sortableColumns.push(opt.sortActive || false)
+    })
+    return sortableColumns
+  },
+  getColumnSort(sortSelected, sortOptions){
+    if(!sortSelected || sortSelected.length === 0 || !sortOptions || sortOptions === undefined || sortOptions.length === 0){
+      return {columnIndex: -1, sortDirection: 'descending'}
+    }
+
+    const sortColumn = sortOptions.filter((x) => x.value === sortSelected[0])[0]
+    const sortDirection = sortSelected[0].split(" ")[1] === "asc" ? "ascending" : "descending"
+
+    return {
+      columnIndex: sortColumn.columnIndex - 1,
+      sortDirection: sortDirection
+    }
+  },
+  getInitialSortSelected(sortOptions, filtersMap){
+    if(!sortOptions || sortOptions === undefined || sortOptions.length === 0){
+      return {columnIndex: -1, sortDirection: 'descending'}
+    }
+    if(!filtersMap || filtersMap?.sort === undefined || filtersMap.sort.length === 0){
+      return [sortOptions[0].value]
+    }
+    return filtersMap.sort
   }
 }
 

@@ -26,16 +26,20 @@ function GithubServerTable(props) {
 
   const filtersMap = PersistStore(state => state.filtersMap)
   const setFiltersMap = PersistStore(state => state.setFiltersMap)
-  const initialStateFilters = tableFunc.mergeFilters(props.appliedFilters || [], ((filtersMap[window.location.href] && filtersMap[window.location.href]['filters']) ? filtersMap[window.location.href]['filters'] : []),props.disambiguateLabel)
-
+  const pageFiltersMap = filtersMap[window.location.href]
+  const initialStateFilters = tableFunc.mergeFilters(props.appliedFilters || [], (pageFiltersMap?.filters || []),props.disambiguateLabel)
   const { mode, setMode } = useSetIndexFiltersMode(props?.mode ? props.mode : IndexFiltersMode.Filtering);
-  const [sortSelected, setSortSelected] = useState(props?.sortOptions?.length > 0 ? [props.sortOptions[0].value] : []);
+  const [sortSelected, setSortSelected] = useState(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
   const [data, setData] = useState([]);
   const [total, setTotal] = useState([]);
   const [page, setPage] = useState(0);
   const pageLimit = props?.pageLimit || 20;
   const [appliedFilters, setAppliedFilters] = useState(initialStateFilters);
   const [queryValue, setQueryValue] = useState('');
+
+  const [sortableColumns, setSortableColumns] = useState([])
+  const [activeColumnSort, setActiveColumnSort] = useState({columnIndex: -1, sortDirection: 'descending'})
+
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.value] = 'OR'; return map }, {})
 
   const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
@@ -49,8 +53,14 @@ function GithubServerTable(props) {
     } 
   }
 
+  useEffect(()=> {
+    setAppliedFilters(initialStateFilters)
+    setSortSelected(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
+  },[window.location.href])
+
   useEffect(() => {
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
+    setActiveColumnSort(tableFunc.getColumnSort(sortSelected, props?.sortOptions))
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
     appliedFilters.forEach((filter) => {
       filters[filter.key] = filter.value
@@ -62,7 +72,28 @@ function GithubServerTable(props) {
     }
     handleSelectedTab(props?.selected)
     fetchData();
-  }, [sortSelected, appliedFilters, queryValue, page])
+  }, [sortSelected, appliedFilters, queryValue, page, pageFiltersMap])
+
+  useEffect(()=> {
+    setSortableColumns(tableFunc.getSortableChoices(props?.headers))
+  },[props?.headers])
+
+  const handleSort = (col, dir) => {
+    let tempSortSelected = props?.sortOptions.filter(x => x.columnIndex === (col + 1))
+    let sortVal = [tempSortSelected[0].value]
+    if(dir.includes("desc")){
+      setSortSelected([tempSortSelected[1].value])
+      sortVal = [tempSortSelected[1].value]
+    }else{
+      setSortSelected([tempSortSelected[0].value])
+    }
+    let copyFilters = filtersMap
+    copyFilters[window.location.href] = {
+      'filters': pageFiltersMap?.filters || [],
+      'sort': sortVal
+    }
+    setFiltersMap(copyFilters)
+  }
 
   const handleRemoveAppliedFilter = (key) => {
     let temp = appliedFilters
@@ -79,7 +110,10 @@ function GithubServerTable(props) {
     } else {
       setAppliedFilters(temp);
       let tempFilters = filtersMap
-      tempFilters[window.location.href]['filters'] = temp
+      tempFilters[window.location.href] = {
+        'filters': temp,
+        'sort': pageFiltersMap?.sort || []
+      }
       setFiltersMap(tempFilters)
     }
   }
@@ -99,7 +133,10 @@ function GithubServerTable(props) {
     }
     setPage(0);
     let tempFilters = filtersMap
-    tempFilters[window.location.href]['filters'] = temp
+    tempFilters[window.location.href] = {
+      'filters': temp,
+      'sort': pageFiltersMap?.sort || []
+    }
     setFiltersMap(tempFilters)
     setAppliedFilters(temp);
   };
@@ -186,11 +223,13 @@ function GithubServerTable(props) {
   }
 
   const handleFiltersClearAll = useCallback(() => {
-    setFiltersMap([])
+    let tempFilters = pageFiltersMap
+    delete tempFilters.filters
+    setFiltersMap(tempFilters)
     if(appliedFilters.length > 0 && appliedFilters.filter((x) => x.key === 'dateRange')){
       getDate({ type: "update", period: values.ranges[3] });
     }
-    setAppliedFilters(props.appliedFilters || [])
+    setAppliedFilters([])
   }, []);
 
   const resourceIDResolver = (data) => {
@@ -298,6 +337,10 @@ function GithubServerTable(props) {
                 bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
                 promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
                 hasZebraStriping={props.hasZebraStriping || false}
+                sortable={sortableColumns}
+                sortColumnIndex={activeColumnSort.columnIndex}
+                sortDirection={activeColumnSort.sortDirection}
+                onSort={handleSort}
               >
                 {rowMarkup}
               </IndexTable>
