@@ -746,7 +746,7 @@ public class Utils {
     }
 
     public static ApiAccessType getApiAccessTypeFromString(String apiAccessType){
-        switch (apiAccessType) {
+        switch (apiAccessType.toLowerCase()) {
             case "private":
                 return ApiAccessType.PRIVATE;
             case "public":
