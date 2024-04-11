@@ -28,10 +28,12 @@ const headers = [
         text: "Total endpoints",
         value: "endpoints",
         isText: CellType.TEXT,
+        sortActive: true
     },
     {
         title: 'Risk score',
         value: 'riskScoreComp',
+        sortActive: true
     },
     {   
         title: 'Test coverage',
@@ -61,16 +63,26 @@ const headers = [
         text: 'Last traffic seen', 
         value: 'lastTraffic',
         isText: CellType.TEXT,
+        sortActive: true
+    },
+    {
+        title: 'Discovered',
+        text: 'Discovered',
+        value: 'discovered',
+        isText: CellType.TEXT,
+        sortActive: true
     }
 ]
 
 const sortOptions = [
-    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore' },
-    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' },
-    { label: 'Discovered', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'startTs' },
-    { label: 'Discovered', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'startTs' },
-    { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints' },
-    { label: 'Endpoints', value: 'endpoints desc', directionLabel: 'Less', sortKey: 'endpoints' },
+    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: 3 },
+    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' , columnIndex: 3},
+    { label: 'Discovered', value: 'discovered asc', directionLabel: 'Recent first', sortKey: 'startTs', columnIndex: 9 },
+    { label: 'Discovered', value: 'discovered desc', directionLabel: 'Oldest first', sortKey: 'startTs' , columnIndex: 9},
+    { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints', columnIndex: 2 },
+    { label: 'Endpoints', value: 'endpoints desc', directionLabel: 'Less', sortKey: 'endpoints' , columnIndex: 2},
+    { label: 'Last traffic seen', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'detected', columnIndex: 8 },
+    { label: 'Last traffic seen', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'detected' , columnIndex: 8},
   ];        
 
 
@@ -99,7 +111,8 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
             severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
-            riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0
+            riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0,
+            discovered: func.prettifyEpoch(c.startTs || 0),
         }
     })
 

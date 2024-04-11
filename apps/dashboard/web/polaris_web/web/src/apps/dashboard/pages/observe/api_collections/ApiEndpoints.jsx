@@ -31,13 +31,15 @@ const headings = [
         text: "Endpoint",
         value: "endpointComp",
         title: "Api endpoints",
-        textValue: "endpoint"
+        textValue: "endpoint",
+        sortActive: true
     },
     {
         text: "Risk score",
         title: "Risk score",
         value: "riskScoreComp",
-        textValue: "riskScore"
+        textValue: "riskScore",
+        sortActive: true
     },
     {
         text: "Hostname",
@@ -52,13 +54,15 @@ const headings = [
         title: 'Access type',
         showFilter: true,
         type: CellType.TEXT,
+        sortActive: true
     },
     {
         text: 'Auth Type',
         title: 'Auth type',
         value: 'auth_type',
         showFilter: true,
-        textValue: 'authTypeTag'
+        textValue: 'authTypeTag',
+        sortActive: true
     },
     {
         text: 'Sensitive Params',
@@ -73,7 +77,8 @@ const headings = [
         title: 'Last seen',
         value: 'last_seen',
         isText: true,
-        type: CellType.TEXT
+        type: CellType.TEXT,
+        sortActive: true
     }
 ]
 
@@ -83,22 +88,23 @@ headers.push({
     filterKey: 'method',
     showFilter: true,
     textValue: 'method',
+    sortActive: true
 })
 
 
 const sortOptions = [
-    { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore'},
-    { label: 'Risk Score', value: 'riskScore desc', directionLabel: 'Lowest', sortKey: 'riskScore'},
-    { label: 'Method', value: 'method asc', directionLabel: 'A-Z', sortKey: 'method' },
-    { label: 'Method', value: 'method desc', directionLabel: 'Z-A', sortKey: 'method' },
-    { label: 'Endpoint', value: 'endpoint asc', directionLabel: 'A-Z', sortKey: 'endpoint' },
-    { label: 'Endpoint', value: 'endpoint desc', directionLabel: 'Z-A', sortKey: 'endpoint' },
-    { label: 'Auth Type', value: 'auth_type asc', directionLabel: 'A-Z', sortKey: 'auth_type' },
-    { label: 'Auth Type', value: 'auth_type desc', directionLabel: 'Z-A', sortKey: 'auth_type' },
-    { label: 'Access Type', value: 'access_type asc', directionLabel: 'A-Z', sortKey: 'access_type' },
-    { label: 'Access Type', value: 'access_type desc', directionLabel: 'Z-A', sortKey: 'access_type' },
-    { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs' },
-    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs' },
+    { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore', columnIndex: 2},
+    { label: 'Risk Score', value: 'riskScore desc', directionLabel: 'Lowest', sortKey: 'riskScore', columnIndex: 2},
+    { label: 'Method', value: 'method asc', directionLabel: 'A-Z', sortKey: 'method', columnIndex: 8 },
+    { label: 'Method', value: 'method desc', directionLabel: 'Z-A', sortKey: 'method', columnIndex: 8 },
+    { label: 'Endpoint', value: 'endpoint asc', directionLabel: 'A-Z', sortKey: 'endpoint', columnIndex: 1 },
+    { label: 'Endpoint', value: 'endpoint desc', directionLabel: 'Z-A', sortKey: 'endpoint', columnIndex: 1 },
+    { label: 'Auth Type', value: 'auth_type asc', directionLabel: 'A-Z', sortKey: 'auth_type', columnIndex: 5 },
+    { label: 'Auth Type', value: 'auth_type desc', directionLabel: 'Z-A', sortKey: 'auth_type', columnIndex: 5 },
+    { label: 'Access Type', value: 'access_type asc', directionLabel: 'A-Z', sortKey: 'access_type', columnIndex: 4 },
+    { label: 'Access Type', value: 'access_type desc', directionLabel: 'Z-A', sortKey: 'access_type', columnIndex: 4 },
+    { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs', columnIndex: 7 },
+    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 7 },
 ];
 
 function ApiEndpoints() {
