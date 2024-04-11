@@ -18,6 +18,7 @@ import org.bouncycastle.jce.provider.JDKDSASigner.stdDSA;
 
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.UrlModifierPayload;
 import com.akto.util.Constants;
@@ -741,6 +742,19 @@ public class Utils {
             }
         }catch (Exception e){
             return false;
+        }
+    }
+
+    public static ApiAccessType getApiAccessTypeFromString(String apiAccessType){
+        switch (apiAccessType) {
+            case "private":
+                return ApiAccessType.PRIVATE;
+            case "public":
+                return ApiAccessType.PUBLIC;
+            case "partner":
+                return ApiAccessType.PARTNER;
+            default:
+                return null;
         }
     }
 

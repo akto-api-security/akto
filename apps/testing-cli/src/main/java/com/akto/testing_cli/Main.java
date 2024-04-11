@@ -182,7 +182,8 @@ public class Main {
                     || content.contains(ContextOperator.PARAM_CONTEXT.toString().toLowerCase())
                     || content.contains(ContextOperator.PRIVATE_VARIABLE_CONTEXT.toString().toLowerCase())
                     || content.contains(ContextOperator.INCLUDE_ROLES_ACCESS.toString().toLowerCase())
-                    || content.contains(ContextOperator.EXCLUDE_ROLES_ACCESS.toString().toLowerCase())){
+                    || content.contains(ContextOperator.EXCLUDE_ROLES_ACCESS.toString().toLowerCase())
+                    || content.contains(ContextOperator.API_ACCESS_TYPE.toString().toLowerCase())){
                         String info = "Cannot run context tests. Skipping " + obj;
                         logger.info(info);
                         return false;
