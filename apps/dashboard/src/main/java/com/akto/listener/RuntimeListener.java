@@ -68,7 +68,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
             @Override
             public void accept(Account account) {
                 Main.initializeRuntimeHelper();
-                if (account.getId() != 1_000_000) return;
+                //if (account.getId() != 1_000_000) return;
                 // only for 1M we want to run demo data
                 AccountHTTPCallParserAktoPolicyInfo info = new AccountHTTPCallParserAktoPolicyInfo();
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
@@ -225,7 +225,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
             for (SingleTypeInfo singleTypeInfo: params) {
                 urlList.add(singleTypeInfo.getUrl());
             }
-            if (urlList.size() != 190) {
+            if (urlList.size() != 189) {
                 Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
             }
 
