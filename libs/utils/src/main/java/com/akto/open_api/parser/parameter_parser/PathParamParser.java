@@ -35,7 +35,7 @@ public class PathParamParser {
                 String type = schema.getType();
                 String format = schema.getFormat();
 
-                String example = schema.getExample() != null ? String.valueOf(schema.getExample()) : null;
+                String example = schema.getExample() != null ? parameter.getExample() != null ? String.valueOf(schema.getExample()) : null: null;
                 if(example != null) {
                     replacement = example;
                 }
