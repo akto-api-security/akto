@@ -11,12 +11,8 @@ import {
   ChoiceList,
   Tabs} from '@shopify/polaris';
 import {GithubRow} from './rows/GithubRow';
-import { useState, useCallback, useEffect, useReducer } from 'react';
-import DateRangePicker from '../layouts/DateRangePicker';
+import { useState, useCallback, useEffect } from 'react';
 import "./style.css"
-import func from '@/util/func';
-import { produce } from "immer"
-import values from "@/util/values"
 import transform from '../../pages/observe/transform';
 import DropdownSearch from '../shared/DropdownSearch';
 import PersistStore from '../../../main/PersistStore';
@@ -43,14 +39,12 @@ function GithubServerTable(props) {
   const [appliedFilters, setAppliedFilters] = useState(initialStateFilters);
   const [queryValue, setQueryValue] = useState('');
 
-  const { applyFilter, tabsInfo } = useTable()
+  const { applyFilter } = useTable()
 
   const [sortableColumns, setSortableColumns] = useState([])
   const [activeColumnSort, setActiveColumnSort] = useState({columnIndex: -1, sortDirection: 'descending'})
 
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.value] = 'OR'; return map }, {})
-
-  const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
 
   const handleSelectedTab = (x) => {
     const tableTabs = props.tableTabs ? props.tableTabs : props.tabs
@@ -119,17 +113,13 @@ function GithubServerTable(props) {
         temp.push(defaultAppliedFilter)
       }
     })
-    if (key === "dateRange") {
-      getDate({ type: "update", period: values.ranges[3] });
-    } else {
-      setAppliedFilters(temp);
-      let tempFilters = filtersMap
-      tempFilters[currentPageKey] = {
-        'filters': temp,
-        'sort': pageFiltersMap?.sort || []
-      }
-      setFiltersMap(tempFilters)
+    setAppliedFilters(temp);
+    let tempFilters = filtersMap
+    tempFilters[currentPageKey] = {
+      'filters': temp,
+      'sort': pageFiltersMap?.sort || []
     }
+    setFiltersMap(tempFilters)
   }
 
   const changeAppliedFilters = (key, value) => {
@@ -166,12 +156,6 @@ function GithubServerTable(props) {
 
   const handleFilterStatusChange = (key,value) => {
     changeAppliedFilters(key, value);
-  }
-
-  const getDate = (dateObj) => {
-    dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})
-    let obj = dateObj.period.period;
-    handleFilterStatusChange("dateRange",obj)
   }
 
   const getSortedChoices = (choices) => {
@@ -221,28 +205,14 @@ function GithubServerTable(props) {
         }
       })
   }
-  if (props.calenderFilter) {
-    filters.push({
-      key: "dateRange",
-      label: props.calenderLabel || "Discovered",
-      filter:
-        (
-          <DateRangePicker ranges={values.ranges}
-          initialDispatch = {currDateRange} 
-          dispatch={(dateObj) => getDate(dateObj)}
-          setPopoverState={() => {}}
-        />),
-      pinned: true
-    })
-  }
 
   const handleFiltersClearAll = useCallback(() => {
-    let tempFilters = pageFiltersMap
-    delete tempFilters.filters
-    setFiltersMap(tempFilters)
-    if(appliedFilters.length > 0 && appliedFilters.filter((x) => x.key === 'dateRange')){
-      getDate({ type: "update", period: values.ranges[3] });
-    }
+    setFiltersMap({
+      ...filtersMap,
+      [currentPageKey]:{
+        sort: filtersMap[currentPageKey]?.sort || []
+      }
+    })
     setAppliedFilters([])
   }, []);
 
