@@ -1,13 +1,16 @@
 package com.akto.action;
 
+import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.SignupDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.Config;
 import com.akto.dto.SignupInfo;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
+import com.akto.listener.RuntimeListener;
 import com.akto.utils.Token;
 import com.akto.utils.JWT;
 import com.mongodb.BasicDBObject;
@@ -99,6 +102,19 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
     private void decideFirstPage(BasicDBObject loginResult, int accountId){
         Context.accountId.set(accountId);
+        try {
+            // add backward compatibility check
+            BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
+            if (backwardCompatibility.getVulnerableApiUpdationVersionV1() == 0) {
+                RuntimeListener.addSampleData();
+            }
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.VULNERABLE_API_UPDATION_VERSION_V1, Context.now())
+            );
+        } catch (Exception e) {
+            logger.error("error updating vulnerable api's collection" + e.getMessage());
+        }
         long count = SingleTypeInfoDao.instance.getEstimatedCount();
         if(count == 0){
             logger.info("New user, showing quick start page");
