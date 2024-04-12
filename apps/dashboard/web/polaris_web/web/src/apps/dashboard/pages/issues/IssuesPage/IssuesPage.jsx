@@ -253,7 +253,11 @@ function IssuesPage(){
 
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
         setLoading(true);
-
+        const res = await api.fetchIssues(skip, 1, null, null, null, null, 0)
+        if(res.totalIssuesCount === 0){
+            setShowEmptyScreen(true)
+            return {value:{} , total:0};
+        }
         let total =0;
         let ret = []
         let filterCollectionsId = filters.apiCollectionId.concat(filters.collectionIds);
@@ -279,9 +283,7 @@ function IssuesPage(){
             setLoading(false);
         })
         ret = func.sortFunc(ret, sortKey, sortOrder)
-        if(total === 0){
-            setShowEmptyScreen(true)
-        }
+        
         return {value:ret , total:total};
     }
 
