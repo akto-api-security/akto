@@ -11,6 +11,7 @@ import com.akto.dto.SignupInfo;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
 import com.akto.listener.RuntimeListener;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.Token;
 import com.akto.utils.JWT;
 import com.mongodb.BasicDBObject;
@@ -32,6 +33,8 @@ import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 
@@ -45,6 +48,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     private static final Logger logger = LoggerFactory.getLogger(LoginAction.class);
     
     public static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
+    private static final ExecutorService service = Executors.newFixedThreadPool(1);
     public BasicDBObject getLoginResult() {
         return loginResult;
     }
@@ -102,19 +106,23 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
     private void decideFirstPage(BasicDBObject loginResult, int accountId){
         Context.accountId.set(accountId);
-        try {
-            // add backward compatibility check
-            BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
-            if (backwardCompatibility.getVulnerableApiUpdationVersionV1() == 0) {
-                RuntimeListener.addSampleData();
+        service.submit(() ->{
+            Context.accountId.set(accountId);
+            logger.info("updating vulnerable api's collection for account " + accountId);
+            try {
+                // add backward compatibility check
+                BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
+                if (backwardCompatibility.getVulnerableApiUpdationVersionV1() == 0) {
+                    RuntimeListener.addSampleData();
+                }
+                BackwardCompatibilityDao.instance.updateOne(
+                        Filters.eq("_id", backwardCompatibility.getId()),
+                        Updates.set(BackwardCompatibility.VULNERABLE_API_UPDATION_VERSION_V1, Context.now())
+                );
+            } catch (Exception e) {
+                logger.error("error updating vulnerable api's collection for account " + accountId + " " + e.getMessage());
             }
-            BackwardCompatibilityDao.instance.updateOne(
-                    Filters.eq("_id", backwardCompatibility.getId()),
-                    Updates.set(BackwardCompatibility.VULNERABLE_API_UPDATION_VERSION_V1, Context.now())
-            );
-        } catch (Exception e) {
-            logger.error("error updating vulnerable api's collection" + e.getMessage());
-        }
+        });
         long count = SingleTypeInfoDao.instance.getEstimatedCount();
         if(count == 0){
             logger.info("New user, showing quick start page");
