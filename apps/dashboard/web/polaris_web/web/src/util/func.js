@@ -1369,6 +1369,36 @@ mapCollectionIdToHostName(apiCollections){
     }
     return hash;
   },
+  getTableTabsContent(tableTabs, countObj, setSelectedTab, selectedTab, currentCount){
+    const finalTabs = tableTabs.map((tab,ind) => {
+      const tabId = this.getKeyFromName(tab)
+      return {
+          content: tab,
+          badge: selectedTab === tabId ? currentCount.toString() : countObj[tabId].toString(),
+          onAction: () => { setSelectedTab(tabId) },
+          id: this.getKeyFromName(tabId),
+          index: ind 
+      }
+    })
+    return finalTabs
+  },
+  getTabsCount(tableTabs, data, initialCountArr = []){
+    const currentState = PersistStore(state => state.tableInitialState)
+    const baseUrl = window.location.href.split('#')[0]
+
+    let finalCountObj = {}
+    tableTabs.forEach((tab,ind) => {
+      const tabId = this.getKeyFromName(tab)
+      const tabKey = baseUrl + '#' + tabId
+      const count = currentState[tabKey] || data[tabId]?.length || initialCountArr[ind] || 0
+      finalCountObj[tabId] = count
+    })
+
+    return finalCountObj
+  },
+  getKeyFromName(key){
+    return key.replace(/[\s/]+/g, '_').toLowerCase();
+  }
 }
 
 export default func

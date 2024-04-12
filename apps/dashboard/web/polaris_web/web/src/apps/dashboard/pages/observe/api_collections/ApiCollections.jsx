@@ -3,17 +3,19 @@ import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList } from 
 import api from "../api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
-import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
+import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import { CircleTickMajor } from '@shopify/polaris-icons';
 import ObserveStore from "../observeStore"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
-import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-import { CellType } from "../../../components/tables/rows/GithubRow"
+import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered"
+import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
 import CreateNewCollectionModal from "./CreateNewCollectionModal"
-import TooltipText from "../../../components/shared/TooltipText"
-import SummaryCardInfo from "../../../components/shared/SummaryCardInfo"
+import TooltipText from "@/apps/dashboard/components/shared/TooltipText"
+import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo"
 import CollectionsPageBanner from "./component/CollectionsPageBanner"
+import useTable from "@/apps/dashboard/components/tables/TableContext"
+
 
 const headers = [
     {
@@ -122,44 +124,22 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 
 function ApiCollections() {
 
-    const [data, setData] = useState({'All':[]})
+    const [data, setData] = useState({'all':[]})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
-    const [selectedTab, setSelectedTab] = useState("All")
+    const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(false)
     const [envTypeMap, setEnvTypeMap] = useState({})
     const [refreshData, setRefreshData] = useState(false)
     const [popover,setPopover] = useState(false)
-    
-    
-    const tableTabs = [
-        {
-            content: 'All',
-            badge: data["All"]?.length?.toString(),
-            onAction: () => { setSelectedTab('All') },
-            id: 'All',
-        },
-        {
-            content: 'Hostname',
-            badge: data["Hostname"]?.length?.toString(),
-            onAction: () => { setSelectedTab('Hostname') },
-            id: 'Hostname',
-        },
-        {
-            content: 'Groups',
-            badge: data["Groups"]?.length?.toString(),
-            onAction: () => { setSelectedTab('Groups') },
-            id: 'Groups',
-        },
-        {
-            content: 'Custom',
-            badge: data["Custom"]?.length?.toString(),
-            onAction: () => { setSelectedTab('Custom') },
-            id: 'Custom',
-        }
-    ]
+
+    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom']
+
+    const { tabsInfo } = useTable()
+    const tableCountObj = func.getTabsCount(definedTableTabs, data)
+    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
     const setInventoryFlyout = ObserveStore(state => state.setInventoryFlyout)
     const setFilteredItems = ObserveStore(state => state.setFilteredItems) 
@@ -227,10 +207,10 @@ function ApiCollections() {
         setHostNameMap(allHostNameMap)
         
         tmp = {}
-        tmp.All = dataObj.prettify
-        tmp.Hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
-        tmp.Groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
-        tmp.Custom = tmp.All.filter(x => !tmp.Hostname.includes(x) && !tmp.Groups.includes(x));
+        tmp.all = dataObj.prettify
+        tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
+        tmp.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
+        tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !tmp.groups.includes(x));
 
         setData(tmp);
     }

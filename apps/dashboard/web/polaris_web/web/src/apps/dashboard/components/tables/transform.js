@@ -9,7 +9,7 @@ const tableFunc = {
           let key = header.filterKey || header.value
           let label = header.filterLabel || header.text
           let allItemValues = []
-          props.data.forEach(i => {
+          props.data && props.data.forEach(i => {
             let value = i[key]
             if (value instanceof Set) {
               allItemValues = allItemValues.concat(...value)
@@ -127,7 +127,7 @@ const tableFunc = {
   },
   getInitialSortSelected(sortOptions, filtersMap){
     if(!sortOptions || sortOptions === undefined || sortOptions.length === 0){
-      return {columnIndex: -1, sortDirection: 'descending'}
+      return ['']
     }
     if(!filtersMap || filtersMap?.sort === undefined || filtersMap.sort.length === 0){
       return [sortOptions[0].value]

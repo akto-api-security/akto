@@ -23,6 +23,7 @@ const initialState = {
     // selectedSampleApi: {},
     coverageMap:{},
     filtersMap:{},
+    tableInitialState: {},
 };
 
 let persistStore = (set) => ({
@@ -44,6 +45,7 @@ let persistStore = (set) => ({
     // setSelectedSampleApi: (selectedSampleApi) => set({selectedSampleApi: selectedSampleApi}),
     setCoverageMap:(coverageMap)=>{set({coverageMap: coverageMap})},
     setFiltersMap: (filtersMap) => set({ filtersMap }),
+    setTableInitialState: (tableInitialState) => set({ tableInitialState }),
 
     resetAll: () => set(initialState), // Reset function
 })
