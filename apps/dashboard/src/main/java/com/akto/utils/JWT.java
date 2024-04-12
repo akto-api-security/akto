@@ -75,11 +75,13 @@ public class JWT {
 
     private static String readKey(String keyPath) throws IOException {
         File f = new File(keyPath);
-        FileInputStream fis = new FileInputStream(f);
-        DataInputStream dis = new DataInputStream(fis);
-        byte[] keyBytes = new byte[(int) f.length()];
-        dis.readFully(keyBytes);
-        dis.close();
+        byte[] keyBytes;
+
+        try (FileInputStream fis = new FileInputStream(f);
+             DataInputStream dis = new DataInputStream(fis)) {
+            keyBytes = new byte[(int) f.length()];
+            dis.readFully(keyBytes);
+        }
 
         return new String(keyBytes);
     }

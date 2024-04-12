@@ -154,7 +154,7 @@ export default {
             }
 
             if (typeof obj === "string") {
-                let json = tryJson(obj, "")
+                let json = tryJson(obj)
 
                 if (json) {
                     return flatten(json, "")

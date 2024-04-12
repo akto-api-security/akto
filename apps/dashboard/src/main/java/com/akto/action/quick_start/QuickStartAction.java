@@ -362,7 +362,7 @@ public class QuickStartAction extends UserAction {
     }
 
     public boolean getIsFirstSetup() {
-        return dashboardHasNecessaryRole;
+        return isFirstSetup;
     }
 
     public void setIsFirstSetup(boolean isFirstSetup) {
