@@ -21,12 +21,18 @@ import transform from '../../pages/observe/transform';
 import DropdownSearch from '../shared/DropdownSearch';
 import PersistStore from '../../../main/PersistStore';
 import tableFunc from './transform';
+import useTable from './TableContext';
 
 function GithubServerTable(props) {
 
   const filtersMap = PersistStore(state => state.filtersMap)
   const setFiltersMap = PersistStore(state => state.setFiltersMap)
-  const pageFiltersMap = filtersMap[window.location.href]
+  const tableInitialState = PersistStore(state => state.tableInitialState)
+  const setTableInitialState = PersistStore(state => state.setTableInitialState)
+
+  const currentPageKey = window.location.href
+
+  const pageFiltersMap = filtersMap[currentPageKey]
   const initialStateFilters = tableFunc.mergeFilters(props.appliedFilters || [], (pageFiltersMap?.filters || []),props.disambiguateLabel)
   const { mode, setMode } = useSetIndexFiltersMode(props?.mode ? props.mode : IndexFiltersMode.Filtering);
   const [sortSelected, setSortSelected] = useState(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
@@ -36,6 +42,8 @@ function GithubServerTable(props) {
   const pageLimit = props?.pageLimit || 20;
   const [appliedFilters, setAppliedFilters] = useState(initialStateFilters);
   const [queryValue, setQueryValue] = useState('');
+
+  const { applyFilter, tabsInfo } = useTable()
 
   const [sortableColumns, setSortableColumns] = useState([])
   const [activeColumnSort, setActiveColumnSort] = useState({columnIndex: -1, sortDirection: 'descending'})
@@ -48,7 +56,7 @@ function GithubServerTable(props) {
     const tableTabs = props.tableTabs ? props.tableTabs : props.tabs
     if(tableTabs){
       const primitivePath = window.location.origin + window.location.pathname
-      const newUrl = primitivePath + "#" +  tableTabs[x].content
+      const newUrl = primitivePath + "#" +  tableTabs[x].id
       window.history.replaceState(null, null, newUrl)
     } 
   }
@@ -56,7 +64,7 @@ function GithubServerTable(props) {
   useEffect(()=> {
     setAppliedFilters(initialStateFilters)
     setSortSelected(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
-  },[window.location.href])
+  },[currentPageKey])
 
   useEffect(() => {
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
@@ -69,6 +77,12 @@ function GithubServerTable(props) {
       let tempData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, page * pageLimit, pageLimit, filters, filterOperators, queryValue);
       tempData ? setData([...tempData.value]) : setData([])
       tempData ? setTotal(tempData.total) : setTotal(0)
+      applyFilter(tempData.total)
+      
+      setTableInitialState({
+        ...tableInitialState,
+        [currentPageKey]: tempData.total
+      })
     }
     handleSelectedTab(props?.selected)
     fetchData();
@@ -88,7 +102,7 @@ function GithubServerTable(props) {
       setSortSelected([tempSortSelected[0].value])
     }
     let copyFilters = filtersMap
-    copyFilters[window.location.href] = {
+    copyFilters[currentPageKey] = {
       'filters': pageFiltersMap?.filters || [],
       'sort': sortVal
     }
@@ -110,7 +124,7 @@ function GithubServerTable(props) {
     } else {
       setAppliedFilters(temp);
       let tempFilters = filtersMap
-      tempFilters[window.location.href] = {
+      tempFilters[currentPageKey] = {
         'filters': temp,
         'sort': pageFiltersMap?.sort || []
       }
@@ -133,7 +147,7 @@ function GithubServerTable(props) {
     }
     setPage(0);
     let tempFilters = filtersMap
-    tempFilters[window.location.href] = {
+    tempFilters[currentPageKey] = {
       'filters': temp,
       'sort': pageFiltersMap?.sort || []
     }

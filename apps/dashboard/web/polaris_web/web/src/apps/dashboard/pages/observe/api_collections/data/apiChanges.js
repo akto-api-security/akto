@@ -194,7 +194,7 @@ let paramFilters = [
 
 const apiChangesData = {
     getData(key){
-        if(key === 'param'){
+        if(key.includes('param')){
             const obj = {
                 headers: [...newParametersHeaders, ...methodObj],
                 headings: newParametersHeaders,
