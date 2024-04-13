@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.testing.Main;
 import com.akto.dto.*;
 import com.akto.dto.type.URLMethods;
@@ -58,23 +59,26 @@ public class YamlNodeExecutor extends NodeExecutor {
         }
 
         RawApi rawApi = yamlNodeDetails.getRawApi();
+        RawApi sampleRawApi = rawApi.copy();
 
         Executor executor = new Executor();
         ExecutorNode executorNode = yamlNodeDetails.getExecutorNode();
         FilterNode validatorNode = yamlNodeDetails.getValidatorNode();
         List<ExecutorNode> childNodes = executorNode.getChildNodes();
 
-        ApiInfo.ApiInfoKey apiInfoKey = null;
+        ApiInfo.ApiInfoKey apiInfoKey = ((YamlNodeDetails) node.getWorkflowNodeDetails()).getApiInfoKey();
         ExecutorNode firstChildNode = childNodes.get(0); // todo check for length
-        if (firstChildNode.getOperationType().equals("API")) {
-            String api = firstChildNode.getValues().toString();
-            apiInfoKey = apiNameToApiInfoKey.get(api);
-            OriginalHttpRequest newRequest = memory.run(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
-            rawApi.setRequest(newRequest);
+        if (firstChildNode.getOperationType().equalsIgnoreCase("api")) {
+            String apiType = firstChildNode.getValues().toString();
+            if (apiType.equalsIgnoreCase("get_asset_api")) {
+                rawApi = memory.findAssetGetterRequest(apiInfoKey);
+            }
             childNodes.remove(0);
+        } else {
+            OriginalHttpRequest request = memory.run(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+            rawApi.setRequest(request);
         }
 
-        RawApi sampleRawApi = rawApi.copy();
 
         List<RawApi> rawApis = new ArrayList<>();
         rawApis.add(rawApi.copy());

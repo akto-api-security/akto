@@ -10,6 +10,7 @@ import com.akto.dao.file.FilesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.YamlTestResult;
 import com.akto.dto.traffic.SampleData;
@@ -41,6 +42,8 @@ import com.sun.jna.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 
 public class HarAction extends UserAction {
@@ -54,11 +57,42 @@ public class HarAction extends UserAction {
     private byte[] tcpContent;
     private static final LoggerMaker loggerMaker = new LoggerMaker(HarAction.class);
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
+        Context.accountId.set(1_000_000);
+
+        DependencyFlow dependencyFlow = new DependencyFlow();
+        dependencyFlow.run();
+        dependencyFlow.syncWithDb();
+    }
+
+    public static void main3(String[] args) throws IOException {
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
+        Context.accountId.set(1_000_000);
+
+        String filePath = "/Users/avneesh/Downloads/juiceshop_address_1.har";
+        String content;
+        try {
+            content = new String(Files.readAllBytes(Paths.get(filePath)));
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
+
+        System.out.println(content.length());
+
+        HarAction harAction = new HarAction();
+        harAction.setHarString(content);
+        harAction.setApiCollectionName("a3");
+        harAction.skipKafka = true;
+        harAction.execute();
+    }
+
+    public static void main2(String[] args) {
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
         Context.accountId.set(1_000_000);
 
-        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1710156663, "https://juiceshop.akto.io/rest/products/reviews", URLMethods.Method.PATCH);
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1712980524, "https://juiceshop.akto.io/api/Cards/INTEGER", URLMethods.Method.DELETE);
 
         SampleData sampleData = SampleDataDao.instance.findOne(
                 Filters.and(
@@ -117,73 +151,29 @@ public class HarAction extends UserAction {
             "    - CVE-2023-4647\n" +
             "    - CVE-2023-38254\n" +
             "\n" +
-            "workflow_selection_filters:\n" +
-            "  API_1:\n" +
-            "    response_code:\n" +
-            "      gte: 200\n" +
-            "      lt: 300\n" +
-            "    url:\n" +
-            "      contains_either:\n" +
-            "        - rest/user/login\n" +
-            "  API_2:\n" +
-            "    response_code:\n" +
-            "      gte: 200\n" +
-            "      lt: 300\n" +
-            "    url:\n" +
-            "      contains_either:\n" +
-            "        - rest/products/reviews\n" +
             "\n" +
             "api_selection_filters:\n" +
             "  response_code:\n" +
             "    gte: 200\n" +
             "    lt: 300\n" +
             "\n" +
-            "wordLists:\n" +
-            "  dummyHeaders:\n" +
-            "    - a\n" +
-            "\n" +
             "execute:\n" +
-            "  type: multiple\n" +
+            "  type: graph\n" +
             "  requests:\n" +
             "  - req:\n" +
-            "    - api: API_1\n" +
-            "    - add_header:\n" +
-            "        dummy_Header_Key1: \"dummyValue\"\n" +
+            "    - replace_auth_header: true\n" +
             "    - validate:\n" +
             "        percentage_match:\n" +
             "          gte: 90\n" +
             "    - success: x2\n" +
             "    - failure: x2\n" +
-            "\n" +
             "  - req:\n" +
-            "    - api: API_2\n" +
-            "    - add_header:\n" +
-            "        dummy_Header_Key2: \"dummyValue\"\n" +
-            "    - validate:\n" +
-            "        percentage_match:\n" +
-            "          gte: 90\n" +
-            "    - success: x3\n" +
-            "    - failure: x3\n" +
+            "    - api: get_asset_api\n" +
+            "    - validate: \n" +
+            "       response_code: 4xx\n" +
+            "       success: vulnerability\n" +
+            "       failure: exit\n" +
             "\n" +
-            "  - req:\n" +
-            "    - api: API_1\n" +
-            "    - add_header:\n" +
-            "        dummy_Header_Key3: \"dummyValue\"\n" +
-            "    - validate:\n" +
-            "        percentage_match:\n" +
-            "          gte: 90\n" +
-            "    - success: x4\n" +
-            "    - failure: x4\n" +
-            "\n" +
-            "  - req:\n" +
-            "    - api: API_2\n" +
-            "    - add_header:\n" +
-            "        dummy_Header_Key4: \"dummyValue\"\n" +
-            "    - validate:\n" +
-            "        percentage_match:\n" +
-            "          gte: 90\n" +
-            "    - success: x5\n" +
-            "    - failure: x5\n" +
             "\n" +
             "\n" +
             "validate:\n" +
@@ -194,6 +184,7 @@ public class HarAction extends UserAction {
             "    - compare_greater:\n" +
             "        - ${x2.response.stats.median_response_time}\n" +
             "        - ${x1.response.stats.median_response_time} * 3";
+
     public String executeWithSkipKafka(boolean skipKafka) throws IOException {
         this.skipKafka = skipKafka;
         execute();
@@ -212,7 +203,7 @@ public class HarAction extends UserAction {
             apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
             if (apiCollection == null) {
                 ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
-                apiCollectionsAction.setSession(this.getSession());
+//                apiCollectionsAction.setSession(this.getSession());
                 apiCollectionsAction.setCollectionName(apiCollectionName);
                 String result = apiCollectionsAction.createCollection();
                 if (result.equalsIgnoreCase(Action.SUCCESS)) {
@@ -269,16 +260,16 @@ public class HarAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if (getSession().getOrDefault("utility","").equals(Utility.BURP.toString())) {
-            BurpPluginInfoDao.instance.updateLastDataSentTimestamp(getSUser().getLogin());
-        }
+//        if (getSession().getOrDefault("utility","").equals(Utility.BURP.toString())) {
+//            BurpPluginInfoDao.instance.updateLastDataSentTimestamp(getSUser().getLogin());
+//        }
 
         try {
             HAR har = new HAR();
             loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
-            String zippedString = GzipUtils.zipString(harString);
-            com.akto.dto.files.File file = new com.akto.dto.files.File(HttpResponseParams.Source.HAR.toString(),zippedString);
-            FilesDao.instance.insertOne(file);
+//            String zippedString = GzipUtils.zipString(harString);
+//            com.akto.dto.files.File file = new com.akto.dto.files.File(HttpResponseParams.Source.HAR.toString(),zippedString);
+//            FilesDao.instance.insertOne(file);
             List<String> messages = har.getMessages(harString, apiCollectionId, Context.accountId.get());
             harErrors = har.getErrors();
             Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka);
