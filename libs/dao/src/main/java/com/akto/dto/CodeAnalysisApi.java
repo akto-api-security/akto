@@ -7,21 +7,51 @@ public class CodeAnalysisApi {
     private Location location;
 
     public static class Location {
-        private String filepath;
+        private String filePath;
+        private String fileName;
+        private String fileLink;
+        private int lineNo;
 
         public Location() {
         }
 
-        public Location(String filepath) {
-            this.filepath = filepath;
+        public Location(String filePath, String fileName, String fileLink, int lineNo) {
+            this.filePath = filePath;
+            this.fileName = fileName;
+            this.fileLink = fileLink;
+            this.lineNo = lineNo;
         }
 
-        public String getFilepath() {
-            return filepath;
+        public String getFilePath() {
+            return filePath;
         }
 
-        public void setFilepath(String filepath) {
-            this.filepath = filepath;
+        public void setFilePath(String filePath) {
+            this.filePath = filePath;
+        }
+
+        public String getFileName() {
+            return fileName;
+        }
+
+        public void setFileName(String fileName) {
+            this.fileName = fileName;
+        }
+
+        public String getFileLink() {
+            return fileLink;
+        }
+
+        public void setFileLink(String fileLink) {
+            this.fileLink = fileLink;
+        }
+
+        public int getLineNo() {
+            return lineNo;
+        }
+
+        public void setLineNo(int lineNo) {
+            this.lineNo = lineNo;
         }
     }
 

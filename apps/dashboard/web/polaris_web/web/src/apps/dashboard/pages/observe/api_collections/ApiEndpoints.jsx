@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, Link } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -76,12 +76,18 @@ const headings = [
         isText: true,
         type: CellType.TEXT
     },
+    // {
+    //     text: 'Source location',
+    //     title: 'Source location',
+    //     value: 'source_location',
+    //     isText: true,
+    //     type: CellType.TEXT
+    // }
     {
-        text: 'Source location',
-        title: 'Source location',
-        value: 'source_location',
-        isText: true,
-        type: CellType.TEXT
+        text: "Source location",
+        value: "sourceLocationComp",
+        textValue: "sourceLocation",
+        title: "Source location",
     }
 ]
 
@@ -242,7 +248,9 @@ function ApiEndpoints() {
 
                 if (Object.hasOwn(codeAnalysisApisMap, apiKey)) {
                     const codeAnalysisApi = codeAnalysisApisMap[apiKey]
-                    api.source_location = codeAnalysisApi.location.filepath
+                    const location = codeAnalysisApi.location
+                    api.sourceLocation = codeAnalysisApi.location.filePath
+                    api.sourceLocationComp = getSourceLocationComp(codeAnalysisApi.location)
 
                     delete shadowApis[apiKey]
                 }
@@ -266,7 +274,8 @@ function ApiEndpoints() {
                     sensitiveTagsComp: "",
                     last_seen: "",
                     codeAnalysisEndpoint: true,
-                    source_location: location.filepath,  
+                    sourceLocation: location.filePath, 
+                    sourceLocationComp: getSourceLocationComp(location),
                 }
             })
         }
@@ -347,6 +356,20 @@ function ApiEndpoints() {
             }
             return { ...tmp }
         })
+    }
+
+    function getSourceLocationComp(location) {
+
+        return (
+            <Box>
+                {location.fileLink === "" ?
+                    <Text variant="bodyMd" fontWeight="medium" breakWord>{location.filePath}</Text> :
+                     <Link url={location.fileLink} monochrome target="_blank">
+                        <Text variant="bodyMd" fontWeight="medium" breakWord>{location.filePath}</Text> 
+                    </Link> 
+                }
+            </Box>
+        )
     }
 
     function handleRefresh() {
