@@ -22,6 +22,8 @@ const initialState = {
     lastFetchedSensitiveResp: [],
     // selectedSampleApi: {},
     coverageMap:{},
+    filtersMap:{},
+    tableInitialState: {},
 };
 
 let persistStore = (set) => ({
@@ -42,6 +44,8 @@ let persistStore = (set) => ({
     setLastFetchedSensitiveResp: (lastFetchedSensitiveResp) => set({ lastFetchedSensitiveResp }),
     // setSelectedSampleApi: (selectedSampleApi) => set({selectedSampleApi: selectedSampleApi}),
     setCoverageMap:(coverageMap)=>{set({coverageMap: coverageMap})},
+    setFiltersMap: (filtersMap) => set({ filtersMap }),
+    setTableInitialState: (tableInitialState) => set({ tableInitialState }),
 
     resetAll: () => set(initialState), // Reset function
 })
