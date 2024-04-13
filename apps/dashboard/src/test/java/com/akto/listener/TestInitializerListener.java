@@ -14,8 +14,8 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.URLMethods;
-import com.akto.types.CappedSet;
 
+import com.akto.types.CappedSet;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;

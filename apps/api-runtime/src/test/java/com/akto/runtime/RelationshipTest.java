@@ -1,10 +1,8 @@
 package com.akto.runtime;
 
 
-import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.Relationship;
-import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.HttpRequestParams;
@@ -12,7 +10,6 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mongodb.ConnectionString;
 import org.junit.Test;
 
 import java.io.IOException;

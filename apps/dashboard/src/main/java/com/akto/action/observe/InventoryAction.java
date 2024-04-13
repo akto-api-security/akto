@@ -1,31 +1,26 @@
 package com.akto.action.observe;
 
-import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
-import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.util.Constants;
+import com.akto.util.parsers.HttpCallParserHelper;
+import com.akto.util.runtime.RuntimeUtil;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
-import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.opensymphony.xwork2.Action;
@@ -84,7 +79,7 @@ public class InventoryAction extends UserAction {
         List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 1_000, Sorts.descending("timestamp"), Projections.exclude("values"));
         for(SingleTypeInfo sti: latestHosts) {
             loggerMaker.debugInfoAddToDb(sti.getUrl() + " discovered_ts: " + sti.getTimestamp() + " inserted_ts: " + sti.getId().getTimestamp(), LogDb.DASHBOARD);
-            BasicDBObject id = 
+            BasicDBObject id =
                 new BasicDBObject("apiCollectionId", sti.getApiCollectionId())
                 .append("url", sti.getUrl())
                 .append("method", sti.getMethod());
@@ -676,7 +671,7 @@ public class InventoryAction extends UserAction {
         List<HttpResponseParams> responses = new ArrayList<>();
         for (String sample : samples) {
             try {
-                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                HttpResponseParams httpResponseParams = HttpCallParserHelper.parseKafkaMessage(sample);
                 httpResponseParams.requestParams.setApiCollectionId(apiCollectionId);
                 responses.add(httpResponseParams);
             } catch (Exception e) {
@@ -704,7 +699,7 @@ public class InventoryAction extends UserAction {
         info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
 
         try {
-            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.GET);
+            URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(url, URLMethods.Method.GET);
             if (info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId) != null) {
                 RequestTemplate requestTemplate = info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId).getTemplateURLToMethods().get(urlTemplate);
                 loggerMaker.infoAndAddToDb("Request template exists for url " + urlTemplate.getTemplateString() + " : " + ( requestTemplate != null), LogDb.DASHBOARD);

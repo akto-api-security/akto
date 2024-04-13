@@ -231,8 +231,7 @@ export default {
         Spinner,
         FilterColumn,
         SecondaryButton,
-        LayoutWithTabs,
-        Spinner
+        LayoutWithTabs
     },
     data () {
         let endTimestamp = this.defaultEndTimestamp || func.timeNow()
@@ -695,7 +694,7 @@ export default {
     font-size: 14px        
     font-weight: 500
     color: var(--themeColorDark9)
-    margin-bottom:10px
+    margin-bottom: 10px
     display: flex
     justify-content: space-between
     padding-right: 24px

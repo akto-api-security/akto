@@ -5,7 +5,6 @@ import static org.junit.Assert.assertEquals;
 import java.util.*;
 
 import com.akto.dto.type.AccountDataTypesInfo;
-import org.checkerframework.checker.units.qual.A;
 import org.junit.Test;
 
 import com.akto.MongoBasedTest;

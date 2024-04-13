@@ -1,13 +1,12 @@
 package com.akto.analyser;
 
 import com.akto.DaoInit;
-import com.akto.InstanceDetails;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
-import com.akto.parsers.HttpCallParser;
+import com.akto.util.parsers.HttpCallParserHelper;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Updates;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -15,8 +14,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.errors.WakeupException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.*;
@@ -75,7 +72,7 @@ public class Main {
                     i ++;
 
                     try {
-                        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
+                        HttpResponseParams httpResponseParams = HttpCallParserHelper.parseKafkaMessage(r.value());
                         int accountId = Integer.parseInt(httpResponseParams.getAccountId());
                         ResourceAnalyser resourceAnalyser = resourceAnalyserMap.get(accountId);
                         if (resourceAnalyser == null) {

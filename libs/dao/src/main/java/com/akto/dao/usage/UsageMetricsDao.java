@@ -1,9 +1,7 @@
 package com.akto.dao.usage;
 
 import com.akto.dao.MCollection;
-import com.akto.dto.billing.Organization;
 import org.bson.conversions.Bson;
-import org.springframework.jmx.support.MetricType;
 
 import com.akto.dao.BillingContextDao;
 import com.akto.dto.usage.MetricTypes;

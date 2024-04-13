@@ -1294,13 +1294,6 @@ mapCollectionIdToHostName(apiCollections){
       funcToCall();
     }
   },
-  async refreshApiCollections() {
-    let apiCollections = await homeFunctions.getAllCollections()
-    const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
-
-    PersistStore.getState().setAllCollections(apiCollections);
-    PersistStore.getState().setCollectionsMap(allCollectionsMap);
-  },
 
   convertParamToDotNotation(str) {
     return str.replace(/[#\$]+/g, '.');;

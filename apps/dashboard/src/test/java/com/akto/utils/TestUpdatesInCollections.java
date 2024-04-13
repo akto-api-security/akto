@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
+import com.akto.util.parsers.HttpCallParserHelper;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.junit.Test;
@@ -64,7 +65,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         List<HttpResponseParams> httpResponseParamsList = new ArrayList<>();
 
         for(String payload: payloads){
-            HttpResponseParams httpResponseParam = HttpCallParser.parseKafkaMessage(payload);
+            HttpResponseParams httpResponseParam = HttpCallParserHelper.parseKafkaMessage(payload);
             httpResponseParamsList.add(httpResponseParam);
         }
 

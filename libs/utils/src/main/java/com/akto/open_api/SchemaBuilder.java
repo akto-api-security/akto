@@ -1,8 +1,8 @@
 package com.akto.open_api;
 
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.types.CappedSet;
 
+import com.akto.types.CappedSet;
 import io.swagger.v3.oas.models.media.*;
 
 import java.util.*;

@@ -27,6 +27,17 @@
             </modules>
         </profile>
         <profile>
+            <id>dependency-service</id>
+            <activation>
+                <file>
+                    <exists>dependency-service/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>dependency-service</module>
+            </modules>
+        </profile>
+        <profile>
             <id>api-runtime</id>
             <activation>
                 <file>

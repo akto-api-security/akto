@@ -1,6 +1,5 @@
 package com.akto.dao;
 
-import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomDataType;
@@ -15,7 +14,6 @@ import com.akto.dto.type.URLMethods;
 import com.akto.types.CappedSet;
 import com.akto.utils.MongoBasedTest;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.junit.Test;

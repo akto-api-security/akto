@@ -234,7 +234,7 @@ public class AdminSettingsAction extends UserAction {
 
         return SUCCESS.toUpperCase();
     }
-    
+
     public String editPrivateCidrList(){
 
         try {

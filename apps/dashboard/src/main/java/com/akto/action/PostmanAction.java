@@ -19,7 +19,6 @@ import com.akto.dto.upload.FileUpload;
 import com.akto.dto.upload.FileUploadError;
 import com.akto.dto.upload.PostmanWorkspaceUpload;
 import com.akto.dto.upload.PostmanUploadLog;
-import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.postman.Main;

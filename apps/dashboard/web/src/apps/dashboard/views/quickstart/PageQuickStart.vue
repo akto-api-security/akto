@@ -60,7 +60,7 @@ export default {
 
 .detail-panels
     margin: 16px
-    width: unset! important
+    width: unset !important
 
 .clickable-docs
     cursor: pointer

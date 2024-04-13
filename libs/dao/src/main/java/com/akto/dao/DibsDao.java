@@ -1,6 +1,5 @@
 package com.akto.dao;
 
-import com.akto.dao.AccountsContextDao;
 import com.akto.dto.Dibs;
 
 public class DibsDao extends AccountsContextDao<Dibs> {

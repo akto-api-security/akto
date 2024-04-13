@@ -10,7 +10,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -62,7 +61,7 @@ public class LoggerMaker  {
     private LogDb db;
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER
+        TESTING,RUNTIME,DASHBOARD,DEPENDENCY_SERVICE,BILLING,ANALYSER
     }
 
     private static AccountSettings accountSettings = null;
@@ -222,6 +221,9 @@ public class LoggerMaker  {
                 case BILLING:
                     BillingLogsDao.instance.insertOne(log);
                     break;
+                case DEPENDENCY_SERVICE:
+                    DependencyServiceLogsDao.instance.insertOne(log);
+                    break;
                 default:
                     break;
             }
@@ -256,6 +258,9 @@ public class LoggerMaker  {
                 break;
             case BILLING:
                 logs = BillingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
+            case DEPENDENCY_SERVICE:
+                logs = DependencyServiceLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
                 break;
             default:
                 break;

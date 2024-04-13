@@ -7,9 +7,9 @@ import com.akto.dto.type.*;
 import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.URLAggregator;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
+import com.akto.util.runtime.RuntimeUtil;
 import com.google.common.base.Charsets;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
@@ -127,7 +127,7 @@ public class ResourceAnalyser {
         String method = requestParams.getMethod();
 
         // get actual url (without any query params)
-        URLStatic urlStatic = URLAggregator.getBaseURL(requestParams.getURL(), method);
+        URLStatic urlStatic = RuntimeUtil.getBaseURL(requestParams.getURL(), method);
         String baseUrl = urlStatic.getUrl();
         String url = baseUrl;
 
@@ -253,7 +253,7 @@ public class ResourceAnalyser {
             Map<URLStatic, RequestTemplate> strictUrls = catalog.getStrictURLToMethods();
 
             if (APICatalog.isTemplateUrl(url)) {
-                URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.valueOf(method));
+                URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(url, URLMethods.Method.valueOf(method));
                 urlTemplates.put(urlTemplate, null);
             } else {
                 URLStatic urlStatic = new URLStatic(url, URLMethods.Method.valueOf(method));

@@ -20,8 +20,6 @@ import javax.servlet.http.HttpServletRequest;
 
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 public class ApiTokenAction extends UserAction implements ServletRequestAware {

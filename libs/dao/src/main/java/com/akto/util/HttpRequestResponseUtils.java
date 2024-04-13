@@ -1,6 +1,5 @@
 package com.akto.util;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.akto.util.grpc.ProtoBufUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
@@ -12,8 +11,6 @@ import java.net.URLEncoder;
 import java.util.*;
 
 import static com.akto.dto.OriginalHttpRequest.*;
-import static com.akto.util.grpc.ProtoBufUtils.DECODED_QUERY;
-import static com.akto.util.grpc.ProtoBufUtils.RAW_QUERY;
 
 public class HttpRequestResponseUtils {
 

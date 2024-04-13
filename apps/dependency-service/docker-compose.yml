@@ -1,0 +1,8 @@
+version: '3.8'
+
+services:
+  dependency-graph-jetty:
+    image: tangobee/akto-dependency-graph
+    restart: always
+    ports:
+      - "8080:8080"

@@ -1,9 +1,7 @@
 package com.akto.test_editor.filter.data_operands_impl;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.dto.type.KeyTypes;

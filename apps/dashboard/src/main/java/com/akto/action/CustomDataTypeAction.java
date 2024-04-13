@@ -13,6 +13,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.util.JSONUtils;
+import com.akto.util.parsers.HttpCallParserHelper;
 import com.akto.utils.AktoCustomException;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -431,7 +432,7 @@ public class CustomDataTypeAction extends UserAction{
             for (String sample: samples) {
                 Key apiKey = sampleData.getId();
                 try {
-                    HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                    HttpResponseParams httpResponseParams = HttpCallParserHelper.parseKafkaMessage(sample);
                     boolean skip1 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) ) ? forHeaders(httpResponseParams.getHeaders(), customDataType, apiKey) : false;
                     boolean skip2 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_HEADER) ) ? forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, apiKey) : false;
                     boolean skip3 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD) ) ? forPayload(httpResponseParams.getPayload(), customDataType, apiKey) : false;

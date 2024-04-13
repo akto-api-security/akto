@@ -3,7 +3,7 @@ package com.akto.utils;
 import com.akto.dto.*;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.parsers.HttpCallParser;
+import com.akto.util.parsers.HttpCallParserHelper;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -25,14 +25,14 @@ public class RedactSampleData {
     public static final String redactValue = "****";
 
     public static String redactIfRequired(String sample, boolean accountLevelRedact, boolean apiCollectionLevelRedact) throws Exception {
-        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+        HttpResponseParams httpResponseParams = HttpCallParserHelper.parseKafkaMessage(sample);
         HttpResponseParams.Source source = httpResponseParams.getSource();
         if(source.equals(HttpResponseParams.Source.HAR) || source.equals(HttpResponseParams.Source.PCAP)) return sample;
         return redact(httpResponseParams, accountLevelRedact || apiCollectionLevelRedact);
     }
 
     public static String redactDataTypes(String sample) throws Exception{
-        return redact(HttpCallParser.parseKafkaMessage(sample), false);
+        return redact(HttpCallParserHelper.parseKafkaMessage(sample), false);
     }
 
     private static void handleHeaders(Map<String, List<String>> responseHeaders, boolean redactAll) {
