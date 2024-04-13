@@ -20,7 +20,7 @@ const initialState = {
     lastFetchedSeverityResp: {},
     lastCalledSensitiveInfo: 0,
     lastFetchedSensitiveResp: [],
-    // selectedSampleApi: {},
+    selectedSampleApi: {},
     coverageMap:{},
 };
 
@@ -40,7 +40,7 @@ let persistStore = (set) => ({
     setLastFetchedSeverityResp: (lastFetchedSeverityResp) => set({ lastFetchedSeverityResp }),
     setLastCalledSensitiveInfo: (lastCalledSensitiveInfo) => set({ lastCalledSensitiveInfo }),
     setLastFetchedSensitiveResp: (lastFetchedSensitiveResp) => set({ lastFetchedSensitiveResp }),
-    // setSelectedSampleApi: (selectedSampleApi) => set({selectedSampleApi: selectedSampleApi}),
+    setSelectedSampleApi: (selectedSampleApi) => set({selectedSampleApi: selectedSampleApi}),
     setCoverageMap:(coverageMap)=>{set({coverageMap: coverageMap})},
 
     resetAll: () => set(initialState), // Reset function
