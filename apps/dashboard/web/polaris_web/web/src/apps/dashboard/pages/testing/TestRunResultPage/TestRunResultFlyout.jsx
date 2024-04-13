@@ -118,7 +118,7 @@ function TestRunResultFlyout(props) {
             <div style={{display: 'flex', justifyContent: "space-between", gap:"24px", padding: "16px", paddingTop: '0px'}}>
                 <VerticalStack gap={"2"}>
                     <Box width="100%">
-                        <div style={{display: 'flex', gap: '4px'}}>
+                        <div style={{display: 'flex', gap: '4px'}} className='test-title'>
                             <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
                             {severity.length > 0 ? <Box><Badge size="small" status={func.getTestResultStatus(severity)}>{severity}</Badge></Box> : null}
                         </div>

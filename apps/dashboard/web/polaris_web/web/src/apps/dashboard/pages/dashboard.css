@@ -114,6 +114,10 @@
     word-break: break-all !important;
 }
 
+.test-title .Polaris-Text--break {
+    word-break: normal !important;
+}
+
 .Polaris-Frame__Skip{
     visibility: hidden !important;
 }
