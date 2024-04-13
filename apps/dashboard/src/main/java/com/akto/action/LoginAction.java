@@ -100,17 +100,23 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         //For the case when no account exists, the user will get access to 1_000_000 account
         String accountIdStr = user.getAccounts().keySet().isEmpty() ? "1000000" : user.getAccounts().keySet().iterator().next();
         int accountId = StringUtils.isNumeric(accountIdStr) ? Integer.parseInt(accountIdStr) : 1_000_000;
+        try {
+            service.submit(() ->{
+                triggerVulnColUpdation(user);
+            });
+        } catch (Exception e) {
+            logger.error("error updating vuln collection ", e);
+        }
         decideFirstPage(loginResult, accountId);
         return result;
     }
 
-    private void decideFirstPage(BasicDBObject loginResult, int accountId){
-        Context.accountId.set(accountId);
-        service.submit(() ->{
+    private void triggerVulnColUpdation(User user) {
+        for (String accountIdStr: user.getAccounts().keySet()) {
+            int accountId = Integer.parseInt(accountIdStr);
             Context.accountId.set(accountId);
             logger.info("updating vulnerable api's collection for account " + accountId);
             try {
-                // add backward compatibility check
                 BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
                 if (backwardCompatibility.getVulnerableApiUpdationVersionV1() == 0) {
                     RuntimeListener.addSampleData();
@@ -122,7 +128,11 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             } catch (Exception e) {
                 logger.error("error updating vulnerable api's collection for account " + accountId + " " + e.getMessage());
             }
-        });
+        }
+    }
+
+    private void decideFirstPage(BasicDBObject loginResult, int accountId){
+        Context.accountId.set(accountId);
         long count = SingleTypeInfoDao.instance.getEstimatedCount();
         if(count == 0){
             logger.info("New user, showing quick start page");
