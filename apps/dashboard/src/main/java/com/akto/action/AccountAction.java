@@ -316,7 +316,6 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
                     loggerMaker.infoAndAddToDb("updating vulnerable api's collection for new account " + newAccountId, LogDb.DASHBOARD);
                     RuntimeListener.addSampleData();
                 });
-                RuntimeListener.addSampleData();
                 AccountSettingsDao.instance.updateOnboardingFlag(true);
                 InitializerListener.insertPiiSources();
 
