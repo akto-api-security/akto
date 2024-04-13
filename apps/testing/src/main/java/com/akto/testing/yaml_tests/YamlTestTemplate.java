@@ -58,32 +58,6 @@ public class YamlTestTemplate extends SecurityTestTemplate {
 
     @Override
     public boolean workflowFilter() {
-        Map<String, ApiInfo.ApiInfoKey> result = new HashMap<>();
-        int skip = 0;
-        int limit = 1000;
-        while (true) {
-            List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject(), skip, limit, Sorts.ascending("_id.url"));// todo: can be improved
-            for (SampleData sampleData: sampleDataList) {
-                RawApi localRawApi = RawApi.buildFromMessage(sampleData.getSamples().get(0));
-                ApiInfo.ApiInfoKey localApiInfoKey = new ApiInfo.ApiInfoKey(sampleData.getId().getApiCollectionId(), sampleData.getId().getUrl(), sampleData.getId().getMethod());
-                for (String key: this.workFlowSelectionFilters.keySet()) {
-                    if (result.containsKey(key)) continue;
-                    ConfigParserResult configParserResult = this.workFlowSelectionFilters.get(key);
-                    FilterNode localFilterNode = configParserResult.getNode();
-                    boolean isValid = TestPlugin.validateFilter(localFilterNode, localRawApi, localApiInfoKey, this.varMap, this.logId);
-                    if (isValid) {
-                        result.put(key, localApiInfoKey);
-                        break;
-                    }
-                }
-                if (result.size() == this.workFlowSelectionFilters.size()) break;
-            }
-
-            if (sampleDataList.size() < limit || result.size() == this.workFlowSelectionFilters.size()) break;
-        }
-
-        memory = new Memory(new ArrayList<>(result.values()), new HashMap<>());
-        this.apiNameToApiInfoKey = result;
         return true;
     }
 

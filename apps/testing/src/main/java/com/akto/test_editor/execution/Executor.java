@@ -145,7 +145,12 @@ public class Executor {
         boolean requestSent = false;
 
         String executionType = node.getChildNodes().get(0).getValues().toString();
-        if (executionType.equals("multiple")) {
+        if (executionType.equals("multiple") || executionType.equals("graph")) {
+            if (executionType.equals("graph")) {
+                List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
+                apiInfoKeys.add(apiInfoKey);
+                memory = new Memory(apiInfoKeys, new HashMap<>());
+            }
             workflowTest = buildWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
             result.add(triggerMultiExecution(workflowTest, reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory, apiNameToApiInfoKey));
             yamlTestResult = new YamlTestResult(result, workflowTest);
