@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 public class PayloadAnalyzer {
     private static final Logger logger = LoggerFactory.getLogger(PayloadAnalyzer.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(PayloadAnalyzer.class);
-    private static EndpointInfo endpointInfo = null;
+    private static volatile EndpointInfo endpointInfo = null;
 
     public static EndpointInfo getEndpointInfo() {
         return endpointInfo;
