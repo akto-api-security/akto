@@ -28,6 +28,7 @@ import TooltipText from "../../../components/shared/TooltipText";
 import PersistStore from "../../../../main/PersistStore";
 import TrendChart from "./TrendChart";
 import { CellType } from "../../../components/tables/rows/GithubRow";
+import useTable from "../../../components/tables/TableContext";
 
 let headers = [
   {
@@ -37,6 +38,7 @@ let headers = [
   {
     title: 'Severity',
     value: 'severityComp',
+    sortActive: true
   },
   {
     value: 'testCategory',
@@ -55,6 +57,7 @@ let headers = [
   {
     value: "scanned_time_comp",
     title: 'Scanned',
+    sortActive: true
   },
   {
     title: '',
@@ -63,10 +66,10 @@ let headers = [
 ]
 
 const sortOptions = [
-  { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity' },
-  { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity' },
-  { label: 'Run time', value: 'time asc', directionLabel: 'Newest run', sortKey: 'endTimestamp' },
-  { label: 'Run time', value: 'time desc', directionLabel: 'Oldest run', sortKey: 'endTimestamp' },
+  { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 2},
+  { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity', columnIndex: 2 },
+  { label: 'Run time', value: 'time asc', directionLabel: 'Newest run', sortKey: 'endTimestamp', columnIndex: 6 },
+  { label: 'Run time', value: 'time desc', directionLabel: 'Oldest run', sortKey: 'endTimestamp', columnIndex: 6 },
 ];
 
 const resourceName = {
@@ -124,13 +127,13 @@ let filters = [
 
 function SingleTestRunPage() {
 
-  const [testRunResults, setTestRunResults] = useState({ vulnerable: [], secured: [], skipped: [] })
+  const [testRunResults, setTestRunResults] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [] })
   const [ selectedTestRun, setSelectedTestRun ] = useState({});
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const subCategoryMap = PersistStore(state => state.subCategoryMap);
   const params= useParams()
   const [loading, setLoading] = useState(false);
-  const [tempLoading , setTempLoading] = useState({vulnerable: false, secured: false, skipped: false, running: false})
+  const [tempLoading , setTempLoading] = useState({vulnerable: false, no_vulnerability_found: false, skipped: false, running: false})
   const [selectedTab, setSelectedTab] = useState("vulnerable")
   const [selected, setSelected] = useState(0)
   const [workflowTest, setWorkflowTest ] = useState(false);
@@ -168,7 +171,7 @@ function SingleTestRunPage() {
     setLoading(false);
     setTempLoading((prev) => {
       prev.vulnerable = true;
-      prev.secured = true;
+      prev.no_vulnerability_found = true;
       prev.skipped = true;
       return {...prev};
     });
@@ -188,7 +191,7 @@ function SingleTestRunPage() {
     await api.fetchTestingRunResults(summaryHexId, "SECURED").then(({ testingRunResults }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
     })
-    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'secured')
+    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'no_vulnerability_found')
   }
 
   async function fetchData(setData) {
@@ -311,29 +314,11 @@ const promotedBulkActions = (selectedDataHexIds) => {
     }
   }
 
-  const tableTabs = [
-    {
-      content: 'Vulnerable',
-      index: 0,
-      badge: testRunResults["vulnerable"]?.length?.toString(),
-      onAction: ()=> {setSelectedTab('vulnerable')},
-      id: 'vulnerable',
-    },
-    {
-        content: 'Skipped',
-        index: 1,
-        badge: testRunResults["skipped"]?.length?.toString(),
-        onAction: ()=> {setSelectedTab('skipped')},
-        id: 'skipped',
-    },
-    {
-        content: 'No vulnerability found',
-        index: 2,
-        badge: testRunResults["secured"]?.length?.toString(),
-        onAction: ()=> {setSelectedTab('secured')},
-        id: 'secured',
-    }
-  ]
+  const definedTableTabs = ['Vulnerable', 'Skipped', 'No vulnerability found']
+
+  const { tabsInfo } = useTable()
+  const tableCountObj = func.getTabsCount(definedTableTabs, testRunResults)
+  const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
   const handleSelectedTab = (selectedIndex) => {
       setLoading(true)
@@ -447,7 +432,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     )
   }
 
-  const allResultsLength = testRunResults.skipped.length + testRunResults.secured.length + testRunResults.vulnerable.length
+  const allResultsLength = testRunResults.skipped.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length
   const useComponents = (!workflowTest && allResultsLength === 0) ? [<EmptyData key="empty"/>] : components
 
   return (
