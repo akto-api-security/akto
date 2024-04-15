@@ -370,4 +370,19 @@ export default {
             data: {roleName}
         })
     },
+    fetchTestCollectionConfiguration(apiCollectionId) {
+        return request({
+            url: '/api/fetchTestCollectionConfiguration',
+            method: 'post',
+            data: {apiCollectionId}
+        })
+    },
+    fetchPropertyIds() {
+        return request({
+            url: '/api/fetchPropertyIds',
+            method: 'post',
+            data: {}
+        })
+    }
+
 }
