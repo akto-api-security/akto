@@ -201,7 +201,7 @@ public class Executor {
                 }
                     
                 // follow redirects = true for now
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs);
+                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
                 requestSent = true;
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                 TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
