@@ -111,7 +111,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         return result;
     }
 
-    private void triggerVulnColUpdation(User user) {
+    private static void triggerVulnColUpdation(User user) {
         for (String accountIdStr: user.getAccounts().keySet()) {
             int accountId = Integer.parseInt(accountIdStr);
             Context.accountId.set(accountId);
@@ -191,6 +191,9 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                         )
                 );
             }
+            service.submit(() ->{
+                triggerVulnColUpdation(user);
+            });
             return Action.SUCCESS.toUpperCase();
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             e.printStackTrace();
