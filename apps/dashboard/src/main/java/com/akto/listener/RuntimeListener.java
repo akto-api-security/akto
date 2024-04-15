@@ -79,7 +79,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
                 try {
                     initialiseDemoCollections();
-                    addSampleData();
+                    //addSampleData();
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,"Error while initialising demo collections: " + e, LoggerMaker.LogDb.DASHBOARD);
                 }
