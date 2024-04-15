@@ -35,15 +35,15 @@ const SampleApi = () => {
     const selectedTest = TestEditorStore(state => state.selectedTest)
     const vulnerableRequestsObj = TestEditorStore(state => state.vulnerableRequestsMap)
     const defaultRequest = TestEditorStore(state => state.defaultRequest)
-    const selectedSampleApi = TestEditorStore(state => state.selectedSampleApi)
-    const setSelectedSampleApi = TestEditorStore(state => state.setSelectedSampleApi)
+    const selectedSampleApi = PersistStore(state => state.selectedSampleApi)
+    const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
 
     const tabs = [{ id: 'request', content: 'Request' }, { id: 'response', content: 'Response'}];
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
 
     useEffect(()=>{
         let testId = selectedTest.value
-        let selectedUrl = selectedSampleApi.hasOwnProperty(testId) ? selectedSampleApi[testId] : vulnerableRequestsObj?.[testId]
+        let selectedUrl = Object.keys(selectedSampleApi).length > 0 ? selectedSampleApi : vulnerableRequestsObj?.[testId]
         setSelectedCollectionId(null)
         setCopyCollectionId(null)
         setTestResult(null)
@@ -95,6 +95,8 @@ const SampleApi = () => {
                 localEditorData = transform.formatData(sampleData?.responseJson, "http")
             }
             setEditorData({message: localEditorData})
+        }else{
+            setEditorData({message: ''})
         }
     }
 
@@ -137,23 +139,26 @@ const SampleApi = () => {
                 },0)
 
                 setSelected(0)
+            }else{
+                setEditorData({message: ''})
             }
+        }else{
+            setEditorData({message: ''})
         }
     }
 
     const toggleSelectApiActive = () => setSelectApiActive(prev => !prev)
     const saveFunc = () =>{
         setSelectedApiEndpoint(copySelectedApiEndpoint)
-        let copySampleApiObj = {...selectedSampleApi}
         const urlObj = func.toMethodUrlObject(copySelectedApiEndpoint)
-        copySampleApiObj[selectedTest.value] = {
+        const sampleApi = {
             apiCollectionId :copyCollectionId, 
             url: urlObj.url,
             method:{
                 "_name": urlObj.method
             }
         }
-        setSelectedSampleApi(copySampleApiObj)
+        setSelectedSampleApi(sampleApi)
         setSelectedCollectionId(copyCollectionId)
         toggleSelectApiActive()
     }
