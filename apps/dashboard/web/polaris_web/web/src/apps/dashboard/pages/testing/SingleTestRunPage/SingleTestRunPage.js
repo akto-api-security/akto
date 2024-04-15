@@ -124,13 +124,13 @@ let filters = [
 
 function SingleTestRunPage() {
 
-  const [testRunResults, setTestRunResults] = useState({ vulnerable: [], all: [] })
+  const [testRunResults, setTestRunResults] = useState({ vulnerable: [], secured: [], skipped: [] })
   const [ selectedTestRun, setSelectedTestRun ] = useState({});
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const subCategoryMap = PersistStore(state => state.subCategoryMap);
   const params= useParams()
   const [loading, setLoading] = useState(false);
-  const [tempLoading , setTempLoading] = useState({vulnerable: false, all: false, running: false})
+  const [tempLoading , setTempLoading] = useState({vulnerable: false, secured: false, skipped: false, running: false})
   const [selectedTab, setSelectedTab] = useState("vulnerable")
   const [selected, setSelected] = useState(0)
   const [workflowTest, setWorkflowTest ] = useState(false);
@@ -168,19 +168,27 @@ function SingleTestRunPage() {
     setLoading(false);
     setTempLoading((prev) => {
       prev.vulnerable = true;
-      prev.all = true;
+      prev.secured = true;
+      prev.skipped = true;
       return {...prev};
     });
     let testRunResults = [];
-    await api.fetchTestingRunResults(summaryHexId, true).then(({ testingRunResults }) => {
+    await api.fetchTestingRunResults(summaryHexId, "VULNERABLE").then(({ testingRunResults }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
     })
     
     fillData(transform.getPrettifiedTestRunResults(testRunResults), 'vulnerable')
-    await api.fetchTestingRunResults(summaryHexId).then(({ testingRunResults }) => {
+
+    await api.fetchTestingRunResults(summaryHexId, "SKIPPED_EXEC").then(({ testingRunResults }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
     })
-    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'all')
+
+    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'skipped')
+
+    await api.fetchTestingRunResults(summaryHexId, "SECURED").then(({ testingRunResults }) => {
+      testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+    })
+    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'secured')
   }
 
   async function fetchData(setData) {
@@ -312,12 +320,19 @@ const promotedBulkActions = (selectedDataHexIds) => {
       id: 'vulnerable',
     },
     {
-        content: 'All',
+        content: 'Skipped',
         index: 1,
-        badge: testRunResults["all"]?.length?.toString(),
-        onAction: ()=> {setSelectedTab('all')},
-        id: 'all',
+        badge: testRunResults["skipped"]?.length?.toString(),
+        onAction: ()=> {setSelectedTab('skipped')},
+        id: 'skipped',
     },
+    {
+        content: 'No vulnerability found',
+        index: 2,
+        badge: testRunResults["secured"]?.length?.toString(),
+        onAction: ()=> {setSelectedTab('secured')},
+        id: 'secured',
+    }
   ]
 
   const handleSelectedTab = (selectedIndex) => {
@@ -422,7 +437,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
                   No test run data found
                 </Text>
               </HorizontalStack>
-              <Text variant="bodyMd">
+              <Text variant="bodyMd" alignment="center">
                 The next summary will be ready with the upcoming test.
               </Text>
             </VerticalStack>
@@ -432,7 +447,8 @@ const promotedBulkActions = (selectedDataHexIds) => {
     )
   }
 
-  const useComponents = (!workflowTest && testRunResults.all.length === 0) ? [<EmptyData key="empty"/>] : components
+  const allResultsLength = testRunResults.skipped.length + testRunResults.secured.length + testRunResults.vulnerable.length
+  const useComponents = (!workflowTest && allResultsLength === 0) ? [<EmptyData key="empty"/>] : components
 
   return (
     <PageWithMultipleCards
@@ -477,7 +493,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
       func.downloadAsCSV((testRunResults[selectedTab]), selectedTestRun)
       }>Export</Button></Box>: undefined}
       secondaryActions={!workflowTest ? <Button onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button> : undefined}
-      components={components}
+      components={useComponents}
     />
   );
 }

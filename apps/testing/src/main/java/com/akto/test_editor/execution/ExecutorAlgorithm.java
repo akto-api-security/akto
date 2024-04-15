@@ -6,6 +6,7 @@ import java.util.Map;
 
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ExecuteAlgoObj;
@@ -33,7 +34,7 @@ public class ExecutorAlgorithm {
     public ExecutorAlgorithm(){
     }
     
-    public ExecutorSingleRequest execute(List<ExecutorNode> executorNodes, int operationIndex, Map<Integer, ExecuteAlgoObj> algoMap, List<RawApi> rawApis, boolean expandRawApis, int rawapiInsertCount) {
+    public ExecutorSingleRequest execute(List<ExecutorNode> executorNodes, int operationIndex, Map<Integer, ExecuteAlgoObj> algoMap, List<RawApi> rawApis, boolean expandRawApis, int rawapiInsertCount, ApiInfo.ApiInfoKey apiInfoKey) {
 
         if (operationIndex < 0 || operationIndex >= executorNodes.size()) {
             return new ExecutorSingleRequest(true, "", rawApis, null);
@@ -92,7 +93,7 @@ public class ExecutorAlgorithm {
         for (int i = 0; i < numberOfOperations; i++) {
             if (!expandRawApis && rawApiIndex >= rawApis.size()) {
                 for (int j = 0; j < operationIndex; j++) {
-                    executorSingleRequest = execute(executorNodes, j, algoMap, rawApis, true, numberOfOperations - i);
+                    executorSingleRequest = execute(executorNodes, j, algoMap, rawApis, true, numberOfOperations - i, apiInfoKey);
                     if (!executorSingleRequest.getSuccess()) {
                         return executorSingleRequest;
                     }
@@ -110,7 +111,7 @@ public class ExecutorAlgorithm {
                     valIndex = (valIndex + 1)%valList.size();
                 }
             }
-            ExecutorSingleOperationResp resp = executor.invokeOperation(executorNode.getOperationType(), key, val, rawApis.get(rawApiIndex), varMap, authMechanism, customAuthTypes);
+            ExecutorSingleOperationResp resp = executor.invokeOperation(executorNode.getOperationType(), key, val, rawApis.get(rawApiIndex), varMap, authMechanism, customAuthTypes, apiInfoKey);
             if (!resp.getSuccess()) {
                 return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
             }
@@ -123,7 +124,7 @@ public class ExecutorAlgorithm {
 
         algoMap.put(operationIndex, new ExecuteAlgoObj(numberOfOperations, keyIndex, valIndex, rawApis.size()));
         if (!expandRawApis) {
-            executorSingleRequest = execute(executorNodes, operationIndex + 1, algoMap, rawApis, false, 0);
+            executorSingleRequest = execute(executorNodes, operationIndex + 1, algoMap, rawApis, false, 0, apiInfoKey);
         }
         return executorSingleRequest;
     }

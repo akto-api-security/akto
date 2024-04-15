@@ -36,7 +36,7 @@ function AwsSource() {
     }
 
     const renderProgressBar = (createTime) => {
-      setProgressBar(quickStartFunc.renderProgressBar(createTime))
+      setProgressBar(quickStartFunc.renderProgressBar(createTime, progressBar))
     }
 
     const removeProgressBarAndStatuschecks = (intervalId) => {
@@ -130,7 +130,7 @@ function AwsSource() {
     }
 
     const copyRequest = () => {
-        func.copyToClipboard(formattedJson, ref, "Policy copied to clipboard.")
+      func.copyToClipboard(formattedJson, ref, "Policy copied to clipboard.")
     }
 
     const saveFunc = async() => {
@@ -153,11 +153,15 @@ function AwsSource() {
     const preSelected = quickStartFunc.getValuesArr(selectedLBs)
     const noAccessText = "Your dashboard's instance needs relevant access to setup traffic mirroring, please do the following steps:"
 
-    const noAccessObject= {
+    const noAccessObject= (loading ? {
+      text: "",
+      component: <SpinnerCentered/>,
+      title: ""
+    }:{
       text: noAccessText,
       component: <NoAccessComponent dataString={formattedJson} onClickFunc={() => copyRequest()} steps={steps} title="Policy JSON" toolTipContent="Copy JSON"/>,
       title: "NoAccess"
-    }
+    })
     
     const localDeployObj = {
       text: "Use AWS packet mirroring to send duplicate stream of traffic to Akto. No performance impact, only mirrored traffic is used to analyze APIs.",
@@ -179,7 +183,7 @@ function AwsSource() {
             <Button onClick={saveFunc} disabled={func.deepComparison(preSelectedLBs,selectedLBs)} primary loading={loading}>Apply </Button>
           </Box>
           <Text variant="bodyMd" as="h3">{statusText}</Text>
-          {progressBar.show ? <ProgressBar progress={progressBar.value} size='medium' /> : null }
+          {progressBar.show ? <ProgressBar progress={progressBar.value} size="small" color="primary" /> : null }
         </VerticalStack>
     )
 

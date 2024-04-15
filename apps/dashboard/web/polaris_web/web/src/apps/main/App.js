@@ -9,8 +9,6 @@ import SensitiveDataExposure from "../dashboard/pages/observe/SensitiveDataExpos
 import SingleRequest from "../dashboard/pages/observe/SingleRequest/SingleRequest";
 import PageObserve from "../dashboard/pages/observe/PageObserve"
 import PageTesting from "../dashboard/pages/testing/PageTesting";
-import { AppProvider } from "@shopify/polaris"
-import SignUp from "../signup/pages/SignUp"
 import {
   createBrowserRouter,
   RouterProvider,
@@ -21,6 +19,7 @@ import Integrations from "../dashboard/pages/settings/integrations/Integrations"
 import Settings from "../dashboard/pages/settings/Settings";
 import Users from "../dashboard/pages/settings/users/Users";
 import Postman from "../dashboard/pages/settings/integrations/Postman";
+import Jira from "../dashboard/pages/settings/integrations/Jira";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
 import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
 import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
@@ -55,10 +54,18 @@ import { generateSearchData } from "@/util/searchItems"
 import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
+import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
+import AzureSso from "../dashboard/pages/settings/integrations/AzureSso";
+
 import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
 import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
 import { useStiggContext } from '@stigg/react-sdk';
 import DependencyTable from "../dashboard/pages/testing/DependencyTable/DependencyTable";
+import TestRoleAccessMatrix from "../dashboard/pages/testing/TestRoleAccessMatrix/TestRoleAccessMatrix";
+import SignupPage from "../signup/pages/SignupPage";
+import PageCheckInbox from "../signup/pages/PageCheckInbox"
+import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
+import TokenValidator from "./TokenValidator"
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -100,6 +107,10 @@ const router = createBrowserRouter([
               {
                 path:"roles/details",
                 element:<TestRoleSettings/>
+              },
+              {
+                path:"roles/access-matrix",
+                element:<TestRoleAccessMatrix/>
               },
               {
                 path:"user-config",
@@ -188,6 +199,10 @@ const router = createBrowserRouter([
             element: <Postman />,
           },
           {
+            path: "integrations/jira",
+            element: <Jira />,
+          },
+          {
             path: "integrations/akto_apis",
             element: <ApiTokens />,
           },
@@ -198,6 +213,14 @@ const router = createBrowserRouter([
           {
             path: "integrations/github_sso",
             element: <GithubSso />
+          },
+          {
+            path: "integrations/okta_sso",
+            element: <OktaIntegration />
+          },
+          {
+            path: "integrations/azure_sso",
+            element: <AzureSso />
           },
           {
             path: "integrations/github_app",
@@ -280,14 +303,26 @@ const router = createBrowserRouter([
     ],
     errorElement: <ErrorComponent/>
   },
-{
-  path: "/login",
-    element: <SignUp />,
-},
-{
-  path: "/",
-    element: <Navigate to="/login" />,
+  {
+      path: "/login",
+      element: <SignupPage />,
   },
+  {
+      path: "/",
+      element: <TokenValidator />,
+  },
+  {
+    path: "/signup",
+    element: <SignupPage />,
+  },
+  {
+    path: "/check-inbox",
+    element: <PageCheckInbox />
+  },
+  {
+    path: "/business-email",
+    element: <PageBusinessEmail />
+  }
 ])
 
 function App() {

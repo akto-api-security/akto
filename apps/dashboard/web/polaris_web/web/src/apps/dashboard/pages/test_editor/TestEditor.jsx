@@ -25,6 +25,7 @@ const TestEditor = () => {
     const setVulnerableRequestMap = TestEditorStore(state => state.setVulnerableRequestMap)
     const setDefaultRequest = TestEditorStore(state => state.setDefaultRequest)
     const setActive = PersistStore(state => state.setActive)
+    const selectedSampleApi = TestEditorStore(state => state.selectedSampleApi)
 
     const [loading, setLoading] = useState(true)
 

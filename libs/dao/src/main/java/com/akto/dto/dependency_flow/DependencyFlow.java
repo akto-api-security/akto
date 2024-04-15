@@ -16,12 +16,15 @@ import org.jgrapht.Graph;
 import org.jgrapht.alg.cycle.SzwarcfiterLauerSimpleCycles;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
 public class DependencyFlow {
 
     public Map<ApiInfo.ApiInfoKey, Node> resultNodes = new HashMap<>();
+    private static final Logger logger = LoggerFactory.getLogger(DependencyFlow.class);
 
     public void syncWithDb() {
         List<Node> nodes = new ArrayList<>(resultNodes.values());
@@ -247,7 +250,7 @@ public class DependencyFlow {
 
         if (cycles.isEmpty()) return null;
 
-        System.out.println("We found " + cycles.size() + " circular dependency");
+        logger.info("We found " + cycles.size() + " circular dependency");
 
         int currentMinMissingCount = Integer.MAX_VALUE;
         ApiInfo.ApiInfoKey result = null;
@@ -277,7 +280,7 @@ public class DependencyFlow {
         }
 
         if (result != null) {
-            System.out.println(resultNodes.get(result).getUrl() + " is being marked done");
+            logger.info(resultNodes.get(result).getUrl() + " is being marked done");
         }
 
         return result;

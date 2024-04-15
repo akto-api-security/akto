@@ -64,6 +64,7 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
         apiToken = ApiTokensDao.instance.findOne(
                 Filters.and(
                         Filters.eq(ApiToken.USER_NAME, getSUser().getLogin()),
+                        Filters.eq(ApiToken.ACCOUNT_ID, Context.accountId.get()),
                         Filters.eq(ApiToken.UTILITY, ApiToken.Utility.BURP)
                 )
         );

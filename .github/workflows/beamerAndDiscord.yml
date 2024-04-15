@@ -7,6 +7,8 @@ jobs:
   push-release-notes:
     runs-on: ubuntu-latest
     steps:
+      - name: Setup Bolt
+        uses: koalalab-inc/bolt@v1
       - name: Get Latest Release
         id: get_latest_release
         run: |
@@ -38,17 +40,7 @@ jobs:
                       line = line.split('by', 1)[0].strip()
                   release_notes += f'<li>{line[1:]}</li>'
           release_notes += '</ul>'
-          release_notes2 = '<p>More...</p>'
-          release_notes2 += '<ul></ul>'
-          release_notes2 += '<p>'
-          release_notes2 += '<a href=https://discord.com/invite/Wpc6xVME4s >'
-          release_notes2 += '</a>'
-          release_notes2 += '</p>'
-          release_notes2 += '<ul>'
-          release_notes2 += '<a href=https://discord.com/invite/Wpc6xVME4s ></a>'
-          release_notes2 += '<li><a href=https://discord.com/invite/Wpc6xVME4s ></a><a href=https://discord.com/invite/Wpc6xVME4s >Join Discord </a>to know more</li>'
-          release_notes2 += '<li>Star Akto on <a href=https://github.com/akto-api-security/akto>Github</a></li>'
-          release_notes2 += '</ul>'
+          release_notes2 = '<p></p>Have questions? Ask on <a href=https://discord.com/invite/Wpc6xVME4s >Discord</a> or our <a href=https://community.akto.io >Community page</a>'
           release_notes = release_notes+release_notes2
       
           
@@ -85,6 +77,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Setup Bolt
+        uses: koalalab-inc/bolt@v1
       - name: Get Latest Release
         id: get_latest_release
         run: |
@@ -136,6 +130,8 @@ jobs:
   notify_slack:
     runs-on: ubuntu-latest
     steps:
+      - name: Setup Bolt
+        uses: koalalab-inc/bolt@v1
       - name: Get Latest Release
         id: get_latest_release
         run: |

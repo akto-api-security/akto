@@ -1,6 +1,7 @@
 package com.akto.listener;
 
 
+import com.akto.analyser.ResourceAnalyser;
 import com.akto.action.HarAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
@@ -34,6 +35,8 @@ import com.mongodb.client.model.Updates;
 
 import org.bson.conversions.Bson;
 import org.json.JSONArray;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -45,6 +48,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class RuntimeListener extends AfterMongoConnectListener {
+
+    public static HttpCallParser httpCallParser = null;
+    public static AktoPolicyNew aktoPolicyNew = null;
+    public static ResourceAnalyser resourceAnalyser = null;
+    //todo add resource analyser in AccountHttpCallParserAktoPolicyInfo
     public static final String JUICE_SHOP_DEMO_COLLECTION_NAME = "juice_shop_demo";
     public static final String VULNERABLE_API_COLLECTION_NAME = "vulnerable_apis";
     public static final String LLM_API_COLLECTION_NAME = "llm_apis";
@@ -52,7 +60,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
     public static final int LLM_API_COLLECTION_ID = 1222222222;
 
     public static Map<Integer, AccountHTTPCallParserAktoPolicyInfo> accountHTTPParserMap = new ConcurrentHashMap<>();
-
+    private static final Logger logger = LoggerFactory.getLogger(RuntimeListener.class);
     private static final LoggerMaker loggerMaker= new LoggerMaker(RuntimeListener.class);
     @Override
     public void runMainFunction() {
@@ -65,11 +73,13 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 AccountHTTPCallParserAktoPolicyInfo info = new AccountHTTPCallParserAktoPolicyInfo();
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
+//                info.setResourceAnalyser(new ResourceAnalyser(300_000, 0.01, 100_000, 0.01));
                 accountHTTPParserMap.put(account.getId(), info);
+
 
                 try {
                     initialiseDemoCollections();
-                    addSampleData();
+                    //addSampleData();
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,"Error while initialising demo collections: " + e, LoggerMaker.LogDb.DASHBOARD);
                 }
@@ -121,7 +131,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         harAction.setSession(session);
         // todo: skipKafka = true for onPrem also
         try {
-            harAction.execute();
+            harAction.executeWithSkipKafka(true);
         } catch (IOException e) {
             loggerMaker.errorAndAddToDb(e,"Error: " + e, LoggerMaker.LogDb.DASHBOARD);
         }
@@ -185,7 +195,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 //vulnerableRequestForTemplate.setTemplateIds(testList);
 
                 if (testId.equals("XSS_VIA_APPENDING_TO_QUERY_PARAMS")) {
-                    System.out.println("hi");
+                    logger.info("hi");
                 }
 
                 String p = (String) sampleDataMap.get("path");
@@ -215,7 +225,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
             for (SingleTypeInfo singleTypeInfo: params) {
                 urlList.add(singleTypeInfo.getUrl());
             }
-            if (urlList.size() != 117) {
+            if (urlList.size() != 194) {
                 Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
             }
 

@@ -35,7 +35,11 @@ public class PathParamParser {
                 String type = schema.getType();
                 String format = schema.getFormat();
 
-                if ("integer".equalsIgnoreCase(type)) {
+                String example = schema.getExample() != null ?  String.valueOf(schema.getExample()) : parameter.getExample() != null ? String.valueOf(parameter.getExample()): null;
+                if(example != null) {
+                    replacement = example;
+                }
+                else if ("integer".equalsIgnoreCase(type)) {
                     replacement = "INTEGER";
                 } else if ("string".equalsIgnoreCase(type)) {
                     if ("uuid".equalsIgnoreCase(format)) {
