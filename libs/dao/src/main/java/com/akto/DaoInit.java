@@ -29,6 +29,7 @@ import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.testing.info.BFLATestInfo;
 import com.akto.dto.testing.info.NucleiTestInfo;
 import com.akto.dto.testing.info.TestInfo;
@@ -306,7 +307,8 @@ public class DaoInit {
                 new EnumCodec<>(ApiCollection.ENV_TYPE.class),
                 new EnumCodec<>(FileUpload.UploadType.class),
                 new EnumCodec<>(FileUpload.UploadStatus.class),
-                new EnumCodec<>(FileUploadLog.UploadLogStatus.class)
+                new EnumCodec<>(FileUploadLog.UploadLogStatus.class),
+                new EnumCodec<>(TestCollectionProperty.Id.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,

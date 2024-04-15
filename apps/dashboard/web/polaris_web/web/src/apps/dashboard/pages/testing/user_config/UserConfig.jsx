@@ -11,6 +11,7 @@ import Store from "../../../store";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import Dropdown from "../../../components/layouts/Dropdown";
 import settingRequests from "../../settings/api";
+import TestCollectionConfiguration from '../configurations/TestCollectionConfiguration'
 
 function UserConfig() {
 
@@ -42,7 +43,7 @@ function UserConfig() {
         fetchAuthMechanismData()
     }, [])
 
-    async function handleStopAlltests() {
+    async function handleStopAllTests() {
         await api.stopAllTests()
         setToastConfig({ isActive: true, isError: false, message: "All tests stopped!" })
     }
@@ -134,7 +135,7 @@ function UserConfig() {
         </LegacyCard>
     )
 
-    const components = [authTokenComponent, rateLimit]
+    const components = [<TestCollectionConfiguration/>, authTokenComponent, rateLimit]
 
     return (
         isLoading ? <SpinnerCentered /> 
@@ -147,7 +148,7 @@ function UserConfig() {
                         User config
                     </Text>
                 }
-                primaryAction={{ content: 'Stop all tests', onAction: handleStopAlltests }}
+                primaryAction={{ content: 'Stop all tests', onAction: handleStopAllTests }}
             />
 
     )

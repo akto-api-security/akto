@@ -279,7 +279,7 @@ function GithubServerTable(props) {
               </IndexTable>
             </div>
             </LegacyCard.Section>
-            <LegacyCard.Section>
+            {(total > pageLimit) && <LegacyCard.Section>
               <HorizontalStack
                 align="center">
                 <Pagination
@@ -295,7 +295,7 @@ function GithubServerTable(props) {
                   onNext={onPageNext}
                 />
               </HorizontalStack>
-            </LegacyCard.Section>
+            </LegacyCard.Section>}
           </div>
         }
 
