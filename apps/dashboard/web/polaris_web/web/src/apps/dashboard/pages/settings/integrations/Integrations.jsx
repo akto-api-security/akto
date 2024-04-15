@@ -174,7 +174,8 @@ function Integrations() {
         const sourceActions = (item) => {
             return [
               {
-                content: 'Configure',
+                // content: 'Configure',
+                content: <div data-testid={`configure_${id}`}>Configure</div>,
                 onClick: () => handleTab(item),
               },
             ];

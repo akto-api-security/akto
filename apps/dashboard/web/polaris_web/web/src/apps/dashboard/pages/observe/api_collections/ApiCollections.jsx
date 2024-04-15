@@ -267,7 +267,8 @@ function ApiCollections() {
 
     const promotedBulkActions = (selectedResources) => {
         const removeCollectionsObj = {
-            content: `Remove collection${func.addPlurality(selectedResources.length)}`,
+            // content: `Remove collection${func.addPlurality(selectedResources.length)}`,
+            content: <div data-testid="delete_button">{`Remove collection${func.addPlurality(selectedResources.length)}`}</div>,
             onAction: () => handleRemoveCollections(selectedResources)
         }
 
