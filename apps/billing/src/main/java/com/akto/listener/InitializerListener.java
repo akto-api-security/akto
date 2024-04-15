@@ -34,6 +34,8 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.mockito.internal.matchers.Or;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.akto.dto.billing.OrganizationUsage.ORG_ID;
 import static com.akto.dto.billing.OrganizationUsage.SINKS;
@@ -43,12 +45,14 @@ public class InitializerListener implements ServletContextListener {
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
+    private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
+
 
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
 
         String mongoURI = System.getenv("BILLING_DB_CONN_URL");
-        System.out.println("MONGO URI " + mongoURI);
+        logger.info("MONGO URI " + mongoURI);
 
         executorService.schedule(new Runnable() {
             public void run() {
@@ -86,7 +90,7 @@ public class InitializerListener implements ServletContextListener {
         OrganizationUsageDao.createIndexIfAbsent();
         OrganizationsDao.createIndexIfAbsent();
         UsageMetricsDao.createIndexIfAbsent();
-        System.out.println("Running initializer functions");
+        logger.info("Running initializer functions");
     }
 
     @Override

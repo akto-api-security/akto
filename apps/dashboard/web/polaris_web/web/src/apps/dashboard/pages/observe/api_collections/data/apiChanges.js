@@ -121,6 +121,14 @@ const endpointResourceName = {
     plural: 'API endpoints',
 };
 
+const methodObj = [{
+    text: 'Method',
+    value: 'method',
+    filterKey: 'method',
+    showFilter: true,
+    textValue: 'method',
+}]
+
 const endpointSortOptions = [
     { label: 'Method', value: 'method asc', directionLabel: 'A-Z', sortKey: 'method' },
     { label: 'Method', value: 'method desc', directionLabel: 'Z-A', sortKey: 'method' },
@@ -180,13 +188,15 @@ const apiChangesData = {
     getData(key){
         if(key === 'param'){
             const obj = {
-                headers: newParametersHeaders,
+                headers: [...newParametersHeaders, ...methodObj],
+                headings: newParametersHeaders,
                 resourceName: parameterResourceName,
                 sortOptions: parameterSortOptions,
             }
             return obj;
         }else{
             const obj = {
+                headings: endpointHeadings,
                 headers: endpointHeadings,
                 resourceName: endpointResourceName,
                 sortOptions: endpointSortOptions,

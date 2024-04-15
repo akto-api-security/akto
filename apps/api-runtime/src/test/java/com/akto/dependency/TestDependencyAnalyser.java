@@ -49,7 +49,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
 
         HttpCallParser httpCallParser = new HttpCallParser("", 0, 0, 0, false);
         httpCallParser.syncFunction(httpResponseParamsList, true,true, null);
-        APICatalogSync.mergeUrlsAndSave(1000, true);
+        APICatalogSync.mergeUrlsAndSave(1000, true, true);
 
         List<DependencyNode> nodes = DependencyNodeDao.instance.findAll(new BasicDBObject());
         assertEquals(expectedNodes, nodes.size());
@@ -248,7 +248,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/hotel/INTEGER", URLMethods.Method.POST), null);
         apiCatalog.setTemplateURLToMethods(templateURLToMethods);
         dbState.put(1000, apiCatalog);
-        DependencyAnalyser dependencyAnalyser = new DependencyAnalyser(dbState);
+        DependencyAnalyser dependencyAnalyser = new DependencyAnalyser(dbState, false);
         dependencyAnalyser.nodes = nodes;
 
         assertEquals(6, dependencyAnalyser.nodes.size());

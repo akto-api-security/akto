@@ -13,6 +13,8 @@ jobs:
     outputs:
       IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
     steps:
+      - name: Setup Bolt
+        uses: koalalab-inc/bolt@v1
       - uses: actions/checkout@v2
       - uses: actions/setup-java@v2
         with:
@@ -32,9 +34,6 @@ jobs:
           wget -O general.json https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json
           wget -O fintech.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json
           wget -O filetypes.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json
-      - name: Prepare Dashboard UI
-        working-directory: ./apps/dashboard/
-        run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
       - name: Prepare Dashboard polaris UI
         working-directory: ./apps/dashboard/web/polaris_web
         run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
@@ -45,8 +44,6 @@ jobs:
           aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
           aws-region: ap-south-1
 
-      - name: Deploy static site to S3 bucket
-        run: aws s3 sync ./apps/dashboard/web/dist s3://dashboard-on-cdn/web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
       - name: Deploy polaris site to S3 bucket
         run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
 
@@ -115,6 +112,8 @@ jobs:
     outputs:
       lb_name: ${{ steps.deploy_cluster.outputs.lb_name }}
     steps:
+    - name: Setup Bolt
+      uses: koalalab-inc/bolt@v1
     #revert branch name
     - name: Setup mongo, akto-k8s-agent kube yaml's
       run: |
@@ -188,6 +187,8 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     steps:
+      - name: Setup Bolt
+        uses: koalalab-inc/bolt@v1
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
         with:
@@ -226,6 +227,8 @@ jobs:
       FLASH_NLB_DNS: ${{ secrets.FLASH_NLB_DNS }}
       FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
     steps:
+    - name: Setup Bolt
+      uses: koalalab-inc/bolt@v1
 
     - name: Fetch kube yaml
       #revert branch name

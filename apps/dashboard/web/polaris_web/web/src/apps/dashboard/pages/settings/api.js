@@ -29,6 +29,15 @@ const settingRequests = {
             }
         })
     },
+    makeAdmin(email) {
+        return request({
+            url: '/api/makeAdmin',
+            method: 'post',
+            data: {
+                email: email
+            }
+        })
+    },
 
     
     fetchApiTokens() {
@@ -218,13 +227,79 @@ const settingRequests = {
             data: {}
         })
     },
-    fetchGithubAppId() {
+
+    testJiraIntegration(userEmail, apiToken, baseUrl, projId) {
         return request({
-            url: '/api/fetchGithubAppId',
+            url: '/api/testIntegration',
+            method: 'post',
+            data: {userEmail, apiToken, baseUrl, projId}
+        })
+    },
+
+    fetchJiraIntegration() {
+        return request({
+            url: '/api/fetchIntegration',
             method: 'post',
             data: {}
         })
     },
+
+    fetchOktaSso() {
+        return request({
+            url: '/api/fetchOktaSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addJiraIntegration(userEmail, apiToken, baseUrl, projId, issueType) {
+        return request({
+            url: '/api/addIntegration',
+            method: 'post',
+            data: {userEmail, apiToken, baseUrl, projId, issueType}
+        })
+    },
+
+    addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
+        return request({
+            url: '/api/addOktaSso',
+            method: 'post',
+            data: {clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri}
+        })
+    },
+
+    deleteOktaSso() {
+        return request({
+            url: '/api/deleteOktaSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchAzureSso() {
+        return request({
+            url: '/api/fetchAzureSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addAzureSso(loginUrl, x509Certificate, azureEntityId, applicationIdentifier, acsUrl) {
+        return request({
+            url: '/api/addAzureSso',
+            method: 'post',
+            data: {loginUrl, x509Certificate, azureEntityId, applicationIdentifier, acsUrl}
+        })
+    },
+
+    deleteAzureSso() {
+        return request({
+            url: '/api/deleteAzureSso',
+            method: 'post',
+            data: {}
+        })
+    },
+
     addGithubAppSecretKey(githubAppSecretKey, githubAppId) {
         return request({
             url: '/api/addGithubAppSecretKey',
@@ -232,13 +307,23 @@ const settingRequests = {
             data: {githubAppSecretKey, githubAppId}
         })
     },
+
     deleteGithubAppSettings() {
         return request({
             url: '/api/deleteGithubAppSecretKey',
             method: 'post',
+            data: {},
+        })
+    },
+
+    fetchGithubAppId() {
+        return request({
+            url: '/api/fetchGithubAppId',
+            method: 'post',
             data: {}
         })
     },
+
     toggleRedactFeature(redactPayload) {
         return request({
             url: '/api/toggleRedactFeature',
@@ -271,6 +356,61 @@ const settingRequests = {
             url: '/api/updateTrafficAlertThresholdSeconds',
             method: 'post',
             data: {trafficAlertThresholdSeconds}
+        })
+    },
+    toggleTelemetry(enableTelemetry) {
+        return request({
+            url: '/api/toggleTelemetry',
+            method: 'post',
+            data: {
+                enableTelemetry
+            }
+        });
+    },
+    addFilterHeaderValueMap(filterHeaderValueMap){
+        return request({
+            url: '/api/addFilterHeaderValueMap',
+            method: 'post',
+            data: {
+                filterHeaderValueMap
+            }
+        })
+    },
+
+    addApiCollectionNameMapper(regex, newName, headerName) {
+        return request ({
+            url: '/api/addApiCollectionNameMapper',
+            method: 'post',
+            data: {
+                regex, 
+                newName,
+                headerName
+            }
+        })
+    },
+
+    deleteApiCollectionNameMapper(regex) {
+        return request ({
+            url: '/api/deleteApiCollectionNameMapper',
+            method: 'post',
+            data: {
+                regex
+            }
+        })
+    },
+    
+    configPrivateCidr(privateCidrList){
+        return request({
+            url: '/api/updatePrivateCidrIps',
+            method: 'post',
+            data: {privateCidrList}
+        })
+    },
+    configPartnerIps(partnerIpList){
+        return request({
+            url: '/api/updatePartnerIps',
+            method: 'post',
+            data: {partnerIpList}
         })
     }
 }
