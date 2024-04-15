@@ -68,7 +68,9 @@ public class DependencyFlow {
         Set<ApiInfo.ApiInfoKey> neverL0 = new HashSet<>();
         Set<ApiInfo.ApiInfoKey> maybeL0 = new HashSet<>();
 
-        while (true) {
+        int maxIterations = 100;
+        while (maxIterations > 0) {
+            maxIterations -= 1;
             Bson filter = lastId == null ? new BasicDBObject() : Filters.gt(ID, lastId);
             List<DependencyNode> dependencyNodeList = DependencyNodeDao.instance.findAll(filter, 0, limit, Sorts.ascending(ID));
             findL0Apis(neverL0, maybeL0, dependencyNodeList);
@@ -106,7 +108,7 @@ public class DependencyFlow {
                         Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, apiInfoKey.getApiCollectionId()+""),
                         Filters.eq(DependencyNode.URL_RESP, apiInfoKey.getUrl()),
                         Filters.eq(DependencyNode.METHOD_RESP, apiInfoKey.getMethod().name())
-                )
+                ), 0, 500, Sorts.ascending("_id")
         );
 
         ReverseNode reverseNode = new ReverseNode(
