@@ -221,6 +221,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 <Checkbox
                     label={label}
                     checked={test.selected}
+                    ariaDescribedBy={test.label}
                     onChange={() => handleTestsSelected(test)}
                 />
             )])
@@ -413,7 +414,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 />
                             </div>
 
-                            <Button icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll()}>Remove All</Button>
+                            <Button icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Remove All</div></Button>
                         </div>
 
                         <br />
