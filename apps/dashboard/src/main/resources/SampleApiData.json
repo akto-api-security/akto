@@ -4490,5 +4490,135 @@
             "responseHeaders": {},
             "statusCode": 200
         }
+    },
+    {
+        "id": "CONTENT_TYPE_HEADER_MISSING",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "",
+            "responsePayload": "{\"courses\": [{\"courseId\": \"CS101\", \"name\": \"Computer Science\", \"duration\": \"4 years\", \"faculty\": \"PROF-404\", \"description\": \"This course provides in-depth knowledge of computer science principles and applications.\"}, {\"courseId\": \"ENG201\", \"name\": \"English\", \"duration\": \"3 years\", \"faculty\": \"PROF-202\", \"description\": \"Explore the world of literature and develop critical thinking and analytical skills.\"}, {\"courseId\": \"MAT301\", \"name\": \"Mathematics\", \"duration\": \"3 years\", \"faculty\": \"PROF-505\", \"description\": \"Study advanced mathematical concepts and their real-world applications.\"}]}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Length\": \"2\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/course-list"
+        },
+        "testData": {
+            "method": "GET",
+            "url": "/api/college/course-list",
+            "responsePayload": {
+                "courses": {
+                    "courseId_1": "CS101",
+                    "courseId_2": "CS102",
+                    "courseId_3": "CS103",
+                    "courseId_4": "CS104",
+                    "courseId_5": "CS105"
+                }
+            },
+            "responseHeaders": {
+                "Server": "Apache/2.4.18 (Ubuntu)"
+            },
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "FIREBASE_UNAUTHENTICATED",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "",
+            "responsePayload": "{\"d1\" : \"CSE\", \"d2\": \"ECE\", \"d3\": \"IT\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/info/departments/branch"
+        },
+        "testData": {
+            "method": "GET",
+            "url": "/api/college/info/departments/branch.json",
+            "responsePayload": {
+                "d1": {
+                    "id": "CSE",
+                    "name": "Computer Science"
+                },
+                "d2": {
+                    "id": "ECE",
+                    "name": "Electronics and Communication"
+                },
+                "d3": {
+                    "id": "IT",
+                    "name": "Information Technology"
+                }
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "PASSWD_CHANGE_BRUTE_FORCE",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"username\": \"STUD-9965\", \"password\":\"qwerty123\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Password change successful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/erp/login/change-password"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/erp/login/change-password",
+            "responsePayload": {
+                "status": "Password change successful"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "BOLA_COOKIE_FUZZING",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "{\"email\": \"user6@example.com\",\"role\": \"user\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"cookie\": \"refreshToken=eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVasdkSDG3jsnVlIiwidjknbjhksd8757dfsjkgDFG93nQGFrdG8uaW8iLCJpYXQiOjE2ODk2OTg0MDgsImV4cCI6MTY5MDIxNjgwOH0.i4YOfDCn4W3weTYqU5M3zaB37L4DHRUaFc91XVzD0_WOYRlTETrzFyLRpMETP7GrttSE79DyFDIN9nVgtuiAOrcLafyZUZsbV9oqLaNxEHx3vcyOQpg7Br7AUPxzqnIyZs_vxdmnkewRoxaeMifhlXuhIvORCoLZRHBgLX66CuJNqBwQy6zO3W0DcdgFN0DOWeQulYN2m8KLuNVDzHswq0s9jOWLPEwVBwlQc-sdf3sFKAoe9rewKNMSA4ptWOds6tqphBs0RYyaE4S_HFywT8mmMb8mer7fdzFqTEXfyKFzEFbI2M9k2_kpASyd6uvl_Cdk22QSIZBzjRMVo3VOLWgg; intercom-device-id-xjvl0z2h=25750e91-1931-42e2-a319-8b7289df6800\"}",
+            "responsePayload": "{\"flower\": \"Lilium\", \"number\": \"274\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/garden/123653"
+        },
+        "testData": {
+            "method": "GET",
+            "url": "/api/college/garden/123653",
+            "responsePayload": {
+                "flower": "Lilium",
+                "number": "274"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "HEAD_METHOD_TEST",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "",
+            "responsePayload": "{\"message\": \"Redirecting...\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\", \"X-CSRF-Token\": \"abcdef1234567890\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "302",
+            "path": "/api/college/head-endpoint"
+        },
+        "testData": {
+            "method": "HEAD",
+            "url": "/api/college/head-endpoint",
+            "responsePayload": {
+                "message": "Welcome to the collegeXYZ Portal"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
     }
 ]
