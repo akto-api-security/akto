@@ -17,5 +17,6 @@ public class Constants {
     public static final String AKTO_ATTACH_FILE = "x-akto-attach-file";
     public static final String AKTO_TOKEN_KEY = "x-akto-key";
     public static final String AKTO_NODE_ID = "x-akto-node";
+    public static final String AKTO_REMOVE_AUTH= "x-akto-remove-auth";
 
 }

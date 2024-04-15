@@ -41,9 +41,6 @@ const YamlEditor = ({ fetchAllTests }) => {
     const setTestsObj = TestEditorStore(state => state.setTestsObj)
     const setCurrentContent = TestEditorStore(state => state.setCurrentContent)
 
-    const selectedSampleApi = TestEditorStore(state => state.selectedSampleApi)
-    const setSelectedSampleApi = TestEditorStore(state => state.setSelectedSampleApi)
-
     const [ isEdited, setIsEdited ] = useState(false)
     const [ editorInstance, _setEditorInstance ] = useState()
     const editorInstanceRef = useRef(editorInstance)
@@ -72,9 +69,6 @@ const YamlEditor = ({ fetchAllTests }) => {
                 isError: false,
                 message: "Test saved successfully!"
             })
-            let newUrlObj = {...selectedSampleApi}
-            newUrlObj[addTestTemplateResponse.finalTestId] = selectedSampleApi[selectedTest.value];
-            setSelectedSampleApi(newUrlObj);
             navigate(`/dashboard/test-editor/${addTestTemplateResponse.finalTestId}`) 
             fetchAllTests()
         } catch(error) {
