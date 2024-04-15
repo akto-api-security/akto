@@ -214,7 +214,7 @@ public class HttpCallParser {
             numberOfSyncs++;
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI);
             dependencyAnalyser.dbState = apiCatalogSync.dbState;
-//            dependencyAnalyser.syncWithDb();
+            dependencyAnalyser.syncWithDb();
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
