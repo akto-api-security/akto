@@ -3,17 +3,19 @@ import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList } from 
 import api from "../api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
-import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
+import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import { CircleTickMajor } from '@shopify/polaris-icons';
 import ObserveStore from "../observeStore"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
-import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-import { CellType } from "../../../components/tables/rows/GithubRow"
+import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered"
+import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
 import CreateNewCollectionModal from "./CreateNewCollectionModal"
-import TooltipText from "../../../components/shared/TooltipText"
-import SummaryCardInfo from "../../../components/shared/SummaryCardInfo"
+import TooltipText from "@/apps/dashboard/components/shared/TooltipText"
+import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo"
 import CollectionsPageBanner from "./component/CollectionsPageBanner"
+import useTable from "@/apps/dashboard/components/tables/TableContext"
+
 
 const headers = [
     {
@@ -28,10 +30,12 @@ const headers = [
         text: "Total endpoints",
         value: "endpoints",
         isText: CellType.TEXT,
+        sortActive: true
     },
     {
         title: 'Risk score',
         value: 'riskScoreComp',
+        sortActive: true
     },
     {   
         title: 'Test coverage',
@@ -61,16 +65,26 @@ const headers = [
         text: 'Last traffic seen', 
         value: 'lastTraffic',
         isText: CellType.TEXT,
+        sortActive: true
+    },
+    {
+        title: 'Discovered',
+        text: 'Discovered',
+        value: 'discovered',
+        isText: CellType.TEXT,
+        sortActive: true
     }
 ]
 
 const sortOptions = [
-    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore' },
-    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' },
-    { label: 'Discovered', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'startTs' },
-    { label: 'Discovered', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'startTs' },
-    { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints' },
-    { label: 'Endpoints', value: 'endpoints desc', directionLabel: 'Less', sortKey: 'endpoints' },
+    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: 3 },
+    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' , columnIndex: 3},
+    { label: 'Discovered', value: 'discovered asc', directionLabel: 'Recent first', sortKey: 'startTs', columnIndex: 9 },
+    { label: 'Discovered', value: 'discovered desc', directionLabel: 'Oldest first', sortKey: 'startTs' , columnIndex: 9},
+    { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints', columnIndex: 2 },
+    { label: 'Endpoints', value: 'endpoints desc', directionLabel: 'Less', sortKey: 'endpoints' , columnIndex: 2},
+    { label: 'Last traffic seen', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'detected', columnIndex: 8 },
+    { label: 'Last traffic seen', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'detected' , columnIndex: 8},
   ];        
 
 
@@ -99,7 +113,8 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
             severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
-            riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0
+            riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0,
+            discovered: func.prettifyEpoch(c.startTs || 0),
         }
     })
 
@@ -109,44 +124,22 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 
 function ApiCollections() {
 
-    const [data, setData] = useState({'All':[]})
+    const [data, setData] = useState({'all':[]})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
-    const [selectedTab, setSelectedTab] = useState("All")
+    const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(false)
     const [envTypeMap, setEnvTypeMap] = useState({})
     const [refreshData, setRefreshData] = useState(false)
     const [popover,setPopover] = useState(false)
-    
-    
-    const tableTabs = [
-        {
-            content: 'All',
-            badge: data["All"]?.length?.toString(),
-            onAction: () => { setSelectedTab('All') },
-            id: 'All',
-        },
-        {
-            content: 'Hostname',
-            badge: data["Hostname"]?.length?.toString(),
-            onAction: () => { setSelectedTab('Hostname') },
-            id: 'Hostname',
-        },
-        {
-            content: 'Groups',
-            badge: data["Groups"]?.length?.toString(),
-            onAction: () => { setSelectedTab('Groups') },
-            id: 'Groups',
-        },
-        {
-            content: 'Custom',
-            badge: data["Custom"]?.length?.toString(),
-            onAction: () => { setSelectedTab('Custom') },
-            id: 'Custom',
-        }
-    ]
+
+    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom']
+
+    const { tabsInfo } = useTable()
+    const tableCountObj = func.getTabsCount(definedTableTabs, data)
+    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
     const setInventoryFlyout = ObserveStore(state => state.setInventoryFlyout)
     const setFilteredItems = ObserveStore(state => state.setFilteredItems) 
@@ -214,10 +207,10 @@ function ApiCollections() {
         setHostNameMap(allHostNameMap)
         
         tmp = {}
-        tmp.All = dataObj.prettify
-        tmp.Hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
-        tmp.Groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
-        tmp.Custom = tmp.All.filter(x => !tmp.Hostname.includes(x) && !tmp.Groups.includes(x));
+        tmp.all = dataObj.prettify
+        tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
+        tmp.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
+        tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !tmp.groups.includes(x));
 
         setData(tmp);
     }

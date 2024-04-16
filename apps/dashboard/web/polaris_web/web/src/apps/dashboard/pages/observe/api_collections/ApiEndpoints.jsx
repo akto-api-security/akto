@@ -25,19 +25,22 @@ import TooltipText from "../../../components/shared/TooltipText"
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
 import { ENDPOINTS_PAGE_DOCS_URL } from "../../../../main/onboardingData"
 import {TestrunsBannerComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
+import useTable from "../../../components/tables/TableContext"
 
 const headings = [
     {
         text: "Endpoint",
         value: "endpointComp",
         title: "Api endpoints",
-        textValue: "endpoint"
+        textValue: "endpoint",
+        sortActive: true
     },
     {
         text: "Risk score",
         title: "Risk score",
         value: "riskScoreComp",
-        textValue: "riskScore"
+        textValue: "riskScore",
+        sortActive: true
     },
     {
         text: "Hostname",
@@ -52,13 +55,15 @@ const headings = [
         title: 'Access type',
         showFilter: true,
         type: CellType.TEXT,
+        sortActive: true
     },
     {
         text: 'Auth Type',
         title: 'Auth type',
         value: 'auth_type',
         showFilter: true,
-        textValue: 'authTypeTag'
+        textValue: 'authTypeTag',
+        sortActive: true
     },
     {
         text: 'Sensitive Params',
@@ -73,7 +78,8 @@ const headings = [
         title: 'Last seen',
         value: 'last_seen',
         isText: true,
-        type: CellType.TEXT
+        type: CellType.TEXT,
+        sortActive: true
     }
 ]
 
@@ -83,22 +89,23 @@ headers.push({
     filterKey: 'method',
     showFilter: true,
     textValue: 'method',
+    sortActive: true
 })
 
 
 const sortOptions = [
-    { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore'},
-    { label: 'Risk Score', value: 'riskScore desc', directionLabel: 'Lowest', sortKey: 'riskScore'},
-    { label: 'Method', value: 'method asc', directionLabel: 'A-Z', sortKey: 'method' },
-    { label: 'Method', value: 'method desc', directionLabel: 'Z-A', sortKey: 'method' },
-    { label: 'Endpoint', value: 'endpoint asc', directionLabel: 'A-Z', sortKey: 'endpoint' },
-    { label: 'Endpoint', value: 'endpoint desc', directionLabel: 'Z-A', sortKey: 'endpoint' },
-    { label: 'Auth Type', value: 'auth_type asc', directionLabel: 'A-Z', sortKey: 'auth_type' },
-    { label: 'Auth Type', value: 'auth_type desc', directionLabel: 'Z-A', sortKey: 'auth_type' },
-    { label: 'Access Type', value: 'access_type asc', directionLabel: 'A-Z', sortKey: 'access_type' },
-    { label: 'Access Type', value: 'access_type desc', directionLabel: 'Z-A', sortKey: 'access_type' },
-    { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs' },
-    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs' },
+    { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore', columnIndex: 2},
+    { label: 'Risk Score', value: 'riskScore desc', directionLabel: 'Lowest', sortKey: 'riskScore', columnIndex: 2},
+    { label: 'Method', value: 'method asc', directionLabel: 'A-Z', sortKey: 'method', columnIndex: 8 },
+    { label: 'Method', value: 'method desc', directionLabel: 'Z-A', sortKey: 'method', columnIndex: 8 },
+    { label: 'Endpoint', value: 'endpoint asc', directionLabel: 'A-Z', sortKey: 'endpoint', columnIndex: 1 },
+    { label: 'Endpoint', value: 'endpoint desc', directionLabel: 'Z-A', sortKey: 'endpoint', columnIndex: 1 },
+    { label: 'Auth Type', value: 'auth_type asc', directionLabel: 'A-Z', sortKey: 'auth_type', columnIndex: 5 },
+    { label: 'Auth Type', value: 'auth_type desc', directionLabel: 'Z-A', sortKey: 'auth_type', columnIndex: 5 },
+    { label: 'Access Type', value: 'access_type asc', directionLabel: 'A-Z', sortKey: 'access_type', columnIndex: 4 },
+    { label: 'Access Type', value: 'access_type desc', directionLabel: 'Z-A', sortKey: 'access_type', columnIndex: 4 },
+    { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs', columnIndex: 7 },
+    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 7 },
 ];
 
 function ApiEndpoints() {
@@ -121,7 +128,7 @@ function ApiEndpoints() {
     const [runTests, setRunTests ] = useState(false)
 
     const [endpointData, setEndpointData] = useState([])
-    const [selectedTab, setSelectedTab] = useState("All")
+    const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
     const [loading, setLoading] = useState(true)
     const [apiDetail, setApiDetail] = useState({})
@@ -140,43 +147,12 @@ function ApiEndpoints() {
     const queryParams = new URLSearchParams(location.search);
     const selectedUrl = queryParams.get('selected_url')
     const selectedMethod = queryParams.get('selected_method')
-    const tableTabs = [
-        {
-            content: 'All',
-            index: 0,
-            badge: endpointData["All"]?.length?.toString(),
-            onAction: ()=> {setSelectedTab('All')},
-            id: 'All',
-        },
-        {
-            content: 'New',
-            index: 1,
-            badge: endpointData["New"]?.length?.toString(),
-            onAction: ()=> {setSelectedTab('New')},
-            id: 'New',
-        },
-        {
-            content: 'Sensitive',
-            index: 2,
-            badge: endpointData["Sensitive"]?.length?.toString(),
-            onAction: ()=> {setSelectedTab('Sensitive')},
-            id:'Sensitive',
-        },
-        {
-            content: 'High risk',
-            index: 3,
-            badge: endpointData["Risk"]?.length?.toString(),
-            onAction: ()=> {setSelectedTab('Risk')},
-            id: 'Risk',
-        },
-        {
-            content: 'No auth detected',
-            index: 4,
-            badge: endpointData["No_auth"]?.length?.toString(),
-            onAction: ()=> {setSelectedTab('No_auth')},
-            id: 'No_auth'
-        },
-    ]
+
+    const definedTableTabs = ['All', 'New', 'Sensitive', 'High risk', 'No auth']
+
+    const { tabsInfo } = useTable()
+    const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
+    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
     async function fetchData() {
         setLoading(true)
@@ -208,13 +184,13 @@ function ApiEndpoints() {
         let data = {}
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, null)
         const prettifyData = transform.prettifyEndpointsData(allEndpoints)
-        data['All'] = prettifyData
-        data['Sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0)
-        data['Risk'] = prettifyData.filter(x=> x.riskScore >= 4)
-        data['New'] = prettifyData.filter(x=> x.isNew)
-        data['No_auth'] = prettifyData.filter(x => x.open)
+        data['all'] = prettifyData
+        data['sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0)
+        data['high_risk'] = prettifyData.filter(x=> x.riskScore >= 4)
+        data['new'] = prettifyData.filter(x=> x.isNew)
+        data['no_auth'] = prettifyData.filter(x => x.open)
         setEndpointData(data)
-        setSelectedTab("All")
+        setSelectedTab("all")
         setSelected(0)
 
         setApiEndpoints(apiEndpointsInCollection)
@@ -225,8 +201,8 @@ function ApiEndpoints() {
     }
 
     useEffect(() => {
-        if (!endpointData || !endpointData["All"] || !selectedUrl || !selectedMethod) return
-        let allData = endpointData["All"]
+        if (!endpointData || !endpointData["all"] || !selectedUrl || !selectedMethod) return
+        let allData = endpointData["all"]
 
         const selectedApiDetail = allData.filter((x) => {
             return selectedUrl === x.endpoint && selectedMethod === x.method
@@ -330,7 +306,7 @@ function ApiEndpoints() {
             let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.type === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0].length > 0));
 
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
-            const allEndpoints = endpointData['All']
+            const allEndpoints = endpointData['all']
             allEndpoints.forEach(i => {
                 csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
             })
@@ -511,7 +487,7 @@ function ApiEndpoints() {
             <RunTest
                 apiCollectionId={apiCollectionId}
                 endpoints={filteredEndpoints}
-                filtered={loading ? false : filteredEndpoints.length !== endpointData["All"].length}
+                filtered={loading ? false : filteredEndpoints.length !== endpointData["all"].length}
                 runTestFromOutside={runTests}
                 disabled={showEmptyScreen}
             />
@@ -587,7 +563,7 @@ function ApiEndpoints() {
                 <WorkflowTests
                 key={"workflow-tests"}
                 apiCollectionId={apiCollectionId}
-                endpointsList={loading ? [] : endpointData["All"]}
+                endpointsList={loading ? [] : endpointData["all"]}
             />
              ] : showEmptyScreen ? [
                 <EmptyScreensLayout key={"emptyScreen"}
