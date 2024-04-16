@@ -139,7 +139,7 @@ public class YamlNodeExecutor extends NodeExecutor {
             try {
                 tsBeforeReq = Context.nowInMillis();
                 testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
-                if (apiInfoKey != null) {
+                if (apiInfoKey != null && memory != null) {
                     memory.fillResponse(testReq.getRequest(), testResponse, apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
                     memory.reset(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
                 }

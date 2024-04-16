@@ -38,7 +38,7 @@ public class TreeHelper {
 
         result.put(node.hashCode(), node);
 
-        if (node.getMaxDepth() == 0) return; // todo: check implication on front end graph
+        if (node.getMaxDepth() == 0) return;
 
 
         Map<String, Connection> connections = node.getConnections();
