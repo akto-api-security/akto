@@ -13,8 +13,6 @@ jobs:
     outputs:
       IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
     steps:
-      - name: Setup Bolt
-        uses: koalalab-inc/bolt@v1
       - uses: actions/checkout@v2
       - uses: actions/setup-java@v2
         with:
@@ -112,8 +110,6 @@ jobs:
     outputs:
       lb_name: ${{ steps.deploy_cluster.outputs.lb_name }}
     steps:
-    - name: Setup Bolt
-      uses: koalalab-inc/bolt@v1
     #revert branch name
     - name: Setup mongo, akto-k8s-agent kube yaml's
       run: |
@@ -187,8 +183,6 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     steps:
-      - name: Setup Bolt
-        uses: koalalab-inc/bolt@v1
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
         with:
@@ -227,8 +221,6 @@ jobs:
       FLASH_NLB_DNS: ${{ secrets.FLASH_NLB_DNS }}
       FLASH_MONGO_CONN: ${{ secrets.FLASH_MONGO_CONN }}
     steps:
-    - name: Setup Bolt
-      uses: koalalab-inc/bolt@v1
 
     - name: Fetch kube yaml
       #revert branch name
