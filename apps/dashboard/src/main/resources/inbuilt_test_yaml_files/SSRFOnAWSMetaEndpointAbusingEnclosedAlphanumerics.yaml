@@ -21,7 +21,7 @@ info:
     - OWASP top 10
     - HackerOne top 10
   references:
-    - "https://github.com/OWASP/API-Security/blob/master/2023/en/src/0xa6-server-side-request-forgery.md"
+    - "https://github.com/OWASP/API-Security/blob/master/editions/2023/en/0xa7-server-side-request-forgery.md"
     - "https://www.akto.io/blog/how-to-prevent-server-side-request-forgery-ssrf-as-a-developer"
     - "https://github.com/cujanovic/SSRF-Testing/tree/master#abusing-enclosed-alphanumerics"
   cwe:

@@ -23,7 +23,7 @@ info:
     - OWASP top 10
     - HackerOne top 10
   references:
-    - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa6-mass-assignment.md"
+    - "https://github.com/OWASP/API-Security/blob/master/editions/2019/en/0xa6-mass-assignment.md"
   cwe:
     - CWE-915
   cve:
