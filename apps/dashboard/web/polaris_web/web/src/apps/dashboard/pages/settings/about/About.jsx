@@ -36,6 +36,7 @@ function About() {
     const [enableTelemetry, setEnableTelemetry] = useState(false)
     const [privateCidrList, setPrivateCidrList] = useState([])
     const [partnerIpsList, setPartnerIpsList] = useState([])
+    const [allowRedundantUrls,setAllowRedundantUrls] = useState(false)
 
     const setupOptions = settingFunctions.getSetupOptions()
 
@@ -57,6 +58,8 @@ function About() {
 
         setPrivateCidrList(resp.privateCidrList || [])
         setPartnerIpsList(resp.partnerIpList || [])
+        console.log(resp)
+        setAllowRedundantUrls(resp.allowRedundantEndpoints)
     }
 
     useEffect(()=>{
@@ -110,6 +113,11 @@ function About() {
     const handleSelectTraffic = async(val) => {
         setTrafficThreshold(val) ;
         await settingRequests.updateTrafficAlertThresholdSeconds(val);
+    }
+
+    const toggleUrlSettings = async(val) => {
+        setAllowRedundantUrls(val);
+        await settingRequests.handleRedundantUrls(val);
     }
 
     const handleIpsChange = async(ip, isAdded, type) => {
@@ -308,7 +316,7 @@ function About() {
               <LegacyCard.Section title={<Text variant="headingMd">Details</Text>}>
                   {infoComponent}
               </LegacyCard.Section>
-              {isOnPrem &&
+              {isOnPrem ?
                   <LegacyCard.Section title={<Text variant="headingMd">More settings</Text>}>
                       <div style={{ display: 'flex' }}>
                           <div style={{ flex: "1" }}>
@@ -326,6 +334,7 @@ function About() {
                                   <ToggleComponent text={"Redact sample data"} initial={redactPayload} onToggle={handleRedactPayload} />
                                   <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
                                   <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
+                                  <ToggleComponent text={"Allow redundant urls"} initial={allowRedundantUrls} onToggle={toggleUrlSettings} />
                                   <VerticalStack gap={1}>
                                       <Text color="subdued">Traffic alert threshold</Text>
                                       <Box width='120px'>
@@ -344,6 +353,9 @@ function About() {
                               {replaceCollectionComponent}
                           </div>
                       </div>
+                  </LegacyCard.Section>
+                  :<LegacyCard.Section title={<Text variant="headingMd">More settings</Text>}>
+                    <ToggleComponent text={"Allow redundant urls"} initial={allowRedundantUrls} onToggle={toggleUrlSettings} />
                   </LegacyCard.Section>
               }
             <LegacyCard.Section subdued>
