@@ -44,10 +44,6 @@
     padding-left: 10px ;
 }
 
-.new-diff .view-lines{
-    background: #FAFBFB !important;
-}
-
 .new-diff .monaco-hover{
     background-color: #FFF5EA !important;
     border-radius: 2px;

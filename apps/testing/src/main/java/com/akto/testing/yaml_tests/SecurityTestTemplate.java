@@ -9,6 +9,8 @@ import com.akto.test_editor.execution.Memory;
 
 import java.util.*;
 
+import static com.akto.dto.testing.TestResult.TestError.*;
+
 public abstract class SecurityTestTemplate {
 
     ApiInfo.ApiInfoKey apiInfoKey;
@@ -60,13 +62,13 @@ public abstract class SecurityTestTemplate {
         boolean valid = filter();
         if (!valid) {
             List<GenericTestResult> testResults = new ArrayList<>();
-            testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList("Request API failed to satisfy api_selection_filters block, skipping execution"), 0, false, TestResult.Confidence.HIGH, null));
+            testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(SKIPPING_EXECUTION_BECAUSE_FILTERS.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
             return new YamlTestResult(testResults, null);
         }
         valid = checkAuthBeforeExecution(debug, testLogs);
         if (!valid) {
             List<GenericTestResult> testResults = new ArrayList<>();
-            testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList("Request API failed authentication check, skipping execution"), 0, false, TestResult.Confidence.HIGH, null));
+            testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(SKIPPING_EXECUTION_BECAUSE_AUTH.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
             return new YamlTestResult(testResults, null);
         }
 

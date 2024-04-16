@@ -76,7 +76,8 @@ public class TestEditorEnums {
         PARAM_CONTEXT,
         ENDPOINT_IN_TRAFFIC_CONTEXT,
         INCLUDE_ROLES_ACCESS,
-        EXCLUDE_ROLES_ACCESS
+        EXCLUDE_ROLES_ACCESS,
+        API_ACCESS_TYPE
     }
 
 

@@ -162,7 +162,7 @@ public class Executor {
         testRawApis.add(sampleRawApi.copy());
         ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes);
         Map<Integer, ExecuteAlgoObj> algoMap = new HashMap<>();
-        ExecutorSingleRequest singleReq = executorAlgorithm.execute(executorNodes, 0, algoMap, testRawApis, false, 0);
+        ExecutorSingleRequest singleReq = executorAlgorithm.execute(executorNodes, 0, algoMap, testRawApis, false, 0, apiInfoKey);
         
         if (!singleReq.getSuccess()) {
             testRawApis = new ArrayList<>();
@@ -378,9 +378,9 @@ public class Executor {
         return testResult;
     }
 
-    public ExecutorSingleOperationResp invokeOperation(String operationType, Object key, Object value, RawApi rawApi, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
+    public ExecutorSingleOperationResp invokeOperation(String operationType, Object key, Object value, RawApi rawApi, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
         try {
-            ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, key, value, varMap, authMechanism, customAuthTypes);
+            ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, key, value, varMap, authMechanism, customAuthTypes, apiInfoKey);
             return resp;
         } catch(Exception e) {
             return new ExecutorSingleOperationResp(false, "error executing executor operation " + e.getMessage());
@@ -551,7 +551,7 @@ public class Executor {
         return bDObject;
     }
 
-    public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
+    public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
         switch (operationType.toLowerCase()) {
             case "send_ssrf_req":
                 String keyValue = key.toString().replaceAll("\\$\\{random_uuid\\}", "");
@@ -657,6 +657,9 @@ public class Executor {
                 }
                 removed = removeCustomAuth(rawApi, customAuthTypes) || removed ;
                 if (removed) {
+                    if (apiInfoKey.getApiCollectionId() == 1111111111) {
+                        Operations.addHeader(rawApi, Constants.AKTO_REMOVE_AUTH , "0");
+                    }
                     return new ExecutorSingleOperationResp(true, "");
                 } else {
                     return new ExecutorSingleOperationResp(false, "header key not present");
