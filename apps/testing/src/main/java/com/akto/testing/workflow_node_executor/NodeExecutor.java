@@ -11,5 +11,5 @@ import com.akto.test_editor.execution.Memory;
 
 public abstract class NodeExecutor {
     
-    public abstract WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, Map<String, ApiInfo.ApiInfoKey> apiNameToApiInfoKey);
+    public abstract WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory);
 }

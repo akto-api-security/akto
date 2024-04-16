@@ -16,7 +16,7 @@ import com.akto.test_editor.filter.Filter;
 
 public class ConditionalGraphExecutor extends GraphExecutor {
     
-    public GraphExecutorResult executeGraph(GraphExecutorRequest graphExecutorRequest, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, Map<String, ApiInfo.ApiInfoKey> apiNameToApiInfoKey) {
+    public GraphExecutorResult executeGraph(GraphExecutorRequest graphExecutorRequest, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
 
         Map<String, Boolean> visitedMap = graphExecutorRequest.getVisitedMap();
         List<String> errors = new ArrayList<>();
@@ -32,7 +32,7 @@ public class ConditionalGraphExecutor extends GraphExecutor {
         boolean success = false;
 
         WorkflowTestResult.NodeResult nodeResult;
-        nodeResult = Utils.executeNode(node, graphExecutorRequest.getValuesMap(), debug, testLogs, memory, apiNameToApiInfoKey);
+        nodeResult = Utils.executeNode(node, graphExecutorRequest.getValuesMap(), debug, testLogs, memory);
 
         graphExecutorRequest.getWorkflowTestResult().getNodeResultMap().put(node.getId(), nodeResult);
         graphExecutorRequest.getExecutionOrder().add(node.getId());
@@ -79,7 +79,7 @@ public class ConditionalGraphExecutor extends GraphExecutor {
         boolean vulnerable = success;
         if (childNode != null) {
             GraphExecutorRequest childExecReq = new GraphExecutorRequest(graphExecutorRequest, childNode, graphExecutorRequest.getWorkflowTestResult(), visitedMap, graphExecutorRequest.getExecutionOrder());
-            GraphExecutorResult childExecResult = executeGraph(childExecReq, debug, testLogs, memory, apiNameToApiInfoKey);
+            GraphExecutorResult childExecResult = executeGraph(childExecReq, debug, testLogs, memory);
             vulnerable = childExecResult.getVulnerable();
             return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), vulnerable, errors);
         } else {

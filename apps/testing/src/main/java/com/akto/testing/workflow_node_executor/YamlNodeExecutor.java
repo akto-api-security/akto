@@ -50,7 +50,7 @@ public class YamlNodeExecutor extends NodeExecutor {
     private static final Gson gson = new Gson();
 
 
-    public NodeResult processNode(Node node, Map<String, Object> varMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, Map<String, ApiInfo.ApiInfoKey> apiNameToApiInfoKey) {
+    public NodeResult processNode(Node node, Map<String, Object> varMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         List<String> testErrors = new ArrayList<>();
 
         YamlNodeDetails yamlNodeDetails = (YamlNodeDetails) node.getWorkflowNodeDetails();
@@ -69,15 +69,17 @@ public class YamlNodeExecutor extends NodeExecutor {
 
         ApiInfo.ApiInfoKey apiInfoKey = ((YamlNodeDetails) node.getWorkflowNodeDetails()).getApiInfoKey();
         ExecutorNode firstChildNode = childNodes.get(0); // todo check for length
-        if (firstChildNode.getOperationType().equalsIgnoreCase("api")) {
-            String apiType = firstChildNode.getValues().toString();
-            if (apiType.equalsIgnoreCase("get_asset_api")) {
-                rawApi = memory.findAssetGetterRequest(apiInfoKey);
+        if (memory != null) {
+            if (firstChildNode.getOperationType().equalsIgnoreCase("api")) {
+                String apiType = firstChildNode.getValues().toString();
+                if (apiType.equalsIgnoreCase("get_asset_api")) {
+                    rawApi = memory.findAssetGetterRequest(apiInfoKey);
+                }
+                childNodes.remove(0);
+            } else {
+                OriginalHttpRequest request = memory.run(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+                rawApi.setRequest(request);
             }
-            childNodes.remove(0);
-        } else {
-            OriginalHttpRequest request = memory.run(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
-            rawApi.setRequest(request);
         }
 
 

@@ -26,7 +26,7 @@ public class ApiNodeExecutor extends NodeExecutor {
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiNodeExecutor.class);
 
-    public NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, Map<String, ApiInfo.ApiInfoKey> apiNameToApiInfoKey) {
+    public NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         loggerMaker.infoAndAddToDb("\n", LogDb.TESTING);
         loggerMaker.infoAndAddToDb("NODE: " + node.getId(), LogDb.TESTING);
         List<String> testErrors = new ArrayList<>();
