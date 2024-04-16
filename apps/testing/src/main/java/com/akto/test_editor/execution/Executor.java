@@ -4,6 +4,8 @@ import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.TokensDao;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
@@ -44,12 +46,6 @@ import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 import org.json.JSONObject;
 
@@ -76,7 +72,7 @@ public class Executor {
     public YamlTestResult execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
         AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig, List<CustomAuthType> customAuthTypes, boolean debug, List<TestingRunResult.TestLog> testLogs) {
         List<GenericTestResult> result = new ArrayList<>();
-        
+
         ExecutionListBuilder executionListBuilder = new ExecutionListBuilder();
         List<ExecutorNode> executorNodes = new ArrayList<>();
         ExecutionOrderResp executionOrderResp = executionListBuilder.parseExecuteOperations(node, executorNodes);
@@ -171,35 +167,6 @@ public class Executor {
                 break;
             }
             try {
-
-                // change host header in case of override URL ( if not already changed by test template )
-                try {
-                    List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
-                    List<String> attemptHostHeaders = testReq.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
-
-                    if (!originalHostHeaders.isEmpty()
-                        && originalHostHeaders.get(0) != null
-                        && !attemptHostHeaders.isEmpty()
-                        && attemptHostHeaders.get(0) != null
-                        && originalHostHeaders.get(0).equals(attemptHostHeaders.get(0))
-                        && testingRunConfig != null
-                        && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
-
-                        String url = ApiExecutor.prepareUrl(testReq.getRequest(), testingRunConfig);
-                        URI uri = new URI(url);
-                        String host = uri.getHost();
-                        if (uri.getPort() != -1) {
-                            host += ":" + uri.getPort();
-                        }
-                        testReq.getRequest().getHeaders().put(_HOST, Collections.singletonList(host));
-                    }
-
-                } catch (Exception e) {
-                    testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "unable to update host header for overridden test URL"));
-                    loggerMaker.errorAndAddToDb(e,"unable to update host header for overridden test URL",
-                            LogDb.TESTING);
-                }
-                    
                 // follow redirects = true for now
                 testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs);
                 requestSent = true;
@@ -228,6 +195,59 @@ public class Executor {
         yamlTestResult = new YamlTestResult(result, workflowTest);
 
         return yamlTestResult;
+    }
+
+    public void overrideTestUrl(RawApi rawApi, TestingRunConfig testingRunConfig) {
+        try {
+            String url = "";
+            List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
+            if (!originalHostHeaders.isEmpty() && testingRunConfig != null
+                && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
+
+                Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
+                Matcher matcher = pattern.matcher(testingRunConfig.getOverriddenTestAppUrl());
+                if (matcher.find()) {
+                    String match = matcher.group(0);
+                    match = match.substring(2, match.length());
+                    match = match.substring(0, match.length() - 1);
+                    String[] params = match.split("\\+");
+                    for (int i = 0; i < params.length; i++) {
+                        url += resolveParam(params[i], rawApi);
+                    }
+                    testingRunConfig.setOverriddenTestAppUrl(url);
+                } else {
+                    url = testingRunConfig.getOverriddenTestAppUrl();
+                }
+
+                String newUrl = ApiExecutor.replacePathFromConfig(rawApi.getRequest().getUrl(), testingRunConfig);
+                URI uri = new URI(newUrl);
+                String host = uri.getHost();
+                if (uri.getPort() != -1) {
+                    host += ":" + uri.getPort();
+                }
+                rawApi.getRequest().getHeaders().put(_HOST, Collections.singletonList(host));
+                rawApi.getRequest().setUrl(newUrl);
+
+            }
+
+        } catch (Exception e) {
+            //testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "unable to update host header for overridden test URL"));
+            loggerMaker.errorAndAddToDb(e,"unable to update host header for overridden test URL",
+                    LogDb.TESTING);
+        }
+    }
+
+    public String resolveParam(String param, RawApi rawApi) {
+        param = param.trim();
+        String[] params = param.split("\\.");
+
+        if (params.length == 1) {
+            return params[0];
+        }
+
+        String key = params[params.length - 1];
+        String val = rawApi.getRequest().getHeaders().get(key).get(0);
+        return val;
     }
 
     private void overrideAuth(RawApi rawApi, AuthMechanism authMechanism) {
