@@ -470,7 +470,7 @@ public class Utils {
                 info = new AccountHTTPCallParserAktoPolicyInfo();
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
-//                info.setResourceAnalyser(new ResourceAnalyser(300_000, 0.01, 100_000, 0.01));
+                // info.setResourceAnalyser(new ResourceAnalyser(300_000, 0.01, 100_000, 0.01));
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 

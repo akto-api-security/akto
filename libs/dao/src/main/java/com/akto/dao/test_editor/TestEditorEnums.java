@@ -198,6 +198,7 @@ public class TestEditorEnums {
     }
 
     public enum TerminalExecutorDataOperands {
+        API,
         DELETE_HEADER,
         DELETE_BODY_PARAM,
         DELETE_QUERY_PARAM,
