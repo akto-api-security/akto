@@ -158,6 +158,11 @@ public class Utils {
             new URL(url).toURI();
             return true;
         } catch (MalformedURLException | URISyntaxException e) {
+            Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
+                Matcher matcher = pattern.matcher(url);
+                if (matcher.find()) {
+                    return true;
+                }
             return false;
         }
     }
