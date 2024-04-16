@@ -11,9 +11,9 @@ import java.util.Map;
 
 public class ApiWorkflowExecutor {
 
-    public GraphExecutorResult init(GraphExecutorRequest graphExecutorRequest, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, Map<String, ApiInfo.ApiInfoKey> apiNameToApiInfoKey) {
+    public GraphExecutorResult init(GraphExecutorRequest graphExecutorRequest, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         GraphExecutor graphExecutor = GraphExecutorFactory.fetchExecutor(graphExecutorRequest);
-        GraphExecutorResult graphExecutorResult = graphExecutor.executeGraph(graphExecutorRequest,debug,testLogs, memory, apiNameToApiInfoKey);
+        GraphExecutorResult graphExecutorResult = graphExecutor.executeGraph(graphExecutorRequest,debug,testLogs, memory);
         return graphExecutorResult;
     }
 

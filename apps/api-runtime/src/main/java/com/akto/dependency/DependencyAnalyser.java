@@ -238,7 +238,7 @@ public class DependencyAnalyser {
         if (val == null) return false;
         if (val instanceof Boolean) return false;
         if (val instanceof String) return val.toString().length() > 4 && val.toString().length() <= 4096;
-        if (val instanceof Integer) return ((int) val) > 0;
+        if (val instanceof Integer) return ((int) val) > 50;
         return true;
     }
 

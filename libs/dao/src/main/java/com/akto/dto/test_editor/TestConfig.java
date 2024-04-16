@@ -14,7 +14,6 @@ public class TestConfig {
     private Auth auth;
 
     private ConfigParserResult apiSelectionFilters;
-    private Map<String, ConfigParserResult> workFlowSelectionFilters;
 
     private Map<String, List<String>> wordlists;
 
@@ -30,7 +29,7 @@ public class TestConfig {
     private String author;
 
     public TestConfig(String id, Info info, Auth auth, ConfigParserResult apiSelectionFilters, Map<String, List<String>> wordlists, ExecutorConfigParserResult execute, 
-        ConfigParserResult validation, Strategy strategy, Map<String, ConfigParserResult> workFlowSelectionFilters) {
+        ConfigParserResult validation, Strategy strategy) {
         
         this.id = id;
         info.setSubCategory(id);
@@ -41,7 +40,6 @@ public class TestConfig {
         this.execute = execute;
         this.validation = validation;
         this.strategy = strategy;
-        this.workFlowSelectionFilters = workFlowSelectionFilters;
     }
 
     public TestConfig() { }
@@ -148,14 +146,6 @@ public class TestConfig {
 
     public void setAuthor(String author) {
         this.author = author;
-    }
-
-    public Map<String, ConfigParserResult> getWorkFlowSelectionFilters() {
-        return workFlowSelectionFilters;
-    }
-
-    public void setWorkFlowSelectionFilters(Map<String, ConfigParserResult> workFlowSelectionFilters) {
-        this.workFlowSelectionFilters = workFlowSelectionFilters;
     }
 
     public boolean isInactive() {

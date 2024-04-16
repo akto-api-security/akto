@@ -11,6 +11,6 @@ import java.util.Map;
 
 public abstract class GraphExecutor {
     
-    public abstract GraphExecutorResult executeGraph(GraphExecutorRequest graphExecutorRequest, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, Map<String, ApiInfo.ApiInfoKey> apiNameToApiInfoKey);
+    public abstract GraphExecutorResult executeGraph(GraphExecutorRequest graphExecutorRequest, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory);
 
 }
