@@ -40,7 +40,7 @@ export default{
 	padding: 16px;
 }
 .title{
-	font-family: 'Poppins';
+	font-family: 'Poppins', sans-serif;
 	font-style: normal;
 	font-weight: 600;
 	font-size: 14px !important;
@@ -49,7 +49,7 @@ export default{
 }
 
 .content{
-	font-family: 'Poppins';
+	font-family: 'Poppins', sans-serif;
 	font-style: normal;
 	font-weight: 400;
 	font-size: 14px !important;
@@ -58,7 +58,7 @@ export default{
 }
 
 .cta{
-	font-family: 'Poppins';
+	font-family: 'Poppins', sans-serif;
 	font-style: normal;
 	font-weight: 600;
 	font-size: 14px !important;

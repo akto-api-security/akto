@@ -29,7 +29,7 @@ export default {
 	position: relative;
 	top: 0px;
 	left: 0px;
-	font-family: Poppins;
+	font-family: 'Poppins', sans-serif;
 	font-weight: 500;
 	font-size: 14px;
 	opacity: 1;
@@ -42,7 +42,7 @@ export default {
 	position: relative;
 	top: 0px;
 	left: 0px;
-	font-family: Poppins;
+	font-family: 'Poppins', sans-serif;
 	/* font-size: 14px; */
 	opacity: 1;
 	text-align: center;

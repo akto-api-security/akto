@@ -325,12 +325,6 @@ export default {
                 return nonNullData
             }
         },
-        mapCollectionIdToName() {
-            return this.$store.state.collections.apiCollections.reduce((m, e) => {
-                m[e.id] = e.displayName
-                return m
-            }, {})
-        },
         flattenedTestingRunResults() {
             return this.testingRunResults.filter(x => x.resultMap && Object.values(x.resultMap).find(y => y.vulnerable)).map(this.prepareItemForTable)
         },

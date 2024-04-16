@@ -38,7 +38,7 @@
           }
         },
         async mounted () {
-            if (typeof window !== undefined && window._AKTO === undefined) {
+            if (typeof window !== 'undefined' && window._AKTO === undefined) {
                 window._AKTO = this
             }
         },
@@ -69,7 +69,7 @@
                     text: 'Server Error',
                     color: 'error'
                 }
-            }),
+            })
             this.$on('HIDE_SNACKBAR', () => {
               this.snackbar = {
                 show: false

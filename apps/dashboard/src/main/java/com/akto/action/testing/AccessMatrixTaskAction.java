@@ -154,7 +154,7 @@ public class AccessMatrixTaskAction extends UserAction{
                     }
                 }
 
-                isListEmpty = sampleDataList != null && !sampleDataList.isEmpty();
+                isListEmpty = sampleDataList == null || sampleDataList.isEmpty();
                 if (!isListEmpty) {
                     Key id = sampleDataList.get(sampleDataList.size() - 1).getId();
                     lastFetchedMethod = id.getMethod().name();
@@ -168,9 +168,9 @@ public class AccessMatrixTaskAction extends UserAction{
     }
 
     public String updateAccessMatrixTask(){
-        if (!sanityCheck()) {
-            return ERROR.toUpperCase();
-        }
+//        if (!sanityCheck()) {
+//            return ERROR.toUpperCase();
+//        }
         try{
             ObjectId id = new ObjectId(hexId);
             Bson q = Filters.eq(Constants.ID, id);

@@ -250,7 +250,6 @@ export default Vue.extend({
   font-size: 100%;
   font-family: inherit;
   border: 0;
-  padding: 0;
   background-color: transparent;
   width: 100%;
 

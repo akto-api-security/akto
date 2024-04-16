@@ -6,7 +6,7 @@
         </div>
         <div v-if="!hideOperators" class="d-flex jc-end pr-2" style="background-color: var(--white)">
             <v-btn 
-                v-for="key, index in operators" 
+                v-for="key, index in operators"
                 plain 
                 :ripple="false" 
                 :key="index"
@@ -126,13 +126,13 @@ export default {
             this.checkedMap[item.value] = !this.checkedMap[item.value]
             this.$emit('clickedItem', {item: item, checked: this.checkedMap[item.value], operator: this.selectedOperator})
         },
-        textChanged () {
-            if (this.searchText && this.searchText.length > 0) {
-
-            } else {
-
-            }
-        },
+        // textChanged () {
+        //     if (this.searchText && this.searchText.length > 0) {
+        //
+        //     } else {
+        //
+        //     }
+        // },
         globalCheckboxClicked () {
             this.globalCheckbox = !this.globalCheckbox
             for(var index in this.filteredItems) {
@@ -173,7 +173,7 @@ export default {
     color: var(--themeColorDark) !important
 .filter-list
     height: 350px
-    overflow-y: scrollbar
+    overflow-y: scroll
     overflow-x: hidden
 .list-header
     border-bottom: 1px solid var(--themeColorDark)    

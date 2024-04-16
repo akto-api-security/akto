@@ -207,8 +207,8 @@ public class Executor {
                 TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
                 if (res != null) {
                     result.add(res);
+                    vulnerable = res.getVulnerable();
                 }
-                vulnerable = res.getVulnerable();
             } catch(Exception e) {
                 testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
                 error_messages.add("Error executing test request: " + e.getMessage());

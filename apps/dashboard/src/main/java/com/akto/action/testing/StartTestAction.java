@@ -115,7 +115,7 @@ public class StartTestAction extends UserAction {
         }
 
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
-        if (authMechanism == null && testIdConfig == 0) {
+        if (authMechanism == null || testIdConfig == 0) {
             addActionError("Please set authentication mechanism before you test any APIs");
             return null;
         }
@@ -183,7 +183,7 @@ public class StartTestAction extends UserAction {
         if (localTestingRun == null) {
             try {
                 localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
-                if (triggeredBy != null && !triggeredBy.isEmpty()) {
+                if (localTestingRun != null && triggeredBy != null && !triggeredBy.isEmpty()) {
                     localTestingRun.setTriggeredBy(triggeredBy);
                 }
             } catch (Exception e) {
