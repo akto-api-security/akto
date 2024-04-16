@@ -74,10 +74,18 @@ public class YamlNodeExecutor extends NodeExecutor {
                 String apiType = firstChildNode.getValues().toString();
                 if (apiType.equalsIgnoreCase("get_asset_api")) {
                     rawApi = memory.findAssetGetterRequest(apiInfoKey);
+                    if (rawApi == null)  {
+                        testErrors.add("Couldn't find corresponding getter api");
+                        new WorkflowTestResult.NodeResult("[]",false, testErrors);
+                    }
                 }
                 childNodes.remove(0);
             } else {
                 OriginalHttpRequest request = memory.run(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+                if (request == null) {
+                    testErrors.add("Failed getting request from dependency graph");
+                    new WorkflowTestResult.NodeResult("[]",false, testErrors);
+                }
                 rawApi.setRequest(request);
             }
         }
