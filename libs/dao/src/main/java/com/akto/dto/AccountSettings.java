@@ -94,7 +94,10 @@ public class AccountSettings {
     public static final String PARTNER_IP_LIST = "partnerIpList";
     private List<String> partnerIpList;
 
-	public AccountSettings() {
+    public static final String ALLOW_REDUNDANT_ENDPOINTS = "allowRedundantEndpoints";
+    private boolean allowRedundantEndpoints;
+
+    public AccountSettings() {
     }
 
     public AccountSettings(int id, List<String> privateCidrList, Boolean redactPayload, SetupType setupType) {
@@ -360,4 +363,12 @@ public class AccountSettings {
 	public void setPartnerIpList(List<String> partnerIpList) {
 		this.partnerIpList = partnerIpList;
 	}
+
+    public boolean getAllowRedundantEndpoints() {
+        return allowRedundantEndpoints;
+    }
+
+    public void setAllowRedundantEndpoints(boolean allowRedundantEndpoints) {
+        this.allowRedundantEndpoints = allowRedundantEndpoints;
+    }
 }
