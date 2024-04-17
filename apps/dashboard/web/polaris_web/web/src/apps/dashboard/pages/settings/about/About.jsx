@@ -58,7 +58,6 @@ function About() {
 
         setPrivateCidrList(resp.privateCidrList || [])
         setPartnerIpsList(resp.partnerIpList || [])
-        console.log(resp)
         setAllowRedundantUrls(resp.allowRedundantEndpoints)
     }
 
