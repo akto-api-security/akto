@@ -59,6 +59,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public static final String BUSINESS_EMAIL_REQUIRED_ERROR = "BUSINESS_EMAIL_REQUIRED";
     public static final String ERROR_STR = "error";
     public static final String ERROR_DESCRIPTION = "error_description";
+    public static final String GET_GITHUB_EMAILS_URL = "https://api.github.com/user/emails";
     public String getCode() {
         return code;
     }
@@ -404,7 +405,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             return  "";
         }else{
             for (Map<String, String> entryMap : emailResp) {
-                if(entryMap.get("primary") == "true"){
+                if(entryMap.get("primary").equals("true")){
                     return entryMap.get("email");
                 }
             }
@@ -432,8 +433,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String refreshToken = tokenData.getOrDefault("refresh_token", "").toString();
             int refreshTokenExpiry = Integer.parseInt(tokenData.getOrDefault("refresh_token_expires_in", "0").toString());
             Map<String,Object> userData = CustomHttpRequest.getRequest("https://api.github.com/user", "Bearer " + accessToken);
-            String emailsUrl = "https://api.github.com/user/emails";
-            List<Map<String, String>> emailResp = GithubLogin.getEmailRequest(emailsUrl, accessToken);
+            List<Map<String, String>> emailResp = GithubLogin.getEmailRequest(GET_GITHUB_EMAILS_URL, accessToken);
 
             String primaryEmail = getPrimaryEmail(emailResp);
 
