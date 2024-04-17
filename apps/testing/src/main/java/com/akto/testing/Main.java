@@ -6,6 +6,7 @@ import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.SetupDao;
 import com.akto.dao.MCollection;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -16,6 +17,7 @@ import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.Setup;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestResult;
@@ -65,6 +67,9 @@ public class Main {
 
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+
+    public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
+
     public static final ScheduledExecutorService schedulerAccessMatrix = Executors.newScheduledThreadPool(2);
 
     public static final boolean SKIP_SSRF_CHECK = "true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK"));
@@ -191,7 +196,7 @@ public class Main {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        String mongoURI = System.getenv("AKTO_MONGO_CONN");;
+        String mongoURI = "mongodb://localhost:27017";;
         DaoInit.init(new ConnectionString(mongoURI));
 
         boolean connectedToMongo = false;
@@ -396,6 +401,27 @@ public class Main {
                 }
 
                 loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds for account: " + accountId, LogDb.TESTING);
+
+                Organization organization = OrganizationsDao.instance.findOne(
+                        Filters.in(Organization.ACCOUNTS, Context.accountId.get()));
+
+                if(organization.getTestTelemetryEnabled()){
+                    loggerMaker.infoAndAddToDb("Test telemetry enabled for account: " + accountId + ", sending results", LogDb.TESTING);
+                    ObjectId finalSummaryId = summaryId;
+                    testTelemetryScheduler.execute(() -> {
+                        Context.accountId.set(accountId);
+                        try {
+                            com.akto.onprem.Constants.sendTestResults(finalSummaryId, organization);
+                            loggerMaker.infoAndAddToDb("Test telemetry sent for account: " + accountId, LogDb.TESTING);
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, "Error in sending test telemetry for account: " + accountId);
+                        }
+                    });
+
+                } else {
+                    loggerMaker.infoAndAddToDb("Test telemetry disabled for account: " + accountId, LogDb.TESTING);
+                }
+
             }, "testing");
             Thread.sleep(1000);
         }
