@@ -351,6 +351,33 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         return obj
     }
 
+    function getCurrentStatus(){
+        if(!testRun || testRun?.tests === undefined || testRun?.selectedCategory === undefined || testRun.tests[testRun.selectedCategory] === undefined)
+            return false;
+
+        let res = true;
+        const tests = testRun.tests[testRun.selectedCategory];
+        for (let i = 0; i < tests.length; i++) {
+            if (tests[i].selected === false) {
+                res = false;
+                break; 
+            }
+        }
+        return res;
+    }
+
+    const allTestsSelectedOfCategory = getCurrentStatus()
+
+    function toggleTestsSelection(val) {
+        let copyTestRun = testRun
+        copyTestRun.tests[testRun.selectedCategory].forEach((test) => {
+            test.selected = val
+        })
+        setTestRun(prev => {
+            return { ...prev, tests: copyTestRun.tests, testName: convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(copyTestRun.tests).join("_") }
+        })
+    }
+
     return (
         <div>
             {activator}
@@ -429,7 +456,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             </div>
                             <div>
                                 <div style={{ padding: "15px", alignItems: "center" }}>
-                                    <Text variant="headingMd">Tests</Text>
+                                    <HorizontalStack gap={"2"}>
+                                        <Checkbox
+                                            checked={allTestsSelectedOfCategory}
+                                            onChange={(val) => toggleTestsSelection(val)}
+                                        />
+                                        <Text variant="headingMd">Tests</Text>
+                                    </HorizontalStack>
                                 </div>
                                 <Divider />
                                 <div style={{ maxHeight: "35vh", overflowY: "auto", paddingTop: "5px" }}>
