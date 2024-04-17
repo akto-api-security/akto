@@ -36,7 +36,7 @@ public class CodeAnalysisAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class);
     
     public String syncExtractedAPIs() {
-        loggerMaker.infoAndAddToDb("Syncing code analysis endpoints for: " + projectDir, LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("Syncing code analysis endpoints for collection: " + apiCollectionName, LogDb.DASHBOARD);
 
         // todo:  If API collection does exist, create it
         ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(apiCollectionName);
@@ -172,7 +172,7 @@ public class CodeAnalysisAction extends UserAction {
         );
 
         loggerMaker.infoAndAddToDb("Updated code analysis collection: " + apiCollectionName, LogDb.DASHBOARD);
-        loggerMaker.infoAndAddToDb("Source code endpoints: " + codeAnalysisApisMap.size(), LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("Source code endpoints count: " + codeAnalysisApisMap.size(), LogDb.DASHBOARD);
 
         return SUCCESS.toUpperCase();
     }

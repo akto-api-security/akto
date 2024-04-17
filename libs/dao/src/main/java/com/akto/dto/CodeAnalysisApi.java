@@ -4,18 +4,18 @@ public class CodeAnalysisApi {
 
     private String method;
     private String endpoint;
-    private Location location;
+    private CodeAnalysisApiLocation location;
 
-    public static class Location {
+    public static class CodeAnalysisApiLocation {
         private String filePath;
         private String fileName;
         private String fileLink;
         private int lineNo;
 
-        public Location() {
+        public CodeAnalysisApiLocation() {
         }
 
-        public Location(String filePath, String fileName, String fileLink, int lineNo) {
+        public CodeAnalysisApiLocation(String filePath, String fileName, String fileLink, int lineNo) {
             this.filePath = filePath;
             this.fileName = fileName;
             this.fileLink = fileLink;
@@ -58,7 +58,7 @@ public class CodeAnalysisApi {
     public CodeAnalysisApi() {
     }
 
-    public CodeAnalysisApi(String method, String endpoint, Location location) {
+    public CodeAnalysisApi(String method, String endpoint, CodeAnalysisApiLocation location) {
         this.method = method;
         this.endpoint = endpoint;
         this.location = location;
@@ -84,11 +84,11 @@ public class CodeAnalysisApi {
         this.endpoint = endpoint;
     }
 
-    public Location getLocation() {
+    public CodeAnalysisApiLocation getLocation() {
         return location;
     }
 
-    public void setLocation(Location location) {
+    public void setLocation(CodeAnalysisApiLocation location) {
         this.location = location;
     }
 }

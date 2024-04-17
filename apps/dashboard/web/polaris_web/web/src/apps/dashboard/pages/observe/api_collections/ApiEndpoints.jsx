@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, Link } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, Link, Tooltip } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -26,6 +26,7 @@ import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
 import { ENDPOINTS_PAGE_DOCS_URL } from "../../../../main/onboardingData"
 import {TestrunsBannerComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
 import GetPrettifyEndpoint from "../GetPrettifyEndpoint"
+import SourceLocation from "./component/SourceLocation"
 
 const headings = [
     {
@@ -76,13 +77,6 @@ const headings = [
         isText: true,
         type: CellType.TEXT
     },
-    // {
-    //     text: 'Source location',
-    //     title: 'Source location',
-    //     value: 'source_location',
-    //     isText: true,
-    //     type: CellType.TEXT
-    // }
     {
         text: "Source location",
         value: "sourceLocationComp",
@@ -235,6 +229,11 @@ function ApiEndpoints() {
 
         if (codeAnalysisCollection) {
             const codeAnalysisApisMap = codeAnalysisCollection.codeAnalysisApisMap
+
+            // Don't show empty screen if there are codeanalysis endpoints present
+            if (codeAnalysisApisMap && Object.keys(codeAnalysisApisMap).length > 0) {
+                setShowEmptyScreen(false)
+            }
             shadowApis = { ...codeAnalysisApisMap }
 
             // Find shadow endpoints and map api endpoint location
@@ -250,7 +249,7 @@ function ApiEndpoints() {
                     const codeAnalysisApi = codeAnalysisApisMap[apiKey]
                     const location = codeAnalysisApi.location
                     api.sourceLocation = codeAnalysisApi.location.filePath
-                    api.sourceLocationComp = getSourceLocationComp(codeAnalysisApi.location)
+                    api.sourceLocationComp = <SourceLocation location={location} />
 
                     delete shadowApis[apiKey]
                 }
@@ -275,7 +274,7 @@ function ApiEndpoints() {
                     last_seen: "",
                     codeAnalysisEndpoint: true,
                     sourceLocation: location.filePath, 
-                    sourceLocationComp: getSourceLocationComp(location),
+                    sourceLocationComp: <SourceLocation location={location} />,
                 }
             })
         }
@@ -358,19 +357,7 @@ function ApiEndpoints() {
         })
     }
 
-    function getSourceLocationComp(location) {
 
-        return (
-            <Box>
-                {location.fileLink === "" ?
-                    <Text variant="bodyMd" fontWeight="medium" breakWord>{location.filePath}</Text> :
-                     <Link url={location.fileLink} monochrome target="_blank">
-                        <Text variant="bodyMd" fontWeight="medium" breakWord>{location.filePath}</Text> 
-                    </Link> 
-                }
-            </Box>
-        )
-    }
 
     function handleRefresh() {
         fetchData()
