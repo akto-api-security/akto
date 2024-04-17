@@ -151,6 +151,7 @@ public class ApiExecutor {
                 typedUrl = new URI(url);
 
             } catch (URISyntaxException e) {
+                loggerMaker.errorAndAddToDb(e, "error converting req url to uri " + url, LogDb.TESTING);
                 throw new RuntimeException(e);
             }
 
@@ -161,6 +162,7 @@ public class ApiExecutor {
                 newUri = new URI(newUrl);
 
             } catch (URISyntaxException e) {
+                loggerMaker.errorAndAddToDb(e, "error converting override url to uri " + url, LogDb.TESTING);
                 throw new RuntimeException(e);
             }
 
@@ -181,6 +183,7 @@ public class ApiExecutor {
 
                 url = new URI(newScheme, null, newHost, newPort, newPath, typedUrl.getQuery(), typedUrl.getFragment()).toString();
             } catch (URISyntaxException e) {
+                loggerMaker.errorAndAddToDb(e, "error building new url using override url", LogDb.TESTING);
                 throw new RuntimeException(e);
             }
         }
