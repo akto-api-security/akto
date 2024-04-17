@@ -237,6 +237,9 @@ public class DaoInit {
         ClassModel<ModifyHostDetail> modifyHostDetailClassModel = ClassModel.builder(ModifyHostDetail.class).enableDiscriminator(true).build();
         ClassModel<FileUpload> fileUploadClassModel = ClassModel.builder(FileUpload.class).enableDiscriminator(true).build();
         ClassModel<FileUploadLog> fileUploadLogClassModel = ClassModel.builder(FileUploadLog.class).enableDiscriminator(true).build();
+        ClassModel<CodeAnalysisCollection> codeAnalysisCollectionClassModel = ClassModel.builder(CodeAnalysisCollection.class).enableDiscriminator(true).build();
+        ClassModel<CodeAnalysisApi> codeAnalysisApiClassModel = ClassModel.builder(CodeAnalysisApi.class).enableDiscriminator(true).build();
+        ClassModel<CodeAnalysisApi.CodeAnalysisApiLocation> codeAnalysisApiLocationClassModel = ClassModel.builder(CodeAnalysisApi.CodeAnalysisApiLocation.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -265,7 +268,7 @@ public class DaoInit {
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel,
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
-                ,fileUploadLogClassModel).automatic(true).build());
+                ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiClassModel, codeAnalysisApiLocationClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
