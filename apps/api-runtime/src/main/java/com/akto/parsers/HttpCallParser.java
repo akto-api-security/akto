@@ -394,7 +394,7 @@ public class HttpCallParser {
             if (ignoreAktoFlag != null) continue;
 
             // check for garbage points here
-            if(!accountSettings.getAllowRedundantEndpoints()){
+            if(accountSettings != null && !accountSettings.getAllowRedundantEndpoints()){
                 if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL())){
                     continue;
                 }
