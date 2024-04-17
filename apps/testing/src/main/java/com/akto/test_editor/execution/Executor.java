@@ -200,6 +200,7 @@ public class Executor {
     public void overrideTestUrl(RawApi rawApi, TestingRunConfig testingRunConfig) {
         try {
             String url = "";
+            loggerMaker.infoAndAddToDb("override url received - " + testingRunConfig.getOverriddenTestAppUrl(), LogDb.TESTING);
             List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
             if (!originalHostHeaders.isEmpty() && testingRunConfig != null
                 && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
