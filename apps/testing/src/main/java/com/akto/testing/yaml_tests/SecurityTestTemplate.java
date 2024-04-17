@@ -8,6 +8,7 @@ import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.Strategy;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.TestError;
+import com.akto.test_editor.execution.Memory;
 
 import java.util.Collections;
 import java.util.ArrayList;
@@ -30,6 +31,8 @@ public abstract class SecurityTestTemplate {
 
     TestingRunConfig testingRunConfig;
     Strategy strategy;
+
+    Memory memory;
 
     public SecurityTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode ,RawApi rawApi, Map<String, Object> varMap, Auth auth, AuthMechanism authMechanism, String logId, TestingRunConfig testingRunConfig, Strategy strategy) {
         this.apiInfoKey = apiInfoKey;
@@ -148,5 +151,5 @@ public abstract class SecurityTestTemplate {
     public void setLogId(String logId) {
         this.logId = logId;
     }
-    
+
 }
