@@ -1,5 +1,6 @@
 package com.akto.utils;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -69,7 +70,7 @@ public class GithubLogin {
         OriginalHttpRequest request = new OriginalHttpRequest(emailsUrl, "", "GET", null, headers, "");
         OriginalHttpResponse response = null;
         try {
-            response = ApiExecutor.sendRequest(request, false, null);
+            response = ApiExecutor.sendRequest(request, false, null, false, new ArrayList<>());
             return objectMapper.readValue(response.getBody(), new TypeReference<List<Map<String, String>>>() {});
         }catch(Exception e){
             return null;
