@@ -1,9 +1,12 @@
-import { Page, VerticalStack } from "@shopify/polaris";
+import {  HorizontalStack,  Page, VerticalStack } from "@shopify/polaris";
 import { useNavigate, useLocation } from "react-router-dom";
+import { learnMoreObject } from "../../../main/onboardingData"
+import LearnPopoverComponent from "./LearnPopoverComponent";
+import func from  "@/util/func"
 
 const PageWithMultipleCards = (props) => {
 
-    const {backUrl, isFirstPage, title, primaryAction, secondaryActions, divider, components} = props
+    const {backUrl, isFirstPage, title, primaryAction, secondaryActions, divider, components, fullWidth} = props
 
     const location = useLocation();
     const navigate = useNavigate()
@@ -20,12 +23,27 @@ const PageWithMultipleCards = (props) => {
         return isNewTab || isFirstPage ? null : { onAction: navigateBack }
     }
 
+
+    const learnMoreObj = learnMoreObject.hasOwnProperty(func.transformString(location.pathname)) ? learnMoreObject[func.transformString(location.pathname)] : null
+
+    const learnMoreComp = (
+        learnMoreObj ?
+        <LearnPopoverComponent learnMoreObj={learnMoreObj} /> : null
+    )
+
+    const useSecondaryActions = (
+        <HorizontalStack gap={2}>
+            {learnMoreObj ? learnMoreComp : null }
+            {secondaryActions}
+        </HorizontalStack>
+    )
+
     return (
-        <Page fullWidth
+        <Page fullWidth={fullWidth === undefined ? true: fullWidth}
             title={title}
             backAction={getBackAction()}
             primaryAction={primaryAction}
-            secondaryActions={secondaryActions}
+            secondaryActions={useSecondaryActions}
             divider={divider}
         >
             <VerticalStack gap="4">

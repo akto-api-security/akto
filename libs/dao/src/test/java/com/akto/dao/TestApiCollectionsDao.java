@@ -18,13 +18,13 @@ public class TestApiCollectionsDao extends MongoBasedTest {
         ApiCollectionsDao.instance.getMCollection().drop();
 
         // mirroring collection with host
-        ApiCollection apiCollection1 = new ApiCollection(1000, "mirroring_with_host", 1000, new HashSet<>(), "akto.io", 123);
+        ApiCollection apiCollection1 = new ApiCollection(1000, "mirroring_with_host", 1000, new HashSet<>(), "akto.io", 123, false, true);
         // mirroring collections without hosts
-        ApiCollection apiCollection2 = new ApiCollection(2000, "mirroring_without_host", 2000, new HashSet<>(), null, 456);
+        ApiCollection apiCollection2 = new ApiCollection(2000, "mirroring_without_host", 2000, new HashSet<>(), null, 456, false, true);
         // manually created collections with vxlanid == 0
-        ApiCollection apiCollection3 = new ApiCollection(3000, "burp1", 3000, new HashSet<>(),null, 0);
+        ApiCollection apiCollection3 = new ApiCollection(3000, "burp1", 3000, new HashSet<>(),null, 0, false, true);
         // manually created collections with vxlanid != 0
-        ApiCollection apiCollection4 = new ApiCollection(4000, "burp2", 4000, new HashSet<>(),null, 4000);
+        ApiCollection apiCollection4 = new ApiCollection(4000, "burp2", 4000, new HashSet<>(),null, 4000, false, true);
 
         ApiCollectionsDao.instance.insertMany(Arrays.asList(apiCollection1, apiCollection2, apiCollection3, apiCollection4));
 

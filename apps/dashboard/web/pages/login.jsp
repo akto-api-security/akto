@@ -61,11 +61,22 @@
                     window.RELEASE_VERSION = '${requestScope.releaseVersion}';
                     window.RELEASE_VERSION_GLOBAL = '${requestScope.AktoVersionGlobal}';
                     window.AKTO_UI_MODE = '${requestScope.aktoUIMode}'
-                    window.GITHUB_AUTH_URL=atob('${requestScope.githubAuthUrl}')
+                    window.GITHUB_CLIENT_ID=atob('${requestScope.githubClientId}')
+                    window.STIGG_CUSTOMER_ID='${requestScope.stiggCustomerId}'
+                    window.STIGG_CUSTOMER_TOKEN='${requestScope.stiggCustomerToken}'
+                    window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
+                    window.JIRA_INTEGRATED ='${requestScope.jiraIntegrated}'
 
+                    window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
+                    window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');
+                    window.STIGG_FEATURE_WISE_ALLOWED = JSON.parse('${requestScope.stiggFeatureWiseAllowed}' || '{}');
                     if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host.endsWith('akto.io') ){
                         window.DASHBOARD_MODE='LOCAL_DEPLOY'
                         window.IS_SAAS='true'
+                    }
+
+                    if(!window.STIGG_CLIENT_KEY){
+                        window.STIGG_CLIENT_KEY='invalid-key'
                     }
 
                     // Enabling the debug mode flag is useful during implementation,
@@ -91,7 +102,10 @@
                         window.intercomSettings = {
                             api_base: "https://api-iam.intercom.io",
                             app_id: "xjvl0z2h",
-                            created_at: new Date().getTime()
+                            created_at: new Date().getTime(),
+                            show_overage: window.STIGG_IS_OVERAGE==='true',
+                            data_ingestion_paused: window.USAGE_PAUSED?.dataIngestion === 'true',
+                            test_runs_paused: window.USAGE_PAUSED?.testRuns === 'true'
                         };
                     }
    // mixpanel.track('Login');
@@ -117,19 +131,11 @@
                     // the user will always see the old login screen
                     script.type = "text/javascript"
                     if (window.RELEASE_VERSION_GLOBAL == '' || window.RELEASE_VERSION_GLOBAL == 'akto-release-version') {// Case when akto version is not available
-                        if (window.AKTO_UI_MODE == 'VERSION_2') {
-                            script.src = "/polaris_web/web/dist/main.js";
-                        } else {
-                            script.src = "/dist/main.js";
-                        }
+                        script.src = "/polaris_web/web/dist/main.js";
                     } else if (window.RELEASE_VERSION == '' || window.RELEASE_VERSION == 'akto-release-version') {
-                        script.src = "https://d1hvi6xs55woen.cloudfront.net/web/" + window.RELEASE_VERSION_GLOBAL + "/dist/main.js";;
+                        script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION_GLOBAL + "/dist/main.js";;
                     } else {
-                        if (window.AKTO_UI_MODE == 'VERSION_2') {
-                            script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION + "/dist/main.js";
-                        } else {
-                            script.src = "https://d1hvi6xs55woen.cloudfront.net/web/" + window.RELEASE_VERSION + "/dist/main.js";
-                        }
+                        script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION + "/dist/main.js";;
                     }
                     document.body.appendChild(script);
                 </script>

@@ -1,34 +1,42 @@
 package com.akto.dto.testing;
 
 import com.akto.dao.testing.EndpointLogicalGroupDao;
+import com.akto.dto.testing.sources.AuthWithCond;
 import com.mongodb.client.model.Filters;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
+
+import java.util.List;
 
 import static com.akto.util.Constants.ID;
 
 public class TestRoles {
     private ObjectId id;
+    @BsonIgnore
+    private String hexId;
     public static final String NAME = "name";
     private String name;
     private ObjectId endpointLogicalGroupId;
-    private AuthMechanism authMechanism;
+    public static final String AUTH_WITH_COND_LIST = "authWithCondList";
+    private List<AuthWithCond> authWithCondList;
     @BsonIgnore
     private EndpointLogicalGroup endpointLogicalGroup;
+
     private String createdBy;
     private int createdTs;
     public static final String LAST_UPDATED_TS = "lastUpdatedTs";
     private int lastUpdatedTs;
     public TestRoles(){}
-    public TestRoles(ObjectId id, String name, ObjectId endpointLogicalGroupId, AuthMechanism authMechanism, String createdBy, int createdTs, int lastUpdatedTs) {
+    public TestRoles(ObjectId id, String name, ObjectId endpointLogicalGroupId, List<AuthWithCond> authWithCondList, String createdBy, int createdTs, int lastUpdatedTs) {
         this.id = id;
         this.name = name;
         this.endpointLogicalGroupId = endpointLogicalGroupId;
-        this.authMechanism = authMechanism;
+        this.authWithCondList = authWithCondList;
         this.createdBy = createdBy;
         this.createdTs = createdTs;
         this.lastUpdatedTs = lastUpdatedTs;
-    }
+	}
+    
     public EndpointLogicalGroup fetchEndpointLogicalGroup() {
         if (this.endpointLogicalGroup == null) {
             this.endpointLogicalGroup = EndpointLogicalGroupDao.instance.findOne(Filters.eq(ID, this.endpointLogicalGroupId));
@@ -57,14 +65,6 @@ public class TestRoles {
 
     public void setEndpointLogicalGroupId(ObjectId endpointLogicalGroupId) {
         this.endpointLogicalGroupId = endpointLogicalGroupId;
-    }
-
-    public AuthMechanism getAuthMechanism() {
-        return authMechanism;
-    }
-
-    public void setAuthMechanism(AuthMechanism authMechanism) {
-        this.authMechanism = authMechanism;
     }
 
     public EndpointLogicalGroup getEndpointLogicalGroup() {
@@ -97,5 +97,33 @@ public class TestRoles {
 
     public void setLastUpdatedTs(int lastUpdatedTs) {
         this.lastUpdatedTs = lastUpdatedTs;
+    }
+
+    public List<AuthWithCond> getAuthWithCondList() {
+        return authWithCondList;
+    }
+
+    public void setAuthWithCondList(List<AuthWithCond> authWithCondList) {
+        this.authWithCondList = authWithCondList;
+    }
+
+    public String getHexId() {
+        if (hexId == null) return this.id.toHexString();
+        return this.hexId;
+    }
+
+    public void setHexId(String hexId) {
+        this.hexId = hexId;
+    }
+
+    public AuthMechanism getDefaultAuthMechanism(){
+        if(this.getAuthWithCondList() != null && !this.getAuthWithCondList().isEmpty()){
+            for (AuthWithCond authWithCond : this.getAuthWithCondList()) {
+                if(authWithCond.getHeaderKVPairs() != null && authWithCond.getHeaderKVPairs().isEmpty()){
+                    return authWithCond.getAuthMechanism();
+                }
+            }
+        }
+        return null;
     }
 }

@@ -1,9 +1,10 @@
-import { Text, Button } from "@shopify/polaris"
+import { Text, Button, HorizontalStack } from "@shopify/polaris"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubServerTable from "../../../components/tables/GithubServerTable"
-import { useEffect, useState } from "react"
+import { useReducer, useState } from "react"
+import values from "@/util/values";
+import {produce} from "immer"
 import api from "../api"
-import Store from "../../../store"
 import func from "@/util/func"
 import { useNavigate, useParams } from "react-router-dom"
 import {
@@ -11,6 +12,7 @@ import {
     DynamicSourceMinor, ClockMinor  } from '@shopify/polaris-icons';
 import StyledEndpoint from "../api_collections/component/StyledEndpoint"
 import PersistStore from "../../../../main/PersistStore"
+import DateRangeFilter from "../../../components/layouts/DateRangeFilter"
 
 const headers = [
     {
@@ -38,6 +40,7 @@ const headers = [
     {
         text: "Timestamp",
         value: "timestamp",
+        sortActive: true
     },
     {
         text: "Location",
@@ -49,11 +52,14 @@ const headers = [
         text: "API call",
         value: "isRequest",
     },
+    {
+        value: 'collectionIds',
+    }
 ]
 
 const sortOptions = [
-    { label: 'Discovered time', value: 'timestamp asc', directionLabel: 'Newest', sortKey: 'timestamp' },
-    { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp' },
+    { label: 'Discovered time', value: 'timestamp asc', directionLabel: 'Newest', sortKey: 'timestamp', columnIndex:4 },
+    { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp', columnIndex:4 },
     
 ];
 
@@ -68,7 +74,15 @@ let filters = [
     key: 'isRequest',
     label: 'API call',
     title: 'API call',
-    choices: [],
+    choices: [
+        {
+            label:"In request",
+            value:true
+        },
+        {
+            label:"In response",
+            value:false
+        }],
     singleSelect:true
   },
   {
@@ -80,6 +94,12 @@ let filters = [
         {label:"Payload", value:"payload"},
         {label:"URL param", value:"urlParam"}
     ],
+  },
+  {
+    key: 'collectionIds',
+    label: 'API groups',
+    title: 'API groups',
+    choices: [],
   }
 ]
 
@@ -117,34 +137,29 @@ function SensitiveDataExposure() {
     const subType = params.subType;
     const apiCollectionMap = PersistStore(state => state.collectionsMap)
 
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
+    const getTimeEpoch = (key) => {
+        return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
+    }
+
+    const startTimestamp = getTimeEpoch("since")
+    const endTimestamp = getTimeEpoch("until")
+
     function disambiguateLabel(key, value) {
         switch (key) {
             case "location":
                 return func.convertToDisambiguateLabelObj(value, null, 2)
+            case "collectionIds": 
             case "apiCollectionId": 
             return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
             case "isRequest":
                 return value[0] ? "In request" : "In response"
-            case "dateRange":
-                return value.since.toDateString() + " - " + value.until.toDateString();
             default:
                 return value;
         }
       }
-    filters[0].choices=[];
-    Object.keys(apiCollectionMap).forEach((key) => { 
-        filters[0].choices.push({
-            label:apiCollectionMap[key],
-            value:Number(key)
-        })
-    });
-    filters[1].choices=[{
-        label:"In request",
-        value:true
-    },{
-        label:"In response",
-        value:false
-    }]
+
+    filters = func.getCollectionFilters(filters)
 
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
         setLoading(true);
@@ -154,14 +169,6 @@ function SensitiveDataExposure() {
         filterOperators['subType']="OR"
         let ret = []
         let total = 0; 
-        let dateRange = filters['dateRange'] || false;
-        delete filters['dateRange']
-        let startTimestamp = 0;
-        let endTimestamp = func.timeNow()
-        if(dateRange){
-            startTimestamp = Math.floor(Date.parse(dateRange.since) / 1000);
-            endTimestamp = Math.floor(Date.parse(dateRange.until) / 1000)
-        }
         await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, true,isRequest).then((res)=> {
             res.endpoints.forEach((endpoint, index) => {
                 let temp = {}
@@ -189,6 +196,13 @@ const handleRedirect = () => {
     navigate("/dashboard/observe/data-types")
 }
 
+const primaryActions = (
+    <HorizontalStack gap={"2"}>
+        <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
+        <Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>
+    </HorizontalStack>
+)
+
     return (
         <PageWithMultipleCards
         title={
@@ -197,10 +211,10 @@ const handleRedirect = () => {
           </Text>
         }
         backUrl="/dashboard/observe/sensitive"
-        primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
+        primaryAction={primaryActions}
         components = {[
             <GithubServerTable
-                key="table"
+                key={startTimestamp + endTimestamp}
                 headers={headers}
                 resourceName={resourceName} 
                 appliedFilters={appliedFilters}
@@ -212,7 +226,6 @@ const handleRedirect = () => {
                 filters={filters}
                 // promotedBulkActions={promotedBulkActions}
                 hideQueryField={true}
-                calenderFilter={true}
                 getStatus={func.getTestResultStatus}
             />
         ]}

@@ -1,5 +1,6 @@
 package com.akto.dao;
 
+import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.*;
 import com.mongodb.client.model.*;
@@ -7,11 +8,12 @@ import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
 
-import org.bson.BsonDocument;
+import com.mongodb.BasicDBObject;
 import org.bson.Document;
 import com.mongodb.client.result.UpdateResult;
 
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,15 +31,51 @@ public abstract class MCollection<T> {
     abstract public String getDBName();
     abstract public String getCollName();
     abstract public Class<T> getClassT();
+    public static final Bson noMatchFilter = Filters.nor(new BasicDBObject());;
 
     public Document getStats() {
         MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
         return mongoDatabase.runCommand(new Document("serverStatus",1));
     }
 
-    public MongoCollection<T> getMCollection() {
+    public boolean isCapped() {
         MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
-        return mongoDatabase.getCollection(getCollName(), getClassT());
+
+        for (Document collection: mongoDatabase.listCollections()) {
+            if (collection.getString("name").equals(getCollName())) {
+                return collection.get("options", new Document()).getBoolean("capped", false);
+            }
+        }
+        return false;
+    }
+    public Document convertToCappedCollection(long sizeInBytes) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        for (Document collection: mongoDatabase.listCollections()) {
+            if (collection.getString("name").equals(getCollName())) {
+                return mongoDatabase.runCommand(new Document("convertToCapped", getCollName())
+                        .append("size", sizeInBytes));
+            }
+        }
+        return null;
+    }
+
+    public MongoCollection<T> getMCollection() {
+        return getMCollection(getDBName(), getCollName(), getClassT());
+    }
+
+    public static <T> MongoCollection<T> getMCollection(String dbName, String collectionName, Class<T> classT) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(dbName);
+        return mongoDatabase.getCollection(collectionName, classT);
+    }
+
+    public static boolean checkConnection() {
+        try {
+            clients[0].listDatabaseNames().first();
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     public<V> List<T> findAll(String key, V value) {
@@ -150,8 +188,15 @@ public abstract class MCollection<T> {
         return this.getMCollection().findOneAndUpdate(q, obj, new FindOneAndUpdateOptions().upsert(true));
     }
 
+    public T updateOneNoUpsert(Bson q, Bson obj) {
+        return this.getMCollection().findOneAndUpdate(q, obj, new FindOneAndUpdateOptions().upsert(false));
+    }
+
     public UpdateResult updateMany (Bson q, Bson obj) {
         return this.getMCollection().updateMany(q, obj);
+    }
+    public UpdateResult updateManyNoUpsert (Bson q, Bson obj) {
+        return this.getMCollection().updateMany(q, obj, new UpdateOptions().upsert(false));
     }
     public BulkWriteResult bulkWrite (List<WriteModel<T>> modelList, BulkWriteOptions options) {
         return this.getMCollection().bulkWrite(modelList, options);
@@ -215,7 +260,7 @@ public abstract class MCollection<T> {
     public static boolean createIndexIfAbsent(String dbName, String collName, Bson idx, IndexOptions options) {
         try{
             MongoDatabase db = clients[0].getDatabase(dbName);
-            
+
             MongoCursor<Document> cursor = db.getCollection(collName).listIndexes().cursor();
             List<Document> indices = new ArrayList<>();
 
@@ -239,10 +284,21 @@ public abstract class MCollection<T> {
 
     }
 
+    public static boolean createUniqueIndex(String dbName, String collName, String[] fieldNames, boolean isAscending) {
+
+        Bson indexInfo = isAscending ? Indexes.ascending(fieldNames) : Indexes.descending(fieldNames);
+        String name = generateIndexName(fieldNames, isAscending);
+        return createIndexIfAbsent(dbName, collName, indexInfo, new IndexOptions().name(name).unique(true));
+    }
+
     public static boolean createIndexIfAbsent(String dbName, String collName, String[] fieldNames, boolean isAscending) {
 
         Bson indexInfo = isAscending ? Indexes.ascending(fieldNames) : Indexes.descending(fieldNames);
+        String name = generateIndexName(fieldNames, isAscending);
+        return createIndexIfAbsent(dbName, collName, indexInfo, new IndexOptions().name(name));
+    }
 
+    public static String generateIndexName(String[] fieldNames, boolean isAscending) {
         String name = "";
 
         int lenPerField = 30/fieldNames.length - 1;
@@ -260,8 +316,30 @@ public abstract class MCollection<T> {
 
         name += ("_");
         name += (isAscending ? "1" : "-1");
-
-        return createIndexIfAbsent(dbName, collName, indexInfo, new IndexOptions().name(name));
+        return name;
     }
+
+    public ObjectId findNthDocumentIdFromEnd(int n) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        MongoCursor<Document> cursor = mongoDatabase.getCollection(getCollName(), Document.class).find(new BasicDBObject())
+                .sort(Sorts.descending(ID))
+                .skip(n)
+                .limit(1)
+                .cursor();
+
+        return cursor.hasNext() ? cursor.next().getObjectId(ID) : null;
+    }
+
+    public void trimCollection(int maxDocuments) {
+        long count = this.getMCollection().estimatedDocumentCount();
+        if (count <= maxDocuments) return;
+        long deleteCount =  maxDocuments / 2;
+        ObjectId objectId = findNthDocumentIdFromEnd((int) deleteCount);
+        if (objectId == null) return;
+
+        DeleteResult deleteResult = this.getMCollection().deleteMany(lt(ID, objectId));
+        logger.info("Trimmed : " + deleteResult.getDeletedCount());
+    }
+
 
 }

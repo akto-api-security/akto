@@ -9,7 +9,7 @@ import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside }) {
 
     const initialState = {
         categories: [],
@@ -24,7 +24,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
         testRunTimeLabel: "Till complete",
         maxConcurrentRequests: -1,
         testName: "",
-        authMechanismPresent: false
+        authMechanismPresent: false,
+        testRoleLabel: "No test role selected",
+        testRoleId: "",
     }
 
     const navigate = useNavigate()
@@ -34,7 +36,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
     })
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const [loading, setLoading] = useState(true)
-    const [active, setActive] = useState(false);
+    const [testRolesArr, setTestRolesArr] = useState([])
+    const [active, setActive] = useState(runTestFromOutside || false);
 
     const runTestRef = useRef(null);
 
@@ -62,6 +65,15 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
         setLoading(true)
 
         const allSubCategoriesResponse = await testingApi.fetchAllSubCategories(true)
+        const testRolesResponse = await testingApi.fetchTestRoles()
+        var testRoles = testRolesResponse.testRoles.map(testRole => {
+            return {
+                "label": testRole.name,
+                "value": testRole.hexId
+            }
+        })
+        testRoles.unshift({"label": "No test role selected", "value": ""})
+        setTestRolesArr(testRoles)
         const businessLogicSubcategories = allSubCategoriesResponse.subCategories
         const categories = allSubCategoriesResponse.categories
         const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(businessLogicSubcategories)
@@ -104,7 +116,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
 
     useEffect(() => {
         fetchData()
-    }, [apiCollectionName])
+        if(runTestFromOutside === true){
+            setActive(true)
+        }
+    }, [apiCollectionName,runTestFromOutside])
 
     const toggleRunTest = () => setActive(prev => !prev)
 
@@ -118,7 +133,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
             let obj = {
                 label: x.testName,
                 value: x.name,
-                icon: "$aktoWhite"
+                author: x.author
             }
             ret[x.superCategory.name].all.push(obj)
             ret[x.superCategory.name].selected.push(obj)
@@ -195,7 +210,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
         }
 
         testRows = testRun.tests[testRun.selectedCategory].map(test => {
-            const isCustom = test.label.includes("Custom") || test.value.includes("CUSTOM")
+            const isCustom = test?.author !== "AKTO"
             const label = (
                 <span style={{display: 'flex', gap: '4px', alignItems: 'flex-start'}}>
                     <Text variant="bodyMd">{test.label}</Text>
@@ -295,7 +310,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl } = testRun
+        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId } = testRun
         const collectionId = parseInt(apiCollectionId)
 
         const tests = testRun.tests
@@ -314,9 +329,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
         }))
 
         if (filtered) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI")
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId)
         }
 
         setActive(false)
@@ -508,7 +523,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
                                         initial={"Default"}
                                         selected={(requests) => {
                                             let maxConcurrentRequests
-                                            console.log(requests);
                                             if (requests === "Default") maxConcurrentRequests = -1
                                             else maxConcurrentRequests = requests
 
@@ -521,7 +535,27 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled }) {
                                             }))
                                         }} />
                                 </ButtonGroup>
+                                
                             </Box>
+                            <Box>
+                            <ButtonGroup>
+                                    <Text>Select test role:</Text>
+                                    <Dropdown
+                                        menuItems={testRolesArr}
+                                        initial={"No test role selected"}
+                                        selected={(requests) => {
+                                            let testRole
+                                            if (!(requests === "No test role selected")){testRole = requests}
+                                            const testRoleOption = getLabel(testRolesArr, requests)
+
+                                            setTestRun(prev => ({
+                                                ...prev,
+                                                testRoleId: testRole,
+                                                testRoleLabel: testRoleOption.label
+                                            }))
+                                        }} />
+                                </ButtonGroup>
+                                </Box>
                         </HorizontalGrid>
                     </Modal.Section>
                 }

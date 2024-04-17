@@ -1,20 +1,23 @@
 package com.akto.testing;
 
+import com.akto.dao.ActivitiesDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
-import com.akto.dto.test_editor.Auth;
-import com.akto.dto.test_editor.ExecutorNode;
-import com.akto.dto.test_editor.FilterNode;
-import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.api_workflow.Graph;
+import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
@@ -22,11 +25,14 @@ import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.execution.Executor;
+import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.Constants;
@@ -35,17 +41,17 @@ import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
+import com.mongodb.MongoInterruptedException;
+import org.apache.commons.lang3.StringUtils;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.mortbay.util.ajax.JSON;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -55,6 +61,8 @@ import java.util.concurrent.*;
 public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
+    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
+
     public static long acceptableSizeInBytes = 5_000_000;
     private static final Gson gson = new Gson();
 
@@ -64,13 +72,13 @@ public class TestExecutor {
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
     public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() != 1) {
-            apiWiseInit(testingRun, summaryId);
+            apiWiseInit(testingRun, summaryId, false, new ArrayList<>());
         } else {
-            workflowInit(testingRun, summaryId);
+            workflowInit(testingRun, summaryId, false, new ArrayList<>());
         }
     }
 
-    public void workflowInit (TestingRun testingRun, ObjectId summaryId) {
+    public void workflowInit (TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
         if (!testingEndpoints.getType().equals(TestingEndpoints.Type.WORKFLOW)) {
             loggerMaker.errorAndAddToDb("Invalid workflow type", LogDb.TESTING);
@@ -91,7 +99,12 @@ public class TestExecutor {
 
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         try {
-            apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId);
+            Map<String, Object> valuesMap = new HashMap<>();
+            Graph graph = new Graph();
+            graph.buildGraph(workflowTest);
+            GraphExecutorRequest graphExecutorRequest = new GraphExecutorRequest(graph, workflowTest, testingRun.getId(), summaryId, valuesMap, false, "linear");
+            GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest, debug, testLogs, null);
+            WorkflowTestResultsDao.instance.insertOne(graphExecutorResult.getWorkflowTestResult());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while executing workflow test " + e, LogDb.TESTING);
         }
@@ -111,14 +124,14 @@ public class TestExecutor {
         );
     }
 
-    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
+    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs) {
         int accountId = Context.accountId.get();
         int now = Context.now();
         int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? Math.min( testingRun.getMaxConcurrentRequests(), 100) : 10;
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
-        sampleMessageStore.fetchSampleMessages();
+        sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(testingRun.getTestingEndpoints().returnApis()));
         AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
@@ -127,7 +140,7 @@ public class TestExecutor {
 
         sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
-        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
+        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();;
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false);
 
@@ -177,6 +190,14 @@ public class TestExecutor {
         String hostName;
         for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
             TestConfig testConfig = testConfigMap.get(testSubCategory);
+            if (testConfig == null) {
+                continue;
+            }
+            Map<String, Object> wordListsMap = (Map) testConfig.getWordlists();
+            //VariableResolver.resolveWordList(wordListsMap, testingUtil.getSampleMessageStore().getSampleDataMap(), ap);
+        }
+        for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
+            TestConfig testConfig = testConfigMap.get(testSubCategory);
             if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
                 continue;
             }
@@ -194,6 +215,8 @@ public class TestExecutor {
             }
         }
 
+        final int maxRunTime = testingRun.getTestRunTime() < 0 ? 30*60 : testingRun.getTestRunTime(); // if nothing specified wait for 30 minutes
+
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
                 hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
@@ -208,7 +231,7 @@ public class TestExecutor {
                          () -> startWithLatch(apiInfoKey,
                                  testingRun.getTestIdConfig(),
                                  testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
-                                 accountId, latch, now, testingRun.getTestRunTime(), testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap));
+                                 accountId, latch, now, maxRunTime, testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs));
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
@@ -219,10 +242,16 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("Waiting...", LogDb.TESTING);
 
         try {
-            int maxRunTime = testingRun.getTestRunTime();
-            if (maxRunTime < 0) maxRunTime = 30*60; // if nothing specified wait for 30 minutes
             boolean awaitResult = latch.await(maxRunTime, TimeUnit.SECONDS);
             loggerMaker.infoAndAddToDb("Await result: " + awaitResult, LogDb.TESTING);
+
+            if (!awaitResult) { // latch countdown didn't reach 0
+                for (Future<Void> future : futureTestingRunResults) {
+                    future.cancel(true);
+                }
+                loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
+            }
+
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -259,7 +288,7 @@ public class TestExecutor {
                                     Filters.eq(TestingRunResult.VULNERABLE, true)),
                             limit,
                             skip,
-                            Projections.include("testResults.confidence"));
+                            Projections.exclude("testResults.originalMessage", "testResults.nodeResultMap"));
 
             loggerMaker.infoAndAddToDb("Reading " + testingRunResults.size() + " vulnerable testingRunResults",
                     LogDb.TESTING);
@@ -277,14 +306,21 @@ public class TestExecutor {
 
         } while (fetchMore);
 
-        TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+        FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
+        options.returnDocument(ReturnDocument.AFTER);
+        TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(Constants.ID, summaryId),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
                         Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
-                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)));
+                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)),
+                options);
+        GithubUtils.publishGithubComments(testingRunResultSummary);
 
         loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
+        if(totalCountIssues.get(Severity.HIGH.toString()) > 0){
+            ActivitiesDao.instance.insertActivity("High Vulnerability detected", totalCountIssues.get(Severity.HIGH.toString()) + " HIGH vulnerabilites detected");
+        }
     }
 
     public static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult){
@@ -332,7 +368,7 @@ public class TestExecutor {
         return loginFlowResponse;
     }
 
-    public LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
+    public static LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
 
         if (authMechanism.getType() == null) {
             loggerMaker.infoAndAddToDb("auth type value is null", LogDb.TESTING);
@@ -349,11 +385,11 @@ public class TestExecutor {
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         LoginFlowResponse loginFlowResp;
-        loginFlowResp = apiWorkflowExecutor.runLoginFlow(workflowObj, authMechanism, loginFlowParams);
+        loginFlowResp =  com.akto.testing.workflow_node_executor.Utils.runLoginFlow(workflowObj, authMechanism, loginFlowParams);
         return loginFlowResp;
     }
 
-    public WorkflowTest convertToWorkflowGraph(ArrayList<RequestData> requestData, LoginFlowParams loginFlowParams) {
+    public static WorkflowTest convertToWorkflowGraph(ArrayList<RequestData> requestData, LoginFlowParams loginFlowParams) {
 
         String source, target;
         List<String> edges = new ArrayList<>();
@@ -392,10 +428,10 @@ public class TestExecutor {
             if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.RECORDED_FLOW.toString())) {
                 nodeType = WorkflowNodeDetails.Type.RECORDED;
             }
-            WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),
-                    URLMethods.Method.fromString(data.getMethod()), "", sampleData,
-                    nodeType, true, waitTime, 0, 0, data.getRegex(), data.getOtpRefUuid());
 
+            WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),
+                    URLMethods.Method.fromString(data.getMethod()), "", sampleData, nodeType,
+                    true, waitTime, 0, 0, data.getRegex(), data.getOtpRefUuid());
             mapNodeIdToWorkflowNodeDetails.put(target, workflowNodeDetails);
         }
 
@@ -455,22 +491,17 @@ public class TestExecutor {
     public Void startWithLatch(
             ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
             TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime,
-            int timeToKill, Map<String, TestConfig> testConfigMap, TestingRun testingRun, 
-            ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap) {
-
-        loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);
+            int maxRunTime, Map<String, TestConfig> testConfigMap, TestingRun testingRun,
+            ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
+            boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
         Context.accountId.set(accountId);
-        int now = Context.now();
-        if ( timeToKill <= 0 || now - startTime <= timeToKill) {
-            try {
-                // todo: commented out older one
-//                testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
-                startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap);
-            } catch (Exception e) {
-                e.printStackTrace();
-                loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);
-            }
+        loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
+
+        try {
+            startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, maxRunTime);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
         }
 
         latch.countDown();
@@ -478,12 +509,18 @@ public class TestExecutor {
     }
 
     public static void trim(TestingRunResult testingRunResult) {
-        List<TestResult> testResults = testingRunResult.getTestResults();
+        List<GenericTestResult> testResults = testingRunResult.getTestResults();
         int endIdx = testResults.size();
         long currentSize = 0;
 
         for (int idx=0;idx< testResults.size();idx++) {
-            TestResult testResult = testResults.get(idx);
+            GenericTestResult tr = testResults.get(idx);
+
+            if (tr instanceof MultiExecTestResult) {
+                return;
+            }
+
+            TestResult testResult = (TestResult) tr;
 
             String originalMessage = testResult.getOriginalMessage();
             long originalMessageSize = originalMessage == null ? 0 : originalMessage.getBytes().length;
@@ -526,28 +563,41 @@ public class TestExecutor {
     public void startTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId,
                                                TestingRunConfig testingRunConfig, TestingUtil testingUtil,
                                                ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap,
-                                               ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap) {
+                                               ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
+                                               boolean debug, List<TestingRunResult.TestLog> testLogs, int startTime, int timeToKill) {
 
         List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
 
+        int countSuccessfulTests = 0;
         for (String testSubCategory: testSubCategories) {
+            if (Context.now() - startTime > timeToKill) {
+                loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
+                return;
+            }
             List<TestingRunResult> testingRunResults = new ArrayList<>();
 
             TestConfig testConfig = testConfigMap.get(testSubCategory);
+            
             if (testConfig == null) continue;
             TestingRunResult testingRunResult = null;
             if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
                 continue;
             }
             try {
-                testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig);
+                testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
                 e.printStackTrace();
             }
-            if (testingRunResult != null) testingRunResults.add(testingRunResult);
+            if (testingRunResult != null) {
+                testingRunResults.add(testingRunResult);
+                countSuccessfulTests++;
+            }
 
             insertResultsAndMakeIssues(testingRunResults);
+        }
+        if(countSuccessfulTests > 0){
+            ApiInfoDao.instance.updateLastTestedField(apiInfoKey);
         }
 
     }
@@ -568,31 +618,39 @@ public class TestExecutor {
     }
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
-                                       ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig) {
+                                       ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
 
         List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
         if (messages == null || messages.isEmpty()){
-            List<TestResult> testResults = new ArrayList<>();
+            List<GenericTestResult> testResults = new ArrayList<>();
             testResults.add(new TestResult(null, null, Collections.singletonList(TestError.NO_PATH.getMessage()),0, false, Confidence.HIGH, null));
             return new TestingRunResult(
                 testRunId, apiInfoKey, testSuperType, testSubType ,testResults,
                 false,new ArrayList<>(),100,Context.now(),
-                Context.now(), testRunResultSummaryId
+                Context.now(), testRunResultSummaryId, null, Collections.singletonList(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "No samples messages found"))
             );
         }
 
-        String message = messages.get(0);
+        String message = messages.get(messages.size() - 1);
 
         RawApi rawApi = RawApi.buildFromMessage(message);
         int startTime = Context.now();
 
-        filterGraphQlPayload(rawApi, apiInfoKey);
+        try {
+            boolean isGraphQlPayload = filterGraphQlPayload(rawApi, apiInfoKey);
+            if (isGraphQlPayload) testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "GraphQL payload found"));
+        } catch (Exception e) {
+            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, e.getMessage()));
+        }
 
         FilterNode filterNode = testConfig.getApiSelectionFilters().getNode();
-        FilterNode validatorNode = testConfig.getValidation().getNode();
+        FilterNode validatorNode = null;
+        if (testConfig.getValidation() != null) {
+            validatorNode = testConfig.getValidation().getNode();
+        }
         ExecutorNode executorNode = testConfig.getExecute().getNode();
         Auth auth = testConfig.getAuth();
         Map<String, List<String>> wordListsMap = testConfig.getWordlists();
@@ -603,23 +661,30 @@ public class TestExecutor {
             varMap.put("wordList_" + key, wordListsMap.get(key));
         }
 
+        VariableResolver.resolveWordList(varMap, testingUtil.getSampleMessages(), apiInfoKey);
+
         String testExecutionLogId = UUID.randomUUID().toString();
         
         loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
             testSubType + "logId" + testExecutionLogId, LogDb.TESTING);
 
         List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
+        // TestingUtil -> authMechanism
+        // TestingConfig -> auth
+        com.akto.test_editor.execution.Executor executor = new Executor();
+        executor.overrideTestUrl(rawApi, testingRunConfig);
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
-                rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes);
-        List<TestResult> testResults = yamlTestTemplate.run();
-        if (testResults == null || testResults.isEmpty()) {
-            testResults = new ArrayList<>();
-            testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.SOMETHING_WENT_WRONG.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
+                rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
+        YamlTestResult testResults = yamlTestTemplate.run(debug, testLogs);
+        if (testResults == null || testResults.getTestResults().isEmpty()) {
+            List<GenericTestResult> res = new ArrayList<>();
+            res.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.SOMETHING_WENT_WRONG.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
+            testResults.setTestResults(res);
         }
         int endTime = Context.now();
 
         boolean vulnerable = false;
-        for (TestResult testResult: testResults) {
+        for (GenericTestResult testResult: testResults.getTestResults()) {
             if (testResult == null) continue;
             vulnerable = vulnerable || testResult.isVulnerable();
             try {
@@ -634,17 +699,17 @@ public class TestExecutor {
         int confidencePercentage = 100;
 
         return new TestingRunResult(
-                testRunId, apiInfoKey, testSuperType, testSubType ,testResults,
+                testRunId, apiInfoKey, testSuperType, testSubType ,testResults.getTestResults(),
                 vulnerable,singleTypeInfos,confidencePercentage,startTime,
-                endTime, testRunResultSummaryId
+                endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs
         );
     }
 
-    public void filterGraphQlPayload(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) {
+    public boolean filterGraphQlPayload(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) throws Exception {
 
         String url = apiInfoKey.getUrl();
         if (!url.toLowerCase().contains("graphql") || (!url.toLowerCase().contains("query") && !url.toLowerCase().contains("mutation"))) {
-            return;
+            return false;
         }
 
         String queryName;
@@ -657,17 +722,17 @@ public class TestExecutor {
                 split = apiInfoKey.getUrl().split("mutation/");
             }
             if (split.length < 2) {
-                return;
+                return false;
             }
             String queryStr = split[1];
 
             String []querySplit = queryStr.split("/");
             if (querySplit.length < 2) {
-                return;
+                return false;
             }
             queryName = querySplit[0];
         } catch (Exception e) {
-            return;
+            throw new Exception("Error while getting queryString");
         }
 
         ObjectMapper m = new ObjectMapper();
@@ -680,7 +745,7 @@ public class TestExecutor {
             List<Object> respObjList = Arrays.asList((Object[])respObj);
 
             if (objList.size() != respObjList.size()) {
-                return;
+                return false;
             }
             int index = 0;
 
@@ -706,9 +771,9 @@ public class TestExecutor {
 
             rawApi.getRequest().setBody(updatedBody);
             rawApi.getResponse().setBody(updatedRespBody);
-
+            return true;
         } catch (Exception e) {
-            return;
+            throw new Exception("Error while modifying graphQL payload");
         }
     }
 

@@ -27,8 +27,8 @@ public class RelationshipSync {
     private int last_sync;
     private final int last_sync_thresh;
     public Map<String,Map<String, Map<String, Set<Relationship.ApiRelationInfo>>>> userWiseParameterMap = new HashMap<>();
-    ObjectMapper mapper = new ObjectMapper();
-    JsonFactory factory = mapper.getFactory();
+    static ObjectMapper mapper = new ObjectMapper();
+    static JsonFactory factory = mapper.getFactory();
     private static final LoggerMaker loggerMaker = new LoggerMaker(RelationshipSync.class);
 
     public RelationshipSync(int user_thresh, int counter_thresh, int last_sync_thresh) {
@@ -212,8 +212,25 @@ public class RelationshipSync {
 
     }
 
+    public static Map<String, Set<String>> extractAllValuesFromPayload(String payload) {
+        if (payload == null || payload.isEmpty()) payload = "{}";
+        if (payload.startsWith("[")) payload = "{\"json\": "+payload+"}";
+
+        Map<String, Set<String>> valuesMap = new HashMap<>();
+        try {
+            JsonParser jp = factory.createParser(payload);
+            JsonNode jsonNode = mapper.readTree(jp);
+            RelationshipSync.extractAllValuesFromPayload(jsonNode, new ArrayList<>(), valuesMap);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return valuesMap;
+    }
+
 
     public static void extractAllValuesFromPayload(JsonNode node, List<String> params, Map<String, Set<String>> values) {
+        // TODO: null values remove
         if (node == null) return;
         if (node.isValueNode()) {
             String textValue = node.asText();

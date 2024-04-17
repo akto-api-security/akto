@@ -24,6 +24,7 @@ const headers = [
         value: "subType",
         showFilter:true,
         itemOrder: 1,
+        sortActive: true
     },
     {
         text: "Custom type",
@@ -43,15 +44,16 @@ const headers = [
     },
     {
         text:"Sensitive count",
-        value: "sensitiveCount"
+        value: "sensitiveCount",
+        sortActive: true
     }
 ] 
 
 const sortOptions = [
-    { label: 'Sensitive data', value: 'sensitiveCount asc', directionLabel: 'More exposure', sortKey: 'sensitiveCount' },
-    { label: 'Sensitive data', value: 'sensitiveCount desc', directionLabel: 'Less exposure', sortKey: 'sensitiveCount' },
-    { label: 'Data type', value: 'subType asc', directionLabel: 'A-Z', sortKey: 'subType' },
-    { label: 'Data type', value: 'subType desc', directionLabel: 'Z-A', sortKey: 'subType' },
+    { label: 'Sensitive data', value: 'sensitiveCount asc', directionLabel: 'More exposure', sortKey: 'sensitiveCount', columnIndex: 6 },
+    { label: 'Sensitive data', value: 'sensitiveCount desc', directionLabel: 'Less exposure', sortKey: 'sensitiveCount', columnIndex: 6 },
+    { label: 'Data type', value: 'subType asc', directionLabel: 'A-Z', sortKey: 'subType', columnIndex: 2 },
+    { label: 'Data type', value: 'subType desc', directionLabel: 'Z-A', sortKey: 'subType', columnIndex: 2 },
   ];
 
 const resourceName = {
@@ -105,7 +107,8 @@ function AllSensitiveData() {
                         icon: CircleTickMajor,
                         iconColor: "success",
                         iconTooltip: "Active",
-                        sensitiveCount:0
+                        sensitiveCount:0,
+                        redacted: type.redacted
                     })
                 })
                 res.dataTypes.customDataTypes.forEach((type) => {
@@ -120,7 +123,8 @@ function AllSensitiveData() {
                         icon: type.active ? CircleTickMajor : CircleCancelMajor,
                         iconColor: type.active ? "success" : "critical",
                         iconTooltip: type.active ? "Active" : "Inactive",
-                        sensitiveCount:0
+                        sensitiveCount:0,
+                        redacted: type.redacted
                     })
                 })
                 setMapData(mapDataToKey)

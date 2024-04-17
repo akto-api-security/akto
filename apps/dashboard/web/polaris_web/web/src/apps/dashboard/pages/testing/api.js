@@ -1,12 +1,12 @@
 import request from "../../../../util/request"
 
 export default {
-    async fetchTestingDetails(startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters) {
+    async fetchTestingDetails(startTimestamp, endTimestamp,  sortKey, sortOrder, skip, limit, filters, testingRunType) {
         const resp = await request({
             url: '/api/retrieveAllCollectionTests',
             method: 'post',
             data: {
-                startTimestamp, endTimestamp, fetchCicd, sortKey, sortOrder, skip, limit, filters
+                startTimestamp, endTimestamp,  sortKey, sortOrder, skip, limit, filters, testingRunType
             }
         })
         return resp
@@ -24,12 +24,12 @@ export default {
         })
         return resp
     },
-    async fetchTestingRunResults(testingRunResultSummaryHexId, fetchOnlyVulnerable) {
+    async fetchTestingRunResults(testingRunResultSummaryHexId, queryMode) {
         const resp = await request({
             url: '/api/fetchTestingRunResults',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId, fetchOnlyVulnerable
+                testingRunResultSummaryHexId, queryMode
             }
         })
         return resp        
@@ -80,6 +80,24 @@ export default {
             method: 'post',
             data: {
                 testingRunResultHexId
+            }
+        })
+    },
+    createJiraTicket(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId) {
+        return request({
+            url: '/api/createJiraIssue',
+            method: 'post',
+            data: {
+                hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId
+            }
+        })
+    },
+    attachFileToIssue(origReq, testReq, issueId) {
+        return request({
+            url: '/api/attachFileToIssue',
+            method: 'post',
+            data: {
+                origReq, testReq, issueId
             }
         })
     },
@@ -186,6 +204,25 @@ export default {
         })
         return resp
     },
+
+    async getCountsMap(startTimestamp, endTimestamp){
+        return await request({
+            url: '/api/getAllTestsCountMap',
+            method: 'post',
+            data: {startTimestamp, endTimestamp}
+        })
+    },
+
+    async getSummaryInfo(startTimestamp, endTimestamp){
+        return await request({
+            url: '/api/getIssueSummaryInfo',
+            method: 'post',
+            data: {
+                startTimestamp: startTimestamp,
+                endTimestamp: endTimestamp,
+            }
+        })
+    },
     fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip) {
         return request({
             url: '/api/fetchVulnerableTestRunResults',
@@ -194,6 +231,143 @@ export default {
                 testingRunResultSummaryHexId,
                 skip
             }
+        })
+    },
+    addAuthToRole(roleName, apiCond, authParamData, authAutomationType, reqData, recordedLoginFlowInput) {
+        return request({
+            url: '/api/addAuthToRole',
+            method: 'post',
+            data: {roleName, apiCond, authParamData, authAutomationType, reqData, recordedLoginFlowInput}
+        })
+    },
+    deleteAuthFromRole(roleName, index) {
+        return request({
+            url: '/api/deleteAuthFromRole',
+            method: 'post',
+            data: {roleName, index}
+        })
+    },
+    deleteTestRuns(testRunIds){
+        return request({
+            url: '/api/deleteTestRuns',
+            method: 'post',
+            data: {
+               testRunIds
+            }
+        })
+    },
+
+    deleteTestRunsFromSummaries(latestSummaryIds){
+        return request({
+            url: '/api/deleteTestRunsFromSummaries',
+            method: 'post',
+            data: {
+                latestSummaryIds
+            }
+        })
+    },
+    
+    buildDependencyTable(apiCollectionIds, skip){
+        return request({
+            url: '/api/buildDependencyTable',
+            method: 'post',
+            data: {
+                apiCollectionIds, skip
+            }
+        })
+    },
+
+    getUserTestRuns(){
+        return request({
+            url: '/api/fetchUsageTestRuns',
+            method: 'post',
+            data: {}
+        })
+    },
+    invokeDependencyTable(apiCollectionIds){
+        return request({
+            url: '/api/invokeDependencyTable',
+            method: 'post',
+            data: {
+                apiCollectionIds
+            }
+        })
+    },
+
+    saveReplaceDetails(apiCollectionId, url, method, kvPairs){
+        return request({
+            url: '/api/saveReplaceDetails',
+            method: 'post',
+            data: {
+                apiCollectionId, url, method, kvPairs
+            }
+        })
+    },
+
+    fetchGlobalVars(apiCollectionIds){
+        return request({
+            url: '/api/fetchGlobalVars',
+            method: 'post',
+            data: {
+                apiCollectionIds
+            }
+        })
+    },
+
+    saveGlobalVars(modifyHostDetails){
+        return request({
+            url: '/api/saveGlobalVars',
+            method: 'post',
+            data: {
+                modifyHostDetails
+            }
+        })
+    },
+
+    fetchValuesForParameters(apiCollectionId, url, method, params){
+        if (typeof apiCollectionId === "string") {
+            apiCollectionId = parseInt(apiCollectionId)
+        }
+        return request({
+            url: '/api/fetchValuesForParameters',
+            method: 'post',
+            data: {
+                apiCollectionId, url, method, params
+            }
+        })
+    },
+    updateGlobalRateLimit(globalRateLimit) {
+        return request({
+            url: '/api/updateGlobalRateLimit',
+            method: 'post',
+            data: {
+                globalRateLimit
+            }
+        })
+    },
+    fetchAccessMatrixUrlToRoles(){
+        return request({
+            url: '/api/fetchAccessMatrixUrlToRoles',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    createMultipleAccessMatrixTasks(roleName){
+        return request({
+            url: '/api/createMultipleAccessMatrixTasks',
+            method: 'post',
+            data: {roleName}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    deleteAccessMatrix(roleName){
+        return request({
+            url: '/api/deleteAccessMatrix',
+            method: 'post',
+            data: {roleName}
         })
     },
 }

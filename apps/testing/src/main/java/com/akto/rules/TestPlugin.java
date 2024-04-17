@@ -175,6 +175,7 @@ public abstract class TestPlugin {
         try {
             message = RedactSampleData.convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
+            // TODO:
             logger.error("Error while converting OriginalHttpRequest to string", e);
             message = RedactSampleData.convertOriginalReqRespToString(new OriginalHttpRequest(), new OriginalHttpResponse());
             errors.add(TestResult.TestError.FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING.getMessage());
@@ -383,7 +384,7 @@ public abstract class TestPlugin {
 
     private static boolean validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId) {
         Filter filter = new Filter();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap, logId);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap, logId, false);
         return dataOperandsFilterResponse.getResult();
     }
 

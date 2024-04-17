@@ -38,18 +38,36 @@ public class BackwardCompatibility {
     public static final String ENABLE_NEW_MERGING = "enableNewMerging";
     private int enableNewMerging;
 
+    public static final String ENABLE_ASYNC_MERGE_OUTSIDE = "enableMergeAsyncOutside";
+    private int enableMergeAsyncOutside;
     public static final String LOAD_TEMPLATES_FILES_FROM_DIRECTORY = "loadTemplateFilesFromDirectory";
-    private int loadTemplateFilesFromDirectory;
 
     public static final String DEFAULT_NEW_UI = "aktoDefaultNewUI";
     private int aktoDefaultNewUI;
 
+    public static final String COMPUTE_INTEGRATED_CONNECTIONS = "computeIntegratedConnections";
+    private int computeIntegratedConnections;
+    public static final String INITIALIZE_ORGANIZATION_ACCOUNT_BELONGS_TO = "initializeOrganizationAccountBelongsTo";
+    private int initializeOrganizationAccountBelongsTo;
+
+    public static final String ORGS_IN_BILLING = "orgsInBilling";
+    private int orgsInBilling;
+
+    public static final String DELETE_LAST_CRON_RUN_INFO= "deleteLastCronRunInfo";
+    private int deleteLastCronRunInfo;
+
+    public static final String DEFAULT_TELEMETRY_SETTINGS = "defaultTelemetrySettings";
+    private int defaultTelemetrySettings;
+
+    public static final String VULNERABLE_API_UPDATION_VERSION_V1 = "vulnerableApiUpdationVersionV1";
+    private int vulnerableApiUpdationVersionV1;
 
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
-                                 int deleteNullSubCategoryIssues, int enableNewMerging, int loadTemplateFilesFromDirectory,
-                                 int aktoDefaultNewUI) {
+                                 int deleteNullSubCategoryIssues, int enableNewMerging,
+                                 int aktoDefaultNewUI, int initializeOrganizationAccountBelongsTo, int orgsInBilling,
+                                 int computeIntegratedConnections, int deleteLastCronRunInfo, int vulnerableApiUpdationVersionV1) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -62,8 +80,13 @@ public class BackwardCompatibility {
         this.deleteAccessListFromApiToken = deleteAccessListFromApiToken;
         this.deleteNullSubCategoryIssues = deleteNullSubCategoryIssues;
         this.enableNewMerging = enableNewMerging;
-        this.loadTemplateFilesFromDirectory = loadTemplateFilesFromDirectory;
+        this.enableMergeAsyncOutside = enableMergeAsyncOutside;
         this.aktoDefaultNewUI = aktoDefaultNewUI;
+        this.computeIntegratedConnections = computeIntegratedConnections;
+        this.initializeOrganizationAccountBelongsTo = initializeOrganizationAccountBelongsTo;
+        this.orgsInBilling = orgsInBilling;
+        this.deleteLastCronRunInfo = deleteLastCronRunInfo;
+        this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
     }
 
     public BackwardCompatibility() {
@@ -173,13 +196,13 @@ public class BackwardCompatibility {
         this.enableNewMerging = enableNewMerging;
     }
 
-    public int getLoadTemplateFilesFromDirectory() {
-        return loadTemplateFilesFromDirectory;
-    } 
+    public int getEnableMergeAsyncOutside() {
+        return enableMergeAsyncOutside;
+    }
 
-    public int setLoadTemplateFilesFromDirectory(int loadTemplateFilesFromDirectory) {
-        return this.loadTemplateFilesFromDirectory = loadTemplateFilesFromDirectory;
-    } 
+    public void setEnableMergeAsyncOutside(int enableMergeAsyncOutside) {
+        this.enableMergeAsyncOutside = enableMergeAsyncOutside;
+    }
 
     public int getAktoDefaultNewUI() {
         return aktoDefaultNewUI;
@@ -187,5 +210,53 @@ public class BackwardCompatibility {
 
     public void setAktoDefaultNewUI(int aktoDefaultNewUI) {
         this.aktoDefaultNewUI = aktoDefaultNewUI;
+    }
+
+    public int getComputeIntegratedConnections() {
+        return computeIntegratedConnections;
+    }
+
+    public void setComputeIntegratedConnections(int computeIntegratedConnections) {
+        this.computeIntegratedConnections = computeIntegratedConnections;
+    }
+
+    public int getInitializeOrganizationAccountBelongsTo() {
+        return initializeOrganizationAccountBelongsTo;
+    }
+
+    public void setInitializeOrganizationAccountBelongsTo(int initializeOrganizationAccountBelongsTo) {
+        this.initializeOrganizationAccountBelongsTo = initializeOrganizationAccountBelongsTo;
+    }
+
+    public int getOrgsInBilling() {
+        return orgsInBilling;
+    }
+
+    public void setOrgsInBilling(int orgsInBilling) {
+        this.orgsInBilling = orgsInBilling;
+    }
+
+    public int getDeleteLastCronRunInfo() {
+        return deleteLastCronRunInfo;
+    }
+
+    public void setDeleteLastCronRunInfo(int deleteLastCronRunInfo) {
+        this.deleteLastCronRunInfo = deleteLastCronRunInfo;
+    }
+
+    public int getDefaultTelemetrySettings() {
+        return defaultTelemetrySettings;
+    }
+
+    public void setDefaultTelemetrySettings(int defaultTelemetrySettings) {
+        this.defaultTelemetrySettings = defaultTelemetrySettings;
+    }
+
+    public int getVulnerableApiUpdationVersionV1() {
+        return vulnerableApiUpdationVersionV1;
+    }
+
+    public void setVulnerableApiUpdationVersionV1(int vulnerableApiUpdationVersionV1) {
+        this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
     }
 }

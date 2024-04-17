@@ -1,4 +1,4 @@
-import { Button, Card, Collapsible, FormLayout, HorizontalGrid, HorizontalStack, Icon, LegacyCard, Link, Page, Text, TextContainer, TextField, Tooltip } from "@shopify/polaris"
+import { Button, FormLayout, HorizontalStack, Icon, Text, TextField, Tooltip } from "@shopify/polaris"
 import { InfoMinor } from "@shopify/polaris-icons"
 import { useState } from "react";
 import api from "../api"
@@ -6,7 +6,7 @@ import Store from "../../../store";
 import { useEffect } from "react";
 import TestingStore from "../testingStore";
 
-function HardCoded() {
+function HardCoded({showOnlyApi, extractInformation, setInformation}) {
 
     const setToastConfig = Store(state => state.setToastConfig)
     const authMechanism = TestingStore(state => state.authMechanism)
@@ -26,6 +26,14 @@ function HardCoded() {
             })
         }
     }, [])
+
+    useEffect(()=> {
+        if(extractInformation){
+            setInformation(userConfig)
+        }else{
+            return ;
+        }
+    },[userConfig])
 
     function updateUserConfig(field, value) {
         setUserConfig(prev => ({
@@ -79,7 +87,7 @@ function HardCoded() {
                 </FormLayout.Group>
             </FormLayout>
             <br />
-            <Button
+            {showOnlyApi ? null :<Button
                 id={"save-token"}
                 primary
                 disabled={!hasChanges}
@@ -87,6 +95,7 @@ function HardCoded() {
             >
                 Save changes
             </Button>
+            }
         </div>
     )
 }

@@ -1,5 +1,7 @@
 import { Navigation } from "@shopify/polaris"
-import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor} from "@shopify/polaris-icons"
+import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor} from "@shopify/polaris-icons"
+import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor} from "@shopify/polaris-icons"
+import { VariantMajor, VocabularyMajor } from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
 
 const SettingsLeftNav = () => {
@@ -27,6 +29,19 @@ const SettingsLeftNav = () => {
         selected: page === "metrics",
         onClick: () => navigate("/dashboard/settings/metrics")
     }]
+    const selfHostedArr = window.IS_SAAS === 'true' ? [{
+        label: 'Self hosted',
+        icon: PlanMajor,
+        selected: page === "self-hosted",
+        onClick: () => navigate("/dashboard/settings/self-hosted")
+    }] : []
+
+    const billingArr = window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM' ? [{
+        label: 'Billing',
+        icon: PlanMajor,
+        selected: page === "billing",
+        onClick: () => navigate("/dashboard/settings/billing")
+     }] : [];
 
     return (
         <Navigation>
@@ -67,11 +82,25 @@ const SettingsLeftNav = () => {
                         onClick: () => navigate("/dashboard/settings/auth-types")
                     },
                     {
+                        label: 'Default payloads',
+                        icon: VariantMajor,
+                        selected: page === "default-payloads",
+                        onClick: () => navigate("/dashboard/settings/default-payloads")
+                    },
+                    {
                         label: 'Tags',
                         icon: CollectionsFilledMajor,
                         selected: page === "tags",
                         onClick: () => navigate("/dashboard/settings/tags")
                     },
+                    {
+                        label: 'Test library',
+                        icon: VocabularyMajor,
+                        selected: page === "test-library",
+                        onClick: () => navigate("/dashboard/settings/test-library")
+                    },
+                    ...billingArr,
+                    ...selfHostedArr
                 ]}
             />
         </Navigation>

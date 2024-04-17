@@ -7,7 +7,6 @@ import org.bson.types.ObjectId;
 import java.util.List;
 import java.util.Map;
 
-import static com.akto.util.enums.GlobalEnums.*;
 
 public class TestingRunConfig {
 
@@ -17,16 +16,18 @@ public class TestingRunConfig {
     private List<String> testSubCategoryList;
     private ObjectId authMechanismId;
 
+    private String testRoleId;
     private String overriddenTestAppUrl;
     public TestingRunConfig() {}
     public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
                             List<String> testSubCategoryList,
-                            ObjectId authMechanismId, String overriddenTestAppUrl) {
+                            ObjectId authMechanismId, String overriddenTestAppUrl, String testRoleId) {
         this.id = id;
         this.collectionWiseApiInfoKey = collectionWiseApiInfoKey;
         this.testSubCategoryList = testSubCategoryList;
         this.authMechanismId = authMechanismId;
         this.overriddenTestAppUrl = overriddenTestAppUrl;
+        this.testRoleId = testRoleId;
     }
 
     public List<String> getTestSubCategoryList() {
@@ -89,5 +90,17 @@ public class TestingRunConfig {
         if (this.overriddenTestAppUrl == null) {
             this.overriddenTestAppUrl = that.overriddenTestAppUrl;
         }
+
+        if(this.testRoleId == null) {
+            this.testRoleId = that.testRoleId;
+        }
+    }
+    
+    public String getTestRoleId() {
+        return testRoleId;
+    }
+
+    public void setTestRoleId(String testRoleId) {
+        this.testRoleId = testRoleId;
     }
 }

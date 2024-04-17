@@ -18,6 +18,8 @@ import com.opensymphony.xwork2.Action;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.*;
 import javax.servlet.http.Cookie;
@@ -40,6 +42,7 @@ import static com.akto.action.LoginAction.REFRESH_TOKEN_COOKIE_NAME;
 // Using the username from the access token it sets the user details in session to be used by other filters/action
 public class UserDetailsFilter implements Filter {
 
+    private static final Logger logger = LoggerFactory.getLogger(UserDetailsFilter.class);
     public static final String LOGIN_URI = "/login";
     public static final String API_URI = "/api";
 
@@ -66,6 +69,9 @@ public class UserDetailsFilter implements Filter {
         filterChain.doFilter(httpServletRequest, httpServletResponse);
     }
 
+    public static final String ACCOUNT_ID = "accountId";
+    
+    //TODO: logout if user in access-token is not the same as the user in cookie
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
         HttpServletRequest httpServletRequest= (HttpServletRequest) servletRequest;
@@ -113,7 +119,7 @@ public class UserDetailsFilter implements Filter {
             try {
                 accessToken = Token.generateAccessToken(apiToken.getUsername(),"true");
             } catch (Exception e) {
-                ;
+                e.printStackTrace();
                 httpServletResponse.sendError(403);
                 return;
             }
@@ -160,6 +166,7 @@ public class UserDetailsFilter implements Filter {
 
         // session will be non-null for external API Key requests and when session data has not been deleted
         if (session == null ) {
+            logger.info("Session expired");
             Token tempToken = AccessTokenAction.generateAccessTokenFromServletRequest(httpServletRequest);
             // If we are able to extract token from Refresh Token then this means RT is valid and new session can be created
             if (tempToken== null) {
@@ -170,6 +177,7 @@ public class UserDetailsFilter implements Filter {
             session.setAttribute("username", username);
             session.setAttribute("login", Context.now());
             session.setAttribute("signedUp", signedUp);
+            logger.info("New session created");
         }
 
         // only for access-token based auth we check if session is valid or not
@@ -251,9 +259,9 @@ public class UserDetailsFilter implements Filter {
                     redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
                     return ;
                 }
-                session.setAttribute("accountId", accountId);
+                session.setAttribute(ACCOUNT_ID, accountId);
             }
-            Object accountIdObj = session.getAttribute("accountId");
+            Object accountIdObj = session.getAttribute(ACCOUNT_ID);
             String accountIdStr = accountIdObj == null ? null : accountIdObj+"";
 
             if (StringUtils.isEmpty(accountIdStr)) {
@@ -264,6 +272,7 @@ public class UserDetailsFilter implements Filter {
                 if (accountId > 0) {
                     if(user.getAccounts().containsKey(accountIdStr)) {
                         Context.accountId.set(accountId);
+                        logger.info("choosing account: " + accountIdStr);
                     } else {
 
                         accountIdStr = user.findAnyAccountId();
@@ -275,13 +284,13 @@ public class UserDetailsFilter implements Filter {
                         accountId = Integer.parseInt(accountIdStr);
 
                         Context.accountId.set(accountId);
-                        session.setAttribute("accountId", accountId);
+                        session.setAttribute(ACCOUNT_ID, accountId);
 
                     }
                 }
             }
             if (accessTokenFromRequest == null) {
-                ProfileAction.executeMeta1(user, httpServletRequest, httpServletResponse);
+                ProfileAction.executeMeta1(utility, user, httpServletRequest, httpServletResponse);
             }
         } else {
             redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);

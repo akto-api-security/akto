@@ -22,11 +22,14 @@ public class TestingRunIssues {
     private ObjectId latestTestingRunSummaryId;
     public static final String IGNORE_REASON = "ignoreReason";
     private String ignoreReason;
+    private String jiraIssueUrl;
+    public static final String LAST_UPDATED = "lastUpdated";
+    private int lastUpdated;
 
     private List<Integer> collectionIds;
 
     public TestingRunIssues(TestingIssuesId id, GlobalEnums.Severity severity, GlobalEnums.TestRunIssueStatus status,
-                            int creationTime, int lastSeen, ObjectId latestTestingRunSummaryId) {
+                            int creationTime, int lastSeen, ObjectId latestTestingRunSummaryId, String jiraIssueUrl, int lastUpdated) {
         this.creationTime = creationTime;
         this.lastSeen = lastSeen;
         this.id = id;
@@ -36,6 +39,8 @@ public class TestingRunIssues {
         this.severity = severity;
         this.testRunIssueStatus = status;
         this.latestTestingRunSummaryId = latestTestingRunSummaryId;
+        this.jiraIssueUrl = jiraIssueUrl;
+        this.lastUpdated = lastUpdated;
     }
 
     public TestingRunIssues() {
@@ -107,4 +112,21 @@ public class TestingRunIssues {
     public void setCollectionIds(List<Integer> collectionIds) {
         this.collectionIds = collectionIds;
     }
+    public String getJiraIssueUrl() {
+        return jiraIssueUrl;
+    }
+
+    public void setJiraIssueUrl(String jiraIssueUrl) {
+        this.jiraIssueUrl = jiraIssueUrl;
+    }
+
+
+    public int getLastUpdated() {
+        return lastUpdated;
+    }
+
+    public void setLastUpdated(int lastUpdated) {
+        this.lastUpdated = lastUpdated;
+    }
+
 }

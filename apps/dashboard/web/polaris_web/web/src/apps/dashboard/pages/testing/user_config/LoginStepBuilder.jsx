@@ -1,4 +1,4 @@
-import { LegacyCard, Tabs, Text, Button, ButtonGroup, Divider } from '@shopify/polaris';
+import { LegacyCard, Tabs, Text, Button, ButtonGroup, Divider, HorizontalStack, Checkbox } from '@shopify/polaris';
 import { useState, useEffect } from 'react';
 import SpinnerCentered from '../../../components/progress/SpinnerCentered';
 import DropdownSearch from '../../../components/shared/DropdownSearch';
@@ -10,7 +10,7 @@ import api from '../api';
 import { v4 as uuidv4 } from 'uuid';
 import AuthParams from './AuthParams';
 
-function LoginStepBuilder() {
+function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
 
     const initialStepState = {
         id: "step1",
@@ -23,6 +23,7 @@ function LoginStepBuilder() {
         regex: "(\d+){1,6}",
         type: "LOGIN_FORM",
         url: "https://xyz.com",
+        allowAllStatusCodes: false,
         testResponse: ""
     }
 
@@ -44,21 +45,26 @@ function LoginStepBuilder() {
     const authMechanism = TestingStore(state => state.authMechanism)
 
     const [selectedStep, setSelectedStep] = useState(0)
-    const [isLoading, setIsLoading] = useState(true)
+    const [isLoading, setIsLoading] = useState(false)
 
     useEffect(() => {
-        setIsLoading(true)
-        if (authMechanism && authMechanism.type === "LOGIN_REQUEST" && authMechanism.requestData[0].type !== "RECORDED_FLOW") {
-            setSteps(authMechanism.requestData.map((step, index) => ({
-                ...step,
-                id: `step${index + 1}`,
-                content: `Step ${index + 1}`,
-                testResponse: ''
-            })))
-            setAuthParams(authMechanism.authParams)
+        
+        if(!extractInformation){
+            setIsLoading(true)
+            if (authMechanism && authMechanism.type === "LOGIN_REQUEST" && authMechanism.requestData[0].type !== "RECORDED_FLOW") {
+                setSteps(authMechanism.requestData.map((step, index) => ({
+                    ...step,
+                    id: `step${index + 1}`,
+                    content: `Step ${index + 1}`,
+                    testResponse: ''
+                })))
+                setAuthParams(authMechanism.authParams)
+            }
+            setSelectedStep(0)
+            setIsLoading(false)
+        }else{
+            return;
         }
-        setSelectedStep(0)
-        setIsLoading(false)
     }, [])
 
     const stepOptions = [
@@ -81,6 +87,14 @@ function LoginStepBuilder() {
         setSelectedStep(step)
     }
 
+    function handleStatusCodeToggle(val) {
+        setSteps(prev => prev.map((step, index) => index === selectedStep ? {
+            ...step,
+            allowAllStatusCodes: val
+        }
+        : step))
+    }
+
     function handleStepTypeChange(type) {
         if (type === "LOGIN_FORM") {
             setSteps(prev => prev.map((step, index) => index === selectedStep ? {
@@ -100,7 +114,7 @@ function LoginStepBuilder() {
             }
             : step))
         }
-       
+
     }
 
     function handleAddStep () {
@@ -139,6 +153,17 @@ function LoginStepBuilder() {
         setToastConfig({ isActive: true, isError: false, message: "Login flow saved successfully!" })
     }
 
+    useEffect(() => {
+        if(extractInformation){
+            setStoreData({
+                steps:steps,
+                authParams: authParams
+            })
+        }else{
+            return;
+        }
+    },[steps,authParams])
+
     return (
         <div>
             <Text variant="headingMd">Login Step Builder</Text>
@@ -150,15 +175,22 @@ function LoginStepBuilder() {
                     <LegacyCard>
                         <div style={{ display: "grid", gridTemplateColumns: "auto max-content", alignItems: "center", padding: "10px" }}>
                             <Tabs tabs={stepsTabs} selected={selectedStep} onSelect={handleStepChange}></Tabs>
-                            <Button id={"add-step-button"} primary onClick={handleAddStep}>Add step</Button>
+                            <HorizontalStack gap={"2"}>
+                                <Checkbox
+                                    label='Allow All Status codes'
+                                    checked={steps[selectedStep].allowAllStatusCodes}
+                                    onChange={() => handleStatusCodeToggle(!steps[selectedStep].allowAllStatusCodes)}
+                                />
+                                <Button id={"add-step-button"} primary onClick={handleAddStep}>Add step</Button>
+                            </HorizontalStack>
                         </div>
 
                         <Divider />
 
                         <LegacyCard.Section>
-                            <div style={{ display: "grid", gridTemplateColumns: "max-content max-content", gap: "10px", alignItems: "center" }}>
+                        {showOnlyApi !==null && showOnlyApi ? null : <div style={{ display: "grid", gridTemplateColumns: "max-content max-content", gap: "10px", alignItems: "center" }}>
                                 <Text>Select step type:</Text>
-                                <DropdownSearch
+                                 <DropdownSearch
                                     id={"select-step-type-menu"}
                                     placeholder="Select step type"
                                     optionsList={stepOptions}
@@ -167,6 +199,7 @@ function LoginStepBuilder() {
                                     value={getStepDropdownLabel()}
                                 />
                             </div>
+                        }
                             <br />
                             <div>
                                 {steps[selectedStep].type === "LOGIN_FORM" && <LoginForm step={steps[selectedStep]} setSteps={setSteps}/>}
@@ -181,7 +214,7 @@ function LoginStepBuilder() {
                     <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
 
                     <br />
-                    <Button id={"save-token"} primary onClick={handleSave}>Save changes</Button>
+                    {showOnlyApi ? null :<Button id={"save-token"} primary onClick={handleSave}>Save changes</Button>}
 
                 </div>
             }

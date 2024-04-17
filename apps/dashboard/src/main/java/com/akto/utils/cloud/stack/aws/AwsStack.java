@@ -24,9 +24,12 @@ import com.amazonaws.services.cloudformation.AmazonCloudFormationAsyncClientBuil
 import com.amazonaws.services.cloudformation.AmazonCloudFormationClientBuilder;
 import com.amazonaws.services.cloudformation.model.*;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AwsStack implements com.akto.utils.cloud.stack.Stack {
 
+    private static final Logger logger = LoggerFactory.getLogger(AwsStack.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(AwsStack.class);
     private static final Set<String> ACCEPTABLE_STACK_STATUSES = new HashSet<String>(
             Arrays.asList(StackStatus.CREATE_IN_PROGRESS.toString(), StackStatus.CREATE_COMPLETE.toString()));
@@ -69,7 +72,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             loggerMaker.infoAndAddToDb("Stack Id: " + createStackResult.getStackId(), LogDb.DASHBOARD);
             return createStackResult.getStackId();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, e.toString(), LogDb.DASHBOARD);
             throw e;
         }
     }
@@ -108,8 +111,11 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             if (e.getMessage().contains("does not exist")) {
                 return new StackState(StackStatus.DOES_NOT_EXISTS.toString(), 0);
             }
-            ;
-            return new StackState(StackStatus.FAILED_TO_FETCH_STACK_STATUS.toString(), 0); 
+            e.printStackTrace();
+            return new StackState(StackStatus.FAILED_TO_FETCH_STACK_STATUS.toString(), 0); // TODO: what should we
+                                                                                           // return when we fail to
+            // fetch
+            // stack's status.
         }
     }
 
@@ -123,10 +129,10 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
         try {
             DescribeStackResourcesResult res = CLOUD_FORMATION_SYNC.describeStackResources(req);
             List<StackResource> resources = res.getStackResources();
-
+            logger.info(String.valueOf(resources));
             return resources.get(0).getPhysicalResourceId();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("Failed to fetch physical id of resource with logical id %s : %s", logicalId, e.toString()), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, String.format("Failed to fetch physical id of resource with logical id %s : %s", logicalId, e.toString()), LogDb.DASHBOARD);
             return "";
         }
     }

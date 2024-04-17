@@ -15,7 +15,9 @@ public class TestEditorEnums {
         LT,
         NEQ,
         PARAM,
-        CONTAINS_JWT
+        CONTAINS_JWT,
+        COOKIE_EXPIRE_FILTER,
+        DATATYPE
     }
 
     public enum CollectionOperands {
@@ -37,7 +39,9 @@ public class TestEditorEnums {
 
     public enum PredicateOperator {
         AND,
-        OR
+        OR,
+        COMPARE_GREATER,
+        SSRF_URL_HIT
     }
 
     public enum KeyValOperator {
@@ -47,11 +51,13 @@ public class TestEditorEnums {
 
     public enum BodyOperator {
         LENGTH,
-        PERCENTAGE_MATCH
+        PERCENTAGE_MATCH,
+        PERCENTAGE_MATCH_SCHEMA
     }
 
     public enum ExtractOperator {
-        EXTRACT
+        EXTRACT,
+        EXTRACTMULTIPLE
     }
 
     public enum OperandTypes {
@@ -68,7 +74,10 @@ public class TestEditorEnums {
     public enum ContextOperator {
         PRIVATE_VARIABLE_CONTEXT,
         PARAM_CONTEXT,
-        ENDPOINT_IN_TRAFFIC_CONTEXT
+        ENDPOINT_IN_TRAFFIC_CONTEXT,
+        INCLUDE_ROLES_ACCESS,
+        EXCLUDE_ROLES_ACCESS,
+        API_ACCESS_TYPE
     }
 
 
@@ -189,6 +198,7 @@ public class TestEditorEnums {
     }
 
     public enum TerminalExecutorDataOperands {
+        API,
         DELETE_HEADER,
         DELETE_BODY_PARAM,
         DELETE_QUERY_PARAM,
@@ -197,7 +207,11 @@ public class TestEditorEnums {
         FOLLOW_REDIRECT,
         REMOVE_AUTH_HEADER,
         REPLACE_AUTH_HEADER,
-        REPLACE_BODY
+        REPLACE_BODY,
+        DELETE_GRAPHQL_FIELD,
+        JWT_REPLACE_BODY,
+        ATTACH_FILE,
+        SEND_SSRF_REQ,
     }
 
     public enum NonTerminalExecutorDataOperands {
@@ -206,7 +220,26 @@ public class TestEditorEnums {
         ADD_QUERY_PARAM,
         MODIFY_HEADER,
         MODIFY_BODY_PARAM,
-        MODIFY_QUERY_PARAM
+        MODIFY_QUERY_PARAM,
+        ADD_GRAPHQL_FIELD,
+        MODIFY_GRAPHQL_FIELD
+    }
+
+    public enum TerminalNonExecutableDataOperands {
+        TYPE,
+        TEST_NAME,
+        LABEL,
+        SUCCESS,
+        FAILURE
+    }
+
+    public enum ValidateExecutorDataOperands {
+        Validate
+    }
+
+    public enum LoopExecutorOperands {
+        FOR_ALL,
+        FOR_ONE
     }
 
     public enum ExecutorOperandTypes {
@@ -214,7 +247,11 @@ public class TestEditorEnums {
         Req,
         Terminal,
         NonTerminal,
-        Data
+        Data,
+        TerminalNonExecutable,
+        Validate,
+        Loop,
+        Dynamic
     }
 
     public String getExecutorOperandValue(String key) {
@@ -237,36 +274,80 @@ public class TestEditorEnums {
             }
         }
 
+        for (TerminalNonExecutableDataOperands operand: TerminalNonExecutableDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return operand.toString();
+            }
+        }
+
+        for (ValidateExecutorDataOperands operand: ValidateExecutorDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return operand.toString();
+            }
+        }
+
         return key;
     }
 
-    public String getExecutorOperandType(String key) {
+    public String getExecutorOperandType(String key, String parentNodeType) {
 
         for (ExecutorParentOperands operand: ExecutorParentOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
-                return "parent";
+                return ExecutorOperandTypes.Parent.toString().toLowerCase();
             }
         }
 
         for (RequestParentOperand operand: RequestParentOperand.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
-                return "req";
+                return ExecutorOperandTypes.Req.toString().toLowerCase();
             }
         }
 
         for (TerminalExecutorDataOperands operand: TerminalExecutorDataOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
-                return "terminal";
+                return ExecutorOperandTypes.Terminal.toString().toLowerCase();
             }
         }
 
         for (NonTerminalExecutorDataOperands operand: NonTerminalExecutorDataOperands.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
-                return "nonterminal";
+                return ExecutorOperandTypes.NonTerminal.toString().toLowerCase();
             }
         }
 
-        return "data";
+        for (TerminalNonExecutableDataOperands operand: TerminalNonExecutableDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return ExecutorOperandTypes.TerminalNonExecutable.toString().toLowerCase();
+            }
+        }
+
+        for (ValidateExecutorDataOperands operand: ValidateExecutorDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return ExecutorOperandTypes.Validate.toString().toLowerCase();
+            }
+        }
+
+        for (LoopExecutorOperands operand: LoopExecutorOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return ExecutorOperandTypes.Loop.toString().toLowerCase();
+            }
+        }
+
+        for (RequestParentOperand operand: RequestParentOperand.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return ExecutorOperandTypes.Req.toString().toLowerCase();
+            }
+        }
+
+        if (key.startsWith("${") && key.endsWith("}")) {
+            if (parentNodeType.equalsIgnoreCase(ExecutorOperandTypes.Req.toString())) {
+                return ExecutorOperandTypes.Dynamic.toString().toLowerCase();
+            } else {
+                return ExecutorOperandTypes.Data.toString().toLowerCase();
+            }
+        }
+
+        return ExecutorOperandTypes.Data.toString().toLowerCase();
     }
 
 }

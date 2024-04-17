@@ -1,8 +1,9 @@
-import { Box, Button, ButtonGroup, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
-import React, { useEffect, useState } from 'react'
+import { Box, Button, ButtonGroup, HorizontalStack, Link, Text, VerticalStack } from '@shopify/polaris'
+import React, { useEffect, useState, useRef } from 'react'
 import {useNavigate} from "react-router-dom"
 import api from '../api'
 import func from "@/util/func"
+import InformationBannerComponent from './shared/InformationBannerComponent'
  
 function BurpSource() {
     const navigate = useNavigate()
@@ -10,6 +11,7 @@ function BurpSource() {
     const [aktoIp, setAktoIp] = useState("");
     const [aktoToken, setAktoToken] = useState("");
     const [burpCollectionURL, setBurpCollectionURL] = useState("")
+    const ref = useRef(null)
 
     const getGithubLink = async() => {
         await api.fetchBurpPluginDownloadLink().then((resp) => {
@@ -54,14 +56,17 @@ function BurpSource() {
     }
 
     const copyText = (text,messageText) => {
-        navigator.clipboard.writeText(text)
-        func.setToast(true, false, `${messageText} is copied to clipboard.`)
+        func.copyToClipboard(text, ref, `${messageText} is copied to clipboard.`)
     }
 
     const steps = [
         {
-            text: "Download akto's burp extension",
-            component: <Box width='200px'><Button size="slim" onClick={downloadBurpJar}>Download</Button></Box>,
+            textComponent: (
+                <div style={{display: "flex", gap: '4px', alignItems: 'center'}}>
+                    <Text variant="bodyMd">1. Download akto's burp extension</Text>
+                    <Button size="slim" onClick={downloadBurpJar}>Download</Button>
+                </div>
+            ),
         },
         {
             text: "Open Burp and add the downloaded jar file in extension tab."
@@ -74,6 +79,7 @@ function BurpSource() {
             component: (
                 <Box paddingInlineStart={2}>
                     <VerticalStack gap={1}>
+                        <div ref={ref}/>
                         <HorizontalStack gap={1}>
                             <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_IP:</Text>
                             <Button onClick={() => copyText(aktoIp, "AKTO_IP")} plain>
@@ -115,20 +121,32 @@ function BurpSource() {
         getCredentials()
     },[])
 
+    const content = (
+        <HorizontalStack gap={1}>
+            <Text variant="bodyMd">Akto Burp plugin will work post</Text>
+            <Link target="_blank" url='https://portswigger.net/burp/releases/professional-community-2024-1-1-1'>v2024.1.1.1</Link>
+        </HorizontalStack>
+    )
+
     return (
         <div className='card-items'>
             <Text variant='bodyMd'>
                 Use burp plugin to send traffic to Akto and realize quick value. If you like what you see, we highly recommend using AWS or GCP traffic mirroring to get real user data for a smooth, automated and minimum false positive experience.
             </Text>
 
+            <InformationBannerComponent content={content} docsUrl={""}/>
+
             <VerticalStack gap="1">
                 {steps.map((element,index) => (
                     <VerticalStack gap="1" key={index}>
                         <HorizontalStack gap="1" wrap={false} key={element.text}>
-                            <Text>{index + 1}.</Text>
-                            <Text variant="bodyMd">{element?.text}</Text>
+                            {element?.text ?<Text>{index + 1}.</Text> : null}
+                            {element?.text ?<Text variant="bodyMd">{element?.text}</Text> : null}
+                            {element?.textComponent}
                         </HorizontalStack>
-                        {element?.component}
+                        <Box paddingInlineStart={2}>
+                            {element?.component}
+                        </Box>
                     </VerticalStack>
                 ))}
             </VerticalStack>

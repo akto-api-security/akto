@@ -9,8 +9,6 @@ import SensitiveDataExposure from "../dashboard/pages/observe/SensitiveDataExpos
 import SingleRequest from "../dashboard/pages/observe/SingleRequest/SingleRequest";
 import PageObserve from "../dashboard/pages/observe/PageObserve"
 import PageTesting from "../dashboard/pages/testing/PageTesting";
-import { AppProvider } from "@shopify/polaris"
-import SignUp from "../signup/pages/SignUp"
 import {
   createBrowserRouter,
   RouterProvider,
@@ -21,9 +19,11 @@ import Integrations from "../dashboard/pages/settings/integrations/Integrations"
 import Settings from "../dashboard/pages/settings/Settings";
 import Users from "../dashboard/pages/settings/users/Users";
 import Postman from "../dashboard/pages/settings/integrations/Postman";
+import Jira from "../dashboard/pages/settings/integrations/Jira";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
 import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
 import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
+import GithubAppIntegration from "../dashboard/pages/settings/integrations/GithubAppIntegration";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import About from "../dashboard/pages/settings/about/About";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
@@ -37,8 +37,11 @@ import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPag
 import TestRoleSettings from "../dashboard/pages/testing/TestRoleSettings/TestRoleSettings";
 import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
+import DefaultPayloads from "../dashboard/pages/settings/default_payloads/DefaultPayloads";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Tags from "../dashboard/pages/settings/tags/Tags";
+import Billing from "../dashboard/pages/settings/billing/Billing";
+import SelfHosted from "../dashboard/pages/settings/billing/SelfHosted";
 import TagDetails from "../dashboard/pages/settings/tags/TagDetails";
 import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
@@ -51,6 +54,19 @@ import { generateSearchData } from "@/util/searchItems"
 import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
+import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
+import AzureSso from "../dashboard/pages/settings/integrations/AzureSso";
+
+import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
+import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
+import { useStiggContext } from '@stigg/react-sdk';
+import DependencyTable from "../dashboard/pages/testing/DependencyTable/DependencyTable";
+import TestRoleAccessMatrix from "../dashboard/pages/testing/TestRoleAccessMatrix/TestRoleAccessMatrix";
+import SignupPage from "../signup/pages/SignupPage";
+import PageCheckInbox from "../signup/pages/PageCheckInbox"
+import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
+import TokenValidator from "./TokenValidator"
+import { TableContextProvider } from "@/apps/dashboard/components/tables/TableContext";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -63,6 +79,10 @@ const router = createBrowserRouter([
         path: "",
         element: <HomePage />,
         children: [
+          {
+            path: "home",
+            element: <HomeDashboard />,
+          },
           {
             path: "testing",
             element: <PageTesting />,
@@ -90,8 +110,16 @@ const router = createBrowserRouter([
                 element:<TestRoleSettings/>
               },
               {
+                path:"roles/access-matrix",
+                element:<TestRoleAccessMatrix/>
+              },
+              {
                 path:"user-config",
                 element:<UserConfig/>
+              },
+              {
+                path:"dependency",
+                element:<DependencyTable/>
               }
             ]
           },
@@ -172,6 +200,10 @@ const router = createBrowserRouter([
             element: <Postman />,
           },
           {
+            path: "integrations/jira",
+            element: <Jira />,
+          },
+          {
             path: "integrations/akto_apis",
             element: <ApiTokens />,
           },
@@ -182,6 +214,18 @@ const router = createBrowserRouter([
           {
             path: "integrations/github_sso",
             element: <GithubSso />
+          },
+          {
+            path: "integrations/okta_sso",
+            element: <OktaIntegration />
+          },
+          {
+            path: "integrations/azure_sso",
+            element: <AzureSso />
+          },
+          {
+            path: "integrations/github_app",
+            element: <GithubAppIntegration />
           },
           {
             path: "integrations/slack",
@@ -208,6 +252,10 @@ const router = createBrowserRouter([
             element:<AuthTypes/>
           },
           {
+            path: "default-payloads",
+            element:<DefaultPayloads/>
+          },
+          {
             path: "auth-types/details",
             element: <AuthTypeDetails/>
           },
@@ -218,11 +266,27 @@ const router = createBrowserRouter([
           {
             path: "tags/details",
             element: <TagDetails/>
+          },
+          {
+            path: "test-library",
+            element: <TestLibrary/>
+          },
+          {
+            path: "billing",
+            element: <Billing/>
+          },
+          {
+            path: "self-hosted",
+            element: <SelfHosted/>
           }
         ]
       },
       {
         path: "test-editor/:testId",
+        element: <TestEditor />
+      },
+      {
+        path: "test-editor",
         element: <TestEditor />
       },
       {
@@ -240,20 +304,37 @@ const router = createBrowserRouter([
     ],
     errorElement: <ErrorComponent/>
   },
-{
-  path: "/login",
-    element: <SignUp />,
-},
-{
-  path: "/",
-    element: <Navigate to="/login" />,
+  {
+      path: "/login",
+      element: <SignupPage />,
   },
+  {
+      path: "/",
+      element: <TokenValidator />,
+  },
+  {
+    path: "/signup",
+    element: <SignupPage />,
+  },
+  {
+    path: "/check-inbox",
+    element: <PageCheckInbox />
+  },
+  {
+    path: "/business-email",
+    element: <PageBusinessEmail />
+  }
 ])
 
 function App() {
   const setAllRoutes = Store(state => state.setAllRoutes)
   const searchData= generateSearchData(router.routes)
-  setAllRoutes(searchData)
+  const { stigg } = useStiggContext();
+  useEffect(() => {
+    stigg.setCustomerId(window.STIGG_CUSTOMER_ID, window.STIGG_CUSTOMER_TOKEN)
+    
+  })
+
 
   useEffect(() => {
     const script = document.createElement('script')
@@ -267,14 +348,15 @@ function App() {
       }
       };
     `);
+    setAllRoutes(searchData)
     script.appendChild(scriptText);
     document.body.appendChild(script)
   }, [])
 
   return (
-    <AppProvider>
+    <TableContextProvider>
       <RouterProvider router={router} />
-    </AppProvider>
+    </TableContextProvider>
   );
 }
 

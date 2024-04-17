@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Modal } from "@shopify/polaris"
+import { Avatar, Box, Button, Popover, Modal, Tooltip } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -10,6 +10,9 @@ import dashboardFunc from "../../transform";
 import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
 import func from "@/util/func"
 import transform from "../transform";
+import ApiDependency from "./ApiDependency";
+
+import { HorizontalDotsMinor } from "@shopify/polaris-icons"
 
 function ApiDetails(props) {
 
@@ -22,6 +25,9 @@ function ApiDetails(props) {
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [loading, setLoading] = useState(false)
     const [badgeActive, setBadgeActive] = useState(false)
+    const [showDemerge, setShowDemerge] = useState(false)
+
+    const ref = useRef(null)
 
     const fetchData = async() => {
         if(showDetails){
@@ -91,6 +97,16 @@ function ApiDetails(props) {
         setPrompts(activePrompts)
     }
 
+    function isDeMergeAllowed(){
+        const { endpoint } = apiDetail
+        if(!endpoint || endpoint === undefined){
+            return false;
+        }
+        return (endpoint.includes("STRING") || endpoint.includes("INTEGER") || endpoint.includes("OBJECT_ID"))
+    }
+
+    const isDemergingActive = isDeMergeAllowed() ;
+
 
     const SchemaTab = {
         id: 'schema',
@@ -116,35 +132,92 @@ function ApiDetails(props) {
             />
         </Box>,
     }
+    const DependencyTab = {
+        id: 'dependency',
+        content: "Dependency Graph",
+        component: <Box paddingBlockStart={"2"}>
+            <ApiDependency
+                apiCollectionId={apiDetail['apiCollectionId']}
+                endpoint={apiDetail['endpoint']}
+                method={apiDetail['method']}
+            />
+        </Box>,
+    }
+
+    const deMergeApis = () => {
+        const { apiCollectionId, endpoint, method } = apiDetail
+        api.deMergeApi(apiCollectionId, endpoint, method).then((resp) => {
+            func.setToast(true, false, "De-merging successful!!.")
+            window.location.reload()
+        })
+    }
+
+    const DeMergeButton = () => {
+        return(
+            <div className="button-fixed" style={{right: '12px', top: "64px"}}>
+                <Popover 
+                    active={showDemerge}
+                    activator={
+                        <Tooltip content="More actions" dismissOnMouseOut ><Button plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowDemerge(!showDemerge)} /></Tooltip>
+                    }
+                    autofocusTarget="first-node"
+                    onClose={() => setShowDemerge(false)}
+                >
+                    <Popover.Pane fixed>
+                        <Popover.Section>
+                            <Button plain monochrome removeUnderline size="slim" onClick={deMergeApis}>De merge</Button>
+                        </Popover.Section>
+                    </Popover.Pane>
+                </Popover>
+            </div>
+        )
+    }
+    const headingComp = (
+        <div style={{display: "flex", justifyContent: "space-between"}}  key="heading">
+            <GithubCell
+                width="40vw"
+                data={apiDetail}
+                headers={headers}
+                getStatus={getStatus}
+                isBadgeClickable={true}
+                badgeClicked={badgeClicked}
+            />
+            <Box paddingBlockStart={"05"}>
+                <Button plain onClick={() => func.copyToClipboard(apiDetail['endpoint'], ref, "URL copied")}>
+                    <Tooltip content="Copy endpoint" dismissOnMouseOut>
+                        <div className="reduce-size">
+                            <Avatar size="extraSmall" source="/public/copy_icon.svg" />
+                        </div>
+                    </Tooltip>
+                    <Box ref={ref} />
+                </Button>
+            </Box>
+        </div>
+    )
 
     const components = [
-            <GithubCell
-            key="heading"
-            width="35vw"
-            nameWidth="32vw"
-            data={apiDetail}
-            headers={headers}
-            getStatus={getStatus}
-            isBadgeClickable={true}
-            badgeClicked={badgeClicked}
-        />,
+        headingComp
+            ,
         <LayoutWithTabs
             key="tabs"
-            tabs={[SchemaTab, ValuesTab]}
+            tabs={[SchemaTab, ValuesTab, DependencyTab]}
             currTab={() => { }}
         />
     ]
 
+    const componentsArr = isDemergingActive ? [...components, <DeMergeButton key={"demerge"} />] : components
+ 
     const aktoGptButton = (
         <div 
-            className={"gpt-button-fixed"}
+            className={"button-fixed"}
             key="akto-gpt"
+            style={{right: isDemergingActive ? "48px" : '24px'}}
         >
-            <Button onClick={displayGPT}>Ask AktoGPT</Button> 
+            <Button onClick={displayGPT} size="slim">Ask AktoGPT</Button> 
         </div>
     )
 
-    const currentComponents = isGptActive ? [...components, aktoGptButton] : components
+    const currentComponents = isGptActive ? [...componentsArr, aktoGptButton] : componentsArr
 
     return ( 
         <div>

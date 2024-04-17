@@ -17,34 +17,27 @@ export default function Header() {
 
     const navigate = useNavigate()
 
-    const setLeftNavSelected = Store((state) => state.setLeftNavSelected)
-    const leftNavCollapsed = Store((state) => state.leftNavCollapsed)
-    const toggleLeftNavCollapsed = Store(state => state.toggleLeftNavCollapsed)
     const username = Store((state) => state.username)
     const storeAccessToken = PersistStore(state => state.storeAccessToken)
     const accounts = Store(state => state.accounts)
     const activeAccount = Store(state => state.activeAccount)
+    const resetAll = PersistStore(state => state.resetAll)
 
     const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
     const searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections)
 
-    const handleLeftNavCollapse = () => {
-        if (!leftNavCollapsed) {
-            setLeftNavSelected('')
-        }
-
-        toggleLeftNavCollapsed()
-    }
+    
 
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
         [],
     );
 
-    const handleLogOut = async () => {
-        storeAccessToken(null)
+    const handleLogOut = async () => {        
         api.logout().then(res => {
+            resetAll();
+            storeAccessToken(null)
             if(res.logoutUrl){
                 window.location.href = res.logoutUrl
             } else {
@@ -56,6 +49,7 @@ export default function Header() {
     }
 
     const handleSwitchUI = async () => {
+        resetAll();
         let currPath = window.location.pathname
         await api.updateAktoUIMode({ aktoUIMode: "VERSION_1" })
         if(currPath.includes("sensitive")){
@@ -94,6 +88,7 @@ export default function Header() {
             onAction: async () => {
                 await api.goToAccount(accountId)
                 func.setToast(true, false, `Switched to account ${accounts[accountId]}`)
+                resetAll();
                 window.location.href = '/dashboard/observe/inventory'
             }
         }
@@ -103,7 +98,7 @@ export default function Header() {
         api.saveToAccount(newAccount).then(resp => {
           setShowCreateAccount(false)
           setNewAccount('')
-
+          resetAll();
           window.location.href="/dashboard/onboarding"
         })
     }
@@ -128,7 +123,7 @@ export default function Header() {
                 },
                 {
                     items: [
-                        (window?.DASHBOARD_MODE === 'LOCAL_DEPLOY' || window?.DASHBOARD_MODE === "ON_PREM") ? {} :
+                        (window.IS_SAAS !== "true" && (window?.DASHBOARD_MODE === 'LOCAL_DEPLOY' || window?.DASHBOARD_MODE === "ON_PREM")) ? {} :
                         { id: "create_account", content: <ContentWithIcon icon={CustomerPlusMajor} text={"Create account"} />, onAction: () => setShowCreateAccount(true)},
                         // { id: "manage", content: 'Manage account' },
                         { id: "log-out", content: <ContentWithIcon icon={LogOutMinor} text={"Logout"} /> , onAction: handleLogOut }
@@ -136,7 +131,7 @@ export default function Header() {
                 },
                 {
                     items: [
-                        { id: "switch-ui", content: <ContentWithIcon text={"Switch to legacy"} icon={ReplaceMajor} />, onAction: handleSwitchUI },
+                        // { id: "switch-ui", content: <ContentWithIcon text={"Switch to legacy"} icon={ReplaceMajor} />, onAction: handleSwitchUI },
                         { content: <ContentWithIcon text={"Documentation"} icon={NoteMinor} />, onAction: () => { window.open("https://docs.akto.io/readme") } },
                         { content: <ContentWithIcon text={"Tutorials"} icon={ResourcesMajor}/>, onAction: () => { window.open("https://www.youtube.com/@aktodotio") } },
                         { content: <ContentWithIcon icon={UpdateInventoryMajor} text={"Changelog"} />, onAction: () => { window.open("https://app.getbeamer.com/akto/en") } },
@@ -190,6 +185,17 @@ export default function Header() {
         />
     );
 
+    const secondaryMenuMarkup = (
+        <TopBar.Menu
+            activatorContent={
+                <span id="beamer-btn">
+                    <Icon source={NotificationMajor} />
+                </span>
+            }
+            actions={[]}
+        />
+    );
+
     const topBarMarkup = (
         <div className='topbar'>
             <TopBar
@@ -199,6 +205,7 @@ export default function Header() {
                 searchResultsVisible={isSearchActive}
                 searchResults={searchResultsMarkup}
                 onSearchResultsDismiss={handleSearchResultsDismiss}
+                secondaryMenu={secondaryMenuMarkup}
             />
             <Modal
                 open={showCreateAccount}

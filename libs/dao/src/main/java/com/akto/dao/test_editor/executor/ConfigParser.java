@@ -7,6 +7,7 @@ import java.util.Map;
 
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
+import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ConfigParserValidationResult;
 import com.akto.dto.test_editor.ExecutorConfigParserResult;
 import com.akto.dto.test_editor.ExecutorNode;
@@ -44,7 +45,17 @@ public class ConfigParser {
         }
 
         if (curNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Data.toString()) || 
-                curNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Terminal.toString())) {
+                curNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Terminal.toString()) || 
+                curNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.TerminalNonExecutable.toString())) {
+            return new ExecutorConfigParserResult(curNode, true, "");
+        }
+
+        if (curNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Validate.toString())) {
+            com.akto.dao.test_editor.filter.ConfigParser configParser = new com.akto.dao.test_editor.filter.ConfigParser();
+            ConfigParserResult configParserResult = configParser.parse(curNode.getValues());
+            List<ExecutorNode> childNodes = curNode.getChildNodes();
+            childNodes.add(new ExecutorNode(TestEditorEnums.ExecutorOperandTypes.Validate.toString(), new ArrayList<>(), configParserResult.getNode(), TestEditorEnums.ExecutorOperandTypes.Validate.toString()));
+            curNode.setChildNodes(childNodes);
             return new ExecutorConfigParserResult(curNode, true, "");
         }
 
@@ -60,7 +71,7 @@ public class ConfigParser {
                 Map<String,Object> mapValues = m.convertValue(obj, Map.class);
 
                 for (Map.Entry<String, Object> entry : mapValues.entrySet()) {
-                    String operandType = testEditorEnums.getExecutorOperandType(entry.getKey());
+                    String operandType = testEditorEnums.getExecutorOperandType(entry.getKey(), curNode.getNodeType());
                     String operandValue = testEditorEnums.getExecutorOperandValue(entry.getKey());
                     ExecutorNode node = new ExecutorNode(operandType, new ArrayList<>(), entry.getValue(), operandValue);
                     ExecutorConfigParserResult configParserResult = parse(config, node, curNode);
@@ -75,7 +86,7 @@ public class ConfigParser {
         } else if (values instanceof Map) {
             Map<String,Object> mapValues = m.convertValue(values, Map.class);
             for (Map.Entry<String, Object> entry : mapValues.entrySet()) {
-                String operandType = testEditorEnums.getExecutorOperandType(entry.getKey());
+                String operandType = testEditorEnums.getExecutorOperandType(entry.getKey(), curNode.getNodeType());
                 String operandValue = testEditorEnums.getExecutorOperandValue(entry.getKey());
                 ExecutorNode node = new ExecutorNode(operandType, new ArrayList<>(), entry.getValue(), operandValue);
                 ExecutorConfigParserResult configParserResult = parse(config, node, curNode);
@@ -115,7 +126,7 @@ public class ConfigParser {
             return configParserValidationResult;
         }
 
-        if ((curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString()) || curNodeType.equalsIgnoreCase(ExecutorOperandTypes.NonTerminal.toString())) && !parentNodeType.equalsIgnoreCase(ExecutorOperandTypes.Req.name() )) {
+        if ((curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString()) || curNodeType.equalsIgnoreCase(ExecutorOperandTypes.NonTerminal.toString())) && !(parentNodeType.equalsIgnoreCase(ExecutorOperandTypes.Req.name()) || parentNodeType.equalsIgnoreCase(ExecutorOperandTypes.Loop.name()) )) {
             configParserValidationResult.setIsValid(false);
             configParserValidationResult.setErrMsg("terminal/nonTerminal Executor operand should have executorParentNode as the parent node");
             return configParserValidationResult;
@@ -125,6 +136,10 @@ public class ConfigParser {
             configParserValidationResult.setIsValid(false);
             configParserValidationResult.setErrMsg("terminalOperand should have terminalExecutorOperand/nonTerminalExecutorOperand as the parent node");
             return configParserValidationResult;
+        }
+
+        if (curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Validate.toString())) {
+            return new ConfigParserValidationResult(true, "");
         }
 
         if (curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) {

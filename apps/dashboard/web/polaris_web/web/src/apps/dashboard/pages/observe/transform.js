@@ -1,5 +1,11 @@
 import func from "@/util/func";
+import { Badge, Box, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
+import TooltipText from "../../components/shared/TooltipText";
+import StyledEndpoint from "./api_collections/component/StyledEndpoint"
+import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor } from "@shopify/polaris-icons"
+import api from "./api";
+import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -24,6 +30,150 @@ const standardHeaders = [
     'x-content-type-options', 'x-dns-prefetch-control', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-frame-options', 'x-xss-protection'
 ];
 
+const apiDetailsHeaders = [
+    {
+        text: "Method",
+        value: "method",
+        showFilter: true
+    },
+    {
+        text: "Endpoint",
+        value: "parameterisedEndpoint",
+        itemOrder: 1,
+        showFilter: true,
+        component: (data) => StyledEndpoint(data, "14px", "headingSm", true, true)
+    },
+    {
+        text: 'Collection name',
+        value: 'apiCollectionName',
+        itemOrder: 3,
+        icon: DynamicSourceMinor,
+    },
+    {
+        text: 'Tags',
+        value: 'tags',
+        itemCell: 3,
+        showFilter: true
+    },
+    {
+        text: 'Sensitive Params',
+        value: 'sensitiveTags',
+        itemOrder: 4,
+        showFilter: true,
+    },
+    {
+        text: 'hostname',
+        itemOrder: 3,
+        value: 'hostName',
+        icon: GlobeMinor,
+    },
+    {
+        text: 'Last Seen',
+        value: 'last_seen',
+        icon: SearchMinor,
+        itemOrder: 3
+    },
+    {
+        text: 'Access Type',
+        value: 'access_type',
+        icon: InfoMinor,
+        itemOrder: 3,
+        showFilter: true
+    },
+    {
+        text: 'Auth Type',
+        value: 'auth_type',
+        icon: LockMinor,
+        itemOrder: 3,
+        showFilter: true
+    },
+    {
+        text: "Discovered",
+        value: 'added',
+        icon: ClockMinor,
+        itemOrder: 3
+    },
+    {
+        text: 'Changes',
+        value: 'changes',
+        icon: InfoMinor,
+        itemOrder: 3
+
+    }
+]
+
+const paramHeaders = [
+    {
+        text: 'Name',
+        value: 'name',
+        itemOrder: 1,
+    },
+    {
+        text: 'Type',
+        value: 'subType',
+        icon: PasskeyMinor,
+        itemOrder: 3
+    },
+    {
+        text: 'Endpoint',
+        value: 'endpoint',
+        icon: LinkMinor,
+        itemOrder: 3,
+        sortKey: 'url',
+        showFilterMenu: true
+    },
+    {
+        text: 'Collection',
+        value: 'apiCollectionName',
+        icon: DynamicSourceMinor,
+        itemOrder: 3,
+        sortKey: 'apiCollectionId',
+        showFilterMenu: true
+    },
+    {
+        text: 'Method',
+        value: 'method',
+        icon: GlobeMinor,
+        itemOrder: 3,
+        sortKey: 'method',
+        showFilterMenu: true
+    },
+    {
+        text: 'Location',
+        value: 'location',
+        icon: LocationsMinor,
+        itemOrder: 3,
+        sortKey: 'isHeader',
+        showFilterMenu: true
+    },
+    {
+        text: "Discovered",
+        value: 'added',
+        icon: ClockMinor,
+        itemOrder: 3,
+        sortKey: 'timestamp',
+        showFilterMenu: true
+    },
+    {
+        text: 'Values',
+        value: 'domain',
+        icon: PriceLookupMinor,
+        itemOrder: 3,
+        showFilterMenu: true
+    }
+]
+
+const lastFetchedInfo = PersistStore.getState().lastFetchedInfo
+const lastFetchedResp = PersistStore.getState().lastFetchedResp
+const lastFetchedSeverityResp = PersistStore.getState().lastFetchedSeverityResp
+const lastCalledSensitiveInfo = PersistStore.getState().lastCalledSensitiveInfo
+const lastFetchedSensitiveResp = PersistStore.getState().lastFetchedSensitiveResp
+const setLastFetchedInfo = PersistStore.getState().setLastFetchedInfo
+const setLastFetchedResp = PersistStore.getState().setLastFetchedResp
+const setLastFetchedSeverityResp = PersistStore.getState().setLastFetchedSeverityResp
+const setLastCalledSensitiveInfo = PersistStore.getState().setLastCalledSensitiveInfo
+const setLastFetchedSensitiveResp = PersistStore.getState().setLastFetchedSensitiveResp
+
 const transform = {
     prepareEndpointData: (apiCollectionMap, res) => {
         let apiCollection = apiCollectionMap[res?.data?.endpoints[0]?.apiCollectionId];
@@ -45,6 +195,7 @@ const transform = {
     prepareSampleData: (res, subType) => {
         let paths = []
         for (const c in res.sensitiveSampleData) {
+            if(c === "") continue
             let paramInfoList = res.sensitiveSampleData[c]
             if (!paramInfoList) {
                 paramInfoList = []
@@ -62,7 +213,7 @@ const transform = {
         }
         return paths;
     },
-    findNewParametersCount: (resp, startTimestamp, endTimestamp) => {
+    findNewParametersCountTrend: (resp, startTimestamp, endTimestamp) => {
         let newParametersCount = 0
         let todayDate = new Date(endTimestamp * 1000)
         let twoMonthsAgo = new Date(startTimestamp * 1000)
@@ -79,7 +230,10 @@ const transform = {
             ret.push([func.toDate(func.toYMD(currDate)), dateToCount[func.toYMD(currDate)] || 0])
             currDate = func.incrDays(currDate, 1)
         }
-        return newParametersCount
+        return {
+            count: newParametersCount,
+            trend: ret
+        }
     },
     fillSensitiveParams: (sensitiveParams, apiCollection) => {
         sensitiveParams = sensitiveParams.reduce((z,e) => {
@@ -100,13 +254,16 @@ const transform = {
     },
     prepareEndpointForTable(x, index) {
         const idToNameMap = PersistStore.getState().collectionsMap;
+        const endpointComp = <GetPrettifyEndpoint method={x.method} url={x.url} isNew={false} />
+        const name = x.param.replaceAll("#", ".").replaceAll(".$", "")
+
         return {
             id:index,
-            name: x.param.replaceAll("#", ".").replaceAll(".$", ""),
+            name: <Box maxWidth="130px"><TooltipText tooltip={name} text={name} textProps={{fontWeight: 'medium'}} /></Box> ,
             endpoint: x.url,
             url: x.url,
             method: x.method,
-            added: "Discovered " + func.prettifyEpoch(x.timestamp),
+            added: func.prettifyEpoch(x.timestamp),
             location: (x.responseCode === -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
             subType: x.subType.name,
             detectedTs: x.timestamp,
@@ -114,7 +271,8 @@ const transform = {
             apiCollectionName: idToNameMap[x.apiCollectionId] || '-',
             x: x,
             domain: func.prepareDomain(x),
-            valuesString: func.prepareValuesTooltip(x)
+            valuesString: func.prepareValuesTooltip(x),
+            endpointComp: endpointComp,
         }
     },
     formatNumberWithCommas(number) {
@@ -124,25 +282,308 @@ const transform = {
     getStandardHeaderList(){
         return standardHeaders
     },
+    isValidString(string){
+        try {
+            const val = JSON.parse(string)
+            return {type:true, val: val}
+        } catch (error) {
+            return {type:false, val: ""}
+        }
+    },
     getCommonSamples(nonSensitiveData, sensitiveData){
         let sensitiveSamples = this.prepareSampleData(sensitiveData, '')
         const samples = new Set()
         const highlightPathsObj ={}
         sensitiveSamples.forEach((x) => {
-            samples.add(JSON.parse(x.message))
-            highlightPathsObj[JSON.parse(x.message)] = x.highlightPaths
+            const validObj = this.isValidString(x.message)
+            if(validObj.type){
+                samples.add(validObj.val)
+                highlightPathsObj[validObj.val] = x.highlightPaths 
+            }
+            
         })
 
         let uniqueNonSensitive = []
         nonSensitiveData.forEach((x) => {
-            let parsed = JSON.parse(x)
-            if(!samples.has(parsed)){
-                uniqueNonSensitive.push({message: x, highlightPaths: []})
+            try {
+                let parsed = JSON.parse(x)
+                if(samples.size === 0 || !samples.has(parsed)){
+                    uniqueNonSensitive.push({message: x, highlightPaths: []})
+                }
+            } catch (e) {
+            }
+            
+        })
+        let finalArr = [...uniqueNonSensitive]
+        if(samples.size > 0){
+            finalArr = [...sensitiveSamples, ...finalArr]
+        }
+        return finalArr
+    },
+    getColor(key){
+        switch(key.toUpperCase()){
+            case "HIGH" : return "critical";
+            case "MEDIUM": return "attention";
+            case "LOW": return "info";
+            default:
+                return "bg";
+        }
+    },
+
+    getStatus(riskScore){
+        if(riskScore >= 4.5){
+            return "critical"
+        }else if(riskScore >= 4){
+            return "attention"
+        }else if(riskScore >= 2.5){
+            return "warning"
+        }else if(riskScore > 0){
+            return "info"
+        }else{
+            return "success"
+        }
+    },
+
+    getIssuesList(severityInfo){
+        return (
+            <HorizontalStack gap="1">
+                {
+                    Object.keys(severityInfo).length > 0 ? Object.keys(severityInfo).map((key,index)=>{
+                        return(
+                            <Badge size="small" status={this.getColor(key)} key={index}>{severityInfo[key].toString()}</Badge>
+                        )
+                    }):
+                    <Text fontWeight="regular" variant="bodyMd" color="subdued">-</Text>
+                }
+            </HorizontalStack>
+        )
+    },
+
+    prettifySubtypes(sensitiveTags){
+        return(
+            <Box maxWidth="200px">
+                <HorizontalStack gap={1}>
+                    {sensitiveTags.map((item,index)=>{
+                        return(index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index}><Box><Icon color="subdued" source={func.getSensitiveIcons(item)} /></Box></Tooltip> : null)
+                    })}
+                    {sensitiveTags.length > 4 ? <Badge size="small" status="warning" key={"more"}>{'+' + (sensitiveTags.length - 4).toString() + 'more'}</Badge> : null}
+                </HorizontalStack>
+            </Box>
+        )
+    },
+
+    prettifyCollectionsData(newData){
+        const prettifyData = newData.map((c)=>{
+            let calcCoverage = '0%';
+            if(c.endpoints > 0){
+                if(c.endpoints < c.testedEndpoints){
+                    calcCoverage= '100%'
+                }else{
+                    calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%'
+                }
+            }
+            return{
+                ...c,
+                id: c.id,
+                nextUrl: '/dashboard/observe/inventory/' + c.id,
+                displayName: c.displayName,
+                displayNameComp: c.displayNameComp,
+                endpoints: c.endpoints,
+                riskScoreComp: <Badge status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
+                coverage: calcCoverage,
+                issuesArr: this.getIssuesList(c.severityInfo),
+                sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes),
+                lastTraffic: c.detected,
+                riskScore: c.riskScore,
+                envTypeComp: c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null
             }
         })
-        const finalArr = [...sensitiveSamples, ...uniqueNonSensitive]
-        return finalArr
+
+
+        return prettifyData
+    },
+
+    getSummaryData(collectionsData){
+        let totalUrl = 0;
+        let sensitiveInRes = 0;
+        let totalTested = 0 ;
+
+        collectionsData?.forEach((c) =>{
+            totalUrl += c.endpoints ;
+            totalTested += c.testedEndpoints;
+        })
+
+        return {
+            totalEndpoints:totalUrl , totalTestedEndpoints: totalTested, totalSensitiveEndpoints: sensitiveInRes
+        }
+    },
+
+    getTruncatedUrl(url){
+        try {
+            const parsedURL = new URL(url)
+            const pathUrl = parsedURL.pathname.replace(/%7B/g, '{').replace(/%7D/g, '}');
+            return pathUrl
+        } catch (error) {
+            return url
+        }
+    },
+
+    getHostName(url){
+        try {
+            const parsedURL = new URL(url)
+            return parsedURL.hostname
+        } catch (error) {
+            return "No host"
+        }
+    },
+
+    getRiskScoreValue(severity){
+        if(severity >= 100){
+            return 2
+        }else if(severity >= 10){
+            return 1
+        }else if(severity > 0){
+            return 0.5
+        }else{
+            return 0
+        }
+    },
+
+    isNewEndpoint(lastSeen){
+        let lastMonthEpoch = func.timeNow() - (30 * 24 * 60 * 60);
+        return lastSeen > lastMonthEpoch
+    },
+
+    getRiskScoreForEndpoint(url){
+        let riskScore = 0 
+        riskScore += this.getRiskScoreValue(url.severityScore);
+
+        if(url.access_type === "Public"){
+            riskScore += 1
+        }
+
+        if(url.isSensitive){
+            riskScore += 1
+        }
+
+        if(this.isNewEndpoint(url.lastSeenTs)){
+            riskScore += 1
+        }
+
+        return riskScore
+    },
+
+    prettifyEndpointsData(inventoryData){
+        const hostNameMap = PersistStore.getState().hostNameMap
+        const prettifyData = inventoryData.map((url) => {
+            const score = this.getRiskScoreForEndpoint(url)
+            return{
+                ...url,
+                last_seen: url.last_seen,
+                hostName: (hostNameMap[url.apiCollectionId] !== null ? hostNameMap[url.apiCollectionId] : this.getHostName(url.endpoint)),
+                access_type: url.access_type,
+                auth_type: url.auth_type,
+                endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} isNew={this.isNewEndpoint(url.lastSeenTs)} />,
+                sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
+                riskScoreComp: <Badge status={this.getStatus(score)} size="small">{score.toString()}</Badge>,
+                riskScore: score,
+                isNew: this.isNewEndpoint(url.lastSeenTs),
+                sensitiveDataTags: url?.sensitiveTags.join(" "),
+            }
+        })
+
+        return prettifyData
+    },
+
+    getDetailsHeaders(){
+        return apiDetailsHeaders
+    },
+
+    changesTrend (data, startTimestamp, endTimestamp) {
+        let end = new Date(endTimestamp * 1000)
+        let start = new Date(startTimestamp * 1000)
+        
+        let date = start
+        let ret = []
+        let dateToCount = data.reduce((m, e) => { 
+            let detectDate = func.toYMD(new Date(e.detectedTs*1000))
+            m[detectDate] = (m[detectDate] || 0 ) + 1
+            return m
+        }, {})
+        while (date <= end) {
+            ret.push([func.toDate(func.toYMD(date)), dateToCount[func.toYMD(date)] || 0])
+            date = func.incrDays(date, 1)
+        }
+        return ret
+    },
+
+    getParamHeaders(){
+        return paramHeaders;
+    },
+
+    async fetchRiskScoreInfo(){
+        let tempRiskScoreObj = lastFetchedResp
+        let tempSeverityObj = lastFetchedSeverityResp
+        await api.lastUpdatedInfo().then(async(resp) => {
+            if(resp.lastUpdatedSeverity >= lastFetchedInfo.lastRiskScoreInfo || resp.lastUpdatedSensitiveMap >= lastFetchedInfo.lastSensitiveInfo){
+                try {
+                    await api.getRiskScoreInfo().then((res) =>{
+                        const newObj = {
+                            criticalUrls: res.criticalEndpointsCount,
+                            riskScoreMap: res.riskScoreOfCollectionsMap, 
+                        }
+                        tempRiskScoreObj = JSON.parse(JSON.stringify(newObj));
+                        setLastFetchedResp(newObj);
+                    })
+                } catch (error) {
+                    func.setToast(true, false, error.message)
+                }
+                
+            }
+            if(resp.lastUpdatedSeverity >= lastFetchedInfo.lastRiskScoreInfo){
+                try {
+                    await api.getSeverityInfoForCollections().then((resp) => {
+                        tempSeverityObj = JSON.parse(JSON.stringify(resp))
+                        setLastFetchedSeverityResp(resp)
+                    })
+                } catch (error) {
+                    func.setToast(true, false, error.message)
+                }
+                
+            }
+            setLastFetchedInfo({
+                lastRiskScoreInfo: func.timeNow() >= resp.lastUpdatedSeverity ? func.timeNow() : resp.lastUpdatedSeverity,
+                lastSensitiveInfo: func.timeNow() >= resp.lastUpdatedSensitiveMap ? func.timeNow() : resp.lastUpdatedSensitiveMap,
+            })
+        })
+        let finalObj = {
+            riskScoreObj: tempRiskScoreObj,
+            severityObj: tempSeverityObj
+        }
+        return finalObj
+    },
+
+    async fetchSensitiveInfo(){
+        let tempSensitiveInfo = lastFetchedSensitiveResp
+        if((func.timeNow() - (5 * 60)) >= lastCalledSensitiveInfo){
+            try {
+                await api.getSensitiveInfoForCollections().then((resp) => {
+                    const sensitiveObj = {
+                        sensitiveUrls: resp.sensitiveUrlsInResponse,
+                        sensitiveInfoMap: resp.sensitiveSubtypesInCollection
+                    }
+                    setLastCalledSensitiveInfo(func.timeNow())
+                    setLastFetchedSensitiveResp(sensitiveObj)
+                    tempSensitiveInfo = JSON.parse(JSON.stringify(sensitiveObj))
+                })
+            } catch (error) {
+                return tempSensitiveInfo
+            }
+            
+        }
+        return tempSensitiveInfo; 
     }
+
       
 }
 

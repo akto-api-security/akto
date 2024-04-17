@@ -52,20 +52,11 @@ const transform = {
         }
     },
 
-    getFirstLine(original,current,originalParams,currentParams){
-        let ogFirstLine = original
-        let firstLine = current
-        originalParams && Object.keys(originalParams).forEach((key) => {
-            ogFirstLine = ogFirstLine + '?' + key + '=' + encodeURI(originalParams[key])
-        })
-        currentParams && Object.keys(currentParams).forEach((key) => {
-            firstLine = firstLine + '?' + key + '=' + encodeURI(currentParams[key])
-        })
-    
+    getFirstLine(original,current){
         return{
-            original: ogFirstLine,
-            firstLine: firstLine,
-            isUpdated: firstLine !== ogFirstLine
+            original: original,
+            firstLine: current,
+            isUpdated: original !== current
         }
     },
 
@@ -86,88 +77,151 @@ const transform = {
        }
     },
 
-    getPayloadData(original,current){
-        let changedKeys = []
-        let insertedKeys = []
-        let deletedKeys = []
-        let finalUnflatObj = {}
+    getPayloadData(original, current) {
 
-        let ogFlat = func.flattenObject(original)
-        let currFlat = func.flattenObject(current)
+        let res = {
+            headersMap: {},
+            json: ""
+        }
 
-        for(const key in ogFlat){
-            let mainKey = '"' + key.split(".")?.pop() + '": ' 
-            if(!currFlat?.hasOwnProperty(key)){
-                let searchKey = "";
-                if(typeof(ogFlat[key]) === "string"){
-                    searchKey =  mainKey + '"' + ogFlat[key] + '"'
-                } else if(typeof(ogFlat[key]) === 'object'){
-                    searchKey = mainKey 
-                } else{
-                    searchKey = mainKey + ogFlat[key]
+        let ogType = typeof (original)
+        let curType = typeof (current)
+
+        if (ogType === 'object' && curType === 'object' && !Array.isArray(original) && !Array.isArray(current)) {
+
+            // object diff
+            let final = { ...original, ...current };
+            var diff = require('deep-diff').diff;
+            var differences = diff(original, current);
+            // console.log(original, current, differences)
+            res.json = this.formatJson(final);
+            if (differences != undefined) {
+                for (let diff of differences) {
+                    let kind = diff.kind;
+                    let key = diff.path.pop();
+                    if(key==undefined){
+                        continue;
+                    }
+                    let searchKey = '"' + key + '": ';
+                    switch (kind) {
+                        case 'N':
+                            searchKey = this.getSearchKey(searchKey, diff.rhs);
+                            searchKey.split("\n").forEach((line) => {
+                                res.headersMap[this.escapeRegex(line)] = { className: 'added-content' }
+                            })
+                            break;
+                        case 'D':
+                            searchKey = this.getSearchKey(searchKey, diff.lhs);
+                            searchKey.split("\n").forEach((line) => {
+                                res.headersMap[this.escapeRegex(line)] = { className: 'deleted-content' }
+                            })
+                            break;
+                        case 'A':
+                            let ogTemp = original;
+                            let curTemp = current;
+                            for (let i in diff.path) {
+                                ogTemp = ogTemp[diff.path[i]];
+                                curTemp = curTemp[diff.path[i]];
+                            }
+                            let data = this.formatJson(ogTemp) + "->" + this.formatJson(curTemp);
+                            res.headersMap[searchKey] = { className: 'updated-content', keyLength: key.length + 2, data: data }
+                            break;
+                        case 'E':
+                            let data2 = this.formatJson(diff.lhs) + "->" + this.formatJson(diff.rhs);
+                            res.headersMap[searchKey] = { className: 'updated-content', keyLength: key.length + 2, data: data2 }
+                    }
                 }
-                deletedKeys.push({header: searchKey, className: 'deleted-content'})
-                finalUnflatObj[key] = ogFlat[key]
-            }else if(!func.deepComparison(ogFlat[key],currFlat[key])){
-                let searchKey = typeof(ogFlat[key]) === "string" ? mainKey + '"' + currFlat[key] + '"' : mainKey + currFlat[key]
-                changedKeys.push({header:searchKey, className: 'updated-content', data: ogFlat[key] + "->" + currFlat[key], keyLength: key.split(".")?.pop().length + 2})
-                finalUnflatObj[key] = currFlat[key]
-            }else{
-                finalUnflatObj[key] = ogFlat[key]
             }
-        }
 
-        for(const key in currFlat){
-            let mainKey = '"' + key.split(".")?.pop() + '": ' 
-            if(!ogFlat.hasOwnProperty(key)){
-                insertedKeys.push({header: mainKey + '"' + currFlat[key] + '"', className: 'added-content'})
-                finalUnflatObj[key] = currFlat[key]
-            }
-        }
+        } else if (ogType === 'string' && curType === 'string') {
 
-        const mergedObject = [...deletedKeys, ...insertedKeys, ...changedKeys].reduce((result, item) => {
-            result[item.header] = {className:item.className, data: item?.data, keyLength: item.keyLength};
-            return result;
-        }, {});
+            // string diff.
+            let ogArr = typeof (original) === 'string' ? original.split("\n") : []
+            let curArr = typeof (current) === 'string' ? current.split("\n") : []
 
-        let ret = {};
-        ret.headersMap = mergedObject
-        ret.json = "";
-
-        let ogArr = typeof(original)==='string' ? original.split("\n") : []
-        let curArr = typeof(current)==='string' ? current.split("\n") : [] 
-
-        let retArr = []
-        for(let i in Array.from(Array(Math.max(ogArr.length, curArr.length)))){
-            if(ogArr[i] && curArr[i]){
-                if(ogArr[i]!==curArr[i]){
-                    ret.headersMap[curArr[i]] = {className: 'updated-content', data: ogArr[i].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + "->" + curArr[i].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'), keyLength: -2}
+            let retArr = []
+            for (let i in Array.from(Array(Math.max(ogArr.length, curArr.length)))) {
+                if (ogArr[i] && curArr[i]) {
+                    if (ogArr[i] !== curArr[i]) {
+                        res.headersMap[this.escapeRegex(curArr[i])] = { className: 'updated-content', data: ogArr[i].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + "->" + curArr[i].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'), keyLength: -2 }
+                    }
+                    retArr.push(curArr[i]);
+                } else if (ogArr[i]) {
+                    res.headersMap[this.escapeRegex(curArr[i])] = { className: 'deleted-content' };
+                    retArr.push(ogArr[i]);
+                } else if (curArr[i]) {
+                    res.headersMap[this.escapeRegex(curArr[i])] = { className: 'added-content' };
+                    retArr.push(curArr[i]);
                 }
-                retArr.push(curArr[i]);
-            } else if(ogArr[i]) {
-                ret.headersMap[curArr[i]] = {className:'deleted-content'};
-                retArr.push(ogArr[i]);
-            } else if(curArr[i]){
-                ret.headersMap[curArr[i]] = {className:'added-content'};
-                retArr.push(curArr[i]);
             }
-        }
+            res.json = retArr.join("\n")
 
-        if(typeof(current)!=='string' && typeof(original)!=='string'){
-            ret.json = this.formatJson(func.unflattenObject(finalUnflatObj));
-        } else if(typeof(current)==='string' && typeof(original)==='string'){
-            ret.json = retArr.join("\n")
-        } else if(typeof(current)==='string'){
-            ret.json = retArr.join("\n") + "\n" + this.formatJson(original);
         } else {
-            ret.json = this.formatJson(current) + "\n" + retArr.join("\n");
+            // handle mix match. array, string, object.
+
+            let og = this.standardDiff(original)
+            let cur = this.standardDiff(current)
+            if(og === cur){
+                res.json = cur
+            }
+            else {
+                res.json = og + "\n" + cur
+                og.split("\n").forEach((line) => {
+                    res.headersMap[this.escapeRegex(line)] = { className: 'deleted-content' }
+                })
+                cur.split("\n").forEach((line) => {
+                    res.headersMap[this.escapeRegex(line)] = { className: 'added-content' }
+                })
+            }
+            
         }
 
-        return ret;
+        return res;
+    },
+
+    standardDiff(data) {
+
+        if(data == null || data == undefined){
+            return "";
+        }    
+
+        let type = typeof (data)
+
+        if (type === 'string' || type === 'number' || type === 'boolean') {
+            return data.toString();
+        } else if (type === 'object') {
+            if (Array.isArray(data)) {
+                return this.processArrayJson(this.formatJson(data))
+            } else {
+                return this.formatJson(data)
+            }
+        } else {
+            return data.toString();
+        }
+    },
+
+    escapeRegex(string) {
+        return string;
+    },
+
+    getSearchKey(mainKey, value) {
+        let searchKey = "";
+        if (typeof (value) === "string") {
+            searchKey = mainKey + '"' + value + '"'
+        } else if (typeof (value) === 'object') {
+            if (Array.isArray(value)) {
+                searchKey = mainKey + this.processArrayJson(this.formatJson(value))
+            } else {
+                searchKey = mainKey + this.formatJson(value)
+            }
+        } else {
+            searchKey = mainKey + value
+        }
+        return searchKey;
     },
 
     mergeDataObjs(lineObj, jsonObj, payloadObj){
-        let finalMessage = (lineObj.firstLine ? lineObj.firstLine: "") + "\n" + (jsonObj.message ? jsonObj.message: "") + "\n" + this.processArrayJson(payloadObj.json)
+        let finalMessage = (lineObj.firstLine ? lineObj.firstLine: "") + "\n" + (jsonObj.message ? jsonObj.message: "") + "\n" + payloadObj.json
         return{
             message: finalMessage,
             firstLine: lineObj.original + "->" + lineObj.firstLine,
@@ -175,7 +229,30 @@ const transform = {
             headersMap: {...jsonObj.headersMap, ...payloadObj.headersMap},
             updatedData: jsonObj.updatedData,
         }
-    },  
+    },
+    formatData(data,style){
+        let localFirstLine = data?.firstLine
+        let finalData = ""
+        let payLoad = null
+        if(style === "http" && data && Object.keys(data).length > 0){
+            if(data.json){
+                Object.keys(data?.json).forEach((element)=> {
+                    if(element.includes("Header")){
+                        if(data.json[element]){
+                            Object.keys(data?.json[element]).forEach((key) => {
+                                finalData = finalData + key + ': ' + data.json[element][key] + "\n"
+                            })
+                        }
+                    }else{
+                        payLoad = data.json[element]
+                    }
+                })
+            }
+            finalData = finalData.split("\n").sort().join("\n");
+            return (localFirstLine + "\n\n" + finalData + "\n\n" + this.formatJson(payLoad))
+        }
+        return (data?.firstLine ? data?.firstLine + "\n\n" : "") + (data?.json ? this.formatJson(data.json) : "");
+      }  
       
 }
 

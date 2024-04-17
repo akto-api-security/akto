@@ -4,14 +4,15 @@ import JsonComponent from './shared/JsonComponent'
 import { HorizontalStack, VerticalStack } from '@shopify/polaris'
 import QuickStartStore from '../quickStartStore'
 import func from '@/util/func'
+import { useRef } from 'react'
 
-function FargateSource({docsUrl,bannerTitle}) {
+function FargateSource({docsUrl,bannerTitle, innerUrl}) {
 
     const yamlContent = QuickStartStore(state => state.yamlContent)
+    const ref = useRef(null)
 
     const copyYaml = () => {
-        navigator.clipboard.writeText(yamlContent)
-        func.setToast(true, false, "Variables Copied to Clipboard !")
+        func.copyToClipboard(yamlContent, ref, "Variables Copied to Clipboard !")
     }
 
     const deploymentMethod = "FARGATE"
@@ -22,12 +23,14 @@ function FargateSource({docsUrl,bannerTitle}) {
 
     const stackCompleteComponent = (
         <VerticalStack gap="2">
+            <div ref = {ref}/>
             <HorizontalStack gap="1">
-                <span>Add traffic sources from our docs. Click</span>
-                <a href='dashboard/observe/inventory'>here</a>
+                <span>Your stack is ready. Now follow the steps mentioned 
+                {" "} <a target="_blank" href={innerUrl}>here</a>. You will need the following variables for the next steps.
+                </span>
             </HorizontalStack>
 
-            <JsonComponent title="Variables" toolTipContent="Copy your variables" onClickFunc={()=> copyYaml()} dataString={yamlContent} language="yaml" minHeight="50px"/>
+            <JsonComponent title="Variables" toolTipContent="Copy your variables" onClickFunc={()=> copyYaml()} dataString={yamlContent} language="yaml" minHeight="100px"/>
         </VerticalStack>
     )
 

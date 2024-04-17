@@ -9,6 +9,7 @@ import com.google.gson.reflect.TypeToken;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -26,7 +27,7 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     public static final String TEST_SUB_TYPE = "testSubType";
     private String testSubType;
     public static final String TEST_RESULTS = "testResults";
-    private List<TestResult> testResults;
+    private List<GenericTestResult> testResults;
     public static final String VULNERABLE = "vulnerable";
     private boolean vulnerable;
     public static final String SINGLE_TYPE_INFOS = "singleTypeInfos";
@@ -41,11 +42,58 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     public static final String TEST_RUN_RESULT_SUMMARY_ID = "testRunResultSummaryId";
     private ObjectId testRunResultSummaryId;
 
+    private WorkflowTest workflowTest;
+
+    @BsonIgnore
+    private List<TestLog> testLogs = new ArrayList<>();
+
+    public static class TestLog {
+        TestLogType testLogType;
+        String message;
+
+        long timestamp;
+
+        public TestLog(TestLogType testLogType, String message) {
+            this.testLogType = testLogType;
+            this.message = message;
+            this.timestamp = System.currentTimeMillis();
+        }
+
+        public TestLogType getTestLogType() {
+            return testLogType;
+        }
+
+        public void setTestLogType(TestLogType testLogType) {
+            this.testLogType = testLogType;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
+
+        public void setTimestamp(long timestamp) {
+            this.timestamp = timestamp;
+        }
+    }
+
+    public enum TestLogType {
+        ERROR, INFO,
+    }
+
     public TestingRunResult() { }
 
     public TestingRunResult(ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey, String testSuperType, String testSubType,
-                            List<TestResult> testResults, boolean vulnerable, List<SingleTypeInfo> singleTypeInfos,
-                            int confidencePercentage, int startTimestamp, int endTimestamp, ObjectId testRunResultSummaryId) {
+                            List<GenericTestResult> testResults, boolean vulnerable, List<SingleTypeInfo> singleTypeInfos,
+                            int confidencePercentage, int startTimestamp, int endTimestamp, ObjectId testRunResultSummaryId, 
+                            WorkflowTest workflowTest, List<TestLog> testLogs) {
         this.testRunId = testRunId;
         this.apiInfoKey = apiInfoKey;
         this.testSuperType = testSuperType;
@@ -57,6 +105,8 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
         this.testRunResultSummaryId = testRunResultSummaryId;
+        this.workflowTest = workflowTest;
+        this.testLogs = testLogs;
     }
 
     public ObjectId getId() {
@@ -133,11 +183,11 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
         this.testSubType = testSubType;
     }
 
-    public List<TestResult> getTestResults() {
+    public List<GenericTestResult> getTestResults() {
         return testResults;
     }
 
-    public void setTestResults(List<TestResult> testResults) {
+    public void setTestResults(List<GenericTestResult> testResults) {
         this.testResults = testResults;
     }
 
@@ -163,6 +213,14 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setConfidencePercentage(int confidencePercentage) {
         this.confidencePercentage = confidencePercentage;
+    }
+
+    public WorkflowTest getWorkflowTest() {
+        return workflowTest;
+    }
+
+    public void setWorkflowTest(WorkflowTest workflowTest) {
+        this.workflowTest = workflowTest;
     }
 
     @Override
@@ -197,7 +255,11 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
         bld.append("API: " + apiInfoKey.getUrl() + " " + apiInfoKey.getMethod().toString() + "\n");
         bld.append("Test: " + testSuperType + " " + testSubType + " Vulnerable: " + vulnerable +
         (vulnerable ? " Severity : " + severity : "") + "\n");
-        for (TestResult testResult : testResults) {
+        for (GenericTestResult tr : testResults) {
+            if (tr instanceof MultiExecTestResult) {
+                continue;
+            }
+            TestResult testResult = (TestResult) tr;
             Gson gson = new Gson();
             Map<String, Object> json = gson.fromJson(testResult.getOriginalMessage(), new TypeToken<Map<String, Object>>(){}.getType());
             try {
@@ -244,4 +306,11 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
         return 0;
     }
 
+    public List<TestLog> getTestLogs() {
+        return testLogs;
+    }
+
+    public void setTestLogs(List<TestLog> testLogs) {
+        this.testLogs = testLogs;
+    }
 }

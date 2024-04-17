@@ -32,6 +32,8 @@ public class LoginRecorderAction extends UserAction {
 
     private String nodeId;
 
+    private Boolean tokenFetchInProgress;
+
     private static final LoggerMaker loggerMaker = new LoggerMaker(LoginRecorderAction.class);
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
@@ -42,6 +44,12 @@ public class LoginRecorderAction extends UserAction {
 
         int accountId = Context.accountId.get();
 
+        // Delete recorded login flow input for user (if exists)
+        int userId = getSUser().getId();
+        if (userId != 0) {
+            RecordedLoginInputDao.instance.deleteAll(Filters.eq("userId", userId));
+        }
+
         executorService.schedule( new Runnable() {
             public void run() {
                 try {
@@ -50,7 +58,7 @@ public class LoginRecorderAction extends UserAction {
                     File tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
                     RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), getSUser().getId());
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("error running recorded flow " + e.toString(), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(e,"error running recorded flow " + e.toString(), LogDb.DASHBOARD);
                 }
             }
         }, 1, TimeUnit.SECONDS);
@@ -61,6 +69,11 @@ public class LoginRecorderAction extends UserAction {
     public String fetchRecordedFlowOutput() {
 
         RecordedLoginFlowInput recordedLoginInput = RecordedLoginInputDao.instance.findOne(Filters.eq("userId", getSUser().getId()));
+
+        if (recordedLoginInput == null) {
+            tokenFetchInProgress = true;
+            return SUCCESS.toUpperCase();
+        }
 
         try {
             token = RecordedLoginFlowUtil.fetchToken(recordedLoginInput.getOutputFilePath(), recordedLoginInput.getErrorFilePath());
@@ -112,5 +125,13 @@ public class LoginRecorderAction extends UserAction {
 
     public void setToken(String token) {
         this.token = token;
+    }
+
+    public Boolean getTokenFetchInProgress() {
+        return this.tokenFetchInProgress;
+    }
+
+    public void setTokenFetchInProgress(Boolean tokenFetchInProgress) {
+        this.tokenFetchInProgress = tokenFetchInProgress;
     }
 }

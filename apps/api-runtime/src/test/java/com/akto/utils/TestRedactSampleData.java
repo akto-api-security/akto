@@ -1,5 +1,7 @@
 package com.akto.utils;
 
+import com.akto.dao.CustomDataTypeDao;
+import com.akto.dto.CustomDataType;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.parsers.HttpCallParser;
@@ -104,13 +106,16 @@ public class TestRedactSampleData {
         Set<String> redactedReqKeys = extractKeys(redacted.requestParams.getPayload());
         Set<String> originalReqKeys = extractKeys(original.requestParams.getPayload());
         if (!redactedReqKeys.equals(originalReqKeys)) {
+            System.out.println(redactedReqKeys);
+            System.out.println(originalReqKeys);
             return false;
         }
 
         Set<String> redactedRespKeys = extractKeys(redacted.getPayload());
         Set<String> originalRespKeys = extractKeys(original.getPayload());
         if (!redactedRespKeys.equals(originalRespKeys)) {
-
+            System.out.println(redactedRespKeys);
+            System.out.println(originalRespKeys);
             return false;
         }
 
@@ -203,7 +208,7 @@ public class TestRedactSampleData {
                 "type", 200, "OK", respHeaders, respPayload, httpRequestParams, 0, "1000000", false, HttpResponseParams.Source.MIRRORING, "orig","172.0.0.1"
         );
 
-        String redactedValue = RedactSampleData.redact(httpResponseParams);
+        String redactedValue = RedactSampleData.redact(httpResponseParams, true);
 
         HttpResponseParams redactedHttpResponseParams = HttpCallParser.parseKafkaMessage(redactedValue);
 
@@ -271,7 +276,7 @@ public class TestRedactSampleData {
         HttpResponseParams originalHttpResponseParams = HttpCallParser.parseKafkaMessage(originalString);
 
 
-        String redactedValue = RedactSampleData.redact(httpResponseParams);
+        String redactedValue = RedactSampleData.redact(httpResponseParams, true);
 
         HttpResponseParams redactedHttpResponseParams = HttpCallParser.parseKafkaMessage(redactedValue);
 
@@ -279,7 +284,7 @@ public class TestRedactSampleData {
             boolean result = testRedactDoneCorrect(originalHttpResponseParams, redactedHttpResponseParams);
             Assertions.assertTrue(result);
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
             Assertions.fail();
         }
 

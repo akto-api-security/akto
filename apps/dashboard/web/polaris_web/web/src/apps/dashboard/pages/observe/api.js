@@ -218,6 +218,15 @@ export default {
             return resp
         })
     },
+    redactCollection(apiCollectionId, redacted){
+        return request({
+            url: '/api/redactCollection',
+            method: 'post',
+            data:{
+                apiCollectionId,redacted
+            }
+        })
+    },
 
     async fetchAllUrlsAndMethods (apiCollectionId) {
         const resp = await request({
@@ -438,20 +447,20 @@ export default {
             data: {}
         })
     },
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl }
+            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId }
         }).then((resp) => {
             return resp
         })
     },
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId}
         }).then((resp) => {
             return resp
         })        
@@ -496,4 +505,140 @@ export default {
             }
         })
     },
+
+    async addApisToCustomCollection(apiList, collectionName) {
+        return await request({
+            url: '/api/addApisToCustomCollection',
+            method: 'post',
+            data: {
+                apiList, collectionName
+            }
+        })
+    },
+    async removeApisFromCustomCollection(apiList, collectionName) {
+        return await request({
+            url: '/api/removeApisFromCustomCollection',
+            method: 'post',
+            data: {
+                apiList, collectionName
+            }
+        })
+    },
+    async computeCustomCollections(collectionName) {
+        return await request({
+            url: '/api/computeCustomCollections',
+            method: 'post',
+            data: {
+                collectionName
+            }
+        })
+    },
+    async createCustomCollection(collectionName, conditions) {
+        return await request({
+            url: '/api/createCustomCollection',
+            method: 'post',
+            data: {
+                collectionName, conditions
+            }
+        })
+    },
+    async getEndpointsFromConditions(conditions) {
+        return await request({
+            url: '/api/getEndpointsFromConditions',
+            method: 'post',
+            data: {
+                conditions
+            }
+        })
+    },
+    fetchApiDependencies(apiCollectionId, url, method) {
+        return request({
+            url: '/api/fetchApiDependencies',
+            method: 'post',
+            data: {
+                apiCollectionId, url, method
+            }
+        })
+    },
+
+    async getSensitiveInfoForCollections(){
+        return await request({
+            url: '/api/getSensitiveInfoForCollections',
+            method: 'post',
+            data:{},
+        })
+    },
+
+    async getCoverageInfoForCollections(){
+        return await request({
+            url: '/api/getCoverageInfoForCollections',
+            method: 'post',
+            data:{},
+        })
+    },
+
+    async getSeverityInfoForCollections(){
+        return await request({
+            url: '/api/getSeverityInfoForCollections',
+            method: 'post',
+            data:{},
+        })
+    },
+
+    async getLastTrafficSeen(){
+        return await request({
+            url: '/api/getLastSeenTrafficInfoForCollections',
+            method: 'post',
+            data:{},
+        })
+    },
+
+    async getRiskScoreInfo() {
+        return await request({
+            url: '/api/getRiskScoreInfo',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    async lastUpdatedInfo() {
+        return await request({
+            url: '/api/getLastCalculatedInfo',
+            method: 'post',
+            data: {}
+        })
+    },
+    
+    async deMergeApi(apiCollectionId, url, method){
+        return await request({
+            url: '/api/deMergeApi',
+            method: 'post',
+            data: {apiCollectionId, url, method}
+        })
+    },
+    async getUserEndpoints(){
+        return await request({
+            url: '/api/getCustomerEndpoints',
+            method: 'post',
+            data:{},
+        })
+    },
+    async updateEnvTypeOfCollection(envType, apiCollectionIds){
+        return await request({
+            url: '/api/updateEnvType',
+            method: 'post',
+            data: {envType, apiCollectionIds}
+        })
+    },
+    fetchEndpoint(apiInfoKey){
+        return request({
+            url: '/api/getSingleEndpoint',
+            method: 'post',
+            data: {
+                url: apiInfoKey.url,
+                method: apiInfoKey.method,
+                apiCollectionId: apiInfoKey.apiCollectionId
+            }
+        })
+    }
 }

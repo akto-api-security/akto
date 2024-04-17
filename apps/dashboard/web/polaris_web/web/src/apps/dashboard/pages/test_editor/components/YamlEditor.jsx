@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { Box, Button, Divider, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris"
-import { tokens } from "@shopify/polaris-tokens"
 import { InfoMinor, ClipboardMinor, CircleTickMinor, CircleCancelMinor } from "@shopify/polaris-icons"
-import convertFunc from "../transform";
 
 import Store from "../../../store";
 import TestEditorStore from "../testEditorStore";
@@ -34,6 +32,7 @@ import keywords from "./editor_config/keywords"
 
 const YamlEditor = ({ fetchAllTests }) => {
     const navigate = useNavigate()
+    const ref = useRef(null)
 
     const setToastConfig = Store(state => state.setToastConfig)
     const testsObj = TestEditorStore(state => state.testsObj)
@@ -113,7 +112,7 @@ const YamlEditor = ({ fetchAllTests }) => {
       }, [selectedTest])
 
     const copyTestName = () =>{
-        func.copyToClipboard(editorInstance.getValue())
+        func.copyToClipboard(editorInstance.getValue(), ref)
     }
 
     const setTestInactive = () => {
@@ -145,6 +144,7 @@ const YamlEditor = ({ fetchAllTests }) => {
         <div>
             <div className="editor-header">
                 <HorizontalStack gap={"1"}>
+                    <div ref={ref} />
                     <Tooltip content={selectedTest.label + '.yaml'} width="wide">
                         <Text variant="headingSm" as="h5" truncate>{selectedTest.label + '.yaml'}</Text>
                     </Tooltip>

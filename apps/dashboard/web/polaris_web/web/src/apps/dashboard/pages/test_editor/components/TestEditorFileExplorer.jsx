@@ -26,7 +26,13 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
     const navigate = useNavigate()
 
     const selectedFunc = (val) =>{
-        setSelectedCategory(val)
+        setSelectedCategory((prev) => {
+            if(prev === val){
+                return "none"
+            }else{
+                return val
+            }
+        })
     }
 
     const toggleFunc = (param) =>{
@@ -91,7 +97,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
     const searchResult = (val) => {
         let cloneObj = JSON.parse(JSON.stringify(testObj))
         setSearchText(val)
-        let searchObj = searchFunction(cloneObj, val)
+        let searchObj = searchFunction(cloneObj, val.toLowerCase())
 
         setCustomItems(convertFunc.getNavigationItems(searchObj,"CUSTOM",selectedFunc))
         setAktoItems(convertFunc.getNavigationItems(searchObj,"Akto",selectedFunc))

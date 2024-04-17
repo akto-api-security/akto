@@ -55,6 +55,17 @@
                             </template>
                         </simple-menu>
                     </div>
+                    <div>
+                        <simple-menu :items="testRoleOptions">
+                            <template v-slot:activator2>
+                                <div>
+                                    <span class="column-title">Select test role: </span>
+                                    <span class="column-title clickable-line">{{ testRoleLabel }}</span>
+                                    <v-icon size="14" color="var(--themeColorDark)">$fas_angle-down</v-icon>
+                                </div>
+                            </template>
+                        </simple-menu>
+                    </div>
                 </div>
             </div>
             <v-btn primary dark color="var(--themeColor)" @click="schedule">
@@ -69,6 +80,7 @@
 import func from '@/util/func'
 import SimpleMenu from "@/apps/dashboard/shared/components/SimpleMenu"
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
+import api from '../api.js' 
 
 export default {
     name: "ScheduleBox",
@@ -124,7 +136,10 @@ export default {
             testRunTimeOptions: [{ label: "Till complete", click: () => this.setTestRunTimeDefault() }, ...runTimeMinutes, ...runTimeHours],
             maxConcurrentRequests: -1,
             maxConcurrentRequestsLabel: "Default ",
-            maxConcurrentRequestsOptions: [{ label: "Default", click: () => this.setMaxConcurrentRequest("Default", -1) }, ...maxRequests]
+            maxConcurrentRequestsOptions: [{ label: "Default", click: () => this.setMaxConcurrentRequest("Default", -1) }, ...maxRequests],
+            testRoleLabel: "No test role selected",
+            testRoleOptions: [],
+            testRoleId: null
         }
     },
     methods: {
@@ -152,8 +167,25 @@ export default {
         schedule() {
             let overriddenHost = this.hasOverriddenTestAppUrl ? this.overriddenTestAppUrl : null
             return this.$emit("schedule", { recurringDaily: this.recurringDaily, startTimestamp: this.startTimestamp,
-                  testRunTime : this.testRunTime, maxConcurrentRequests: this.maxConcurrentRequests, overriddenTestAppUrl: overriddenHost})
+                  testRunTime : this.testRunTime, maxConcurrentRequests: this.maxConcurrentRequests, overriddenTestAppUrl: overriddenHost, testRoleId: this.testRoleId})
+        },
+        setTestRole(label, id){
+            this.testRoleLabel = label,
+            this.testRoleId = id
+        },
+        fetchTestRoles(){
+            api.fetchTestRoles().then(resp => {
+                this.testRoleOptions.push({label: 'No test role selected', click: () => this.setTestRole("Not test role selected", "")})
+                if(resp.testRoles){
+                    resp.testRoles.forEach(role => {
+                        this.testRoleOptions.push({label: role.name, click: () => this.setTestRole(role.name, role.hexId)})
+                    })
+                }
+            });
         }
+    },
+    mounted() {
+        this.fetchTestRoles()
     },
     computed: {
         scheduleString() {

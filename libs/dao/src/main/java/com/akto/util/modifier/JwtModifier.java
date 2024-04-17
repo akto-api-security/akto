@@ -2,13 +2,24 @@ package com.akto.util.modifier;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.type.KeyTypes;
+import com.auth0.jwt.JWT;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
+import com.nimbusds.jose.Algorithm;
+import com.nimbusds.jose.jwk.JWK;
+import com.nimbusds.jose.jwk.KeyUse;
+
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.*;
 
@@ -32,7 +43,7 @@ public abstract class JwtModifier extends PayloadModifier {
                     finalValue.add(modifiedString);
                     flag = true;
                 } catch (Exception e) {
-                    ;
+                    e.printStackTrace();
                     return null;
                 }
             } else {
@@ -49,6 +60,7 @@ public abstract class JwtModifier extends PayloadModifier {
         String modifiedHeaderStr = mapper.writeValueAsString(json);
         // encode it and remove trailing =
         String encodedModifiedHeader = Base64.getEncoder().encodeToString(modifiedHeaderStr.getBytes(StandardCharsets.UTF_8));
+        if (encodedModifiedHeader.endsWith("=")) encodedModifiedHeader = encodedModifiedHeader.substring(0, encodedModifiedHeader.length()-1);
         if (encodedModifiedHeader.endsWith("=")) encodedModifiedHeader = encodedModifiedHeader.substring(0, encodedModifiedHeader.length()-1);
 
         String[] jwtArr = jwt.split("\\.");
@@ -74,6 +86,22 @@ public abstract class JwtModifier extends PayloadModifier {
         return json;
     }
 
+    public static Map<String, Object> manipulateJWTHeaderToMapObject(String jwt, Map<String, Object> extraHeaders) throws Exception {
+        String[] jwtArr = jwt.split("\\.");
+        if (jwtArr.length != 3) throw new Exception("Not jwt");
+
+        String encodedHeader = jwtArr[0];
+        byte[] decodedHeaderBytes = Base64.getDecoder().decode(encodedHeader);
+        String decodedHeaderStr = new String(decodedHeaderBytes, StandardCharsets.UTF_8);
+
+        Map<String, Object> json = new Gson().fromJson(decodedHeaderStr, Map.class);
+        for (String key: extraHeaders.keySet()) {
+            json.put(key, extraHeaders.get(key));
+        }
+
+        return json;
+    }
+
     public static String manipulateJWT(String jwt, Map<String, String> extraHeaders, Map<String, String> extraBody, String privateKeyString) throws Exception {
 
         // add header
@@ -87,6 +115,90 @@ public abstract class JwtModifier extends PayloadModifier {
             }
         }
 
+        addTimestampsToJwtBody(bodyJson);
+
+        byte [] decoded = Base64.getDecoder().decode(privateKeyString);
+        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decoded);
+        KeyFactory kf = KeyFactory.getInstance("RSA");
+
+        Key privateKey = kf.generatePrivate(keySpec);
+
+        return Jwts.builder()
+                .setHeader(manipulatedJwtHeader)
+                .setPayload(mapper.writeValueAsString(bodyJson))
+                .signWith(privateKey)
+                .compact();
+
+    }
+
+    public static String addKidParamHeader(String jwt) throws Exception {
+
+        Map<String, String> extraHeaders = new HashMap<>();
+        extraHeaders.put("kid", "/proc/1/comm");
+        Map<String, Object> manipulatedJwtHeader = manipulateJWTHeaderToMap(jwt, extraHeaders);
+
+        Map<String, Object> bodyJson = extractBodyFromJWT(jwt);
+
+        for (String key: bodyJson.keySet()) {
+            Object value = bodyJson.get(key);
+            if (value == null) {
+                bodyJson.remove(key);
+            }
+            if (value instanceof Map) {
+                Map<String, Object> valMap = (Map<String, Object>) value;
+                for (String valKey: valMap.keySet()) {
+                    if (valMap.get(valKey) == null) {
+                        valMap.remove(valKey);
+                    }
+                }
+            }
+        }
+
+        com.auth0.jwt.algorithms.Algorithm algorithm = com.auth0.jwt.algorithms.Algorithm.HMAC256("systemd");
+
+        return JWT.create()
+                .withHeader(manipulatedJwtHeader)
+                .withPayload(bodyJson)
+                .sign(algorithm);
+
+    }
+
+    public static String addJwkHeader(String jwt) throws Exception {
+        
+        Map<String, Object> extraHeaders = new HashMap<>();
+        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
+        gen.initialize(2048);
+        KeyPair keyPair = gen.generateKeyPair();
+
+        // Convert to JWK format
+        JWK jwk = new com.nimbusds.jose.jwk.RSAKey.Builder((RSAPublicKey)keyPair.getPublic())
+            .privateKey((RSAPrivateKey)keyPair.getPrivate())
+            .keyUse(KeyUse.SIGNATURE)
+            .keyID(UUID.randomUUID().toString())
+            .build();
+
+        BasicDBObject jwkParams = new BasicDBObject();
+        jwkParams.put("e", jwk.getRequiredParams().get("e"));
+        jwkParams.put("kty", jwk.getRequiredParams().get("kty"));
+        jwkParams.put("n", jwk.getRequiredParams().get("n"));
+        jwkParams.put("kid", jwk.getKeyID());
+        extraHeaders.put("kid", jwk.getKeyID());
+        extraHeaders.put("jwk", jwkParams);
+
+        Map<String, Object> manipulatedJwtHeader = manipulateJWTHeaderToMapObject(jwt, extraHeaders);
+
+        Map<String, Object> bodyJson = extractBodyFromJWT(jwt);
+
+        addTimestampsToJwtBody(bodyJson);
+
+        return Jwts.builder()
+                .setHeader(manipulatedJwtHeader)
+                .setPayload(mapper.writeValueAsString(bodyJson))
+                .signWith(keyPair.getPrivate())
+                .compact();
+    }
+
+    public static void addTimestampsToJwtBody(Map<String, Object> bodyJson) {
         String issueTimeKey = "iat";
         String expiryTimeKey = "exp";
         try {
@@ -101,19 +213,6 @@ public abstract class JwtModifier extends PayloadModifier {
             }
         } catch (Exception ignored) {
         }
-
-        byte [] decoded = Base64.getDecoder().decode(privateKeyString);
-        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decoded);
-        KeyFactory kf = KeyFactory.getInstance("RSA");
-
-        Key privateKey = kf.generatePrivate(keySpec);
-
-        return Jwts.builder()
-                .setHeader(manipulatedJwtHeader)
-                .setPayload(mapper.writeValueAsString(bodyJson))
-                .signWith(privateKey)
-                .compact();
-
     }
 
     public static Map<String, Object> extractBodyFromJWT(String jwt) throws Exception {

@@ -9,11 +9,13 @@ public class DataOperandsFilterResponse {
     private Boolean result;
     private List<String> matchedEntities;
     private List<BasicDBObject> contextEntities;
+    private FilterNode extractNode;
 
-    public DataOperandsFilterResponse(Boolean result, List<String> matchedEntities, List<BasicDBObject> contextEntities) {
+    public DataOperandsFilterResponse(Boolean result, List<String> matchedEntities, List<BasicDBObject> contextEntities, FilterNode extractNode) {
         this.result = result;
         this.matchedEntities = matchedEntities;
         this.contextEntities = contextEntities;
+        this.extractNode = extractNode;
     }
 
     public DataOperandsFilterResponse() { }
@@ -40,6 +42,14 @@ public class DataOperandsFilterResponse {
 
     public void setContextEntities(List<BasicDBObject> contextEntities) {
         this.contextEntities = contextEntities;
+    }
+
+    public FilterNode getExtractNode() {
+        return extractNode;
+    }
+
+    public void setExtractNode(FilterNode extractNode) {
+        this.extractNode = extractNode;
     }
 
 }

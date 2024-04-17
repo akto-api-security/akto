@@ -29,7 +29,7 @@ const Users = () => {
         getTeamData();
     }, [])
 
-    const isLocalDeploy = window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'
+    const isLocalDeploy = window.IS_SAAS !== "true" && window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'
     const currentUser = users.find(user => user.login === username)
 
     let isAdmin = false
@@ -49,6 +49,11 @@ const Users = () => {
     const handleRemoveUser = async (login) => {
         await settingRequests.removeUser(login)
         func.setToast(true, false, "User removed successfully")
+    }
+
+    const handleMakeAdmin = async (login) => {
+        await settingRequests.makeAdmin(login)
+        func.setToast(true, false, "User " + login + " made admin successfully")
     }
 
     return (
@@ -90,8 +95,13 @@ const Users = () => {
                             const shortcutActions = username !== login && isAdmin  ? 
                                 [
                                     {
-                                        content: 'Remove User',
+                                        content: 'Remove user',
                                         onAction: () => {handleRemoveUser(login)},
+                                    },
+                                    ( role.toUpperCase() === "MEMBER" ) &&
+                                    {
+                                        content: 'Make admin',
+                                        onAction: () => {handleMakeAdmin(login)},
                                     }
                                 ] : []
 

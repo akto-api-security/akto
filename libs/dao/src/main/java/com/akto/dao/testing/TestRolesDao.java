@@ -10,6 +10,8 @@ import com.mongodb.client.model.Indexes;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
+
 public class TestRolesDao extends AccountsContextDao<TestRoles> {
     @Override
     public String getCollName() {
@@ -35,22 +37,14 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
 
-        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
-        int counter = 0;
-        while (cursor.hasNext()) {
-            counter++;
-            cursor.next();
-        }
+        String[] fieldNames = {TestRoles.NAME};
+        instance.getMCollection().createIndex(Indexes.ascending(fieldNames), new IndexOptions().unique(true));
 
-        if (counter == 1) {//Only _id as index available
-            String[] fieldNames = {TestRoles.NAME};
-            instance.getMCollection().createIndex(Indexes.ascending(fieldNames), new IndexOptions().unique(true));
-        }
     }
 
     public TestRoles createTestRole (String roleName, ObjectId endpointLogicalGroupId, String userName) {
         int createdTs = Context.now();
-        TestRoles role = new TestRoles(new ObjectId(), roleName, endpointLogicalGroupId, null,userName,createdTs, createdTs);
+        TestRoles role = new TestRoles(new ObjectId(), roleName, endpointLogicalGroupId, new ArrayList<>(),userName,createdTs, createdTs);
 
         this.insertOne(role);
         this.getLogger().info("Created test role with name :{}, and logical group id : {}", roleName, endpointLogicalGroupId.toHexString());

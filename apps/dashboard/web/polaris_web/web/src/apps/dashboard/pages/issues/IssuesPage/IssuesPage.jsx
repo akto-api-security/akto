@@ -5,9 +5,12 @@ import api from "../api"
 import Store from "../../../store";
 import transform from "../transform";
 import func from "@/util/func";
-import { ClockMinor,DynamicSourceMinor,LinkMinor } from '@shopify/polaris-icons';
+import { ClockMinor,DynamicSourceMinor,LinkMinor, MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
 import { Button } from "@shopify/polaris";
+import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
+import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
+import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
 
 const headers = [
     {
@@ -35,6 +38,7 @@ const headers = [
     {
         text: "Timestamp",
         value: "timestamp",
+        sortActive: true
     },
     {
         text: "Endpoint",
@@ -55,14 +59,17 @@ const headers = [
         text:"Ignore reason",
         value:"ignoreReason",
         itemCell:2
+    },
+    {
+        value: 'collectionIds'
     }
 ]
 
 const sortOptions = [
-    { label: 'Discovered time', value: 'timestamp asc', directionLabel: 'Newest', sortKey: 'timestamp' },
-    { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp' },
-    { label: 'Issue', value: 'categoryName asc', directionLabel: 'A-Z', sortKey: 'categoryName' },
-    { label: 'Issue', value: 'categoryName desc', directionLabel: 'Z-A', sortKey: 'categoryName' },    
+    { label: 'Discovered time', value: 'timestamp asc', directionLabel: 'Newest', sortKey: 'timestamp', columnIndex: 5 },
+    { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp', columnIndex: 5 },
+    { label: 'Issue', value: 'categoryName asc', directionLabel: 'A-Z', sortKey: 'categoryName', columnIndex: 1 },
+    { label: 'Issue', value: 'categoryName desc', directionLabel: 'Z-A', sortKey: 'categoryName', columnIndex: 1 },    
 ];
 
 let filtersOptions = [
@@ -109,6 +116,12 @@ let filtersOptions = [
             { label:"Last week", value:func.timeNow() - 7 * 24 * 60 * 60 },
             { label:"Last month", value:func.timeNow() + 60 - 30 * 24 * 60 * 60 },
         ]
+    },
+    {
+        key: 'collectionIds',
+        label: 'API groups',
+        title: 'API groups',
+        choices: [],
     }
 ]
 
@@ -140,6 +153,8 @@ function IssuesPage(){
     const [issuesFilters, setIssuesFilters] = useState({})
     const [key, setKey] = useState(false);
     const apiCollectionMap = PersistStore(state => state.collectionsMap);
+    const allCollections = PersistStore(state => state.allCollections);
+    const [showEmptyScreen, setShowEmptyScreen] = useState(false)
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -150,13 +165,7 @@ function IssuesPage(){
         })
     }
 
-    filtersOptions[0].choices=[];
-    Object.keys(apiCollectionMap).forEach((key) => { 
-        filtersOptions[0].choices.push({
-            label:apiCollectionMap[key],
-            value:Number(key)
-        })
-    });
+    filtersOptions = func.getCollectionFilters(filtersOptions)
 
     let promotedBulkActions = (selectedResources) => {
         selectedResources = selectedResources.map((item) => JSON.parse(item));
@@ -234,6 +243,7 @@ function IssuesPage(){
                 return func.convertToDisambiguateLabel(value, func.toSentenceCase, 2)
             case "issueCategory":
                 return func.convertToDisambiguateLabelObj(value, null, 3)
+            case "collectionIds":
             case "apiCollectionId":
                 return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
             default:
@@ -243,10 +253,14 @@ function IssuesPage(){
 
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
         setLoading(true);
-
+        const res = await api.fetchIssues(skip, 1, null, null, null, null, 0)
+        if(res.totalIssuesCount === 0){
+            setShowEmptyScreen(true)
+            return {value:{} , total:0};
+        }
         let total =0;
         let ret = []
-        let filterCollectionsId = filters.apiCollectionId;
+        let filterCollectionsId = filters.apiCollectionId.concat(filters.collectionIds);
         let filterSeverity = filters.severity
         let filterSubCategory = []
         filters?.issueCategory?.forEach((issue) => {
@@ -269,20 +283,53 @@ function IssuesPage(){
             setLoading(false);
         })
         ret = func.sortFunc(ret, sortKey, sortOrder)
+        
         return {value:ret , total:total};
     }
 
     const openVulnerabilityReport = () => {
         let summaryId = btoa(JSON.stringify(issuesFilters))
-    window.open('/dashboard/issues/summary/' + summaryId, '_blank');
+        window.open('/dashboard/issues/summary/' + summaryId, '_blank');
     }
+
+    const infoItems = [
+        {
+            title: "Triage",
+            icon: MarkFulfilledMinor,
+            description: "Prioritize, assign them to team members and manage API issues effectively.",
+        },
+        {
+            title: "Download vulnerability report",
+            icon: ReportMinor,
+            description: "Export and share detailed report of vulnerabilities in your APIs.",
+        },
+        {
+            title: "Send them to GitHub",
+            icon: ExternalMinor,
+            description: "Integrate Akto with GitHub to send all issues to your developers on GitHub."
+        }
+    ]
     
     return (
         <PageWithMultipleCards
             title="Issues"
             isFirstPage={true}
             components = {[
-                <GithubServerTable
+                showEmptyScreen ? 
+                <EmptyScreensLayout key={"emptyScreen"}
+                    iconSrc={"/public/alert_hexagon.svg"}
+                    headingText={"No issues yet!"}
+                    description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
+                    buttonText={"Run test"}
+                    infoItems={infoItems}
+                    infoTitle={"Once you have issues:"}
+                    learnText={"issues"}
+                    docsUrl={ISSUES_PAGE_DOCS_URL}
+                    bodyComponent={<SelectCollectionComponent />}
+                />
+
+            
+            : <GithubServerTable
                     key={key}
                     headers={headers}
                     resourceName={resourceName} 
@@ -300,7 +347,7 @@ function IssuesPage(){
                     getStatus={func.getTestResultStatus}
                 />
             ]}
-            primaryAction={<Button monochrome removeUnderline plain onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button>}
+            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export vulnerability report</Button>}
             />
     )
 }

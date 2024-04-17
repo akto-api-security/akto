@@ -2,6 +2,7 @@ package com.akto.action.testing_issues;
 
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
+import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -14,11 +15,13 @@ import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
@@ -28,6 +31,8 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,7 +45,7 @@ import static com.akto.util.enums.GlobalEnums.*;
 public class IssuesAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(IssuesAction.class);
-
+    private static final Logger logger = LoggerFactory.getLogger(IssuesAction.class);
     private List<TestingRunIssues> issues;
     private TestingIssuesId issueId;
     private List<TestingIssuesId> issueIdArray;
@@ -64,9 +69,7 @@ public class IssuesAction extends UserAction {
             filters = Filters.and(filters, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, filterStatus));
         }
         if (filterCollectionsId != null && !filterCollectionsId.isEmpty()) {
-            filters = Filters.and(filters, Filters.in(ID + "."
-                    + TestingIssuesId.API_KEY_INFO + "."
-                    + ApiInfo.ApiInfoKey.API_COLLECTION_ID, filterCollectionsId));
+            filters = Filters.and(filters, Filters.in(SingleTypeInfo._COLLECTION_IDS, filterCollectionsId));
         }
         if (filterSeverity != null && !filterSeverity.isEmpty()) {
             filters = Filters.and(filters, Filters.in(TestingRunIssues.KEY_SEVERITY, filterSeverity));
@@ -142,9 +145,11 @@ public class IssuesAction extends UserAction {
             Bson orFilters = Filters.or(andFilters);
             this.testingRunResults = TestingRunResultDao.instance.findAll(orFilters);
             Map<String, String> sampleDataVsCurlMap = new HashMap<>();
+            // todo: fix
             for (TestingRunResult runResult: this.testingRunResults) {
-                List<TestResult> testResults = new ArrayList<>();
-                for (TestResult testResult : runResult.getTestResults()) {
+                List<GenericTestResult> testResults = new ArrayList<>();
+                for (GenericTestResult tr : runResult.getTestResults()) {
+                    TestResult testResult = (TestResult) tr;
                     if (testResult.isVulnerable()) {
                         testResults.add(testResult);
                         sampleDataVsCurlMap.put(testResult.getMessage(), ExportSampleDataAction.getCurl(testResult.getMessage()));
@@ -208,6 +213,7 @@ public class IssuesAction extends UserAction {
         infoObj.put("content", testConfig.getContent());
         infoObj.put("templateSource", testConfig.getTemplateSource());
         infoObj.put("updatedTs", testConfig.getUpdateTs());
+        infoObj.put("author", testConfig.getAuthor());
 
         superCategory.put("displayName", info.getCategory().getDisplayName());
         superCategory.put("name", info.getCategory().getName());
@@ -234,7 +240,7 @@ public class IssuesAction extends UserAction {
                 }
             } catch (Exception e) {
                 String err = "Error while fetching subcategories for " + entry.getKey();
-                loggerMaker.errorAndAddToDb(err, LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e,err, LogDb.DASHBOARD);
             }
         }
 
@@ -250,7 +256,11 @@ public class IssuesAction extends UserAction {
             throw new IllegalStateException();
         }
 
-        Bson update = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated);
+        logger.info("Issue id from db to be updated " + issueId);
+        logger.info("status id from db to be updated " + statusToBeUpdated);
+        logger.info("status reason from db to be updated " + ignoreReason);
+        Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
+                                        Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored
             update = Updates.combine(update, Updates.set(TestingRunIssues.IGNORE_REASON, ignoreReason));
@@ -269,6 +279,9 @@ public class IssuesAction extends UserAction {
             throw new IllegalStateException();
         }
 
+        logger.info("Issue id from db to be updated " + issueIdArray);
+        logger.info("status id from db to be updated " + statusToBeUpdated);
+        logger.info("status reason from db to be updated " + ignoreReason);
         Bson update = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated);
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored

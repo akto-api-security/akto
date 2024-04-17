@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import Store from '../../../store'
 import BannerComponent from './shared/BannerComponent'
 import { Button, ProgressBar, Text, VerticalStack } from '@shopify/polaris'
@@ -20,6 +20,8 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
     const [progressBar, setProgressBar] = useState({show: false, value: 0, max_deployment_time_in_ms: 8 * 60 * 1000})
     const [yaml, setYaml] = useState(quickStartFunc.getYamlLines(deploymentMethod))
 
+    const ref = useRef(null)
+
     const setYamlContent = QuickStartStore(state => state.setYamlContent)
 
     const isLocalDeploy = Store(state => state.isLocalDeploy)
@@ -35,7 +37,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
     }
 
     const renderProgressBar = (createTime) => {
-        setProgressBar(quickStartFunc.renderProgressBar(createTime))
+        setProgressBar(quickStartFunc.renderProgressBar(createTime, progressBar))
         }
     
         const removeProgressBarAndStatuschecks = (intervalId) => {
@@ -48,14 +50,14 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
         switch (stackState.status) {
             case 'CREATE_IN_PROGRESS':
             renderProgressBar(stackState.creationTime);
-            setStatusText('We are setting up mirroring for you! Grab a cup of coffee, sit back and relax while we work our magic!')
+            setStatusText('We are setting up a daemonset stack for you! Grab a cup of coffee, sit back and relax while we work our magic!')
             break;
             case 'CREATE_COMPLETE':
             removeProgressBarAndStatuschecks(intervalId);
             break;
             case 'DOES_NOT_EXISTS':
             removeProgressBarAndStatuschecks(intervalId);
-            setStatusText('Mirroring is not set up currently, choose 1 or more LBs to enable mirroring.')
+            setStatusText('Stack not setup yet, click on the above button!')
             break;
             case 'TEMP_DISABLE':
             removeProgressBarAndStatuschecks(intervalId)
@@ -63,7 +65,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
             break;
             default:
             removeProgressBarAndStatuschecks(intervalId);
-            setStatusText('Something went wrong while setting up mirroring, please write to us at support@akto.io')
+            setStatusText('Something went wrong while setting up stack, please write to us at support@akto.io')
         }      
         }
 
@@ -85,7 +87,9 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
                             line = line.replace('<AKTO_MONGO_CONN>', resp.aktoMongoConn);
                             yamlCopy[i] = line;
                         }
-                        setYaml(yaml)
+                        setYaml(yamlCopy)
+                        const yamlContent = yaml.join('\n')
+                        setYamlContent(yamlContent)
                     }
                 })
             }, 5000)
@@ -131,14 +135,13 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
     const formattedJson = func.convertPolicyLines(policyLines)
 
     const copyRequest = () => {
-        navigator.clipboard.writeText(formattedJson)
-        setToast(true, false, "Policy copied to clipboard.")
+        func.copyToClipboard(formattedJson, ref, "Policy copied to clipboard.")
     }
     
     const creatFargateStack = async() => {
         setLoading(true)
         setStatusText("Starting Deployment!!")
-        await api.createRuntimeStack().then((resp)=> {
+        await api.createRuntimeStack(deploymentMethod).then((resp)=> {
             setInitialClicked(true)
             setLoading(false)
             checkStackState()
@@ -163,7 +166,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
         <VerticalStack gap="2">
             {isButtonActive ? <Button primary onClick={creatFargateStack} loading={loading}>{setupButtonText}</Button> : null}
             <Text variant="bodyMd" as="h3">{statusText}</Text>
-            {progressBar.show ? <ProgressBar progress={progressBar.value} size='medium' /> : null }
+            {progressBar.show ? <ProgressBar progress={progressBar.value} size="small" color="primary" /> : null }
             {/* {stackCompleteComponent} */}
             {stackStatus === "CREATE_COMPLETE" ?
                 stackCompleteComponent
@@ -202,6 +205,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
         <div className='card-items'>
             {loading ? null : <Text>{displayObj?.text}</Text>}
             {loading ? <SpinnerCentered /> : displayObj?.component}
+            <div ref = {ref}/>
         </div>
     )
 }

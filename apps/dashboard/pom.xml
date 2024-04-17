@@ -66,6 +66,12 @@
             <artifactId>commons-lang3</artifactId>
             <version>3.12.0</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/org.kohsuke/github-api -->
+        <dependency>
+            <groupId>org.kohsuke</groupId>
+            <artifactId>github-api</artifactId>
+            <version>1.316</version>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/org.eclipse.jetty/jetty-servlets -->
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
@@ -79,6 +85,11 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
+            <groupId>com.onelogin</groupId>
+            <artifactId>java-saml</artifactId>
+            <version>2.9.0</version>
+        </dependency>
+        <dependency>
             <groupId>org.mongodb</groupId>
             <artifactId>mongodb-driver-sync</artifactId>
             <version>4.2.1</version>
@@ -86,6 +97,11 @@
         <dependency>
             <groupId>com.akto.apps.api-runtime</groupId>
             <artifactId>api-runtime</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.akto.apps.api-analyser</groupId>
+            <artifactId>api-analyser</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -144,22 +160,6 @@
             <groupId>com.twilio.sdk</groupId>
             <artifactId>twilio</artifactId>
             <version>8.8.0</version>
-        </dependency>
-        <!--faster xml required by twilio-->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.12.7.1</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
-            <version>2.13.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-annotations</artifactId>
-            <version>2.13.0</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
@@ -220,6 +220,16 @@
             <artifactId>mockito-core</artifactId>
             <version>3.12.4</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.13</version> <!-- Use the latest version -->
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpmime</artifactId>
+            <version>4.5.13</version> <!-- Use the latest version -->
         </dependency>
     </dependencies>
     <build>

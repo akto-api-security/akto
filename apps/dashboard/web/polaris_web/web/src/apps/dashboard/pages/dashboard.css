@@ -38,11 +38,13 @@
    --color-patch: #50e3c2 ;
    --color-disabled: #ebebeb ;
    --color-options: #0d5aa7 ;
+   --white: #ffffff;
 
     --p-color-bg-primary: var(--akto-primary) !important;
     --p-color-bg-primary-hover: #5400CB !important;
     --p-color-bg-primary-active: #4700AE !important;
     --p-color-bg-primary-subdued-hover: #ECEBFF !important;
+    --p-color-bg-info-subdued-hover: #F2F7FE !important;
 
     --p-color-text-primary: var(--akto-primary) !important;
     --p-color-text-success: var(--akto-primary) !important;
@@ -50,6 +52,10 @@
     
     --p-color-icon-primary: var(--akto-primary) !important;
     --p-color-bg-interactive-selected: #F6F6F7 !important;
+
+    --p-color-bg-critical-subdued: #FED3D1 !important;
+    --p-color-bg-caution-subdued: #FFD79D !important;
+    --p-color-bg-info-subdued: #A4E8F2 !important;
 }
 
 .Polaris-Page{
@@ -60,6 +66,18 @@
     background: #F6F6F7 !important;
 }
 
+.Polaris-Tabs {
+    padding: 0 !important;
+}
+
+.Polaris-Tabs__Tab--active {
+    background: #EDEEEF !important;
+    color: #202223 !important;
+}
+
+.Polaris-Tabs .Polaris-Badge--statusSuccess{
+    background: rgba(221, 224, 228, 1) !important;
+}
 .Polaris-TopBar-UserMenu__Details{
     margin-right: 0px !important;
 }
@@ -69,11 +87,41 @@
 }
 
 .beamer_defaultBeamerSelector {
-    top: 12px !important;
-    position: fixed !important;
-    right: 4vw !important;
-    width: 32px !important;
-    height: 32px !important;
-    left: unset !important;
-    background-color: #d2d5d7 !important;
+    display: none !important;
+}
+
+.beamer_icon.active{
+    top: -8px !important;
+    left: 6px !important;
+    height: 17px !important;
+    width: 17px !important;
+}
+
+.Polaris-VideoThumbnail__Thumbnail{
+    border-radius: 8px !important;
+}
+
+.Polaris-Frame__Skip{
+    visibility: hidden !important;
+}
+
+.form-class .Polaris-Label{
+    color: #202223 !important;
+}
+
+.Polaris-Text--break {
+    white-space: normal !important;
+    word-break: break-all !important;
+}
+
+.test-title .Polaris-Text--break {
+    word-break: normal !important;
+}
+
+.Polaris-Frame__Skip{
+    visibility: hidden !important;
+}
+
+.form-class .Polaris-Label{
+    color: #202223 !important;
 }

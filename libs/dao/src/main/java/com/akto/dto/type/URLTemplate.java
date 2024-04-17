@@ -9,6 +9,7 @@ import com.akto.dto.type.URLMethods.Method;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 import org.bson.codecs.pojo.annotations.BsonId;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.bson.types.ObjectId;
 
 @BsonDiscriminator
 public class URLTemplate {
@@ -75,10 +76,16 @@ public class URLTemplate {
                         if (!"true".equals(thatToken.toLowerCase()) && !"false".equals(thatToken.toLowerCase())) return false;
                         break;
                     case INTEGER:
+                        if (thatToken.charAt(0) == '+') {
+                            thatToken = thatToken.substring(1);
+                        }
                         if (!NumberUtils.isParsable(thatToken) || thatToken.contains(".")) return false;
                         break;
                     case FLOAT:
                         if (!NumberUtils.isParsable(thatToken) || !thatToken.contains(".")) return false;
+                        break;
+                    case OBJECT_ID:
+                        if (!ObjectId.isValid(thatToken)) return false;
                         break;
                     default:
                         continue;

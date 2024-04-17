@@ -19,7 +19,7 @@
     border-top: 1px solid #D72C0D;
     border-bottom: 1px solid #D72C0D;
     margin-left: -62px;
-    width: 550px !important;
+    width: 100vw !important;
     border-radius: 2px;
     background-color: rgba(255, 0, 0, 0.1);
 }
@@ -35,17 +35,13 @@
     border-top: 1px solid #238636;
     border-bottom: 1px solid #238636;
     margin-left: -62px;
-    width: 550px !important;
+    width: 100vw !important;
     border-radius: 2px;
     background-color: rgba(0, 255, 0, 0.1);
 }
 
 .new-diff .view-line{
     padding-left: 10px ;
-}
-
-.new-diff .view-lines{
-    background: #FAFBFB !important;
 }
 
 .new-diff .monaco-hover{
@@ -99,4 +95,14 @@
 
 .editor .margin-view-overlays{
     border-right: 1px solid #d3ded3;
+}
+
+.pie-chart .highcharts-button{
+    display: none !important;
+}
+
+.empty-icon-container .Polaris-Avatar__Image{
+    width: 92px !important;
+    height: 92px !important;
+    border-radius: unset !important;
 }

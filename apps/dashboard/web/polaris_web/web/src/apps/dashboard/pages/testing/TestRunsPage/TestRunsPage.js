@@ -1,22 +1,25 @@
 import GithubServerTable from "../../../components/tables/GithubServerTable";
-import {
-  Text,
-  Card} from '@shopify/polaris';
+import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider} from '@shopify/polaris';
 import {
   CircleCancelMajor,
   CalendarMinor,
   ReplayMinor,
-  NoteMinor,
-  PlayCircleMajor,
   PlayMinor,
-  ClockMinor
+  ChevronDownMinor,
+  ChevronUpMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
-import { useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func"
-import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
+import ChartypeComponent from "./ChartypeComponent";
+import { CellType } from "../../../components/tables/rows/GithubRow";
+import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
+import {produce} from "immer"
+import values from "@/util/values";
+import {TestrunsBannerComponent} from "./TestrunsBannerComponent";
+import useTable from "../../../components/tables/TableContext";
 
 /*
   {
@@ -38,44 +41,42 @@ import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 
 let headers = [
   {
-    text:"",
-    value:"icon",
-    itemOrder:0
+    text:"Test name",
+    title: 'Test run name',
+    value:"testName",
+    itemOrder:1,
   },
   {
-    text:"Text name",
-    value:"name",
-    itemOrder:1
+    text: "Number of tests",
+    title: "Number of tests",
+    value: "number_of_tests",
+    itemOrder: 3,
+    type: CellType.TEXT,
   },
   {
     text:"Severity",
     value: 'severity',
+    title: 'Issues',
     filterKey:"severityStatus",
     itemOrder:2,
   },
   {
-    text: "Number of tests",
-    value: "number_of_tests_str",
-    itemOrder: 3,
-    icon: NoteMinor,
-  },
-  {
-    text: 'Run type',
-    value: 'run_type',
-    itemOrder: 3,
-    icon: PlayCircleMajor
-  },
-  {
     text: 'Run time',
     value: 'run_time',
+    title: 'Status',
     itemOrder: 3,
-    icon: ClockMinor
+    type: CellType.TEXT,
+    sortActive: true
   },
+  {
+    title: '',
+    type: CellType.ACTION,
+  }
 ]
 
 const sortOptions = [
-  { label: 'Run time', value: 'endTimestamp asc', directionLabel: 'Newest run', sortKey: 'endTimestamp' },
-  { label: 'Run time', value: 'endTimestamp desc', directionLabel: 'Oldest run', sortKey: 'endTimestamp' }
+  { label: 'Run time', value: 'endTimestamp asc', directionLabel: 'Newest run', sortKey: 'endTimestamp', columnIndex: 4 },
+  { label: 'Run time', value: 'endTimestamp desc', directionLabel: 'Oldest run', sortKey: 'endTimestamp', columnIndex: 4 }
 ];
 
 const resourceName = {
@@ -100,8 +101,6 @@ function disambiguateLabel(key, value) {
   switch (key) {
     case 'severity':
       return (value).map((val) => `${func.toSentenceCase(val)} severity`).join(', ');
-    case "dateRange":
-      return value.since.toDateString() + " - " + value.until.toDateString();
     default:
       return value;
   }
@@ -183,9 +182,29 @@ function getActions(item){
   return arr
 }
 
+const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
+const getTimeEpoch = (key) => {
+    return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
+}
+
+const startTimestamp = getTimeEpoch("since")
+const endTimestamp = getTimeEpoch("until") + 86400
+
+
 const [loading, setLoading] = useState(true);
-const [currentTab, setCurrentTab] = useState("onetime");
+const [currentTab, setCurrentTab] = useState("one_time");
 const [updateTable, setUpdateTable] = useState(false);
+const [countMap, setCountMap] = useState({});
+const [selected, setSelected] = useState(1);
+
+const [severityCountMap, setSeverityCountMap] = useState({
+  HIGH: {text : 0, color: func.getColorForCharts("HIGH")},
+  MEDIUM: {text : 0, color: func.getColorForCharts("MEDIUM")},
+  LOW: {text : 0, color: func.getColorForCharts("LOW")},
+})
+const [subCategoryInfo, setSubCategoryInfo] = useState({})
+const [collapsible, setCollapsible] = useState(true)
+const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 
 const checkIsTestRunning = (testingRuns) => {
   let val = false
@@ -204,7 +223,7 @@ const refreshSummaries = () =>{
 }
 
 function processData(testingRuns, latestTestingRunResultSummaries, cicd){
-  let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries, cicd);
+  let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries, cicd, true);
   if(checkIsTestRunning(testRuns)){
     refreshSummaries();
   }
@@ -215,38 +234,37 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     setLoading(true);
     let ret = [];
     let total = 0;
-    let now = func.timeNow()
-    let dateRange = filters['dateRange'] || false;
-    delete filters['dateRange']
-    let startTimestamp = 0;
-    let endTimestamp = func.timeNow()
-    if (dateRange) {
-      startTimestamp = Math.floor(Date.parse(dateRange.since) / 1000);
-      endTimestamp = Math.floor(Date.parse(dateRange.until) / 1000);
-      filters.endTimestamp = [startTimestamp, endTimestamp]
-    }
+    
 
     switch (currentTab) {
 
-      case "cicd":
+      case "ci_cd":
         await api.fetchTestingDetails(
-          0, 0, true, sortKey, sortOrder, skip, limit, filters
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CI_CD",
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries, true);
           total = testingRunsCount;
         });
         break;
-      case "recurring":
+      case "scheduled":
         await api.fetchTestingDetails(
-          0, 0, false, sortKey, sortOrder, skip, limit, filters
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "RECURRING"
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
         });
         break;
-      case "onetime":
+      case "one_time":
         await api.fetchTestingDetails(
-          now - func.recencyPeriod, now, false, sortKey, sortOrder, skip, limit, filters
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "ONE_TIME"
+        ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
+          ret = processData(testingRuns, latestTestingRunResultSummaries);
+          total = testingRunsCount;
+        });
+        break;
+      default:
+        await api.fetchTestingDetails(
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, null
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -269,71 +287,129 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
   }
 
+  const fetchCountsMap = async() => {
+    await api.getCountsMap(startTimestamp, endTimestamp).then((resp)=>{
+      setCountMap(resp)
+    })
+  }
+
+  const fetchSummaryInfo = async()=>{
+    await api.getSummaryInfo(startTimestamp, endTimestamp).then((resp)=>{
+      const severityObj = transform.convertSubIntoSubcategory(resp)
+      setSubCategoryInfo(severityObj.subCategoryMap)
+      const severityMap = severityObj.countMap;
+      let tempMap = JSON.parse(JSON.stringify(severityCountMap))
+      Object.keys(tempMap).forEach((key) => {
+        tempMap[key].text = severityMap[key]
+      })
+      setSeverityCountMap(tempMap)
+    })
+  }
+
+  const definedTableTabs = ['All', 'One time', 'Scheduled', 'CI/CD']
+  const initialCount = [countMap['allTestRuns'], countMap['ontTime'], countMap['scheduled'], countMap['cicd']]
+
+  const { tabsInfo } = useTable()
+  const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
+  const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setCurrentTab, currentTab, tabsInfo)
+
+  const fetchTotalCount = () =>{
+    setLoading(true)
+    api.getUserTestRuns().then((resp)=> {
+      setHasUserInitiatedTestRuns(resp)
+    })
+    setLoading(false)
+    
+  }
+
+  useEffect(()=>{
+    fetchTotalCount()
+    fetchCountsMap()
+    fetchSummaryInfo()
+  },[currDateRange])
+
+  const handleSelectedTab = (selectedIndex) => {
+    setLoading(true)
+    setSelected(selectedIndex)
+    setTimeout(()=>{
+        setLoading(false)
+    },200)
+}
+
+const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
+const SummaryCardComponent = () =>{
+  let totalVulnerabilites = severityCountMap?.HIGH?.text + severityCountMap?.MEDIUM?.text +  severityCountMap?.LOW?.text 
+  return(
+    <LegacyCard>
+      <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
+        <HorizontalStack align="space-between">
+          <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilites} vulnerabilities in total</Text>
+          <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
+        </HorizontalStack>
+        {totalVulnerabilites > 0 ? 
+        <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
+          <LegacyCard.Subsection>
+            <Box paddingBlockStart={3}><Divider/></Box>
+            <HorizontalGrid columns={2} gap={6}>
+              <ChartypeComponent data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
+              <ChartypeComponent data={severityCountMap} reverse={true} title={"Severity"} charTitle={totalVulnerabilites} chartSubtitle={"Total Vulnerabilities"}/>
+            </HorizontalGrid>
+
+          </LegacyCard.Subsection>
+        </Collapsible>
+        : null }
+      </LegacyCard.Section>
+    </LegacyCard>
+  )
+}
+  const promotedBulkActions = (selectedTestRuns) => { 
+    return [
+    {
+      content: `Delete ${selectedTestRuns.length} test run${selectedTestRuns.length==1 ? '' : 's'}`,
+      onAction: async() => {
+        await api.deleteTestRuns(selectedTestRuns);
+        func.setToast(true, false, `${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`)
+        window.location.reload();
+      },
+    },
+  ]};
+
+  const key = currentTab + startTimestamp + endTimestamp + updateTable;
+
 const coreTable = (
 <GithubServerTable
-    key={updateTable}
+    key={key}
     pageLimit={50}
     fetchData={fetchTableData}
     sortOptions={sortOptions} 
     resourceName={resourceName} 
     filters={filters}
     hideQueryField={true}
-    calenderFilter={true}
-    calenderLabel={"Last run"}
     disambiguateLabel={disambiguateLabel} 
     headers={headers}
     getActions = {getActions}
     hasRowActions={true}
     loading={loading}
     getStatus={func.getTestResultStatus}
+    tableTabs={tableTabs}
+    onSelect={handleSelectedTab}
+    selected={selected}
+    mode={IndexFiltersMode.Default}
+    headings={headers}
+    useNewRow={true}
+    condensedHeight={true}
+    promotedBulkActions={promotedBulkActions}
+    selectable= {true}
   />   
 )
 
-const OnetimeTable = {
-  id:  'onetime',
-  content: "One time",
-  component: (
-    coreTable
-  )
-}
-
-const CicdTable = {
-  id:  'cicd',
-  content: "CI/CD",
-  component: (
-    coreTable
-  )
-}
-
-const RecurringTable = {
-  id:  'recurring',
-  content: "Recurring",
-  component: (
-    coreTable
-  )
-}
-
-function handleCurrTab(tab) {
-  setCurrentTab(tab.id)
-}
-
-const TestTabs = (
-  <Card padding={"0"} key="tabs">
-    <LayoutWithTabs
-      key="tabs"
-      tabs={[OnetimeTable, CicdTable, RecurringTable ]}
-      currTab={handleCurrTab}
-    />
-  </Card>
-)
-
-const components = [ TestTabs]
-
+const components = !hasUserInitiatedTestRuns ? [<SummaryCardComponent key={"summary"}/>,<TestrunsBannerComponent key={"banner-comp"}/>, coreTable] : [<SummaryCardComponent key={"summary"}/>, coreTable]
   return (
     <PageWithMultipleCards
-    title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}
-    isFirstPage={true}
-    components={components}
+      title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}
+      isFirstPage={true}
+      components={components}
+      primaryAction={<DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>}
     />
   );
 }

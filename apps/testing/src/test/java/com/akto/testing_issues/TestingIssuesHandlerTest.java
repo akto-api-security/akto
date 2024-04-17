@@ -6,6 +6,7 @@ import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
@@ -15,6 +16,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.bson.types.ObjectId;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -41,7 +43,7 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
         ids.add(new ObjectId(new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 2)));
         ObjectId summaryId = new ObjectId();
 
-        List<TestResult> results = new ArrayList<>();
+        List<GenericTestResult> results = new ArrayList<>();
         List<SingleTypeInfo> singleTypeInfosList = new ArrayList<>();
         return new TestingRunResult(ids.get(getIndex(ids.size(),random)),
                 apiInfoKey,
@@ -53,7 +55,7 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
                 100,
                 Context.now(),
                 Context.now(),
-                summaryId);
+                summaryId, null, new ArrayList<>());
     }
 
 //     @Test
