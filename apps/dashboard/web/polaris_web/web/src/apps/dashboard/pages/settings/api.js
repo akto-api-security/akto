@@ -412,7 +412,16 @@ const settingRequests = {
             method: 'post',
             data: {partnerIpList}
         })
-    }
+    },
+    handleRedundantUrls(allowRedundantEndpoints) {
+        return request({
+            url: '/api/updateUrlSettings',
+            method: 'post',
+            data: {
+                allowRedundantEndpoints
+            }
+        });
+    },
 }
 
 export default settingRequests
