@@ -14,7 +14,9 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
+import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.*;
+import com.akto.test_editor.execution.Memory;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.json.JSONObject;
@@ -187,7 +189,7 @@ public class Utils {
         return token;
     }
 
-    public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs) {
+    public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         if (node.getWorkflowNodeDetails().getType() == WorkflowNodeDetails.Type.RECORDED) {
             return processRecorderNode(node, valuesMap);
         }
@@ -195,22 +197,22 @@ public class Utils {
             return processOtpNode(node, valuesMap);
         }
         else {
-            return processApiNode(node, valuesMap, allowAllStatusCodes, debug, testLogs);
+            return processApiNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory);
         }
     }
 
 
-    public static WorkflowTestResult.NodeResult processApiNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs) {
+    public static WorkflowTestResult.NodeResult processApiNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         
         NodeExecutorFactory nodeExecutorFactory = new NodeExecutorFactory();
         NodeExecutor nodeExecutor = nodeExecutorFactory.getExecutor(node);
-        return nodeExecutor.processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs);
+        return nodeExecutor.processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory);
     }
 
-    public static WorkflowTestResult.NodeResult executeNode(Node node, Map<String, Object> valuesMap,boolean debug, List<TestingRunResult.TestLog> testLogs) {
+    public static WorkflowTestResult.NodeResult executeNode(Node node, Map<String, Object> valuesMap,boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         WorkflowTestResult.NodeResult nodeResult;
         try {
-            nodeResult = Utils.processNode(node, valuesMap, true, debug, testLogs);
+            nodeResult = Utils.processNode(node, valuesMap, true, debug, testLogs, memory);
         } catch (Exception e) {
             ;
             List<String> testErrors = new ArrayList<>();
@@ -244,7 +246,7 @@ public class Utils {
                 if (authMechanism.getRequestData() != null && authMechanism.getRequestData().size() > 0 && authMechanism.getRequestData().get(index).getAllowAllStatusCodes()) {
                     allowAllStatusCodes = authMechanism.getRequestData().get(0).getAllowAllStatusCodes();
                 }
-                nodeResult = processNode(node, valuesMap, allowAllStatusCodes, false, new ArrayList<>());
+                nodeResult = processNode(node, valuesMap, allowAllStatusCodes, false, new ArrayList<>(), null);
             } catch (Exception e) {
                 ;
                 List<String> testErrors = new ArrayList<>();
