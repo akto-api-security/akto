@@ -63,7 +63,6 @@ public class TestingIssuesHandler {
 
             // name = cateogry
             String subCategory = runResult.getTestSubType();
-            // string comparison (nuclei test)
 
             if (subCategory.startsWith("http")) {//TestSourceConfig case
                 TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runResult.getTestSubType());
@@ -113,7 +112,6 @@ public class TestingIssuesHandler {
             if (!doesExists && runResult.isVulnerable()) {
                 // name = category
                 String subCategory = runResult.getTestSubType();
-                // string comparison (nuclei test)
                 if (subCategory.startsWith("http")) {
                     TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runResult.getTestSubType());
                     writeModelList.add(new InsertOneModel<>(new TestingRunIssues(testingIssuesId,
