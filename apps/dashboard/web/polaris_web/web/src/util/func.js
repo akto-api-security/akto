@@ -13,9 +13,9 @@ import inventoryApi from "../apps/dashboard/pages/observe/api"
 import { isValidElement } from 'react';
 import Store from '../apps/dashboard/store';
 import { current } from 'immer';
+import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
-import homeFunctions from '../apps/dashboard/pages/home/module';
 
 const func = {
   setToast (isActive, isError, message) {
@@ -257,8 +257,8 @@ prettifyEpoch(epoch) {
       let a = testSubType.superCategory["severity"]["_name"]
       return a
     }
-  }
-  ,
+  },
+
   copyToClipboard(text, ref, toastMessage) {
     if (!navigator.clipboard) {
       // Fallback for older browsers (e.g., Internet Explorer)
@@ -724,12 +724,15 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
                   access_type = null
               } else if (access_types.indexOf("PUBLIC") !== -1) {
                   access_type = "Public"
-              } else {
+              } else if (access_types.indexOf("PARTNER") !== -1){
+                  access_type = "Partner"
+              }else{
                   access_type = "Private"
               }
           }
 
           let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
+          let authTypeTag = authType.replace(",", "");
           let score = apiInfoMap[key] ? apiInfoMap[key]?.severityScore : 0
           let isSensitive = apiInfoMap[key] ? apiInfoMap[key]?.isSensitive : false
 
@@ -755,6 +758,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               auth_type: (authType || "").toLowerCase(),
               sensitiveTags: [...this.convertSensitiveTags(x.sensitive)],
+              authTypeTag: (authTypeTag || "").toLowerCase(),
               collectionIds: apiInfoMap[key] ? apiInfoMap[key]?.collectionIds.filter(x => {
                 return Object.keys(apiGroupsMap).includes(x) || Object.keys(apiGroupsMap).includes(x.toString())
               }).map( x => {
@@ -1067,6 +1071,9 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 },
 
 convertToDisambiguateLabelObj(value, convertObj, maxAllowed){
+  if(!value || value.length  === 0 || !Array.isArray(value)){
+    return ""
+  }
   if (value.length > maxAllowed) {
       return `${value.slice(0, maxAllowed)
                      .map(val => convertObj ? convertObj[val] : val)
@@ -1290,6 +1297,13 @@ mapCollectionIdToHostName(apiCollections){
       funcToCall();
     }
   },
+  async refreshApiCollections() {
+    let apiCollections = await homeFunctions.getAllCollections()
+    const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
+
+    PersistStore.getState().setAllCollections(apiCollections);
+    PersistStore.getState().setCollectionsMap(allCollectionsMap);
+  },
 
   convertParamToDotNotation(str) {
     return str.replace(/[#\$]+/g, '.');;
@@ -1353,8 +1367,46 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     primaryAction: primaryAction,
     show: true
   })
-}
+},
+  hashCode(str) {
+    var hash = 0;
+    for (var i = 0; i < str.length; i++) {
+        var character = str.charCodeAt(i);
+        hash = ((hash<<5)-hash)+character;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    return hash;
+  },
+  getTableTabsContent(tableTabs, countObj, setSelectedTab, selectedTab, currentCount){
+    const finalTabs = tableTabs.map((tab,ind) => {
+      const tabId = this.getKeyFromName(tab)
+      return {
+          content: tab,
+          badge: selectedTab === tabId ? currentCount.toString() : countObj[tabId].toString(),
+          onAction: () => { setSelectedTab(tabId) },
+          id: this.getKeyFromName(tabId),
+          index: ind 
+      }
+    })
+    return finalTabs
+  },
+  getTabsCount(tableTabs, data, initialCountArr = []){
+    const currentState = PersistStore(state => state.tableInitialState)
+    const baseUrl = window.location.href.split('#')[0]
 
+    let finalCountObj = {}
+    tableTabs.forEach((tab,ind) => {
+      const tabId = this.getKeyFromName(tab)
+      const tabKey = baseUrl + '#' + tabId
+      const count = currentState[tabKey] || data[tabId]?.length || initialCountArr[ind] || 0
+      finalCountObj[tabId] = count
+    })
+
+    return finalCountObj
+  },
+  getKeyFromName(key){
+    return key.replace(/[\s/]+/g, '_').toLowerCase();
+  }
 }
 
 export default func

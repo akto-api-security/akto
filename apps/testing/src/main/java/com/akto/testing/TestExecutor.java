@@ -6,6 +6,7 @@ import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
@@ -16,10 +17,7 @@ import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Graph;
-import com.akto.dto.test_editor.Auth;
-import com.akto.dto.test_editor.ExecutorNode;
-import com.akto.dto.test_editor.FilterNode;
-import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
@@ -33,6 +31,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
@@ -43,6 +42,7 @@ import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
+import com.mongodb.MongoInterruptedException;
 import org.apache.commons.lang3.StringUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
@@ -51,6 +51,8 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.mortbay.util.ajax.JSON;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -60,6 +62,8 @@ import java.util.concurrent.*;
 public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
+    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
+
     public static long acceptableSizeInBytes = 5_000_000;
     private static final Gson gson = new Gson();
 
@@ -100,7 +104,7 @@ public class TestExecutor {
             Graph graph = new Graph();
             graph.buildGraph(workflowTest);
             GraphExecutorRequest graphExecutorRequest = new GraphExecutorRequest(graph, workflowTest, testingRun.getId(), summaryId, valuesMap, false, "linear");
-            GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest, debug, testLogs);
+            GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest, debug, testLogs, null);
             WorkflowTestResultsDao.instance.insertOne(graphExecutorResult.getWorkflowTestResult());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while executing workflow test " + e, LogDb.TESTING);
@@ -128,7 +132,7 @@ public class TestExecutor {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
-        sampleMessageStore.fetchSampleMessages();
+        sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(testingRun.getTestingEndpoints().returnApis()));
         AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
@@ -137,7 +141,7 @@ public class TestExecutor {
 
         sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
-        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
+        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();;
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false);
 
@@ -212,6 +216,8 @@ public class TestExecutor {
             }
         }
 
+        final int maxRunTime = testingRun.getTestRunTime() < 0 ? 30*60 : testingRun.getTestRunTime(); // if nothing specified wait for 30 minutes
+
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
                 hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
@@ -226,7 +232,7 @@ public class TestExecutor {
                          () -> startWithLatch(apiInfoKey,
                                  testingRun.getTestIdConfig(),
                                  testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
-                                 accountId, latch, now, testingRun.getTestRunTime(), testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs));
+                                 accountId, latch, now, maxRunTime, testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs));
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
@@ -237,10 +243,16 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("Waiting...", LogDb.TESTING);
 
         try {
-            int maxRunTime = testingRun.getTestRunTime();
-            if (maxRunTime < 0) maxRunTime = 30*60; // if nothing specified wait for 30 minutes
             boolean awaitResult = latch.await(maxRunTime, TimeUnit.SECONDS);
             loggerMaker.infoAndAddToDb("Await result: " + awaitResult, LogDb.TESTING);
+
+            if (!awaitResult) { // latch countdown didn't reach 0
+                for (Future<Void> future : futureTestingRunResults) {
+                    future.cancel(true);
+                }
+                loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
+            }
+
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -480,24 +492,17 @@ public class TestExecutor {
     public Void startWithLatch(
             ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
             TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime,
-            int timeToKill, Map<String, TestConfig> testConfigMap, TestingRun testingRun, 
+            int maxRunTime, Map<String, TestConfig> testConfigMap, TestingRun testingRun,
             ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
             boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
         Context.accountId.set(accountId);
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
 
-        
-        int now = Context.now();
-        if ( timeToKill <= 0 || now - startTime <= timeToKill) {
-            try {
-                // todo: commented out older one
-//                testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
-                startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs);
-            } catch (Exception e) {
-                e.printStackTrace();
-                loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);
-            }
+        try {
+            startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, maxRunTime);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
         }
 
         latch.countDown();
@@ -560,12 +565,16 @@ public class TestExecutor {
                                                TestingRunConfig testingRunConfig, TestingUtil testingUtil,
                                                ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap,
                                                ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
-                                               boolean debug, List<TestingRunResult.TestLog> testLogs) {
+                                               boolean debug, List<TestingRunResult.TestLog> testLogs, int startTime, int timeToKill) {
 
         List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
 
         int countSuccessfulTests = 0;
         for (String testSubCategory: testSubCategories) {
+            if (Context.now() - startTime > timeToKill) {
+                loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
+                return;
+            }
             List<TestingRunResult> testingRunResults = new ArrayList<>();
 
             TestConfig testConfig = testConfigMap.get(testSubCategory);
@@ -638,7 +647,7 @@ public class TestExecutor {
             );
         }
 
-        String message = messages.get(0);
+        String message = messages.get(messages.size() - 1);
 
         RawApi rawApi = RawApi.buildFromMessage(message);
         int startTime = Context.now();
@@ -673,6 +682,10 @@ public class TestExecutor {
             testSubType + "logId" + testExecutionLogId, LogDb.TESTING);
 
         List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
+        // TestingUtil -> authMechanism
+        // TestingConfig -> auth
+        com.akto.test_editor.execution.Executor executor = new Executor();
+        executor.overrideTestUrl(rawApi, testingRunConfig);
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
                 rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
         YamlTestResult testResults = yamlTestTemplate.run(debug, testLogs);

@@ -88,7 +88,7 @@ public class UsageInterceptor extends AbstractInterceptor {
         } catch (Exception e) {
             String api = invocation.getProxy().getActionName();
             String error = "Error in UsageInterceptor for api: " + api + " ERROR: " + e.getMessage();
-            loggerMaker.errorAndAddToDb(error, LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, error, LogDb.DASHBOARD);
         }
 
         return invocation.invoke();

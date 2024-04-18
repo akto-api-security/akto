@@ -2,6 +2,7 @@ package com.akto.dao;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.akto.util.DbMode;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -17,6 +18,9 @@ import com.mongodb.client.model.Sorts;
 public class ActivitiesDao extends AccountsContextDao<Activity> {
 
     public static final ActivitiesDao instance = new ActivitiesDao();
+
+    public static final int maxDocuments = 1000;
+    public static final int sizeInBytes = 100_000_000;
     public void createIndicesIfAbsent() {
         boolean exists = false;
         String dbName = Context.accountId.get()+"";
@@ -29,7 +33,11 @@ public class ActivitiesDao extends AccountsContextDao<Activity> {
         };
 
         if (!exists) {
-            db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(1000).sizeInBytes(100_000_000));
+            if (DbMode.allowCappedCollections()) {
+                db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(maxDocuments).sizeInBytes(sizeInBytes));
+            } else {
+                db.createCollection(getCollName());
+            }
         }
         
         MongoCursor<Document> cursor = db.getCollection(getCollName()).listIndexes().cursor();

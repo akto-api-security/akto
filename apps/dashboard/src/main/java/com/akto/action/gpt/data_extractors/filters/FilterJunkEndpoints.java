@@ -70,6 +70,6 @@ public class FilterJunkEndpoints implements Filter<String>{
     public static void main(String[] args) {
         String e = "/questions/70067185/css-only-typewriter-animation-over-multiple-lines";
         
-        System.out.println(countSwitches(e));
+        logger.info(String.valueOf(countSwitches(e)));
     }
 }

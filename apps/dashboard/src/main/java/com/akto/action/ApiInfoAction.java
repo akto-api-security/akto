@@ -1,19 +1,13 @@
 package com.akto.action;
 
 
-import com.akto.action.observe.InventoryAction;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.URLMethods.Method;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+
+import org.bson.conversions.Bson;
 
 public class ApiInfoAction extends UserAction {
     @Override
@@ -31,6 +25,16 @@ public class ApiInfoAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private String url ;
+    private String method;
+    private ApiInfo apiInfo;
+
+    public String fetchApiInfo(){
+        Bson filter = ApiInfoDao.getFilter(url, method, apiCollectionId);
+        this.apiInfo = ApiInfoDao.instance.findOne(filter);
+        return SUCCESS.toUpperCase();
+    }
+
     public List<ApiInfo> getApiInfoList() {
         return apiInfoList;
     }
@@ -38,4 +42,17 @@ public class ApiInfoAction extends UserAction {
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
     }
+
+    public void setUrl(String url) {
+        this.url = url;
+    }
+
+    public void setMethod(String method) {
+        this.method = method;
+    }
+
+    public ApiInfo getApiInfo() {
+        return apiInfo;
+    }
+
 }

@@ -20,8 +20,11 @@ public class RequestData {
 
     private String tokenFetchCommand;
 
+    private boolean allowAllStatusCodes;
+
     public RequestData() { }
-    public RequestData(String body, String headers, String queryParams, String url, String method, String type, String regex, String otpRefUuid, String tokenFetchCommand) {
+    public RequestData(String body, String headers, String queryParams, String url, String method, 
+        String type, String regex, String otpRefUuid, String tokenFetchCommand, boolean allowAllStatusCodes) {
         this.body = body;
         this.headers = headers;
         this.queryParams = queryParams;
@@ -101,5 +104,12 @@ public class RequestData {
 
     public void setTokenFetchCommand(String tokenFetchCommand) {
         this.tokenFetchCommand = tokenFetchCommand;
+    }
+
+    public boolean getAllowAllStatusCodes() {
+        return allowAllStatusCodes;
+    }
+    public void setAllowAllStatusCodes(boolean allowAllStatusCodes) {
+        this.allowAllStatusCodes = allowAllStatusCodes;
     }
 }

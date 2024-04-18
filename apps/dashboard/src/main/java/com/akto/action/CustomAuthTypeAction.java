@@ -19,8 +19,11 @@ import com.opensymphony.xwork2.Action;
 import com.akto.dto.User;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.utils.CustomAuthUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CustomAuthTypeAction extends UserAction{
+    private static final Logger logger = LoggerFactory.getLogger(CustomAuthTypeAction.class);
     private String name;
     private List<String> headerKeys;
     private List<String> payloadKeys;
@@ -91,6 +94,7 @@ public class CustomAuthTypeAction extends UserAction{
         customAuthType = CustomAuthTypeDao.instance.findOne(CustomAuthType.NAME,name);
         executorService.schedule( new Runnable() {
             public void run() {
+                logger.info("RUNNING");
                 Context.accountId.set(accountId);
                 CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.getCustomAuthType(accountId));
             }
