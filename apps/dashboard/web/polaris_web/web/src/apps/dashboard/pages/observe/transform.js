@@ -1,11 +1,11 @@
 import func from "@/util/func";
 import { Badge, Box, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
-import tranform from "../onboarding/transform"
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
 import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor } from "@shopify/polaris-icons"
 import api from "./api";
+import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -41,7 +41,7 @@ const apiDetailsHeaders = [
         value: "parameterisedEndpoint",
         itemOrder: 1,
         showFilter: true,
-        component: StyledEndpoint
+        component: (data) => StyledEndpoint(data, "14px", "headingSm", true, true)
     },
     {
         text: 'Collection name',
@@ -58,8 +58,14 @@ const apiDetailsHeaders = [
     {
         text: 'Sensitive Params',
         value: 'sensitiveTags',
-        itemOrder: 2,
-        showFilter: true
+        itemOrder: 4,
+        showFilter: true,
+    },
+    {
+        text: 'hostname',
+        itemOrder: 3,
+        value: 'hostName',
+        icon: GlobeMinor,
     },
     {
         text: 'Last Seen',
@@ -248,7 +254,7 @@ const transform = {
     },
     prepareEndpointForTable(x, index) {
         const idToNameMap = PersistStore.getState().collectionsMap;
-        const endpointComp = this.getPrettifyEndpoint(x.method, x.url, false);
+        const endpointComp = <GetPrettifyEndpoint method={x.method} url={x.url} isNew={false} />
         const name = x.param.replaceAll("#", ".").replaceAll(".$", "")
 
         return {
@@ -394,7 +400,8 @@ const transform = {
                 lastTraffic: c.detected,
                 riskScore: c.riskScore,
                 deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
-                activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 ))
+                activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 )),
+                envTypeComp: c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null
             }
         })
 
@@ -420,7 +427,8 @@ const transform = {
     getTruncatedUrl(url){
         try {
             const parsedURL = new URL(url)
-            return parsedURL.pathname
+            const pathUrl = parsedURL.pathname.replace(/%7B/g, '{').replace(/%7D/g, '}');
+            return pathUrl
         } catch (error) {
             return url
         }
@@ -433,26 +441,6 @@ const transform = {
         } catch (error) {
             return "No host"
         }
-    },
-    
-    getPrettifyEndpoint(method,url, isNew){
-        return(   
-            <div style={{display: 'flex', gap: '4px'}}>
-                <Box width="54px">
-                    <HorizontalStack align="end">
-                        <span style={{color: tranform.getTextColor(method), fontSize: "14px", fontWeight: 500}}>{method}</span>
-                    </HorizontalStack>
-                </Box>
-                <Box width="200px" maxWidth="200px">
-                    <HorizontalStack align="space-between">
-                        <Box maxWidth={isNew ? "140px" : '180px'}>
-                            <TooltipText text={this.getTruncatedUrl(url)} tooltip={this.getTruncatedUrl(url)} textProps={{fontWeight: "medium"}} />
-                        </Box>
-                        {isNew ? <Badge size="small">New</Badge> : null}
-                    </HorizontalStack>
-                </Box>
-            </div> 
-        )
     },
 
     getRiskScoreValue(severity){
@@ -501,11 +489,12 @@ const transform = {
                 hostName: (hostNameMap[url.apiCollectionId] !== null ? hostNameMap[url.apiCollectionId] : this.getHostName(url.endpoint)),
                 access_type: url.access_type,
                 auth_type: url.auth_type,
-                endpointComp: this.getPrettifyEndpoint(url.method, url.endpoint, this.isNewEndpoint(url.lastSeenTs)),
+                endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} isNew={this.isNewEndpoint(url.lastSeenTs)} />,
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
                 riskScoreComp: <Badge status={this.getStatus(score)} size="small">{score.toString()}</Badge>,
                 riskScore: score,
-                isNew: this.isNewEndpoint(url.lastSeenTs)
+                isNew: this.isNewEndpoint(url.lastSeenTs),
+                sensitiveDataTags: url?.sensitiveTags.join(" "),
             }
         })
 
@@ -543,20 +532,30 @@ const transform = {
         let tempSeverityObj = lastFetchedSeverityResp
         await api.lastUpdatedInfo().then(async(resp) => {
             if(resp.lastUpdatedSeverity >= lastFetchedInfo.lastRiskScoreInfo || resp.lastUpdatedSensitiveMap >= lastFetchedInfo.lastSensitiveInfo){
-                await api.getRiskScoreInfo().then((res) =>{
-                    const newObj = {
-                        criticalUrls: res.criticalEndpointsCount,
-                        riskScoreMap: res.riskScoreOfCollectionsMap, 
-                    }
-                    tempRiskScoreObj = JSON.parse(JSON.stringify(newObj));
-                    setLastFetchedResp(newObj);
-                })
+                try {
+                    await api.getRiskScoreInfo().then((res) =>{
+                        const newObj = {
+                            criticalUrls: res.criticalEndpointsCount,
+                            riskScoreMap: res.riskScoreOfCollectionsMap, 
+                        }
+                        tempRiskScoreObj = JSON.parse(JSON.stringify(newObj));
+                        setLastFetchedResp(newObj);
+                    })
+                } catch (error) {
+                    func.setToast(true, false, error.message)
+                }
+                
             }
             if(resp.lastUpdatedSeverity >= lastFetchedInfo.lastRiskScoreInfo){
-                await api.getSeverityInfoForCollections().then((resp) => {
-                    tempSeverityObj = JSON.parse(JSON.stringify(resp))
-                    setLastFetchedSeverityResp(resp)
-                })
+                try {
+                    await api.getSeverityInfoForCollections().then((resp) => {
+                        tempSeverityObj = JSON.parse(JSON.stringify(resp))
+                        setLastFetchedSeverityResp(resp)
+                    })
+                } catch (error) {
+                    func.setToast(true, false, error.message)
+                }
+                
             }
             setLastFetchedInfo({
                 lastRiskScoreInfo: func.timeNow() >= resp.lastUpdatedSeverity ? func.timeNow() : resp.lastUpdatedSeverity,
@@ -573,15 +572,20 @@ const transform = {
     async fetchSensitiveInfo(){
         let tempSensitiveInfo = lastFetchedSensitiveResp
         if((func.timeNow() - (5 * 60)) >= lastCalledSensitiveInfo){
-            await api.getSensitiveInfoForCollections().then((resp) => {
-                const sensitiveObj = {
-                    sensitiveUrls: resp.sensitiveUrlsInResponse,
-                    sensitiveInfoMap: resp.sensitiveSubtypesInCollection
-                }
-                setLastCalledSensitiveInfo(func.timeNow())
-                setLastFetchedSensitiveResp(sensitiveObj)
-                tempSensitiveInfo = JSON.parse(JSON.stringify(sensitiveObj))
-            })
+            try {
+                await api.getSensitiveInfoForCollections().then((resp) => {
+                    const sensitiveObj = {
+                        sensitiveUrls: resp.sensitiveUrlsInResponse,
+                        sensitiveInfoMap: resp.sensitiveSubtypesInCollection
+                    }
+                    setLastCalledSensitiveInfo(func.timeNow())
+                    setLastFetchedSensitiveResp(sensitiveObj)
+                    tempSensitiveInfo = JSON.parse(JSON.stringify(sensitiveObj))
+                })
+            } catch (error) {
+                return tempSensitiveInfo
+            }
+            
         }
         return tempSensitiveInfo; 
     }

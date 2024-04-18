@@ -28,6 +28,13 @@ public class Organization {
     private boolean onPrem;
 
     public static final String GRACE_PERIOD = "gracePeriod";
+
+    public static final String HOTJAR_SITE_ID = "hotjarSiteId";
+
+    public String hotjarSiteId = "hotjarSiteId";
+
+    public static final String TEST_TELEMETRY_ENABLED = "testTelemetryEnabled";
+    private boolean testTelemetryEnabled;
     private int gracePeriod;
 
     public Organization() { }
@@ -105,11 +112,27 @@ public class Organization {
         this.gracePeriod = gracePeriod;
     }
 
+    public  String getHotjarSiteId() {
+        return hotjarSiteId;
+    }
+
+    public  void setHotjarSiteId(String hotjarSiteId) {
+        this.hotjarSiteId = hotjarSiteId;
+    }
+
     public int getLastFeatureMapUpdate() {
         return lastFeatureMapUpdate;
     }
 
     public void setLastFeatureMapUpdate(int lastFeatureMapUpdate) {
         this.lastFeatureMapUpdate = lastFeatureMapUpdate;
+    }
+
+    public boolean getTestTelemetryEnabled() {
+        return testTelemetryEnabled;
+    }
+
+    public void setTestTelemetryEnabled(boolean testTelemetryEnabled) {
+        this.testTelemetryEnabled = testTelemetryEnabled;
     }
 }

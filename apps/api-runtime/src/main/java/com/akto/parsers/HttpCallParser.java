@@ -1,32 +1,43 @@
 package com.akto.parsers;
 
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.*;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
+import com.akto.runtime.Main;
 import com.akto.runtime.URLAggregator;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.JSONUtils;
+import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
+import okhttp3.*;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 
-import java.net.URL;
+import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 
 public class HttpCallParser {
-    
     private final int sync_threshold_count;
     private final int sync_threshold_time;
     private int sync_count = 0;
@@ -36,14 +47,39 @@ public class HttpCallParser {
     public DependencyAnalyser dependencyAnalyser;
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
     private Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap = new HashMap<>();
+    public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
+    private static final String trafficMetricsUrl = "https://logs.akto.io/traffic-metrics";
+    private static final OkHttpClient client = new OkHttpClient().newBuilder()
+            .writeTimeout(1, TimeUnit.SECONDS)
+            .readTimeout(1, TimeUnit.SECONDS)
+            .callTimeout(1, TimeUnit.SECONDS)
+            .build();
 
+    private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
+    private static final int MAX_ALLOWED_HTML_CONTENT = 1024 * 1024 ;
+
+    public static void init() {
+        trafficMetricsExecutor.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                while(!queue.isEmpty()) {
+                    BasicDBObject metrics = queue.poll();
+                    try {
+                        sendTrafficMetricsToTelemetry(metrics);
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error while sending traffic_metrics data to prometheus", LogDb.RUNTIME);
+                    }
+                }
+            }
+        },0,5,TimeUnit.MINUTES);
+    }
     public HttpCallParser(String userIdentifier, int thresh, int sync_threshold_count, int sync_threshold_time, boolean fetchAllSTI) {
         last_synced = 0;
         this.sync_threshold_count = sync_threshold_count;
         this.sync_threshold_time = sync_threshold_time;
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
-        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState);
+        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
     }
     
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
@@ -164,17 +200,17 @@ public class HttpCallParser {
         if (accountSettings != null && accountSettings.getDefaultPayloads() != null) {
             filteredResponseParams = filterDefaultPayloads(filteredResponseParams, accountSettings.getDefaultPayloads());
         }
-        filteredResponseParams = filterHttpResponseParams(filteredResponseParams);
-        boolean isHarOrPcap = aggregate(filteredResponseParams);
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, accountSettings);
+        boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
 
         for (int apiCollectionId: aggregatorMap.keySet()) {
             URLAggregator aggregator = aggregatorMap.get(apiCollectionId);
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-        for (HttpResponseParams responseParam: filteredResponseParams) {
-            dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
-        }
+         for (HttpResponseParams responseParam: filteredResponseParams) {
+             dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+         }
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
@@ -202,6 +238,7 @@ public class HttpCallParser {
     }
 
     public void syncTrafficMetricsWithDB() {
+        loggerMaker.infoAndAddToDb("Starting syncing traffic metrics", LogDb.RUNTIME);
         try {
             syncTrafficMetricsWithDBHelper();
         } catch (Exception e) {
@@ -209,10 +246,14 @@ public class HttpCallParser {
         } finally {
             trafficMetricsMap = new HashMap<>();
         }
+        loggerMaker.infoAndAddToDb("Finished syncing traffic metrics", LogDb.RUNTIME);
     }
 
     public void syncTrafficMetricsWithDBHelper() {
         ArrayList<WriteModel<TrafficMetrics>> bulkUpdates = new ArrayList<>();
+        BasicDBObject metricsData = new BasicDBObject();
+        int accountId = Context.accountId.get();
+        Organization organization = OrganizationsDao.instance.findOne(Filters.eq(Organization.ACCOUNTS, accountId));
         for (TrafficMetrics trafficMetrics: trafficMetricsMap.values()) {
             TrafficMetrics.Key key = trafficMetrics.getId();
             Map<String, Long> countMap = trafficMetrics.getCountMap();
@@ -220,12 +261,18 @@ public class HttpCallParser {
             if (countMap == null || countMap.isEmpty()) continue;
 
             Bson updateKey = TrafficMetricsDao.filtersForUpdate(key);
-
+            int count = 0;
             List<Bson> individualUpdates = new ArrayList<>();
             for (String ts: countMap.keySet()) {
                 individualUpdates.add(Updates.inc("countMap." + ts, countMap.get(ts)));
+                count += countMap.get(ts);
             }
 
+            if (organization != null && Main.isOnprem) {
+                String metricKey = key.getName().name() + "|" + key.getIp() + "|" + key.getHost() + "|" + key.getVxlanID() + "|" + organization.getId() + "|" + accountId;
+                count += (int) metricsData.getOrDefault(metricKey, 0);
+                metricsData.put(metricKey, count);
+            }
             Bson update = Updates.combine(individualUpdates);
 
             UpdateOneModel<TrafficMetrics> updateOneModel = new UpdateOneModel<>(updateKey, update, new UpdateOptions().upsert(true));
@@ -233,9 +280,36 @@ public class HttpCallParser {
         }
 
         if (bulkUpdates.size() > 0) {
+            if (metricsData.size() != 0 && Main.isOnprem) {
+                queue.add(metricsData);
+            }
             TrafficMetricsDao.instance.getMCollection().bulkWrite(bulkUpdates);
         }
+    }
 
+    private static void sendTrafficMetricsToTelemetry(BasicDBObject metricsData) {
+        MediaType mediaType = MediaType.parse("application/json");
+        RequestBody body = RequestBody.create(new BasicDBObject("data", metricsData).toJson(), mediaType);
+        Request request = new Request.Builder()
+                .url(trafficMetricsUrl)
+                .method("POST", body)
+                .addHeader("Content-Type", "application/json")
+                .build();
+        Response response = null;
+        try {
+            response =  client.newCall(request).execute();
+        } catch (IOException e) {
+            loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e.getMessage(), LogDb.RUNTIME);
+        } finally {
+            if (response != null) {
+                response.close();
+            }
+        }
+        if (response!= null && response.isSuccessful()) {
+            loggerMaker.infoAndAddToDb("Updated traffic_metrics", LogDb.RUNTIME);
+        } else {
+            loggerMaker.infoAndAddToDb("Traffic_metrics not sent", LogDb.RUNTIME);
+        }
     }
 
     public static boolean useHostCondition(String hostName, HttpResponseParams.Source source) {
@@ -284,8 +358,25 @@ public class HttpCallParser {
         trafficMetrics.inc(value);
     }
 
-    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
+    private boolean isRedundantEndpoint(String url){
+        String regex = ".*\\.(js|css|svg|png|json|html|io).*";
+
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(url);
+        return matcher.matches();
+    }
+
+    private boolean isInvalidContentType(String contentType){
+        boolean res = false;
+        if(contentType == null || contentType.length() == 0) return res;
+
+        res = contentType.contains("javascript") || contentType.contains("png");
+        return res;
+    }
+
+    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, AccountSettings accountSettings) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
+        int originalSize = httpResponseParamsList.size();
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
@@ -294,14 +385,29 @@ public class HttpCallParser {
             }
 
             boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
-            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.POSTMAN)) {
+            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.POSTMAN) && httpResponseParam.getStatusCode() <= 0) {
                 cond = true;
             }
 
             if (!cond) continue;
             
-            String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), AccountSettings.AKTO_IGNORE_FLAG);
+            String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(),Constants.AKTO_IGNORE_FLAG);
             if (ignoreAktoFlag != null) continue;
+
+            // check for garbage points here
+            if(accountSettings != null && !accountSettings.getAllowRedundantEndpoints()){
+                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL())){
+                    continue;
+                }
+                List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
+                String contentType = null;
+                if(!contentTypeList.isEmpty()){
+                    contentType = contentTypeList.get(0);
+                }
+                if(isInvalidContentType(contentType)){
+                    continue;
+                }
+            }
 
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
@@ -366,6 +472,8 @@ public class HttpCallParser {
             return deactivatedCollections.contains(apiCollectionId);
         });
 
+        int filteredSize = filteredResponseParams.size();
+        loggerMaker.debugInfoAddToDb("Filtered " + (originalSize - filteredSize) + " responses", LogDb.RUNTIME);
         return filteredResponseParams;
     }
 
@@ -379,13 +487,23 @@ public class HttpCallParser {
         return this.aggregatorMap;
     }
 
-    public boolean aggregate(List<HttpResponseParams> responses) {
+    public static boolean aggregate(List<HttpResponseParams> responses, Map<Integer, URLAggregator> aggregatorMap) {
         int count = 0;
         boolean ret = false;
+        Set<String> urlSet= new HashSet<>();
         for (HttpResponseParams responseParams: responses) {
             if (responseParams.getSource() == HttpResponseParams.Source.HAR || responseParams.getSource() == HttpResponseParams.Source.PCAP) {
                 ret = true;
             }
+
+            HttpRequestParams requestParams = responseParams.requestParams;
+            if (requestParams != null) {
+                String path = requestParams.getMethod() + " " + requestParams.url;
+                if (urlSet.size() < 50) {
+                    urlSet.add(path);
+                }
+            }
+
             try {
                 int collId = responseParams.getRequestParams().getApiCollectionId();
                 URLAggregator aggregator = aggregatorMap.get(collId);
@@ -397,10 +515,10 @@ public class HttpCallParser {
                 aggregator.addURL(responseParams);
                 count++;
             } catch (Exception  e) {
-                
             }
         }
-        
+
+        loggerMaker.debugInfoAddToDb("URLs: " + urlSet.toString(), LogDb.RUNTIME);
         loggerMaker.infoAndAddToDb("added " + count + " urls", LogDb.RUNTIME);
         return ret;
     }
@@ -424,6 +542,4 @@ public class HttpCallParser {
     public void setTrafficMetricsMap(Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap) {
         this.trafficMetricsMap = trafficMetricsMap;
     }
-
-    
 }

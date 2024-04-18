@@ -4,6 +4,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.amazonaws.services.cloudformation.AmazonCloudFormation;
 import com.amazonaws.services.cloudformation.AmazonCloudFormationClientBuilder;
+import com.amazonaws.services.cloudformation.model.*;
 import com.amazonaws.services.cloudformation.model.DescribeStacksRequest;
 import com.amazonaws.services.cloudformation.model.DescribeStacksResult;
 import com.amazonaws.services.cloudformation.model.Tag;
@@ -13,6 +14,8 @@ import com.amazonaws.services.ec2.model.RebootInstancesRequest;
 import com.amazonaws.services.ec2.model.RebootInstancesResult;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public class Utils {
 
@@ -25,13 +28,23 @@ public class Utils {
     }
 
     public static List<Tag> fetchTags(String stackName){
+        Stack stack = fetchStack(stackName);
+        return stack.getTags();
+    }
+
+    private static Stack fetchStack(String stackName) {
         DescribeStacksRequest describeStackRequest = new DescribeStacksRequest();
         describeStackRequest.setStackName(stackName);
         AmazonCloudFormation cloudFormation = AmazonCloudFormationClientBuilder.standard()
                 .build();
         DescribeStacksResult result = cloudFormation.describeStacks(describeStackRequest);
-        com.amazonaws.services.cloudformation.model.Stack stack = result.getStacks().get(0);
-        return stack.getTags();
+        Stack stack = result.getStacks().get(0);
+        return stack;
+    }
+
+    public static Map<String, String> fetchOutputs(String stackName){
+        Stack stack = fetchStack(stackName);
+        return stack.getOutputs().stream().collect(Collectors.toMap(Output::getOutputKey, Output::getOutputValue));
     }
 
     public static void rebootInstance(String instanceId){

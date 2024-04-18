@@ -1,5 +1,6 @@
 package com.akto.test_editor;
 
+import java.util.*;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -13,8 +14,14 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.bouncycastle.jce.provider.JDKDSASigner.stdDSA;
+
+import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.ApiInfo.ApiAccessType;
+import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.UrlModifierPayload;
+import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -25,6 +32,9 @@ import com.fasterxml.jackson.databind.node.TextNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+
+import static com.akto.rules.TestPlugin.extractAllValuesFromPayload;
+import okhttp3.*;
 
 public class Utils {
 
@@ -238,6 +248,59 @@ public class Utils {
         return result;
     }
 
+
+    public static Set<String> headerValuesUnchanged(Map<String, List<String>> originalRequestHeaders, Map<String, List<String>> testRequestHeaders) {
+        Set<String> diff = new HashSet<>();
+        if (originalRequestHeaders == null) return diff;
+        for (String key: testRequestHeaders.keySet()) {
+            List<String> originalHeaderValues = originalRequestHeaders.get(key);
+            List<String> testHeaderValues = testRequestHeaders.get(key);
+            if (originalHeaderValues == null || testHeaderValues == null) continue;
+            if (areListsEqual(originalHeaderValues, testHeaderValues)) {
+                diff.add(key);
+            }
+        }
+
+        return diff;
+    }
+
+    public static boolean areListsEqual(List<String> list1, List<String> list2) {
+        if (list1.size() != list2.size()) {
+            return false;
+        }
+
+        List<String> copyOfList1 = new ArrayList<>(list1);
+        List<String> copyOfList2 = new ArrayList<>(list2);
+
+        Collections.sort(copyOfList1);
+        Collections.sort(copyOfList2);
+
+        return copyOfList1.equals(copyOfList2);
+    }
+
+    public static Set<String> bodyValuesUnchanged(String originalPayload, String testPayload) {
+        Set<String> diff = new HashSet<>();
+
+        Map<String, Set<String>> originalRequestParamMap = new HashMap<>();
+        Map<String, Set<String>> testRequestParamMap= new HashMap<>();
+        try {
+            extractAllValuesFromPayload(originalPayload, originalRequestParamMap);
+            extractAllValuesFromPayload(testPayload, testRequestParamMap);
+        } catch (Exception e) {
+        }
+
+        for (String key: testRequestParamMap.keySet()) {
+            Set<String> testValues = testRequestParamMap.get(key);
+            Set<String> originalValues = originalRequestParamMap.get(key);
+            if (testValues == null) continue;
+            String[] keySplit = key.split("\\.");
+            String finalKey = keySplit[keySplit.length - 1];
+            if (testValues.equals(originalValues)) diff.add(finalKey); // todo: check null
+        }
+
+        return diff;
+    }
+
     public static BasicDBObject fetchJsonObjForString(Object val) {
         if (!(val instanceof String)) {
             return null;
@@ -391,7 +454,7 @@ public class Utils {
             payload = payload.replaceAll("=", ":");
 
             if (payload.contains("regex:")) {
-                payload = payload.substring(0, 22) + "\"" + payload.substring(22, payload.indexOf(",")) + "\"" + payload.substring(payload.indexOf(","), payload.length());
+                payload = payload.substring(0, 22) + "\"" + payload.substring(22, payload.lastIndexOf(",")) + "\"" + payload.substring(payload.lastIndexOf(","), payload.length());
             }
 
             String x[] = payload.split("replace_with:");
@@ -401,6 +464,7 @@ public class Utils {
             String y[] = x[1].split("}}");
             x[1] = y[0].toString() + "\"}}";
             payload = String.join("replace_with:\"", x);
+            payload = payload.replace("\\", "\\\\");
             Map<String, Object> json = gson.fromJson(payload, Map.class);
             String operation = "regex_replace";
             Map<String, Object> operationMap = new HashMap<>();
@@ -573,6 +637,125 @@ public class Utils {
             return currentRes && newVal;
         }
         return currentRes || newVal;
+    }
+
+    public static String convertToHarPayload(String message, int akto_account_id, int time, String type, String source) throws Exception {
+
+        Map<String, Object> json = gson.fromJson(message, Map.class);
+
+        Map<String, Object> req = (Map) json.get("request");
+        Map<String, Object> resp = (Map) json.get("response");
+
+        Map<String, Object> reqHeaders = new HashMap<>();
+        try {
+            reqHeaders = mapper.readValue((String) req.get("headers"), HashMap.class);
+            reqHeaders.remove("x-akto-ignore");
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+
+        String requestHeaders = mapper.writeValueAsString(reqHeaders);
+        String responseHeaders = (String) resp.get("headers");
+
+        String path = OriginalHttpRequest.getFullUrlWithParams((String) req.get("url"), (String) req.get("queryParams"));
+        String contentType = (String) reqHeaders.get("content-type");
+
+        Map<String,String> result = new HashMap<>();
+        result.put("akto_account_id", akto_account_id+"");
+        result.put("path", path);
+        result.put("requestHeaders", requestHeaders);
+        result.put("responseHeaders", responseHeaders);
+        result.put("method", (String) req.get("method"));
+        result.put("requestPayload", (String) req.get("body"));
+        result.put("responsePayload", (String) resp.get("method"));
+        result.put("ip", "");
+        result.put("time",time+"");
+        result.put("statusCode", ((Double) resp.get("statusCode")).intValue()+"");
+        result.put("type", type);
+        result.put("status", null);
+        result.put("contentType", contentType);
+        result.put("source", source);
+
+        return mapper.writeValueAsString(result);
+    }
+
+    public static String extractValue(String keyValue, String key) {
+        String result = "";
+        if (keyValue.contains(key)) {
+            result = keyValue.split(key)[1].split("[,}]")[0];
+            result = result.replaceAll("\\}$", "");
+            result = result.trim();
+        }
+        return result;
+    }
+
+    public static ExecutorSingleOperationResp sendRequestToSsrfServer(String requestUrl, String redirectUrl, String tokenVal){
+        RequestBody emptyBody = RequestBody.create(new byte[]{}, null);
+        
+        Request request = new Request.Builder()
+            .url(requestUrl)
+            .addHeader("x-akto-redirect-url", redirectUrl)
+            .addHeader(Constants.AKTO_TOKEN_KEY, tokenVal)
+            .post(emptyBody)
+            .build();
+
+        OkHttpClient client = new OkHttpClient();
+        Response okResponse = null;
+    
+        try {
+            okResponse = client.newCall(request).execute();
+            if (!okResponse.isSuccessful()) {
+                return new ExecutorSingleOperationResp(false,"Could not send request to the ssrf server.");
+            }
+            return new ExecutorSingleOperationResp(true, "");
+        }catch (Exception e){
+            return new ExecutorSingleOperationResp(false, e.getMessage());
+        }
+    }
+
+    public static Boolean sendRequestToSsrfServer(String url){
+        String requestUrl = "";
+        if(!(url.startsWith("http"))){
+            String hostName ="https://test-services.akto.io/";
+            if(System.getenv("SSRF_SERVICE_NAME") != null && System.getenv("SSRF_SERVICE_NAME").length() > 0){
+                hostName = System.getenv("SSRF_SERVICE_NAME");
+            }
+            requestUrl = hostName + "validate/" + url;
+        }
+
+        Request request = new Request.Builder()
+            .url(requestUrl)
+            .get()
+            .build();
+
+            OkHttpClient client = new OkHttpClient();
+            Response okResponse = null;
+        
+        try {
+            okResponse = client.newCall(request).execute();
+            if (!okResponse.isSuccessful()) {
+                return false;
+            }else{
+                ResponseBody responseBody = okResponse.body();
+                BasicDBObject bd = BasicDBObject.parse(responseBody.string());
+                return bd.getBoolean("url-hit");
+            }
+        }catch (Exception e){
+            return false;
+        }
+    }
+
+    public static ApiAccessType getApiAccessTypeFromString(String apiAccessType){
+        switch (apiAccessType.toLowerCase()) {
+            case "private":
+                return ApiAccessType.PRIVATE;
+            case "public":
+                return ApiAccessType.PUBLIC;
+            case "partner":
+                return ApiAccessType.PARTNER;
+            default:
+                return null;
+        }
     }
 
 }
