@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
@@ -12,16 +13,13 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.Main;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.util.DashboardMode;
-import com.akto.utils.GithubSync;
+import com.akto.utils.TestTemplateUtils;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.aws.AwsStack;
-import com.akto.utils.cloud.stack.dto.StackState;
 import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
-import com.amazonaws.services.autoscaling.AmazonAutoScaling;
-import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
 import com.amazonaws.services.autoscaling.model.RefreshPreferences;
 import com.amazonaws.services.autoscaling.model.StartInstanceRefreshRequest;
 import com.amazonaws.services.autoscaling.model.StartInstanceRefreshResult;
@@ -39,6 +37,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -50,11 +49,12 @@ public class AccountAction extends UserAction {
 
     private String newAccountName;
     private int newAccountId;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.class);
+private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.class);
 
     public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 50;
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    
+    private static final ExecutorService service = Executors.newFixedThreadPool(1);
+
     @Override
     public String execute() {
 
@@ -122,7 +122,7 @@ public class AccountAction extends UserAction {
         loggerMaker.infoAndAddToDb(String.format("instance refresh called on %s with result %s", asg, result.toString()), LogDb.DASHBOARD);
     }
 
-    public void lambdaInstanceRefresh(){
+    public void lambdaInstanceRefreshViaLogicalId() throws Exception{
         String lambda;
             try {
                 lambda = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_CONTEXT_ANALYZER_UPDATE_LAMBDA);
@@ -161,31 +161,40 @@ public class AccountAction extends UserAction {
     }
 
     public String takeUpdate() {
-        if(checkIfStairwayInstallation()) {
-            RefreshPreferences refreshPreferences = new RefreshPreferences();
-            StartInstanceRefreshRequest refreshRequest = new StartInstanceRefreshRequest();
-            refreshPreferences.setMinHealthyPercentage(0);
-            refreshPreferences.setInstanceWarmup(200);
-            refreshRequest.setPreferences(refreshPreferences);
-            try {
-                asgInstanceRefresh(refreshRequest, MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_CONTEXT_ANALYSER_AUTO_SCALING_GROUP);
-                asgInstanceRefresh(refreshRequest, MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_TRAFFIC_MIRRORING_AUTO_SCALING_GROUP);
-                asgInstanceRefresh(refreshRequest, DashboardStackDetails.getStackName(), DashboardStackDetails.AKTO_DASHBOARD_AUTO_SCALING_GROUP);
-            } catch (Exception e){
-                loggerMaker.infoAndAddToDb("could not invoke instance refresh directly, using lambdas " + e.getMessage(), LogDb.DASHBOARD);
-                lambdaInstanceRefresh();
-            }
-        } else {
-            loggerMaker.infoAndAddToDb("This is an old installation, updating via old way", LogDb.DASHBOARD);
-            listMatchingLambda("InstanceRefresh");
-        }
-        dashboardReboot();
-        return Action.SUCCESS.toUpperCase();
-    }
+        if (!DashboardMode.isOnPremDeployment()) return Action.ERROR.toUpperCase();
 
-    private boolean checkIfStairwayInstallation() {
-        StackState stackStatus = AwsStack.getInstance().fetchStackStatus(MirroringStackDetails.getStackName());
-        return "CREATE_COMPLETE".equalsIgnoreCase(stackStatus.getStatus());
+        RefreshPreferences refreshPreferences = new RefreshPreferences();
+        StartInstanceRefreshRequest refreshRequest = new StartInstanceRefreshRequest();
+        refreshPreferences.setMinHealthyPercentage(0);
+        refreshPreferences.setInstanceWarmup(200);
+        refreshRequest.setPreferences(refreshPreferences);
+        try {
+            asgInstanceRefresh(refreshRequest, MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_CONTEXT_ANALYSER_AUTO_SCALING_GROUP);
+            asgInstanceRefresh(refreshRequest, MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_TRAFFIC_MIRRORING_AUTO_SCALING_GROUP);
+            asgInstanceRefresh(refreshRequest, DashboardStackDetails.getStackName(), DashboardStackDetails.AKTO_DASHBOARD_AUTO_SCALING_GROUP);
+            loggerMaker.infoAndAddToDb("Successfully updated Akto via instance refresh", LogDb.DASHBOARD);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e){
+            loggerMaker.infoAndAddToDb("Couldn't do instance refresh : " + e.getMessage(), LogDb.DASHBOARD);
+        }
+        loggerMaker.infoAndAddToDb("Instance refresh failed, trying via Lambda V2", LogDb.DASHBOARD);
+        try {
+            lambdaInstanceRefreshViaLogicalId();
+            loggerMaker.infoAndAddToDb("Successfully updated Akto via Lambda V2", LogDb.DASHBOARD);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e){
+            loggerMaker.errorAndAddToDb("Couldn't update Akto via Lambda V2 : " + e.getMessage(), LogDb.DASHBOARD);
+        }
+        loggerMaker.infoAndAddToDb("This is an old installation, updating via old way", LogDb.DASHBOARD);
+        try {
+            listMatchingLambda("InstanceRefresh");
+            loggerMaker.infoAndAddToDb("Successfully updated Akto via old way", LogDb.DASHBOARD);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e){
+            loggerMaker.errorAndAddToDb("Couldn't update Akto via old way : " + e.getMessage(), LogDb.DASHBOARD);
+        }
+        loggerMaker.infoAndAddToDb("Couldn't update Akto", LogDb.DASHBOARD);
+        return Action.ERROR.toUpperCase();
     }
 
     public static int createAccountRecord(String accountName) {
@@ -299,10 +308,14 @@ public class AccountAction extends UserAction {
                     BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
                 }
                 InitializerListener.setBackwardCompatibilities(backwardCompatibility);
-                Main.createIndices();
+                DaoInit.createIndices();
                 Main.insertRuntimeFilters();
                 RuntimeListener.initialiseDemoCollections();
-                RuntimeListener.addSampleData();
+                service.submit(() ->{
+                    Context.accountId.set(newAccountId);
+                    loggerMaker.infoAndAddToDb("updating vulnerable api's collection for new account " + newAccountId, LogDb.DASHBOARD);
+                    RuntimeListener.addSampleData();
+                });
                 AccountSettingsDao.instance.updateOnboardingFlag(true);
                 InitializerListener.insertPiiSources();
 
@@ -313,10 +326,13 @@ public class AccountAction extends UserAction {
                 }
 
                 try {
-                    GithubSync githubSync = new GithubSync();
-                    byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
+                    byte[] testingTemplates = TestTemplateUtils.getTestingTemplates();
+                    if(testingTemplates == null){
+                        loggerMaker.errorAndAddToDb("Failed to load test templates", LogDb.DASHBOARD);
+                        return;
+                    }
                     loggerMaker.infoAndAddToDb(String.format("Updating akto test templates for new account: %d", newAccountId), LogDb.DASHBOARD);
-                    InitializerListener.processTemplateFilesZip(repoZip, InitializerListener._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                    InitializerListener.processTemplateFilesZip(testingTemplates, InitializerListener._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,String.format("Error while adding test editor templates for new account %d, Error: %s", newAccountId, e.getMessage()), LogDb.DASHBOARD);
                 }

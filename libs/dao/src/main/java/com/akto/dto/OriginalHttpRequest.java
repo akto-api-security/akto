@@ -34,8 +34,14 @@ public class OriginalHttpRequest {
     }
 
     public OriginalHttpRequest copy() {
+        Map<String, List<String>> headersCopy = new HashMap<>();
+        for(Map.Entry<String, List<String>> headerKV: this.headers.entrySet()) {
+            ArrayList<String> headerValues = new ArrayList<>();
+            headerValues.addAll(headerKV.getValue());
+            headersCopy.put(headerKV.getKey(), headerValues);
+        }
         return new OriginalHttpRequest(
-                this.url, this.queryParams, this.method, this.body, new HashMap<>(this.headers), this.type
+                this.url, this.queryParams, this.method, this.body, headersCopy, this.type
         );
     }
 
@@ -93,6 +99,30 @@ public class OriginalHttpRequest {
         List<String> values = this.headers.get(headerName.trim().toLowerCase());
         if (values == null || values.size() == 0) return null;
         return values.get(0);
+    }
+
+    public String findHeaderValueIncludingInCookie(String headerName) {
+        String value = findHeaderValue(headerName);
+        if (value != null) return value;
+
+        List<String> cookieList = headers.getOrDefault("cookie", new ArrayList<>());
+        if (cookieList.isEmpty()) return null;
+
+        for (String cookieValues : cookieList) {
+            String[] cookies = cookieValues.split(";");
+            for (String cookie : cookies) {
+                cookie=cookie.trim();
+                String[] cookieFields = cookie.split("=");
+                if (cookieFields.length == 2) {
+                    String cookieKey = cookieFields[0].toLowerCase();
+                    if(cookieKey.equals(headerName.toLowerCase())){
+                        return cookieFields[1];
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     // queryString2 overrides queryString1 use accordingly

@@ -14,9 +14,10 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GenerateCurlForTest implements QueryHandler{
-
+    private static final Logger logger = LoggerFactory.getLogger(GenerateCurlForTest.class);
     private final ResultFetcherStrategy<BasicDBObject> resultFetcherStrategy;
 
     public GenerateCurlForTest(ResultFetcherStrategy<BasicDBObject> resultFetcherStrategy) {
@@ -32,7 +33,7 @@ public class GenerateCurlForTest implements QueryHandler{
         String modifiedSampleData = modifiedHeaders.getLeft();
         try {
             curl = ExportSampleDataAction.getCurl(modifiedSampleData);
-            System.out.println("curl: " + curl);
+            logger.info("curl: " + curl);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -41,7 +42,7 @@ public class GenerateCurlForTest implements QueryHandler{
         request.put("test_type", meta.getString("test_type"));
         request.put("response_details", meta.getString("response_details"));
         request.put(GptAction.USER_EMAIL, meta.getString(GptAction.USER_EMAIL));
-        System.out.println("request: " + request.toJson());
+        logger.info("request: " + request.toJson());
         BasicDBObject resp =  this.resultFetcherStrategy.fetchResult(request);
         String respStr = resp.toJson();
         respStr = HeadersUtils.replaceHeadersWithValues(Pair.of(respStr, modifiedHeaders.getRight()));

@@ -1,20 +1,22 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box } from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
-import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
+import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import { CircleTickMajor } from '@shopify/polaris-icons';
 import ObserveStore from "../observeStore"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
-import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-import { CellType } from "../../../components/tables/rows/GithubRow"
+import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered"
+import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
 import CreateNewCollectionModal from "./CreateNewCollectionModal"
-import TooltipText from "../../../components/shared/TooltipText"
-import SummaryCardInfo from "../../../components/shared/SummaryCardInfo"
+import TooltipText from "@/apps/dashboard/components/shared/TooltipText"
+import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo"
 import collectionApi from "./api"
 import CollectionsPageBanner from "./component/CollectionsPageBanner"
+import useTable from "@/apps/dashboard/components/tables/TableContext"
+
 
 const headers = [
     {
@@ -29,10 +31,12 @@ const headers = [
         text: "Total endpoints",
         value: "endpoints",
         isText: CellType.TEXT,
+        sortActive: true
     },
     {
         title: 'Risk score',
         value: 'riskScoreComp',
+        sortActive: true
     },
     {   
         title: 'Test coverage',
@@ -50,23 +54,40 @@ const headers = [
         text: 'Sensitive data' , 
         value: 'sensitiveSubTypes',
     },
+    {
+        text: 'Collection type',
+        title: 'Collection type',
+        value: 'envTypeComp',
+        filterKey: "envType",
+        showFilter: true
+    },
     {   
         title: 'Last traffic seen', 
         text: 'Last traffic seen', 
         value: 'lastTraffic',
         isText: CellType.TEXT,
+        sortActive: true
+    },
+    {
+        title: 'Discovered',
+        text: 'Discovered',
+        value: 'discovered',
+        isText: CellType.TEXT,
+        sortActive: true
     }
 ]
 
 const sortOptions = [
     { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'deactivatedRiskScore' },
     { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'activatedRiskScore' },
-    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore' },
-    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' },
-    { label: 'Discovered', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'startTs' },
-    { label: 'Discovered', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'startTs' },
-    { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints' },
-    { label: 'Endpoints', value: 'endpoints desc', directionLabel: 'Less', sortKey: 'endpoints' },
+    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: 3 },
+    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' , columnIndex: 3},
+    { label: 'Discovered', value: 'discovered asc', directionLabel: 'Recent first', sortKey: 'startTs', columnIndex: 9 },
+    { label: 'Discovered', value: 'discovered desc', directionLabel: 'Oldest first', sortKey: 'startTs' , columnIndex: 9},
+    { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints', columnIndex: 2 },
+    { label: 'Endpoints', value: 'endpoints desc', directionLabel: 'Less', sortKey: 'endpoints' , columnIndex: 2},
+    { label: 'Last traffic seen', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'detected', columnIndex: 8 },
+    { label: 'Last traffic seen', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'detected' , columnIndex: 8},
   ];        
 
 
@@ -99,7 +120,8 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
             severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
-            riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0
+            riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0,
+            discovered: func.prettifyEpoch(c.startTs || 0),
         }
     })
 
@@ -109,41 +131,22 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 
 function ApiCollections() {
 
-    const [data, setData] = useState({'All':[]})
+    const [data, setData] = useState({'all':[]})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
-    const [selectedTab, setSelectedTab] = useState("All")
+    const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(false)
-    
-    
-    const tableTabs = [
-        {
-            content: 'All',
-            badge: data["All"]?.length?.toString(),
-            onAction: () => { setSelectedTab('All') },
-            id: 'All',
-        },
-        {
-            content: 'Hostname',
-            badge: data["Hostname"]?.length?.toString(),
-            onAction: () => { setSelectedTab('Hostname') },
-            id: 'Hostname',
-        },
-        {
-            content: 'Groups',
-            badge: data["Groups"]?.length?.toString(),
-            onAction: () => { setSelectedTab('Groups') },
-            id: 'Groups',
-        },
-        {
-            content: 'Custom',
-            badge: data["Custom"]?.length?.toString(),
-            onAction: () => { setSelectedTab('Custom') },
-            id: 'Custom',
-        }
-    ]
+    const [envTypeMap, setEnvTypeMap] = useState({})
+    const [refreshData, setRefreshData] = useState(false)
+    const [popover,setPopover] = useState(false)
+
+    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom']
+
+    const { tabsInfo } = useTable()
+    const tableCountObj = func.getTabsCount(definedTableTabs, data)
+    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
     const setInventoryFlyout = ObserveStore(state => state.setInventoryFlyout)
     const setFilteredItems = ObserveStore(state => state.setFilteredItems) 
@@ -187,6 +190,11 @@ function ApiCollections() {
         setCoverageMap(coverageInfo)
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
+        let envTypeObj = {}
+        tmp.forEach((c) => {
+            envTypeObj[c.id] = c.envType
+        })
+        setEnvTypeMap(envTypeObj)
 
         const issuesObj = await transform.fetchRiskScoreInfo();
         const severityObj = issuesObj.severityObj;
@@ -207,10 +215,10 @@ function ApiCollections() {
         setHostNameMap(allHostNameMap)
         
         tmp = {}
-        tmp.All = dataObj.prettify
-        tmp.Hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
-        tmp.Groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
-        tmp.Custom = tmp.All.filter(x => !tmp.Hostname.includes(x) && !tmp.Groups.includes(x));
+        tmp.all = dataObj.prettify
+        tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
+        tmp.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
+        tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !tmp.groups.includes(x));
 
         setData(tmp);
     }
@@ -262,7 +270,53 @@ function ApiCollections() {
             )
         }
 
-        return actions;
+        const toggleTypeContent = (
+            <Popover
+                activator={<div onClick={() => setPopover(!popover)}>Set ENV type</div>}
+                onClose={() => setPopover(false)}
+                active={popover}
+                autofocusTarget="first-node"
+            >
+                <Popover.Pane>
+                    <ActionList
+                        actionRole="menuitem"
+                        items={[
+                            {content: 'Staging', onAction: () => updateEnvType(selectedResources, "STAGING")},
+                            {content: 'Production', onAction: () => updateEnvType(selectedResources, "PRODUCTION")},
+                            {content: 'Reset', onAction: () => updateEnvType(selectedResources, null)},
+                        ]}
+                    />
+                </Popover.Pane>
+            </Popover>
+        )
+
+        const toggleEnvType = {
+            content: toggleTypeContent
+        }
+
+        return [...actions, toggleEnvType];
+    }
+    const updateData = (dataMap) => {
+        let copyObj = data;
+        Object.keys(copyObj).forEach((key) => {
+            data[key].length > 0 && data[key].forEach((c) => {
+                c['envType'] = dataMap[c.id]
+                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" status="info">{func.toSentenceCase(dataMap[c.id])}</Badge> : null
+            })
+        })
+        setData(copyObj)
+        setRefreshData(!refreshData)
+    }
+
+    const updateEnvType = (apiCollectionIds,type) => {
+        let copyObj = JSON.parse(JSON.stringify(envTypeMap))
+        apiCollectionIds.forEach(id => copyObj[id] = type)
+        api.updateEnvTypeOfCollection(type,apiCollectionIds).then((resp) => {
+            func.setToast(true, false, "ENV type updated successfully")
+            setEnvTypeMap(copyObj)
+            updateData(copyObj)
+        })
+        
     }
 
     const modalComponent = <CreateNewCollectionModal
@@ -308,7 +362,7 @@ function ApiCollections() {
 
     const tableComponent = (
         <GithubSimpleTable
-            key="table"
+            key={refreshData}
             pageLimit={100}
             data={data[selectedTab]} 
             sortOptions={sortOptions} 
