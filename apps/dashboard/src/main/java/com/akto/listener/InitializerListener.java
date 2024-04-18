@@ -1611,9 +1611,9 @@ public class InitializerListener implements ServletContextListener {
                 }, "context-initializer");
 
                 if (DashboardMode.isMetered()) {
+                    DeactivateCollections.deactivateCollectionsJob();
                     setupUsageScheduler();
                     setupUsageSyncScheduler();
-                    DeactivateCollections.deactivateCollectionsJob();
                 }
                 trimCappedCollections();
                 setUpPiiAndTestSourcesScheduler();
