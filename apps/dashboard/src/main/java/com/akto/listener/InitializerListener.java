@@ -1602,42 +1602,42 @@ public class InitializerListener implements ServletContextListener {
                 setDashboardMode();
                 updateGlobalAktoVersion();
 
-                        AccountTask.instance.executeTask(new Consumer<Account>() {
-                            @Override
-                            public void accept(Account account) {
-                                AccountSettingsDao.instance.getStats();
-                                runInitializerFunctions();
-                            }
-                        }, "context-initializer");
-                        setUpPiiAndTestSourcesScheduler();
-                        setUpTrafficAlertScheduler();
-//                        setUpAktoMixpanelEndpointsScheduler();
-                        SingleTypeInfo.init();
-                        setUpDailyScheduler();
-                        setUpWebhookScheduler();
-                        setUpDefaultPayloadRemover();
-                        setUpTestEditorTemplatesScheduler();
-                        updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                        syncCronInfo.setUpUpdateCronScheduler();
-                        //fetchGithubZip();
-                        updateGlobalAktoVersion();
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account account) {
+                        AccountSettingsDao.instance.getStats();
+                        runInitializerFunctions();
+                    }
+                }, "context-initializer");
 
-                        if (DashboardMode.isMetered()) {
-                            setupUsageScheduler();
-                            setupUsageSyncScheduler();
-                            DeactivateCollections.deactivateCollectionsJob();
-                        }
-
-                        crons.deleteTestRunsScheduler();
-
-                        if(isSaas){
-                            try {
-                                Auth0.getInstance();
-                                loggerMaker.infoAndAddToDb("Auth0 initialized", LogDb.DASHBOARD);
-                            } catch (Exception e) {
-                                loggerMaker.errorAndAddToDb(e,"Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
-                            }
-                        }
+                if (DashboardMode.isMetered()) {
+                    setupUsageScheduler();
+                    setupUsageSyncScheduler();
+                }
+                trimCappedCollections();
+                setUpPiiAndTestSourcesScheduler();
+//                setUpDependencyFlowScheduler();
+                setUpTrafficAlertScheduler();
+                // setUpAktoMixpanelEndpointsScheduler();
+                SingleTypeInfo.init();
+                setUpDailyScheduler();
+                setUpWebhookScheduler();
+                setUpDefaultPayloadRemover();
+                setUpTestEditorTemplatesScheduler();
+                tokenGeneratorCron.tokenGeneratorScheduler();
+                crons.deleteTestRunsScheduler();
+                updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                syncCronInfo.setUpUpdateCronScheduler();
+                // setUpAktoMixpanelEndpointsScheduler();
+                //fetchGithubZip();
+                if(isSaas){
+                    try {
+                        Auth0.getInstance();
+                        loggerMaker.infoAndAddToDb("Auth0 initialized", LogDb.DASHBOARD);
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
+                    }
+                }
 
                 setUpUpdateCustomCollections();
                 setUpFillCollectionIdArrayJob();

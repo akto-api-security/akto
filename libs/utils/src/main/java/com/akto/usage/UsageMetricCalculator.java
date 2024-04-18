@@ -53,20 +53,23 @@ public class UsageMetricCalculator {
             return deactivatedCollections;
         }
 
+        deactivatedCollections = getDeactivatedLatest();
+        lastDeactivatedFetched = Context.now();
+        return deactivatedCollections;
+    }
+
+    public static Set<Integer> getDeactivatedLatest(){
         List<ApiCollection> deactivated = ApiCollectionsDao.instance
                 .findAll(Filters.eq(ApiCollection._DEACTIVATED, true));
         Set<Integer> deactivatedIds = new HashSet<>(
                 deactivated.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList()));
-
-        deactivatedCollections = deactivatedIds;
-        lastDeactivatedFetched = Context.now();
 
         return deactivatedIds;
     }
     
     public static Bson excludeDemosAndDeactivated(String key){
         List<Integer> demos = new ArrayList<>(getDemos());
-        List<Integer> deactivated = new ArrayList<>(getDeactivated());
+        List<Integer> deactivated = new ArrayList<>(getDeactivatedLatest());
         deactivated.addAll(demos);
 
         return Filters.nin(key, deactivated);
