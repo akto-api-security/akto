@@ -145,7 +145,7 @@ public class OrganizationUtils {
     }
 
     public static void flushUsagePipelineForOrg(String organizationId) {
-        fetchFromBillingService("flushUsageDataForOrg", new BasicDBObject("organizationId", organizationId));
+        UsageMetricUtils.fetchFromBillingService("flushUsageDataForOrg", new BasicDBObject("organizationId", organizationId));
     }
 
     public static BasicDBObject fetchOrgDetails(String orgId) {

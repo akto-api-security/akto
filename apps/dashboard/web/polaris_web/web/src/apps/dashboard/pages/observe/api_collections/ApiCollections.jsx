@@ -257,7 +257,7 @@ function ApiCollections() {
                 {
                     content: `Deactivate collection${func.addPlurality(selectedResources.length)}`,
                     onAction: () => {
-                        const message = "Deactivating a collection will stop traffic ingestion and testing for this collection. Are you sure, you want to deactivate this collection ?"
+                        const message = "Deactivating a collection will stop traffic ingestion and testing for this collection. Please sync the usage data via Settings > billing after deactivating a collection to reflect your updated usage. Are you sure, you want to deactivate this collection ?"
                         func.showConfirmationModal(message, "Deactivate collection", () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deactivated") )
                     }
                 }

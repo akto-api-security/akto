@@ -205,65 +205,6 @@ function TestRunResultPage(props) {
     },200)
   }, [subCategoryMap, subCategoryFromSourceConfigMap, props, hexId2])
 
-  const testErrorComponent = (
-    <LegacyCard title="Errors" sectioned key="test-errors">
-      {
-        selectedTestRunResult?.errors?.map((error, i) => {
-          return (
-            <Text key={i}>{error}</Text>
-          )
-        })
-      }
-    </LegacyCard>
-  )
-
-  function showTestSampleData(selectedTestRunResult){
-
-    let skipList = [
-      "skipping execution",
-      "deactivated"
-    ]
-
-    let errors = selectedTestRunResult.errors;
-
-    if (errors && errors.length > 0) {
-      let errorInSkipList = errors.filter(x => {
-        return skipList.some(y => x.includes(y))
-      }).length > 0
-
-      return !errorInSkipList
-    }
-    return true;
-  }
-
-  const components = loading ? [<SpinnerCentered key="loading" />] : [
-      issueDetails.id &&
-      <LegacyCard title="Description" sectioned key="description">
-        {
-          getDescriptionText(fullDescription) 
-        }
-        <Button plain onClick={() => setFullDescription(!fullDescription)}> {fullDescription ? "Less" : "More"} information</Button>
-      </LegacyCard>
-    ,
-    ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) ? testErrorComponent : <></>,
-    showTestSampleData(selectedTestRunResult) && selectedTestRunResult.testResults &&
-    <SampleDataList
-      key={"sampleData"}
-      sampleData={selectedTestRunResult?.testResults.map((result) => {
-        return {originalMessage: result.originalMessage, message:result.message, highlightPaths:[]}
-      })}
-      isNewDiff={true}
-      vulnerable={selectedTestRunResult?.vulnerable}
-      heading={"Attempt"}
-      isVulnerable={selectedTestRunResult.vulnerable}
-    />,
-      issueDetails.id &&
-      <MoreInformationComponent
-        key="info"
-        sections={infoState}
-      />
-  ]
-
   return (
     useFlyout ?
     <>
