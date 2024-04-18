@@ -120,6 +120,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
             severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
+            detectedTimestamp : trafficInfoMap[c.id] || 0,
             riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0,
             discovered: func.prettifyEpoch(c.startTs || 0),
         }
@@ -265,7 +266,10 @@ function ApiCollections() {
             actions.push(
                 {
                     content: `Reactivate collection${func.addPlurality(selectedResources.length)}`,
-                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated")
+                    onAction: () =>  {
+                        const message = "Please sync the usage data via Settings > billing after reactivating a collection to resume data ingestion and testing."
+                        func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
+                    }
                 }
             )
         }

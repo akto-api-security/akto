@@ -144,6 +144,10 @@ public class OrganizationUtils {
         }
     }
 
+    public static void flushUsagePipelineForOrg(String organizationId) {
+        fetchFromBillingService("flushUsageDataForOrg", new BasicDBObject("organizationId", organizationId));
+    }
+
     public static BasicDBObject fetchOrgDetails(String orgId) {
         String orgIdUUID = UUID.fromString(orgId).toString();
         return UsageMetricUtils.fetchFromBillingService("fetchOrgDetails", new BasicDBObject("orgId", orgIdUUID));
