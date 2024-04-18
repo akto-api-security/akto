@@ -15,6 +15,7 @@ import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.lang.RuntimeEnvironment;
+import org.apache.commons.lang3.StringUtils;
 import org.kohsuke.github.*;
 
 import java.security.Key;
@@ -74,11 +75,20 @@ public class GithubUtils {
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(generateFilter());
         String privateKey = accountSettings.getGithubAppSecretKey();
         String githubAppId = accountSettings.getGithubAppId();
+        if (StringUtils.isEmpty(privateKey) || StringUtils.isEmpty(githubAppId)) {//If github app is not integrated
+            return;
+        }
         String jwtToken;
         try {
             Map<String, String> metaData = testingRunResultSummary.getMetadata();
+            if (metaData == null) {//No metaData is present, i.e. not a cicd test
+                return;
+            }
             String repository = metaData.get("repository");
             String commitSHA = metaData.get("commit_sha_head");
+            if (StringUtils.isEmpty(repository)  || StringUtils.isEmpty(commitSHA)) {
+                return;
+            }
             jwtToken = createJWT(githubAppId,privateKey, 10 * 60 * 1000);
             GitHub gitHub = new GitHubBuilder().withJwtToken(jwtToken).build();
             GHApp ghApp = gitHub.getApp();
@@ -115,11 +125,21 @@ public class GithubUtils {
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(generateFilter());
         String privateKey = accountSettings.getGithubAppSecretKey();
         String githubAppId = accountSettings.getGithubAppId();
+        if (StringUtils.isEmpty(privateKey) || StringUtils.isEmpty(githubAppId)) {//If github app is not integrated
+            return;
+        }
         try {
             Map<String, String> metaData = testingRunResultSummary.getMetadata();
+            if (metaData == null) {//No metaData is present, i.e. not a cicd test
+                return;
+            }
             String repository = metaData.get("repository");
             String pullRequestId = metaData.get("pull_request_id");
             String commitSHA = metaData.get("commit_sha_head");
+            if (StringUtils.isEmpty(repository) || StringUtils.isEmpty(pullRequestId) || StringUtils.isEmpty(commitSHA)) {
+                return;
+            }
+
             boolean isCompleted = testingRunResultSummary.getState() == TestingRun.State.COMPLETED;
             StringBuilder messageStringBuilder = new StringBuilder();
             if (isCompleted) {
@@ -152,7 +172,7 @@ public class GithubUtils {
                 loggerMaker.infoAndAddToDb("Github app doesn't have access to repository", LoggerMaker.LogDb.TESTING);
                 return;
             }
-            if (pullRequestId == null || !pullRequestId.startsWith("refs/pull/")) {
+            if (!pullRequestId.startsWith("refs/pull/")) {
                 loggerMaker.infoAndAddToDb("Pull request id not available", LoggerMaker.LogDb.TESTING);
                 return;
             }

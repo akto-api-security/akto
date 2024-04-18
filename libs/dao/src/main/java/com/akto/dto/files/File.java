@@ -2,6 +2,7 @@ package com.akto.dto.files;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.upload.FileUpload;
 import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.types.ObjectId;
 
@@ -10,21 +11,21 @@ public class File {
     @BsonId
     private ObjectId id;
 
-    private HttpResponseParams.Source source;
+    private String type;
 
     private int uploadTimestamp;
 
     private String compressedContent;
 
-    public File(HttpResponseParams.Source source, String compressedContent) {
-        this.source = source;
+    public File(String fileType, String compressedContent) {
+        this.type = fileType;
         this.compressedContent = compressedContent;
         this.uploadTimestamp = Context.now();
     }
 
-    public File(ObjectId id, HttpResponseParams.Source source, int uploadTimestamp, String compressedContent) {
+    public File(ObjectId id, String uploadType, int uploadTimestamp, String compressedContent) {
         this.id = id;
-        this.source = source;
+        this.type = uploadType;
         this.uploadTimestamp = uploadTimestamp;
         this.compressedContent = compressedContent;
     }
@@ -53,11 +54,11 @@ public class File {
         this.compressedContent = compressedContent;
     }
 
-    public HttpResponseParams.Source getSource() {
-        return source;
+    public String getType() {
+        return type;
     }
 
-    public void setSource(HttpResponseParams.Source source) {
-        this.source = source;
+    public void setType(String type) {
+        this.type = type;
     }
 }

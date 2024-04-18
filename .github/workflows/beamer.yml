@@ -7,6 +7,8 @@ jobs:
   push-release-notes:
     runs-on: ubuntu-latest
     steps:
+      - name: Setup Bolt
+        uses: koalalab-inc/bolt@v1
       - name: Checkout repository
         uses: actions/checkout@v2
 

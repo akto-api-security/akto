@@ -1,4 +1,4 @@
-import { Badge, Button, ButtonGroup, Checkbox, HorizontalStack, RadioButton, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Button, ButtonGroup, Checkbox, HorizontalStack, RadioButton, Text, VerticalStack, Modal, DescriptionList, Tooltip, Icon } from '@shopify/polaris'
 import React, { useCallback, useEffect, useState } from 'react'
 import Dropdown from '../../../components/layouts/Dropdown'
 import settingFunctions from '../../settings/module'
@@ -8,6 +8,8 @@ import {CancelMajor} from "@shopify/polaris-icons"
 import api from '../api';
 import Store from '../../../store';
 import InformationBannerComponent from "./shared/InformationBannerComponent";
+import SpinnerCentered from "../../../components/progress/SpinnerCentered"
+import { QuestionMarkMinor } from "@shopify/polaris-icons"
 
 
 function PostmanSource() {
@@ -16,6 +18,11 @@ function PostmanSource() {
     const [workspaces, setWorkspaces] = useState([]);
     const [selected, setSelected] = useState('');
     const [loading, setLoading] = useState(false)
+    const [showImportDetailsModal, setShowImportDetailsModal] = useState(false);
+    const [uploadObj, setUploadObj] = useState({})
+    const [importType, setImportType] = useState('ONLY_SUCCESSFUL_APIS');
+    const [uploadId, setUploadId] = useState('');
+    const [intervalId, setIntervalId] = useState(null);
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -140,18 +147,134 @@ function PostmanSource() {
     const importCollection = async() => {
         setLoading(true)
         await api.importPostmanWorkspace(selected,allowResponses,postmanKey).then((resp)=> {
+            let uploadId = resp.uploadId;
             setLoading(false)
             setToast(true, false, "Workspace imported successfully")
+            setShowImportDetailsModal(true);
+            
+            const id = setInterval(async () => {
+                api.fetchPostmanImportLogs(uploadId).then(resp => {
+                    if(resp.uploadDetails.uploadStatus === 'SUCCEEDED' || resp.uploadDetails.uploadStatus === 'FAILED'){
+                        clearInterval(id);
+                        setIntervalId(null);
+                        setUploadObj(resp.uploadDetails);
+                        if(resp.uploadDetails.uploadStatus === 'FAILED'){
+                            setUploadId(uploadId);
+                        }
+                    }
+                });
+            }, 5000);
+            setIntervalId(id);
         })
     }
 
     const uploadCollection = async() => {
         setLoading(true)
         await api.importDataFromPostmanFile(files.content, allowResponses).then((resp)=> {
+            let uploadId = resp.uploadId;
             setLoading(false)
             setToast(true, false, "File uploaded successfully.")
+            setShowImportDetailsModal(true);
+            const id = setInterval(async () => {
+                api.fetchPostmanImportLogs(uploadId).then(resp => {
+                    if(resp.uploadDetails.uploadStatus === 'SUCCEEDED' || resp.uploadDetails.uploadStatus === 'FAILED'){
+                        clearInterval(id);
+                        setIntervalId(null);
+                        setUploadObj(resp.uploadDetails);
+                        if(resp.uploadDetails.uploadStatus === 'FAILED'){
+                            setUploadId(uploadId);
+                        }
+                    }
+                });
+            }, 5000);
+            setIntervalId(id);
         })
     }
+
+    const toggleImport = (val) => {
+        setImportType(val)
+    }
+
+    const startImport = async() => {
+        setShowImportDetailsModal(false)
+        setUploadObj({})
+        api.ingestPostman(uploadObj.uploadId, importType).then(resp => {
+            setToast(true, false, "File import has begun, refresh inventory page to view the postman collection")
+        })
+    }
+
+    const closeModal = async() => {
+        setShowImportDetailsModal(false)
+        if(intervalId != null){
+            clearInterval(this.intervalId)
+            setIntervalId(null)
+        }
+        api.deleteImportedPostman(uploadObj.uploadId).then(resp => {
+        })
+        setUploadObj({})
+    }
+
+
+    let successModalContent = (
+        <div>
+            <Text>Total APIs in the {type==='api' ? 'selected workspace': 'uploaded file'}: {uploadObj.totalCount}</Text>
+            <Text>Total apis parsed correctly by Akto: {uploadObj.correctlyParsedApis}</Text>
+            {
+                uploadObj.apisWithErrorsAndCannotBeImported + uploadObj.apisWithErrorsAndParsed > 0 &&
+                <div>
+                    <Text>Total apis parsed with errors by Akto (can still be imported): {uploadObj.apisWithErrorsAndParsed}</Text>
+                    <Text>Total apis which cannot be imported: {uploadObj.apisWithErrorsAndCannotBeImported}</Text>
+                    { uploadObj.apisWithErrorsAndParsed > 0 && 
+                    <div>
+                        <div style={{display: "flex"}}>
+                            <RadioButton id="forceImport" label="Force import all APIs" checked={importType === "ALL_APIS"} onChange={()=>toggleImport("ALL_APIS")} />
+                            <div style={{margin: "auto 12px"}}>
+                                <Tooltip content={`We will import ${uploadObj.correctlyParsedApis + uploadObj.apisWithErrorsAndParsed} apis i.e. all the apis that have been correctly parsed and apis which have errors and can still be imported`} dismissOnMouseOut width="wide">
+                                    <Icon source={QuestionMarkMinor} color="base" />
+                                </Tooltip>
+                            </div>
+                        </div>
+                        <div style={{display: "flex"}}>
+                            <RadioButton id="successFulApis" label="Import only correctly formatted APIs" checked={importType === "ONLY_SUCCESSFUL_APIS"} onChange={()=>toggleImport("ONLY_SUCCESSFUL_APIS")}/>
+                            <div style={{margin: "auto 12px"}}>
+                                <Tooltip content={`We will import ${uploadObj.correctlyParsedApis} apis i.e. all the apis that have been correctly parsed only`} dismissOnMouseOut width="wide">
+                                    <Icon source={QuestionMarkMinor} color="base" />
+                                </Tooltip>
+                            </div>
+                        </div>
+                    </div>
+                    }
+                </div>
+            }
+            {uploadObj.collectionErrors > 0 && 
+                <div>
+                    {uploadObj.collectionErrors.forEach(error => {
+                        <Text>{{error}}</Text>
+                    })}
+                </div>
+            }
+            {uploadObj.collectionErrors && uploadObj.collectionErrors.length > 0 &&
+                <div>
+                    <Text>Collection level errors</Text>
+                    <DescriptionList
+                        items={uploadObj.collectionErrors}
+                    />
+                </div>
+            }
+
+            {uploadObj.logs && uploadObj.logs.length > 0 &&
+                <div>
+                    <Text>Url level errors</Text>
+                    <DescriptionList
+                        items={uploadObj.logs}
+                    />
+                </div>
+            }
+
+                
+            
+        </div>
+    )
 
 
     const steps = type === "api" ? ApiKeySteps: CollectionSteps
@@ -204,6 +327,32 @@ function PostmanSource() {
                             }}>postman trouble-shooting guide</Button>
                 </ButtonGroup>
             </VerticalStack>
+            <Modal
+                open={showImportDetailsModal}
+                onClose={() => {closeModal()}}
+                title="Postman Import details"
+                key="postman-import-details-modal"
+                primaryAction={{
+                    content: "Import",
+                    onAction: startImport,
+                    disabled: uploadObj.uploadStatus !== 'SUCCEEDED' || ( uploadObj.uploadStatus === 'SUCCEEDED' && (uploadObj.apisWithErrorsAndParsed + uploadObj.correctlyParsedApis === 0))
+                }}
+                secondaryActions={[
+                    {
+                        content: 'Cancel',
+                        onAction: closeModal,
+                    },
+                ]}
+            >
+                <Modal.Section>
+                    {uploadObj.uploadStatus === 'SUCCEEDED' ?
+                        successModalContent
+                    : uploadObj.uploadStatus === 'FAILED' ?
+                    <Text>Something went wrong while processing this postman import. Please reach out to us at help@akto.io with the following uploadId: {uploadId} for further support.</Text> :
+                    <div><Text>We are analyzing the postman file before we import it in Akto</Text><SpinnerCentered></SpinnerCentered></div>
+                }
+                </Modal.Section>
+            </Modal>
         </div>
     )
 }

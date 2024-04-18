@@ -92,6 +92,42 @@ const api = {
             method: 'post',
             data: formData,
         })
+    },
+    fetchPostmanImportLogs(uploadId){
+        return request({
+            url: '/api/fetchPostmanImportLogs',
+            method: 'post',
+            data: {uploadId},
+        })
+    },
+    fetchSwaggerImportLogs(uploadId){
+        return request({
+            url: '/api/fetchSwaggerImportLogs',
+            method: 'post',
+            data: {uploadId},
+        })
+    },
+    ingestPostman(uploadId, importType){
+        return request({
+            url: '/api/ingestPostman',
+            method: 'post',
+            data: {uploadId, importType},
+        })
+    },
+    ingestSwagger(uploadId, importType){
+        return request({
+            url: '/api/importSwaggerLogs',
+            method: 'post',
+            data: {uploadId, importType},
+        })
+    },
+
+    deleteImportedPostman(uploadId){
+        return request({
+            url: '/api/deletePostmanImportLogs',
+            method: 'post',
+            data: {uploadId},
+        })
     }
 }
 

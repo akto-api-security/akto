@@ -7,10 +7,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.testing.AccessMatrixUrlToRole;
 
 import org.bson.conversions.Bson;
 
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.test_editor.TestEditorEnums;
@@ -20,6 +23,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterActionRequest;
@@ -61,6 +65,7 @@ public final class FilterAction {
         put("contains_jwt", new ContainsJwt());
         put("cookie_expire_filter", new CookieExpireFilter());
         put("datatype", new DatatypeFilter());
+        put("ssrf_url_hit", new SsrfUrlHitFilter());
     }};
 
     public FilterAction() { }
@@ -75,6 +80,12 @@ public final class FilterAction {
                 return evaluateParamContext(filterActionRequest);
             case "endpoint_in_traffic_context":
                 return endpointInTraffic(filterActionRequest);
+            case "include_roles_access":
+                return evaluateRolesAccessContext(filterActionRequest, true);
+            case "exclude_roles_access":
+                return evaluateRolesAccessContext(filterActionRequest, false);
+            case "api_access_type":
+                return applyFilterOnAccessType(filterActionRequest);                
             default:
                 return new DataOperandsFilterResponse(false, null, null, null);
         }
@@ -714,7 +725,11 @@ public final class FilterAction {
                 val = listVal;  
             }
         } else {
-            val = queryParams;
+            if (queryParams == null) {
+                val = "";
+            } else {
+                val = queryParams;
+            }
         }
 
         if (val != null) {
@@ -1149,6 +1164,44 @@ public final class FilterAction {
             res = singleTypeInfo != null;
         } else {
             res = singleTypeInfo == null;
+        }
+        return new DataOperandsFilterResponse(res, null, null, null);
+    }
+
+    private DataOperandsFilterResponse evaluateRolesAccessContext(FilterActionRequest filterActionRequest, boolean include) {
+
+        ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
+        Bson filterQ = Filters.eq("_id", apiInfoKey);
+        List<String> querySet = (List) filterActionRequest.getQuerySet();
+        String roleName = querySet.get(0);
+
+        AccessMatrixUrlToRole accessMatrixUrlToRole = AccessMatrixUrlToRolesDao.instance.findOne(filterQ);
+
+        List<String> rolesThatHaveAccessToApi = new ArrayList<>();
+        if (accessMatrixUrlToRole != null) {
+            rolesThatHaveAccessToApi = accessMatrixUrlToRole.getRoles();
+        }
+
+        int indexOfRole = rolesThatHaveAccessToApi.indexOf(roleName);
+
+        boolean res = include == (indexOfRole != -1);
+
+        return new DataOperandsFilterResponse(res, null, null, null);
+    }
+
+    private DataOperandsFilterResponse applyFilterOnAccessType(FilterActionRequest filterActionRequest){
+        List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
+        ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(apiInfoKey));
+        Set<ApiAccessType> apiAccessTypes = apiInfo.getApiAccessTypes();
+        boolean res = false;
+        if(apiInfo != null && !querySet.isEmpty() && apiAccessTypes.size() > 0){
+            ApiAccessType apiAccessType = Utils.getApiAccessTypeFromString(querySet.get(0).toString());
+            if(apiAccessTypes.size() == 1){
+                res = apiAccessTypes.contains(apiAccessType);
+            }else{
+                res = apiAccessType == ApiAccessType.PUBLIC;
+            }
         }
         return new DataOperandsFilterResponse(res, null, null, null);
     }

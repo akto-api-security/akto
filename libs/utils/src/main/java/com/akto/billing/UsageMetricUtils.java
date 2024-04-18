@@ -22,6 +22,7 @@ import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.UsageUtils;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
@@ -30,8 +31,12 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class UsageMetricUtils {
+    private static final Logger logger = LoggerFactory.getLogger(UsageMetricUtils.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricUtils.class);
     private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(UsageMetricUtils.class);
 
@@ -117,7 +122,7 @@ public class UsageMetricUtils {
             props.put("Organization Name", organization.getName());
             props.put("Source", "Dashboard");
 
-            System.out.println("Sending event to mixpanel: " + eventName);
+            logger.info("Sending event to mixpanel: " + eventName);
 
             AktoMixpanel aktoMixpanel = new AktoMixpanel();
             aktoMixpanel.sendEvent(distinct_id, eventName, props);
@@ -129,6 +134,42 @@ public class UsageMetricUtils {
     public static boolean checkMeteredOverage(int accountId, MetricTypes metricType) {
         FeatureAccess featureAccess = getFeatureAccess(accountId, metricType);
         return featureAccess.checkInvalidAccess();
+    }
+
+    public static BasicDBObject fetchFromBillingService(String apiName, BasicDBObject reqBody) {
+        String json = reqBody.toJson();
+
+        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+        RequestBody body = RequestBody.create(json, JSON);
+        Request request = new Request.Builder()
+                .url(UsageUtils.getUsageServiceUrl() + "/api/"+apiName)
+                .post(body)
+                .build();
+
+        OkHttpClient client = new OkHttpClient();
+        Response response = null;
+
+        try {
+            response = client.newCall(request).execute();
+            if (!response.isSuccessful()) {
+                throw new IOException("Unexpected code " + response);
+            }
+
+            ResponseBody responseBody = response.body();
+            if (responseBody == null) {
+                return null;
+            }
+
+            return BasicDBObject.parse(responseBody.string());
+
+        } catch (IOException e) {
+            loggerMaker.errorAndAddToDb(e, "Failed to sync organization with Akto. Error - " +  e.getMessage(), LogDb.DASHBOARD);
+            return null;
+        } finally {
+            if (response != null) {
+                response.close();
+            }
+        }
     }
 
     public static boolean checkActiveEndpointOverage(int accountId){

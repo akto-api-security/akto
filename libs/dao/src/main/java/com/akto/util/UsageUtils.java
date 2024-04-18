@@ -2,6 +2,11 @@ package com.akto.util;
 
 import java.util.concurrent.TimeUnit;
 
+import org.bson.conversions.Bson;
+
+import com.akto.dao.billing.TokensDao;
+import com.mongodb.client.model.Updates;
+
 public class UsageUtils {
 
     public static final TimeUnit USAGE_CRON_PERIOD = TimeUnit.HOURS;
@@ -13,7 +18,7 @@ public class UsageUtils {
         if (usageServiceUrl != null) {
             return usageServiceUrl;
         } else {
-            return "https://usage.akto.io";
+            return "https://saas.usage.akto.io";
         }
     }
 
@@ -25,6 +30,14 @@ public class UsageUtils {
         } else {
             return "https://internal.akto.io";
         }
+    }
+
+    public static void saveToken(String orgId, int accountId, Bson updates, Bson filters, String token) {
+        updates = Updates.combine(
+            updates,
+            Updates.set("token", token)
+        );
+        TokensDao.instance.updateOne(filters, updates);
     }
 
 }

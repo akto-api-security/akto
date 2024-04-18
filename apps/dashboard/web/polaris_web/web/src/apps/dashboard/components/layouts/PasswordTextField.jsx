@@ -26,6 +26,7 @@ function PasswordTextField(props) {
     return (
         <TextField suffix={toggleButton} value={props.field} type={type} helpText={props.helpText} 
                     onChange={handleValueChange} label={props.label ? props.label : null}
+                    monospaces={props?.monospaced}
         />
     )
 }

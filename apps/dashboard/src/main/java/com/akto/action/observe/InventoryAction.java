@@ -7,6 +7,8 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.*;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -15,7 +17,16 @@ import com.akto.interceptor.CollectionInterceptor;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
+import com.akto.listener.InitializerListener;
+import com.akto.listener.RuntimeListener;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.APICatalogSync;
+import com.akto.runtime.Main;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.util.Constants;
+import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
@@ -33,6 +44,7 @@ import org.bson.conversions.Bson;
 
 import java.net.URI;
 import java.util.*;
+import java.util.regex.Pattern;
 
 public class InventoryAction extends UserAction {
 
@@ -78,6 +90,7 @@ public class InventoryAction extends UserAction {
         );
         List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 1_000, Sorts.descending("timestamp"), Projections.exclude("values"));
         for(SingleTypeInfo sti: latestHosts) {
+            loggerMaker.debugInfoAddToDb(sti.getUrl() + " discovered_ts: " + sti.getTimestamp() + " inserted_ts: " + sti.getId().getTimestamp(), LogDb.DASHBOARD);
             BasicDBObject id = 
                 new BasicDBObject("apiCollectionId", sti.getApiCollectionId())
                 .append("url", sti.getUrl())
@@ -146,10 +159,8 @@ public class InventoryAction extends UserAction {
 
     public String fetchCollectionWiseApiEndpoints() {
         listOfEndpointsInCollection = new HashSet<>();
-        List<BasicDBObject> list = null;
-        if (apiCollectionId > -1) {
-            list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
-        }
+        List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
+
         if (list != null && !list.isEmpty()) {
             list.forEach(element -> {
                 BasicDBObject item = (BasicDBObject) element.get(Constants.ID);
@@ -233,6 +244,7 @@ public class InventoryAction extends UserAction {
         return prependPath;
     }
 
+    // todo: handle null
     public static Set<String> fetchSwaggerData(List<BasicDBObject> endpoints, OpenAPI openAPI) {
         List<Server> servers = openAPI.getServers();
 
@@ -342,7 +354,7 @@ public class InventoryAction extends UserAction {
                 unused = fetchSwaggerData(list, openAPI);
             }
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
         }
 
         attachTagsInAPIList(list);
@@ -423,7 +435,12 @@ public class InventoryAction extends UserAction {
         pipeline.add(Aggregates.match(Filters.lte("timestamp", endTimestamp)));
         pipeline.add(Aggregates.match(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}))));
-        pipeline.add(Aggregates.project(Projections.computed("dayOfYear", new BasicDBObject("$trunc", new Object[]{"$dayOfYearFloat", 0}))));
+
+        Bson doyProj = Projections.computed("dayOfYear", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}));
+        if (InitializerListener.isNotKubernetes()) {
+            doyProj = Projections.computed("dayOfYear", new BasicDBObject("$floor", new Object[]{"$dayOfYearFloat"}));
+        }
+        pipeline.add(Aggregates.project(doyProj));
         pipeline.add(Aggregates.group("$dayOfYear", Accumulators.sum("count", 1)));
 
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -623,6 +640,104 @@ public class InventoryAction extends UserAction {
         response.put("subTypeCountMap", subTypeCountMap);
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+
+    public String deMergeApi() {
+        if (this.url == null || this.url.length() == 0) {
+            addActionError("URL can't be null or empty");
+            return ERROR.toUpperCase();
+        }
+
+        if (this.method == null || this.method.length() == 0) {
+            addActionError("Method can't be null or empty");
+            return ERROR.toUpperCase();
+        }
+
+        Method urlMethod = null;
+        try {
+            urlMethod = Method.valueOf(method);
+        } catch (Exception e) {
+            addActionError("Invalid Method");
+            return ERROR.toUpperCase();
+        }
+
+        if (!APICatalog.isTemplateUrl(this.url)) {
+            addActionError("Only merged URLs can be de-merged");
+            return ERROR.toUpperCase();
+        }
+
+
+        SampleData sampleData = SampleDataDao.instance.fetchSampleDataForApi(apiCollectionId, url, urlMethod);
+        List<String> samples = sampleData.getSamples();
+        loggerMaker.infoAndAddToDb("Found " + samples.size() + " samples for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
+
+        Bson stiFilter = SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, url, urlMethod);
+        SingleTypeInfoDao.instance.deleteAll(stiFilter);
+
+        Bson sampleDataFilter = SampleDataDao.filterForSampleData(apiCollectionId, url, urlMethod);
+        ApiInfoDao.instance.deleteAll(sampleDataFilter);
+        SampleDataDao.instance.deleteAll(sampleDataFilter);
+        SensitiveSampleDataDao.instance.deleteAll(sampleDataFilter);
+        TrafficInfoDao.instance.deleteAll(sampleDataFilter);
+
+        loggerMaker.infoAndAddToDb("Cleanup done", LogDb.DASHBOARD);
+
+        List<HttpResponseParams> responses = new ArrayList<>();
+        for (String sample : samples) {
+            try {
+                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                httpResponseParams.requestParams.setApiCollectionId(apiCollectionId);
+                responses.add(httpResponseParams);
+            } catch (Exception e) {
+                loggerMaker.infoAndAddToDb("Error while processing sample message while de-merging : " + e.getMessage(), LogDb.DASHBOARD);
+            }
+        }
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        if (accountSettings != null) {
+            Map<String, Map<Pattern, String>> apiCollectioNameMapper = accountSettings.convertApiCollectionNameMapperToRegex();
+            Main.changeTargetCollection(apiCollectioNameMapper, responses);
+        }
+
+        int accountId = Context.accountId.get();
+
+        AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
+        if (info == null) { // account created after docker run
+            info = new AccountHTTPCallParserAktoPolicyInfo();
+            HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+            info.setHttpCallParser(callParser);
+            RuntimeListener.accountHTTPParserMap.put(accountId, info);
+        }
+
+        // because changes were made to db and apiCatalogSync doesn't have latest data
+        info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
+
+        try {
+            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.GET);
+            if (info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId) != null) {
+                RequestTemplate requestTemplate = info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId).getTemplateURLToMethods().get(urlTemplate);
+                loggerMaker.infoAndAddToDb("Request template exists for url " + urlTemplate.getTemplateString() + " : " + ( requestTemplate != null), LogDb.DASHBOARD);
+            } else {
+                loggerMaker.infoAndAddToDb("Clean dbState for apiCollectionId: " + apiCollectionId,LogDb.DASHBOARD);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("Error while checking requestTemplate: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+
+        loggerMaker.infoAndAddToDb("Processing " + responses.size() + " httpResponseParams for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
+
+        responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
+        loggerMaker.infoAndAddToDb("After filter: Processing " + responses.size() + " httpResponseParams for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
+        try {
+            info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
+        } catch (Exception e) {
+            addActionError("Error in httpCallParser : " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+
+        return SUCCESS.toUpperCase();
     }
 
     public String getSortKey() {
