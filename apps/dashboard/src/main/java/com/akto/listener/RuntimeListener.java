@@ -79,7 +79,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
                 try {
                     initialiseDemoCollections();
-                    addSampleData();
+                    //addSampleData();
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,"Error while initialising demo collections: " + e, LoggerMaker.LogDb.DASHBOARD);
                 }
@@ -225,7 +225,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
             for (SingleTypeInfo singleTypeInfo: params) {
                 urlList.add(singleTypeInfo.getUrl());
             }
-            if (urlList.size() != 117) {
+            if (urlList.size() != 194) {
                 Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
             }
 

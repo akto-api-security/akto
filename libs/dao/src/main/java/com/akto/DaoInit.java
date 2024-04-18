@@ -345,6 +345,8 @@ public class DaoInit {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         TrafficMetricsDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
+        UsersDao.instance.createIndicesIfAbsent();
+        AccountsDao.instance.createIndexIfAbsent();
 
         ApiInfoDao.instance.createIndicesIfAbsent();
         RuntimeLogsDao.instance.createIndicesIfAbsent();

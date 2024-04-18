@@ -66,6 +66,7 @@ import SignupPage from "../signup/pages/SignupPage";
 import PageCheckInbox from "../signup/pages/PageCheckInbox"
 import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
 import TokenValidator from "./TokenValidator"
+import { TableContextProvider } from "@/apps/dashboard/components/tables/TableContext";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -353,7 +354,9 @@ function App() {
   }, [])
 
   return (
+    <TableContextProvider>
       <RouterProvider router={router} />
+    </TableContextProvider>
   );
 }
 

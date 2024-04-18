@@ -9,6 +9,7 @@ import TableExpand from "./TableExpand";
 import func from "../../../../../util/func";
 import EditModal from "./EditModal";
 import GlobalVarModal from "./GlobalVarModal";
+import { useLocation } from "react-router-dom";
 
 const headers = [
     {
@@ -65,6 +66,7 @@ function DependencyTable() {
     const [editData, setEditData] = useState([])
 
     const [globalVarActive, setGlobalVarActive] = useState(false)
+    const location = useLocation()
 
     const queryParams = new URLSearchParams(location.search);
     const apiCollectionIdsString = queryParams.get('col_ids')
@@ -231,6 +233,7 @@ function DependencyTable() {
             headings={headers}
             useNewRow={true}
             condensedHeight={true}
+            tableId="dependency-table"
         />
     )
 
