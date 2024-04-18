@@ -1,6 +1,7 @@
 package com.akto.dependency;
 
 import com.akto.dao.context.Context;
+import com.akto.dependency.store.BFStore;
 import com.akto.dependency.store.HashSetStore;
 import com.akto.dependency.store.Store;
 import com.akto.dao.DependencyNodeDao;
@@ -14,6 +15,9 @@ import com.akto.runtime.URLAggregator;
 import com.akto.runtime.policies.AuthPolicy;
 import com.akto.util.HTTPHeadersExample;
 import com.akto.util.JSONUtils;
+import com.google.common.base.Charsets;
+import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.Document;
@@ -34,10 +38,17 @@ public class DependencyAnalyser {
     public Map<Integer, APICatalog> dbState = new HashMap<>();
 
 
-    public DependencyAnalyser(Map<Integer, APICatalog> dbState) {
-        valueStore = new HashSetStore(10_000);
-        urlValueStore= new HashSetStore(10_000);
-        urlParamValueStore = new HashSetStore(10_000);
+    public DependencyAnalyser(Map<Integer, APICatalog> dbState, boolean useMap) {
+
+        if (useMap) {
+            valueStore = new HashSetStore(10_000);
+            urlValueStore= new HashSetStore(10_000);
+            urlParamValueStore = new HashSetStore(10_000);
+        } else {
+            valueStore = new BFStore(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100_000_000, 0.01));
+            urlValueStore = new BFStore(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100_000_000, 0.01));
+            urlParamValueStore = new BFStore(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100_000_000, 0.01));
+        }
         this.dbState = dbState;
     }
 
@@ -141,7 +152,10 @@ public class DependencyAnalyser {
                 SingleTypeInfo.SuperType superType = urlTemplate.getTypes()[i];
                 if (superType == null) continue;
                 int idx = ogUrl.startsWith("http") ? i:i+1;
-                String s = ogUrlSplit[idx]; // because ogUrl=/api/books/123 while template url=api/books/INTEGER
+                Object s = ogUrlSplit[idx]; // because ogUrl=/api/books/123 while template url=api/books/INTEGER
+                if (superType.equals(SingleTypeInfo.SuperType.INTEGER)) {
+                    s = Integer.parseInt(ogUrlSplit[idx]);
+                }
                 Set<Object> val = new HashSet<>();
                 val.add(s);
                 processRequestParam(i+"", val, combinedUrl, true, false);

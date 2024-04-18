@@ -1,5 +1,15 @@
 package com.akto;
 
+import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.loaders.LoadersDao;
+import com.akto.dao.testing.TestRolesDao;
+import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.traffic_metrics.TrafficMetricsDao;
+import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.*;
 import com.akto.dto.data_types.*;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
@@ -25,17 +35,21 @@ import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetricsAlert;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.type.URLTemplate;
+import com.akto.dto.upload.FileUpload;
+import com.akto.dto.upload.FileUploadLog;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.dto.usage.UsageSync;
 import com.akto.types.CappedList;
 import com.akto.types.CappedSet;
+import com.akto.util.DbMode;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.EnumCodec;
 import com.akto.util.LastCronRunInfo;
@@ -47,12 +61,15 @@ import com.akto.dto.billing.Organization;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
+import com.mongodb.ReadPreference;
 import com.mongodb.client.MongoClients;
 
 import org.bson.codecs.configuration.CodecRegistries;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.ClassModel;
 import org.bson.codecs.pojo.PojoCodecProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.akto.dao.MCollection.clients;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
@@ -60,8 +77,10 @@ import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
 public class DaoInit {
 
+    private static final Logger logger = LoggerFactory.getLogger(DaoInit.class);
+
     public static CodecRegistry createCodecRegistry(){
-                ClassModel<Config> configClassModel = ClassModel.builder(Config.class).enableDiscriminator(true).build();
+        ClassModel<Config> configClassModel = ClassModel.builder(Config.class).enableDiscriminator(true).build();
         ClassModel<SignupInfo> signupInfoClassModel = ClassModel.builder(SignupInfo.class).enableDiscriminator(true)
                 .build();
         ClassModel<APIAuth> apiAuthClassModel = ClassModel.builder(APIAuth.class).enableDiscriminator(true).build();
@@ -125,6 +144,8 @@ public class DaoInit {
                 .build();
         ClassModel<AuthMechanism> authMechanismClassModel = ClassModel.builder(AuthMechanism.class)
                 .enableDiscriminator(true).build();
+        ClassModel<Setup> setupClassModel = ClassModel.builder(Setup.class)
+                .enableDiscriminator(true).build();
         ClassModel<AuthParam> authParamClassModel = ClassModel.builder(AuthParam.class).enableDiscriminator(true)
                 .build();
         ClassModel<HardcodedAuthParam> hardcodedAuthParamClassModel = ClassModel.builder(HardcodedAuthParam.class)
@@ -184,16 +205,18 @@ public class DaoInit {
         ClassModel<TestInfo> testInfoClassModel = ClassModel.builder(TestInfo.class).enableDiscriminator(true).build();
         ClassModel<BFLATestInfo> bflaTestInfoClassModel = ClassModel.builder(BFLATestInfo.class).enableDiscriminator(true).build();
         ClassModel<NucleiTestInfo> nucleiTestInfoClassModel = ClassModel.builder(NucleiTestInfo.class).enableDiscriminator(true).build();
-
-        ClassModel<LoginFlowStepsData> loginFlowStepsData = ClassModel.builder(LoginFlowStepsData.class)
-        .enableDiscriminator(true).build();
-
+        ClassModel<AccessMatrixUrlToRole> accessMatrixUrlToRoleClassModel = ClassModel.builder(AccessMatrixUrlToRole.class).enableDiscriminator(true).build();
+        ClassModel<AccessMatrixTaskInfo> accessMatrixTaskInfoClassModel = ClassModel.builder(AccessMatrixTaskInfo.class).enableDiscriminator(true).build();
         ClassModel<Loader> loaderClassModel = ClassModel.builder(Loader.class).enableDiscriminator(true).build();
         ClassModel<NormalLoader> normalLoaderClassModel = ClassModel.builder(NormalLoader.class).enableDiscriminator(true).build();
         ClassModel<PostmanUploadLoader> postmanUploadLoaderClassModel = ClassModel.builder(PostmanUploadLoader.class).enableDiscriminator(true).build();
         ClassModel<AktoGptConfig> aktoGptConfigClassModel = ClassModel.builder(AktoGptConfig.class).enableDiscriminator(true).build();
+
+        ClassModel<LoginFlowStepsData> loginFlowStepsData = ClassModel.builder(LoginFlowStepsData.class)
+        .enableDiscriminator(true).build();
         ClassModel<VulnerableRequestForTemplate> vulnerableRequestForTemplateClassModel = ClassModel.builder(VulnerableRequestForTemplate.class).enableDiscriminator(true).build();
         ClassModel<TrafficMetricsAlert> trafficMetricsAlertClassModel = ClassModel.builder(TrafficMetricsAlert.class).enableDiscriminator(true).build();
+        ClassModel<JiraIntegration> jiraintegrationClassModel = ClassModel.builder(JiraIntegration.class).enableDiscriminator(true).build();
         ClassModel<MethodCondition> methodConditionClassModel = ClassModel.builder(MethodCondition.class).enableDiscriminator(true).build();
         ClassModel<DependencyNode> dependencyNodeClassModel = ClassModel.builder(DependencyNode.class).enableDiscriminator(true).build();
         ClassModel<ParamInfo> paramInfoClassModel = ClassModel.builder(ParamInfo.class).enableDiscriminator(true).build();
@@ -212,10 +235,11 @@ public class DaoInit {
         ClassModel<Organization> OrganizationClassModel = ClassModel.builder(Organization.class).enableDiscriminator(true).build();
         ClassModel<ReplaceDetail> replaceDetailClassModel = ClassModel.builder(ReplaceDetail.class).enableDiscriminator(true).build();
         ClassModel<ModifyHostDetail> modifyHostDetailClassModel = ClassModel.builder(ModifyHostDetail.class).enableDiscriminator(true).build();
+        ClassModel<FileUpload> fileUploadClassModel = ClassModel.builder(FileUpload.class).enableDiscriminator(true).build();
+        ClassModel<FileUploadLog> fileUploadLogClassModel = ClassModel.builder(FileUploadLog.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
-                configClassModel,
-                signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
+                configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
                 thirdPartyAccessClassModel, credentialClassModel, apiTokenClassModel, apiInfoClassModel,
                 apiInfoKeyClassModel, customFilterClassModel, runtimeFilterClassModel, filterSampleDataClassModel,
@@ -233,12 +257,15 @@ public class DaoInit {
                 testingIssuesIdClassModel, testSourceConfigClassModel, endpointLogicalGroupClassModel, testRolesClassModel,
                 logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
+                accessMatrixUrlToRoleClassModel, accessMatrixTaskInfoClassModel,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
-                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
+                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel,jiraintegrationClassModel, setupClassModel,
+                cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
                 methodConditionClassModel,
-                UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel, 
+                UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel,
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
-                        nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel).automatic(true).build());
+                        nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
+                ,fileUploadLogClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -275,22 +302,64 @@ public class DaoInit {
                 new EnumCodec<>(MetricTypes.class),
                 new EnumCodec<>(User.AktoUIMode.class),
                 new EnumCodec<>(TrafficMetricsAlert.FilterType.class),
-                new EnumCodec<>(KVPair.KVType.class));
+                new EnumCodec<>(KVPair.KVType.class),
+                new EnumCodec<>(ApiCollection.ENV_TYPE.class),
+                new EnumCodec<>(FileUpload.UploadType.class),
+                new EnumCodec<>(FileUpload.UploadStatus.class),
+                new EnumCodec<>(FileUploadLog.UploadLogStatus.class)
+        );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
                 customEnumCodecs);
     }
 
-    public static void init(ConnectionString connectionString) {
+    public static void init(ConnectionString connectionString, ReadPreference readPreference) {
+        DbMode.refreshDbType(connectionString.getConnectionString());
 
         CodecRegistry codecRegistry = createCodecRegistry();
 
         MongoClientSettings clientSettings = MongoClientSettings.builder()
+                .readPreference(readPreference)
                 .applyConnectionString(connectionString)
                 .codecRegistry(codecRegistry)
                 .build();
 
         clients[0] = MongoClients.create(clientSettings);
+    }
+    public static void init(ConnectionString connectionString) {
+        init(connectionString, ReadPreference.secondary());
+    }
+
+    public static void createIndices() {
+        try {
+            TestingRunResultDao.instance.convertToCappedCollection();
+        } catch (Exception e) {
+                logger.error("Error while converting TestingRunResults to capped collection: " + e.getMessage());
+        }
+
+        OrganizationsDao.createIndexIfAbsent();
+        UsageMetricsDao.createIndexIfAbsent();
+        SingleTypeInfoDao.instance.createIndicesIfAbsent();
+        TrafficMetricsDao.instance.createIndicesIfAbsent();
+        TestRolesDao.instance.createIndicesIfAbsent();
+        UsersDao.instance.createIndicesIfAbsent();
+        AccountsDao.instance.createIndexIfAbsent();
+
+        ApiInfoDao.instance.createIndicesIfAbsent();
+        RuntimeLogsDao.instance.createIndicesIfAbsent();
+        LogsDao.instance.createIndicesIfAbsent();
+        DashboardLogsDao.instance.createIndicesIfAbsent();
+        AnalyserLogsDao.instance.createIndicesIfAbsent();
+        SampleDataDao.instance.createIndicesIfAbsent();
+        LoadersDao.instance.createIndicesIfAbsent();
+        TestingRunResultDao.instance.createIndicesIfAbsent();
+        TestingRunResultSummariesDao.instance.createIndicesIfAbsent();
+        TestingRunDao.instance.createIndicesIfAbsent();
+        TestingRunIssuesDao.instance.createIndicesIfAbsent();
+        ApiCollectionsDao.instance.createIndicesIfAbsent();
+        ActivitiesDao.instance.createIndicesIfAbsent();
+        DependencyNodeDao.instance.createIndicesIfAbsent();
+        DependencyFlowNodesDao.instance.createIndicesIfAbsent();
     }
 
 }

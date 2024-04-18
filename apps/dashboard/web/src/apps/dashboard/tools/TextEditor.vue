@@ -585,7 +585,7 @@ export default {
             this.textEditor.addAction({
                 id: "giveTypingEffect",
                 label: "Give typing effect",
-                keybindings: [KeyMod.Shift | KeyCode.KeyB],
+                keybindings: [KeyMod.Ctrl | KeyCode.KeyB],
                 run: () => {
                     this.giveTypingEffect(false, true);
                 },

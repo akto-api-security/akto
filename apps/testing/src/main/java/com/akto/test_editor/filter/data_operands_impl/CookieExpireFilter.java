@@ -1,11 +1,12 @@
 package com.akto.test_editor.filter.data_operands_impl;
 
 import java.time.Duration;
-import java.time.ZonedDateTime;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import com.akto.dto.test_editor.DataOperandFilterRequest;
@@ -34,26 +35,41 @@ public class CookieExpireFilter extends DataOperandsImpl {
 
         Map<String,String> cookieMap = AuthPolicy.parseCookie(Arrays.asList(data));
 
-        if (cookieMap.containsKey("Max-Age")) {
-            int maxAge = Integer.parseInt(cookieMap.get("Max-Age"));
-            if (maxAge/(60*60*24) > 30) {
-                return false == queryVal;
+        boolean result = queryVal;
+        boolean res = false;
+        if (cookieMap.containsKey("Max-Age") || cookieMap.containsKey("max-age")) {
+            int maxAge;
+            if (cookieMap.containsKey("Max-Age")) {
+                maxAge = Integer.parseInt(cookieMap.get("Max-Age"));
+            } else {
+                maxAge = Integer.parseInt(cookieMap.get("max-age"));
             }
-        } else if (cookieMap.containsKey("Expires")) {
-            String expiresTs = cookieMap.get("Expires");
-            DateTimeFormatter formatter = DateTimeFormatter.RFC_1123_DATE_TIME;
-            ZonedDateTime dateTime = ZonedDateTime.parse(expiresTs, formatter);
-            
-            ZonedDateTime now = ZonedDateTime.now();
+            if (maxAge/(60*60*24) > 30) {
+                res = true;
+            }
+        } else if (cookieMap.containsKey("Expires") || cookieMap.containsKey("expires")) {
+            String expiresTs;
+            if (cookieMap.containsKey("Expires")) {
+                expiresTs = cookieMap.get("Expires");
+            } else {
+                expiresTs = cookieMap.get("expires");
+            }
+
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH);
+            LocalDateTime dateTime;
+            try {
+                dateTime = LocalDateTime.parse(expiresTs, formatter);
+            } catch (Exception e) {
+                formatter = DateTimeFormatter.ofPattern("EEE, dd-MMM-yyyy HH:mm:ss z", Locale.ENGLISH);
+                dateTime = LocalDateTime.parse(expiresTs, formatter);
+            }
+            LocalDateTime now = LocalDateTime.now();
             Duration duration = Duration.between(now, dateTime);
             long seconds = duration.getSeconds();
             if (seconds/(60*60*24) > 30) {
-                return false == queryVal;
+                res = true;
             }
-        } else {
-            return true == queryVal;
         }
-
-        return true == queryVal;
+        return result == res;
     }
 }

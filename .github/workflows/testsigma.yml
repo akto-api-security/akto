@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Setup Bolt
+        uses: koalalab-inc/bolt@v1
       - name: Trigger Testsigma Test
         run: |
           curl --insecure -X POST -H "Content-type: application/json" -H "Accept:application/json" -H "Authorization: Bearer ${{ vars.TESTSIGMA_API_KEY }}" \

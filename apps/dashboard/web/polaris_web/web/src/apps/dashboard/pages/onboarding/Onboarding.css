@@ -1,6 +1,5 @@
 .onboarding .Polaris-TopBar__SecondaryMenu {
-    width: 50vw;
-    padding: 0 8vw;
+    margin-right: 20px;
 }
 
 .onboarding .Polaris-Avatar--sizeExtraSmall {

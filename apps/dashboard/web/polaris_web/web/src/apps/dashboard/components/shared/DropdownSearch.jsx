@@ -1,4 +1,4 @@
-import { Autocomplete, Avatar, Icon, TextContainer } from '@shopify/polaris';
+import { Autocomplete, Avatar, Checkbox, Icon, TextContainer } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import React, { useState, useCallback, useEffect } from 'react';
 import func from "@/util/func";
@@ -13,6 +13,7 @@ function DropdownSearch(props) {
     const [inputValue, setInputValue] = useState(value ? value : undefined);
     const [options, setOptions] = useState(deselectedOptions);
     const [loading, setLoading] = useState(false);
+    const [checked,setChecked] = useState(false)
 
 
     useEffect(() => {
@@ -39,6 +40,12 @@ function DropdownSearch(props) {
             }
             return deselectedOptions;
         })
+
+        if(allowMultiple){
+            if(preSelected.length === deselectedOptions.length){
+                setChecked(true)
+            }
+        }
     }, [deselectedOptions, value, preSelected])
 
     const updateText = useCallback(
@@ -102,6 +109,18 @@ function DropdownSearch(props) {
         [options],
     );
 
+    const selectAllFunc = () => {
+        if(!checked){
+            const valueArr = deselectedOptions.map((obj) => obj.value)
+            updateSelection(valueArr)
+            setChecked(true)
+        }else{
+            setChecked(false)
+            updateSelection([])
+        }
+        
+    }
+
     const textField = (
         <Autocomplete.TextField
             id={id}
@@ -122,6 +141,9 @@ function DropdownSearch(props) {
         />
     );
 
+    const showSelectAll = (allowMultiple && optionsList.length > 5)
+    const checkboxLabel = checked ? "Deselect all" : "Select all"
+
     const emptyState = (
         <React.Fragment>
             <Icon source={SearchMinor} />
@@ -141,6 +163,10 @@ function DropdownSearch(props) {
                 loading={loading}
                 textField={textField}
                 preferredPosition='below'
+                {...(showSelectAll ? {actionBefore:{
+                    content:(<Checkbox label={checkboxLabel} checked={checked} onChange={() => selectAllFunc()}/>),
+                    onAction: () => selectAllFunc(),
+                }} : {})}
             />
     );
 }
