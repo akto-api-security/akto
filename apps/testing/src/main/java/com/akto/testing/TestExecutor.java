@@ -632,7 +632,7 @@ public class TestExecutor {
             return new TestingRunResult(
                 testRunId, apiInfoKey, testSuperType, testSubType ,testResults,
                 false,new ArrayList<>(),100,Context.now(),
-                Context.now(), testRunResultSummaryId, null, Collections.singletonList(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "No samples messages found"))
+                Context.now(), testRunResultSummaryId, null, Collections.singletonList(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Deactivated endpoint"))
             );
         }
 

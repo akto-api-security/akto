@@ -1406,6 +1406,24 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
   getKeyFromName(key){
     return key.replace(/[\s/]+/g, '_').toLowerCase();
+  },
+  showTestSampleData(selectedTestRunResult){
+
+    let skipList = [
+      "skipping execution",
+      "deactivated"
+    ]
+
+    let errors = selectedTestRunResult.errors;
+
+    if (errors && errors.length > 0) {
+      let errorInSkipList = errors.filter(x => {
+        return skipList.some(y => x.includes(y))
+      }).length > 0
+
+      return !errorInSkipList
+    }
+    return true;
   }
 }
 
