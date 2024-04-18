@@ -22,7 +22,7 @@ function SourceLocation(props) {
             <Box width="200px">
                 <Tooltip content={tooltipText} preferredPosition="below">
                     {location.fileLink === "" ?
-                        <Text variant="bodyMd" fontWeight="medium" breakWord>{filePathText}</Text> :
+                        <Text variant="bodyMd" fontWeight="medium">{filePathText}</Text> :
                         <Link onClick={(e) => e.stopPropagation()} url={location.fileLink} monochrome target="_blank">
                             <Text variant="bodyMd" fontWeight="medium" breakWord>{filePathText}</Text> 
                         </Link> 

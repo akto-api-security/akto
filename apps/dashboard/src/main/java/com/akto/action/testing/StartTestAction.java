@@ -70,6 +70,7 @@ public class StartTestAction extends UserAction {
     private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
     private TestingRunType testingRunType;
+    private String searchString;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
@@ -346,6 +347,34 @@ public class StartTestAction extends UserAction {
         }
     }
 
+    private Bson getSearchFilters(){
+        if(this.searchString == null || this.searchString.length() == 0){
+            return Filters.empty();
+        }
+        Bson filter = Filters.or(
+            Filters.regex(TestingRun.NAME, this.searchString, "i")
+        );
+        return filter;
+    }
+
+    private ArrayList<Bson> getTableFilters(){
+        ArrayList<Bson> filterList = new ArrayList<>();
+        if(this.filters == null){
+            return filterList;
+        }
+        List<Integer> apiCollectionIds = (List<Integer>) this.filters.getOrDefault("apiCollectionId", new ArrayList<>());
+        if(!apiCollectionIds.isEmpty()){
+            filterList.add(
+                Filters.or(
+                    Filters.in(TestingRun._API_COLLECTION_ID, apiCollectionIds),
+                    Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, apiCollectionIds)
+                )
+            );
+        }
+
+        return filterList;
+    }
+
     public String retrieveAllCollectionTests() {
 
         this.authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
@@ -354,7 +383,8 @@ public class StartTestAction extends UserAction {
         Bson testingRunTypeFilter = getTestingRunTypeFilter(testingRunType);
         testingRunFilters.add(testingRunTypeFilter);
         testingRunFilters.addAll(prepareFilters(startTimestamp, endTimestamp));
-        
+        testingRunFilters.add(getSearchFilters());
+        testingRunFilters.addAll(getTableFilters());
 
         int pageLimit = Math.min(limit == 0 ? 50 : limit, 10_000);
 
@@ -449,6 +479,10 @@ public class StartTestAction extends UserAction {
     String testingRunResultSummaryHexId;
     List<TestingRunResult> testingRunResults;
     private boolean fetchOnlyVulnerable;
+    public enum QueryMode {
+        VULNERABLE, SECURED, SKIPPED_EXEC_NEED_CONFIG, SKIPPED_EXEC_NO_ACTION, SKIPPED_EXEC, ALL;
+    }
+    private QueryMode queryMode;
 
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
@@ -461,11 +495,27 @@ public class StartTestAction extends UserAction {
 
         List<Bson> testingRunResultFilters = new ArrayList<>();
 
-        if (fetchOnlyVulnerable) {
-            testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, true));
-        }
-
         testingRunResultFilters.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
+
+        if (queryMode == null) {
+            if (fetchOnlyVulnerable) {
+                testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, true));
+            }
+        } else {
+            switch (queryMode) {
+                case VULNERABLE:
+                    testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, true));
+                    break;
+                case SKIPPED_EXEC:
+                    testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
+                    testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
+                    break;
+                case SECURED:
+                    testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
+                    testingRunResultFilters.add(Filters.nin(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
+                    break;
+            }
+        }
 
         this.testingRunResults = TestingRunResultDao.instance
                 .fetchLatestTestingRunResult(Filters.and(testingRunResultFilters));
@@ -1013,6 +1063,10 @@ public class StartTestAction extends UserAction {
         this.fetchOnlyVulnerable = fetchOnlyVulnerable;
     }
 
+    public void setQueryMode(QueryMode queryMode) {
+        this.queryMode = queryMode;
+    }
+
     public Map<String, Set<String>> getMetadataFilters() {
         return metadataFilters;
     }
@@ -1051,6 +1105,10 @@ public class StartTestAction extends UserAction {
 
     public boolean getTestRunsByUser() {
         return testRunsByUser;
+    }
+
+    public void setSearchString(String searchString) {
+        this.searchString = searchString;
     }
 
 

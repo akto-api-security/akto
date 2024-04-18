@@ -31,6 +31,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 
@@ -53,6 +55,7 @@ public class HttpCallParser {
             .build();
 
     private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
+    private static final int MAX_ALLOWED_HTML_CONTENT = 1024 * 1024 ;
 
     public static void init() {
         trafficMetricsExecutor.scheduleAtFixedRate(new Runnable() {
@@ -196,17 +199,17 @@ public class HttpCallParser {
         if (accountSettings != null && accountSettings.getDefaultPayloads() != null) {
             filteredResponseParams = filterDefaultPayloads(filteredResponseParams, accountSettings.getDefaultPayloads());
         }
-        filteredResponseParams = filterHttpResponseParams(filteredResponseParams);
-        boolean isHarOrPcap = aggregate(filteredResponseParams);
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, accountSettings);
+        boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
 
         for (int apiCollectionId: aggregatorMap.keySet()) {
             URLAggregator aggregator = aggregatorMap.get(apiCollectionId);
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-//        for (HttpResponseParams responseParam: filteredResponseParams) {
-//            dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
-//        }
+         for (HttpResponseParams responseParam: filteredResponseParams) {
+             dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+         }
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
@@ -214,7 +217,7 @@ public class HttpCallParser {
             numberOfSyncs++;
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI);
             dependencyAnalyser.dbState = apiCatalogSync.dbState;
-//            dependencyAnalyser.syncWithDb();
+            dependencyAnalyser.syncWithDb();
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
@@ -354,7 +357,23 @@ public class HttpCallParser {
         trafficMetrics.inc(value);
     }
 
-    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
+    private boolean isRedundantEndpoint(String url){
+        String regex = ".*\\.(js|css|svg|png|json|html|io).*";
+
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(url);
+        return matcher.matches();
+    }
+
+    private boolean isInvalidContentType(String contentType){
+        boolean res = false;
+        if(contentType == null || contentType.length() == 0) return res;
+
+        res = contentType.contains("javascript") || contentType.contains("png");
+        return res;
+    }
+
+    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, AccountSettings accountSettings) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
@@ -373,6 +392,21 @@ public class HttpCallParser {
             
             String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(),Constants.AKTO_IGNORE_FLAG);
             if (ignoreAktoFlag != null) continue;
+
+            // check for garbage points here
+            if(accountSettings != null && !accountSettings.getAllowRedundantEndpoints()){
+                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL())){
+                    continue;
+                }
+                List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
+                String contentType = null;
+                if(!contentTypeList.isEmpty()){
+                    contentType = contentTypeList.get(0);
+                }
+                if(isInvalidContentType(contentType)){
+                    continue;
+                }
+            }
 
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
@@ -445,7 +479,7 @@ public class HttpCallParser {
         return this.aggregatorMap;
     }
 
-    public boolean aggregate(List<HttpResponseParams> responses) {
+    public static boolean aggregate(List<HttpResponseParams> responses, Map<Integer, URLAggregator> aggregatorMap) {
         int count = 0;
         boolean ret = false;
         Set<String> urlSet= new HashSet<>();

@@ -19,6 +19,8 @@ import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
 import {produce} from "immer"
 import values from "@/util/values";
 import {TestrunsBannerComponent} from "./TestrunsBannerComponent";
+import useTable from "../../../components/tables/TableContext";
+import PersistStore from "../../../../main/PersistStore";
 
 /*
   {
@@ -65,6 +67,7 @@ let headers = [
     title: 'Status',
     itemOrder: 3,
     type: CellType.TEXT,
+    sortActive: true
   },
   {
     title: '',
@@ -73,8 +76,8 @@ let headers = [
 ]
 
 const sortOptions = [
-  { label: 'Run time', value: 'endTimestamp asc', directionLabel: 'Newest run', sortKey: 'endTimestamp' },
-  { label: 'Run time', value: 'endTimestamp desc', directionLabel: 'Oldest run', sortKey: 'endTimestamp' }
+  { label: 'Run time', value: 'scheduleTimestamp asc', directionLabel: 'Newest run', sortKey: 'scheduleTimestamp', columnIndex: 4 },
+  { label: 'Run time', value: 'scheduleTimestamp desc', directionLabel: 'Oldest run', sortKey: 'scheduleTimestamp', columnIndex: 4 }
 ];
 
 const resourceName = {
@@ -92,17 +95,14 @@ let filters = [
       { label: "Medium", value: "MEDIUM" },
       { label: "Low", value: "LOW" }
     ]
-  }
+  },
+  {
+    key: 'apiCollectionId',
+    label: 'Api collection name',
+    title: 'Api collection name',
+    choices: [],
+},
 ]
-
-function disambiguateLabel(key, value) {
-  switch (key) {
-    case 'severity':
-      return (value).map((val) => `${func.toSentenceCase(val)} severity`).join(', ');
-    default:
-      return value;
-  }
-}
 
 function TestRunsPage() {
 
@@ -124,6 +124,21 @@ function TestRunsPage() {
       func.setToast(true, true, "Unable to re-run test")
     });
   }
+
+  const apiCollectionMap = PersistStore(state => state.collectionsMap)
+
+  function disambiguateLabel(key, value) {
+    switch (key) {
+      case 'severity':
+        return (value).map((val) => `${func.toSentenceCase(val)} severity`).join(', ');
+      case "apiCollectionId": 
+        return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
+      default:
+        return value;
+    }
+  }
+
+  filters = func.getCollectionFilters(filters)
 
 const getActionsList = (hexId) => {
   return [
@@ -190,7 +205,7 @@ const endTimestamp = getTimeEpoch("until") + 86400
 
 
 const [loading, setLoading] = useState(true);
-const [currentTab, setCurrentTab] = useState("oneTime");
+const [currentTab, setCurrentTab] = useState("one_time");
 const [updateTable, setUpdateTable] = useState(false);
 const [countMap, setCountMap] = useState({});
 const [selected, setSelected] = useState(1);
@@ -236,9 +251,9 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
     switch (currentTab) {
 
-      case "cicd":
+      case "ci_cd":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CI_CD",
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CI_CD",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries, true);
           total = testingRunsCount;
@@ -246,15 +261,15 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       case "scheduled":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "RECURRING"
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "RECURRING",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
         });
         break;
-      case "oneTime":
+      case "one_time":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "ONE_TIME"
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "ONE_TIME",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -262,7 +277,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       default:
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, null
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, null,queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -304,36 +319,12 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     })
   }
 
-  const tableTabs = [
-    {
-        content: 'All',
-        index: 0,
-        badge: countMap['allTestRuns']?.toString(),
-        onAction: ()=> {setCurrentTab('All')},
-        id: 'All',
-    },
-    {
-      content: 'One time',
-      index: 0,
-      badge: countMap['oneTime']?.toString(),
-      onAction: ()=> {setCurrentTab('oneTime')},
-      id: 'oneTime',
-    },
-    {
-      content: 'Recurring',
-      index: 0,
-      badge: countMap['scheduled']?.toString(),
-      onAction: ()=> {setCurrentTab('scheduled')},
-      id: 'scheduled',
-    },
-    {
-      content: 'CI/CD',
-      index: 0,
-      badge: countMap['cicd']?.toString(),
-      onAction: ()=> {setCurrentTab('cicd')},
-      id: 'cicd',
-    },
-  ]
+  const definedTableTabs = ['All', 'One time', 'Scheduled', 'CI/CD']
+  const initialCount = [countMap['allTestRuns'], countMap['ontTime'], countMap['scheduled'], countMap['cicd']]
+
+  const { tabsInfo } = useTable()
+  const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
+  const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setCurrentTab, currentTab, tabsInfo)
 
   const fetchTotalCount = () =>{
     setLoading(true)
@@ -406,7 +397,6 @@ const coreTable = (
     sortOptions={sortOptions} 
     resourceName={resourceName} 
     filters={filters}
-    hideQueryField={true}
     disambiguateLabel={disambiguateLabel} 
     headers={headers}
     getActions = {getActions}
