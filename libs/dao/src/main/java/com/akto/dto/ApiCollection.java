@@ -46,8 +46,16 @@ public class ApiCollection {
         API_GROUP
     }
 
+    public enum ENV_TYPE {
+        STAGING,PRODUCTION
+    }
+
     Type type;
     public static final String _TYPE = "type";
+    
+    ENV_TYPE userSetEnvType;
+
+	public static final String USER_ENV_TYPE = "userSetEnvType";
 
     List<TestingEndpoints> conditions;
     public static final String CONDITIONS_STRING = "conditions";
@@ -105,6 +113,19 @@ public class ApiCollection {
 
     public void setUrls(Set<String> urls) {
         this.urls = urls;
+    }
+
+    public ENV_TYPE getEnvType(){
+        if(this.type != null && this.type == Type.API_GROUP) return null;
+        
+        if(this.userSetEnvType == null){
+            if(this.hostName != null && this.hostName.matches(".*(staging|preprod|qa|demo|dev|test\\.).*")){
+                return ENV_TYPE.STAGING;
+            }
+            return null;
+        }else{
+            return this.userSetEnvType;
+        }
     }
 
     @Override
@@ -242,4 +263,13 @@ public class ApiCollection {
     public void setSampleCollectionsDropped(boolean sampleCollectionsDropped) {
         this.sampleCollectionsDropped = sampleCollectionsDropped;
     }
+
+    public ENV_TYPE getUserSetEnvType() {
+		return userSetEnvType;
+	}
+
+	public void setUserSetEnvType(ENV_TYPE userSetEnvType) {
+		this.userSetEnvType = userSetEnvType;
+	}
+    
 }

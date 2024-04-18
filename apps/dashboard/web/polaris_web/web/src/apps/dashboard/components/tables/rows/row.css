@@ -27,10 +27,6 @@
     fill: #BABEC3 !important;
 }
 
-.Polaris-IndexTable-Checkbox__TableCellContentContainer {
-    padding-top: 3px !important;
-}
-
 .Polaris-IndexTable {
     border-radius: unset !important;
 }

@@ -58,6 +58,7 @@ function Webhooks() {
             value: "webhookName",
             showFilter: true,
             itemOrder: 1,
+            sortActive: true
         },
         {
             text: "Create time",
@@ -80,8 +81,8 @@ function Webhooks() {
     ]
 
     const sortOptions = [
-        { label: 'Name', value: 'webhookName asc', directionLabel: 'A-Z', sortKey: 'webhookName' },
-        { label: 'Name', value: 'webhookName desc', directionLabel: 'Z-A', sortKey: 'webhookName' },
+        { label: 'Name', value: 'webhookName asc', directionLabel: 'A-Z', sortKey: 'webhookName', columnIndex: 1 },
+        { label: 'Name', value: 'webhookName desc', directionLabel: 'Z-A', sortKey: 'webhookName', columnIndex: 1 },
       ];
     
     async function handleWebhookStatusChange(id, status) {

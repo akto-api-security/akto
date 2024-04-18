@@ -5,16 +5,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Collections;
 
+import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.api_workflow.Node;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.test_editor.execution.Memory;
 import com.akto.testing.ApiExecutor;
+import com.akto.testing.Main;
 import com.akto.testing.Utils;
 import com.akto.utils.RedactSampleData;
 
@@ -22,7 +26,7 @@ public class ApiNodeExecutor extends NodeExecutor {
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiNodeExecutor.class);
 
-    public NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes) {
+    public NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         loggerMaker.infoAndAddToDb("\n", LogDb.TESTING);
         loggerMaker.infoAndAddToDb("NODE: " + node.getId(), LogDb.TESTING);
         List<String> testErrors = new ArrayList<>();
@@ -69,7 +73,7 @@ public class ApiNodeExecutor extends NodeExecutor {
                     Thread.sleep(sleep);
                 }
 
-                response = ApiExecutor.sendRequest(request, followRedirects, null);
+                response = ApiExecutor.sendRequest(request, followRedirects, null, debug, testLogs, Main.SKIP_SSRF_CHECK);
 
                 int statusCode = response.getStatusCode();
 

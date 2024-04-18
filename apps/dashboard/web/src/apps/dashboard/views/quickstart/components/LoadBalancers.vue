@@ -353,6 +353,7 @@ export default {
                 `            "Resource": [`,
                 `                "arn:aws:s3:::akto-setup-AWS_REGION/templates/get-akto-setup-details.zip", `,
                 `                "arn:aws:s3:::akto-setup-AWS_REGION/templates/create-mirror-session.zip", `,
+                `                "arn:aws:s3:::akto-setup-AWS_REGION/templates/configure_security_groups.zip", `,
                 `                "arn:aws:s3:::akto-setup-AWS_REGION/templates/mirroring-collections-split.zip"`,
                 `            ]`,
                 `        }, `,
@@ -373,6 +374,7 @@ export default {
             ],
             aktoDashboardRoleName: null,
             isLocalDeploy: false,
+            deploymentMethod: "AWS_TRAFFIC_MIRRORING"
         }
     },
     mounted() {
@@ -387,7 +389,7 @@ export default {
                 this.loading = false;
                 this.isLocalDeploy = true;
             } else {
-                api.fetchLBs().then((resp) => {
+                api.fetchLBs({deploymentMethod: this.deploymentMethod}).then((resp) => {
                     if (!resp.dashboardHasNecessaryRole) {
                         for (let i = 0; i < this.quick_start_policy_lines.length; i++) {
                             let line = this.quick_start_policy_lines[i];
@@ -434,7 +436,7 @@ export default {
         checkStackState() {
             let intervalId = null;
             intervalId = setInterval(async () => {
-                api.fetchStackCreationStatus().then((resp) => {
+                api.fetchStackCreationStatus({deploymentMethod: this.deploymentMethod}).then((resp) => {
                     if (this.initialCall) {
                         this.initialCall = false;
                         this.loading = false;
@@ -456,6 +458,9 @@ export default {
             else if (stackState.status == 'DOES_NOT_EXISTS') {
                 this.removeProgressBarAndStatuschecks(intervalId);
                 this.text_msg = 'Mirroring is not setup currently, choose 1 or more LBs to enable mirroring.';
+            } else if (stackState.status == 'TEMP_DISABLE') {
+                this.removeProgressBarAndStatuschecks(intervalId);
+                this.text_msg = 'Current deployment is in progress, please refresh this page in sometime.';
             } else {
                 this.removeProgressBarAndStatuschecks(intervalId);
                 this.text_msg = 'Something went wrong while setting up mirroring, please write to us at support@akto.io'

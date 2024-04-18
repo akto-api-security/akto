@@ -7,15 +7,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.testing.Main;
+import com.akto.dto.*;
+import com.akto.dto.type.URLMethods;
+import com.akto.test_editor.execution.Memory;
 import org.json.JSONObject;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.CustomAuthType;
-import com.akto.dto.OriginalHttpResponse;
-import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ExecuteAlgoObj;
@@ -40,6 +41,7 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.ExecutorAlgorithm;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
+import com.akto.util.Constants;
 import com.akto.utils.RedactSampleData;
 import com.google.gson.Gson;
 
@@ -47,25 +49,52 @@ public class YamlNodeExecutor extends NodeExecutor {
     
     private static final Gson gson = new Gson();
 
-    public NodeResult processNode(Node node, Map<String, Object> varMap, Boolean allowAllStatusCodes) {
+
+    public NodeResult processNode(Node node, Map<String, Object> varMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         List<String> testErrors = new ArrayList<>();
 
         YamlNodeDetails yamlNodeDetails = (YamlNodeDetails) node.getWorkflowNodeDetails();
 
         if (yamlNodeDetails.getTestId() != null && yamlNodeDetails.getTestId().length() > 0) {
-            return processYamlNode(node, varMap, allowAllStatusCodes, yamlNodeDetails);
+            return processYamlNode(node, varMap, allowAllStatusCodes, yamlNodeDetails, debug, testLogs);
         }
-        
+
         RawApi rawApi = yamlNodeDetails.getRawApi();
         RawApi sampleRawApi = rawApi.copy();
-        List<RawApi> rawApis = new ArrayList<>();
-        rawApis.add(rawApi.copy());
 
         Executor executor = new Executor();
         ExecutorNode executorNode = yamlNodeDetails.getExecutorNode();
         FilterNode validatorNode = yamlNodeDetails.getValidatorNode();
+        List<ExecutorNode> childNodes = executorNode.getChildNodes();
 
-        for (ExecutorNode execNode: executorNode.getChildNodes()) {
+        ApiInfo.ApiInfoKey apiInfoKey = ((YamlNodeDetails) node.getWorkflowNodeDetails()).getApiInfoKey();
+        ExecutorNode firstChildNode = childNodes.get(0); // todo check for length
+        if (memory != null) {
+            if (firstChildNode.getOperationType().equalsIgnoreCase("api")) {
+                String apiType = firstChildNode.getValues().toString();
+                if (apiType.equalsIgnoreCase("get_asset_api")) {
+                    rawApi = memory.findAssetGetterRequest(apiInfoKey);
+                    if (rawApi == null)  {
+                        testErrors.add("Couldn't find corresponding getter api");
+                        new WorkflowTestResult.NodeResult("[]",false, testErrors);
+                    }
+                }
+                childNodes.remove(0);
+            } else {
+                OriginalHttpRequest request = memory.run(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+                if (request == null) {
+                    testErrors.add("Failed getting request from dependency graph");
+                    new WorkflowTestResult.NodeResult("[]",false, testErrors);
+                }
+                rawApi.setRequest(request);
+            }
+        }
+
+
+        List<RawApi> rawApis = new ArrayList<>();
+        rawApis.add(rawApi.copy());
+
+        for (ExecutorNode execNode: childNodes) {
             if (execNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ValidateExecutorDataOperands.Validate.toString())) {
                 validatorNode = (FilterNode) execNode.getChildNodes().get(0).getValues();
             }
@@ -80,7 +109,7 @@ public class YamlNodeExecutor extends NodeExecutor {
 
         ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes);
         Map<Integer, ExecuteAlgoObj> algoMap = new HashMap<>();
-        ExecutorSingleRequest singleReq = executorAlgorithm.execute(executorNodes, 0, algoMap, rawApis, false, 0);
+        ExecutorSingleRequest singleReq = executorAlgorithm.execute(executorNodes, 0, algoMap, rawApis, false, 0, yamlNodeDetails.getApiInfoKey());
 
         if (!singleReq.getSuccess()) {
             rawApis = new ArrayList<>();
@@ -102,6 +131,11 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<Integer> responseLenArr = new ArrayList<>();
 
         for (RawApi testReq: rawApis) {
+            if (yamlNodeDetails.getApiCollectionId() == 1111111111) {
+                Map<String, List<String>> headers = testReq.fetchReqHeaders();
+                headers.put(Constants.AKTO_NODE_ID, Collections.singletonList(node.getId()));
+                testReq.modifyReqHeaders(headers);
+            }
             if (vulnerable) {
                 break;
             }
@@ -112,7 +146,11 @@ public class YamlNodeExecutor extends NodeExecutor {
             int tsAfterReq = 0;
             try {
                 tsBeforeReq = Context.nowInMillis();
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig);                
+                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                if (apiInfoKey != null && memory != null) {
+                    memory.fillResponse(testReq.getRequest(), testResponse, apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+                    memory.reset(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+                }
                 tsAfterReq = Context.nowInMillis();
                 responseTimeArr.add(tsAfterReq - tsBeforeReq);
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
@@ -214,7 +252,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         return m;
     }
 
-    public WorkflowTestResult.NodeResult processYamlNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, YamlNodeDetails yamlNodeDetails) {
+    public WorkflowTestResult.NodeResult processYamlNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, YamlNodeDetails yamlNodeDetails, boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
         String testSubCategory = yamlNodeDetails.getTestId();
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false);
@@ -266,7 +304,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<CustomAuthType> customAuthTypes = yamlNodeDetails.getCustomAuthTypes();
         TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
         TestExecutor executor = new TestExecutor();
-        TestingRunResult testingRunResult = executor.runTestNew(yamlNodeDetails.getApiInfoKey(), null, testingUtil, null, testConfig, null);
+        TestingRunResult testingRunResult = executor.runTestNew(yamlNodeDetails.getApiInfoKey(), null, testingUtil, null, testConfig, null, debug, testLogs);
 
         List<String> errors = new ArrayList<>();
         List<String> messages = new ArrayList<>();

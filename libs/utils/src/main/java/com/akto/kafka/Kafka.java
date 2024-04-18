@@ -3,6 +3,8 @@ package com.akto.kafka;
 import com.akto.dao.context.Context;
 import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Properties;
@@ -10,6 +12,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 public class Kafka {
+    private static final Logger logger = LoggerFactory.getLogger(Kafka.class);
     private KafkaProducer<String, String> producer;
     public boolean producerReady;
 
@@ -18,7 +21,7 @@ public class Kafka {
         try {
             setProducer(brokerIP, lingerMS, batchSize);
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
         }
     }
 
@@ -66,6 +69,7 @@ public class Kafka {
         public void onCompletion(RecordMetadata recordMetadata, Exception e) {
             if (e != null) {
                 Kafka.this.close();
+                logger.error("onCompletion error: " + e.getMessage());
             }
         }
     }
