@@ -159,7 +159,13 @@ public class UsageMetricCalculator {
         String jsonString = gson.toJson(activeAccounts);
         usageMetric.setMetadata(jsonString);
 
-        return accounts.size();
+        /*
+         * since we are running this query for each account,
+         * and while consolidating the usage metrics
+         * we are summing up the usage metrics for each account,
+         * thus to avoid over counting, we should just return 1 here.
+         */
+        return 1;
     }
     
     public static void calculateUsageMetric(UsageMetric usageMetric) {
