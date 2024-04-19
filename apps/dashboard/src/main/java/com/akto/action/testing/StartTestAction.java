@@ -620,7 +620,6 @@ public class StartTestAction extends UserAction {
                 // name = category
                 String category = result.getTestSubType();
                 TestSourceConfig config = null;
-                // string comparison (nuclei test)
                 if (category.startsWith("http")) {
                     config = TestSourceConfigsDao.instance.getTestSourceConfig(result.getTestSubType());
                 }
