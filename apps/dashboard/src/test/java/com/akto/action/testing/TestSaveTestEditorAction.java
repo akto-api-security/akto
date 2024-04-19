@@ -73,7 +73,7 @@ public class TestSaveTestEditorAction extends MongoBasedTest {
             "    - HackerOne top 10\n" +
             "  references:\n" +
             "    - \"https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/\"\n" +
-            "    - \"https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa2-broken-user-authentication.md\"\n" +
+            "    - \"https://github.com/OWASP/API-Security/blob/master/editions/2023/en/0xa2-broken-authentication.md\"\n" +
             "    - \"https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html\"\n" +
             "    - \"https://cwe.mitre.org/data/definitions/798.html\"\n" +
             "\n" +
