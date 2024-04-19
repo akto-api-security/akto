@@ -25,9 +25,7 @@ function GithubServerTable(props) {
   const setFiltersMap = PersistStore(state => state.setFiltersMap)
   const tableInitialState = PersistStore(state => state.tableInitialState)
   const setTableInitialState = PersistStore(state => state.setTableInitialState)
-
-  const currentPageKey = window.location.href
-
+  const currentPageKey = props?.filterStateUrl || window.location.href
   const pageFiltersMap = filtersMap[currentPageKey]
   const initialStateFilters = tableFunc.mergeFilters(props.appliedFilters || [], (pageFiltersMap?.filters || []),props.disambiguateLabel)
   const { mode, setMode } = useSetIndexFiltersMode(props?.mode ? props.mode : IndexFiltersMode.Filtering);
