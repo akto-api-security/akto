@@ -208,17 +208,17 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-         for (HttpResponseParams responseParam: filteredResponseParams) {
-             dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
-         }
+        //  for (HttpResponseParams responseParam: filteredResponseParams) {
+        //      dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+        //  }
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
             numberOfSyncs++;
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI);
-            dependencyAnalyser.dbState = apiCatalogSync.dbState;
-            dependencyAnalyser.syncWithDb();
+            // dependencyAnalyser.dbState = apiCatalogSync.dbState;
+            // dependencyAnalyser.syncWithDb();
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
@@ -395,19 +395,19 @@ public class HttpCallParser {
             if (ignoreAktoFlag != null) continue;
 
             // check for garbage points here
-            if(accountSettings != null && !accountSettings.getAllowRedundantEndpoints()){
-                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL())){
-                    continue;
-                }
-                List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
-                String contentType = null;
-                if(!contentTypeList.isEmpty()){
-                    contentType = contentTypeList.get(0);
-                }
-                if(isInvalidContentType(contentType)){
-                    continue;
-                }
-            }
+            // if(accountSettings != null && !accountSettings.getAllowRedundantEndpoints()){
+            //     if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL())){
+            //         continue;
+            //     }
+            //     List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
+            //     String contentType = null;
+            //     if(!contentTypeList.isEmpty()){
+            //         contentType = contentTypeList.get(0);
+            //     }
+            //     if(isInvalidContentType(contentType)){
+            //         continue;
+            //     }
+            // }
 
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
