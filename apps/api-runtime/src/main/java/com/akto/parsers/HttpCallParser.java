@@ -394,19 +394,19 @@ public class HttpCallParser {
             if (ignoreAktoFlag != null) continue;
 
             // check for garbage points here
-            if(accountSettings != null && !accountSettings.getAllowRedundantEndpoints()){
-                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL())){
-                    continue;
-                }
-                List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
-                String contentType = null;
-                if(!contentTypeList.isEmpty()){
-                    contentType = contentTypeList.get(0);
-                }
-                if(isInvalidContentType(contentType)){
-                    continue;
-                }
-            }
+            // if(accountSettings != null && !accountSettings.getAllowRedundantEndpoints()){
+            //     if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL())){
+            //         continue;
+            //     }
+            //     List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
+            //     String contentType = null;
+            //     if(!contentTypeList.isEmpty()){
+            //         contentType = contentTypeList.get(0);
+            //     }
+            //     if(isInvalidContentType(contentType)){
+            //         continue;
+            //     }
+            // }
 
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
