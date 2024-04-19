@@ -110,6 +110,7 @@ public class UsageAction extends ActionSupport implements ServletRequestAware {
              */
             usageLowerBound = now - UsageUtils.USAGE_UPPER_BOUND_DL/2;
             usageUpperBound = now + UsageUtils.USAGE_UPPER_BOUND_DL/2;
+            loggerMaker.infoAndAddToDb(String.format("Lower Bound: %d Upper bound: %d", usageLowerBound, usageUpperBound), LogDb.BILLING);
             executorService.schedule(new Runnable() {
                 public void run() {
                     InitializerListener.aggregateAndSinkUsageData(organization, usageLowerBound, usageUpperBound);
