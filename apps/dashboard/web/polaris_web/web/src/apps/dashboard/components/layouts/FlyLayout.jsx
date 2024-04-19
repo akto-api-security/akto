@@ -6,7 +6,13 @@ import "./style.css"
 
 function FlyLayout(props) {
 
-    const { title, show, setShow, components,loading, showDivider, newComp, handleClose} = props
+    const { title, show, setShow, components,loading, showDivider, newComp, handleClose, isHandleClose} = props
+    const handleExit = () => {
+        setShow(!show)
+        if(isHandleClose){
+            handleClose()
+        }
+    }
     return (
         <div className={"flyLayout " + (show ? "show" : "")}>
             <div className="innerFlyLayout">
@@ -18,7 +24,7 @@ function FlyLayout(props) {
                                 <Text variant="headingMd">
                                     {title}
                                 </Text>
-                                <Button icon={CancelMajor} onClick={() => { setShow(!show); handleClose() }} plain></Button>
+                                <Button icon={CancelMajor} onClick={() => { handleExit()}} plain></Button>
                             </HorizontalStack>
                         </Box>
                         <Scrollable style={{ height: "92vh" }} shadow>

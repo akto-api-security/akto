@@ -264,6 +264,7 @@ function TestRunResultFlyout(props) {
             showDivider={true}
             newComp={true}
             handleClose={handleClose}
+            isHandleClose={true}
         />
     )
 }
