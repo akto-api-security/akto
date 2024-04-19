@@ -19,8 +19,7 @@ import com.akto.dto.RawApi;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.sources.AuthWithCond;
-import com.akto.testing.ApiExecutor;
-import com.akto.testing.TestExecutor;
+import com.akto.testing.*;
 import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.util.enums.LoginFlowEnums.LoginStepTypesEnums;
@@ -36,7 +35,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
-import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.UsageUtils;
@@ -175,7 +173,7 @@ public class Executor {
             }
             try {
                 // follow redirects = true for now
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs);
+                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
                 requestSent = true;
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                 TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
