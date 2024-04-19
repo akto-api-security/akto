@@ -87,7 +87,7 @@ const headings = [
         text: "Source location",
         value: "sourceLocationComp",
         textValue: "sourceLocation",
-        title: "Source location"
+        title: "Source location"    
     }
 ]
 
@@ -113,7 +113,7 @@ const sortOptions = [
     { label: 'Access Type', value: 'access_type asc', directionLabel: 'A-Z', sortKey: 'access_type', columnIndex: 4 },
     { label: 'Access Type', value: 'access_type desc', directionLabel: 'Z-A', sortKey: 'access_type', columnIndex: 4 },
     { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs', columnIndex: 7 },
-    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 7 },
+    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 7 }
 ];
 
 function ApiEndpoints() {
@@ -235,12 +235,6 @@ function ApiEndpoints() {
                     endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={false} />,
                     method: method,
                     endpoint: endpoint,
-                    riskScore: 0,
-                    hostName: "",
-                    access_type: "",
-                    auth_type: "",
-                    sensitiveTagsComp: "",
-                    last_seen: "",
                     codeAnalysisEndpoint: true,
                     sourceLocation: location.filePath, 
                     sourceLocationComp: <SourceLocation location={location} />,
