@@ -490,13 +490,13 @@ public class Utils {
 //                info.getResourceAnalyser().analyse(responseParams);
 //            }
 //            info.getResourceAnalyser().syncWithDb();
-           try {
-               DependencyFlow dependencyFlow = new DependencyFlow();
-               dependencyFlow.run();
-               dependencyFlow.syncWithDb();
-           } catch (Exception e) {
-               loggerMaker.errorAndAddToDb(e,"Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
-           }
+        //    try {
+        //        DependencyFlow dependencyFlow = new DependencyFlow();
+        //        dependencyFlow.run();
+        //        dependencyFlow.syncWithDb();
+        //    } catch (Exception e) {
+        //        loggerMaker.errorAndAddToDb(e,"Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
+        //    }
         }
     }
 
