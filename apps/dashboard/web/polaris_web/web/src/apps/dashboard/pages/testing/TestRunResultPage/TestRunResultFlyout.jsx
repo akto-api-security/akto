@@ -8,11 +8,12 @@ import { Avatar, Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Te
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import GridRows from '../../../components/shared/GridRows'
+import { useNavigate } from 'react-router-dom'
 
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage} = props
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
     const [popoverActive, setPopoverActive] = useState(false)
@@ -36,6 +37,8 @@ function TestRunResultFlyout(props) {
             setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam))
         }
     }
+
+    const navigate = useNavigate()
 
     useEffect(() => {
        if(issueDetails && Object.keys(issueDetails).length > 0){       
@@ -72,6 +75,11 @@ function TestRunResultFlyout(props) {
         content: 'Reopen',
         onAction: () => { reopenAction() }
     }]
+
+    const handleClose = () => {
+        const navigateUrl = isIssuePage ? "/dashboard/issues" : window.location.pathname.split("result")[0]
+        navigate(navigateUrl) 
+    }
     
     function ActionsComp (){
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
@@ -244,15 +252,18 @@ function TestRunResultFlyout(props) {
         <TitleComponent/>, tabsComponent
     ]
 
+    const title = isIssuePage ? "Issue details" : "Test result"
+
     return (
         <FlyLayout
-            title={"Test result"}
+            title={title}
             show={showDetails}
             setShow={setShowDetails}
             components={currentComponents}
             loading={loading}
             showDivider={true}
             newComp={true}
+            handleClose={handleClose}
         />
     )
 }

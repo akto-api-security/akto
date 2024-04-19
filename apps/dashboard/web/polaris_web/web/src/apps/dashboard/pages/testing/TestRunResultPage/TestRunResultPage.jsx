@@ -128,6 +128,7 @@ function TestRunResultPage(props) {
         let res = await api.fetchIssueFromTestRunResultDetails(hexId2)
         runIssues = res.runIssues;
       }
+      setShowDetails(true)
     }
     setData(testingRunResult, runIssues);
   setTimeout(() => {
@@ -198,11 +199,6 @@ function TestRunResultPage(props) {
 
   useEffect(() => {
     fetchData();
-    setShowDetails(true)
-    setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-    },200)
   }, [subCategoryMap, subCategoryFromSourceConfigMap, props, hexId2])
 
   return (
@@ -222,6 +218,7 @@ function TestRunResultPage(props) {
       source={props?.source}
       setShowDetails={setShowDetails}
       showDetails={showDetails}
+      isIssuePage={location.pathname.includes("issues")}
     />
     </>
     :
