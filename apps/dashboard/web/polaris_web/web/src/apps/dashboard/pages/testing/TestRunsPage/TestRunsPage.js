@@ -1,13 +1,6 @@
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider} from '@shopify/polaris';
-import {
-  CircleCancelMajor,
-  CalendarMinor,
-  ReplayMinor,
-  PlayMinor,
-  ChevronDownMinor,
-  ChevronUpMinor
-} from '@shopify/polaris-icons';
+import { ChevronDownMinor , ChevronUpMinor } from '@shopify/polaris-icons';
 import api from "../api";
 import { useEffect, useReducer, useState } from 'react';
 import transform from "../transform";
@@ -126,61 +119,6 @@ function TestRunsPage() {
       func.setToast(true, true, "Unable to re-run test")
     });
   }
-
-const getActionsList = (hexId) => {
-  return [
-  {
-      content: 'Schedule test',
-      icon: CalendarMinor,
-      onAction: () => {console.log("schedule test function")},
-  },
-  {
-      content: 'Re-run',
-      icon: ReplayMinor,
-      onAction: () => {rerunTest(hexId || "")},
-  },
-  {
-      content: 'Add to CI/CD pipeline',
-      icon: PlayMinor,
-      onAction: () => {window.open('https://docs.akto.io/testing/run-tests-in-cicd', '_blank');},
-  },
-  {
-      content: 'Stop',
-      icon: CircleCancelMajor,
-      destructive:true,
-      onAction: () => {stopTest(hexId || "")},
-      disabled: true,
-  }
-]}
-
-function getActions(item){
-  let arr = []
-  let section1 = {items:[]}
-  let actionsList = getActionsList(item.id);
-  if(item['run_type'] === 'One-time'){
-    // section1.items.push(actionsList[0])
-  }else{
-    section1.items.push(actionsList[1])
-  }
-
-  if(item['run_type'] === 'CI/CD'){
-    // section1.items.push(actionsList[0])
-  }else{
-    section1.items.push(actionsList[2])
-  }
-  
-  if(item['orderPriority'] === 1 || item['orderPriority'] === 2){
-      actionsList[3].disabled = false
-  }else{
-      actionsList[3].disabled = true
-  }
-
-  arr.push(section1)
-  let section2 = {items:[]}
-  section2.items.push(actionsList[3]);
-  arr.push(section2);
-  return arr
-}
 
 const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
 const getTimeEpoch = (key) => {
@@ -387,7 +325,7 @@ const coreTable = (
     hideQueryField={true}
     disambiguateLabel={disambiguateLabel} 
     headers={headers}
-    getActions = {getActions}
+    getActions = {(item) => transform.getActions(item, stopTest, rerunTest)}
     hasRowActions={true}
     loading={loading}
     getStatus={func.getTestResultStatus}

@@ -7,14 +7,19 @@ import {
   Icon,
   Badge,
   Box,
-  Tooltip,
   LegacyCard,
   IndexFiltersMode,
+  Link,
+  Popover,
+  ActionList,
 } from '@shopify/polaris';
 
 import {
   CircleInformationMajor,
-  RefreshMinor
+  FileMinor,
+  ArchiveMinor,
+  PriceLookupMinor,
+  ReportMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import func from '@/util/func';
@@ -29,6 +34,7 @@ import PersistStore from "../../../../main/PersistStore";
 import TrendChart from "./TrendChart";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 import useTable from "../../../components/tables/TableContext";
+import { icon } from "@fortawesome/fontawesome-svg-core";
 
 let headers = [
   {
@@ -137,8 +143,12 @@ function SingleTestRunPage() {
   const [selectedTab, setSelectedTab] = useState("vulnerable")
   const [selected, setSelected] = useState(0)
   const [workflowTest, setWorkflowTest ] = useState(false);
+  const [secondaryPopover, setSecondaryPopover] = useState(false)
+  const [primaryPopover, setPrimaryPopover] = useState(false)
   const refreshId = useRef(null);
   const hexId = params.hexId;
+
+  const collectionsMap = PersistStore(state => state.collectionsMap)
 
   function fillData(data, key){
     setTestRunResults((prev) => {
@@ -434,50 +444,88 @@ const promotedBulkActions = (selectedDataHexIds) => {
 
   const allResultsLength = testRunResults.skipped.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length
   const useComponents = (!workflowTest && allResultsLength === 0) ? [<EmptyData key="empty"/>] : components
+  const headingComp = (
+    <Box paddingBlockStart={1}>
+      <VerticalStack gap="2">
+        <HorizontalStack gap="2" align="start">
+          { selectedTestRun?.icon && <Box>
+            <Icon color={selectedTestRun.iconColor} source={selectedTestRun.icon }></Icon>
+          </Box>
+          }
+          <Box maxWidth="35vw">
+            <TooltipText 
+              tooltip={selectedTestRun?.name} 
+              text={selectedTestRun?.name || "Test run name"} 
+              textProps={{variant:"headingLg"}}/>
+          </Box>
+          {
+            selectedTestRun?.severity && 
+            selectedTestRun.severity
+            .map((item) =>
+            <Badge key={item} status={func.getTestResultStatus(item)}>
+              <Text fontWeight="regular">
+                {item}
+              </Text>
+            </Badge>
+            )}
+        </HorizontalStack>
+        <HorizontalStack gap={"2"}>
+          <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
+            <HorizontalStack gap={"1"}>
+              <Box><Icon color="subdued" source={ArchiveMinor}/></Box>
+              <Text color="subdued" variant="bodyMd">{collectionsMap[selectedTestRun?.apiCollectionId]}</Text>
+            </HorizontalStack>
+          </Link>
+          <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
+          <HorizontalStack gap={"1"}>
+            <Box><Icon color="subdued" source={PriceLookupMinor}/></Box>
+            <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
+          </HorizontalStack>
+        </HorizontalStack>
+      </VerticalStack>
+    </Box>
+  )
+
+  const exportActionComp = (
+    <Popover
+      active={primaryPopover}
+      onClose={() => setPrimaryPopover(false)}
+      activator={<Button primary onClick={() => setPrimaryPopover(!primaryPopover)}>Export results</Button>}
+      autofocusTarget="first-node"
+    >
+      <ActionList
+         actionRole="menuitem"
+         items={[
+          {content: 'Export as CSV', icon: FileMinor, onAction: () => {func.downloadAsCSV((testRunResults[selectedTab]), selectedTestRun)}},
+          {content: 'Export vulnerability report', icon: ReportMinor, onAction: () => openVulnerabilityReport()}
+         ]}
+      />
+    </Popover>
+  )
+
+  const moreActionsComp = (
+    <Popover
+      active={secondaryPopover}
+      onClose={() => setSecondaryPopover(false)}
+      activator={<Button onClick={() => setSecondaryPopover(!secondaryPopover)}>More actions</Button>}
+      autofocusTarget="first-node"
+    >
+      <ActionList
+         actionRole="menuitem"
+         items={[
+          {content: 'Re-run test', icon: FileMinor, onAction: () => {func.downloadAsCSV((testRunResults[selectedTab]), selectedTestRun)}},
+          {content: 'Add to C', icon: ReportMinor, onAction: () => openVulnerabilityReport()}
+         ]}
+      />
+    </Popover>
+  )
 
   return (
     <PageWithMultipleCards
-    title={
-        <Box paddingBlockStart={1}>
-          <VerticalStack gap="2">
-            <HorizontalStack gap="2" align="start">
-              { selectedTestRun?.icon && <Box>
-                <Icon color={selectedTestRun.iconColor} source={selectedTestRun.icon }></Icon>
-              </Box>
-              }
-              <Box maxWidth="35vw">
-                <TooltipText 
-                  tooltip={selectedTestRun?.name} 
-                  text={selectedTestRun?.name || "Test run name"} 
-                  textProps={{variant:"headingLg"}}/>
-              </Box>
-              {
-                selectedTestRun?.severity && 
-                selectedTestRun.severity
-                .map((item) =>
-                <Badge key={item} status={func.getTestResultStatus(item)}>
-                  <Text fontWeight="regular">
-                    {item}
-                  </Text>
-                </Badge>
-                )}
-                <Tooltip content={"Re-run test"} hoverDelay={400}>
-                  <Button icon={RefreshMinor} plain onClick={() => {rerunTest(hexId)}}/>
-                </Tooltip>
-            </HorizontalStack>
-            <Text color="subdued" fontWeight="regular" variant="bodyMd">
-              {
-                getHeadingStatus(selectedTestRun)
-              }
-            </Text>
-          </VerticalStack>
-          </Box>
-    }
-    backUrl={`/dashboard/testing/`}
-    primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() => 
-      func.downloadAsCSV((testRunResults[selectedTab]), selectedTestRun)
-      }>Export</Button></Box>: undefined}
-      secondaryActions={!workflowTest ? <Button onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button> : undefined}
+      title={headingComp}
+      backUrl={`/dashboard/testing/`}
+      primaryAction={!workflowTest ? exportActionComp: undefined}
+      secondaryActions={!workflowTest ? moreActionsComp: undefined}
       components={useComponents}
     />
   );

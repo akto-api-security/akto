@@ -127,6 +127,9 @@ prettifyEpoch(epoch) {
   },
   downloadAsCSV(data, selectedTestRun) {
     // use correct function, this does not expand objects.
+    if(Object.keys(data).length === 0){
+      return;
+    }
     let headerTextToValueMap = Object.keys(data[0])
 
     let csv = headerTextToValueMap.join(",") + "\r\n"

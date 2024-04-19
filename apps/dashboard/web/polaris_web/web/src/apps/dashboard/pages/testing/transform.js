@@ -4,7 +4,11 @@ import {ResourcesMajor,
   CollectionsMajor,
   CreditCardSecureMajor,
   MarketingMajor,
-  FraudProtectMajor, RiskMajor} from '@shopify/polaris-icons';
+  FraudProtectMajor, RiskMajor,
+  CircleCancelMajor,
+  CalendarMinor,
+  ReplayMinor,
+  PlayMinor} from '@shopify/polaris-icons';
 import React, {  } from 'react'
 import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Tag} from '@shopify/polaris';
 import { history } from "@/util/history";
@@ -219,6 +223,11 @@ const transform = {
       state = 'FAIL'
     }
 
+    let apiCollectionId = -1
+    if(Object.keys(data).length > 0){
+      apiCollectionId = data?.testingEndpoints?.apiCollectionId || data?.testingEndpoints?.apisList[0]?.apiCollectionId
+    }
+
       obj['id'] = data.hexId;
       obj['testingRunResultSummaryHexId'] = testingRunResultSummary?.hexId;
       obj['orderPriority'] = getOrderPriority(state)
@@ -241,6 +250,7 @@ const transform = {
       obj['startTimestamp'] = testingRunResultSummary?.startTimestamp
       obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
+      obj['apiCollectionId'] = apiCollectionId
       if(prettified){
         const prettifiedTest={
           ...obj,
@@ -818,6 +828,59 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
     }
   ]
   return rowItems
+},
+getActionsList(hexId, stopTest, rerunTest){
+  return [
+  {
+      content: 'Schedule test',
+      icon: CalendarMinor,
+      onAction: () => {console.log("schedule test function")},
+  },
+  {
+      content: 'Re-run',
+      icon: ReplayMinor,
+      onAction: () => {rerunTest(hexId || "")},
+  },
+  {
+      content: 'Add to CI/CD pipeline',
+      icon: PlayMinor,
+      onAction: () => {window.open('https://docs.akto.io/testing/run-tests-in-cicd', '_blank');},
+  },
+  {
+      content: 'Stop',
+      icon: CircleCancelMajor,
+      destructive:true,
+      onAction: () => {stopTest(hexId || "")},
+      disabled: true,
+  }
+]},
+getActions(item,stopTest, rerunTest){
+  let arr = []
+  let section1 = {items:[]}
+  let actionsList = this.getActionsList(item.id, stopTest, rerunTest);
+  if(item['run_type'] === 'One-time'){
+    // section1.items.push(actionsList[0])
+  }else{
+    section1.items.push(actionsList[1])
+  }
+
+  if(item['run_type'] === 'CI/CD'){
+    // section1.items.push(actionsList[0])
+  }else{
+    section1.items.push(actionsList[2])
+  }
+  
+  if(item['orderPriority'] === 1 || item['orderPriority'] === 2){
+      actionsList[3].disabled = false
+  }else{
+      actionsList[3].disabled = true
+  }
+
+  arr.push(section1)
+  let section2 = {items:[]}
+  section2.items.push(actionsList[3]);
+  arr.push(section2);
+  return arr
 }
 }
 
