@@ -48,7 +48,7 @@ public class AdminSettingsAction extends UserAction {
     public Boolean enableTelemetry;
 
 	private List<String> partnerIpList;
-    private boolean allowRedundantEndpoints;
+    private List<String> allowRedundantEndpointsList;
 
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -264,7 +264,7 @@ public class AdminSettingsAction extends UserAction {
         try {
             AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
-                Updates.set(AccountSettings.ALLOW_REDUNDANT_ENDPOINTS, this.allowRedundantEndpoints),
+                Updates.set(AccountSettings.ALLOW_REDUNDANT_ENDPOINTS_LIST, this.allowRedundantEndpointsList),
                 new UpdateOptions().upsert(true)
             );
 
@@ -359,8 +359,8 @@ public class AdminSettingsAction extends UserAction {
     public List<String> getPrivateCidrList() {
 		return privateCidrList;
 	}
-
-    public void setAllowRedundantEndpoints(boolean allowRedundantEndpoints) {
-        this.allowRedundantEndpoints = allowRedundantEndpoints;
-    }
+    
+    public void setAllowRedundantEndpointsList(List<String> allowRedundantEndpointsList) {
+        this.allowRedundantEndpointsList = allowRedundantEndpointsList;
+    }   
 }

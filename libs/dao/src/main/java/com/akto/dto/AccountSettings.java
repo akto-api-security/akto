@@ -94,8 +94,8 @@ public class AccountSettings {
     public static final String PARTNER_IP_LIST = "partnerIpList";
     private List<String> partnerIpList;
 
-    public static final String ALLOW_REDUNDANT_ENDPOINTS = "allowRedundantEndpoints";
-    private boolean allowRedundantEndpoints;
+    public static final String ALLOW_REDUNDANT_ENDPOINTS_LIST = "allowRedundantEndpointsList";
+    private List<String> allowRedundantEndpointsList;
 
     public AccountSettings() {
     }
@@ -364,11 +364,11 @@ public class AccountSettings {
 		this.partnerIpList = partnerIpList;
 	}
 
-    public boolean getAllowRedundantEndpoints() {
-        return allowRedundantEndpoints;
+    public List<String> getAllowRedundantEndpointsList() {
+        return allowRedundantEndpointsList;
     }
 
-    public void setAllowRedundantEndpoints(boolean allowRedundantEndpoints) {
-        this.allowRedundantEndpoints = allowRedundantEndpoints;
+    public void setAllowRedundantEndpointsList(List<String> allowRedundantEndpointsList) {
+        this.allowRedundantEndpointsList = allowRedundantEndpointsList;
     }
 }
