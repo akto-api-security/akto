@@ -142,7 +142,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         List<AuthParam> authParamList = new ArrayList<>();
         authParamList.add(new HardcodedAuthParam(AuthParam.Location.HEADER, attackerKey, attackerToken, true));
         AuthMechanism authMechanism = new AuthMechanism(
-             authParamList, new ArrayList<>(), "HARDCODED"
+             authParamList, new ArrayList<>(), "HARDCODED", null
         );
         AuthMechanismsDao.instance.insertOne(authMechanism);
 

@@ -58,13 +58,18 @@ public class BackwardCompatibility {
 
     public static final String DEFAULT_TELEMETRY_SETTINGS = "defaultTelemetrySettings";
     private int defaultTelemetrySettings;
+    public static final String MOVE_AUTH_MECHANISM_TO_ROLE = "moveAuthMechanismToRole";
+    private int moveAuthMechanismToRole;
+    public static final String LOGIN_SIGNUP_GROUPS = "loginSignupGroups";
+    private int loginSignupGroups;
 
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
                                  int deleteNullSubCategoryIssues, int enableNewMerging,
                                  int aktoDefaultNewUI, int initializeOrganizationAccountBelongsTo, int orgsInBilling,
-                                 int computeIntegratedConnections, int deleteLastCronRunInfo) {
+                                 int computeIntegratedConnections, int deleteLastCronRunInfo, int moveAuthMechanismToRole,
+                                 int loginSignupGroups) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -83,6 +88,8 @@ public class BackwardCompatibility {
         this.initializeOrganizationAccountBelongsTo = initializeOrganizationAccountBelongsTo;
         this.orgsInBilling = orgsInBilling;
         this.deleteLastCronRunInfo = deleteLastCronRunInfo;
+        this.moveAuthMechanismToRole = moveAuthMechanismToRole;
+        this.loginSignupGroups = loginSignupGroups;
     }
 
     public BackwardCompatibility() {
@@ -246,5 +253,21 @@ public class BackwardCompatibility {
 
     public void setDefaultTelemetrySettings(int defaultTelemetrySettings) {
         this.defaultTelemetrySettings = defaultTelemetrySettings;
+    }
+
+    public int getMoveAuthMechanismToRole() {
+        return this.moveAuthMechanismToRole;
+    }
+
+    public void setMoveAuthMechanismToRole(int moveAuthMechanismToRole) {
+        this.moveAuthMechanismToRole = moveAuthMechanismToRole;
+    }
+
+    public int getLoginSignupGroups() {
+        return loginSignupGroups;
+    }
+
+    public void setLoginSignupGroups(int loginSignupGroups) {
+        this.loginSignupGroups = loginSignupGroups;
     }
 }

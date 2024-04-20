@@ -89,7 +89,7 @@ public class TestRolesAction extends UserAction {
                 authParams.add(param);
             }
 
-            AuthMechanism authM = new AuthMechanism(authParams, this.reqData, authAutomationType);
+            AuthMechanism authM = new AuthMechanism(authParams, this.reqData, authAutomationType, null);
             AuthWithCond authWithCond = new AuthWithCond(authM, apiCond, recordedLoginFlowInput);
             TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.push(TestRoles.AUTH_WITH_COND_LIST, authWithCond));
         }

@@ -114,7 +114,7 @@ public class StartTestAction extends UserAction {
             }
         }
 
-        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
         if (authMechanism == null && testIdConfig == 0) {
             addActionError("Please set authentication mechanism before you test any APIs");
             return null;
@@ -348,7 +348,7 @@ public class StartTestAction extends UserAction {
 
     public String retrieveAllCollectionTests() {
 
-        this.authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+        this.authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
 
         ArrayList<Bson> testingRunFilters = new ArrayList<>();
         Bson testingRunTypeFilter = getTestingRunTypeFilter(testingRunType);

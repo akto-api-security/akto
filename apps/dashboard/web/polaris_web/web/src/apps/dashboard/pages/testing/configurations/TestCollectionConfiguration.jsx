@@ -1,5 +1,6 @@
-import { Box, Badge } from "@shopify/polaris";
+import { Box, Badge, Link } from "@shopify/polaris";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api"
 import func from "@/util/func"
 import { useEffect } from "react";
@@ -9,10 +10,10 @@ import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTa
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
 
 function TestCollectionConfiguration() {
+    const navigate = useNavigate()
     const allCollections = PersistStore(state => state.allCollections)
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
     const subCategoryMap = PersistStore(state => state.subCategoryMap)
-
     const allCollectionsExceptApiGroups = allCollections.filter(x => x.type !== "API_GROUP")
     const [testCollectionProperties, setTestCollectionProperties] = useState([])
     const [apiCollectionId, setApiCollectionId] = useState(0)
@@ -20,6 +21,65 @@ function TestCollectionConfiguration() {
 
     function getCategoryName(categoryName) {
         return Object.values(subCategoryMap).find(sc => sc.superCategory.name === categoryName)?.superCategory.shortName || categoryName
+    }
+
+    function drawComponentToEdit(propsFromConfig, propertyIds) {
+        let possibleProp = propertyIds[propsFromConfig.name]
+        let ret = <div></div>
+        if (possibleProp) {
+            switch (possibleProp.type) {
+            case "CUSTOM_AUTH":
+               ret =
+                <div>{propsFromConfig.values.map(v => {
+                    return <span style={{marginRight: "8px"}}><Link monochrome target="_blank" url={window.location.origin+"/dashboard/settings/auth-types/details?name="+v}>{v}</Link></span>
+                })}</div>
+                break;
+
+            case "TEST_YAML_KEYWORD":
+               ret =
+                (propsFromConfig.values?.length) ?
+                <div>{propsFromConfig.values.map(v => {
+                    return <span style={{marginRight: "8px"}}><Link monochrome target="_blank" url={window.location.origin+"/dashboard/observe/inventory/"+v}>{mapCollectionIdToName[v]}</Link></span>
+                })}</div>
+                :<div>Not Implemented</div>
+
+
+               break;
+            case "ROLE":
+               ret =
+                   <div>{propsFromConfig.values.map(v => {
+                       return <Link monochrome target="_blank" url={window.location.origin+"/dashboard/testing/roles/details?name="+v}>{v}</Link>
+                   })}</div>
+               break;
+
+            }
+            return ret
+        } else {
+            return <div/>
+        }
+    }
+
+    function drawComponentToCreateNew(type) {
+        let ret = null
+        switch(type) {
+            case "CUSTOM_AUTH":
+               ret =
+               <Link  target="_blank" url={window.location.origin+"/dashboard/settings/auth-types/details"}>
+                Create
+               </Link>
+               break;
+            case "ROLE":
+                ret =  <Link target="_blank" url={window.location.origin+"/dashboard/testing/roles/details"}>
+               Create
+               </Link>
+
+               break;
+        }
+
+        console.log(type, ret)
+
+        return ret
+
     }
 
     function fetchTestCollectionConfiguration(apiCollectionId) {
@@ -42,21 +102,25 @@ function TestCollectionConfiguration() {
                     }
 
                     if (propsFromConfig) {
+                        let isDefault = (propsFromConfig.apiCollectionId == 0) && apiCollectionId != 0
                         return {
                             formattedValues: propsFromConfig.values.join(", "),
-                            statusComp: <Badge status="success" progress="complete">Done</Badge>,
+                            formattedValuesComp: drawComponentToEdit(propsFromConfig, propertyIds),
+                            statusComp: <Badge status={isDefault ? "warning":"success"} progress="complete">{isDefault ? "Default":"Done"}</Badge>,
                             ...propsFromConfig,
                             ...ret
                         }
                     } else {
                         return {
                             formattedValues: "-",
+                            formattedValuesComp: drawComponentToCreateNew(propsFromPossible.type),
                             statusComp: <Badge status="critical" progress="incomplete">Pending</Badge>,
                             ...ret
                         }
                     }
                 })
 
+                console.log("finalProps: ", finalProps)
                 setTestCollectionProperties(finalProps)
             })
         })
@@ -94,8 +158,7 @@ function TestCollectionConfiguration() {
         {
             text: 'Values',
             title: 'Values',
-            value: 'formattedValuesComp',
-            isText: CellType.TEXT
+            value: 'formattedValuesComp'
         },
         {
             text: 'Impacting categories',

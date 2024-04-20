@@ -17,7 +17,8 @@ public class TestEditorEnums {
         PARAM,
         CONTAINS_JWT,
         COOKIE_EXPIRE_FILTER,
-        DATATYPE
+        DATATYPE,
+        BELONGS_TO_COLLECTIONS
     }
 
     public enum CollectionOperands {

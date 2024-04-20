@@ -157,6 +157,8 @@ public class DaoInit {
                 .enableDiscriminator(true).build();
         ClassModel<CustomTestingEndpoints> customTestingEndpointsClassModel = ClassModel
                 .builder(CustomTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<AllTestingEndpoints> allTestingEndpointsClassModel = ClassModel
+                .builder(AllTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<CollectionWiseTestingEndpoints> collectionWiseTestingEndpointsClassModel = ClassModel
                 .builder(CollectionWiseTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<WorkflowTestingEndpoints> workflowTestingEndpointsClassModel = ClassModel
@@ -219,6 +221,7 @@ public class DaoInit {
         ClassModel<TrafficMetricsAlert> trafficMetricsAlertClassModel = ClassModel.builder(TrafficMetricsAlert.class).enableDiscriminator(true).build();
         ClassModel<JiraIntegration> jiraintegrationClassModel = ClassModel.builder(JiraIntegration.class).enableDiscriminator(true).build();
         ClassModel<MethodCondition> methodConditionClassModel = ClassModel.builder(MethodCondition.class).enableDiscriminator(true).build();
+        ClassModel<RegexTestingEndpoints> regexTestingEndpointsClassModel = ClassModel.builder(RegexTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<DependencyNode> dependencyNodeClassModel = ClassModel.builder(DependencyNode.class).enableDiscriminator(true).build();
         ClassModel<ParamInfo> paramInfoClassModel = ClassModel.builder(ParamInfo.class).enableDiscriminator(true).build();
         ClassModel<Node> nodeClassModel = ClassModel.builder(Node.class).enableDiscriminator(true).build();
@@ -262,7 +265,7 @@ public class DaoInit {
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
                 vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel,jiraintegrationClassModel, setupClassModel,
                 cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
-                methodConditionClassModel,
+                methodConditionClassModel, regexTestingEndpointsClassModel, allTestingEndpointsClassModel,
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel,
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
@@ -308,7 +311,8 @@ public class DaoInit {
                 new EnumCodec<>(FileUpload.UploadType.class),
                 new EnumCodec<>(FileUpload.UploadStatus.class),
                 new EnumCodec<>(FileUploadLog.UploadLogStatus.class),
-                new EnumCodec<>(TestCollectionProperty.Id.class)
+                new EnumCodec<>(TestCollectionProperty.Id.class),
+                new EnumCodec<>(CustomAuthType.TypeOfToken.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,

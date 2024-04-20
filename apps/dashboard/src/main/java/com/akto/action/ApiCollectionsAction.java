@@ -214,7 +214,7 @@ public class ApiCollectionsAction extends UserAction {
         ApiInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         SensitiveParamInfoDao.instance.updateMany(filter, update);
 
-        List<ApiCollection> apiGroups = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
+        List<ApiCollection> apiGroups = ApiCollectionsDao.instance.fetchApiGroups();
         for(ApiCollection collection: apiGroups){
             List<TestingEndpoints> conditions = collection.getConditions();
             for (TestingEndpoints it : conditions) {
