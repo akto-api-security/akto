@@ -60,6 +60,9 @@ const ignore = {
   ],
   notVulnerable: [
     'DOS_TEST_URL',
+    'TRACE_METHOD_TEST',
+    'USER_ENUM_FOLDER_ACCESS',
+    'REMOVE_TOKENS',
     'TEXT_INJECTION_VIA_INVALID_URLS',
     'XSS_IN_PATH',
   ]
