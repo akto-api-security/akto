@@ -2,6 +2,7 @@ package com.akto.dto.testing;
 
 import com.akto.dto.testing.info.TestInfo;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class TestResult extends GenericTestResult {
@@ -10,6 +11,8 @@ public class TestResult extends GenericTestResult {
     public static final String _ERRORS = "errors";
     private List<String> errors;
     public static final String TEST_RESULTS_ERRORS = TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS;
+
+    public static final String ERRORS = "errors";
     private String originalMessage;
     private double percentageMatch;
     private TestInfo testInfo;
@@ -19,33 +22,46 @@ public class TestResult extends GenericTestResult {
     }
 
     public enum TestError {
-        NO_PATH("No sample data found for the API"),
-        NO_MESSAGE_WITH_AUTH_TOKEN("No sample data found for the API which contains the auth token"),
-        NO_AUTH_MECHANISM("No authentication mechanism saved"),
-        API_REQUEST_FAILED("API request failed"),
-        SOMETHING_WENT_WRONG("OOPS! Something went wrong"),
-        FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING("Failed to store test"),
-        INSUFFICIENT_MESSAGES("Insufficient messages"),
-        NO_AUTH_TOKEN_FOUND("No authentication token found"),
-        FAILED_DOWNLOADING_NUCLEI_TEMPLATE("Failed downloading nuclei template"),
-        FAILED_DOWNLOADING_PAYLOAD_FILES("Failed downloading payload files"),
-        FAILED_BUILDING_NUCLEI_TEMPLATE("Failed building nuclei template"),
-        FAILED_BUILDING_URL_WITH_DOMAIN("Failed building URL with domain"),
-        FAILED_REPLACING_VARIABLES_IN_NUCLEI_TEMPLATE("Failed replacing variables in nuclei template"),
-        EXECUTION_FAILED("Test execution failed"),
-        INVALID_EXECUTION_BLOCK("Invalid test execution block in template"),
-        NO_API_REQUEST("No test requests created"),
-        DEACTIVATED_ENDPOINT("This is a deactivated endpoint"),
-        USAGE_EXCEEDED("You have exceeded the limit of this feature, skipping execution");
-
+        NO_PATH("No sample data found for the API", true),
+        NO_MESSAGE_WITH_AUTH_TOKEN("No sample data found for the API which contains the auth token", true),
+        NO_AUTH_MECHANISM("No authentication mechanism saved", false),
+        API_REQUEST_FAILED("API request failed", false),
+        SOMETHING_WENT_WRONG("OOPS! Something went wrong", false),
+        FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING("Failed to store test", false),
+        INSUFFICIENT_MESSAGES("Insufficient messages", false),
+        NO_AUTH_TOKEN_FOUND("No authentication token found", false),
+        FAILED_DOWNLOADING_PAYLOAD_FILES("Failed downloading payload files", false),
+        FAILED_BUILDING_URL_WITH_DOMAIN("Failed building URL with domain", false),
+        EXECUTION_FAILED("Test execution failed", false),
+        INVALID_EXECUTION_BLOCK("Invalid test execution block in template", true),
+        NO_API_REQUEST("No test requests created", false),
+        SKIPPING_EXECUTION_BECAUSE_AUTH("Request API failed authentication check, skipping execution", true),
+        SKIPPING_EXECUTION_BECAUSE_FILTERS("Request API failed to satisfy api_selection_filters block, skipping execution", true),
+        DEACTIVATED_ENDPOINT("This is a deactivated endpoint", true),
+        USAGE_EXCEEDED("You have exceeded the limit of this feature, skipping execution", true);
         private final String message;
+        private final boolean skipTest;
 
-        TestError(String message) {
+        TestError(String message, boolean skipTest) {
             this.message = message;
+            this.skipTest = skipTest;
         }
 
         public String getMessage() {
             return message;
+        }
+        public boolean getSkipTest() {
+            return skipTest;
+        }
+
+        public static List<String> getErrorsToSkipTests() {
+            List<String> ret = new ArrayList<>();
+            for(TestError te: TestError.values()) {
+                if (te.getSkipTest()) {
+                    ret.add(te.getMessage());
+                }
+            }
+            return ret;
         }
     }
 

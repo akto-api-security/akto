@@ -1,8 +1,8 @@
 package com.akto.utils;
 
-import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.HttpResponseParams;
@@ -13,13 +13,13 @@ import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.upload.FileUploadError;
 import com.akto.listener.KafkaListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.testing.ApiExecutor;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,6 +28,7 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
@@ -51,47 +52,47 @@ public class Utils {
             return result;
         }
 
-        try {
-            String authType = auth.get("type").asText().toLowerCase();
 
-            switch (authType) {
-                case "bearer":
-                    ArrayNode authParams = (ArrayNode) auth.get("bearer");
-                    for (JsonNode authHeader : authParams) {
-                        String tokenKey = authHeader.get("key").asText();
-                        if (tokenKey.equals("token")) {
-                            String tokenValue = authHeader.get("value").asText();
-                            String replacedTokenValue = replaceVariables(tokenValue, variableMap);
+        String authType = auth.get("type").asText().toLowerCase();
 
-                            result.put("Authorization", "Bearer " + replacedTokenValue);
+        switch (authType) {
+            case "bearer":
+                ArrayNode authParams = (ArrayNode) auth.get("bearer");
+                for (JsonNode authHeader : authParams) {
+                    String tokenKey = authHeader.get("key").asText();
+                    if (tokenKey.equals("token")) {
+                        String tokenValue = authHeader.get("value").asText();
+                        String replacedTokenValue = replaceVariables(tokenValue, variableMap);
 
-                        }
+                        result.put("Authorization", "Bearer " + replacedTokenValue);
+
                     }
-                    break;
-                case "apikey":
-                    ArrayNode apikeyParams = (ArrayNode) auth.get("apikey");
-                    String authKeyName = "", authValueName = "";
-                    for (JsonNode apikeyHeader : apikeyParams) {
-                        String key = apikeyHeader.get("key").asText();
-                        String value = apikeyHeader.get("value").asText();
+                }
+                break;
+            case "apikey":
+                ArrayNode apikeyParams = (ArrayNode) auth.get("apikey");
+                String authKeyName = "", authValueName = "";
+                for (JsonNode apikeyHeader : apikeyParams) {
+                    String key = apikeyHeader.get("key").asText();
+                    String value = apikeyHeader.get("value").asText();
 
-                        switch (key) {
-                            case "key":
-                                authKeyName = replaceVariables(value, variableMap);
-                                break;
-                            case "value":
-                                authValueName = replaceVariables(value, variableMap);
-                                break;
+                    switch (key) {
+                        case "key":
+                            authKeyName = replaceVariables(value, variableMap);
+                            break;
+                        case "value":
+                            authValueName = replaceVariables(value, variableMap);
+                            break;
 
-                            case "in":
-                                if (!value.equals("header")) {
-                                    throw new IllegalArgumentException("Only header supported in apikey");
-                                }
-                                break;
-                            default:
-                                break;
-                        }
+                        case "in":
+                            if (!value.equals("header")) {
+                                throw new IllegalArgumentException("Only header supported in apikey");
+                            }
+                            break;
+                        default:
+                            break;
                     }
+                }
 
                     if (authKeyName.isEmpty() || authValueName.isEmpty()) {
                         throw new IllegalArgumentException(
@@ -100,7 +101,7 @@ public class Utils {
                         result.put(authKeyName, authValueName);
                     }
                     break;
-                case "basic": 
+                case "basic":
                     ArrayNode basicParams = (ArrayNode) auth.get("basic");
                     String basicUsername = "", basicPassword = "";
                     for (JsonNode basicKeyHeader : basicParams) {
@@ -136,9 +137,7 @@ public class Utils {
                 default:
                     throw new IllegalArgumentException("Unsupported auth type: " + authType );
             }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Unable to parse auth from postman file: " + e.getMessage(), LogDb.DASHBOARD);
-        }
+
 
         return result;
     }
@@ -159,6 +158,11 @@ public class Utils {
             new URL(url).toURI();
             return true;
         } catch (MalformedURLException | URISyntaxException e) {
+            Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
+                Matcher matcher = pattern.matcher(url);
+                if (matcher.find()) {
+                    return true;
+                }
             return false;
         }
     }
@@ -190,7 +194,9 @@ public class Utils {
         return sb.toString();
     }
     
-    public static Map<String, String> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId, boolean allowReplay, Map<String, String> authMap) {
+    public static Pair<Map<String, String>, List<FileUploadError>> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId, boolean allowReplay, Map<String, String> authMap) {
+        Pair<Map<String, String>, List<String>> resp;
+        List<FileUploadError> errors = new ArrayList<>();
         try {
             JsonNode request = apiInfo.get("request");
 
@@ -198,7 +204,12 @@ public class Utils {
 
             JsonNode authApiNode = request.get("auth");
             if (authApiNode != null) {
-                authMap = getAuthMap(authApiNode, variables);
+                try {
+                    authMap = getAuthMap(authApiNode, variables);
+                }catch (Exception e) {
+                    errors.add(new FileUploadError("Error while getting auth map for " + apiName + " : " + e.toString(), FileUploadError.ErrorType.WARNING));
+                    loggerMaker.errorAndAddToDb(e, String.format("Error while getting auth map for %s : %s", apiName, e.toString()), LogDb.DASHBOARD);
+                }
             }
 
             Map<String, String> result = new HashMap<>();
@@ -206,7 +217,10 @@ public class Utils {
             result.put("path", getPath(request, variables));
 
             JsonNode methodObj = request.get("method");
-            if (methodObj == null) throw new Exception("No method field exists");
+            if (methodObj == null){
+                errors.add(new FileUploadError("No method field exists", FileUploadError.ErrorType.ERROR));
+                return Pair.of(null, errors);
+            }
             result.put("method", methodObj.asText());
 
             ArrayNode requestHeadersNode = (ArrayNode) request.get("header");
@@ -241,12 +255,17 @@ public class Utils {
                         responsePayload =  res.getBody();
                         statusCode =  res.getStatusCode()+"";
                         status =  "";
+                        if(res.getStatusCode() < 200 || res.getStatusCode() >=400){
+                            throw new Exception("Found non 2XX response on replaying the API");
+                        }
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e,"Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), LogDb.DASHBOARD);
-                        return null;
+                        errors.add(new FileUploadError("Error while replaying request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), FileUploadError.ErrorType.ERROR));
+                        return Pair.of(null, errors);
                     }
                 } else {
-                    return null;
+                    errors.add(new FileUploadError("No response field exists", FileUploadError.ErrorType.WARNING));
+                    return Pair.of(null, errors);
                 }
             } else {
                 JsonNode respHeaders = response.get("header");
@@ -282,11 +301,11 @@ public class Utils {
             result.put("time", Context.now()+"");
             result.put("type", "http");
             result.put("source", "POSTMAN");
-
-            return result;
+            return Pair.of(result, errors);
         } catch (Exception e){
             loggerMaker.errorAndAddToDb(e, String.format("Failed to convert postman obj to Akto format : %s", e.toString()), LogDb.DASHBOARD);
-            return null;
+            errors.add(new FileUploadError("Failed to convert postman obj to Akto", FileUploadError.ErrorType.ERROR));
+            return Pair.of(null, errors);
         }
     }
 
@@ -352,6 +371,10 @@ public class Utils {
         return response.get("_postman_previewlanguage").asText();
     }
 
+    public static String getPath(JsonNode request) throws Exception {
+        return getPath(request, new HashMap<>());
+    }
+
     public static String getPath(JsonNode request, Map<String, String> variables) throws Exception {
         JsonNode urlObj = request.get("url");
         if (urlObj == null) throw new Exception("URL field doesn't exists");
@@ -401,6 +424,7 @@ public class Utils {
         return  result;
     }
 
+    //TODO handle item as a json object
     public static void fetchApisRecursively(ArrayNode items, ArrayList<JsonNode> jsonNodes) {
         if(items == null || items.size() == 0){
             return;
@@ -418,7 +442,11 @@ public class Utils {
     public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka) throws Exception {
         List<HttpResponseParams> responses = new ArrayList<>();
         for (String message: messages){
-            if (message.length() < 0.8 * KafkaListener.BATCH_SIZE_CONFIG) {
+            int messageLimit = (int) Math.round(0.8 * KafkaListener.BATCH_SIZE_CONFIG);
+            if (skipKafka) {
+                messageLimit = messageLimit * 2;
+            }
+            if (message.length() < messageLimit) {
                 if (!skipKafka) {
                     KafkaListener.kafka.send(message,"har_" + topic);
                 } else {
@@ -431,6 +459,7 @@ public class Utils {
             }
         }
 
+        //todo:shivam handle resource analyser in AccountHTTPCallParserAktoPolicyInfo
         if(skipKafka) {
             String accountIdStr = responses.get(0).accountId;
             if (!StringUtils.isNumeric(accountIdStr)) {
@@ -446,21 +475,28 @@ public class Utils {
                 info = new AccountHTTPCallParserAktoPolicyInfo();
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
+                // info.setResourceAnalyser(new ResourceAnalyser(300_000, 0.01, 100_000, 0.01));
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, accountSettings);
             info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
-            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, info.getHttpCallParser().apiCatalogSync.existingAPIsInDb);
+            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, false, info.getHttpCallParser().apiCatalogSync.existingAPIsInDb);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
-            try {
-                DependencyFlow dependencyFlow = new DependencyFlow();
-                dependencyFlow.run();
-                dependencyFlow.syncWithDb();
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e,"Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
-            }
+//            for (HttpResponseParams responseParams: responses)  {
+//                responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
+//                info.getResourceAnalyser().analyse(responseParams);
+//            }
+//            info.getResourceAnalyser().syncWithDb();
+        //    try {
+        //        DependencyFlow dependencyFlow = new DependencyFlow();
+        //        dependencyFlow.run();
+        //        dependencyFlow.syncWithDb();
+        //    } catch (Exception e) {
+        //        loggerMaker.errorAndAddToDb(e,"Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
+        //    }
         }
     }
 

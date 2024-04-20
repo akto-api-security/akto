@@ -108,8 +108,9 @@ public class UsageAction extends ActionSupport implements ServletRequestAware {
              * we need to set the limits to check for the current epoch,
              * even though it would be a non-standard epoch.
              */
-            usageLowerBound = now - UsageUtils.USAGE_UPPER_BOUND_DL;
-            usageUpperBound = usageLowerBound + UsageUtils.USAGE_UPPER_BOUND_DL;
+            usageLowerBound = now - UsageUtils.USAGE_UPPER_BOUND_DL/2;
+            usageUpperBound = now + UsageUtils.USAGE_UPPER_BOUND_DL/2;
+            loggerMaker.infoAndAddToDb(String.format("Lower Bound: %d Upper bound: %d", usageLowerBound, usageUpperBound), LogDb.BILLING);
             executorService.schedule(new Runnable() {
                 public void run() {
                     InitializerListener.aggregateAndSinkUsageData(organization, usageLowerBound, usageUpperBound);

@@ -53,8 +53,8 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         String[] fieldNames = {SingleTypeInfo._URL, SingleTypeInfo._METHOD, SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        fieldNames = new String[]{SingleTypeInfo._API_COLLECTION_ID};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+        fieldNames = new String[] { SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._TIMESTAMP };
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
         fieldNames = new String[]{SingleTypeInfo._PARAM, SingleTypeInfo._API_COLLECTION_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
@@ -74,6 +74,20 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         fieldNames =  new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._TIMESTAMP};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
+        // needed for usage metric calculation
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] { SingleTypeInfo.LAST_SEEN }, true);
+        
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] { SingleTypeInfo._TIMESTAMP }, true);
+    }
+
+    public static Bson filterForSTIUsingURL(int apiCollectionId, String url, URLMethods.Method method) {
+        return Filters.and(
+                Filters.eq("apiCollectionId", apiCollectionId),
+                Filters.eq("url", url),
+                Filters.eq("method", method.name())
+        );
     }
 
     public static Bson filterForHostHeader(int apiCollectionId, boolean useApiCollectionId) {
@@ -333,7 +347,8 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 );
                 endpoints.add(apiInfoKey);
             } catch (Exception e) {
-                ;
+                e.printStackTrace();
+
             }
         }
 

@@ -6,6 +6,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+import com.akto.dao.context.Context;
+import com.akto.listener.InitializerListener;
+import com.akto.log.LoggerMaker;
 import org.bson.types.ObjectId;
 
 import com.akto.dao.testing.DeleteTestRunsDao;
@@ -18,6 +21,7 @@ import com.mongodb.client.model.Filters;
 public class Crons {
 
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static LoggerMaker logger = new LoggerMaker(Crons.class, LoggerMaker.LogDb.DASHBOARD);
 
     public void deleteTestRunsScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -37,6 +41,9 @@ public class Crons {
                                     }
                                 }
                             }
+                            logger.infoAndAddToDb("Starting to delete pending test runs");
+                            InitializerListener.deleteFileUploads(Context.accountId.get());
+                            logger.infoAndAddToDb("Finished deleting pending test runs");
                         } catch (Exception e) {
                             e.printStackTrace();
                         }

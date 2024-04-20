@@ -10,6 +10,8 @@ public class DashboardStackDetails {
         return System.getenv(AKTO_DASHBOARD_STACK_NAME);
     }
 
+    //TODO all the pending items from CFT
+
     public static final String AKTO_DASHBOARD_ROLE = "AktoDashboardRole";
 
     public static final String AKTO_DASHBOARD_AUTO_SCALING_GROUP = "AktoDashboardAutoScalingGroup";

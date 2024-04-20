@@ -14,7 +14,9 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
+import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.*;
+import com.akto.test_editor.execution.Memory;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.json.JSONObject;
@@ -155,7 +157,7 @@ public class Utils {
         return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
     }
 
-    private static String fetchToken(RecordedLoginFlowInput recordedLoginFlowInput, int retries) {
+    public static String fetchToken(RecordedLoginFlowInput recordedLoginFlowInput, int retries) {
 
         String token = null;
         for (int i=0; i<retries; i++) {
@@ -187,7 +189,7 @@ public class Utils {
         return token;
     }
 
-    public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs) {
+    public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         if (node.getWorkflowNodeDetails().getType() == WorkflowNodeDetails.Type.RECORDED) {
             return processRecorderNode(node, valuesMap);
         }
@@ -195,22 +197,22 @@ public class Utils {
             return processOtpNode(node, valuesMap);
         }
         else {
-            return processApiNode(node, valuesMap, allowAllStatusCodes, debug, testLogs);
+            return processApiNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory);
         }
     }
 
 
-    public static WorkflowTestResult.NodeResult processApiNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs) {
+    public static WorkflowTestResult.NodeResult processApiNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         
         NodeExecutorFactory nodeExecutorFactory = new NodeExecutorFactory();
         NodeExecutor nodeExecutor = nodeExecutorFactory.getExecutor(node);
-        return nodeExecutor.processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs);
+        return nodeExecutor.processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory);
     }
 
-    public static WorkflowTestResult.NodeResult executeNode(Node node, Map<String, Object> valuesMap,boolean debug, List<TestingRunResult.TestLog> testLogs) {
+    public static WorkflowTestResult.NodeResult executeNode(Node node, Map<String, Object> valuesMap,boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         WorkflowTestResult.NodeResult nodeResult;
         try {
-            nodeResult = Utils.processNode(node, valuesMap, true, debug, testLogs);
+            nodeResult = Utils.processNode(node, valuesMap, true, debug, testLogs, memory);
         } catch (Exception e) {
             ;
             List<String> testErrors = new ArrayList<>();
@@ -236,10 +238,15 @@ public class Utils {
         
         Map<String, Object> valuesMap = constructValueMap(loginFlowParams);
 
+        int index = 0;
         for (Node node: nodes) {
+            boolean allowAllStatusCodes = false;
             WorkflowTestResult.NodeResult nodeResult;
             try {
-                nodeResult = processNode(node, valuesMap, false, false, new ArrayList<>());
+                if (authMechanism.getRequestData() != null && authMechanism.getRequestData().size() > 0 && authMechanism.getRequestData().get(index).getAllowAllStatusCodes()) {
+                    allowAllStatusCodes = authMechanism.getRequestData().get(0).getAllowAllStatusCodes();
+                }
+                nodeResult = processNode(node, valuesMap, allowAllStatusCodes, false, new ArrayList<>(), null);
             } catch (Exception e) {
                 ;
                 List<String> testErrors = new ArrayList<>();
@@ -261,6 +268,7 @@ public class Utils {
                     saveValueMapData(loginFlowParams, valuesMap);
                 }
             }
+            index++;
 
         }
 

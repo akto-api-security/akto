@@ -66,18 +66,19 @@ public class UsageMetricCalculator {
 
         return deactivatedIds;
     }
+    
+    public static Bson excludeDemosAndDeactivated(String key){
+        List<Integer> demos = new ArrayList<>(getDemos());
+        List<Integer> deactivated = new ArrayList<>(getDeactivatedLatest());
+        deactivated.addAll(demos);
+        return Filters.nin(key, deactivated);
+    }
 
     public static Set<Integer> getDemosAndDeactivated() {
         Set<Integer> ret = new HashSet<>();
         ret.addAll(getDeactivated());
         ret.addAll(getDemos());
         return ret;
-    }
-
-    public static Bson excludeDemosAndDeactivated(String key) {
-        List<Integer> list = new ArrayList<>(getDemos());
-        list.addAll(getDeactivatedLatest());
-        return Filters.nin(key, list);
     }
 
     public static List<String> getInvalidTestErrors() {

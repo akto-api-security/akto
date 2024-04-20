@@ -3,6 +3,7 @@ package com.akto.notifications.email;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
+import com.akto.onprem.Constants;
 import com.mongodb.client.model.Filters;
 import com.sendgrid.Method;
 import com.sendgrid.Request;
@@ -12,34 +13,20 @@ import com.sendgrid.helpers.mail.Mail;
 import com.sendgrid.helpers.mail.objects.Content;
 import com.sendgrid.helpers.mail.objects.Email;
 import com.sendgrid.helpers.mail.objects.Personalization;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
 public class SendgridEmail {
+
+    private static final Logger logger = LoggerFactory.getLogger(SendgridEmail.class);
 
     private SendgridEmail() {}
     private static final SendgridEmail sendgridEmail = new SendgridEmail();
 
     public static SendgridEmail getInstance() {
         return sendgridEmail;
-    }
-    private static Config.SendgridConfig sendgridConfig;
-    private int lastRefreshTs = 0;
-    public Config.SendgridConfig getSendgridConfig() {
-        int now = Context.now();
-        if (sendgridConfig == null || now - lastRefreshTs > 60) {
-            synchronized (this) {
-                if (sendgridConfig == null) {
-                    Config config = ConfigsDao.instance.findOne(Filters.eq(ConfigsDao.ID, Config.SendgridConfig.CONFIG_ID));
-                    if (config == null) {
-                        config = new Config.SendgridConfig();
-                    }
-                    sendgridConfig = (Config.SendgridConfig) config;
-                    lastRefreshTs = now;
-                }
-            }
-        }
-        return sendgridConfig;
     }
 
     public Mail buildBillingEmail (
@@ -115,7 +102,7 @@ public class SendgridEmail {
         personalization.addDynamicTemplateData("inviteeName",inviteeName);
         personalization.addDynamicTemplateData("orgName",extractOrgName(inviteFrom));
         personalization.addDynamicTemplateData("aktoUrl",invitiationUrl);
-        System.out.println("Invitation url: "+invitiationUrl);
+        logger.info("Invitation url: "+invitiationUrl);
         return mail;
     }
 
@@ -128,21 +115,21 @@ public class SendgridEmail {
     }
 
     public void send(final Mail mail) throws IOException {
-        String secretKey = this.getSendgridConfig().getSendgridSecretKey();
+        String secretKey = Constants.getSendgridConfig().getSendgridSecretKey();
         if (secretKey == null || secretKey.isEmpty()) {
-            System.out.println("No sendgrid config found. Skipping sending email");
+            logger.info("No sendgrid config found. Skipping sending email");
             return;
         }
-        final SendGrid sg = new SendGrid(this.getSendgridConfig().getSendgridSecretKey());
+        final SendGrid sg = new SendGrid(Constants.getSendgridConfig().getSendgridSecretKey());
         final Request request = new Request();
         request.setMethod(Method.POST);
         request.setEndpoint("mail/send");
         request.setBody(mail.build());
 
         final Response response = sg.api(request);
-        System.out.println(response.getStatusCode());
-        System.out.println(response.getBody());
-        System.out.println(response.getHeaders());
+        logger.info(String.valueOf(response.getStatusCode()));
+        logger.info(response.getBody());
+        logger.info(response.getHeaders().toString());
     }
 
 }

@@ -89,6 +89,7 @@ public class CustomDataType {
                 case OR:
                     return keyResult || valueResult;
                 default:
+                    // TODO:
                     return false;
             }
         }

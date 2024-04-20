@@ -2,13 +2,16 @@ import React from 'react'
 import { HorizontalStack, Text , Tooltip, Icon, TextField } from "@shopify/polaris"
 import { QuestionMarkMinor } from "@shopify/polaris-icons"
 
-function TextFieldWithInfo({labelText,labelTooltip, value, placeholder, setValue}) {
+function TextFieldWithInfo({labelText, labelTextColor, labelTooltip, tooltipIconColor, value, placeholder, setValue }) {
+
+    const labelTextColorV = labelTextColor || ""
+    const tooltipIconColorV = tooltipIconColor || "base"
 
     const label = (
         <HorizontalStack gap="2">
-            <Text>{labelText}</Text>
+            <Text color={labelTextColorV}>{labelText}</Text>
             <Tooltip content={labelTooltip} dismissOnMouseOut width="wide">
-                <Icon source={QuestionMarkMinor} color="base" />
+                <Icon source={QuestionMarkMinor} color={tooltipIconColorV} />
             </Tooltip>
         </HorizontalStack>
     )

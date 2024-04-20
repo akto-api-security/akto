@@ -27,7 +27,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         authMechanismPresent: false,
         testRoleLabel: "No test role selected",
         testRoleId: "",
-
     }
 
     const navigate = useNavigate()
@@ -37,8 +36,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     })
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const [loading, setLoading] = useState(true)
-    const [active, setActive] = useState(runTestFromOutside || false);
     const [testRolesArr, setTestRolesArr] = useState([])
+    const [active, setActive] = useState(runTestFromOutside || false);
 
     const runTestRef = useRef(null);
 
@@ -75,7 +74,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         })
         testRoles.unshift({"label": "No test role selected", "value": ""})
         setTestRolesArr(testRoles)
-
         const businessLogicSubcategories = allSubCategoriesResponse.subCategories
         const categories = allSubCategoriesResponse.categories
         const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(businessLogicSubcategories)
@@ -353,6 +351,33 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         return obj
     }
 
+    function getCurrentStatus(){
+        if(!testRun || testRun?.tests === undefined || testRun?.selectedCategory === undefined || testRun.tests[testRun.selectedCategory] === undefined)
+            return false;
+
+        let res = true;
+        const tests = testRun.tests[testRun.selectedCategory];
+        for (let i = 0; i < tests.length; i++) {
+            if (tests[i].selected === false) {
+                res = false;
+                break; 
+            }
+        }
+        return res;
+    }
+
+    const allTestsSelectedOfCategory = getCurrentStatus()
+
+    function toggleTestsSelection(val) {
+        let copyTestRun = testRun
+        copyTestRun.tests[testRun.selectedCategory].forEach((test) => {
+            test.selected = val
+        })
+        setTestRun(prev => {
+            return { ...prev, tests: copyTestRun.tests, testName: convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(copyTestRun.tests).join("_") }
+        })
+    }
+
     return (
         <div>
             {activator}
@@ -431,7 +456,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             </div>
                             <div>
                                 <div style={{ padding: "15px", alignItems: "center" }}>
-                                    <Text variant="headingMd">Tests</Text>
+                                    <HorizontalStack gap={"2"}>
+                                        <Checkbox
+                                            checked={allTestsSelectedOfCategory}
+                                            onChange={(val) => toggleTestsSelection(val)}
+                                        />
+                                        <Text variant="headingMd">Tests</Text>
+                                    </HorizontalStack>
                                 </div>
                                 <Divider />
                                 <div style={{ maxHeight: "35vh", overflowY: "auto", paddingTop: "5px" }}>
@@ -537,19 +568,17 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                             }))
                                         }} />
                                 </ButtonGroup>
+                                
                             </Box>
                             <Box>
-                                <ButtonGroup>
+                            <ButtonGroup>
                                     <Text>Select test role:</Text>
                                     <Dropdown
                                         menuItems={testRolesArr}
                                         initial={"No test role selected"}
                                         selected={(requests) => {
                                             let testRole
-                                            console.log(requests);
-                                            if (requests === "No test role selected") maxConcurrentRequests = ""
-                                            else testRole = requests
-
+                                            if (!(requests === "No test role selected")){testRole = requests}
                                             const testRoleOption = getLabel(testRolesArr, requests)
 
                                             setTestRun(prev => ({
@@ -559,7 +588,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                             }))
                                         }} />
                                 </ButtonGroup>
-                            </Box>
+                                </Box>
                         </HorizontalGrid>
                     </Modal.Section>
                 }

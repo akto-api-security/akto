@@ -23,6 +23,13 @@ import static com.mongodb.client.model.Updates.set;
 
 public class UsersDao extends CommonContextDao<User> {
 
+    public void createIndicesIfAbsent() {
+
+        String[] fieldNames = { User.LOGIN };
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+    }
+
     public static User addUser(String login, String name, String password, boolean emailValidated) {
         // Checking if the user with same login exists or not
         if (UsersDao.instance.getMCollection().find(eq(User.LOGIN,login)).first() != null) {
@@ -112,6 +119,7 @@ public class UsersDao extends CommonContextDao<User> {
     }
 
 
+    // TODO: account id
     public BasicDBObject getUserInfo(int user_id) {
         User user = instance.getMCollection().find(eq("_id",user_id)).projection(
                 new BasicDBObject("_id",1)

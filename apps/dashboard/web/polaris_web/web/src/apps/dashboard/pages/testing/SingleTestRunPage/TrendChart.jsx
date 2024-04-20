@@ -64,10 +64,11 @@ function TrendChart(props) {
         items.forEach((x) => {
             let ts = x["startTimestamp"] * 1000
             let countIssuesMap = x["countIssues"]
-
-            retH.push([ts, countIssuesMap["HIGH"]])
-            retM.push([ts, countIssuesMap["MEDIUM"]])
-            retL.push([ts, countIssuesMap["LOW"]])
+            if(countIssuesMap && Object.keys(countIssuesMap).length > 0){
+                retH.push([ts, countIssuesMap["HIGH"]])
+                retM.push([ts, countIssuesMap["MEDIUM"]])
+                retL.push([ts, countIssuesMap["LOW"]])
+            }
         })
 
         return [
@@ -144,7 +145,7 @@ function TrendChart(props) {
 
             let count = 0
             testingRunResultSummaries.forEach((ele)=>{
-                let obj = Object.keys(ele.countIssues) ? ele.countIssues : {HIGH: 0, MEDIUM: 0, LOW: 0}
+                let obj = (ele?.countIssues && Object.keys(ele.countIssues).length > 0) ? ele.countIssues : {HIGH: 0, MEDIUM: 0, LOW: 0}
                 count += (obj.HIGH + obj.MEDIUM + obj.LOW)
             })
 
