@@ -149,7 +149,7 @@ public class TestExecutor {
 
         try {
             LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
-            if (!loginFlowResponse.getSuccess()) {
+            if (loginFlowResponse != null && !loginFlowResponse.getSuccess()) {
                 loggerMaker.errorAndAddToDb("login flow failed", LogDb.TESTING);
                 throw new Exception("login flow failed");
             }

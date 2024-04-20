@@ -40,7 +40,8 @@ public class JSONUtils {
 
                 key = anyAlphabetExists ? key: "NUMBER";
                 Object value = basicDBObject.get(key);
-                flatten(value, prefix + (prefix.isEmpty() ? "" : "#") + key, ret);
+                if(prefix != null) flatten(value, prefix + (prefix.isEmpty() ? "" : "#") + key, ret);
+                else flatten(value, key, ret);
             }
         } else if (obj instanceof BasicDBList) {
             for(Object elem: (BasicDBList) obj) {

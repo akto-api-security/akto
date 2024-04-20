@@ -41,10 +41,10 @@ public class SensitiveFieldAction extends UserAction{
         ret = new BasicDBObject();
         Bson filter = SensitiveParamInfoDao.getFilters(url, method, responseCode, isHeader, param, apiCollectionId);
         // null means user wants Akto to decide the sensitivity
-        if (!sensitive)  {
-            SensitiveParamInfoDao.instance.getMCollection().deleteOne(filter);
-            return Action.SUCCESS.toUpperCase();
-        }
+//        if (!sensitive)  {
+//            SensitiveParamInfoDao.instance.getMCollection().deleteOne(filter);
+//            return Action.SUCCESS.toUpperCase();
+//        }
 
         Bson update = Updates.combine(
             Updates.set("sensitive", sensitive),
@@ -57,12 +57,12 @@ public class SensitiveFieldAction extends UserAction{
 
         ret.append("data", param);
 
+        /*
         // only if sensitive is marked true then only find other params
         if (!sensitive) {
             return Action.SUCCESS.toUpperCase();
         }
 
-        /*
 
         Bson parentFilters = Filters.and(
                 Filters.eq("parent.url", url),

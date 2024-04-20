@@ -177,7 +177,7 @@
     padding-top: 12px;
     font-size: 13px;
     color: var(--themeColorDark);
-    font-family: 'Poppins';
+    font-family: 'Poppins', sans-serif;
     font-weight: 500;
 }
 

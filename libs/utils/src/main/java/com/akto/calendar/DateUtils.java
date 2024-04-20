@@ -39,8 +39,8 @@ public class DateUtils {
             case WEEKLY: return LocalDate.of(date/10000, (date/100)%100, date%100).with(DayOfWeek.MONDAY);
             case MONTHLY: return LocalDate.of(date/10000, (date/100)%100, 1);
             case QUARTERLY: return LocalDate.of(date/10000, ((date/100)%100-1)/3 * 3+1, 1);
-            case HALF_YEARLY: LocalDate.of(date/10000, (date/100)%100 <= 6 ? 1 : 7, 1);
-            case YEARLY: LocalDate.of(date/10000, 1, 1);
+            case HALF_YEARLY: return LocalDate.of(date/10000, (date/100)%100 <= 6 ? 1 : 7, 1);
+            case YEARLY: return LocalDate.of(date/10000, 1, 1);
             default:
                 throw new IllegalArgumentException("Invalid Tracking period: " + period);
         }

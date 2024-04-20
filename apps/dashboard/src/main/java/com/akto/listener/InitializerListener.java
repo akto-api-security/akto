@@ -2222,6 +2222,7 @@ public class InitializerListener implements ServletContextListener {
 
                 if (testConfig == null) {
                     logger.error("parsed template for file is null " + path);
+                    continue;
                 }
 
                 String id = testConfig.getId();

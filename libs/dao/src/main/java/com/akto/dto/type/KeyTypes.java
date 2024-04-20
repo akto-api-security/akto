@@ -250,7 +250,7 @@ public class KeyTypes {
 
     public static boolean isPhoneNumber(String mobileNumber) {
         boolean lengthCondition = mobileNumber.length() < 8 || mobileNumber.length() > 16;
-        boolean alphabetsCondition = mobileNumber.toLowerCase() != mobileNumber.toUpperCase(); // contains alphabets
+        boolean alphabetsCondition = !mobileNumber.toLowerCase().equals(mobileNumber.toUpperCase()); // contains alphabets
 
         if (lengthCondition || alphabetsCondition) {
             return false;

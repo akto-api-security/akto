@@ -128,7 +128,7 @@ export default {
     methods: {
         deselectAll() {
             this.globalCheckbox = false
-            Object.keys(this.mapCategoryToSubcategory).map(kk => this.mapCategoryToSubcategory[kk].selected=[])
+          Object.keys(this.mapCategoryToSubcategory).forEach(kk => this.mapCategoryToSubcategory[kk].selected = []);
         },
         getCategoryName(category) {
             return this.categories.find(x => x.name === category).displayName

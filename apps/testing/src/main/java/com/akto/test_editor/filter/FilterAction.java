@@ -355,10 +355,6 @@ public final class FilterAction {
             DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(val, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
             res = invokeFilter(dataOperandFilterRequest);
             return new DataOperandsFilterResponse(res, null, null, null);
-        } else if (filterActionRequest.getConcernedSubProperty() == null) {
-            DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(payload, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-            res = invokeFilter(dataOperandFilterRequest);
-            return new DataOperandsFilterResponse(res, null, null, null);
         }
 
         return new DataOperandsFilterResponse(false, null, null, null);
