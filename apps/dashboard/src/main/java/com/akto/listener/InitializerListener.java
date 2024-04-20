@@ -1372,6 +1372,28 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void setDefaultRedundantUrlsList(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getUpdateRedundantUrlsList() == 0){
+            List<String> ignoreUrlTypesList = Arrays.asList(
+                "htm","html", "css", "js",   // Web formats
+                "jpg", "jpeg", "png", "gif", "svg", "webp",  // Image formats
+                "mp4", "webm", "ogg", "ogv", "avi", "mov",  // Video formats
+                "mp3", "wav", "oga",  // Audio formats
+                "woff", "woff2", "ttf", "otf", // Font formats
+                ".pptx" // file formats
+            );
+            AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.ALLOW_REDUNDANT_ENDPOINTS_LIST, ignoreUrlTypesList),
+                new UpdateOptions().upsert(true)
+            );
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.UPDATE_REDUNDANT_URLS_LIST, Context.now())
+            );
+        }
+    }
+
     public static void createOrg(int accountId) {
         Bson filterQ = Filters.in(Organization.ACCOUNTS, accountId);
         Organization organization = OrganizationsDao.instance.findOne(filterQ);
@@ -1920,6 +1942,7 @@ public class InitializerListener implements ServletContextListener {
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
         setDefaultTelemetrySettings(backwardCompatibility);
+        setDefaultRedundantUrlsList(backwardCompatibility);
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
         }
