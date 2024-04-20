@@ -7,6 +7,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.CodeAnalysisApiInfo.CodeAnalysisApiInfoKey;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.dto.type.APICatalog;
@@ -359,6 +360,7 @@ public class InventoryAction extends UserAction {
         response.put("unusedEndpoints", unused);
 
         // Attach code analysis collection
+        BasicDBObject codeAnalysisCollectionInfo = new BasicDBObject();
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
         CodeAnalysisCollection codeAnalysisCollection = null;
         if (apiCollection != null) {
@@ -366,7 +368,29 @@ public class InventoryAction extends UserAction {
                 Filters.eq("name", apiCollection.getName())
             );
         }
-        response.put("codeAnalysisCollection", codeAnalysisCollection);
+        codeAnalysisCollectionInfo.put("codeAnalysisCollection", codeAnalysisCollection);
+
+        // Fetch code analysis endpoints
+        Map<String, CodeAnalysisApi> codeAnalysisApisMap = new HashMap<>();
+        if (codeAnalysisCollection != null) {
+            List<CodeAnalysisApiInfo> codeAnalysisApiInfoList = CodeAnalysisApiInfoDao.instance.findAll(
+                    Filters.eq("_id.codeAnalysisCollectionId", codeAnalysisCollection.getId()
+                )
+            );
+            
+            for(CodeAnalysisApiInfo codeAnalysisApiInfo: codeAnalysisApiInfoList) {
+                CodeAnalysisApiInfoKey codeAnalysisApiInfoKey = codeAnalysisApiInfo.getId();
+                CodeAnalysisApi codeAnalysisApi = new CodeAnalysisApi(
+                    codeAnalysisApiInfoKey.getMethod(),
+                    codeAnalysisApiInfoKey.getEndpoint(),
+                    codeAnalysisApiInfo.getLocation()
+                );
+                codeAnalysisApisMap.put(codeAnalysisApi.generateCodeAnalysisApisMapKey(), codeAnalysisApi);
+            }
+        }
+        codeAnalysisCollectionInfo.put("codeAnalysisApisMap", codeAnalysisApisMap);
+
+        response.put("codeAnalysisCollectionInfo", codeAnalysisCollectionInfo);
 
         return Action.SUCCESS.toUpperCase();
     }

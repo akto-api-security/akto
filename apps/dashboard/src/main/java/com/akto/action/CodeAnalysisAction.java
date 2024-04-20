@@ -9,14 +9,18 @@ import java.util.Map;
 import java.util.Set;
 
 import org.bson.types.Code;
+import org.bson.types.ObjectId;
 import org.checkerframework.checker.units.qual.s;
 
 import com.akto.action.observe.Utils;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.CodeAnalysisApiInfoDao;
 import com.akto.dao.CodeAnalysisCollectionDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.CodeAnalysisApi;
+import com.akto.dto.CodeAnalysisApiInfo;
+import com.akto.dto.CodeAnalysisApiLocation;
 import com.akto.dto.CodeAnalysisCollection;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
@@ -118,7 +122,7 @@ public class CodeAnalysisAction extends UserAction {
                     codeAnalysisApi.getLocation());
                 
                 tempCodeAnalysisApisMap.remove(codeAnalysisApiKey);
-                tempCodeAnalysisApisMap.put(newCodeAnalysisApi.generateCodeAnalysisApiKey(), newCodeAnalysisApi);
+                tempCodeAnalysisApisMap.put(newCodeAnalysisApi.generateCodeAnalysisApisMapKey(), newCodeAnalysisApi);
             }
         }
 
@@ -153,7 +157,7 @@ public class CodeAnalysisAction extends UserAction {
                             trafficApiEndpoint, 
                             codeAnalysisApi.getLocation());
                         
-                        tempCodeAnalysisApisMap.put(newCodeAnalysisApi.generateCodeAnalysisApiKey(), newCodeAnalysisApi);
+                        tempCodeAnalysisApisMap.put(newCodeAnalysisApi.generateCodeAnalysisApisMapKey(), newCodeAnalysisApi);
                         break;
                     }
                 }
@@ -162,14 +166,48 @@ public class CodeAnalysisAction extends UserAction {
 
         codeAnalysisApisMap = tempCodeAnalysisApisMap;
 
-        CodeAnalysisCollectionDao.instance.updateOne(
-            Filters.eq("codeAnalysisCollectionName", apiCollectionName),
-            Updates.combine(
-                    Updates.setOnInsert(CodeAnalysisCollection.NAME, apiCollectionName),
-                    Updates.set(CodeAnalysisCollection.CODE_ANALYSIS_APIS_MAP, codeAnalysisApisMap),
-                    Updates.set(CodeAnalysisCollection.PROJECT_DIR, projectDir)
-            )
-        );
+        ObjectId codeAnalysisCollectionId = null;
+        try {
+            // ObjectId for new code analysis collection
+            codeAnalysisCollectionId = new ObjectId();
+
+            CodeAnalysisCollection codeAnalysisCollection = CodeAnalysisCollectionDao.instance.updateOne(
+                Filters.eq("codeAnalysisCollectionName", apiCollectionName),
+                Updates.combine(
+                        Updates.setOnInsert(CodeAnalysisCollection.ID, codeAnalysisCollectionId),
+                        Updates.setOnInsert(CodeAnalysisCollection.NAME, apiCollectionName),
+                        Updates.set(CodeAnalysisCollection.PROJECT_DIR, projectDir)
+                )
+            );
+
+            // Set code analysis collection id if existing collection is updated
+            if (codeAnalysisCollection != null) {
+                codeAnalysisCollectionId = codeAnalysisCollection.getId();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error updating code analysis collection: " + apiCollectionName + " Error: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Error syncing code analysis collection: " + apiCollectionName);
+            return ERROR.toUpperCase();
+        }
+       
+        if (codeAnalysisCollectionId != null) {
+            for(Map.Entry<String, CodeAnalysisApi> codeAnalysisApiEntry: codeAnalysisApisMap.entrySet()) {
+                try {
+                    CodeAnalysisApi codeAnalysisApi = codeAnalysisApiEntry.getValue();
+                    CodeAnalysisApiInfo.CodeAnalysisApiInfoKey codeAnalysisApiInfoKey = new CodeAnalysisApiInfo.CodeAnalysisApiInfoKey(codeAnalysisCollectionId, codeAnalysisApi.getMethod(), codeAnalysisApi.getEndpoint());
+
+                    CodeAnalysisApiInfoDao.instance.updateOne(
+                        Filters.eq(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
+                        Updates.combine(
+                            Updates.setOnInsert(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
+                            Updates.set(CodeAnalysisApiInfo.LOCATION, codeAnalysisApi.getLocation())
+                        )
+                    );
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error inserting code analysis API: " + codeAnalysisApiEntry.getKey() + "Error: " + e.getMessage(), LogDb.DASHBOARD);
+                }
+            }
+        }
 
         loggerMaker.infoAndAddToDb("Updated code analysis collection: " + apiCollectionName, LogDb.DASHBOARD);
         loggerMaker.infoAndAddToDb("Source code endpoints count: " + codeAnalysisApisMap.size(), LogDb.DASHBOARD);
