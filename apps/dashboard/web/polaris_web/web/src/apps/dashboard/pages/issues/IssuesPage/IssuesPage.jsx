@@ -343,7 +343,6 @@ function IssuesPage(){
                     promotedBulkActions={promotedBulkActions}
                     hideQueryField={true}
                     getNextUrl={getNextUrl}
-                    rowClickable={true}
                     getStatus={func.getTestResultStatus}
                 />
             ]}

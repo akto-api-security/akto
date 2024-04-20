@@ -152,7 +152,10 @@ public class DependencyAnalyser {
                 SingleTypeInfo.SuperType superType = urlTemplate.getTypes()[i];
                 if (superType == null) continue;
                 int idx = ogUrl.startsWith("http") ? i:i+1;
-                String s = ogUrlSplit[idx]; // because ogUrl=/api/books/123 while template url=api/books/INTEGER
+                Object s = ogUrlSplit[idx]; // because ogUrl=/api/books/123 while template url=api/books/INTEGER
+                if (superType.equals(SingleTypeInfo.SuperType.INTEGER)) {
+                    s = Integer.parseInt(ogUrlSplit[idx]);
+                }
                 Set<Object> val = new HashSet<>();
                 val.add(s);
                 processRequestParam(i+"", val, combinedUrl, true, false);

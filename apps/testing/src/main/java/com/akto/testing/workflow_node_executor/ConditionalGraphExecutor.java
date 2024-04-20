@@ -5,16 +5,18 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.dao.test_editor.TestEditorEnums;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.*;
+import com.akto.test_editor.execution.Memory;
 import com.akto.test_editor.filter.Filter;
 
 public class ConditionalGraphExecutor extends GraphExecutor {
     
-    public GraphExecutorResult executeGraph(GraphExecutorRequest graphExecutorRequest,boolean debug, List<TestingRunResult.TestLog> testLogs) {
+    public GraphExecutorResult executeGraph(GraphExecutorRequest graphExecutorRequest, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
 
         Map<String, Boolean> visitedMap = graphExecutorRequest.getVisitedMap();
         List<String> errors = new ArrayList<>();
@@ -30,7 +32,7 @@ public class ConditionalGraphExecutor extends GraphExecutor {
         boolean success = false;
 
         WorkflowTestResult.NodeResult nodeResult;
-        nodeResult = Utils.executeNode(node, graphExecutorRequest.getValuesMap(), debug, testLogs);
+        nodeResult = Utils.executeNode(node, graphExecutorRequest.getValuesMap(), debug, testLogs, memory);
 
         graphExecutorRequest.getWorkflowTestResult().getNodeResultMap().put(node.getId(), nodeResult);
         graphExecutorRequest.getExecutionOrder().add(node.getId());
@@ -77,7 +79,7 @@ public class ConditionalGraphExecutor extends GraphExecutor {
         boolean vulnerable = success;
         if (childNode != null) {
             GraphExecutorRequest childExecReq = new GraphExecutorRequest(graphExecutorRequest, childNode, graphExecutorRequest.getWorkflowTestResult(), visitedMap, graphExecutorRequest.getExecutionOrder());
-            GraphExecutorResult childExecResult = executeGraph(childExecReq, debug, testLogs);
+            GraphExecutorResult childExecResult = executeGraph(childExecReq, debug, testLogs, memory);
             vulnerable = childExecResult.getVulnerable();
             return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), vulnerable, errors);
         } else {
