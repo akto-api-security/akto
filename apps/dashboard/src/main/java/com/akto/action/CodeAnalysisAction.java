@@ -29,7 +29,10 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
 
 public class CodeAnalysisAction extends UserAction {
 
@@ -191,21 +194,30 @@ public class CodeAnalysisAction extends UserAction {
         }
        
         if (codeAnalysisCollectionId != null) {
+            List<WriteModel<CodeAnalysisApiInfo>> bulkUpdates = new ArrayList<>();
+
             for(Map.Entry<String, CodeAnalysisApi> codeAnalysisApiEntry: codeAnalysisApisMap.entrySet()) {
-                try {
                     CodeAnalysisApi codeAnalysisApi = codeAnalysisApiEntry.getValue();
                     CodeAnalysisApiInfo.CodeAnalysisApiInfoKey codeAnalysisApiInfoKey = new CodeAnalysisApiInfo.CodeAnalysisApiInfoKey(codeAnalysisCollectionId, codeAnalysisApi.getMethod(), codeAnalysisApi.getEndpoint());
 
-                    CodeAnalysisApiInfoDao.instance.updateOne(
-                        Filters.eq(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
-                        Updates.combine(
-                            Updates.setOnInsert(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
-                            Updates.set(CodeAnalysisApiInfo.LOCATION, codeAnalysisApi.getLocation())
+                    bulkUpdates.add(
+                        new UpdateOneModel<>(
+                            Filters.eq(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
+                            Updates.combine(
+                                Updates.setOnInsert(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
+                                Updates.set(CodeAnalysisApiInfo.LOCATION, codeAnalysisApi.getLocation())
+                            ),
+                            new UpdateOptions().upsert(true)
                         )
                     );
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error inserting code analysis API: " + codeAnalysisApiEntry.getKey() + "Error: " + e.getMessage(), LogDb.DASHBOARD);
-                }
+            }
+
+            try {
+                CodeAnalysisApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error updating code analysis api infos: " + apiCollectionName + " Error: " + e.getMessage(), LogDb.DASHBOARD);
+                addActionError("Error syncing code analysis collection: " + apiCollectionName);
+                return ERROR.toUpperCase();
             }
         }
 
