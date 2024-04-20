@@ -357,8 +357,12 @@ public class HttpCallParser {
         trafficMetrics.inc(value);
     }
 
-    private boolean isRedundantEndpoint(String url){
-        String regex = ".*\\.(js|css|svg|png|json|html|io).*";
+    private boolean isRedundantEndpoint(String url, List<String> discardedUrlList){
+        StringJoiner joiner = new StringJoiner("|", ".*\\.(", ")(\\?.*)?");
+        for (String extension : discardedUrlList) {
+            joiner.add(extension);
+        }
+        String regex = joiner.toString();
 
         Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(url);
@@ -394,8 +398,8 @@ public class HttpCallParser {
             if (ignoreAktoFlag != null) continue;
 
             // check for garbage points here
-            if(accountSettings != null && !accountSettings.getAllowRedundantEndpoints()){
-                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL())){
+            if(accountSettings != null && accountSettings.getAllowRedundantEndpointsList() != null){
+                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(), accountSettings.getAllowRedundantEndpointsList())){
                     continue;
                 }
                 List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());

@@ -4,12 +4,13 @@ import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import settingRequests from '../api'
-import { QuestionMarkMajor, DeleteMajor } from "@shopify/polaris-icons"
+import { DeleteMajor } from "@shopify/polaris-icons"
 import TooltipText from "../../../components/shared/TooltipText"
 import { isIP } from "is-ip"
 import isCidr from "is-cidr"
 import func from "@/util/func"
 import TextFieldWithInfo from '../../../components/shared/TextFieldWithInfo'
+import DropdownSearch from '../../../components/shared/DropdownSearch'
 
 function About() {
 
@@ -36,7 +37,9 @@ function About() {
     const [enableTelemetry, setEnableTelemetry] = useState(false)
     const [privateCidrList, setPrivateCidrList] = useState([])
     const [partnerIpsList, setPartnerIpsList] = useState([])
-    const [allowRedundantUrls,setAllowRedundantUrls] = useState(false)
+
+    const initialUrlsList = settingFunctions.getRedundantUrlOptions()
+    const [selectedUrlList, setSelectedUrlsList] = useState([])
 
     const setupOptions = settingFunctions.getSetupOptions()
 
@@ -58,7 +61,7 @@ function About() {
 
         setPrivateCidrList(resp.privateCidrList || [])
         setPartnerIpsList(resp.partnerIpList || [])
-        setAllowRedundantUrls(resp.allowRedundantEndpoints)
+        setSelectedUrlsList(resp.allowRedundantEndpointsList || [])
     }
 
     useEffect(()=>{
@@ -113,12 +116,6 @@ function About() {
         setTrafficThreshold(val) ;
         await settingRequests.updateTrafficAlertThresholdSeconds(val);
     }
-
-    const toggleUrlSettings = async(val) => {
-        setAllowRedundantUrls(val);
-        await settingRequests.handleRedundantUrls(val);
-    }
-
     const handleIpsChange = async(ip, isAdded, type) => {
         if(type === 'cidr'){
             let updatedIps = []
@@ -218,6 +215,27 @@ function About() {
         await settingRequests.deleteApiCollectionNameMapper(regex);
         func.setToast(true, false, "Replace collection deleted successfully.")
     }
+
+    const handleSelectedUrls = async(urlsList) => {
+        setSelectedUrlsList(urlsList)
+        await settingRequests.handleRedundantUrls(urlsList)
+    }
+
+    const redundantUrlComp = (
+        <Box width='220px'>
+            <DropdownSearch
+                label="Select redundant url types"
+                placeholder="Select url types"
+                optionsList={initialUrlsList.options}
+                setSelected={handleSelectedUrls}
+                preSelected={selectedUrlList}
+                itemName={"url type"}
+                value={`${selectedUrlList.length} url type selected`}
+                allowMultiple
+                isNested={true}
+            />
+        </Box>
+    )
     
     const filterHeaderComponent = (
         <VerticalStack gap={5}>
@@ -333,7 +351,7 @@ function About() {
                                   <ToggleComponent text={"Redact sample data"} initial={redactPayload} onToggle={handleRedactPayload} />
                                   <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
                                   <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
-                                  <ToggleComponent text={"Allow redundant urls"} initial={allowRedundantUrls} onToggle={toggleUrlSettings} />
+                                  {redundantUrlComp}
                                   <VerticalStack gap={1}>
                                       <Text color="subdued">Traffic alert threshold</Text>
                                       <Box width='120px'>
@@ -354,7 +372,7 @@ function About() {
                       </div>
                   </LegacyCard.Section>
                   :<LegacyCard.Section title={<Text variant="headingMd">More settings</Text>}>
-                    <ToggleComponent text={"Allow redundant urls"} initial={allowRedundantUrls} onToggle={toggleUrlSettings} />
+                    {redundantUrlComp}
                   </LegacyCard.Section>
               }
             <LegacyCard.Section subdued>
