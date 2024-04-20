@@ -2,13 +2,14 @@ package com.akto.dto;
 
 import java.util.Map;
 
+import org.bson.types.ObjectId;
+
 public class CodeAnalysisCollection {
     
+    private ObjectId id;
+    public static final String ID = "_id";
     private String name;
     public static final String NAME = "name";
-
-    private Map<String, CodeAnalysisApi> codeAnalysisApisMap;
-    public static final String CODE_ANALYSIS_APIS_MAP = "codeAnalysisApisMap";
 
     private String projectDir;
     public static final String PROJECT_DIR = "projectDir";
@@ -16,11 +17,19 @@ public class CodeAnalysisCollection {
     public CodeAnalysisCollection() {
     }
 
-    public CodeAnalysisCollection(String name, Map<String, CodeAnalysisApi> codeAnalysisApisMap, String projectDir) {
+    public CodeAnalysisCollection(String name, String projectDir) {
         this.name = name;
-        this.codeAnalysisApisMap = codeAnalysisApisMap;
         this.projectDir = projectDir;
     }
+
+    public ObjectId getId() {
+        return id;
+    }
+
+    public void setId(ObjectId id) {
+        this.id = id;
+    }
+
 
     public String getName() {
         return name;
@@ -28,14 +37,6 @@ public class CodeAnalysisCollection {
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    public Map<String, CodeAnalysisApi> getCodeAnalysisApisMap() {
-        return codeAnalysisApisMap;
-    }
-
-    public void setCodeAnalysisApisMap(Map<String, CodeAnalysisApi> codeAnalysisApisMap) {
-        this.codeAnalysisApisMap = codeAnalysisApisMap;
     }
 
     public String getProjectDir() {

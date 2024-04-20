@@ -193,12 +193,11 @@ function ApiEndpoints() {
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, null)
 
         // handle code analysis endpoints
-        const codeAnalysisCollection = apiCollectionData.codeAnalysisCollection
+        const codeAnalysisCollectionInfo = apiCollectionData.codeAnalysisCollectionInfo
+        const codeAnalysisApisMap = codeAnalysisCollectionInfo.codeAnalysisApisMap
         let shadowApis = []
 
-        if (codeAnalysisCollection) {
-            const codeAnalysisApisMap = codeAnalysisCollection.codeAnalysisApisMap
-
+        if (codeAnalysisApisMap) {
             // Don't show empty screen if there are codeanalysis endpoints present
             if (codeAnalysisApisMap && Object.keys(codeAnalysisApisMap).length > 0) {
                 setShowEmptyScreen(false)
