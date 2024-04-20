@@ -8,6 +8,7 @@ import transform from "./transform";
 import func from "@/util/func";
 import DetailsPage from "../../../components/DetailsPage";
 import {produce} from "immer"
+import { useSearchParams } from 'react-router-dom';
 
 const selectOptions = [
     {
@@ -40,18 +41,45 @@ function AuthTypeDetails() {
 
     const location = useLocation();
     const navigate = useNavigate()
-    const isNew = location?.state != undefined && Object.keys(location?.state).length > 0 ? false : true
+    const [searchParams] = useSearchParams();
+    const isDataInState = location?.state != undefined && Object.keys(location?.state).length > 0
+    const isNameInSearch = searchParams.get("name")
+    const isNew = !isDataInState && !isNameInSearch
     const pageTitle = isNew ? "Add auth type" : "Configure auth type"
-    const initialState = isNew ? { name: "", active:undefined, headerConditions: [], payloadConditions: [] } : 
-        transform.fillInitialState(location.state, selectOptions[0]);
+    const [initialState, setInitialState] = useState({ name: "", active:undefined, headerConditions: [], payloadConditions: [] })
     const [currState, dispatchCurrState] = useReducer(produce((draft, action) => func.conditionStateReducer(draft, action)), {});
     const [change, setChange] = useState(false)
-    const resetFunc = () => {
-        dispatchCurrState({type:"update", obj:initialState})
+    const resetFunc = (originalState) => {
+        dispatchCurrState({type:"update", obj:originalState})
         setChange(false);
     }
+
     useEffect(() => {
-        resetFunc()
+        if (!isNew) {
+
+            let newState = initialState
+
+            if (isDataInState) {
+                newState = transform.fillInitialState(location.state, selectOptions[0])
+                setInitialState(newState);
+                resetFunc(newState)
+            } else {
+
+                authTypesApi.fetchCustomAuthTypes().then((res) => {
+                    let authTypeDetails = res.customAuthTypes.find((authType) => authType.name === searchParams.get("name"))
+                    if (authTypeDetails) {
+                        authTypeDetails.headerConditions = authTypeDetails.headerKeys
+                        authTypeDetails.payloadConditions = authTypeDetails.payloadKeys
+                        resetFunc(transform.fillInitialState(authTypeDetails, selectOptions[0]))
+                    } else {
+                        resetFunc(newState)
+                    }
+                })
+            }
+        } else {
+            resetFunc(initialState)
+        }
+
     }, [])
 
     useEffect(() => {
@@ -168,7 +196,7 @@ function AuthTypeDetails() {
         pageTitle={pageTitle}
         backUrl="/dashboard/settings/auth-types"
         saveAction={saveAction}
-        discardAction={resetFunc}
+        discardAction={() => resetFunc(initialState)}
         isDisabled={compareFunc}
         components={components}
         />

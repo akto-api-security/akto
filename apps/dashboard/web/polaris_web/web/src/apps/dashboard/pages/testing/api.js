@@ -377,6 +377,13 @@ export default {
             data: {apiCollectionId}
         })
     },
+    fetchTestCollectionProperty(tcpId) {
+        return request({
+            url: '/api/fetchTestCollectionProperty',
+            method: 'post',
+            data: {tcpId}
+        })
+    },
     fetchPropertyIds() {
         return request({
             url: '/api/fetchPropertyIds',

@@ -13,6 +13,7 @@ import { ChevronRightMinor, ChevronDownMinor, InfoMinor } from '@shopify/polaris
 import ParamsCard from './ParamsCard';
 import JsonRecording from '../user_config/JsonRecording';
 import Dropdown from '../../../components/layouts/Dropdown';
+import { useSearchParams } from 'react-router-dom';
 
 const selectOptions = [
     {
@@ -45,9 +46,13 @@ function TestRoleSettings() {
 
     const location = useLocation();
     const navigate = useNavigate()
-    const isNew = location?.state != undefined && Object.keys(location?.state).length > 0 ? false : true
+    const [searchParams] = useSearchParams();
+
+    const isDataInState = location?.state != undefined && Object.keys(location?.state).length > 0
+    const isDataInSearch = searchParams.get("name")
+    const isNew = !isDataInState && !isDataInSearch
     const pageTitle = isNew ? "Add test role" : "Configure test role"
-    const initialItems = isNew ? { name: "" } : location.state;
+    const [initialItems, setInitialItems] = useState({ name: "" })
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => conditionsReducer(draft, action)), []);
     const [roleName, setRoleName] = useState("");
     const [change, setChange] = useState(false);
@@ -59,20 +64,48 @@ function TestRoleSettings() {
     const [headerKey, setHeaderKey] = useState('') ;
     const [headerValue, setHeaderValue] = useState('');
     const [automationType, setAutomationType] = useState("LOGIN_STEP_BUILDER")
-
-    const authWithCondList = isNew ? null : location.state.authWithCondList;
     const automationOptions = [
         { label: "Login Step Builder", value: "LOGIN_STEP_BUILDER" },
         { label: "JSON Recording", value: "RECORDED_FLOW" },
     ]
 
-    const resetFunc = () => {
+    function getAuthWithCondList() {
+        return  initialItems?.authWithCondList
+    }
+
+    const resetFunc = (newItems) => {
         setChange(false);
-        setRoleName(initialItems.name ? initialItems.name : "");
-        dispatchConditions({type:"replace", conditions:transform.createConditions(initialItems.endpoints)})
+        setRoleName(newItems.name || "");
+        dispatchConditions({type:"replace", conditions:transform.createConditions(newItems.endpoints)})
     }
     useEffect(() => {
-        resetFunc()
+        if (!isNew) {
+
+            let newItems = initialItems
+
+            if (isDataInState) {
+                newItems = location.state
+                setInitialItems(location.state);
+                resetFunc(newItems)
+            } else {
+                async function fetchData(){
+                    await api.fetchTestRoles().then((res) => {
+                        let testRole = res.testRoles.find((testRole) => testRole.name === searchParams.get("name"));
+                        if (testRole) {
+                            let oo = {...testRole, endpoints: testRole.endpointLogicalGroup.testingEndpoints}
+                            setInitialItems(oo)
+                            resetFunc(oo)
+                        } else {
+                            resetFunc(newItems)
+                        }
+                    })
+                }
+                fetchData();
+
+            }
+        } else {
+            resetFunc(initialItems)
+        }
     }, [])
 
     useEffect(() => {
@@ -210,13 +243,13 @@ function TestRoleSettings() {
     )
 
     const savedParamComponent = (
-        authWithCondList ? 
+        getAuthWithCondList() ?
         <LegacyCard title={<Text variant="headingMd">Configured auth details</Text>} key={"savedAuth"}>
             <br/>
             <Divider />
             <LegacyCard.Section>
                 <VerticalStack gap={6}>
-                    {authWithCondList.map((authObj,index)=> {
+                    {getAuthWithCondList().map((authObj,index)=> {
                         return(
                             <ParamsCard dataObj={authObj} key={JSON.stringify(authObj)} handleDelete={() => {setDeletedIndex(index); setShowAuthDeleteModal(true)}}/>
                         )
@@ -390,7 +423,7 @@ function TestRoleSettings() {
         pageTitle={pageTitle}
         backUrl="/dashboard/testing/roles"
         saveAction={saveAction}
-        discardAction={resetFunc}
+        discardAction={() => resetFunc(initialItems)}
         isDisabled={compareFunc}
         components={components}
         />

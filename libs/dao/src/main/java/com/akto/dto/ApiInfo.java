@@ -39,6 +39,7 @@ public class ApiInfo {
     private boolean isSensitive;
     public static final String SEVERITY_SCORE = "severityScore";
     private float severityScore;
+    public static final String COLLECTION_IDS = "collectionIds";
     private List<Integer> collectionIds;
 
     public enum AuthType {
