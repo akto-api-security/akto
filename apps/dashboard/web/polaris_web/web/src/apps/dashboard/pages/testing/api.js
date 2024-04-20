@@ -1,12 +1,12 @@
 import request from "../../../../util/request"
 
 export default {
-    async fetchTestingDetails(startTimestamp, endTimestamp,  sortKey, sortOrder, skip, limit, filters, testingRunType) {
+    async fetchTestingDetails(startTimestamp, endTimestamp,  sortKey, sortOrder, skip, limit, filters, testingRunType, searchString) {
         const resp = await request({
             url: '/api/retrieveAllCollectionTests',
             method: 'post',
             data: {
-                startTimestamp, endTimestamp,  sortKey, sortOrder, skip, limit, filters, testingRunType
+                startTimestamp, endTimestamp,  sortKey, sortOrder, skip, limit, filters, testingRunType, searchString
             }
         })
         return resp
@@ -24,12 +24,12 @@ export default {
         })
         return resp
     },
-    async fetchTestingRunResults(testingRunResultSummaryHexId, fetchOnlyVulnerable) {
+    async fetchTestingRunResults(testingRunResultSummaryHexId, queryMode) {
         const resp = await request({
             url: '/api/fetchTestingRunResults',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId, fetchOnlyVulnerable
+                testingRunResultSummaryHexId, queryMode
             }
         })
         return resp        
@@ -80,6 +80,24 @@ export default {
             method: 'post',
             data: {
                 testingRunResultHexId
+            }
+        })
+    },
+    createJiraTicket(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId) {
+        return request({
+            url: '/api/createJiraIssue',
+            method: 'post',
+            data: {
+                hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId
+            }
+        })
+    },
+    attachFileToIssue(origReq, testReq, issueId) {
+        return request({
+            url: '/api/attachFileToIssue',
+            method: 'post',
+            data: {
+                origReq, testReq, issueId
             }
         })
     },
@@ -215,22 +233,20 @@ export default {
             }
         })
     },
-
-        addAuthToRole(roleName, apiCond, authParamData, authAutomationType, reqData) {
-            return request({
-                url: '/api/addAuthToRole',
-                method: 'post',
-                data: {roleName, apiCond, authParamData, authAutomationType, reqData}
-            })
-        },
-        deleteAuthFromRole(roleName, index) {
-            return request({
-                url: '/api/deleteAuthFromRole',
-                method: 'post',
-                data: {roleName, index}
-            })
-        },
-
+    addAuthToRole(roleName, apiCond, authParamData, authAutomationType, reqData, recordedLoginFlowInput) {
+        return request({
+            url: '/api/addAuthToRole',
+            method: 'post',
+            data: {roleName, apiCond, authParamData, authAutomationType, reqData, recordedLoginFlowInput}
+        })
+    },
+    deleteAuthFromRole(roleName, index) {
+        return request({
+            url: '/api/deleteAuthFromRole',
+            method: 'post',
+            data: {roleName, index}
+        })
+    },
     deleteTestRuns(testRunIds){
         return request({
             url: '/api/deleteTestRuns',
@@ -318,6 +334,40 @@ export default {
             data: {
                 apiCollectionId, url, method, params
             }
+        })
+    },
+    updateGlobalRateLimit(globalRateLimit) {
+        return request({
+            url: '/api/updateGlobalRateLimit',
+            method: 'post',
+            data: {
+                globalRateLimit
+            }
+        })
+    },
+    fetchAccessMatrixUrlToRoles(){
+        return request({
+            url: '/api/fetchAccessMatrixUrlToRoles',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    createMultipleAccessMatrixTasks(roleName){
+        return request({
+            url: '/api/createMultipleAccessMatrixTasks',
+            method: 'post',
+            data: {roleName}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    deleteAccessMatrix(roleName){
+        return request({
+            url: '/api/deleteAccessMatrix',
+            method: 'post',
+            data: {roleName}
         })
     },
 }

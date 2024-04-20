@@ -3,8 +3,10 @@ package com.akto.utils.billing;
 import java.io.IOException;
 import java.util.*;
 
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.RBACDao;
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.RBAC;
 import com.akto.dto.billing.FeatureAccess;
@@ -20,9 +22,12 @@ import com.mongodb.client.model.Updates;
 
 import okhttp3.*;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class OrganizationUtils {
 
+    private static final Logger logger = LoggerFactory.getLogger(OrganizationUtils.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(OrganizationUtils.class);
     public static boolean isOverage(HashMap<String, FeatureAccess> featureWiseAllowed) {
 
@@ -98,46 +103,10 @@ public class OrganizationUtils {
                 accounts.add(accountRbac.getAccountId());
             }
         } catch (Exception e) {
-            System.out.println("Failed to find accounts belonging to organization. Error - " + e.getMessage());
+            logger.info("Failed to find accounts belonging to organization. Error - " + e.getMessage());
         }
         
         return accounts;
-    }
-
-    private static BasicDBObject fetchFromBillingService(String apiName, BasicDBObject reqBody) {
-        String json = reqBody.toJson();
-
-        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-        RequestBody body = RequestBody.create(json, JSON);
-        Request request = new Request.Builder()
-                .url(UsageUtils.getUsageServiceUrl() + "/api/"+apiName)
-                .post(body)
-                .build();
-
-        OkHttpClient client = new OkHttpClient();
-        Response response = null;
-
-        try {
-            response = client.newCall(request).execute();
-            if (!response.isSuccessful()) {
-                throw new IOException("Unexpected code " + response);
-            }
-
-            ResponseBody responseBody = response.body();
-            if (responseBody == null) {
-                return null;
-            }
-
-            return BasicDBObject.parse(responseBody.string());
-
-        } catch (IOException e) {
-            System.out.println("Failed to sync organization with Akto. Error - " +  e.getMessage());
-            return null;
-        } finally {
-            if (response != null) {
-                response.close();
-            }
-        }
     }
 
     private static BasicDBObject fetchFromInternalService(String apiName, BasicDBObject reqBody) {
@@ -167,7 +136,7 @@ public class OrganizationUtils {
             return BasicDBObject.parse(responseBody.string());
 
         } catch (IOException e) {
-            System.out.println("Failed to sync organization with Akto. Error - " +  e.getMessage());
+            logger.info("Failed to sync organization with Akto. Error - " +  e.getMessage());
             return null;
         } finally {
             if (response != null) {
@@ -177,12 +146,12 @@ public class OrganizationUtils {
     }
 
     public static void flushUsagePipelineForOrg(String organizationId) {
-        fetchFromBillingService("flushUsageDataForOrg", new BasicDBObject("organizationId", organizationId));
+        UsageMetricUtils.fetchFromBillingService("flushUsageDataForOrg", new BasicDBObject("organizationId", organizationId));
     }
 
     public static BasicDBObject fetchOrgDetails(String orgId) {
         String orgIdUUID = UUID.fromString(orgId).toString();
-        return fetchFromBillingService("fetchOrgDetails", new BasicDBObject("orgId", orgIdUUID));
+        return UsageMetricUtils.fetchFromBillingService("fetchOrgDetails", new BasicDBObject("orgId", orgIdUUID));
     }
     public static BasicDBObject provisionSubscription(String customerId, String planId, String billingPeriod, String successUrl, String cancelUrl) {
         String orgIdUUID = UUID.fromString(customerId).toString();
@@ -198,7 +167,7 @@ public class OrganizationUtils {
     public static String fetchClientKey(String orgId, String adminEmail) {
         String orgIdUUID = UUID.fromString(orgId).toString();
         BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
-        BasicDBObject respBody = fetchFromBillingService("fetchClientKey", reqBody);
+        BasicDBObject respBody = UsageMetricUtils.fetchFromBillingService("fetchClientKey", reqBody);
         if (respBody == null) return "";
 
         return respBody.getOrDefault("clientKey", "").toString();
@@ -208,7 +177,7 @@ public class OrganizationUtils {
     public static String fetchSignature(String orgId, String adminEmail) {
         String orgIdUUID = UUID.fromString(orgId).toString();
         BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
-        BasicDBObject respBody = fetchFromBillingService("fetchSignature", reqBody);
+        BasicDBObject respBody = UsageMetricUtils.fetchFromBillingService("fetchSignature", reqBody);
 
         if (respBody == null) return "";
 
@@ -243,7 +212,7 @@ public class OrganizationUtils {
                 Updates.set(Organization.SYNCED_WITH_AKTO, true)
             );
         } catch (IOException e) {
-            System.out.println("Failed to sync organization with Akto. Error - " +  e.getMessage());
+            logger.info("Failed to sync organization with Akto. Error - " +  e.getMessage());
             return false;
         } finally {
             if (response != null) {
@@ -276,7 +245,7 @@ public class OrganizationUtils {
     public static BasicDBList fetchEntitlements(String orgId, String adminEmail) {
         String orgIdUUID = UUID.fromString(orgId).toString();
         BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
-        BasicDBObject ret = fetchFromBillingService("fetchEntitlements", reqBody);
+        BasicDBObject ret = UsageMetricUtils.fetchFromBillingService("fetchEntitlements", reqBody);
 
         if (ret == null) {
             return null;
@@ -316,5 +285,17 @@ public class OrganizationUtils {
         String expiredStr = (String) additionalMetaData.getOrDefault(OrgMetaData.EXPIRED.name(), "false");
         boolean expired = Boolean.TRUE.toString().equalsIgnoreCase(expiredStr);
         return expired;
+    }
+
+    public static String fetchHotjarSiteId(BasicDBObject metadata) {
+        return additionalMetaData.getString("HOTJAR_SITE_ID", "");
+    }
+
+    public static boolean fetchTelemetryEnabled(BasicDBObject metadata) {
+        return additionalMetaData.getString("ENABLE_TELEMETRY", "NA").equalsIgnoreCase("ENABLED");
+    }
+
+    public static boolean fetchTestTelemetryEnabled(BasicDBObject metadata) {
+        return additionalMetaData.getString("ENABLE_TEST_TELEMETRY", "NA").equalsIgnoreCase("ENABLED");
     }
 }

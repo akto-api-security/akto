@@ -57,6 +57,8 @@ import com.mongodb.client.model.Updates;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -73,6 +75,7 @@ public class SaveTestEditorAction extends UserAction {
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private static final LoggerMaker loggerMaker = new LoggerMaker(SaveTestEditorAction.class);
+    private static final Logger logger = LoggerFactory.getLogger(SaveTestEditorAction.class);
 
     @Override
     public String execute() throws Exception {
@@ -319,10 +322,11 @@ public class SaveTestEditorAction extends UserAction {
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
         TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
         List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
+        int lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
         testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs);
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
-                    new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(0),
+                    new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(lastSampleIndex),
                     Collections.singletonList("failed to execute test"),
                     0, false, TestResult.Confidence.HIGH, null)),
                     false,null,0,Context.now(),
@@ -332,7 +336,7 @@ public class SaveTestEditorAction extends UserAction {
         testingRunResult.setId(new ObjectId());
         if (testingRunResult.isVulnerable()) {
             TestingIssuesId issuesId = new TestingIssuesId(infoKey, GlobalEnums.TestErrorSource.TEST_EDITOR, testConfig.getId(), null);
-            testingRunIssues = new TestingRunIssues(issuesId, GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity()), GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(),null, Context.now());
+            testingRunIssues = new TestingRunIssues(issuesId, GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity()), GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(),null, null, Context.now());
         }
         BasicDBObject infoObj = IssuesAction.createSubcategoriesInfoObj(testConfig);
         subCategoryMap = new HashMap<>();
@@ -520,7 +524,7 @@ public class SaveTestEditorAction extends UserAction {
         List<String> files = new ArrayList<>();
         Files.walk(dir).forEach(path -> showFile(path.toFile(), files));
         for (String filePath : files) {
-            System.out.println(filePath);
+            logger.info(filePath);
             List<String> lines = Files.readAllLines(Paths.get(filePath));
             String content  = String.join("\n", lines);
             SaveTestEditorAction saveTestEditorAction = new SaveTestEditorAction();
@@ -531,7 +535,7 @@ public class SaveTestEditorAction extends UserAction {
             session.put("user",user);
             saveTestEditorAction.setSession(session);
             String success = SUCCESS.toUpperCase();
-            System.out.println(success);
+            logger.info(success);
         }
     }
 
