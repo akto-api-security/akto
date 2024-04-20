@@ -13,6 +13,7 @@ import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.stigg.StiggReporterClient;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -108,6 +109,8 @@ public class UsageCalculator {
             sinks = new HashMap<>();
         }
 
+        BasicDBList updateList = new BasicDBList();
+
         for(Map.Entry<String, Integer> entry: lastUsageItem.getOrgMetricMap().entrySet()) {
             MetricTypes metricType = MetricTypes.valueOf(entry.getKey());
             String featureId = null;
@@ -139,13 +142,23 @@ public class UsageCalculator {
             int value = entry.getValue();
 
             try {
-                StiggReporterClient.instance.reportUsage(value, lastUsageItem.getOrgId(), featureId);
-                sinks.put(OrganizationUsage.DataSink.STIGG.toString(), Context.now());
+                BasicDBObject updateObject = StiggReporterClient.instance.getUpdateObject(value, lastUsageItem.getOrgId(), featureId);
+                updateList.add(updateObject);
                 syncBillingEodWithMixpanel(lastUsageItem, metricType, value);
-            } catch (IOException e) {
-                String errLog = "error while saving to Stigg: " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate() + " " + featureId;
+            } catch (Exception e) {
+                String errLog = "error while saving to Mixpanel: " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate() + " " + featureId;
                 loggerMaker.errorAndAddToDb(e, errLog, LoggerMaker.LogDb.BILLING);
             }
+        }
+
+        try {
+            if (updateList.size() > 0 ){
+                StiggReporterClient.instance.reportUsageBulk(lastUsageItem.getOrgId(), updateList);
+                sinks.put(OrganizationUsage.DataSink.STIGG.toString(), Context.now());
+            }
+        } catch (IOException e) {
+            String errLog = "error while saving to Stigg: " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate();
+            loggerMaker.errorAndAddToDb(e, errLog, LoggerMaker.LogDb.BILLING);
         }
 
         OrganizationUsageDao.instance.updateOne(
