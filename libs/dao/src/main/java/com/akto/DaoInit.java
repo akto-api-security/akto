@@ -362,6 +362,8 @@ public class DaoInit {
         ActivitiesDao.instance.createIndicesIfAbsent();
         DependencyNodeDao.instance.createIndicesIfAbsent();
         DependencyFlowNodesDao.instance.createIndicesIfAbsent();
+        CodeAnalysisCollectionDao.instance.createIndicesIfAbsent();
+        CodeAnalysisApiInfoDao.instance.createIndicesIfAbsent();
     }
 
 }
