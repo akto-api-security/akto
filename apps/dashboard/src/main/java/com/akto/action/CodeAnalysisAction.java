@@ -103,7 +103,7 @@ public class CodeAnalysisAction extends UserAction {
 
             trafficApiEndpointAktoTemplateStrToOriginalMap.put(trafficApiEndpointAktoTemplateStr, trafficApiEndpoint);
         }
-
+        
         Map<String, CodeAnalysisApi> tempCodeAnalysisApisMap = new HashMap<>(codeAnalysisApisMap);
         for (Map.Entry<String, CodeAnalysisApi> codeAnalysisApiEntry: codeAnalysisApisMap.entrySet()) {
             String codeAnalysisApiKey = codeAnalysisApiEntry.getKey();
@@ -212,12 +212,14 @@ public class CodeAnalysisAction extends UserAction {
                     );
             }
 
-            try {
-                CodeAnalysisApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error updating code analysis api infos: " + apiCollectionName + " Error: " + e.getMessage(), LogDb.DASHBOARD);
-                addActionError("Error syncing code analysis collection: " + apiCollectionName);
-                return ERROR.toUpperCase();
+            if (bulkUpdates.size() > 0) {
+                try {
+                    CodeAnalysisApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error updating code analysis api infos: " + apiCollectionName + " Error: " + e.getMessage(), LogDb.DASHBOARD);
+                    addActionError("Error syncing code analysis collection: " + apiCollectionName);
+                    return ERROR.toUpperCase();
+                }
             }
         }
 

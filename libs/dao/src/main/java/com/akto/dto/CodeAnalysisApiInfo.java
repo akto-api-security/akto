@@ -15,6 +15,7 @@ public class CodeAnalysisApiInfo {
     
     public static class CodeAnalysisApiInfoKey {
         private ObjectId codeAnalysisCollectionId;
+        public static final String CODE_ANALYSIS_COLLECTION_ID = "codeAnalysisCollectionId";
         private String method;
         private String endpoint;
 
@@ -74,5 +75,9 @@ public class CodeAnalysisApiInfo {
 
     public void setLocation(CodeAnalysisApiLocation location) {
         this.location = location;
+    }
+
+    public String generateCodeAnalysisApisMapKey() {
+        return id.getMethod() + " " + id.getEndpoint();
     }
 }
