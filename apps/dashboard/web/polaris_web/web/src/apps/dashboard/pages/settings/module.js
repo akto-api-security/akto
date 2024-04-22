@@ -43,6 +43,7 @@ const urlOptionsList = [
   {
     title: 'Documents',
     options: [
+      {value: 'json', label: '.json'},
       {value: 'pdf', label: '.pdf'},
       {value: 'doc', label: '.doc'},
       {value: 'docx', label: '.docx'},
