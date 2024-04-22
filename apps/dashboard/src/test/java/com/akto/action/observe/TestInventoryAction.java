@@ -18,6 +18,9 @@ import com.akto.listener.RuntimeListener;
 import com.akto.parsers.HttpCallParser;
 import com.akto.types.CappedSet;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
+import com.google.api.client.util.Charsets;
+import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -153,8 +156,8 @@ public class TestInventoryAction extends MongoBasedTest {
         String result = inventoryAction.deMergeApi();
         assertEquals(Action.SUCCESS.toUpperCase(), result);
 
-
-        APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, true, httpCallParser.apiCatalogSync.existingAPIsInDb);
+        BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
+        APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, true, existingAPIsInDb);
 
         List<SingleTypeInfo> singleTypeInfoObjectIdList  = SingleTypeInfoDao.instance.findAll(SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, "api/books/OBJECT_ID", URLMethods.Method.POST));
         assertEquals(5, singleTypeInfoObjectIdList.size());
