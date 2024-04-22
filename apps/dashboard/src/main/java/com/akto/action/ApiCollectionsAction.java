@@ -178,7 +178,7 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
 
-        ActivitiesDao.instance.insertActivity("Collection created", "Collection named " + this.collectionName + " was created.");
+        ActivitiesDao.instance.insertActivity("Collection created", "Collection named " + this.collectionName + " was created");
 
         return Action.SUCCESS.toUpperCase();
     }

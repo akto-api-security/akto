@@ -13,6 +13,7 @@ import PersistStore from "../../../../main/PersistStore";
 import ApiChangesTable from "./component/ApiChangesTable";
 import SummaryCardInfo from "../../../components/shared/SummaryCardInfo";
 import StackedChart from "../../../components/charts/StackedChart";
+import { useLocation } from "react-router-dom";
 
 
 function ApiChanges() {
@@ -27,16 +28,30 @@ function ApiChanges() {
     const [apiDetail, setApiDetail] = useState({})
     const [tableHeaders,setTableHeaders] = useState([])
 
+    const location = useLocation()
+
+
+
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
+
+    // console.log(values.ranges[3])
+
+  
+
+    const initialVal = (location.state) ?  { alias: "recencyPeriod", title : (new Date((location.state.timestamp - 5* 60 )*1000)).toLocaleDateString('en-US') ,  period : {since: new Date((location.state.timestamp - 5* 60 )*1000), until: new Date((location.state.timestamp + 5* 60 )*1000)} } : values.ranges[3]
+
+    console.log( initialVal) 
     
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
+    console.log(values.ranges[3])
+    
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
     const getTimeEpoch = (key) => {
         return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
     }
 
-    const startTimestamp = getTimeEpoch("since")
-    const endTimestamp = getTimeEpoch("until")
+    const startTimestamp = (location.state)? (location.state.timestamp - 25*60) : getTimeEpoch("since")
+    const endTimestamp = (location.state)? (location.state.timestamp + 25*60) : getTimeEpoch("until")
     
     function handleRowClick(data,headers) {
         const sameRow = func.deepComparison(apiDetail, data);
@@ -115,6 +130,7 @@ function ApiChanges() {
             newEndpoints={newEndpoints.prettify}
             parametersCount={newParametersCount}
             key="table"
+            tab={(location.state)?(location.state.tab):0 }
         />
     )
 
