@@ -16,7 +16,6 @@ import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo"
 import CollectionsPageBanner from "./component/CollectionsPageBanner"
 import useTable from "@/apps/dashboard/components/tables/TableContext"
 
-
 const headers = [
     {
         title: "API collection name",
@@ -223,14 +222,14 @@ function ApiCollections() {
         fetchData()
         resetFunc()    
     }, [])
-
     const createCollectionModalActivatorRef = useRef();
 
     async function handleRemoveCollections(collectionIdList) {
         const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
         const response = await api.deleteMultipleCollections(collectionIdListObj)
         fetchData()
-        func.setToast(true, false, `${collectionIdList.length} API collection${collectionIdList.length > 1 ? "s" : ""} deleted successfully`)
+        func.setToast(true, false, <div  data-testid="deletion_message">{`${collectionIdList.length} API collection${collectionIdList.length > 1 ? "s" : ""} deleted successfully`}</div>)
+
     }
 
     const updateData = (dataMap) => {
@@ -258,7 +257,7 @@ function ApiCollections() {
 
     const promotedBulkActions = (selectedResources) => {
         const removeCollectionsObj = {
-            content: `Remove collection${func.addPlurality(selectedResources.length)}`,
+            content: <div data-testid="delete_button">{`Remove collection${func.addPlurality(selectedResources.length)}`}</div>,
             onAction: () => handleRemoveCollections(selectedResources)
         }
 
