@@ -97,7 +97,9 @@ function formatRawNodeData(nodes, currentApiCollectionId, currentEndpoint, curre
         let connections = node["connections"]
         let edgesMap = new Map()
         Object.values(connections).forEach(connection => {
-            let edge = connection["edges"][0] // todo: null check
+            let edge = connection["edges"][0]
+
+            if (!edge) return
 
             let source = calculateNodeId(edge["apiCollectionId"], edge["url"], edge["method"]);
             let edgeId = source + "-" + id;
