@@ -428,7 +428,7 @@ function About() {
     }
 
     const components = [accountInfoComponent, 
-                        <UpdateIpsComponent 
+                        window.IS_SAAS !== "true" ? <UpdateIpsComponent 
                             key={"cidr"} 
                             description={"We use these CIDRs to mark the endpoints as PRIVATE"} 
                             title={"Private CIDRs list"}
@@ -437,8 +437,8 @@ function About() {
                             onSubmit={(val) => handleIpsChange(val,true,"cidr")}
                             onRemove={(val) => handleIpsChange(val, false, "cidr")}
                             type={"cidr"}
-                        />,
-                        <UpdateIpsComponent
+                        /> : null,
+                        window.IS_SAAS !== "true" ? <UpdateIpsComponent
                             key={"partner"}
                             description={"We use these IPS to mark the endpoints as PARTNER"} 
                             title={"Third parties Ips list"}
@@ -447,7 +447,7 @@ function About() {
                             onSubmit={(val) => handleIpsChange(val,true,"partner")}
                             onRemove={(val) => handleIpsChange(val, false, "partner")}
                             type={"partner"}
-                        />
+                        /> : null
         ]
 
     return (
