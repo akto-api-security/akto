@@ -168,26 +168,39 @@ const settingFunctions = {
             respOrgStr = respOrg.id + " (" + respOrg.adminEmail + ")"
         }
 
-        arr = [
-          {
-            title: "Organization ID",
-            text: respOrgStr
-          },
-          {
-            title: 'Account ID',
-            text: resp.id,
-          },{
-            title: 'Dashboard Version',
-            text: resp.dashboardVersion,
-          },{
-            title: 'Runtime Version',
-            text: resp.apiRuntimeVersion
-          },
-          {
-            title: 'Last Login',
-            text: loginInfo,
-          },
-        ]
+        if(window.IS_SAAS === "true"){
+          arr = [
+            {
+              title: 'Account ID',
+              text: resp.id,
+            },
+            {
+              title: 'Last Login',
+              text: loginInfo,
+            },
+          ]
+        } else{
+          arr = [
+            {
+              title: "Organization ID",
+              text: respOrgStr
+            },
+            {
+              title: 'Account ID',
+              text: resp.id,
+            },{
+              title: 'Dashboard Version',
+              text: resp.dashboardVersion,
+            },{
+              title: 'Runtime Version',
+              text: resp.apiRuntimeVersion
+            },
+            {
+              title: 'Last Login',
+              text: loginInfo,
+            },
+          ]
+        }
       })
       return {arr,resp}
     },
