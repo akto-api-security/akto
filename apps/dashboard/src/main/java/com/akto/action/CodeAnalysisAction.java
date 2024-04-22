@@ -76,15 +76,18 @@ public class CodeAnalysisAction extends UserAction {
 
             // extract path name from url
             try {
-                URL url = new URL(trafficApiUrl);
-                trafficApiEndpoint = url.getPath(); 
+                // Directly parse the trafficApiUrl as a URI
+                URI uri = new URI(trafficApiUrl);
+                trafficApiEndpoint = uri.getPath();
 
-                trafficApiEndpoint = new URI(trafficApiEndpoint).getPath()
-                        .replace("%7B", "{")
-                        .replace("%7D", "}");
+                // Decode any percent-encoded characters in the path
+                trafficApiEndpoint = java.net.URLDecoder.decode(trafficApiEndpoint, "UTF-8");
+
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error parsing URL: " + trafficApiUrl, LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("Error parsing URI: " + trafficApiUrl, LogDb.DASHBOARD);
+                continue;
             }
+
 
             // Ensure endpoint doesn't end with a slash
             if (trafficApiEndpoint.length() > 1 && trafficApiEndpoint.endsWith("/")) {
@@ -152,6 +155,7 @@ public class CodeAnalysisAction extends UserAction {
                         trafficApiEndpoint = trafficApiKeyParts[1];
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Error parsing traffic API key: " + trafficApiKey, LogDb.DASHBOARD);
+                        continue;
                     }
 
                     if (codeAnalysisApiEndpoint.equals(trafficApiEndpoint)) {
