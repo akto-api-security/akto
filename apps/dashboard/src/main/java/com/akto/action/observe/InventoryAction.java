@@ -10,9 +10,6 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CodeAnalysisApiInfo.CodeAnalysisApiInfoKey;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
-import com.akto.dto.type.APICatalog;
-import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
@@ -361,7 +358,7 @@ public class InventoryAction extends UserAction {
 
         // Attach code analysis collection
         BasicDBObject codeAnalysisCollectionInfo = new BasicDBObject();
-        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
         CodeAnalysisCollection codeAnalysisCollection = null;
         if (apiCollection != null) {
             codeAnalysisCollection = CodeAnalysisCollectionDao.instance.findOne(
