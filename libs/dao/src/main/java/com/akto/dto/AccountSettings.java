@@ -2,6 +2,7 @@ package com.akto.dto;
 
 import com.akto.dto.settings.DefaultPayload;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -94,8 +95,8 @@ public class AccountSettings {
     public static final String PARTNER_IP_LIST = "partnerIpList";
     private List<String> partnerIpList;
 
-    public static final String ALLOW_REDUNDANT_ENDPOINTS = "allowRedundantEndpoints";
-    private boolean allowRedundantEndpoints;
+    public static final String ALLOW_REDUNDANT_ENDPOINTS_LIST = "allowRedundantEndpointsList";
+    private List<String> allowRedundantEndpointsList;
 
     public AccountSettings() {
     }
@@ -364,11 +365,22 @@ public class AccountSettings {
 		this.partnerIpList = partnerIpList;
 	}
 
-    public boolean getAllowRedundantEndpoints() {
-        return allowRedundantEndpoints;
+    public List<String> getAllowRedundantEndpointsList() {
+        if(this.allowRedundantEndpointsList == null) {
+            List<String> ignoreUrlTypesList = Arrays.asList(
+                "htm","html", "css", "js",   // Web formats
+                "jpg", "jpeg", "png", "gif", "svg", "webp",  // Image formats
+                "mp4", "webm", "ogg", "ogv", "avi", "mov",  // Video formats
+                "mp3", "wav", "oga",  // Audio formats
+                "woff", "woff2", "ttf", "otf", // Font formats
+                ".pptx", ".json" // file formats
+            );
+            return ignoreUrlTypesList;
+        }
+        return allowRedundantEndpointsList;
     }
 
-    public void setAllowRedundantEndpoints(boolean allowRedundantEndpoints) {
-        this.allowRedundantEndpoints = allowRedundantEndpoints;
+    public void setAllowRedundantEndpointsList(List<String> allowRedundantEndpointsList) {
+        this.allowRedundantEndpointsList = allowRedundantEndpointsList;
     }
 }
