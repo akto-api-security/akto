@@ -38,12 +38,34 @@ public class CodeAnalysisAction extends UserAction {
 
     private String projectDir;
     private String apiCollectionName;
-    private Map<String, CodeAnalysisApi> codeAnalysisApisMap;
+    private List<CodeAnalysisApi> codeAnalysisApisList;
+
+    public static final int MAX_BATCH_SIZE = 100;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class);
     
     public String syncExtractedAPIs() {
         loggerMaker.infoAndAddToDb("Syncing code analysis endpoints for collection: " + apiCollectionName, LogDb.DASHBOARD);
+
+        if (codeAnalysisApisList == null) {
+            loggerMaker.errorAndAddToDb("Code analysis api's list is null", LogDb.DASHBOARD);
+            addActionError("Code analysis api's list is null");
+            return ERROR.toUpperCase();
+        }
+
+        // Ensure batch size is not exceeded
+        if (codeAnalysisApisList.size() > MAX_BATCH_SIZE) {
+            String errorMsg = "Code analysis api's sync batch size exceeded. Max Batch size: " + MAX_BATCH_SIZE + " Batch size: " + codeAnalysisApisList.size();
+            loggerMaker.errorAndAddToDb(errorMsg, LogDb.DASHBOARD);
+            addActionError(errorMsg);
+            return ERROR.toUpperCase();
+        }
+
+        // populate code analysis api map
+        Map<String, CodeAnalysisApi> codeAnalysisApisMap = new HashMap<>();
+        for (CodeAnalysisApi codeAnalysisApi: codeAnalysisApisList) {
+            codeAnalysisApisMap.put(codeAnalysisApi.generateCodeAnalysisApisMapKey(), codeAnalysisApi);
+        }
 
         // todo:  If API collection does exist, create it
         ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(apiCollectionName);
@@ -249,11 +271,11 @@ public class CodeAnalysisAction extends UserAction {
         this.apiCollectionName = apiCollectionName;
     }
 
-    public Map<String, CodeAnalysisApi> getCodeAnalysisApisMap() {
-        return codeAnalysisApisMap;
+    public List<CodeAnalysisApi> getCodeAnalysisApisList() {
+        return codeAnalysisApisList;
     }
 
-    public void setCodeAnalysisApisMap(Map<String, CodeAnalysisApi> codeAnalysisApisMap) {
-        this.codeAnalysisApisMap = codeAnalysisApisMap;
+    public void setCodeAnalysisApisList(List<CodeAnalysisApi> codeAnalysisApisList) {
+        this.codeAnalysisApisList = codeAnalysisApisList;
     }
 }

@@ -20,6 +20,8 @@ import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
+import io.jsonwebtoken.lang.Arrays;
+
 import static org.junit.Assert.*;
 
 import java.util.ArrayList;
@@ -57,13 +59,14 @@ public class TestCodeAnalysisAction extends MongoBasedTest {
         addTrafficApi(apiCollectionId, "https://code-analysis-test.com/api/books/INTEGER", URLMethods.Method.GET);
         addTrafficApi(apiCollectionId, "https://code-analysis-test.com/api/books/INTEGER", URLMethods.Method.POST);
 
-        Map<String, CodeAnalysisApi> codeAnalysisApisMap = new HashMap<String, CodeAnalysisApi>();
-        codeAnalysisApisMap.put("GET /api/books/STRING", new CodeAnalysisApi("GET", "/api/books/STRING", new CodeAnalysisApiLocation()));
-        
+        List<CodeAnalysisApi> codeAnalysisApisList = new ArrayList<>();
+        CodeAnalysisApi ca1 = new CodeAnalysisApi("GET", "/api/books/STRING", new CodeAnalysisApiLocation());
+        codeAnalysisApisList.add(ca1);
+
         CodeAnalysisAction codeAnalysisAction = new CodeAnalysisAction();
         codeAnalysisAction.setApiCollectionName("code-analysis-test");
         codeAnalysisAction.setProjectDir("code-analysis-test");
-        codeAnalysisAction.setCodeAnalysisApisMap(codeAnalysisApisMap);
+        codeAnalysisAction.setCodeAnalysisApisList(codeAnalysisApisList);
         codeAnalysisAction.syncExtractedAPIs();
 
         CodeAnalysisCollection codeAnalysisCollection = CodeAnalysisCollectionDao.instance.findOne(Filters.eq("name", apiCollectionName));
