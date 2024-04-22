@@ -231,8 +231,8 @@ public class TestExecutor {
                  Future<Void> future = threadPool.submit(
                          () -> startWithLatch(apiInfoKey,
                                  testingRun.getTestIdConfig(),
-                                 testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
-                                 accountId, latch, now, maxRunTime, testingRun.getTestRunTime(), testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, syncLimit));
+                                 testingRun.getId(), testingRun.getTestingRunConfig(), testingUtil, summaryId,
+                                 accountId, latch, now, maxRunTime, testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, syncLimit));
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
@@ -498,18 +498,12 @@ public class TestExecutor {
 
         Context.accountId.set(accountId);
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
-
         
-        int now = Context.now();
-        if ( timeToKill <= 0 || now - startTime <= timeToKill) {
-            try {
-                // todo: commented out older one
-//                testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
-                startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs);
-            } catch (Exception e) {
-                e.printStackTrace();
-                loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);
-            }
+        try {
+            startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, maxRunTime, syncLimit);
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);
         }
 
         latch.countDown();

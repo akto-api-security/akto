@@ -275,7 +275,7 @@ public class OrganizationUtils {
     public static BasicDBObject fetchOrgMetaData(String orgId, String adminEmail) {
         String orgIdUUID = UUID.fromString(orgId).toString();
         BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
-        BasicDBObject orgMetaData = fetchFromBillingService("fetchOrgMetaData", reqBody);
+        BasicDBObject orgMetaData = UsageMetricUtils.fetchFromBillingService("fetchOrgMetaData", reqBody);
         orgMetaData = orgMetaData == null ? new BasicDBObject() : orgMetaData;
         BasicDBObject additionalMetaData = (BasicDBObject) orgMetaData.getOrDefault("additionalMetaData", new BasicDBObject());
         return additionalMetaData;
@@ -287,15 +287,15 @@ public class OrganizationUtils {
         return expired;
     }
 
-    public static String fetchHotjarSiteId(BasicDBObject metadata) {
+    public static String fetchHotjarSiteId(BasicDBObject additionalMetaData) {
         return additionalMetaData.getString("HOTJAR_SITE_ID", "");
     }
 
-    public static boolean fetchTelemetryEnabled(BasicDBObject metadata) {
+    public static boolean fetchTelemetryEnabled(BasicDBObject additionalMetaData) {
         return additionalMetaData.getString("ENABLE_TELEMETRY", "NA").equalsIgnoreCase("ENABLED");
     }
 
-    public static boolean fetchTestTelemetryEnabled(BasicDBObject metadata) {
+    public static boolean fetchTestTelemetryEnabled(BasicDBObject additionalMetaData) {
         return additionalMetaData.getString("ENABLE_TEST_TELEMETRY", "NA").equalsIgnoreCase("ENABLED");
     }
 }

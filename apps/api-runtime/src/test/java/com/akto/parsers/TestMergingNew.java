@@ -16,6 +16,9 @@ import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
 import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
+import com.google.api.client.util.Charsets;
+import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -840,7 +843,7 @@ public class TestMergingNew extends MongoBasedTest {
         httpCallParser.syncFunction(Collections.singletonList(httpResponseParams4), false, true, null);
         httpCallParser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
 
-        APICatalogSync.mergeUrlsAndSave(httpResponseParams4.requestParams.getApiCollectionId(), true, false, parser.apiCatalogSync.existingAPIsInDb);
+        APICatalogSync.mergeUrlsAndSave(httpResponseParams4.requestParams.getApiCollectionId(), true, false, httpCallParser.apiCatalogSync.existingAPIsInDb);
 
         Bson filter3 = Filters.and(
                 Filters.eq("_id.url", "https://petstore.swagger.io/v2/books/INTEGER"),
@@ -876,12 +879,13 @@ public class TestMergingNew extends MongoBasedTest {
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo1);
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo2);
 
-        mergeUrlsAndSave(1, true, false, );
+        BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
+        mergeUrlsAndSave(1, true, false, existingAPIsInDb);
 
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo1.copy());
         SingleTypeInfoDao.instance.insertOne(singleTypeInfo2.copy());
 
-        mergeUrlsAndSave(1, true, false);
+        mergeUrlsAndSave(1, true, false, existingAPIsInDb);
 
         long estimatedDocumentCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.eq(SingleTypeInfo._URL,"api/books/INTEGER"));
         assertEquals(2, estimatedDocumentCount);
@@ -918,8 +922,8 @@ public class TestMergingNew extends MongoBasedTest {
 
         long count = SingleTypeInfoDao.instance.getEstimatedCount();
         assertEquals(2, count);
-
-        mergeUrlsAndSave(apiCollection.getId(),true, false);
+        BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
+        mergeUrlsAndSave(apiCollection.getId(),true, false, existingAPIsInDb);
 
         count = SingleTypeInfoDao.instance.getEstimatedCount();
         assertEquals(2, count);
@@ -955,8 +959,8 @@ public class TestMergingNew extends MongoBasedTest {
 
         long count = SingleTypeInfoDao.instance.getEstimatedCount();
         assertEquals(2, count);
-
-        mergeUrlsAndSave(apiCollection.getId(),true,true);
+        BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
+        mergeUrlsAndSave(apiCollection.getId(),true,true, existingAPIsInDb);
 
         count = SingleTypeInfoDao.instance.getEstimatedCount();
         assertEquals(3, count); // 1 host + 2 url params

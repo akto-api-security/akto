@@ -15,6 +15,11 @@ import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.Setup;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.SyncLimit;
+import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRunConfig;
@@ -209,8 +214,6 @@ public class Main {
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
-        Map<Integer, Integer> logSentMap = new HashMap<>();
-
         while (true) {
             AccountTask.instance.executeTask(account -> {
                 int accountId = account.getId();
@@ -233,14 +236,10 @@ public class Main {
                     return;
                 }
 
-                int accountId = account.getId();
-                if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
-                    int lastSent = logSentMap.getOrDefault(accountId, 0);
-                    if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
-                        logSentMap.put(accountId, start);
-                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
-                                + " . Failing test run : " + start, LogDb.TESTING);
-                    }
+                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
+
+                if (featureAccess.checkInvalidAccess()) {
+                    loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId + ". Failing test run at " + start, LogDb.TESTING);
                     TestingRunDao.instance.getMCollection().findOneAndUpdate(
                             Filters.eq(Constants.ID, testingRun.getId()),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
@@ -254,6 +253,8 @@ public class Main {
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
                 // saving the initial usageLeft, to calc delta later.
                 int usageLeft = syncLimit.getUsageLeft();
+
+                boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
 
                 try {
                     setTestingRunConfig(testingRun, trrs);
@@ -365,6 +366,15 @@ public class Main {
                 }
 
                 loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
+
+                // update usage after test is completed.
+                 int deltaUsage = 0;
+                 if(syncLimit.checkLimit){
+                     deltaUsage = usageLeft - syncLimit.getUsageLeft();
+                 }
+ 
+                 UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.TEST_RUNS, accountId, deltaUsage);
+
             }, "testing");
             Thread.sleep(1000);
         }
