@@ -237,7 +237,6 @@ function ApiCollections() {
         const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
         const response = await api.deleteMultipleCollections(collectionIdListObj)
         fetchData()
-        // func.setToast(true, false, `${collectionIdList.length} API collection${collectionIdList.length > 1 ? "s" : ""} deleted successfully`)
         func.setToast(true, false, <div  data-testid="deletion_message">{`${collectionIdList.length} API collection${collectionIdList.length > 1 ? "s" : ""} deleted successfully`}</div>)
 
     }
@@ -267,7 +266,6 @@ function ApiCollections() {
 
     const promotedBulkActions = (selectedResources) => {
         const removeCollectionsObj = {
-            // content: `Remove collection${func.addPlurality(selectedResources.length)}`,
             content: <div data-testid="delete_button">{`Remove collection${func.addPlurality(selectedResources.length)}`}</div>,
             onAction: () => handleRemoveCollections(selectedResources)
         }
