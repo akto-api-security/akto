@@ -2,6 +2,7 @@ package com.akto.dto;
 
 import com.akto.dto.settings.DefaultPayload;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -365,6 +366,17 @@ public class AccountSettings {
 	}
 
     public List<String> getAllowRedundantEndpointsList() {
+        if(this.allowRedundantEndpointsList == null) {
+            List<String> ignoreUrlTypesList = Arrays.asList(
+                "htm","html", "css", "js",   // Web formats
+                "jpg", "jpeg", "png", "gif", "svg", "webp",  // Image formats
+                "mp4", "webm", "ogg", "ogv", "avi", "mov",  // Video formats
+                "mp3", "wav", "oga",  // Audio formats
+                "woff", "woff2", "ttf", "otf", // Font formats
+                ".pptx" // file formats
+            );
+            return ignoreUrlTypesList;
+        }
         return allowRedundantEndpointsList;
     }
 

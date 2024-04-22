@@ -62,16 +62,12 @@ public class BackwardCompatibility {
     public static final String VULNERABLE_API_UPDATION_VERSION_V1 = "vulnerableApiUpdationVersionV1";
     private int vulnerableApiUpdationVersionV1;
 
-    public static final String UPDATE_REDUNDANT_URLS_LIST = "updateRedundantUrlsList";
-    private int updateRedundantUrlsList;
-
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
                                  int deleteNullSubCategoryIssues, int enableNewMerging,
                                  int aktoDefaultNewUI, int initializeOrganizationAccountBelongsTo, int orgsInBilling,
-                                 int computeIntegratedConnections, int deleteLastCronRunInfo, int vulnerableApiUpdationVersionV1,
-                                 int updateRedundantUrlsList) {
+                                 int computeIntegratedConnections, int deleteLastCronRunInfo, int vulnerableApiUpdationVersionV1) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -91,7 +87,6 @@ public class BackwardCompatibility {
         this.orgsInBilling = orgsInBilling;
         this.deleteLastCronRunInfo = deleteLastCronRunInfo;
         this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
-        this.updateRedundantUrlsList = updateRedundantUrlsList;
     }
 
     public BackwardCompatibility() {
@@ -263,13 +258,5 @@ public class BackwardCompatibility {
 
     public void setVulnerableApiUpdationVersionV1(int vulnerableApiUpdationVersionV1) {
         this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
-    }
-
-    public int getUpdateRedundantUrlsList() {
-        return updateRedundantUrlsList;
-    }
-
-    public void setUpdateRedundantUrlsList(int updateRedundantUrlsList) {
-        this.updateRedundantUrlsList = updateRedundantUrlsList;
     }
 }
