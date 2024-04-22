@@ -357,7 +357,7 @@ public class HttpCallParser {
         trafficMetrics.inc(value);
     }
 
-    private boolean isRedundantEndpoint(String url, List<String> discardedUrlList){
+    public boolean isRedundantEndpoint(String url, List<String> discardedUrlList){
         StringJoiner joiner = new StringJoiner("|", ".*\\.(", ")(\\?.*)?");
         for (String extension : discardedUrlList) {
             joiner.add(extension);

@@ -262,6 +262,12 @@ public class AdminSettingsAction extends UserAction {
 
     public String updateUrlSettings() {
         try {
+            for(String ext : this.allowRedundantEndpointsList){
+                if (ext.matches(".*[\\\\/:*?\"<>|].*")) {
+                    addActionError(ext + " url type is invalid" );
+                    return Action.ERROR.toUpperCase();
+                }
+            }
             AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.ALLOW_REDUNDANT_ENDPOINTS_LIST, this.allowRedundantEndpointsList),
