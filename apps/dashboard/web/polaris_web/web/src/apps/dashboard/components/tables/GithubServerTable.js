@@ -18,6 +18,7 @@ import DropdownSearch from '../shared/DropdownSearch';
 import PersistStore from '../../../main/PersistStore';
 import tableFunc from './transform';
 import useTable from './TableContext';
+import { debounce } from 'lodash';
 
 function GithubServerTable(props) {
 
@@ -60,27 +61,28 @@ function GithubServerTable(props) {
     setSortSelected(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
   },[currentPageKey])
 
-  useEffect(() => {
+  async function fetchData(searchVal) {
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
-    setActiveColumnSort(tableFunc.getColumnSort(sortSelected, props?.sortOptions))
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
     appliedFilters.forEach((filter) => {
       filters[filter.key] = filter.value
     })
-    async function fetchData() {
-      let tempData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, page * pageLimit, pageLimit, filters, filterOperators, queryValue);
-      tempData ? setData([...tempData.value]) : setData([])
-      tempData ? setTotal(tempData.total) : setTotal(0)
-      applyFilter(tempData.total)
-      
-      setTableInitialState({
-        ...tableInitialState,
-        [currentPageKey]: tempData.total
-      })
-    }
+    let tempData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, page * pageLimit, pageLimit, filters, filterOperators, searchVal);
+    tempData ? setData([...tempData.value]) : setData([])
+    tempData ? setTotal(tempData.total) : setTotal(0)
+    applyFilter(tempData.total)
+    
+    setTableInitialState({
+      ...tableInitialState,
+      [currentPageKey]: tempData.total
+    })
+  }
+
+  useEffect(() => {
     handleSelectedTab(props?.selected)
-    fetchData();
-  }, [sortSelected, appliedFilters, queryValue, page, pageFiltersMap])
+    setActiveColumnSort(tableFunc.getColumnSort(sortSelected, props?.sortOptions))
+    fetchData(queryValue);
+  }, [sortSelected, appliedFilters, page, pageFiltersMap])
 
   useEffect(()=> {
     setSortableColumns(tableFunc.getSortableChoices(props?.headers))
@@ -145,10 +147,14 @@ function GithubServerTable(props) {
     setAppliedFilters(temp);
   };
 
-  const handleFiltersQueryChange = useCallback(
-    (value) => setQueryValue(value),
-    [],
-  );
+  const debouncedSearch = useCallback(debounce((searchQuery) => {
+      fetchData(searchQuery)
+  }, 500), []);
+
+  const handleFiltersQueryChange = (val) =>{
+    setQueryValue(val)
+    debouncedSearch(val)
+  }
   const handleFiltersQueryClear = useCallback(
     () => setQueryValue(""),
     [],
