@@ -65,7 +65,7 @@ function OpenApiSource() {
         setShowImportDetailsModal(false)
         setUploadObj({})
         api.ingestSwagger(uploadId, importType).then(resp => {
-            setToast(true, false, "File import has begun, refresh inventory page to view the imported APIs")
+            func.setToast(true, false, "File import has begun, refresh inventory page to view the imported APIs")
         })
     }
 

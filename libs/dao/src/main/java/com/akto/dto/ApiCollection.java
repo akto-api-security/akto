@@ -20,6 +20,7 @@ public class ApiCollection {
     public static final String NAME = "name";
     String name;
     int startTs;
+    public static final String START_TS = "startTs";
     Set<String> urls;
     public static final String URLS_STRING = "urls";
     String hostName;

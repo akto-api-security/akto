@@ -8,11 +8,14 @@ import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.Strategy;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.TestError;
+import com.akto.test_editor.execution.Memory;
 
 import java.util.Collections;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import static com.akto.dto.testing.TestResult.TestError.*;
 
 public abstract class SecurityTestTemplate {
 
@@ -28,6 +31,8 @@ public abstract class SecurityTestTemplate {
 
     TestingRunConfig testingRunConfig;
     Strategy strategy;
+
+    Memory memory;
 
     public SecurityTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode ,RawApi rawApi, Map<String, Object> varMap, Auth auth, AuthMechanism authMechanism, String logId, TestingRunConfig testingRunConfig, Strategy strategy) {
         this.apiInfoKey = apiInfoKey;
@@ -56,13 +61,13 @@ public abstract class SecurityTestTemplate {
         boolean valid = filter();
         if (!valid) {
             List<GenericTestResult> testResults = new ArrayList<>();
-            testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList("Request API failed to satisfy api_selection_filters block, skipping execution"), 0, false, TestResult.Confidence.HIGH, null));
+            testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(SKIPPING_EXECUTION_BECAUSE_FILTERS.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
             return new YamlTestResult(testResults, null);
         }
         valid = checkAuthBeforeExecution(debug, testLogs);
         if (!valid) {
             List<GenericTestResult> testResults = new ArrayList<>();
-            testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList("Request API failed authentication check, skipping execution"), 0, false, TestResult.Confidence.HIGH, null));
+            testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(SKIPPING_EXECUTION_BECAUSE_AUTH.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
             return new YamlTestResult(testResults, null);
         }
         YamlTestResult attempts = executor(debug, testLogs);
@@ -146,5 +151,5 @@ public abstract class SecurityTestTemplate {
     public void setLogId(String logId) {
         this.logId = logId;
     }
-    
+
 }

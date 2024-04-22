@@ -9,6 +9,13 @@ public class AccountsDao extends CommonContextDao<Account> {
 
     public static final AccountsDao instance = new AccountsDao();
 
+    public void createIndexIfAbsent() {
+
+        String[] fieldNames = { Account.INACTIVE_STR };
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+    }
+
     @Override
     public String getCollName() {
         return "accounts";

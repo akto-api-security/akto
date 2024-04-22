@@ -14,7 +14,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.runtime.RelationshipSync;
-import com.akto.utils.Build;
+import com.akto.test_editor.execution.Build;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;

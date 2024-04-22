@@ -11,6 +11,8 @@ import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Base64;
+import org.bson.types.ObjectId;
+import com.akto.dto.billing.Organization;
 
 public class Constants {
     public static final DashboardMode DEFAULT_DASHBOARD_MODE = DashboardMode.LOCAL_DEPLOY;
@@ -87,5 +89,9 @@ public class Constants {
             }
         }
         return sendgridConfig;
+    }
+
+    public static void sendTestResults(ObjectId summaryId, Organization organization) {
+
     }
 }

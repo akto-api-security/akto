@@ -59,12 +59,15 @@ public class BackwardCompatibility {
     public static final String DEFAULT_TELEMETRY_SETTINGS = "defaultTelemetrySettings";
     private int defaultTelemetrySettings;
 
+    public static final String VULNERABLE_API_UPDATION_VERSION_V1 = "vulnerableApiUpdationVersionV1";
+    private int vulnerableApiUpdationVersionV1;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
                                  int deleteNullSubCategoryIssues, int enableNewMerging,
                                  int aktoDefaultNewUI, int initializeOrganizationAccountBelongsTo, int orgsInBilling,
-                                 int computeIntegratedConnections, int deleteLastCronRunInfo) {
+                                 int computeIntegratedConnections, int deleteLastCronRunInfo, int vulnerableApiUpdationVersionV1) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -83,6 +86,7 @@ public class BackwardCompatibility {
         this.initializeOrganizationAccountBelongsTo = initializeOrganizationAccountBelongsTo;
         this.orgsInBilling = orgsInBilling;
         this.deleteLastCronRunInfo = deleteLastCronRunInfo;
+        this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
     }
 
     public BackwardCompatibility() {
@@ -246,5 +250,13 @@ public class BackwardCompatibility {
 
     public void setDefaultTelemetrySettings(int defaultTelemetrySettings) {
         this.defaultTelemetrySettings = defaultTelemetrySettings;
+    }
+
+    public int getVulnerableApiUpdationVersionV1() {
+        return vulnerableApiUpdationVersionV1;
+    }
+
+    public void setVulnerableApiUpdationVersionV1(int vulnerableApiUpdationVersionV1) {
+        this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
     }
 }

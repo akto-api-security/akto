@@ -37,6 +37,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -52,6 +53,7 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
 
     public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 50;
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private static final ExecutorService service = Executors.newFixedThreadPool(1);
 
     @Override
     public String execute() {
@@ -309,7 +311,11 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
                 DaoInit.createIndices();
                 Main.insertRuntimeFilters();
                 RuntimeListener.initialiseDemoCollections();
-                RuntimeListener.addSampleData();
+                service.submit(() ->{
+                    Context.accountId.set(newAccountId);
+                    loggerMaker.infoAndAddToDb("updating vulnerable api's collection for new account " + newAccountId, LogDb.DASHBOARD);
+                    RuntimeListener.addSampleData();
+                });
                 AccountSettingsDao.instance.updateOnboardingFlag(true);
                 InitializerListener.insertPiiSources();
 
