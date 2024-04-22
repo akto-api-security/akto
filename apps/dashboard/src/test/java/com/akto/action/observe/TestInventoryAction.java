@@ -30,6 +30,7 @@ import org.json.JSONArray;
 import org.junit.Test;
 
 import static com.akto.listener.RuntimeListener.convertStreamToString;
+import static com.akto.listener.RuntimeListener.httpCallParser;
 import static org.junit.Assert.*;
 
 public class TestInventoryAction extends MongoBasedTest {
@@ -153,7 +154,7 @@ public class TestInventoryAction extends MongoBasedTest {
         assertEquals(Action.SUCCESS.toUpperCase(), result);
 
 
-        APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, true);
+        APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, true, httpCallParser.apiCatalogSync.existingAPIsInDb);
 
         List<SingleTypeInfo> singleTypeInfoObjectIdList  = SingleTypeInfoDao.instance.findAll(SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, "api/books/OBJECT_ID", URLMethods.Method.POST));
         assertEquals(5, singleTypeInfoObjectIdList.size());
