@@ -141,7 +141,6 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
 
     async function handleSave() {
         await api.addAuthMechanism('LOGIN_REQUEST', [ ...steps ] , authParams)
-        // setToastConfig({ isActive: true, isError: false, message: "Login flow saved successfully!" })
         setToastConfig({ isActive: true, isError: false, message: <div data-testid="login_flow_success_message">Login flow saved successfully!</div> })
 
     }

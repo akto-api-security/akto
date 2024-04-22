@@ -283,10 +283,6 @@ function GithubServerTable(props) {
               <HorizontalStack
                 align="center">
                 <Pagination
-                  // label={
-                  //   total == 0 ? 'No data found' :
-                  //     `Showing ${transform.formatNumberWithCommas(page * pageLimit + Math.min(1, total))}-${transform.formatNumberWithCommas(Math.min((page + 1) * pageLimit, total))} of ${transform.formatNumberWithCommas(total)}`
-                  // }
                   label={
                     total == 0 ? 'No data found' :
                         <div data-testid="pagination-label">
