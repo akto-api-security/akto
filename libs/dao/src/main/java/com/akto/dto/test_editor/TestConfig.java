@@ -148,4 +148,7 @@ public class TestConfig {
         this.author = author;
     }
 
+    public boolean isInactive() {
+        return inactive;
+    }
 }
