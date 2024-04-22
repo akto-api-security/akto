@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, Link, Tooltip } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -25,6 +25,8 @@ import TooltipText from "../../../components/shared/TooltipText"
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
 import { ENDPOINTS_PAGE_DOCS_URL } from "../../../../main/onboardingData"
 import {TestrunsBannerComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
+import GetPrettifyEndpoint from "../GetPrettifyEndpoint"
+import SourceLocation from "./component/SourceLocation"
 import useTable from "../../../components/tables/TableContext"
 
 const headings = [
@@ -80,6 +82,12 @@ const headings = [
         isText: true,
         type: CellType.TEXT,
         sortActive: true
+    },
+    {
+        text: "Source location",
+        value: "sourceLocationComp",
+        textValue: "sourceLocation",
+        title: "Source location"    
     }
 ]
 
@@ -105,7 +113,7 @@ const sortOptions = [
     { label: 'Access Type', value: 'access_type asc', directionLabel: 'A-Z', sortKey: 'access_type', columnIndex: 4 },
     { label: 'Access Type', value: 'access_type desc', directionLabel: 'Z-A', sortKey: 'access_type', columnIndex: 4 },
     { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs', columnIndex: 7 },
-    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 7 },
+    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 7 }
 ];
 
 function ApiEndpoints() {
@@ -148,7 +156,7 @@ function ApiEndpoints() {
     const selectedUrl = queryParams.get('selected_url')
     const selectedMethod = queryParams.get('selected_method')
 
-    const definedTableTabs = ['All', 'New', 'Sensitive', 'High risk', 'No auth']
+    const definedTableTabs = ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow']
 
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
@@ -183,12 +191,66 @@ function ApiEndpoints() {
 
         let data = {}
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, null)
+
+        // handle code analysis endpoints
+        const codeAnalysisCollectionInfo = apiCollectionData.codeAnalysisCollectionInfo
+        const codeAnalysisApisMap = codeAnalysisCollectionInfo.codeAnalysisApisMap
+        let shadowApis = []
+
+        if (codeAnalysisApisMap) {
+            // Don't show empty screen if there are codeanalysis endpoints present
+            if (codeAnalysisApisMap && Object.keys(codeAnalysisApisMap).length > 0) {
+                setShowEmptyScreen(false)
+            }
+            shadowApis = { ...codeAnalysisApisMap }
+
+            // Find shadow endpoints and map api endpoint location
+            allEndpoints.forEach(api => {
+                let apiEndpoint = transform.getTruncatedUrl(api.endpoint)
+                // ensure apiEndpoint does not end with a slash
+                if (apiEndpoint !== "/" && apiEndpoint.endsWith("/")) 
+                    apiEndpoint = apiEndpoint.slice(0, -1)
+
+                const apiKey = api.method + " " + apiEndpoint
+
+                if (Object.hasOwn(codeAnalysisApisMap, apiKey)) {
+                    const codeAnalysisApi = codeAnalysisApisMap[apiKey]
+                    const location = codeAnalysisApi.location
+                    api.sourceLocation = codeAnalysisApi.location.filePath
+                    api.sourceLocationComp = <SourceLocation location={location} />
+
+                    delete shadowApis[apiKey]
+                }
+                else {
+                    api.source_location = ""
+                }
+            })
+
+            shadowApis = Object.entries(shadowApis).map(([ codeAnalysisApiKey, codeAnalysisApi ]) => {
+                const { method, endpoint, location } = codeAnalysisApi
+
+                return {
+                    id: codeAnalysisApiKey,
+                    endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={false} />,
+                    method: method,
+                    endpoint: endpoint,
+                    codeAnalysisEndpoint: true,
+                    sourceLocation: location.filePath, 
+                    sourceLocationComp: <SourceLocation location={location} />,
+                }
+            })
+        }
+
         const prettifyData = transform.prettifyEndpointsData(allEndpoints)
-        data['all'] = prettifyData
+
+        // append shadow endpoints to all endpoints
+        data['all'] = [ ...prettifyData, ...shadowApis ]
         data['sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0)
         data['high_risk'] = prettifyData.filter(x=> x.riskScore >= 4)
         data['new'] = prettifyData.filter(x=> x.isNew)
         data['no_auth'] = prettifyData.filter(x => x.open)
+        data['shadow'] = [ ...shadowApis ]
+
         setEndpointData(data)
         setSelectedTab("all")
         setSelected(0)
@@ -238,7 +300,12 @@ function ApiEndpoints() {
     }
 
     function handleRowClick(data) {
+        // Don't show api details for Code analysis endpoints
+        if (data.codeAnalysisEndpoint) 
+            return
+        
         let tmp = { ...data, endpointComp: "", sensitiveTagsComp: "" }
+        
         const sameRow = func.deepComparison(apiDetail, tmp);
         if (!sameRow) {
             setShowDetails(true)
@@ -252,6 +319,8 @@ function ApiEndpoints() {
             return { ...tmp }
         })
     }
+
+
 
     function handleRefresh() {
         fetchData()
