@@ -29,7 +29,7 @@ function GithubServerTable(props) {
   const currentPageKey = props?.filterStateUrl || window.location.href
   const pageFiltersMap = filtersMap[currentPageKey]
 
-  const filterMode = (pageFiltersMap?.filters.length > 0) ? IndexFiltersMode.Filtering : (props?.mode ? props.mode : IndexFiltersMode.Filtering)
+  const filterMode = (pageFiltersMap?.filters?.length > 0) ? IndexFiltersMode.Filtering : (props?.mode ? props.mode : IndexFiltersMode.Filtering)
   const initialStateFilters = tableFunc.mergeFilters(props.appliedFilters || [], (pageFiltersMap?.filters || []),props.disambiguateLabel)
   const { mode, setMode } = useSetIndexFiltersMode(filterMode);
   const [sortSelected, setSortSelected] = useState(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
@@ -64,6 +64,9 @@ function GithubServerTable(props) {
   async function fetchData(searchVal) {
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
+    // console.log("te",paramFilters)
+    // let useFilters = (appliedFilters.length === 0 && paramFilters) ? paramFilters : appliedFilters
+    // console.log("tf",useFilters)
     appliedFilters.forEach((filter) => {
       filters[filter.key] = filter.value
     })
@@ -147,9 +150,9 @@ function GithubServerTable(props) {
     setAppliedFilters(temp);
   };
 
-  const debouncedSearch = useCallback(debounce((searchQuery) => {
+  const debouncedSearch = debounce((searchQuery) => {
       fetchData(searchQuery)
-  }, 500), []);
+  }, 500);
 
   const handleFiltersQueryChange = (val) =>{
     setQueryValue(val)
