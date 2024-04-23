@@ -17,5 +17,5 @@ jobs:
           token: ${{ secrets.MY_GITHUB_TOKEN }}
           path: e2e_testing
       - name: switch to testing 
-        run: cd e2e_testing && ls && node index.js
+        run: cd e2e_testing && ls && npm install && node index.js
 
