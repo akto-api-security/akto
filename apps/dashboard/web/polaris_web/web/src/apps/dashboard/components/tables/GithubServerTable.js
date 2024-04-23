@@ -64,9 +64,6 @@ function GithubServerTable(props) {
   async function fetchData(searchVal) {
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
-    // console.log("te",paramFilters)
-    // let useFilters = (appliedFilters.length === 0 && paramFilters) ? paramFilters : appliedFilters
-    // console.log("tf",useFilters)
     appliedFilters.forEach((filter) => {
       filters[filter.key] = filter.value
     })
