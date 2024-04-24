@@ -68,7 +68,7 @@ function ParamsCard({dataObj, handleDelete}) {
 
                 </VerticalStack>
                 <HorizontalStack align="end">
-                    <Button size="slim" onClick={handleDelete} icon={DeleteMajor}>Delete</Button>
+                    <Button size="slim" onClick={handleDelete} icon={DeleteMajor}><div data-testid="delete_button">Delete</div></Button>
                 </HorizontalStack>
             </VerticalStack>
         </Box>

@@ -1,11 +1,15 @@
 package com.akto.billing;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import com.akto.log.LoggerMaker;
 import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.akto.dao.billing.OrganizationsDao;
@@ -21,6 +25,7 @@ import com.akto.mixpanel.AktoMixpanel;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.UsageUtils;
+import com.google.api.client.json.Json;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -89,6 +94,26 @@ public class UsageMetricUtils {
         }
     }
 
+    public static JSONObject getUsageMetricsProps(UsageMetric usageMetric, Organization organization)
+            throws JSONException {
+        String adminEmail = organization.getAdminEmail();
+        EmailAccountName emailAccountName = new EmailAccountName(adminEmail);
+        String accountName = emailAccountName.getAccountName();
+        String organizationId = usageMetric.getOrganizationId();
+        JSONObject props = new JSONObject();
+        props.put("Email ID", adminEmail);
+        props.put("Account Name", accountName);
+        props.put("Organization Id", organizationId);
+        props.put("Account Id", usageMetric.getAccountId());
+        props.put("Metric Type", usageMetric.getMetricType());
+        props.put("Dashboard Version", usageMetric.getDashboardVersion());
+        props.put("Dashboard Mode", usageMetric.getDashboardMode());
+        props.put("Usage", usageMetric.getUsage());
+        props.put("Organization Name", organization.getName());
+        props.put("Source", "Dashboard");
+        return props;
+    }
+
     public static void syncUsageMetricWithMixpanel(UsageMetric usageMetric) {
         try {
             String organizationId = usageMetric.getOrganizationId();
@@ -107,20 +132,7 @@ public class UsageMetricUtils {
             String eventName = String.valueOf(usageMetric.getMetricType());
             String distinct_id = adminEmail + "_" + dashboardMode;
 
-            EmailAccountName emailAccountName = new EmailAccountName(adminEmail);
-            String accountName = emailAccountName.getAccountName();
-
-            JSONObject props = new JSONObject();
-            props.put("Email ID", adminEmail);
-            props.put("Account Name", accountName);
-            props.put("Organization Id", organizationId);
-            props.put("Account Id", usageMetric.getAccountId());
-            props.put("Metric Type", usageMetric.getMetricType());
-            props.put("Dashboard Version", usageMetric.getDashboardVersion());
-            props.put("Dashboard Mode", usageMetric.getDashboardMode());
-            props.put("Usage", usageMetric.getUsage());
-            props.put("Organization Name", organization.getName());
-            props.put("Source", "Dashboard");
+            JSONObject props = getUsageMetricsProps(usageMetric, organization);
 
             logger.info("Sending event to mixpanel: " + eventName);
 
@@ -135,6 +147,44 @@ public class UsageMetricUtils {
         FeatureAccess featureAccess = getFeatureAccess(accountId, metricType);
         return featureAccess.checkInvalidAccess();
     }
+
+    public static void syncUsageMetricsWithMixpanel(List<UsageMetric> usageMetrics) {
+        try {
+            UsageMetric usageMetric = usageMetrics.get(0);
+            String organizationId = usageMetric.getOrganizationId();
+            Organization organization = OrganizationsDao.instance.findOne(
+                    Filters.and(
+                            Filters.eq(Organization.ID, organizationId)
+                    )
+            );
+
+            if (organization == null) {
+                return;
+            }
+
+            String adminEmail = organization.getAdminEmail();
+            String dashboardMode = usageMetric.getDashboardMode();
+            String distinct_id = adminEmail + "_" + dashboardMode;
+
+            Map<String, JSONObject> map = new HashMap<>();
+            JSONObject props = getUsageMetricsProps(usageMetric, organization);
+
+            for (UsageMetric metric : usageMetrics) {
+                JSONObject jo = new JSONObject(props);
+                jo.put("Metric Type", metric.getMetricType());
+                jo.put("Usage", metric.getUsage());
+                String eventName = String.valueOf(metric.getMetricType());
+                map.put(eventName, jo);
+                logger.info("Sending event to mixpanel: " + eventName);
+            }
+
+            AktoMixpanel aktoMixpanel = new AktoMixpanel();
+            aktoMixpanel.sendBulkEvents(distinct_id, map);
+        } catch (Exception e) {
+            cacheLoggerMaker.errorAndAddToDb("Failed to execute usage metric in Mixpanel. Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+        }
+    }
+
 
     public static BasicDBObject fetchFromBillingService(String apiName, BasicDBObject reqBody) {
         String json = reqBody.toJson();

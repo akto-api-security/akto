@@ -48,7 +48,9 @@ function Dashboard() {
             }
             navigate(newPath)
         }
-        window.Beamer.init();
+        if(window.Beamer){
+            window.Beamer.init();
+        }
     }, [])
 
     const toastConfig = Store(state => state.toastConfig)
