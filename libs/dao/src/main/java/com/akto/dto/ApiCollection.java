@@ -21,6 +21,7 @@ public class ApiCollection {
     String name;
     int startTs;
     public static final String _URLS = "urls";
+    public static final String START_TS = "startTs";
     Set<String> urls;
     public static final String URLS_STRING = "urls";
     String hostName;

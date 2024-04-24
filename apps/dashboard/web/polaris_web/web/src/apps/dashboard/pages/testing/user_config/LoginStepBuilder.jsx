@@ -150,7 +150,8 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
 
     async function handleSave() {
         await api.addAuthMechanism('LOGIN_REQUEST', [ ...steps ] , authParams)
-        setToastConfig({ isActive: true, isError: false, message: "Login flow saved successfully!" })
+        setToastConfig({ isActive: true, isError: false, message: <div data-testid="login_flow_success_message">Login flow saved successfully!</div> })
+
     }
 
     useEffect(() => {
@@ -214,7 +215,7 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                     <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
 
                     <br />
-                    {showOnlyApi ? null :<Button id={"save-token"} primary onClick={handleSave}>Save changes</Button>}
+                    {showOnlyApi ? null :<Button id={"save-token"} primary onClick={handleSave}><div data-testid="save_token_automated">Save changes</div></Button>}
 
                 </div>
             }
