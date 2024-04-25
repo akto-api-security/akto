@@ -47,6 +47,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
+import static com.akto.listener.InitializerListener.createAndSaveAttackerRole;
+
 public class RuntimeListener extends AfterMongoConnectListener {
 
     public static HttpCallParser httpCallParser = null;
@@ -144,7 +146,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         AuthMechanism authMechanism = new AuthMechanism(
              authParamList, new ArrayList<>(), "HARDCODED", null
         );
-        AuthMechanismsDao.instance.insertOne(authMechanism);
+        createAndSaveAttackerRole(authMechanism);
 
         //inserting first time during initialisation of demo collections
         insertVulnerableRequestsForDemo();

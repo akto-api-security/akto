@@ -135,7 +135,7 @@ function UserConfig() {
         </LegacyCard>
     )
 
-    const components = [<TestCollectionConfiguration/>, authTokenComponent, rateLimit]
+    const components = [<TestCollectionConfiguration/>, rateLimit]
 
     return (
         isLoading ? <SpinnerCentered /> 
