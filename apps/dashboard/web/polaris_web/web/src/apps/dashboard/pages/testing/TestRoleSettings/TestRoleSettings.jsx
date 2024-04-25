@@ -43,10 +43,10 @@ const selectOptions = [
 ]
 
 function TestRoleSettings() {
-
     const location = useLocation();
     const navigate = useNavigate()
     const [searchParams] = useSearchParams();
+    const systemRole = searchParams.get("system")
 
     const isDataInState = location?.state != undefined && Object.keys(location?.state).length > 0
     const isDataInSearch = searchParams.get("name")
@@ -54,7 +54,7 @@ function TestRoleSettings() {
     const pageTitle = isNew ? "Add test role" : "Configure test role"
     const [initialItems, setInitialItems] = useState({ name: "" })
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => conditionsReducer(draft, action)), []);
-    const [roleName, setRoleName] = useState("");
+    const [roleName, setRoleName] = useState(systemRole || "");
     const [change, setChange] = useState(false);
     const [currentInfo, setCurrentInfo] = useState({steps: [], authParams: {}});
     const [hardCodeAuthInfo, setHardCodeAuthInfo] = useState({authHeaderKey: '',authHeaderValue: ''})
@@ -75,7 +75,7 @@ function TestRoleSettings() {
 
     const resetFunc = (newItems) => {
         setChange(false);
-        setRoleName(newItems.name || "");
+        setRoleName(newItems.name || systemRole || "");
         dispatchConditions({type:"replace", conditions:transform.createConditions(newItems.endpoints)})
     }
     useEffect(() => {
@@ -184,7 +184,7 @@ function TestRoleSettings() {
             <LegacyCard.Section>
                 <HorizontalGrid gap="4" columns={2}>
                     <TextField
-                        label="Name" value={roleName}
+                        label="Name" value={roleName} disabled={systemRole}
                         placeholder='New test role name' onChange={isNew ? handleTextChange : () => { }}
                     />
                 </HorizontalGrid>
