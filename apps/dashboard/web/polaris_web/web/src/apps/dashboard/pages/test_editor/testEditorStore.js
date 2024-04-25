@@ -26,9 +26,6 @@ let testEditorStore = (set)=>({
     setCurrentContent:(currentContent)=>{
         set({currentContent: currentContent})
     },
-
-    selectedSampleApi: {},
-    setSelectedSampleApi: (selectedSampleApi) => set({selectedSampleApi: selectedSampleApi})
 })
 
 testEditorStore = devtools(testEditorStore)

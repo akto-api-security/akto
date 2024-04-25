@@ -286,4 +286,9 @@ public class OrganizationUtils {
         BasicDBObject additionalMetaData = (BasicDBObject) metadata.getOrDefault("additionalMetaData", new BasicDBObject());
         return additionalMetaData.getString("ENABLE_TELEMETRY", "NA").equalsIgnoreCase("ENABLED");
     }
+
+    public static boolean fetchTestTelemetryEnabled(BasicDBObject metadata) {
+        BasicDBObject additionalMetaData = (BasicDBObject) metadata.getOrDefault("additionalMetaData", new BasicDBObject());
+        return additionalMetaData.getString("ENABLE_TEST_TELEMETRY", "NA").equalsIgnoreCase("ENABLED");
+    }
 }

@@ -70,6 +70,7 @@ public class StartTestAction extends UserAction {
     private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
     private TestingRunType testingRunType;
+    private String searchString;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
@@ -346,6 +347,34 @@ public class StartTestAction extends UserAction {
         }
     }
 
+    private Bson getSearchFilters(){
+        if(this.searchString == null || this.searchString.length() == 0){
+            return Filters.empty();
+        }
+        Bson filter = Filters.or(
+            Filters.regex(TestingRun.NAME, this.searchString, "i")
+        );
+        return filter;
+    }
+
+    private ArrayList<Bson> getTableFilters(){
+        ArrayList<Bson> filterList = new ArrayList<>();
+        if(this.filters == null){
+            return filterList;
+        }
+        List<Integer> apiCollectionIds = (List<Integer>) this.filters.getOrDefault("apiCollectionId", new ArrayList<>());
+        if(!apiCollectionIds.isEmpty()){
+            filterList.add(
+                Filters.or(
+                    Filters.in(TestingRun._API_COLLECTION_ID, apiCollectionIds),
+                    Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, apiCollectionIds)
+                )
+            );
+        }
+
+        return filterList;
+    }
+
     public String retrieveAllCollectionTests() {
 
         this.authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
@@ -354,7 +383,8 @@ public class StartTestAction extends UserAction {
         Bson testingRunTypeFilter = getTestingRunTypeFilter(testingRunType);
         testingRunFilters.add(testingRunTypeFilter);
         testingRunFilters.addAll(prepareFilters(startTimestamp, endTimestamp));
-        
+        testingRunFilters.add(getSearchFilters());
+        testingRunFilters.addAll(getTableFilters());
 
         int pageLimit = Math.min(limit == 0 ? 50 : limit, 10_000);
 
@@ -590,7 +620,6 @@ public class StartTestAction extends UserAction {
                 // name = category
                 String category = result.getTestSubType();
                 TestSourceConfig config = null;
-                // string comparison (nuclei test)
                 if (category.startsWith("http")) {
                     config = TestSourceConfigsDao.instance.getTestSourceConfig(result.getTestSubType());
                 }
@@ -1075,6 +1104,10 @@ public class StartTestAction extends UserAction {
 
     public boolean getTestRunsByUser() {
         return testRunsByUser;
+    }
+
+    public void setSearchString(String searchString) {
+        this.searchString = searchString;
     }
 
 

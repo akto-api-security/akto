@@ -32,6 +32,9 @@ public class Organization {
     public static final String HOTJAR_SITE_ID = "hotjarSiteId";
 
     public String hotjarSiteId = "hotjarSiteId";
+
+    public static final String TEST_TELEMETRY_ENABLED = "testTelemetryEnabled";
+    private boolean testTelemetryEnabled;
     private int gracePeriod;
 
     public Organization() { }
@@ -123,5 +126,13 @@ public class Organization {
 
     public void setLastFeatureMapUpdate(int lastFeatureMapUpdate) {
         this.lastFeatureMapUpdate = lastFeatureMapUpdate;
+    }
+
+    public boolean getTestTelemetryEnabled() {
+        return testTelemetryEnabled;
+    }
+
+    public void setTestTelemetryEnabled(boolean testTelemetryEnabled) {
+        this.testTelemetryEnabled = testTelemetryEnabled;
     }
 }
