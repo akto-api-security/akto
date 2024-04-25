@@ -3335,6 +3335,9 @@
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+        
         <action name="api/syncExtractedAPIs" class="com.akto.action.CodeAnalysisAction" method="syncExtractedAPIs" >
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
