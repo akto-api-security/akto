@@ -4620,5 +4620,289 @@
             "responseHeaders": {},
             "statusCode": 200
         }
+    },
+    {
+        "id": "DOS_ATTACH_FILE_IN_BODY",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Submission unsuccessful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/research/submit"
+        },
+        "testData": {
+            "x1": {
+                "method": "POST",
+                "url": "/api/college/research/submit",
+                "responsePayload": {
+                    "status": "Submission unsuccessful"
+                },
+                "responseHeaders": {
+                    "Content-Type": "application/json"
+                },
+                "statusCode": 200
+            },
+            "x2": {
+                "method": "POST",
+                "url": "/api/college/research/submit",
+                "responsePayload": {
+                    "status": "Failed to access due to server configuration error."
+                },
+                "responseHeaders": {
+                    "Content-Type": "application/json"
+                },
+                "statusCode": 506,
+                "medianResponseTime": 3002
+            }
+        }
+    },
+    {
+        "id": "DOS_ATTACH_LARGE_FILE",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"multipart/form-data; boundary=6726677a-700d-43ca-ab55-44491b9ed38c\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Submission unsuccessful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/document/submit"
+        },
+        "testData": {
+            "x1": {
+                "method": "POST",
+                "url": "/api/college/document/submit",
+                "responsePayload": {
+                    "status": "Submission unsuccessful"
+                },
+                "responseHeaders": {
+                    "Content-Type": "application/json"
+                },
+                "statusCode": 200
+            },
+            "x2": {
+                "method": "POST",
+                "url": "/api/college/document/submit",
+                "responsePayload": {
+                    "status": "Failed to access due to server configuration error."
+                },
+                "responseHeaders": {
+                    "Content-Type": "application/json"
+                },
+                "statusCode": 506,
+                "medianResponseTime": 3002
+            }
+        }
+    },
+    {
+        "id": "DOS_FILE_URL_CSV",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"fileName\": \"marks.csv\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"multipart/form-data; boundary=6726677a-700d-43ca-ab55-44491b9ed38c\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Submission unsuccessful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/results/submit"
+        },
+        "testData": {
+            "x1": {
+                "method": "POST",
+                "url": "/api/college/results/submit",
+                "responsePayload": {
+                    "status": "Submission unsuccessful"
+                },
+                "responseHeaders": {
+                    "Content-Type": "application/json"
+                },
+                "statusCode": 200
+            },
+            "x2": {
+                "method": "POST",
+                "url": "/api/college/results/submit",
+                "responsePayload": {
+                    "status": "Failed to access due to server configuration error."
+                },
+                "responseHeaders": {
+                    "Content-Type": "application/json"
+                },
+                "statusCode": 506,
+                "medianResponseTime": 3002
+            }
+        }
+    },
+    {
+        "id": "DOS_FILE_URL_JPG",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"fileName\": \"rose.jpg\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"multipart/form-data; boundary=6726677a-700d-43ca-ab55-44491b9ed38c\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Submission unsuccessful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/photos/submit"
+        },
+        "testData": {
+            "x1": {
+                "method": "POST",
+                "url": "/api/college/photos/submit",
+                "responsePayload": {
+                    "status": "Submission unsuccessful"
+                },
+                "responseHeaders": {},
+                "statusCode": 200
+            },
+            "x2": {
+                "method": "POST",
+                "url": "/api/college/photos/submit",
+                "responsePayload": {
+                    "status": "Failed to access due to server configuration error."
+                },
+                "responseHeaders": {},
+                "statusCode": 506,
+                "medianResponseTime": 3002
+            }
+        }
+    },
+    {
+        "id": "DOS_FILE_URL_MP4",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"fileName\": \"football.mp4\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"multipart/form-data; boundary=6726677a-700d-43ca-ab55-44491b9ed38c\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Submission unsuccessful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/videos/submit"
+        },
+        "testData": {
+            "x1": {
+                "method": "POST",
+                "url": "/api/college/videos/submit",
+                "responsePayload": {
+                    "status": "Submission unsuccessful"
+                },
+                "responseHeaders": {},
+                "statusCode": 200
+            },
+            "x2": {
+                "method": "POST",
+                "url": "/api/college/videos/submit",
+                "responsePayload": {
+                    "status": "Failed to access due to server configuration error."
+                },
+                "responseHeaders": {},
+                "statusCode": 506,
+                "medianResponseTime": 3002
+            }
+        }
+    },
+    {
+        "id": "DOS_FILE_URL_PDF",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"fileName\": \"Physics.pdf\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"multipart/form-data; boundary=6726677a-700d-43ca-ab55-44491b9ed38c\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Submission unsuccessful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/books/upload"
+        },
+        "testData": {
+            "x1": {
+                "method": "POST",
+                "url": "/api/college/books/upload",
+                "responsePayload": {
+                    "status": "Submission unsuccessful"
+                },
+                "responseHeaders": {},
+                "statusCode": 200
+            },
+            "x2": {
+                "method": "POST",
+                "url": "/api/college/books/upload",
+                "responsePayload": {
+                    "status": "Failed to access due to server configuration error."
+                },
+                "responseHeaders": {},
+                "statusCode": 506,
+                "medianResponseTime": 3002
+            }
+        }
+    },
+    {
+        "id": "DOS_FILE_URL_PNG",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"fileName\": \"daisy.png\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"multipart/form-data; boundary=6726677a-700d-43ca-ab55-44491b9ed38c\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Submission unsuccessful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/garden/upload"
+        },
+        "testData": {
+            "x1": {
+                "method": "POST",
+                "url": "/api/college/garden/upload",
+                "responsePayload": {
+                    "status": "Submission unsuccessful"
+                },
+                "responseHeaders": {},
+                "statusCode": 200
+            },
+            "x2": {
+                "method": "POST",
+                "url": "/api/college/garden/upload",
+                "responsePayload": {
+                    "status": "Failed to access due to server configuration error."
+                },
+                "responseHeaders": {},
+                "statusCode": 506,
+                "medianResponseTime": 3002
+            }
+        }
+    },
+    {
+        "id": "DOS_FILE_URL_XML",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"fileName\": \"data.xml\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"HOST\": \"vulnerableapi.com\", \"Content-Type\": \"multipart/form-data; boundary=6726677a-700d-43ca-ab55-44491b9ed38c\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Submission unsuccessful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/upload/data"
+        },
+        "testData": {
+            "x1": {
+                "method": "POST",
+                "url": "/api/college/upload/data",
+                "responsePayload": {
+                    "status": "Submission unsuccessful"
+                },
+                "responseHeaders": {},
+                "statusCode": 200
+            },
+            "x2": {
+                "method": "POST",
+                "url": "/api/college/upload/data",
+                "responsePayload": {
+                    "status": "Failed to access due to server configuration error."
+                },
+                "responseHeaders": {},
+                "statusCode": 506,
+                "medianResponseTime": 3002
+            }
+        }
     }
 ]
