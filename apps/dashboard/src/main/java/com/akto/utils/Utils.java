@@ -158,6 +158,11 @@ public class Utils {
             new URL(url).toURI();
             return true;
         } catch (MalformedURLException | URISyntaxException e) {
+            Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
+                Matcher matcher = pattern.matcher(url);
+                if (matcher.find()) {
+                    return true;
+                }
             return false;
         }
     }
@@ -470,7 +475,7 @@ public class Utils {
                 info = new AccountHTTPCallParserAktoPolicyInfo();
                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 info.setHttpCallParser(callParser);
-//                info.setResourceAnalyser(new ResourceAnalyser(300_000, 0.01, 100_000, 0.01));
+                // info.setResourceAnalyser(new ResourceAnalyser(300_000, 0.01, 100_000, 0.01));
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);
             }
 
@@ -485,13 +490,13 @@ public class Utils {
 //                info.getResourceAnalyser().analyse(responseParams);
 //            }
 //            info.getResourceAnalyser().syncWithDb();
-//            try {
-//                DependencyFlow dependencyFlow = new DependencyFlow();
-//                dependencyFlow.run();
-//                dependencyFlow.syncWithDb();
-//            } catch (Exception e) {
-//                loggerMaker.errorAndAddToDb(e,"Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
-//            }
+            try {
+                DependencyFlow dependencyFlow = new DependencyFlow();
+                dependencyFlow.run();
+                dependencyFlow.syncWithDb();
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e,"Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
+            }
         }
     }
 

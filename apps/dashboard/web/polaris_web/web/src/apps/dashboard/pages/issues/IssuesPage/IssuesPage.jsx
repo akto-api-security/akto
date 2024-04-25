@@ -38,6 +38,7 @@ const headers = [
     {
         text: "Timestamp",
         value: "timestamp",
+        sortActive: true
     },
     {
         text: "Endpoint",
@@ -65,10 +66,10 @@ const headers = [
 ]
 
 const sortOptions = [
-    { label: 'Discovered time', value: 'timestamp asc', directionLabel: 'Newest', sortKey: 'timestamp' },
-    { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp' },
-    { label: 'Issue', value: 'categoryName asc', directionLabel: 'A-Z', sortKey: 'categoryName' },
-    { label: 'Issue', value: 'categoryName desc', directionLabel: 'Z-A', sortKey: 'categoryName' },    
+    { label: 'Discovered time', value: 'timestamp asc', directionLabel: 'Newest', sortKey: 'timestamp', columnIndex: 5 },
+    { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp', columnIndex: 5 },
+    { label: 'Issue', value: 'categoryName asc', directionLabel: 'A-Z', sortKey: 'categoryName', columnIndex: 1 },
+    { label: 'Issue', value: 'categoryName desc', directionLabel: 'Z-A', sortKey: 'categoryName', columnIndex: 1 },    
 ];
 
 let filtersOptions = [
@@ -252,7 +253,11 @@ function IssuesPage(){
 
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
         setLoading(true);
-
+        const res = await api.fetchIssues(skip, 1, null, null, null, null, 0)
+        if(res.totalIssuesCount === 0){
+            setShowEmptyScreen(true)
+            return {value:{} , total:0};
+        }
         let total =0;
         let ret = []
         let filterCollectionsId = filters.apiCollectionId.concat(filters.collectionIds);
@@ -278,9 +283,7 @@ function IssuesPage(){
             setLoading(false);
         })
         ret = func.sortFunc(ret, sortKey, sortOrder)
-        if(total === 0){
-            setShowEmptyScreen(true)
-        }
+        
         return {value:ret , total:total};
     }
 
@@ -340,8 +343,8 @@ function IssuesPage(){
                     promotedBulkActions={promotedBulkActions}
                     hideQueryField={true}
                     getNextUrl={getNextUrl}
-                    rowClickable={true}
                     getStatus={func.getTestResultStatus}
+                    filterStateUrl={"/dashboard/issues"}
                 />
             ]}
             primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export vulnerability report</Button>}

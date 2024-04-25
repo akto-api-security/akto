@@ -6,7 +6,7 @@ function DropdownSearch(props) {
 
     const id = props.id ? props.id : "dropdown-search"
 
-    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey} = props
+    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested} = props
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
@@ -42,7 +42,14 @@ function DropdownSearch(props) {
         })
 
         if(allowMultiple){
-            if(preSelected.length === deselectedOptions.length){
+            let totalItems = deselectedOptions.length
+            if(isNested){
+                totalItems = 0
+                deselectedOptions.forEach((opt) => {
+                    totalItems += opt.options.length
+                })
+            }
+            if(preSelected.length === totalItems){
                 setChecked(true)
             }
         }
@@ -64,9 +71,23 @@ function DropdownSearch(props) {
                 }
                 const filterRegex = new RegExp(value, 'i');
                 const searchKey = dropdownSearchKey ? dropdownSearchKey : "label"
-                const resultOptions = deselectedOptions.filter((option) =>
+                let resultOptions = []
+                if(isNested){
+                    deselectedOptions.forEach((opt) => {
+                        const options = opt.options.filter((option) =>
+                          option[searchKey].match(filterRegex),
+                        );
+                
+                        resultOptions.push({
+                          title: opt.title,
+                          options,
+                        });
+                      });
+                }else{
+                    resultOptions = deselectedOptions.filter((option) =>
                     option[searchKey].match(filterRegex)
                 );
+                }
                 setOptions(resultOptions);
                 setLoading(false);
             }, 300);
@@ -111,7 +132,16 @@ function DropdownSearch(props) {
 
     const selectAllFunc = () => {
         if(!checked){
-            const valueArr = deselectedOptions.map((obj) => obj.value)
+            let valueArr = []
+            if(isNested){
+                deselectedOptions.forEach((opt) => {
+                    opt.options.forEach((option) =>
+                      valueArr.push(option.value)
+                    );
+                })
+            }else{
+                deselectedOptions.map((opt) => opt.value)
+            }
             updateSelection(valueArr)
             setChecked(true)
         }else{
