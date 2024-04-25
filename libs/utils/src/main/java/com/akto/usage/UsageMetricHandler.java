@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.json.JSONObject;
+
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.billing.OrganizationsDao;
@@ -66,6 +68,10 @@ public class UsageMetricHandler {
                     String logMessage = String.format("Overage detected for %s at %s", metricType, now);
                     loggerMaker.infoAndAddToDb(logMessage);
                     featureAccess.setOverageFirstDetected(now);
+                    raiseMixpanelEvent(organization, accountId,
+                            featureAccess.getUsage() - featureAccess.getUsageLimit(), featureAccess.getUsageLimit());
+                    sendToSlack(organization, accountId, featureAccess.getUsage() - featureAccess.getUsageLimit(),
+                            featureAccess.getUsageLimit(), metricType.toString());
                 }
             } else {
                 featureAccess.setOverageFirstDetected(-1);
@@ -204,5 +210,33 @@ public class UsageMetricHandler {
             }
         }
         return featureWiseAllowed;
+    }
+
+    private static void raiseMixpanelEvent(Organization organization, int accountId, int overage, int usageLimit) {
+        try {
+            String eventName = "OVERAGE_DETECTED";
+            JSONObject props = new JSONObject();
+            props.put("Overage", overage);
+            props.put("Usage limit", usageLimit);
+            String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
+            if (instanceType == null || instanceType.isEmpty()){
+                instanceType = "DASHBOARD";
+            }
+            props.put("Source", instanceType);
+
+            UsageMetricUtils.raiseUsageMixpanelEvent(organization, accountId, eventName, props);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in raising mixpanel event");
+        }
+    }
+
+    private static void sendToSlack(Organization organization, int accountId, int overage, int usageLimit,
+            String feature) {
+        if (organization == null) {
+            return;
+        }
+        String txt = String.format("Overage found for feature: %s, Org: %s %s acc: %s limit: %s overage: %s.",
+                feature, organization.getId(), organization.getAdminEmail(), accountId, usageLimit, overage);
+        UsageMetricUtils.sendToUsageSlack(txt);
     }
 }
