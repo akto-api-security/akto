@@ -17,8 +17,8 @@ public class TestCollectionProperty {
         PASSWORD_RESET_ENDPOINT("Password reset endpoint", Type.TEST_YAML_KEYWORD, Collections.singletonList(GlobalEnums.TestCategory.NO_AUTH)),
         SIGNUP_ENDPOINT("User registration endpoint", Type.TEST_YAML_KEYWORD, Collections.singletonList(GlobalEnums.TestCategory.NO_AUTH)),
         LOGIN_ENDPOINT("Login endpoint", Type.TEST_YAML_KEYWORD, Collections.singletonList(GlobalEnums.TestCategory.NO_AUTH)),
-        LOCKED_ACCOUNT_ROLE("Locked account role", Type.ROLE, Collections.singletonList(GlobalEnums.TestCategory.NO_AUTH)),
-        LOGGED_OUT_ACCOUNT_ROLE("Logged out account role", Type.ROLE, Collections.singletonList(GlobalEnums.TestCategory.NO_AUTH)),
+        LOCKED_ACCOUNT_SYSTEM_ROLE("Locked account role", Type.ROLE, Collections.singletonList(GlobalEnums.TestCategory.NO_AUTH)),
+        LOGGED_OUT_SYSTEM_ROLE("Logged out account role", Type.ROLE, Collections.singletonList(GlobalEnums.TestCategory.NO_AUTH)),
         ATTACKER_TOKEN("Attacker account role", Type.ROLE, Collections.singletonList(GlobalEnums.TestCategory.BOLA)),
         SESSION_TOKEN_HEADER_KEY("Session token header key", Type.CUSTOM_AUTH, Collections.singletonList(GlobalEnums.TestCategory.NO_AUTH)),
         AUTH_TOKEN("Authentication token header key", Type.CUSTOM_AUTH, Collections.singletonList(GlobalEnums.TestCategory.NO_AUTH));

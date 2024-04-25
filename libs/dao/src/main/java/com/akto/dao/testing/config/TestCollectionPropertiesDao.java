@@ -124,9 +124,9 @@ public class TestCollectionPropertiesDao extends AccountsContextDao<TestCollecti
                 case AUTH_TOKEN:
                     prop = createAuthToken(apiCollectionId, CustomAuthType.TypeOfToken.AUTH);
                     break;
-                case LOCKED_ACCOUNT_ROLE:
+                case LOCKED_ACCOUNT_SYSTEM_ROLE:
                 case ATTACKER_TOKEN:
-                case LOGGED_OUT_ACCOUNT_ROLE:
+                case LOGGED_OUT_SYSTEM_ROLE:
                     prop = createTestRole(apiCollectionId, propId);
                     break;
                 case SESSION_TOKEN_HEADER_KEY:
