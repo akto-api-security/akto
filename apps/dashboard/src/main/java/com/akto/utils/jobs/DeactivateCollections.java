@@ -9,6 +9,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+
+import org.json.JSONObject;
+
 import com.akto.action.ApiCollectionsAction;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.ApiCollectionsDao;
@@ -49,6 +52,22 @@ public class DeactivateCollections {
         }, 0, TimeUnit.SECONDS);
     }
 
+    private static void raiseMixpanelEvent(Organization organization, int accountId, int overage) {
+        String eventName = "DEACTIVATED_COLLECTIONS";
+        JSONObject props = new JSONObject();
+        props.put("Overage", overage);
+        UsageMetricUtils.raiseUsageMixpanelEvent(organization, accountId, eventName, props);
+    }
+
+    protected static void sendToSlack(Organization organization, int accountId, int overage, int usageLimit) {
+        if (organization == null){
+            return;
+        }
+        String txt = String.format("Overage found for %s %s acc: %s limit: %s overage: %s . Deactivating collections.",
+        organization.getId(), organization.getAdminEmail(), accountId, usageLimit, overage);
+        UsageMetricUtils.sendToUsageSlack(txt);
+    }
+
     private static void deactivateCollectionsForOrganization(Organization organization) {
         try {
             Set<Integer> accounts = organization.getAccounts();
@@ -72,6 +91,8 @@ public class DeactivateCollections {
                 if (usageMetricInfo != null) {
                     measureEpoch = usageMetricInfo.getMeasureEpoch();
                 }
+                raiseMixpanelEvent(organization, accountId, overage);
+                sendToSlack(organization, accountId, overage, featureAccess.getUsageLimit());
                 overage = deactivateCollectionsForAccount(overage, measureEpoch);
             }
 

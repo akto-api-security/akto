@@ -558,4 +558,22 @@ public class TestDBSync extends MongoBasedTest {
         String host = requestParams.getHeaders().get("host").get(0);
         assertEquals(allowedHost, host);
     }
+
+    @Test
+    public void testRedundantUrlCheck() {
+
+        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0, true);
+        String url1 = "test1.js";
+        String url2= "test2.jsx";
+        String url3 = "test3.js.js1";
+        String url4 = "test4.js?temp=test";
+        String url5 = "test5.js.js";
+
+        List<String> allowedUrlType = Arrays.asList("js");
+        assertEquals(httpCallParser.isRedundantEndpoint(url1, allowedUrlType), true);
+        assertEquals(httpCallParser.isRedundantEndpoint(url2, allowedUrlType), false);
+        assertEquals(httpCallParser.isRedundantEndpoint(url3, allowedUrlType), false);
+        assertEquals(httpCallParser.isRedundantEndpoint(url4, allowedUrlType), true);
+        assertEquals(httpCallParser.isRedundantEndpoint(url5, allowedUrlType), true);
+    }
 }

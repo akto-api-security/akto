@@ -212,9 +212,9 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-        //  for (HttpResponseParams responseParam: filteredResponseParams) {
-        //      dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
-        //  }
+          for (HttpResponseParams responseParam: filteredResponseParams) {
+              dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+          }
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
@@ -225,8 +225,8 @@ public class HttpCallParser {
 
             numberOfSyncs++;
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
-            // dependencyAnalyser.dbState = apiCatalogSync.dbState;
-            // dependencyAnalyser.syncWithDb();
+            dependencyAnalyser.dbState = apiCatalogSync.dbState;
+            dependencyAnalyser.syncWithDb();
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
@@ -366,8 +366,12 @@ public class HttpCallParser {
         trafficMetrics.inc(value);
     }
 
-    private boolean isRedundantEndpoint(String url){
-        String regex = ".*\\.(js|css|svg|png|json|html|io).*";
+    public boolean isRedundantEndpoint(String url, List<String> discardedUrlList){
+        StringJoiner joiner = new StringJoiner("|", ".*\\.(", ")(\\?.*)?");
+        for (String extension : discardedUrlList) {
+            joiner.add(extension);
+        }
+        String regex = joiner.toString();
 
         Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(url);
@@ -403,19 +407,19 @@ public class HttpCallParser {
             if (ignoreAktoFlag != null) continue;
 
             // check for garbage points here
-            // if(accountSettings != null && !accountSettings.getAllowRedundantEndpoints()){
-            //     if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL())){
-            //         continue;
-            //     }
-            //     List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
-            //     String contentType = null;
-            //     if(!contentTypeList.isEmpty()){
-            //         contentType = contentTypeList.get(0);
-            //     }
-            //     if(isInvalidContentType(contentType)){
-            //         continue;
-            //     }
-            // }
+            if(accountSettings != null && accountSettings.getAllowRedundantEndpointsList() != null){
+                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(), accountSettings.getAllowRedundantEndpointsList())){
+                    continue;
+                }
+                List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
+                String contentType = null;
+                if(!contentTypeList.isEmpty()){
+                    contentType = contentTypeList.get(0);
+                }
+                if(isInvalidContentType(contentType)){
+                    continue;
+                }
+            }
 
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 

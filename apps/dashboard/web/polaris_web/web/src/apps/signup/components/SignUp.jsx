@@ -134,7 +134,7 @@ function SignUp() {
           <div className='form-class'>
             <PasswordTextField setField={(val) => setPassword(val)} onFunc={true} field={password} label="Password" monospaced={true}/>
           </div>
-          <Button fullWidth primary onClick={loginFunc} size="large" loading={loading}>{activeObject.buttonText}</Button>
+          <Button fullWidth primary onClick={loginFunc} size="large" loading={loading}><div data-testid="signin_signup_button">{activeObject.buttonText}</div></Button>
         </VerticalStack>
       </Form>
       <HorizontalStack align="center" gap={1}>

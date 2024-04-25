@@ -13,6 +13,7 @@ import com.mongodb.client.model.Sorts;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.jgrapht.Graph;
+import org.jgrapht.alg.cycle.CycleDetector;
 import org.jgrapht.alg.cycle.SzwarcfiterLauerSimpleCycles;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
@@ -247,38 +248,35 @@ public class DependencyFlow {
             }
         }
 
-        SzwarcfiterLauerSimpleCycles<String, DefaultEdge> simpleCyclesFinder = new SzwarcfiterLauerSimpleCycles<>(directedGraph);
-        List<List<String>> cycles = simpleCyclesFinder.findSimpleCycles();
+        CycleDetector<String, DefaultEdge> cycleDetector = new CycleDetector<String, DefaultEdge>(directedGraph);
 
-        if (cycles.isEmpty()) return null;
-
-        logger.info("We found " + cycles.size() + " circular dependency");
+        boolean cycleDetected = cycleDetector.detectCycles();
+        if (!cycleDetected) return null;
+        Set<String> cycleVertices = cycleDetector.findCycles();
 
         int currentMinMissingCount = Integer.MAX_VALUE;
         ApiInfo.ApiInfoKey result = null;
-        for (List<String> cycle : cycles) {
-            for (String apiInfoKeyString: cycle) {
-                ApiInfo.ApiInfoKey apiInfoKey = generateApiInfoKeyFromString(apiInfoKeyString);
+        for (String apiInfoKeyString: cycleVertices) {
+            ApiInfo.ApiInfoKey apiInfoKey = generateApiInfoKeyFromString(apiInfoKeyString);
 
-                Node node = resultNodes.get(apiInfoKey);
-                Map<String, Connection> connections = node.getConnections();
-                int missing = 0;
-                int filled = 0;
-                for (Connection connection: connections.values()) {
-                    if (connection.getIsHeader()) continue;
-                    if (connection.getEdges() == null || connection.getEdges().isEmpty()) {
-                        missing += 1;
-                    } else {
-                        filled += 1;
-                    }
+            Node node = resultNodes.get(apiInfoKey);
+            Map<String, Connection> connections = node.getConnections();
+            int missing = 0;
+            int filled = 0;
+            for (Connection connection: connections.values()) {
+                if (connection.getIsHeader()) continue;
+                if (connection.getEdges() == null || connection.getEdges().isEmpty()) {
+                    missing += 1;
+                } else {
+                    filled += 1;
                 }
-
-                if (missing == 0) return apiInfoKey; // this means except headers all values have been filled.
-
-                if (filled == 0) continue;
-
-                if (missing < currentMinMissingCount)  result = apiInfoKey;
             }
+
+            if (missing == 0) return apiInfoKey; // this means except headers all values have been filled.
+
+            if (filled == 0) continue;
+
+            if (missing < currentMinMissingCount)  result = apiInfoKey;
         }
 
         if (result != null) {
