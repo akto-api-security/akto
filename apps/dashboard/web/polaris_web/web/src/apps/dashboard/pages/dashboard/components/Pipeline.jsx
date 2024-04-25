@@ -1,7 +1,7 @@
 import { Card, DataTable, Scrollable, Text,HorizontalStack , VerticalStack,Modal,Button } from '@shopify/polaris'
 import React , {useState} from 'react'
 import transform from '../transform'
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Link} from "react-router-dom"
 
 
 function Pipeline({riskScoreMap, collections, collectionsMap}) {
@@ -47,10 +47,11 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
                     <VerticalStack gap={2}>
                         <HorizontalStack gap={2} align="start">
                             <Text>
-                                Lorem ipsum dolor sit amet consectetur, adipisicing elit. Fugiat explicabo, quidem earum ratione quaerat deleniti nostrum velit sequi pariatur obcaecati id &nbsp;
-                                <a href="https://docs.akto.io/api-security-testing/how-to/setup-github-integration-for-ci-cd" target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
-                                    Learn More
-                                </a>
+                            Akto's integration with GitHub enterprise and Github.com allows you to maintain API security through GitHub pull requests itself. &nbsp;
+
+                            <Link to='https://docs.akto.io/api-security-testing/how-to/setup-github-integration-for-ci-cd' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
+                                Learn More
+                            </Link>
                             </Text>
                         </HorizontalStack>
                     </VerticalStack>
@@ -91,7 +92,10 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
 
                 <HorizontalStack gap={4}>
                 <Button onClick={handleShowModal} > Create Token</Button> 
-                <span style={{color:"#3385ff"}} > Learn More</span>
+                <Link to='https://docs.akto.io/api-security-testing/how-to/setup-github-integration-for-ci-cd' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
+                                Learn More
+                </Link>
+
                 </HorizontalStack>
                 </VerticalStack>
             </VerticalStack>
