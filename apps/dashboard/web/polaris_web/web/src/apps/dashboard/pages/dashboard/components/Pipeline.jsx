@@ -1,8 +1,8 @@
-import { Card, DataTable, Scrollable, Text, VerticalStack } from '@shopify/polaris'
+import { Card, DataTable, HorizontalStack, Scrollable, Text, VerticalStack, Button } from '@shopify/polaris'
 import React from 'react'
 import transform from '../transform'
 
-function Pipeline({riskScoreMap, collections, collectionsMap}) {
+function Pipeline({riskScoreMap, collections, collectionsMap, showcicd }) {
 
     const tableRows = transform.prepareTableData(riskScoreMap,collections, collectionsMap);
 
@@ -13,7 +13,7 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
                     <Text variant="bodyLg" fontWeight="semibold">Add in your CI/CD pipeline</Text>
                     <Text>Seamlessly enhance your web application security with CI/CD integration, empowering you to efficiently detect vulnerabilities, analyze and intercept web traffic, and fortify your digital defenses.</Text>
                 </VerticalStack>
-                <Scrollable style={{maxHeight: '200px'}} shadow>
+                <Scrollable style={{maxHeight: '200px', paddingBottom:'10px'}} shadow>
                     <DataTable headings={[]}
                         columnContentTypes={[
                             'text',
@@ -24,7 +24,16 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
                         truncate
                     /> 
                 </Scrollable>
+                <VerticalStack gap={5}>
+             
+                <HorizontalStack gap={4}>
+                <Button onClick={showcicd} > Create Token</Button> 
+                <span style={{color:"#3385ff"}} > Learn More</span>
+                </HorizontalStack>
+                </VerticalStack>
+
             </VerticalStack>
+          
         </Card>
     )
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
@@ -19,6 +19,8 @@ import ActivityTracker from './components/ActivityTracker';
 import NullData from './components/NullData';
 import {DashboardBanner} from './components/DashboardBanner';
 import RiskScoreTrend from './components/RiskScoreTrend';
+import CicdModal from '../observe/api_collections/CicdModal';
+
 
 function HomeDashboard() {
 
@@ -40,6 +42,23 @@ function HomeDashboard() {
 
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
+
+    //ci-cd-modal
+
+    const CicdRef = useRef();
+    const [active, setActive] = useState(false);
+
+    const showcicd = () => {
+        setActive(true)
+    }
+
+    const modalComponent = <CicdModal
+        key="modal"
+        active={active}
+        setActive={setActive}
+        CicdRef={CicdRef}
+    />
+
 
     const fetchData = async() =>{
         setLoading(true)
@@ -248,13 +267,13 @@ function HomeDashboard() {
                     <InitialSteps initialSteps={initialSteps}/>
                     <ActivityTracker latestActivity={recentActivities} collections={collectionsMap} onLoadMore={handleLoadMore} showLoadMore={checkLoadMore}/>
                     <CoverageCard coverageObj={coverageObj} collections={allCollections} collectionsMap={collectionsMap}/>
-                    <Pipeline riskScoreMap={riskScoreObj} collections={allCollections} collectionsMap={collectionsMap}/> 
+                    <Pipeline showcicd={showcicd} riskScoreMap={riskScoreObj} collections={allCollections} collectionsMap={collectionsMap}/> 
                 </VerticalStack>
             </div>
         </div>
     )
 
-    const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" />: null, dashboardComp]
+    const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" />: null, dashboardComp,modalComponent]
 
     return (
             <PageWithMultipleCards
