@@ -69,8 +69,11 @@ public class VariableResolver {
         if (VariableResolver.isWordListVariable(key, varMap)) {
             varList = (List) VariableResolver.resolveWordListVar(key.toString(), varMap);
             for (int i = 0; i < varList.size(); i++) {
+                String origVal = varList.get(i).toString();
                 List<Object> vals = VariableResolver.resolveExpression(varMap, varList.get(i).toString());
-                varList.set(i, vals.get(0).toString());
+                if (vals != null && vals.size() > 0 && !origVal.equals(vals.get(0).toString())) {
+                    varList.set(i, vals.get(0).toString());
+                }
             }
             return varList;
         }
@@ -414,10 +417,10 @@ public class VariableResolver {
         return false;
     }
 
-    public static List<String> resolveWordListVar(String key, Map<String, Object> varMap) {
+    public static List<Object> resolveWordListVar(String key, Map<String, Object> varMap) {
         String expression = key.toString();
 
-        List<String> wordList = new ArrayList<>();
+        List<Object> wordList = new ArrayList<>();
         String wordListKey = null;
 
         Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
@@ -431,7 +434,7 @@ public class VariableResolver {
 
                 Boolean isWordListVar = varMap.containsKey("wordList_" + match);
                 if (isWordListVar) {
-                    wordList = (List<String>) varMap.get("wordList_" + match);
+                    wordList = (List<Object>) varMap.get("wordList_" + match);
                     wordListKey = originalKey;
                     break;
                 }
@@ -440,7 +443,11 @@ public class VariableResolver {
             }
         }
 
-        List<String> result = new ArrayList<>();
+        if (wordListKey.equals(expression)) {
+            return wordList;
+        }
+
+        List<Object> result = new ArrayList<>();
         for (Object word: wordList) {
             result.add(expression.replace(wordListKey, word.toString()));
         }
