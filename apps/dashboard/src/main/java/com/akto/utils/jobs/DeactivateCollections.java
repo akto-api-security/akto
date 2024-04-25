@@ -59,7 +59,7 @@ public class DeactivateCollections {
         UsageMetricUtils.raiseUsageMixpanelEvent(organization, accountId, eventName, props);
     }
 
-    protected static void sendToSlack(Organization organization, int accountId, int overage, int usageLimit) {
+    private static void sendToSlack(Organization organization, int accountId, int overage, int usageLimit) {
         if (organization == null){
             return;
         }
