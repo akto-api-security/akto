@@ -168,17 +168,6 @@ function TestCollectionConfiguration() {
 
     return (
         <div>
-            <Box width="400px" paddingBlockEnd={"16"} >
-                <DropdownSearch
-                    id={`user-config-api-collections`}
-                    disabled={false}
-                    placeholder="Select API collection"
-                    optionsList={apiCollectionItems}
-                    setSelected={fetchTestCollectionConfiguration}
-                    preSelected={[0]}
-                    value={mapCollectionIdToName[apiCollectionId]}
-                />
-            </Box>
             <GithubSimpleTable
                 key="critical"
                 data={testCollectionProperties}
