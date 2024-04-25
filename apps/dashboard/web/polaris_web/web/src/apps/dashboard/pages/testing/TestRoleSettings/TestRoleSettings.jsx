@@ -276,7 +276,7 @@ function TestRoleSettings() {
 
     const addAuthButton = (
         <HorizontalStack align="end" key="auth-button">
-            {isNew ? <Tooltip content= "Save the role first"><Button disabled>Add auth</Button></Tooltip> : <Button primary onClick={() => setShowAuthComponent(true)}>Add auth</Button>}
+            {isNew ? <Tooltip content= "Save the role first"><Button disabled>Add auth</Button></Tooltip> : <Button primary onClick={() => setShowAuthComponent(true)}><div data-testid="add_auth_button">Add auth</div></Button>}
         </HorizontalStack>
     )
 
@@ -319,7 +319,7 @@ function TestRoleSettings() {
     }
 
     const authCard = (
-            <LegacyCard title="Authentication details" key="auth" secondaryFooterActions={[{content: 'Cancel' ,destructive: true, onAction: handleCancel}]} primaryFooterAction={{content: 'Save', onAction: handleSaveAuthMechanism}}>
+            <LegacyCard title="Authentication details" key="auth" secondaryFooterActions={[{content: 'Cancel' ,destructive: true, onAction: handleCancel}]} primaryFooterAction={{content: <div data-testid="save_token_details_button">Save</div>, onAction: handleSaveAuthMechanism}}>
                 <LegacyCard.Section title="Header details">
                     <div>
                         <Text variant="headingMd">Api header conditions</Text>

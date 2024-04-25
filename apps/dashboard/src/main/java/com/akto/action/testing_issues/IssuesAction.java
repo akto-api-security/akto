@@ -114,7 +114,6 @@ public class IssuesAction extends UserAction {
         issues = TestingRunIssuesDao.instance.findAll(filters, skip,limit, sort);
 
         for (TestingRunIssues runIssue : issues) {
-            // string comparison (nuclei test)
             if (runIssue.getId().getTestSubCategory().startsWith("http")) {//TestSourceConfig case
                 TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runIssue.getId().getTestCategoryFromSourceConfig());
                 runIssue.getId().setTestSourceConfig(config);
@@ -172,7 +171,6 @@ public class IssuesAction extends UserAction {
         String testSubType = null;
         // ?? enum stored in db
         String subCategory = issue.getId().getTestSubCategory();
-        // string comparison (nuclei test)
         if (subCategory.startsWith("http")) {
             testSubType = issue.getId().getTestCategoryFromSourceConfig();
         } else {

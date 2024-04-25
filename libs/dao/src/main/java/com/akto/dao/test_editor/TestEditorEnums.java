@@ -77,7 +77,8 @@ public class TestEditorEnums {
         PARAM_CONTEXT,
         ENDPOINT_IN_TRAFFIC_CONTEXT,
         INCLUDE_ROLES_ACCESS,
-        EXCLUDE_ROLES_ACCESS
+        EXCLUDE_ROLES_ACCESS,
+        API_ACCESS_TYPE
     }
 
 
@@ -198,6 +199,7 @@ public class TestEditorEnums {
     }
 
     public enum TerminalExecutorDataOperands {
+        API,
         DELETE_HEADER,
         DELETE_BODY_PARAM,
         DELETE_QUERY_PARAM,

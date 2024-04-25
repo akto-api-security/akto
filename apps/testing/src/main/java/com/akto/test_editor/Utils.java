@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -18,6 +19,7 @@ import org.bouncycastle.jce.provider.JDKDSASigner.stdDSA;
 
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.UrlModifierPayload;
 import com.akto.util.Constants;
@@ -40,6 +42,12 @@ public class Utils {
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final JsonFactory factory = mapper.getFactory();
     private static final Gson gson = new Gson();
+
+    private static final OkHttpClient client = new OkHttpClient().newBuilder()
+        .writeTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
+        .callTimeout(5, TimeUnit.SECONDS)
+        .build();
 
     public static Boolean checkIfContainsMatch(String text, String keyword) {
         Pattern pattern = Pattern.compile(keyword);
@@ -697,8 +705,6 @@ public class Utils {
             .addHeader(Constants.AKTO_TOKEN_KEY, tokenVal)
             .post(emptyBody)
             .build();
-
-        OkHttpClient client = new OkHttpClient();
         Response okResponse = null;
     
         try {
@@ -709,6 +715,10 @@ public class Utils {
             return new ExecutorSingleOperationResp(true, "");
         }catch (Exception e){
             return new ExecutorSingleOperationResp(false, e.getMessage());
+        }finally {
+            if (okResponse != null) {
+                okResponse.close(); // Manually close the response body
+            }
         }
     }
 
@@ -726,8 +736,6 @@ public class Utils {
             .url(requestUrl)
             .get()
             .build();
-
-            OkHttpClient client = new OkHttpClient();
             Response okResponse = null;
         
         try {
@@ -741,6 +749,23 @@ public class Utils {
             }
         }catch (Exception e){
             return false;
+        } finally {
+            if (okResponse != null) {
+                okResponse.close(); // Manually close the response body
+            }
+        }
+    }
+
+    public static ApiAccessType getApiAccessTypeFromString(String apiAccessType){
+        switch (apiAccessType.toLowerCase()) {
+            case "private":
+                return ApiAccessType.PRIVATE;
+            case "public":
+                return ApiAccessType.PUBLIC;
+            case "partner":
+                return ApiAccessType.PARTNER;
+            default:
+                return null;
         }
     }
 
