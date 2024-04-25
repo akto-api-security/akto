@@ -1,0 +1,28 @@
+name: End to end tests
+
+on:
+  workflow_dispatch:
+      
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Bolt
+        uses: koalalab-inc/bolt@v1
+      - name: Checkout e2e_tests tools
+        uses: actions/checkout@v4
+        with:
+          repository: akto-api-security/e2e_testing
+          token: ${{ secrets.MY_TOKEN }}
+          path: e2e_testing
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: switch to testing 
+        run: cd e2e_testing && ls
+      - name: Install dependencies
+        run: npm ci
+      - name: Run Tests
+        run: node index.js
