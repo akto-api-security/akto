@@ -1102,7 +1102,7 @@ public class InitializerListener implements ServletContextListener {
     public static void moveAuthMechanismDataToRole(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getMoveAuthMechanismToRole() == 0) {
 
-            AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
+            AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
             if (authMechanism != null) {
                 createAndSaveAttackerRole(authMechanism);
             }
