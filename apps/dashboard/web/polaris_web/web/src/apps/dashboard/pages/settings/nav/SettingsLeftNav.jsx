@@ -11,12 +11,6 @@ const SettingsLeftNav = () => {
     const path = location.pathname
     const page = path.substring(path.lastIndexOf('/') + 1)
     
-    const aboutArr = window.IS_SAAS === 'true' ? [] : [{
-        label: 'About',
-        icon: StoreDetailsFilledMinor,
-        selected: page === "about",
-        onClick: () => navigate("/dashboard/settings/about")
-    }]
     const logsArr = window.IS_SAAS === 'true' ? [] : [{
         label: 'Logs',
         icon: ListFilledMajor,
@@ -47,7 +41,12 @@ const SettingsLeftNav = () => {
         <Navigation>
             <Navigation.Section
                 items={[
-                    ...aboutArr,
+                    {
+                        label: 'About',
+                        icon: StoreDetailsFilledMinor,
+                        selected: page === "about",
+                        onClick: () => navigate("/dashboard/settings/about")
+                    },
                     {
                         label: 'Users',
                         icon: IdentityCardFilledMajor,

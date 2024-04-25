@@ -37,7 +37,7 @@ function ApiGroupModal(props){
         let ret = getApis();
 
         api.addApisToCustomCollection(ret, apiGroupName).then((resp)=>{
-            func.setToast(true, false, "APIs added to API group successfully")
+            func.setToast(true, false, <div data-testid="api_added_to_group_message">APIs added to API group successfully</div>)
             setCollectionsMap(func.mapCollectionIdToName(resp?.apiCollections))
             setAllCollections(resp?.apiCollections)
             toggleApiGroupModal()
@@ -105,7 +105,7 @@ function ApiGroupModal(props){
 
     const title = operation === Operation.ADD ?`Add API${plurality} to API group` : `Remove API${plurality} from API group`
 
-    const buttonTitle = operation === Operation.ADD ? `Add API${plurality}` : `Remove API${plurality}`
+    const buttonTitle = operation === Operation.ADD ? <div data-testid="add_api_button">{`Add API${plurality}`}</div> : `Remove API${plurality}`
 
     const buttonAction = operation === Operation.ADD ? addAPIs : removeAPIs
 
