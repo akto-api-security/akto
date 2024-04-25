@@ -129,12 +129,12 @@ public class TestCollectionPropertiesDao extends AccountsContextDao<TestCollecti
                 case LOGGED_OUT_SYSTEM_ROLE:
                     prop = createTestRole(apiCollectionId, propId);
                     break;
-                case SESSION_TOKEN_HEADER_KEY:
-                    prop = createAuthToken(apiCollectionId, CustomAuthType.TypeOfToken.SESSION);
-                    break;
-                case CSRF_TOKEN_HEADER:
-                    prop = createAuthToken(apiCollectionId, CustomAuthType.TypeOfToken.CSRF);
-                    break;
+//                case SESSION_TOKEN_HEADER_KEY:
+//                    prop = createAuthToken(apiCollectionId, CustomAuthType.TypeOfToken.SESSION);
+//                    break;
+//                case CSRF_TOKEN_HEADER:
+//                    prop = createAuthToken(apiCollectionId, CustomAuthType.TypeOfToken.CSRF);
+//                    break;
                 case PASSWORD_RESET_ENDPOINT:
                 case SIGNUP_ENDPOINT:
                 case LOGIN_ENDPOINT:
