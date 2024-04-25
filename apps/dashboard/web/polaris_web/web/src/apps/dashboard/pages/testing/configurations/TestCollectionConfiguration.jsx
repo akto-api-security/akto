@@ -31,7 +31,7 @@ function TestCollectionConfiguration() {
             case "CUSTOM_AUTH":
                ret =
                 <div>{propsFromConfig.values.map(v => {
-                    return <span style={{marginRight: "8px"}}><Link monochrome target="_blank" url={window.location.origin+"/dashboard/settings/auth-types/details?name="+v}>{v}</Link></span>
+                    return <span style={{marginRight: "8px"}}><Link onClick={(e) => e.stopPropagation()}  monochrome target="_blank" url={window.location.origin+"/dashboard/settings/auth-types/details?name="+v}>{v}</Link></span>
                 })}</div>
                 break;
 
@@ -39,7 +39,7 @@ function TestCollectionConfiguration() {
                ret =
                 (propsFromConfig.values?.length) ?
                 <div>{propsFromConfig.values.map(v => {
-                    return <span style={{marginRight: "8px"}}><Link monochrome target="_blank" url={window.location.origin+"/dashboard/observe/inventory/"+v}>{mapCollectionIdToName[v]}</Link></span>
+                    return <span style={{marginRight: "8px"}}><Link onClick={(e) => e.stopPropagation()} monochrome target="_blank" url={window.location.origin+"/dashboard/observe/inventory/"+v}>{mapCollectionIdToName[v]}</Link></span>
                 })}</div>
                 :<div>Not Implemented</div>
 
@@ -48,7 +48,7 @@ function TestCollectionConfiguration() {
             case "ROLE":
                ret =
                    <div>{propsFromConfig.values.map(v => {
-                       return <Link monochrome target="_blank" url={window.location.origin+"/dashboard/testing/roles/details?name="+v}>{v}</Link>
+                       return <Link onClick={(e) => e.stopPropagation()} monochrome target="_blank" url={window.location.origin+"/dashboard/testing/roles/details?name="+v}>{v}</Link>
                    })}</div>
                break;
 
@@ -64,12 +64,12 @@ function TestCollectionConfiguration() {
         switch(type) {
             case "CUSTOM_AUTH":
                ret =
-               <Link  target="_blank" url={window.location.origin+"/dashboard/settings/auth-types/details"}>
+               <Link onClick={(e) => e.stopPropagation()}  target="_blank" url={window.location.origin+"/dashboard/settings/auth-types/details"}>
                 Create
                </Link>
                break;
             case "ROLE":
-                ret =  <Link target="_blank" url={window.location.origin+"/dashboard/testing/roles/details"}>
+                ret =  <Link onClick={(e) => e.stopPropagation()}  target="_blank" url={window.location.origin+"/dashboard/testing/roles/details"}>
                Create
                </Link>
 
