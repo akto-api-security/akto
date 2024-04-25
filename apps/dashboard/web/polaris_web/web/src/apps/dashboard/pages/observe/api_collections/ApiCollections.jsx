@@ -17,7 +17,6 @@ import collectionApi from "./api"
 import CollectionsPageBanner from "./component/CollectionsPageBanner"
 import useTable from "@/apps/dashboard/components/tables/TableContext"
 
-
 const headers = [
     {
         title: "API collection name",
@@ -232,7 +231,6 @@ function ApiCollections() {
         fetchData()
         resetFunc()    
     }, [])
-
     const createCollectionModalActivatorRef = useRef();
 
     async function handleCollectionsAction(collectionIdList, apiFunction, toastContent){

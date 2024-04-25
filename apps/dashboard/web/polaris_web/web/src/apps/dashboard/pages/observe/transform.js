@@ -483,6 +483,7 @@ const transform = {
         const hostNameMap = PersistStore.getState().hostNameMap
         const prettifyData = inventoryData.map((url) => {
             const score = this.getRiskScoreForEndpoint(url)
+          
             return{
                 ...url,
                 last_seen: url.last_seen,
@@ -495,6 +496,7 @@ const transform = {
                 riskScore: score,
                 isNew: this.isNewEndpoint(url.lastSeenTs),
                 sensitiveDataTags: url?.sensitiveTags.join(" "),
+                codeAnalysisEndpoint: false,
             }
         })
 

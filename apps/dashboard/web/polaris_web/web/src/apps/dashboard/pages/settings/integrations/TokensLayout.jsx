@@ -32,13 +32,15 @@ function TokensLayout(props) {
 
   const listComponent = (
     tokenList.map((item,index) =>(
+      <div data-testid={`data_${index + 1}`}>
       <LegacyCard.Section title={`Token ${index + 1}`} key={index} 
-        actions={[{ content: 'Delete', destructive: true, onAction: () => deleteToken(item.id)}]}>
+        actions={[{ content: <div data-testid={`delete_token_${index + 1}`}>Delete</div>, destructive: true, onAction: () => deleteToken(item.id)}]}>
           <div style={{ paddingBottom: "5px" }}>
             <Text variant="bodyMd">{func.prettifyEpoch(item.timestamp)}</Text>
           </div>
         <PasswordTextField field={item.key} />
       </LegacyCard.Section>     
+      </div>     
     ))
   )
   
@@ -46,7 +48,7 @@ function TokensLayout(props) {
       <LegacyCard.Section>
         <EmptyState
           heading='No tokens found'
-          action={{content: 'Generate Token',onAction: generateNewToken}}
+          action={{content: <div data-testid="generate_token_button">Generate Token</div>,onAction: generateNewToken}}
           // secondaryAction={{
           //   content: 'Learn more',
           // }}
