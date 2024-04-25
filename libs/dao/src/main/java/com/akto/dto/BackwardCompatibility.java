@@ -63,13 +63,16 @@ public class BackwardCompatibility {
     public static final String LOGIN_SIGNUP_GROUPS = "loginSignupGroups";
     private int loginSignupGroups;
 
+    public static final String VULNERABLE_API_UPDATION_VERSION_V1 = "vulnerableApiUpdationVersionV1";
+    private int vulnerableApiUpdationVersionV1;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
                                  int deleteNullSubCategoryIssues, int enableNewMerging,
                                  int aktoDefaultNewUI, int initializeOrganizationAccountBelongsTo, int orgsInBilling,
                                  int computeIntegratedConnections, int deleteLastCronRunInfo, int moveAuthMechanismToRole,
-                                 int loginSignupGroups) {
+                                 int loginSignupGroups, int vulnerableApiUpdationVersionV1) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -90,6 +93,7 @@ public class BackwardCompatibility {
         this.deleteLastCronRunInfo = deleteLastCronRunInfo;
         this.moveAuthMechanismToRole = moveAuthMechanismToRole;
         this.loginSignupGroups = loginSignupGroups;
+        this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
     }
 
     public BackwardCompatibility() {
@@ -269,5 +273,13 @@ public class BackwardCompatibility {
 
     public void setLoginSignupGroups(int loginSignupGroups) {
         this.loginSignupGroups = loginSignupGroups;
+    }
+    
+    public int getVulnerableApiUpdationVersionV1() {
+        return vulnerableApiUpdationVersionV1;
+    }
+
+    public void setVulnerableApiUpdationVersionV1(int vulnerableApiUpdationVersionV1) {
+        this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
     }
 }

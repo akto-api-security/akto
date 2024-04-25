@@ -1847,6 +1847,8 @@ public class InitializerListener implements ServletContextListener {
             hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
             boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
             setTelemetrySettings(organization, telemetryEnabled);
+            boolean testTelemetryEnabled = OrganizationUtils.fetchTestTelemetryEnabled(metaData);
+            organization.setTestTelemetryEnabled(testTelemetryEnabled);
 
             loggerMaker.infoAndAddToDb("Processed org metadata",LogDb.DASHBOARD);
 
@@ -1864,6 +1866,7 @@ public class InitializerListener implements ServletContextListener {
                             Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed),
                             Updates.set(Organization.GRACE_PERIOD, gracePeriod),
                             Updates.set(Organization.HOTJAR_SITE_ID, hotjarSiteId),
+                            Updates.set(Organization.TEST_TELEMETRY_ENABLED, testTelemetryEnabled),
                             Updates.set(Organization.LAST_FEATURE_MAP_UPDATE, lastFeatureMapUpdate)));
 
             loggerMaker.infoAndAddToDb("Updated org",LogDb.DASHBOARD);

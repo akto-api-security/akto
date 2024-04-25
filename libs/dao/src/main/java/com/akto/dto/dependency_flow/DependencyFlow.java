@@ -2,11 +2,18 @@ package com.akto.dto.dependency_flow;
 
 import com.akto.dao.DependencyFlowNodesDao;
 import com.akto.dao.DependencyNodeDao;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.DependencyNode;
+import com.akto.dto.type.URLMethods;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.InsertManyOptions;
 
+import com.mongodb.client.model.Sorts;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.jgrapht.Graph;
+import org.jgrapht.alg.cycle.CycleDetector;
 import org.jgrapht.alg.cycle.SzwarcfiterLauerSimpleCycles;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
@@ -17,9 +24,8 @@ import java.util.*;
 
 public class DependencyFlow {
 
+    public Map<ApiInfo.ApiInfoKey, Node> resultNodes = new HashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(DependencyFlow.class);
-    public Map<Integer, ReverseNode> initialNodes = new HashMap<>();
-    public Map<Integer, Node> resultNodes = new HashMap<>();
 
     public void syncWithDb() {
         List<Node> nodes = new ArrayList<>(resultNodes.values());
@@ -33,35 +39,56 @@ public class DependencyFlow {
         }
     }
 
-    Queue<Integer> queue = new LinkedList<>();
-    Set<Integer> done = new HashSet<>();
+    Queue<ApiInfo.ApiInfoKey> queue = new LinkedList<>();
+    Set<ApiInfo.ApiInfoKey> done = new HashSet<>();
 
-    public void addToQueue(int nodeId) {
-        queue.add(nodeId);
-        done.add(nodeId);
+    public void addToQueue(ApiInfo.ApiInfoKey apiInfoKey) {
+        queue.add(apiInfoKey);
+        done.add(apiInfoKey);
     }
 
+    public void findL0Apis(Set<ApiInfo.ApiInfoKey> neverL0, Set<ApiInfo.ApiInfoKey> maybeL0, List<DependencyNode> dependencyNodeList) {
+        for (DependencyNode dependencyNode: dependencyNodeList) {
+            ApiInfo.ApiInfoKey req = new ApiInfo.ApiInfoKey(Integer.parseInt(dependencyNode.getApiCollectionIdReq()), dependencyNode.getUrlReq(), URLMethods.Method.fromString(dependencyNode.getMethodReq()));
+            neverL0.add(req);
+            maybeL0.remove(req);
+
+            ApiInfo.ApiInfoKey resp = new ApiInfo.ApiInfoKey(Integer.parseInt(dependencyNode.getApiCollectionIdResp()), dependencyNode.getUrlResp(), URLMethods.Method.fromString(dependencyNode.getMethodResp()));
+            if (!neverL0.contains(resp)) maybeL0.add(resp);
+        }
+    }
+
+    static String ID = "_id";
     public void run() {
-        initialNodes = new HashMap<>();
         resultNodes = new HashMap<>();
         queue = new LinkedList<>();
         done = new HashSet<>();
 
-        List<DependencyNode> dependencyNodeList = DependencyNodeDao.instance.findAll(new BasicDBObject());
+        ObjectId lastId = null;
+        int limit = 100;
+        Set<ApiInfo.ApiInfoKey> neverL0 = new HashSet<>();
+        Set<ApiInfo.ApiInfoKey> maybeL0 = new HashSet<>();
 
-        for (DependencyNode dependencyNode: dependencyNodeList) {
-            fillNodes(dependencyNode); // to fill who is giving data to whom
-            fillResultNodes(dependencyNode); // to fill who is receiving data from whom
+        int maxIterations = 100;
+        while (maxIterations > 0) {
+            maxIterations -= 1;
+            Bson filter = lastId == null ? new BasicDBObject() : Filters.gt(ID, lastId);
+            List<DependencyNode> dependencyNodeList = DependencyNodeDao.instance.findAll(filter, 0, limit, Sorts.ascending(ID));
+            findL0Apis(neverL0, maybeL0, dependencyNodeList);
+            for (DependencyNode dependencyNode: dependencyNodeList) {
+                lastId = dependencyNode.getId();
+                fillResultNodes(dependencyNode); // to fill who is receiving data from whom
+            }
+            if (dependencyNodeList.size() < limit) break;
         }
+
+        List<ApiInfo.ApiInfoKey> l0Apis = new ArrayList<>(maybeL0);
 
         // build initial queue
         // depth 0 for initial queue
-        for (ReverseNode reverseNode: initialNodes.values()) {
-            int id = reverseNode.hashCode();
-            if (resultNodes.containsKey(id)) continue; // to check if the nodes is getting data from anywhere. If yes then don't add to queue now.
-            addToQueue(id);
-            Node resultNodeForZeroLevel = new Node(reverseNode.getApiCollectionId(), reverseNode.getUrl(), reverseNode.getMethod(), new HashMap<>());
-            resultNodes.put(id, resultNodeForZeroLevel); // we want to still store level 0 nodes in db
+        for (ApiInfo.ApiInfoKey apiInfoKey: l0Apis) {
+            addToQueue(apiInfoKey);
+            resultNodes.put(apiInfoKey, new Node(apiInfoKey.getApiCollectionId()+"", apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), new HashMap<>())); // we want to still store level 0 nodes in db
         }
 
         parseTree(); // pops node from queue and fill all the child APIs of that particular
@@ -69,25 +96,56 @@ public class DependencyFlow {
         int maxCycles = 20;
         while (maxCycles > 0) {
             maxCycles -= 1;
-            Integer nodeToBeMarkedDone = markNodeAsDone();
+            ApiInfo.ApiInfoKey nodeToBeMarkedDone = markNodeAsDone();
             if (nodeToBeMarkedDone == null) return;
             addToQueue(nodeToBeMarkedDone);
             parseTree();
         }
     }
 
+    public static ReverseNode buildReverseNode(ApiInfo.ApiInfoKey apiInfoKey) {
+        List<DependencyNode> dependencyNodes = DependencyNodeDao.instance.findAll(
+                Filters.and(
+                        Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, apiInfoKey.getApiCollectionId()+""),
+                        Filters.eq(DependencyNode.URL_RESP, apiInfoKey.getUrl()),
+                        Filters.eq(DependencyNode.METHOD_RESP, apiInfoKey.getMethod().name())
+                ), 0, 500, Sorts.ascending("_id")
+        );
+
+        ReverseNode reverseNode = new ReverseNode(
+                apiInfoKey.getApiCollectionId()+"", apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), new HashMap<>()
+        );
+        for (DependencyNode dependencyNode: dependencyNodes) {
+            for (DependencyNode.ParamInfo paramInfo: dependencyNode.getParamInfos()) {
+                String paramResp = paramInfo.getResponseParam();
+                ReverseConnection reverseConnection = reverseNode.getReverseConnections().getOrDefault(paramResp, new ReverseConnection(paramResp, new ArrayList<>()));
+
+                String paramReq = paramInfo.getRequestParam();
+                reverseConnection.getReverseEdges().add(
+                        new ReverseEdge(
+                                dependencyNode.getApiCollectionIdReq(), dependencyNode.getUrlReq(), dependencyNode.getMethodReq(), paramReq, paramInfo.getCount(), paramInfo.getIsUrlParam(), paramInfo.getIsHeader()
+                        )
+                );
+
+                reverseNode.getReverseConnections().put(paramResp, reverseConnection);
+            }
+        }
+
+        return reverseNode;
+    }
+
     public void parseTree() {
         // pop queue until empty
         while (!queue.isEmpty()) {
-            int nodeId = queue.remove();
-            ReverseNode reverseNode = initialNodes.get(nodeId); // reverse node basically says this API is sending data to what other APIs
+            ApiInfo.ApiInfoKey apiInfoKey = queue.remove();
+            ReverseNode reverseNode = buildReverseNode(apiInfoKey);
 
-            if (reverseNode == null || reverseNode.getReverseConnections() == null) {
+            if (reverseNode.getReverseConnections() == null) {
                 // this means the node is not giving data to anyone so next node please!
                 continue;
             }
 
-            Node nodeFromQueue = resultNodes.get(nodeId);
+            Node nodeFromQueue = resultNodes.get(apiInfoKey);
             nodeFromQueue.fillMaxDepth();
             int depth = nodeFromQueue.getMaxDepth();
 
@@ -95,9 +153,9 @@ public class DependencyFlow {
             for (ReverseConnection reverseConnection: reverseConnections.values()) {
                 for (ReverseEdge reverseEdge: reverseConnection.getReverseEdges()) {
                     // resultNode is basically find which node is receiving the data and fill the edge with that particular parameter
-                    Node resultNode = resultNodes.get(Objects.hash(reverseEdge.getApiCollectionId(), reverseEdge.getUrl(), reverseEdge.getMethod()));
-                    int key = resultNode.hashCode();
-                    if (done.contains(key)) continue;
+                    ApiInfo.ApiInfoKey resultApiInfoKey = new ApiInfo.ApiInfoKey(Integer.parseInt(reverseEdge.getApiCollectionId()), reverseEdge.getUrl(), URLMethods.Method.fromString(reverseEdge.getMethod()));
+                    Node resultNode = resultNodes.get(resultApiInfoKey);
+                    if (done.contains(resultApiInfoKey)) continue;
                     Edge edge = new Edge(reverseNode.getApiCollectionId(), reverseNode.getUrl(), reverseNode.getMethod(), reverseConnection.getParam(), reverseEdge.getIsHeader(), reverseEdge.getCount(), depth + 1);
                     String requestParam = reverseEdge.getParam();
 
@@ -116,14 +174,23 @@ public class DependencyFlow {
 
                     boolean flag = isDone(resultNode); // a node is marked done when all parameters have found a parent
                     if (flag) {
-                        addToQueue(key);
+                        addToQueue(resultApiInfoKey);
                     }
                 }
             }
         }
     }
 
-    public Integer markNodeAsDone() {
+    static String generateStringFromApiInfoKey(ApiInfo.ApiInfoKey apiInfoKey) {
+        return apiInfoKey.getApiCollectionId() + "$" + apiInfoKey.getUrl() + "$" + apiInfoKey.getMethod().name();
+    }
+
+    static ApiInfo.ApiInfoKey generateApiInfoKeyFromString(String apiInfoKeyString) {
+        String[] split = apiInfoKeyString.split("\\$");
+        return new ApiInfo.ApiInfoKey(Integer.parseInt(split[0]), split[1], URLMethods.Method.fromString(split[2]));
+    }
+
+    public ApiInfo.ApiInfoKey markNodeAsDone() {
         List<Node> nodes = new ArrayList<>(resultNodes.values());
 
         // incompleteNodes are the nodes which have some parameters for which we were not able to figure out the parent
@@ -140,15 +207,16 @@ public class DependencyFlow {
         // we add all the incomplete nodes to a graph
         Graph<String, DefaultEdge> directedGraph = new DefaultDirectedGraph<>(DefaultEdge.class);
         for (Node node: incompleteNodes) {
-            directedGraph.addVertex(node.hashCode()+"");
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(Integer.parseInt(node.getApiCollectionId()), node.getUrl(), URLMethods.Method.fromString(node.getMethod()));
+            directedGraph.addVertex(generateStringFromApiInfoKey(apiInfoKey));
         }
 
         // Building edges
         for (Node node: incompleteNodes) {
-            int nodeId = node.hashCode();
             // reverse node basically says this API is sending data to what other APIs
-            ReverseNode reverseNode = initialNodes.get(nodeId);
-            if (reverseNode == null || reverseNode.getReverseConnections() == null) {
+            ApiInfo.ApiInfoKey parentApi = new ApiInfo.ApiInfoKey(Integer.parseInt(node.getApiCollectionId()), node.getUrl(), URLMethods.Method.fromString(node.getMethod()));
+            ReverseNode reverseNode = buildReverseNode(parentApi);
+            if (reverseNode.getReverseConnections() == null) {
                 // this means the node is not giving data to anyone so next node please!
                 continue;
             }
@@ -156,9 +224,9 @@ public class DependencyFlow {
             Map<String,ReverseConnection>  reverseConnections = reverseNode.getReverseConnections();
             for (ReverseConnection reverseConnection: reverseConnections.values()) {
                 for (ReverseEdge reverseEdge: reverseConnection.getReverseEdges()) {
-                    int id = Objects.hash(reverseEdge.getApiCollectionId(), reverseEdge.getUrl(), reverseEdge.getMethod());
+                    ApiInfo.ApiInfoKey childApi = new ApiInfo.ApiInfoKey(Integer.parseInt(reverseEdge.getApiCollectionId()), reverseEdge.getUrl(), URLMethods.Method.fromString(reverseEdge.getMethod()));
 
-                    Node resultNode = resultNodes.get(id);
+                    Node resultNode = resultNodes.get(childApi);
                     Map<String, Connection> connections = resultNode.getConnections();
 
                     String param = reverseEdge.getParam();
@@ -173,44 +241,42 @@ public class DependencyFlow {
                     List<Edge> edges = connection.getEdges();
 
                     if (edges == null || !edges.isEmpty()) continue; // this is because if it already has an edge this means that parameter is not part of the loop, so skip it
-                    if (directedGraph.containsVertex(id+"")) { // this check is added to make sure we are only making edges inside the loop
-                        directedGraph.addEdge(nodeId+"", id+"");
+                    if (directedGraph.containsVertex(generateStringFromApiInfoKey(childApi))) { // this check is added to make sure we are only making edges inside the loop
+                        directedGraph.addEdge(generateStringFromApiInfoKey(parentApi), generateStringFromApiInfoKey(childApi));
                     }
                 }
             }
         }
 
-        SzwarcfiterLauerSimpleCycles<String, DefaultEdge> simpleCyclesFinder = new SzwarcfiterLauerSimpleCycles<>(directedGraph);
-        List<List<String>> cycles = simpleCyclesFinder.findSimpleCycles();
+        CycleDetector<String, DefaultEdge> cycleDetector = new CycleDetector<String, DefaultEdge>(directedGraph);
 
-        if (cycles.isEmpty()) return null;
-
-        logger.info("We found " + cycles.size() + " circular dependency");
+        boolean cycleDetected = cycleDetector.detectCycles();
+        if (!cycleDetected) return null;
+        Set<String> cycleVertices = cycleDetector.findCycles();
 
         int currentMinMissingCount = Integer.MAX_VALUE;
-        Integer result = null;
-        for (List<String> cycle : cycles) {
-            for (String nodeId: cycle) {
-                int key = Integer.parseInt(nodeId);
-                Node node = resultNodes.get(key);
-                Map<String, Connection> connections = node.getConnections();
-                int missing = 0;
-                int filled = 0;
-                for (Connection connection: connections.values()) {
-                    if (connection.getIsHeader()) continue;
-                    if (connection.getEdges() == null || connection.getEdges().isEmpty()) {
-                        missing += 1;
-                    } else {
-                        filled += 1;
-                    }
+        ApiInfo.ApiInfoKey result = null;
+        for (String apiInfoKeyString: cycleVertices) {
+            ApiInfo.ApiInfoKey apiInfoKey = generateApiInfoKeyFromString(apiInfoKeyString);
+
+            Node node = resultNodes.get(apiInfoKey);
+            Map<String, Connection> connections = node.getConnections();
+            int missing = 0;
+            int filled = 0;
+            for (Connection connection: connections.values()) {
+                if (connection.getIsHeader()) continue;
+                if (connection.getEdges() == null || connection.getEdges().isEmpty()) {
+                    missing += 1;
+                } else {
+                    filled += 1;
                 }
-
-                if (missing == 0) return key; // this means except headers all values have been filled.
-
-                if (filled == 0) continue;
-
-                if (missing < currentMinMissingCount)  result = key;
             }
+
+            if (missing == 0) return apiInfoKey; // this means except headers all values have been filled.
+
+            if (filled == 0) continue;
+
+            if (missing < currentMinMissingCount)  result = apiInfoKey;
         }
 
         if (result != null) {
@@ -229,33 +295,6 @@ public class DependencyFlow {
         return flag;
     }
 
-    public void fillNodes(DependencyNode dependencyNode) {
-        ReverseNode reverseNode = new ReverseNode(
-                dependencyNode.getApiCollectionIdResp(),
-                dependencyNode.getUrlResp(),
-                dependencyNode.getMethodResp(),
-                new HashMap<>()
-        );
-
-        Integer key = reverseNode.hashCode();
-        reverseNode = initialNodes.getOrDefault(key, reverseNode);
-
-        for (DependencyNode.ParamInfo paramInfo: dependencyNode.getParamInfos()) {
-            String paramResp = paramInfo.getResponseParam();
-            ReverseConnection reverseConnection = reverseNode.getReverseConnections().getOrDefault(paramResp, new ReverseConnection(paramResp, new ArrayList<>()));
-
-            String paramReq = paramInfo.getRequestParam();
-            reverseConnection.getReverseEdges().add(
-                    new ReverseEdge(
-                            dependencyNode.getApiCollectionIdReq(), dependencyNode.getUrlReq(), dependencyNode.getMethodReq(), paramReq, paramInfo.getCount(), paramInfo.getIsUrlParam(), paramInfo.getIsHeader()
-                    )
-            );
-
-            reverseNode.getReverseConnections().put(paramResp, reverseConnection);
-        }
-
-        initialNodes.put(key, reverseNode);
-    }
 
     public void fillResultNodes(DependencyNode dependencyNode) {
         Node node = new Node(
@@ -265,7 +304,7 @@ public class DependencyFlow {
                 new HashMap<>()
         );
 
-        Integer key = node.hashCode();
+        ApiInfo.ApiInfoKey key = new ApiInfo.ApiInfoKey(Integer.parseInt(dependencyNode.getApiCollectionIdReq()), dependencyNode.getUrlReq(), URLMethods.Method.fromString(dependencyNode.getMethodReq()));
         node = resultNodes.getOrDefault(key, node);
 
         for (DependencyNode.ParamInfo paramInfo: dependencyNode.getParamInfos()) {

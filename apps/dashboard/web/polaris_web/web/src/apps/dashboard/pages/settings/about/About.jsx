@@ -4,12 +4,13 @@ import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import settingRequests from '../api'
-import { QuestionMarkMajor, DeleteMajor } from "@shopify/polaris-icons"
+import { DeleteMajor } from "@shopify/polaris-icons"
 import TooltipText from "../../../components/shared/TooltipText"
 import { isIP } from "is-ip"
 import isCidr from "is-cidr"
 import func from "@/util/func"
 import TextFieldWithInfo from '../../../components/shared/TextFieldWithInfo'
+import DropdownSearch from '../../../components/shared/DropdownSearch'
 
 function About() {
 
@@ -37,6 +38,9 @@ function About() {
     const [privateCidrList, setPrivateCidrList] = useState([])
     const [partnerIpsList, setPartnerIpsList] = useState([])
 
+    const initialUrlsList = settingFunctions.getRedundantUrlOptions()
+    const [selectedUrlList, setSelectedUrlsList] = useState([])
+
     const setupOptions = settingFunctions.getSetupOptions()
 
     const isOnPrem = window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'on_prem'
@@ -57,6 +61,7 @@ function About() {
 
         setPrivateCidrList(resp.privateCidrList || [])
         setPartnerIpsList(resp.partnerIpList || [])
+        setSelectedUrlsList(resp.allowRedundantEndpointsList || [])
     }
 
     useEffect(()=>{
@@ -111,7 +116,6 @@ function About() {
         setTrafficThreshold(val) ;
         await settingRequests.updateTrafficAlertThresholdSeconds(val);
     }
-
     const handleIpsChange = async(ip, isAdded, type) => {
         if(type === 'cidr'){
             let updatedIps = []
@@ -211,6 +215,27 @@ function About() {
         await settingRequests.deleteApiCollectionNameMapper(regex);
         func.setToast(true, false, "Replace collection deleted successfully.")
     }
+
+    const handleSelectedUrls = async(urlsList) => {
+        setSelectedUrlsList(urlsList)
+        await settingRequests.handleRedundantUrls(urlsList)
+    }
+
+    const redundantUrlComp = (
+        <Box width='220px'>
+            <DropdownSearch
+                label="Select redundant url types"
+                placeholder="Select url types"
+                optionsList={initialUrlsList.options}
+                setSelected={handleSelectedUrls}
+                preSelected={selectedUrlList}
+                itemName={"url type"}
+                value={`${selectedUrlList.length} url type selected`}
+                allowMultiple
+                isNested={true}
+            />
+        </Box>
+    )
     
     const filterHeaderComponent = (
         <VerticalStack gap={5}>
@@ -308,7 +333,7 @@ function About() {
               <LegacyCard.Section title={<Text variant="headingMd">Details</Text>}>
                   {infoComponent}
               </LegacyCard.Section>
-              {isOnPrem &&
+              {isOnPrem ?
                   <LegacyCard.Section title={<Text variant="headingMd">More settings</Text>}>
                       <div style={{ display: 'flex' }}>
                           <div style={{ flex: "1" }}>
@@ -326,6 +351,7 @@ function About() {
                                   <ToggleComponent text={"Redact sample data"} initial={redactPayload} onToggle={handleRedactPayload} />
                                   <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
                                   <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
+                                  {redundantUrlComp}
                                   <VerticalStack gap={1}>
                                       <Text color="subdued">Traffic alert threshold</Text>
                                       <Box width='120px'>
@@ -344,6 +370,9 @@ function About() {
                               {replaceCollectionComponent}
                           </div>
                       </div>
+                  </LegacyCard.Section>
+                  :<LegacyCard.Section title={<Text variant="headingMd">More settings</Text>}>
+                    {redundantUrlComp}
                   </LegacyCard.Section>
               }
             <LegacyCard.Section subdued>
@@ -399,7 +428,7 @@ function About() {
     }
 
     const components = [accountInfoComponent, 
-                        <UpdateIpsComponent 
+                        window.IS_SAAS !== "true" ? <UpdateIpsComponent 
                             key={"cidr"} 
                             description={"We use these CIDRs to mark the endpoints as PRIVATE"} 
                             title={"Private CIDRs list"}
@@ -408,8 +437,8 @@ function About() {
                             onSubmit={(val) => handleIpsChange(val,true,"cidr")}
                             onRemove={(val) => handleIpsChange(val, false, "cidr")}
                             type={"cidr"}
-                        />,
-                        <UpdateIpsComponent
+                        /> : null,
+                        window.IS_SAAS !== "true" ? <UpdateIpsComponent
                             key={"partner"}
                             description={"We use these IPS to mark the endpoints as PARTNER"} 
                             title={"Third parties Ips list"}
@@ -418,7 +447,7 @@ function About() {
                             onSubmit={(val) => handleIpsChange(val,true,"partner")}
                             onRemove={(val) => handleIpsChange(val, false, "partner")}
                             type={"partner"}
-                        />
+                        /> : null
         ]
 
     return (

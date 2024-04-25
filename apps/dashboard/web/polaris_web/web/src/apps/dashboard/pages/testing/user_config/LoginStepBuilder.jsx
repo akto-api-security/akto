@@ -1,4 +1,4 @@
-import { LegacyCard, Tabs, Text, Button, ButtonGroup, Divider } from '@shopify/polaris';
+import { LegacyCard, Tabs, Text, Button, ButtonGroup, Divider, HorizontalStack, Checkbox } from '@shopify/polaris';
 import { useState, useEffect } from 'react';
 import SpinnerCentered from '../../../components/progress/SpinnerCentered';
 import DropdownSearch from '../../../components/shared/DropdownSearch';
@@ -23,6 +23,7 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
         regex: "(\d+){1,6}",
         type: "LOGIN_FORM",
         url: "https://xyz.com",
+        allowAllStatusCodes: false,
         testResponse: ""
     }
 
@@ -86,6 +87,14 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
         setSelectedStep(step)
     }
 
+    function handleStatusCodeToggle(val) {
+        setSteps(prev => prev.map((step, index) => index === selectedStep ? {
+            ...step,
+            allowAllStatusCodes: val
+        }
+        : step))
+    }
+
     function handleStepTypeChange(type) {
         if (type === "LOGIN_FORM") {
             setSteps(prev => prev.map((step, index) => index === selectedStep ? {
@@ -141,7 +150,8 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
 
     async function handleSave() {
         await api.addAuthMechanism('LOGIN_REQUEST', [ ...steps ] , authParams)
-        setToastConfig({ isActive: true, isError: false, message: "Login flow saved successfully!" })
+        setToastConfig({ isActive: true, isError: false, message: <div data-testid="login_flow_success_message">Login flow saved successfully!</div> })
+
     }
 
     useEffect(() => {
@@ -166,7 +176,14 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                     <LegacyCard>
                         <div style={{ display: "grid", gridTemplateColumns: "auto max-content", alignItems: "center", padding: "10px" }}>
                             <Tabs tabs={stepsTabs} selected={selectedStep} onSelect={handleStepChange}></Tabs>
-                            <Button id={"add-step-button"} primary onClick={handleAddStep}>Add step</Button>
+                            <HorizontalStack gap={"2"}>
+                                <Checkbox
+                                    label='Allow All Status codes'
+                                    checked={steps[selectedStep].allowAllStatusCodes}
+                                    onChange={() => handleStatusCodeToggle(!steps[selectedStep].allowAllStatusCodes)}
+                                />
+                                <Button id={"add-step-button"} primary onClick={handleAddStep}>Add step</Button>
+                            </HorizontalStack>
                         </div>
 
                         <Divider />
@@ -198,7 +215,7 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                     <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
 
                     <br />
-                    {showOnlyApi ? null :<Button id={"save-token"} primary onClick={handleSave}>Save changes</Button>}
+                    {showOnlyApi ? null :<Button id={"save-token"} primary onClick={handleSave}><div data-testid="save_token_automated">Save changes</div></Button>}
 
                 </div>
             }

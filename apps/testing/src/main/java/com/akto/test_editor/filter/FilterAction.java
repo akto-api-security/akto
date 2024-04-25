@@ -13,6 +13,7 @@ import com.akto.dto.testing.AccessMatrixUrlToRole;
 
 import org.bson.conversions.Bson;
 
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.test_editor.TestEditorEnums;
@@ -22,6 +23,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterActionRequest;
@@ -82,7 +84,9 @@ public final class FilterAction {
             case "include_roles_access":
                 return evaluateRolesAccessContext(filterActionRequest, true);
             case "exclude_roles_access":
-                return evaluateRolesAccessContext(filterActionRequest, false);                
+                return evaluateRolesAccessContext(filterActionRequest, false);
+            case "api_access_type":
+                return applyFilterOnAccessType(filterActionRequest);                
             default:
                 return new DataOperandsFilterResponse(false, null, null, null);
         }
@@ -1183,6 +1187,23 @@ public final class FilterAction {
 
         boolean res = include == (indexOfRole != -1);
 
+        return new DataOperandsFilterResponse(res, null, null, null);
+    }
+
+    private DataOperandsFilterResponse applyFilterOnAccessType(FilterActionRequest filterActionRequest){
+        List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
+        ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(apiInfoKey));
+        Set<ApiAccessType> apiAccessTypes = apiInfo.getApiAccessTypes();
+        boolean res = false;
+        if(apiInfo != null && !querySet.isEmpty() && apiAccessTypes.size() > 0){
+            ApiAccessType apiAccessType = Utils.getApiAccessTypeFromString(querySet.get(0).toString());
+            if(apiAccessTypes.size() == 1){
+                res = apiAccessTypes.contains(apiAccessType);
+            }else{
+                res = apiAccessType == ApiAccessType.PUBLIC;
+            }
+        }
         return new DataOperandsFilterResponse(res, null, null, null);
     }
 

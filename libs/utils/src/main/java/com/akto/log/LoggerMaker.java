@@ -173,9 +173,11 @@ public class LoggerMaker  {
     }
 
     public void infoAndAddToDb(String info, LogDb db) {
-        logger.info(info);
+        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
+        String infoMessage = "acc: " + accountId + ", " + info;
+        logger.info(infoMessage);
         try{
-            insert(info, "info",db);
+            insert(infoMessage, "info",db);
         } catch (Exception e){
 
         }
@@ -186,7 +188,9 @@ public class LoggerMaker  {
     }
 
     public void infoAndAddToDb(String info) {
-        infoAndAddToDb(info, this.db);
+        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
+        String infoMessage = "acc: " + accountId + ", " + info;
+        infoAndAddToDb(infoMessage, this.db);
     }
 
     private Boolean checkUpdate(){
