@@ -3,6 +3,7 @@ package com.akto.billing;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import com.akto.log.LoggerMaker;
@@ -16,6 +17,7 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
+import com.akto.dto.Config;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.usage.MetricTypes;
@@ -267,4 +269,61 @@ public class UsageMetricUtils {
         return featureAccess;
     }
 
+    public static void raiseUsageMixpanelEvent(Organization organization, int accountId, String eventName, JSONObject additionalProps){
+        try {
+            if (organization == null) {
+                return;
+            }
+
+            String adminEmail = organization.getAdminEmail();
+            String dashboardMode = organization.isOnPrem() ? DashboardMode.ON_PREM.toString() : DashboardMode.SAAS.toString();
+            String distinct_id = adminEmail + "_" + dashboardMode;
+            EmailAccountName emailAccountName = new EmailAccountName(adminEmail);
+            String accountName = emailAccountName.getAccountName();
+            String organizationId = organization.getId();
+            
+            JSONObject props = new JSONObject();
+            props.put("Email ID", adminEmail);
+            props.put("Account Name", accountName);
+            props.put("Dashboard Mode", dashboardMode);
+            props.put("Organization Id", organizationId);
+            props.put("Account Id", accountId);
+            props.put("Dashboard Mode", dashboardMode);
+            props.put("Organization Name", organization.getName());
+            props.put("Source", "Dashboard");
+
+            Iterator<?> keys = additionalProps.keys();
+
+            while (keys.hasNext()) {
+                Object key = keys.next();
+                if (key instanceof String) {
+                    String keyString = (String) key;
+                    Object value = additionalProps.get(keyString);
+                    props.put(keyString, value);
+                }
+            }
+
+            loggerMaker.infoAndAddToDb("Sending event to mixpanel: " + eventName);
+
+            AktoMixpanel aktoMixpanel = new AktoMixpanel();
+            aktoMixpanel.sendEvent(distinct_id, eventName, props);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in sending usage event to mixpanel");
+        }
+    }
+
+    public static void sendToUsageSlack(String message) {
+        String slackUsageWebhookUrl = null;
+        try {
+            Config.SlackAlertUsageConfig slackUsageWebhook = com.akto.onprem.Constants.getSlackAlertUsageConfig();
+            if (slackUsageWebhook != null && slackUsageWebhook.getSlackWebhookUrl() != null
+                    && !slackUsageWebhook.getSlackWebhookUrl().isEmpty()) {
+                slackUsageWebhookUrl = slackUsageWebhook.getSlackWebhookUrl();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Unable to find slack webhook URL");
+        }
+
+        LoggerMaker.sendToSlack(slackUsageWebhookUrl, message);
+    }
 }
