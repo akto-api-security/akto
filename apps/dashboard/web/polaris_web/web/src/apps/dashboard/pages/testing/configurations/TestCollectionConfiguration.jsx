@@ -76,8 +76,6 @@ function TestCollectionConfiguration() {
                break;
         }
 
-        console.log(type, ret)
-
         return ret
 
     }

@@ -1088,18 +1088,23 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public static TestRoles createAndSaveAttackerRole(AuthMechanism authMechanism) {
+        int createdTs = authMechanism.getId().getTimestamp();
+        EndpointLogicalGroup endpointLogicalGroup = new EndpointLogicalGroup(new ObjectId(), createdTs, createdTs, "System", "All", new AllTestingEndpoints());
+        EndpointLogicalGroupDao.instance.insertOne(endpointLogicalGroup);
+        AuthWithCond authWithCond = new AuthWithCond(authMechanism, new HashMap<>(), null);
+        List<AuthWithCond> authWithCondList = Collections.singletonList(authWithCond);
+        TestRoles testRoles = new TestRoles(new ObjectId(), "ATTACKER_TOKEN_ALL", endpointLogicalGroup.getId(), authWithCondList, "System", createdTs, createdTs, null);
+        TestRolesDao.instance.insertOne(testRoles);
+        return testRoles;
+    }
+
     public static void moveAuthMechanismDataToRole(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getMoveAuthMechanismToRole() == 0) {
 
             AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
             if (authMechanism != null) {
-                int createdTs = authMechanism.getId().getTimestamp();
-                EndpointLogicalGroup endpointLogicalGroup = new EndpointLogicalGroup(new ObjectId(), createdTs, createdTs, "System", "All", new AllTestingEndpoints());
-                EndpointLogicalGroupDao.instance.insertOne(endpointLogicalGroup);
-                AuthWithCond authWithCond = new AuthWithCond(authMechanism, new HashMap<>(), null);
-                List<AuthWithCond> authWithCondList = Collections.singletonList(authWithCond);
-                TestRoles testRoles = new TestRoles(new ObjectId(), "ATTACKER_TOKEN_ALL", endpointLogicalGroup.getId(), authWithCondList, "System", createdTs, createdTs, null);
-                TestRolesDao.instance.insertOne(testRoles);
+                createAndSaveAttackerRole(authMechanism);
             }
 
             BackwardCompatibilityDao.instance.updateOne(
