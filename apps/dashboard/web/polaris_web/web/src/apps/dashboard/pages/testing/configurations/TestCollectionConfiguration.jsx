@@ -59,7 +59,7 @@ function TestCollectionConfiguration() {
         }
     }
 
-    function drawComponentToCreateNew(type) {
+    function drawComponentToCreateNew(type, name) {
         let ret = null
         switch(type) {
             case "CUSTOM_AUTH":
@@ -69,7 +69,7 @@ function TestCollectionConfiguration() {
                </Link>
                break;
             case "ROLE":
-                ret =  <Link onClick={(e) => e.stopPropagation()}  target="_blank" url={window.location.origin+"/dashboard/testing/roles/details"}>
+                ret =  <Link onClick={(e) => e.stopPropagation()}  target="_blank" url={window.location.origin+"/dashboard/testing/roles/details?system="+name}>
                Create
                </Link>
 
@@ -111,7 +111,7 @@ function TestCollectionConfiguration() {
                     } else {
                         return {
                             formattedValues: "-",
-                            formattedValuesComp: drawComponentToCreateNew(propsFromPossible.type),
+                            formattedValuesComp: drawComponentToCreateNew(propsFromPossible.type, propsFromPossible.id),
                             statusComp: <Badge status="critical" progress="incomplete">Pending</Badge>,
                             ...ret
                         }
