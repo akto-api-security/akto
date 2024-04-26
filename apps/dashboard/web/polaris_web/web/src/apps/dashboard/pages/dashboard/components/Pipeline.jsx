@@ -62,7 +62,7 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
 
 
 
-    const tableRows = transform.prepareTableData(riskScoreMap,collections, collectionsMap);
+    const tableRows = transform.prepareTableData(riskScoreMap,collections, collectionsMap, setActive);
 
     return (
         <Card>
@@ -74,8 +74,7 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
                 <Scrollable style={{maxHeight: '200px', paddingBottom:'10px'}} shadow>
                     <DataTable headings={[]}
                         columnContentTypes={[
-                            'text',
-                            'numeric'
+                            'text'
                         ]}
                         rows={tableRows}
                         increasedTableDensity
