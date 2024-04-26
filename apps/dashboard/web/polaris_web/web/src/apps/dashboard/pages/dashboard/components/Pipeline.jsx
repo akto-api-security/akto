@@ -61,13 +61,6 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
     }
 
 
-    const renderBodyCellContent = (cell) => {
-        return (
-          <Button onClick={() => setActive(true)}>
-            {cell}
-          </Button>
-        );
-      };
 
     const tableRows = transform.prepareTableData(riskScoreMap,collections, collectionsMap);
 
@@ -79,7 +72,6 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
                     <Text>Seamlessly enhance your web application security with CI/CD integration, empowering you to efficiently detect vulnerabilities, analyze and intercept web traffic, and fortify your digital defenses.</Text>
                 </VerticalStack>
                 <Scrollable style={{maxHeight: '200px', paddingBottom:'10px'}} shadow>
-                    <div onClick={handleShowModal}>
                     <DataTable headings={[]}
                         columnContentTypes={[
                             'text',
@@ -88,17 +80,24 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
                         rows={tableRows}
                         increasedTableDensity
                         truncate
-                        renderBodyCellContent={renderBodyCellContent}
                     /> 
-                    </div>
                 </Scrollable>
                 { active && (
-                    <CicdModal
-                        active={active}
-                        setActive={setActive}
-                    />
-                )}
-                
+    <CicdModal
+        active={active}
+        setActive={setActive}
+    />
+)}
+                <VerticalStack gap={5}>
+
+                <HorizontalStack gap={4}>
+                <Button onClick={handleShowModal} > Create Token</Button> 
+                <Link to='https://docs.akto.io/api-security-testing/how-to/setup-github-integration-for-ci-cd' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
+                                Learn More
+                </Link>
+
+                </HorizontalStack>
+                </VerticalStack>
             </VerticalStack>
         </Card>
     )
