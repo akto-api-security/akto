@@ -14,7 +14,7 @@ import java.util.concurrent.Executors;
 
 public class SlackSender {
     private static final LoggerMaker loggerMaker = new LoggerMaker(SlackAlerts.class, LoggerMaker.LogDb.DASHBOARD);
-    private static final ExecutorService executor = Executors.newFixedThreadPool(1);
+    private static final ExecutorService executor = Executors.newFixedThreadPool(3);
 
     public static void sendAlert(int accountId, SlackAlerts alert) {
         executor.submit(() -> {
