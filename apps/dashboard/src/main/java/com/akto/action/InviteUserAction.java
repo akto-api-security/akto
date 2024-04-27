@@ -6,9 +6,6 @@ import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.User;
 import com.akto.notifications.email.SendgridEmail;
-import com.akto.notifications.slack.NewUserJoiningAlert;
-import com.akto.notifications.slack.SlackAlerts;
-import com.akto.notifications.slack.SlackSender;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
 import com.mongodb.client.model.Filters;
@@ -111,9 +108,6 @@ public class InviteUserAction extends UserAction{
             e.printStackTrace();
             return ERROR.toUpperCase();
         }
-
-        SlackAlerts newUserJoiningAlert = new NewUserJoiningAlert(this.inviteeEmail);
-        SlackSender.sendAlert(Context.accountId.get(), newUserJoiningAlert);
 
         return Action.SUCCESS.toUpperCase();
     }
