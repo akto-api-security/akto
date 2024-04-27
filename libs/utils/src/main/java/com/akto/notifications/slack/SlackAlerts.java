@@ -51,36 +51,6 @@ public abstract class SlackAlerts {
         return new BasicDBObject("type", "section").append("text", textObj);
     }
 
-    BasicDBList createNewIssuesSection(int index, NewIssuesModel newIssuesModel) {
-        String issueTitle = "[New issue #"+index+"] " + "<"+newIssuesModel.getIssueUrl() + "|" + newIssuesModel.getIssueTitle() + ">";
-        BasicDBObject textObj = createTextSection(issueTitle);
-
-        String issueFooter = newIssuesModel.getApisAffected() + " APIs affected - " + newIssuesModel.getTime();
-        BasicDBObject textContext = createTextContext(issueFooter);
-
-        BasicDBList issuesList = new BasicDBList();
-        issuesList.add(textObj);
-        issuesList.add(textContext);
-
-        return issuesList;
-    }
-
-    BasicDBObject createActionButtons(List<ActionButtonModel> actionButtonList) {
-        BasicDBList elementList = new BasicDBList();
-
-        for (ActionButtonModel actionButtonModel : actionButtonList) {
-            BasicDBObject textObj = createText(actionButtonModel.getText(), plaintextType);
-
-            BasicDBObject buttonObj = new BasicDBObject("type", "button")
-                    .append("text", textObj)
-                    .append("url", actionButtonModel.getUrl());
-
-            elementList.add(buttonObj);
-        }
-
-        return new BasicDBObject("type", "actions").append("elements", elementList);
-    }
-
     public BasicDBObject toAttachment(BasicDBObject blockObj) {
         BasicDBList attachmentsList = new BasicDBList();
         attachmentsList.add(blockObj);
