@@ -9,12 +9,15 @@ import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class SlackSender {
     private static final LoggerMaker loggerMaker = new LoggerMaker(SlackAlerts.class, LoggerMaker.LogDb.DASHBOARD);
+    private static final ExecutorService executor = Executors.newFixedThreadPool(1);
 
     public static void sendAlert(int accountId, SlackAlerts alert) {
-        Thread thread = new Thread(() -> {
+        executor.submit(() -> {
             Context.accountId.set(accountId);
 
             // Get payload
@@ -42,7 +45,6 @@ public class SlackSender {
 
                     if(statusCode == 200) {
                         loggerMaker.infoAndAddToDb("Slack Alert Type: " + alertType + " Info: " + "Alert sent successfully.");
-                        Thread.currentThread().interrupt();
                         return;
                     } else {
                         loggerMaker.errorAndAddToDb("Slack Alert Type: " + alertType + " Error: " + response.getMessage());
@@ -56,7 +58,6 @@ public class SlackSender {
                         Thread.sleep(retryDelays[attempts]);
                     } catch(InterruptedException ie) {
                         loggerMaker.errorAndAddToDb("Slack Alert Type: " + alertType + " Error: " + "Thread was interrupted, failed to complete operation");
-                        Thread.currentThread().interrupt();
                         return;
                     }
                 }
@@ -66,8 +67,6 @@ public class SlackSender {
 
             loggerMaker.errorAndAddToDb("Slack Alert Type: " + alertType + " Error: " + "Failed to send Alert after multiple retries.");
         });
-
-        thread.start();
     }
 
 }
