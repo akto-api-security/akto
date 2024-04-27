@@ -1,5 +1,6 @@
 package com.akto.notifications.slack;
 
+import com.akto.dao.context.Context;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.log.LoggerMaker;
@@ -12,23 +13,24 @@ import java.util.List;
 public class SlackSender {
     private static final LoggerMaker loggerMaker = new LoggerMaker(SlackAlerts.class, LoggerMaker.LogDb.DASHBOARD);
 
-    public static void sendAlert(SlackAlerts alert) {
-        // Get payload
-        if(alert == null || alert.toJson().isEmpty()) return;
-        String payload = alert.toJson();
-        SlackAlertType alertType = alert.getALERT_TYPE();
-
-        // Get slack webhook url
-        List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
-        if(listWebhooks == null || listWebhooks.isEmpty()) return;
-        String webhookUrl = listWebhooks.get(0).getWebhook();
-
-        // Try to send alert
-        sendAndRetry(webhookUrl, payload, alertType.name());
-    }
-
-    private static void sendAndRetry(String webhookUrl, String payload, String alertType) {
+    public static void sendAlert(int accountId, SlackAlerts alert) {
         Thread thread = new Thread(() -> {
+            Context.accountId.set(accountId);
+
+            // Get payload
+            if(alert == null || alert.toJson().isEmpty()) return;
+            String payload = alert.toJson();
+            SlackAlertType alertType = alert.getALERT_TYPE();
+
+            // Get slack webhook url
+            List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
+            if(listWebhooks == null || listWebhooks.isEmpty()) {
+                loggerMaker.infoAndAddToDb("Slack Alert Type: " + alertType + " Info: " + "No slack webhook found.");
+                return;
+            }
+            String webhookUrl = listWebhooks.get(0).getWebhook();
+
+            // Try to send alert
             Slack slack = Slack.getInstance();
             int attempts = 0;
             final int[] retryDelays = {1000, 5000, 25000};

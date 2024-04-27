@@ -6,7 +6,6 @@ import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.User;
 import com.akto.notifications.email.SendgridEmail;
-import com.akto.notifications.slack.FieldsModel;
 import com.akto.notifications.slack.NewUserJoiningAlert;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
@@ -113,11 +112,8 @@ public class InviteUserAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
-        List<FieldsModel> fieldsModelList = new ArrayList<>();
-        fieldsModelList.add(new FieldsModel("New user", this.inviteeEmail));
-//        fieldsModelList.add(new FieldsModel("Invited by", admin.getLogin()));
-        SlackAlerts newUserJoiningAlert = new NewUserJoiningAlert(fieldsModelList);
-        SlackSender.sendAlert(newUserJoiningAlert);
+        SlackAlerts newUserJoiningAlert = new NewUserJoiningAlert(this.inviteeEmail);
+        SlackSender.sendAlert(Context.accountId.get(), newUserJoiningAlert);
 
         return Action.SUCCESS.toUpperCase();
     }
