@@ -8,6 +8,9 @@ import com.akto.listener.InitializerListener;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.notifications.slack.NewUserJoiningAlert;
+import com.akto.notifications.slack.SlackAlerts;
+import com.akto.notifications.slack.SlackSender;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
 import com.akto.utils.AzureLogin;
@@ -275,6 +278,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId());
                 }
                 createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), Config.ConfigType.AUTH0.toString());
+
+                SlackAlerts newUserJoiningAlert = new NewUserJoiningAlert(email);
+                SlackSender.sendAlert(pendingInviteCode.getAccountId(), newUserJoiningAlert);
+
                 return SUCCESS.toUpperCase();
             } else if(pendingInviteCode == null){
                 // invalid code
@@ -385,6 +392,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 code = "Ask admin to invite you. If you are already a user, please click on login";
                 return ERROR.toUpperCase();
             }
+
+            SlackAlerts newUserJoiningAlert = new NewUserJoiningAlert(email);
+            SlackSender.sendAlert(pendingInviteCode.getAccountId(), newUserJoiningAlert);
 
             // deleting the invitation code
             PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
