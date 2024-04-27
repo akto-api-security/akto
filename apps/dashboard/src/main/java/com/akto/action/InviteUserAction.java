@@ -6,19 +6,12 @@ import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.User;
 import com.akto.notifications.email.SendgridEmail;
+import com.akto.notifications.slack.FieldsModel;
+import com.akto.notifications.slack.NewUserJoiningAlert;
+import com.akto.notifications.slack.SlackAlerts;
+import com.akto.notifications.slack.SlackSender;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
-import com.mongodb.client.model.Filters;
-import com.opensymphony.xwork2.Action;
-import com.sendgrid.helpers.mail.Mail;
-import com.akto.dao.RBACDao;
-import com.akto.dao.UsersDao;
-import com.akto.dto.PendingInviteCode;
-import com.akto.dto.RBAC;
-import com.akto.dto.User;
-import com.akto.notifications.email.SendgridEmail;
-import com.akto.utils.JWT;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 import com.sendgrid.helpers.mail.Mail;
@@ -29,9 +22,7 @@ import io.jsonwebtoken.Jws;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
-import java.util.Calendar;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class InviteUserAction extends UserAction{
 
@@ -121,6 +112,13 @@ public class InviteUserAction extends UserAction{
             e.printStackTrace();
             return ERROR.toUpperCase();
         }
+
+        List<FieldsModel> fieldsModelList = new ArrayList<>();
+        fieldsModelList.add(new FieldsModel("New user", this.inviteeEmail));
+//        fieldsModelList.add(new FieldsModel("Invited by", admin.getLogin()));
+        SlackAlerts newUserJoiningAlert = new NewUserJoiningAlert(fieldsModelList);
+        SlackSender.sendAlert(newUserJoiningAlert);
+
         return Action.SUCCESS.toUpperCase();
     }
 
