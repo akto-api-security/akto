@@ -128,6 +128,7 @@ let filters = [
 function SingleTestRunPage() {
 
   const [testRunResults, setTestRunResults] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [] })
+  const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [] })
   const [ selectedTestRun, setSelectedTestRun ] = useState({});
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const subCategoryMap = PersistStore(state => state.subCategoryMap);
@@ -149,6 +150,13 @@ function SingleTestRunPage() {
       prev[key] = false;
       return {...prev};
     });
+  }
+
+  function fillTempData(data, key){
+    setTestRunResultsText((prev) => {
+      prev[key] = data;
+      return {...prev};
+    })
   }
 
   async function setSummary(summary){
@@ -179,21 +187,21 @@ function SingleTestRunPage() {
     await api.fetchTestingRunResults(summaryHexId, "VULNERABLE").then(({ testingRunResults }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
     })
-    
+    fillTempData(testRunResults, 'vulnerable')
     fillData(transform.getPrettifiedTestRunResults(testRunResults), 'vulnerable')
 
     await api.fetchTestingRunResults(summaryHexId, "SKIPPED_EXEC").then(({ testingRunResults }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
     })
-
+    fillTempData(testRunResults, 'skipped')
     fillData(transform.getPrettifiedTestRunResults(testRunResults), 'skipped')
 
     await api.fetchTestingRunResults(summaryHexId, "SECURED").then(({ testingRunResults }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
     })
+    fillTempData(testRunResults, 'no_vulnerability_found')
     fillData(transform.getPrettifiedTestRunResults(testRunResults), 'no_vulnerability_found')
   }
-
   async function fetchData(setData) {
     let localSelectedTestRun = {}
     await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest, testingRunType }) => {
@@ -272,7 +280,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
   {
     content: `Export ${selectedDataHexIds.length} record${selectedDataHexIds.length==1 ? '' : 's'}`,
     onAction: () => {
-      func.downloadAsCSV((testRunResults[selectedTab]).filter((data) => {return selectedDataHexIds.includes(data.id)}), selectedTestRun)
+      func.downloadAsCSV((testRunResultsText[selectedTab]).filter((data) => {return selectedDataHexIds.includes(data.id)}), selectedTestRun)
     },
   },
 ]};
@@ -351,6 +359,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
         selected={selected}
         tableTabs={tableTabs}
         onSelect={handleSelectedTab}
+        filterStateUrl={"dashboard/testing/" + selectedTestRun?.id + "/" + selectedTab}
       />
   )
 
@@ -475,7 +484,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     }
     backUrl={`/dashboard/testing/`}
     primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() => 
-      func.downloadAsCSV((testRunResults[selectedTab]), selectedTestRun)
+      func.downloadAsCSV((testRunResultsText[selectedTab]), selectedTestRun)
       }>Export</Button></Box>: undefined}
       secondaryActions={!workflowTest ? <Button onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button> : undefined}
       components={useComponents}

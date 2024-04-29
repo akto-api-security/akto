@@ -37,7 +37,6 @@ public class TestingUtils {
             TestSourceConfig config = null;
             // name = subtype
             String subCategory = subType;
-            // string comparison (nuclei test)
             if (subCategory.startsWith("http")) {//Issue came from custom template
                 config = TestSourceConfigsDao.instance.getTestSourceConfig(subType);
             }

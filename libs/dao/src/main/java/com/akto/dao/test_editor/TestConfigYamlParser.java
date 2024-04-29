@@ -65,7 +65,7 @@ public class TestConfigYamlParser {
             // todo: should not be null, throw error
             return new TestConfig(id, info, auth, null, null, null, null, null);
         }
-        
+
         ConfigParser configParser = new ConfigParser();
         ConfigParserResult filters = configParser.parse(filterMap);
         if (filters == null) {

@@ -20,6 +20,7 @@ import {produce} from "immer"
 import values from "@/util/values";
 import {TestrunsBannerComponent} from "./TestrunsBannerComponent";
 import useTable from "../../../components/tables/TableContext";
+import PersistStore from "../../../../main/PersistStore";
 
 /*
   {
@@ -75,8 +76,8 @@ let headers = [
 ]
 
 const sortOptions = [
-  { label: 'Run time', value: 'endTimestamp asc', directionLabel: 'Newest run', sortKey: 'endTimestamp', columnIndex: 4 },
-  { label: 'Run time', value: 'endTimestamp desc', directionLabel: 'Oldest run', sortKey: 'endTimestamp', columnIndex: 4 }
+  { label: 'Run time', value: 'scheduleTimestamp asc', directionLabel: 'Newest run', sortKey: 'scheduleTimestamp', columnIndex: 4 },
+  { label: 'Run time', value: 'scheduleTimestamp desc', directionLabel: 'Oldest run', sortKey: 'scheduleTimestamp', columnIndex: 4 }
 ];
 
 const resourceName = {
@@ -94,17 +95,14 @@ let filters = [
       { label: "Medium", value: "MEDIUM" },
       { label: "Low", value: "LOW" }
     ]
-  }
+  },
+  {
+    key: 'apiCollectionId',
+    label: 'Api collection name',
+    title: 'Api collection name',
+    choices: [],
+},
 ]
-
-function disambiguateLabel(key, value) {
-  switch (key) {
-    case 'severity':
-      return (value).map((val) => `${func.toSentenceCase(val)} severity`).join(', ');
-    default:
-      return value;
-  }
-}
 
 function TestRunsPage() {
 
@@ -126,6 +124,21 @@ function TestRunsPage() {
       func.setToast(true, true, "Unable to re-run test")
     });
   }
+
+  const apiCollectionMap = PersistStore(state => state.collectionsMap)
+
+  function disambiguateLabel(key, value) {
+    switch (key) {
+      case 'severity':
+        return (value).map((val) => `${func.toSentenceCase(val)} severity`).join(', ');
+      case "apiCollectionId": 
+        return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
+      default:
+        return value;
+    }
+  }
+
+  filters = func.getCollectionFilters(filters)
 
 const getActionsList = (hexId) => {
   return [
@@ -240,7 +253,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
       case "ci_cd":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CI_CD",
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CI_CD",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries, true);
           total = testingRunsCount;
@@ -248,7 +261,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       case "scheduled":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "RECURRING"
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "RECURRING",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -256,7 +269,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       case "one_time":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "ONE_TIME"
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "ONE_TIME",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -264,7 +277,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       default:
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, null
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, null,queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -365,10 +378,10 @@ const SummaryCardComponent = () =>{
   const promotedBulkActions = (selectedTestRuns) => { 
     return [
     {
-      content: `Delete ${selectedTestRuns.length} test run${selectedTestRuns.length==1 ? '' : 's'}`,
+      content: <div data-testid="delete_result_button">{`Delete ${selectedTestRuns.length} test run${selectedTestRuns.length==1 ? '' : 's'}`}</div>,
       onAction: async() => {
         await api.deleteTestRuns(selectedTestRuns);
-        func.setToast(true, false, `${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`)
+        func.setToast(true, false, <div data-testid="delete_success_message">{`${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`}</div>),
         window.location.reload();
       },
     },
@@ -384,7 +397,6 @@ const coreTable = (
     sortOptions={sortOptions} 
     resourceName={resourceName} 
     filters={filters}
-    hideQueryField={true}
     disambiguateLabel={disambiguateLabel} 
     headers={headers}
     getActions = {getActions}

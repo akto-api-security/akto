@@ -49,7 +49,6 @@
 								"commands": [
 												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
 												"export DASHBOARD_MODE=\"local_deploy\"",
-                        "export NUCLEI_EXECUTABLE_PATH=apps/testing/src/main/resources/nuclei_linux",                        
 												"java -jar apps/testing/target/testing-1.0-SNAPSHOT-jar-with-dependencies.jar"
 											]
 							}
@@ -106,7 +105,6 @@
 								"commands": [
 												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
 												"export DASHBOARD_MODE=\"local_deploy\"",
-                        "export NUCLEI_EXECUTABLE_PATH=apps/testing/src/main/resources/nuclei_linux",
 												"java -jar apps/testing/target/testing-1.0-SNAPSHOT-jar-with-dependencies.jar"
 											]
 							}
