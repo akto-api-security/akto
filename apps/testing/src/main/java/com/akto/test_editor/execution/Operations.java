@@ -12,6 +12,7 @@ import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.test_editor.Utils;
 import com.akto.util.CookieTransformer;
 import com.mongodb.BasicDBObject;
+import org.apache.commons.lang3.StringUtils;
 
 public class Operations {
     
@@ -127,6 +128,9 @@ public class Operations {
     }
 
     public static ExecutorSingleOperationResp addGraphqlField(RawApi rawApi, String key, String value) {
+        if (StringUtils.isEmpty(key) || StringUtils.isEmpty(value)) {
+            return new ExecutorSingleOperationResp(true,"");
+        }
         String payload = rawApi.getRequest().getBody();
         String modifiedPayload = GraphQLUtils.getUtils().addGraphqlField(payload, key, value);
         rawApi.getRequest().setBody(modifiedPayload);
