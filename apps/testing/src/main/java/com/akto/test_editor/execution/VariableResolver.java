@@ -681,6 +681,11 @@ public class VariableResolver {
             try {
                 httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
                 httpRequestParams = httpResponseParams.getRequestParams();
+
+                if ("terminal_keys".equals(location)) {
+                    worklistVal.addAll(Utils.findAllTerminalKeys(httpResponseParams.getPayload(), key));
+                    continue;
+                }
                 if (location == null || location.equals("header")) {
                     Map<String, List<String>> headers = httpResponseParams.getHeaders();
                     for (String headerName: headers.keySet()) {
