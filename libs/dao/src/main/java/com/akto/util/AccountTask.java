@@ -35,4 +35,29 @@ public class AccountTask {
         }
 
     }
+
+    public void executeTaskHybridAccounts(Consumer<Account> consumeAccount, String taskName) {
+
+        Bson activeFilter = Filters.or(
+                Filters.exists(Account.INACTIVE_STR, false),
+                Filters.eq(Account.INACTIVE_STR, false)
+        );
+
+        Bson accountFilter = Filters.eq(Account.HYBRID_SAAS_ACCOUNT, true);
+
+        Bson combinedFilter = Filters.and(activeFilter, accountFilter);
+
+        List<Account> activeAccounts = AccountsDao.instance.findAll(combinedFilter);
+        logger.info("executeTaskHybridAccounts: accounts length" + activeAccounts.size());
+        for(Account account: activeAccounts) {
+            try {
+                Context.accountId.set(account.getId());
+                consumeAccount.accept(account);
+            } catch (Exception e) {
+                String msgString = String.format("Error in executing task %s for account %d", taskName, account.getId());
+                logger.error(msgString, e);
+            }
+        }
+
+    }
 }
