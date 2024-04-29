@@ -279,9 +279,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 }
                 createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), Config.ConfigType.AUTH0.toString());
 
-                SlackAlerts newUserJoiningAlert = new NewUserJoiningAlert(email);
-                SlackSender.sendAlert(pendingInviteCode.getAccountId(), newUserJoiningAlert);
-
                 return SUCCESS.toUpperCase();
             } else if(pendingInviteCode == null){
                 // invalid code
@@ -392,9 +389,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 code = "Ask admin to invite you. If you are already a user, please click on login";
                 return ERROR.toUpperCase();
             }
-
-            SlackAlerts newUserJoiningAlert = new NewUserJoiningAlert(email);
-            SlackSender.sendAlert(pendingInviteCode.getAccountId(), newUserJoiningAlert);
 
             // deleting the invitation code
             PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
@@ -723,6 +717,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             props.put("Dashboard Mode", dashboardMode);
             props.put("Invited", invitationToAccount != 0);
             props.put("method", method);
+
+            SlackAlerts newUserJoiningAlert = new NewUserJoiningAlert(email);
+            SlackSender.sendAlert(accountId, newUserJoiningAlert);
+
             AktoMixpanel aktoMixpanel = new AktoMixpanel();
             aktoMixpanel.sendEvent(distinct_id, "SIGNUP_SUCCEEDED", props);
         }
