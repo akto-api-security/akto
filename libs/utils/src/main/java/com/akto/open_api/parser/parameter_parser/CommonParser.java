@@ -13,6 +13,8 @@ public class CommonParser {
                 ret = parameter.getExamples().get(exampleName).getValue().toString();
                 break;
             }
+        } else if (parameter.getSchema() != null && parameter.getSchema().getExample() != null) {
+            ret = parameter.getSchema().getExample().toString();
         }
         return ret;
     }

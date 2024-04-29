@@ -343,8 +343,8 @@ function IssuesPage(){
                     promotedBulkActions={promotedBulkActions}
                     hideQueryField={true}
                     getNextUrl={getNextUrl}
-                    rowClickable={true}
                     getStatus={func.getTestResultStatus}
+                    filterStateUrl={"/dashboard/issues"}
                 />
             ]}
             primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export vulnerability report</Button>}

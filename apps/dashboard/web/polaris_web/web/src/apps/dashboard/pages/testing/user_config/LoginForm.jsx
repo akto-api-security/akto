@@ -32,7 +32,7 @@ function LoginForm({ step, setSteps }) {
         func.setToast(true,  false,  "Running login flow")
         const response = await api.triggerSingleStep('LOGIN_REQUEST', step.id, [{ ...step }])
         if (response) {
-            func.setToast(true,  false,  "Login flow ran successfully!")
+            func.setToast(true,  false,  <div data-testid="login_flow_ran_message">Login flow ran successfully!</div>)
             const testResponse = JSON.parse(response.responses[0])
 
             let responseBody
