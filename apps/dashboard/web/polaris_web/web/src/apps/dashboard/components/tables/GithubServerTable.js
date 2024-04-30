@@ -26,12 +26,12 @@ function GithubServerTable(props) {
   const setFiltersMap = PersistStore(state => state.setFiltersMap)
   const tableInitialState = PersistStore(state => state.tableInitialState)
   const setTableInitialState = PersistStore(state => state.setTableInitialState)
-
-  const currentPageKey = window.location.href
-
+  const currentPageKey = props?.filterStateUrl || window.location.href
   const pageFiltersMap = filtersMap[currentPageKey]
+
+  const filterMode = (pageFiltersMap?.filters?.length > 0) ? IndexFiltersMode.Filtering : (props?.mode ? props.mode : IndexFiltersMode.Filtering)
   const initialStateFilters = tableFunc.mergeFilters(props.appliedFilters || [], (pageFiltersMap?.filters || []),props.disambiguateLabel)
-  const { mode, setMode } = useSetIndexFiltersMode(props?.mode ? props.mode : IndexFiltersMode.Filtering);
+  const { mode, setMode } = useSetIndexFiltersMode(filterMode);
   const [sortSelected, setSortSelected] = useState(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
   const [data, setData] = useState([]);
   const [total, setTotal] = useState([]);
@@ -147,9 +147,9 @@ function GithubServerTable(props) {
     setAppliedFilters(temp);
   };
 
-  const debouncedSearch = useCallback(debounce((searchQuery) => {
+  const debouncedSearch = debounce((searchQuery) => {
       fetchData(searchQuery)
-  }, 500), []);
+  }, 500);
 
   const handleFiltersQueryChange = (val) =>{
     setQueryValue(val)
@@ -342,8 +342,10 @@ function GithubServerTable(props) {
                 <Pagination
                   label={
                     total == 0 ? 'No data found' :
-                      `Showing ${transform.formatNumberWithCommas(page * pageLimit + Math.min(1, total))}-${transform.formatNumberWithCommas(Math.min((page + 1) * pageLimit, total))} of ${transform.formatNumberWithCommas(total)}`
-                  }
+                        <div data-testid="pagination-label">
+                            {`Showing ${transform.formatNumberWithCommas(page * pageLimit + Math.min(1, total))}-${transform.formatNumberWithCommas(Math.min((page + 1) * pageLimit, total))} of ${transform.formatNumberWithCommas(total)}`}
+                        </div>
+                }
                   hasPrevious={page > 0}
                   previousKeys={[Key.LeftArrow]}
                   onPrevious={onPagePrevious}
