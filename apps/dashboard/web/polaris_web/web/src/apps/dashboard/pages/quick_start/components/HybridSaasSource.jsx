@@ -12,8 +12,8 @@ function HybridSaasSource() {
     const ref = useRef(null)
     const dbSvcCommand = "helm install aktodbsvc ~/akto_code/helm-charts/charts/akto-setup-database-abstractor -n dev --set mongo.aktoMongoConn=\"mongodb://<mongo_ip>/admini\"";
     const copyCommand = ()=>{func.copyToClipboard(dbSvcCommand, ref, null)}
-    const runtimeSvcCommand = "helm install aktoruntime ~/akto_code/helm-charts/charts/akto-setup-runtime -n dev \
-        --set mini_runtime.aktoApiSecurityRuntime.env.databaseAbstractorToken=\"\"" + apiToken;
+    const runtimeSvcCommand = "helm install aktoruntime ~/akto_code/helm-charts/charts/mini-runtime -n dev \
+        --set mini_runtime.aktoApiSecurityRuntime.env.databaseAbstractorToken=\"" + apiToken + "\"";
     const rcopyCommand = ()=>{func.copyToClipboard(runtimeSvcCommand, ref, null)}
     //const [burpCollectionURL, setBurpCollectionURL] = useState("")
 
@@ -96,7 +96,7 @@ function HybridSaasSource() {
     const steps = [
         {
             text: "Run the below command to setup Akto Runtime service \
-                helm install aktoruntime ~/akto_code/helm-charts/charts/akto-setup-runtime -n dev \
+                helm install akto ~/akto_code/helm-charts/charts/mini-runtime -n dev \
                 --set runtime.aktoApiSecurityRuntime.env.databaseAbstractorToken=\"<token>\" \
                 --set context_analyser.aktoApiSecurityContextAnalyser.env.databaseAbstractorToken=\"\"" + apiToken
         },
