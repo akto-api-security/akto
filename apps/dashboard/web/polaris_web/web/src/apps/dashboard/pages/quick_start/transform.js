@@ -7,6 +7,7 @@ import Kubernetes from "./components/Kubernetes"
 import FutureConnection from "./components/shared/FutureConnection"
 import BannerComponent from "./components/shared/BannerComponent"
 import OpenApiSource from "./components/OpenApiSource"
+import ApiInventoryFromSourceCode from "./components/ApiInventoryFromSourceCode"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -69,14 +70,6 @@ const envoyObj = {
     docsUrl: 'https://docs.akto.io/traffic-connections/envoy',
     key: "ENVOY",
     component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/envoy" bannerTitle="Setup using Envoy" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/envoy#adding-akto-traffic-collector"/>,
-}
-
-const ebpfObj = {
-    icon: '/public/ebpf.svg',
-    label: 'EBPF',
-    text: 'eBPF, the extended Berkeley Packet Filter is a technology that can run sandboxed programs in a privileged context such as the operating system kernel.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/ebpf',
-    component: <FutureConnection />
 }
 
 const gcpObj = {
@@ -153,6 +146,70 @@ const tcpObj = {
     docsUrl: 'https://docs.akto.io/traffic-connections/tcp-agent',
     key: "NGINX",
     component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/tcp-agent" bannerTitle="Setup using TCP Agent" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/tcp-agent#adding-akto-traffic-collector-container" />
+}
+
+const apiInventoryFromSourceCodeObj = {
+    icon: '/public/favicon.svg',
+    badge: "Beta",
+    label: 'API inventory from source code',
+    text: 'Create API inventory from your source code using our code analysis tool.',
+    docsUrl: 'https://docs.akto.io/api-inventory/concepts/api-inventory-from-source-code',
+    component: <ApiInventoryFromSourceCode/>,
+    key: "API_INVENTORY_FROM_SOURCE_CODE"
+}
+
+const ebpfObj = {
+    icon: '/public/ebpf.svg',
+    label: 'eBPF',
+    text: 'Akto-eBPF setup is recommended for mTLS systems when TLS termination happens at a proxy.',
+    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf',
+    key: "EBPF",
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf" bannerTitle="Setup using eBPF" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf#adding-akto-traffic-collector"/>,
+}
+
+const ebpfMTLSObj = {
+    icon: '/public/ebpf.svg',
+    label: 'eBPF on mTLS',
+    text: 'Akto-eBPF-mTLS setup is recommended for mTLS systems where TLS termination occurs at the application.',
+    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf-mtls',
+    key: "EBPF_MTLS",
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf-mtls" bannerTitle="Setup using eBPF mTLS" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf-mtls#adding-akto-traffic-collector"/>,
+}
+
+const istioObj = {
+    icon: '/public/istio.svg',
+    label: 'Istio',
+    text: 'Akto-Istio setup is recommended if your APIs are routed by Istio.',
+    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/envoy-1',
+    key: "ISTIO",
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/envoy-1" bannerTitle="Setup using Istio" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/envoy-1#adding-akto-traffic-collector"/>,
+}
+
+const aktoSdkObj = {
+    icon: '/public/favicon.svg',
+    label: 'Akto SDK',
+    text: 'Use our SDKs to create a data pipeline.',
+    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/akto-sdk',
+    component: <BannerComponent title="Setup SDK" docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/akto-sdk" content="Use our SDKs to create a data pipeline." />,
+    key: "AKTO_SDK"
+}
+
+const awsApiGatewayObj = {
+    icon: '/public/aws_api_gateway.svg',
+    label: "AWS API Gateway",
+    text: "Akto-AWS-API-Gateway setup is recommended if you are using AWS API Gateway.",
+    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/aws-api-gateway',
+    component: <FutureConnection />,
+    key: "AWS_API_GATEWAY",
+}
+
+const hybridSaaSObj = {
+    icon: '/public/aws.svg',
+    label: "Hybrid SaaS",
+    text: "Send traffic from your cloud environment to Akto SaaS.",
+    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/aws-api-gateway',
+    component: <FutureConnection />,
+    key: "HYBRID_SAAS",
 }
 
 const quick_start_policy_lines= [
@@ -685,10 +742,11 @@ const yaml_kubernetes = [
 ]
 
 const quickStartFunc = {
-    getConnectorsList: function (){
+    getConnectorsList: function () {
         const connectorsList = [gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, ebpfObj,
-           harFileUploadObj, kongObj, tcpObj, mirroringObj
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj,
+            harFileUploadObj, kongObj, tcpObj, mirroringObj, apiInventoryFromSourceCodeObj,
+            ebpfObj, ebpfMTLSObj, istioObj, aktoSdkObj, awsApiGatewayObj, hybridSaaSObj
         ]
         return connectorsList
     },
