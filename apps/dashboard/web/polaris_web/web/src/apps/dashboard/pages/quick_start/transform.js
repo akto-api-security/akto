@@ -203,15 +203,6 @@ const awsApiGatewayObj = {
     key: "AWS_API_GATEWAY",
 }
 
-const hybridSaaSObj = {
-    icon: '/public/aws.svg',
-    label: "Hybrid SaaS",
-    text: "Send traffic from your cloud environment to Akto SaaS.",
-    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/aws-api-gateway',
-    component: <FutureConnection />,
-    key: "HYBRID_SAAS",
-}
-
 const quick_start_policy_lines= [
     `{`,
     `    "Version": "2012-10-17",`,
@@ -746,7 +737,7 @@ const quickStartFunc = {
         const connectorsList = [gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
             openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, apiInventoryFromSourceCodeObj,
-            ebpfObj, ebpfMTLSObj, istioObj, aktoSdkObj, awsApiGatewayObj, hybridSaaSObj
+            ebpfObj, ebpfMTLSObj, istioObj, aktoSdkObj, awsApiGatewayObj
         ]
         return connectorsList
     },
