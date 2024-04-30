@@ -21,6 +21,7 @@ import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
+import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -63,6 +64,7 @@ public class QuickStartAction extends UserAction {
 
     private String aktoNLBIp;
     private String aktoMongoConn;
+    private String apiToken;
 
     public enum DeploymentMethod {
         AWS_TRAFFIC_MIRRORING,
@@ -265,6 +267,24 @@ public class QuickStartAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchRuntimeHelmCommand() {
+        try {
+            Map<String,Object> claims = new HashMap<>();
+            claims.put("accountId", Context.accountId.get());
+            apiToken = JwtAuthenticator.createJWT(
+                claims,
+                "Akto",
+                "invite_user",
+                Calendar.MONTH,
+                6
+            );
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String extractLBs() {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < this.selectedLBs.size(); i++) {
@@ -460,4 +480,13 @@ public class QuickStartAction extends UserAction {
     public void setAktoMongoConn(String aktoMongoConn) {
         this.aktoMongoConn = aktoMongoConn;
     }
+
+    public String getApiToken() {
+        return apiToken;
+    }
+
+    public void setApiToken(String apiToken) {
+        this.apiToken = apiToken;
+    }
+
 }

@@ -1,6 +1,7 @@
 import {Avatar, Badge} from "@shopify/polaris"
 import PostmanSource from "./components/PostmanSource"
 import BurpSource from "./components/BurpSource"
+import HybridSaasSource from "./components/HybridSaasSource"
 import AwsSource from "./components/AwsSource"
 import FargateSource from "./components/FargateSource"
 import Kubernetes from "./components/Kubernetes"
@@ -153,6 +154,15 @@ const tcpObj = {
     docsUrl: 'https://docs.akto.io/traffic-connections/tcp-agent',
     key: "NGINX",
     component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/tcp-agent" bannerTitle="Setup using TCP Agent" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/tcp-agent#adding-akto-traffic-collector-container" />
+}
+
+const hybridSaasObj = {
+    icon: '/public/burp.svg',
+    label: "Hybrid Saas",
+    text: "You can deploy hybrid saas setup, add more text.",   
+    docsUrl: 'https://docs.akto.io/traffic-connections/burp-suite',
+    key: "Hybrid Saas",
+    component : <HybridSaasSource/>
 }
 
 const quick_start_policy_lines= [
@@ -688,7 +698,7 @@ const quickStartFunc = {
     getConnectorsList: function (){
         const connectorsList = [gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
             openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, ebpfObj,
-           harFileUploadObj, kongObj, tcpObj, mirroringObj
+           harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj
         ]
         return connectorsList
     },

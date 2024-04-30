@@ -51,6 +51,13 @@ const settingFunctions = {
       })  
       return workspaces
     },
+    fetchRuntimeHelmCommand: async function(){
+      let workspaces = []
+      await settingRequests.fetchRuntimeHelmCommand().then((resp)=>{
+        workspaces = resp.workspaces
+      })
+      return workspaces
+    },
     addOrUpdatePostmanCred: async function(postman_id,workspace_id){
       await settingRequests.addOrUpdatePostmanCred(postman_id,workspace_id)
     },
