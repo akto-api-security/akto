@@ -718,7 +718,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             props.put("Invited", invitationToAccount != 0);
             props.put("method", method);
 
-            SlackAlerts newUserJoiningAlert = new NewUserJoiningAlert(email);
+            SlackAlerts newUserJoiningAlert = new NewUserJoiningAlert(userEmail);
             SlackSender.sendAlert(accountId, newUserJoiningAlert);
 
             AktoMixpanel aktoMixpanel = new AktoMixpanel();
