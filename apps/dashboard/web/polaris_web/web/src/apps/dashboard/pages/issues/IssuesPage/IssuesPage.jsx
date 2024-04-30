@@ -344,6 +344,7 @@ function IssuesPage(){
                     hideQueryField={true}
                     getNextUrl={getNextUrl}
                     getStatus={func.getTestResultStatus}
+                    filterStateUrl={"/dashboard/issues"}
                 />
             ]}
             primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export vulnerability report</Button>}

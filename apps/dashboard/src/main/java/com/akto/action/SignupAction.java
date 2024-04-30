@@ -8,6 +8,9 @@ import com.akto.listener.InitializerListener;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.notifications.slack.NewUserJoiningAlert;
+import com.akto.notifications.slack.SlackAlerts;
+import com.akto.notifications.slack.SlackSender;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
 import com.akto.utils.AzureLogin;
@@ -275,6 +278,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId());
                 }
                 createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), Config.ConfigType.AUTH0.toString());
+
                 return SUCCESS.toUpperCase();
             } else if(pendingInviteCode == null){
                 // invalid code
@@ -713,6 +717,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             props.put("Dashboard Mode", dashboardMode);
             props.put("Invited", invitationToAccount != 0);
             props.put("method", method);
+
+            SlackAlerts newUserJoiningAlert = new NewUserJoiningAlert(userEmail);
+            SlackSender.sendAlert(accountId, newUserJoiningAlert);
+
             AktoMixpanel aktoMixpanel = new AktoMixpanel();
             aktoMixpanel.sendEvent(distinct_id, "SIGNUP_SUCCEEDED", props);
         }

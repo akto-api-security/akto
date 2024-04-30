@@ -61,17 +61,19 @@ function getTotalSeverityTestRunResult(severity) {
 function getRuntime(scheduleTimestamp, endTimestamp, state) {
   let status = getStatus(state);
   if (status === 'RUNNING') {
-    return "Currently running";
+    return <div data-testid="test_run_status">Currently running</div>;
   }
   const currTime = Date.now();
   if (endTimestamp <= 0) {
     if (currTime > scheduleTimestamp) {
-      return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
+      return <div data-testid="test_run_status">Was scheduled for {func.prettifyEpoch(scheduleTimestamp)}</div>;
+
     } else {
-      return "Next run in " + func.prettifyEpoch(scheduleTimestamp)
+      return <div data-testid="test_run_status">Next run in {func.prettifyEpoch(scheduleTimestamp)}</div>;
     }
   }
-  return 'Last run ' + func.prettifyEpoch(endTimestamp);
+  return <div data-testid="test_run_status">Last run {func.prettifyEpoch(endTimestamp)}</div>;
+
 }
 
 function getAlternateTestsInfo(state) {
@@ -664,7 +666,7 @@ getUrlComp(url){
           <Text variant="bodyMd" color="subdued">{method}</Text>
         </HorizontalStack>
       </Box>
-      <Text variant="bodyMd">{endpoint}</Text>
+      <Text variant="bodyMd"><div data-testid="affected_endpoints">{endpoint}</div></Text>
     </HorizontalStack>
   )
 },
@@ -721,7 +723,7 @@ getPrettifiedTestRunResults(testRunResults){
     let obj = testRunResultsObj[key]
     let prettifiedObj = {
       ...obj,
-      nameComp: <Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box>,
+      nameComp: <div data-testid={obj.name}><Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box></div>,
       severityComp: obj?.vulnerable === true ? <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge> : <Text>-</Text>,
       cweDisplayComp: obj?.cweDisplay?.length > 0 ? <HorizontalStack gap={1}>
         {obj.cweDisplay.map((ele,index)=>{

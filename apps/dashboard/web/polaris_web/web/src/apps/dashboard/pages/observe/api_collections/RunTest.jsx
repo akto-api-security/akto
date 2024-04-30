@@ -148,7 +148,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const activator = (
         <div ref={runTestRef}>
-            <Button onClick={toggleRunTest} primary disabled={disabled} >Run test</Button>
+            <Button onClick={toggleRunTest} primary disabled={disabled} ><div data-testid="run_test_button">Run test</div></Button>
         </div>
     );
 
@@ -221,6 +221,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 <Checkbox
                     label={label}
                     checked={test.selected}
+                    ariaDescribedBy={test.label}
                     onChange={() => handleTestsSelected(test)}
                 />
             )])
@@ -271,15 +272,17 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     function scheduleString() {
         if (testRun.hourlyLabel === "Now") {
             if (testRun.recurringDaily) {
-                return "Run daily at this time"
+                return <div data-testid="schedule_run_button">Run daily at this time</div>
             } else {
-                return "Run once now"
+                return <div data-testid="schedule_run_button">Run once now</div>
             }
         } else {
             if (testRun.recurringDaily) {
-                return "Run daily at " + testRun.hourlyLabel
+                return <div data-testid="schedule_run_button">Run daily at {testRun.hourlyLabel}</div>
+
             } else {
-                return "Run today at " + testRun.hourlyLabel
+                return <div data-testid="schedule_run_button">Run today at {testRun.hourlyLabel}</div>
+                
             }
         }
     }
@@ -343,7 +346,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             </HorizontalStack>
         )
 
-        func.setToast(true, false, forwardLink)
+        func.setToast(true, false, <div data-testid="test_run_created_message">{forwardLink}</div>)
+
     }
 
     function getLabel(objList, value) {
@@ -432,7 +436,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 />
                             </div>
 
-                            <Button icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll()}>Remove All</Button>
+                            <Button icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Remove All</div></Button>
                         </div>
 
                         <br />

@@ -13,6 +13,7 @@ import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.stigg.StiggReporterClient;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -82,22 +83,17 @@ public class UsageCalculator {
 
     }
 
-    private void syncBillingEodWithMixpanel(OrganizationUsage ou, MetricTypes metricTypes, int usage) {
-        try {
-            UsageMetric usageMetric = new UsageMetric(
-                    ou.getOrgId(),
-                    -1,
-                    metricTypes,
-                    ou.getCreationEpoch(),
-                    Context.now(),
-                    "SAAS",
-                    "billing"
-            );
-            usageMetric.setUsage(usage);
-            UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
-        } catch (Exception e) {
-            cacheLoggerMaker.errorAndAddToDb(e,"can't sync to mixpanel", LoggerMaker.LogDb.BILLING);
-        }
+    private UsageMetric getUsageMetricObj(OrganizationUsage ou, MetricTypes metricTypes, int usage) {
+        UsageMetric usageMetric = new UsageMetric(
+                ou.getOrgId(),
+                -1,
+                metricTypes,
+                ou.getCreationEpoch(),
+                Context.now(),
+                "SAAS",
+                "billing");
+        usageMetric.setUsage(usage);
+        return usageMetric;
     }
 
     private void syncBillingEodWithStigg(OrganizationUsage lastUsageItem) {
@@ -107,6 +103,9 @@ public class UsageCalculator {
         if (sinks == null) {
             sinks = new HashMap<>();
         }
+
+        BasicDBList updateList = new BasicDBList();
+        List<UsageMetric> usageMetrics = new ArrayList<>();
 
         for(Map.Entry<String, Integer> entry: lastUsageItem.getOrgMetricMap().entrySet()) {
             MetricTypes metricType = MetricTypes.valueOf(entry.getKey());
@@ -138,14 +137,34 @@ public class UsageCalculator {
 
             int value = entry.getValue();
 
-            try {
-                StiggReporterClient.instance.reportUsage(value, lastUsageItem.getOrgId(), featureId);
+            BasicDBObject updateObject = StiggReporterClient.instance.getUpdateObject(value, lastUsageItem.getOrgId(), featureId);
+            updateList.add(updateObject);
+            UsageMetric usageMetricObj = getUsageMetricObj(lastUsageItem, metricType, value);
+            usageMetrics.add(usageMetricObj);
+        }
+
+        try {
+            if (updateList.size() > 0 ){
+                StiggReporterClient.instance.reportUsageBulk(lastUsageItem.getOrgId(), updateList);
                 sinks.put(OrganizationUsage.DataSink.STIGG.toString(), Context.now());
-                syncBillingEodWithMixpanel(lastUsageItem, metricType, value);
-            } catch (IOException e) {
-                String errLog = "error while saving to Stigg: " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate() + " " + featureId;
-                loggerMaker.errorAndAddToDb(e, errLog, LoggerMaker.LogDb.BILLING);
+            } else {
+                loggerMaker.infoAndAddToDb("update list empty for stigg " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate(), LoggerMaker.LogDb.BILLING);
             }
+        } catch (IOException e) {
+            String errLog = "error while saving to Stigg: " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate();
+            loggerMaker.errorAndAddToDb(e, errLog, LoggerMaker.LogDb.BILLING);
+        }
+
+        try {
+            if(usageMetrics.size() > 0){
+                UsageMetricUtils.syncUsageMetricsWithMixpanel(usageMetrics);
+                sinks.put(OrganizationUsage.DataSink.MIXPANEL.toString(), Context.now());
+            } else {
+                loggerMaker.infoAndAddToDb("update list empty for mixpanel " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate(), LoggerMaker.LogDb.BILLING);
+            }
+        } catch (Exception e){
+            String errLog = "error while saving to Mixpanel: " + lastUsageItem.getOrgId() + " " + lastUsageItem.getDate();
+            loggerMaker.errorAndAddToDb(e, errLog, LoggerMaker.LogDb.BILLING);
         }
 
         OrganizationUsageDao.instance.updateOne(
