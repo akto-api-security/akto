@@ -1,4 +1,4 @@
-import request from "../../../../util/request"
+import request from "@/util/request"
 
 export default {
     async fetchTestingDetails(startTimestamp, endTimestamp,  sortKey, sortOrder, skip, limit, filters, testingRunType, searchString) {

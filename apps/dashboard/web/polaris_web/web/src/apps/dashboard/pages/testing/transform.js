@@ -8,7 +8,8 @@ import {ResourcesMajor,
   CircleCancelMajor,
   CalendarMinor,
   ReplayMinor,
-  PlayMinor} from '@shopify/polaris-icons';
+  PlayMinor,
+} from '@shopify/polaris-icons';
 import React, {  } from 'react'
 import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Tag} from '@shopify/polaris';
 import { history } from "@/util/history";
@@ -831,7 +832,26 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
   ]
   return rowItems
 },
-getActionsList(hexId, stopTest, rerunTest){
+
+stopTest(hexId){
+  api.stopTest(hexId).then((resp) => {
+    func.setToast(true, false, "Test run stopped")
+  }).catch((resp) => {
+    func.setToast(true, true, "Unable to stop test run")
+  });
+},
+
+rerunTest(hexId, refreshSummaries){
+  api.rerunTest(hexId).then((resp) => {
+    func.setToast(true, false, "Test re-run initiated")
+    setTimeout(() => {
+      refreshSummaries();
+    }, 2000)
+  }).catch((resp) => {
+    func.setToast(true, true, "Unable to re-run test")
+  });
+},
+getActionsList(hexId, refreshSummaries){
   return [
   {
       content: 'Schedule test',
@@ -841,7 +861,7 @@ getActionsList(hexId, stopTest, rerunTest){
   {
       content: 'Re-run',
       icon: ReplayMinor,
-      onAction: () => {rerunTest(hexId || "")},
+      onAction: () => {this.rerunTest(hexId || "", refreshSummaries)},
   },
   {
       content: 'Add to CI/CD pipeline',
@@ -852,23 +872,18 @@ getActionsList(hexId, stopTest, rerunTest){
       content: 'Stop',
       icon: CircleCancelMajor,
       destructive:true,
-      onAction: () => {stopTest(hexId || "")},
+      onAction: () => {this.stopTest(hexId || "")},
       disabled: true,
   }
 ]},
-getActions(item,stopTest, rerunTest){
+getActions(item, refreshSummaries){
   let arr = []
   let section1 = {items:[]}
-  let actionsList = this.getActionsList(item.id, stopTest, rerunTest);
+  let actionsList = this.getActionsList(item.id, refreshSummaries);
   if(item['run_type'] === 'One-time'){
-    // section1.items.push(actionsList[0])
-  }else{
     section1.items.push(actionsList[1])
   }
-
-  if(item['run_type'] === 'CI/CD'){
-    // section1.items.push(actionsList[0])
-  }else{
+  if(item['run_type'] !== 'CI/CD'){
     section1.items.push(actionsList[2])
   }
   
