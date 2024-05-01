@@ -225,7 +225,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
             for (SingleTypeInfo singleTypeInfo: params) {
                 urlList.add(singleTypeInfo.getUrl());
             }
-            if (urlList.size() != 194) {
+            if (urlList.size() != 202) {
                 Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
             }
 

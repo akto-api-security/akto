@@ -87,7 +87,8 @@ function ApiChanges() {
     const infoItems = [
         {
             title: "New endpoints",
-            data: transform.formatNumberWithCommas(newEndpoints.normal.length),
+            // data: transform.formatNumberWithCommas(newEndpoints.normal.length),
+            data: <div data-testid="new_endpoints_count">{transform.formatNumberWithCommas(newEndpoints.normal.length)}</div>,
         },
         {
             title: "New sensitive endpoints",
