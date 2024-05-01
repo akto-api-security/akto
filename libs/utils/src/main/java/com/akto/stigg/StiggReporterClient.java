@@ -19,6 +19,7 @@ public class StiggReporterClient {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(StiggReporterClient.class);
     public static final StiggReporterClient instance = new StiggReporterClient();
+    private static final OkHttpClient client = new OkHttpClient();
 
     private Config.StiggConfig stiggConfig = null;
     private StiggReporterClient() {
@@ -48,7 +49,6 @@ public class StiggReporterClient {
         if (stiggConfig == null) {
             throw new IllegalStateException("Stigg config is not initialised");
         }
-        OkHttpClient client = new OkHttpClient();
         String requestBody = String.format("{\"query\":\"%s\",\"variables\":%s}", query, vars);
 
         // Set the GraphQL endpoint URL
@@ -132,29 +132,23 @@ public class StiggReporterClient {
         return additionalMetaData;    
     }
 
-    public String reportUsage(int value, String customerId, String featureId) throws IOException {
-
-//        TimeZone utc = TimeZone.getTimeZone("UTC");
-//        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-//        format.setTimeZone(utc);
-
-        BasicDBObject varsObj = new BasicDBObject("input",
-                new BasicDBObject("customerId", customerId)
+    public BasicDBObject getUpdateObject(int value, String customerId, String featureId) {
+        return new BasicDBObject("customerId", customerId)
                 .append("featureId", featureId)
                 .append("value", value)
-                .append("updateBehavior", "SET")
-        );
+                .append("updateBehavior", "SET");
+    }
 
+    public String reportUsageBulk(String customerId, BasicDBList updateList) throws IOException {
+
+        BasicDBObject varsObj = new BasicDBObject("input",
+                new BasicDBObject("usages", updateList));
         String inputVariables = varsObj.toString();
-
-        String mutationQ = "mutation CreateUsageMeasurement($input: UsageMeasurementCreateInput!) {  createUsageMeasurement(usageMeasurement: $input) {    id}}";
-
+        String mutationQ = "mutation ReportUsageBulk($input: ReportUsageBulkInput!) { reportUsageBulk(input: $input) { id } }";
         String ret = executeGraphQL(mutationQ, inputVariables);
 
-        loggerMaker.infoAndAddToDb("Reporting usage for customerId: " + customerId + " featureId: " + featureId + " value: " + value + " " + ret, LoggerMaker.LogDb.BILLING);
-
+        loggerMaker.infoAndAddToDb("Reporting usage for customerId: " + customerId + " data: " + inputVariables + " ret: " + ret, LoggerMaker.LogDb.BILLING);
         return ret;
-
     }
 
     public String provisionSubscription(String customerId, String planId, String billingPeriod, String successUrl, String cancelUrl) {
