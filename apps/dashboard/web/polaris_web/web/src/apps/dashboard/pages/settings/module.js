@@ -9,6 +9,80 @@ const setupOptions = [
   { label: 'DEV', value: 'DEV' }
 ]
 
+const urlOptionsList = [
+  {
+    title: 'HTML',
+    options: [
+      {value: 'html', label: '.html'},
+      {value: 'htm', label: '.htm'},
+    ],
+  },
+  {
+    title: 'CSS',
+    options: [
+      {value: 'css', label: '.css'},
+    ],
+  },
+  {
+    title: 'JS files',
+    options: [
+      {value: 'js', label: '.js'},
+    ],
+  },
+  {
+    title: 'Images',
+    options: [
+      {value: 'jpg', label: '.jpg'},
+      {value: 'jpeg', label: '.jpeg'},
+      {value: 'png', label: '.png'},
+      {value: 'gif', label: '.gif'},
+      {value: 'svg', label: '.svg'},
+      {value: 'webp', label: '.webp'},
+    ],
+  },
+  {
+    title: 'Documents',
+    options: [
+      {value: 'json', label: '.json'},
+      {value: 'pdf', label: '.pdf'},
+      {value: 'doc', label: '.doc'},
+      {value: 'docx', label: '.docx'},
+      {value: 'xlsx', label: '.xlsx'},
+      {value: 'xls', label: '.xls'},
+      {value: 'pptx', label: '.pptx'},
+    ],
+  },
+  {
+    title: 'Videos',
+    options: [
+      {value: 'mp4', label: '.mp4'},
+      {value: 'webm', label: '.webm'},
+      {value: 'ogg', label: '.ogg'},
+      {value: 'ogv', label: '.ogv'},
+      {value: 'avi', label: '.avi'},
+      {value: 'mov', label: '.mov'},
+    ],
+  },
+  {
+    title: 'Audio',
+    options: [
+      {value: 'mp3', label: '.mp3'},
+      {value: 'wav', label: '.wav'},
+      {value: 'oga', label: '.oga'},
+      {value: 'ogg', label: '.ogg'},
+    ],
+  },
+  {
+    title: 'Fonts',
+    options: [
+      {value: 'woff', label: '.woff'},
+      {value: 'woff2', label: '.woff2'},
+      {value: 'ttf', label: '.ttf'},
+      {value: 'otf', label: '.otf'},
+    ],
+  },
+]
+
 const settingFunctions = {
     getTokenList: async function (type){
         let tokensList = []
@@ -94,26 +168,39 @@ const settingFunctions = {
             respOrgStr = respOrg.id + " (" + respOrg.adminEmail + ")"
         }
 
-        arr = [
-          {
-            title: "Organization ID",
-            text: respOrgStr
-          },
-          {
-            title: 'Account ID',
-            text: resp.id,
-          },{
-            title: 'Dashboard Version',
-            text: resp.dashboardVersion,
-          },{
-            title: 'Runtime Version',
-            text: resp.apiRuntimeVersion
-          },
-          {
-            title: 'Last Login',
-            text: loginInfo,
-          },
-        ]
+        if(window.IS_SAAS === "true"){
+          arr = [
+            {
+              title: 'Account ID',
+              text: resp.id,
+            },
+            {
+              title: 'Last Login',
+              text: loginInfo,
+            },
+          ]
+        } else{
+          arr = [
+            {
+              title: "Organization ID",
+              text: respOrgStr
+            },
+            {
+              title: 'Account ID',
+              text: resp.id,
+            },{
+              title: 'Dashboard Version',
+              text: resp.dashboardVersion,
+            },{
+              title: 'Runtime Version',
+              text: resp.apiRuntimeVersion
+            },
+            {
+              title: 'Last Login',
+              text: loginInfo,
+            },
+          ]
+        }
       })
       return {arr,resp}
     },
@@ -182,7 +269,20 @@ const settingFunctions = {
         loginUrl: loginUrl,
         certificate:x509Certificate
       }
-    }
+    },
+
+    getRedundantUrlOptions: function(){
+      let allUrls = []
+      urlOptionsList.forEach((opt) => {
+          opt.options.forEach((option) =>
+            allUrls.push(option.value)
+          );
+      })
+      return {
+        options: urlOptionsList,
+        allUrls: allUrls
+      }
+    },
 }
 
 export default settingFunctions

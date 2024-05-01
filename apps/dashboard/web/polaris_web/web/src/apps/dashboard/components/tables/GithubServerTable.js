@@ -18,6 +18,7 @@ import DropdownSearch from '../shared/DropdownSearch';
 import PersistStore from '../../../main/PersistStore';
 import tableFunc from './transform';
 import useTable from './TableContext';
+import { debounce } from 'lodash';
 
 function GithubServerTable(props) {
 
@@ -25,12 +26,12 @@ function GithubServerTable(props) {
   const setFiltersMap = PersistStore(state => state.setFiltersMap)
   const tableInitialState = PersistStore(state => state.tableInitialState)
   const setTableInitialState = PersistStore(state => state.setTableInitialState)
-
-  const currentPageKey = window.location.href
-
+  const currentPageKey = props?.filterStateUrl || window.location.href
   const pageFiltersMap = filtersMap[currentPageKey]
+
+  const filterMode = (pageFiltersMap?.filters?.length > 0) ? IndexFiltersMode.Filtering : (props?.mode ? props.mode : IndexFiltersMode.Filtering)
   const initialStateFilters = tableFunc.mergeFilters(props.appliedFilters || [], (pageFiltersMap?.filters || []),props.disambiguateLabel)
-  const { mode, setMode } = useSetIndexFiltersMode(props?.mode ? props.mode : IndexFiltersMode.Filtering);
+  const { mode, setMode } = useSetIndexFiltersMode(filterMode);
   const [sortSelected, setSortSelected] = useState(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
   const [data, setData] = useState([]);
   const [total, setTotal] = useState([]);
@@ -60,27 +61,28 @@ function GithubServerTable(props) {
     setSortSelected(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
   },[currentPageKey])
 
-  useEffect(() => {
+  async function fetchData(searchVal) {
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
-    setActiveColumnSort(tableFunc.getColumnSort(sortSelected, props?.sortOptions))
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
     appliedFilters.forEach((filter) => {
       filters[filter.key] = filter.value
     })
-    async function fetchData() {
-      let tempData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, page * pageLimit, pageLimit, filters, filterOperators, queryValue);
-      tempData ? setData([...tempData.value]) : setData([])
-      tempData ? setTotal(tempData.total) : setTotal(0)
-      applyFilter(tempData.total)
-      
-      setTableInitialState({
-        ...tableInitialState,
-        [currentPageKey]: tempData.total
-      })
-    }
+    let tempData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, page * pageLimit, pageLimit, filters, filterOperators, searchVal);
+    tempData ? setData([...tempData.value]) : setData([])
+    tempData ? setTotal(tempData.total) : setTotal(0)
+    applyFilter(tempData.total)
+    
+    setTableInitialState({
+      ...tableInitialState,
+      [currentPageKey]: tempData.total
+    })
+  }
+
+  useEffect(() => {
     handleSelectedTab(props?.selected)
-    fetchData();
-  }, [sortSelected, appliedFilters, queryValue, page, pageFiltersMap])
+    setActiveColumnSort(tableFunc.getColumnSort(sortSelected, props?.sortOptions))
+    fetchData(queryValue);
+  }, [sortSelected, appliedFilters, page, pageFiltersMap])
 
   useEffect(()=> {
     setSortableColumns(tableFunc.getSortableChoices(props?.headers))
@@ -145,10 +147,14 @@ function GithubServerTable(props) {
     setAppliedFilters(temp);
   };
 
-  const handleFiltersQueryChange = useCallback(
-    (value) => setQueryValue(value),
-    [],
-  );
+  const debouncedSearch = debounce((searchQuery) => {
+      fetchData(searchQuery)
+  }, 500);
+
+  const handleFiltersQueryChange = (val) =>{
+    setQueryValue(val)
+    debouncedSearch(val)
+  }
   const handleFiltersQueryClear = useCallback(
     () => setQueryValue(""),
     [],
@@ -336,8 +342,10 @@ function GithubServerTable(props) {
                 <Pagination
                   label={
                     total == 0 ? 'No data found' :
-                      `Showing ${transform.formatNumberWithCommas(page * pageLimit + Math.min(1, total))}-${transform.formatNumberWithCommas(Math.min((page + 1) * pageLimit, total))} of ${transform.formatNumberWithCommas(total)}`
-                  }
+                        <div data-testid="pagination-label">
+                            {`Showing ${transform.formatNumberWithCommas(page * pageLimit + Math.min(1, total))}-${transform.formatNumberWithCommas(Math.min((page + 1) * pageLimit, total))} of ${transform.formatNumberWithCommas(total)}`}
+                        </div>
+                }
                   hasPrevious={page > 0}
                   previousKeys={[Key.LeftArrow]}
                   onPrevious={onPagePrevious}
