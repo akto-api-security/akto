@@ -337,7 +337,7 @@ const coreTable = (
     filters={filters}
     disambiguateLabel={disambiguateLabel} 
     headers={headers}
-    getActions = {(item) => transform.getActions(item, stopTest, rerunTest)}
+    getActions = {(item) => transform.getActions(item, refreshSummaries)}
     hasRowActions={true}
     loading={loading}
     getStatus={func.getTestResultStatus}

@@ -12,6 +12,7 @@ import {
   Link,
   Popover,
   ActionList,
+  Modal,
 } from '@shopify/polaris';
 
 import {
@@ -34,7 +35,7 @@ import PersistStore from "../../../../main/PersistStore";
 import TrendChart from "./TrendChart";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 import useTable from "../../../components/tables/TableContext";
-import { icon } from "@fortawesome/fontawesome-svg-core";
+import ReRunModal from "./ReRunModal";
 
 let headers = [
   {
@@ -409,17 +410,6 @@ const promotedBulkActions = (selectedDataHexIds) => {
   <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type!='One-time'}/> , 
     metadataComponent(), loading ? <SpinnerCentered key="loading"/> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
-  const rerunTest = (hexId) =>{
-    api.rerunTest(hexId).then((resp) => {
-      func.setToast(true, false, "Test re-run")
-      setTimeout(() => {
-        refreshSummaries();
-      }, 2000)
-    }).catch((resp) => {
-      func.setToast(true, true, "Unable to re-run test")
-    });
-  }
-
   const openVulnerabilityReport = () => {
     let summaryId = selectedTestRun.testingRunResultSummaryHexId
     window.open('/dashboard/testing/summary/' + summaryId, '_blank');
@@ -499,7 +489,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     <Popover
       active={primaryPopover}
       onClose={() => setPrimaryPopover(false)}
-      activator={<Button primary onClick={() => setPrimaryPopover(!primaryPopover)}>Export results</Button>}
+      activator={<Button disclosure primary onClick={() => setPrimaryPopover(!primaryPopover)}>Export results</Button>}
       autofocusTarget="first-node"
     >
       <ActionList
@@ -512,31 +502,33 @@ const promotedBulkActions = (selectedDataHexIds) => {
     </Popover>
   )
 
+  const moreActionsList = transform.getActions(selectedTestRun, refreshSummaries)
+
   const moreActionsComp = (
     <Popover
       active={secondaryPopover}
       onClose={() => setSecondaryPopover(false)}
-      activator={<Button onClick={() => setSecondaryPopover(!secondaryPopover)}>More actions</Button>}
+      activator={<Button disclosure onClick={() => setSecondaryPopover(!secondaryPopover)}>More actions</Button>}
       autofocusTarget="first-node"
     >
       <ActionList
          actionRole="menuitem"
-         items={[
-          {content: 'Re-run test', icon: FileMinor, onAction: () => {func.downloadAsCSV((testRunResults[selectedTab]), selectedTestRun)}},
-          {content: 'Add to C', icon: ReportMinor, onAction: () => openVulnerabilityReport()}
-         ]}
+         sections={moreActionsList}
       />
     </Popover>
   )
 
   return (
-    <PageWithMultipleCards
-      title={headingComp}
-      backUrl={`/dashboard/testing/`}
-      primaryAction={!workflowTest ? exportActionComp: undefined}
-      secondaryActions={!workflowTest ? moreActionsComp: undefined}
-      components={useComponents}
-    />
+    <>
+      <PageWithMultipleCards
+        title={headingComp}
+        backUrl={`/dashboard/testing/`}
+        primaryAction={!workflowTest ? exportActionComp: undefined}
+        secondaryActions={!workflowTest ? moreActionsComp: undefined}
+        components={useComponents}
+      />
+      <ReRunModal selectedTestRun={selectedTestRun} refreshSummaries={refreshSummaries}/>
+    </>
   );
 }
 
