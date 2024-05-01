@@ -19,6 +19,7 @@ public class StiggReporterClient {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(StiggReporterClient.class);
     public static final StiggReporterClient instance = new StiggReporterClient();
+    private static final OkHttpClient client = new OkHttpClient();
 
     private Config.StiggConfig stiggConfig = null;
     private StiggReporterClient() {
@@ -48,7 +49,6 @@ public class StiggReporterClient {
         if (stiggConfig == null) {
             throw new IllegalStateException("Stigg config is not initialised");
         }
-        OkHttpClient client = new OkHttpClient();
         String requestBody = String.format("{\"query\":\"%s\",\"variables\":%s}", query, vars);
 
         // Set the GraphQL endpoint URL
