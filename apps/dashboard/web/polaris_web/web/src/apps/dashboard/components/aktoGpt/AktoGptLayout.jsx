@@ -100,6 +100,18 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
         closeModal()
     }
 
+    const addAuthTypes = (name, headerKeys) => {
+        const obj = {
+            name: name,
+            active: true,
+            headerConditions: headerKeys,
+            payloadConditions: [],
+            edit: true
+        }
+        navigate("/dashboard/settings/auth-types/details", {state: obj})
+        closeModal()
+    }
+
     const runTests = () => {
         runCustomTests(response.responses[0].tests)
     }
@@ -148,7 +160,11 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
                                     <Button primary onClick={runTests}>Run tests via Akto</Button>
                                 </div>
-                                :queryType === "generate_curl_for_test" && response?.responses[0]?.curl ?
+                                : queryType === "find_auth_related_tokens" && response?.responses ?
+                                <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
+                                    <Button primary onClick={() => addAuthTypes("", response.responses)}>Add above Auth Types</Button>
+                                </div>
+                                : queryType === "generate_curl_for_test" && response?.responses[0]?.curl ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
                                     <div ref={ref}/>
                                     <Tooltip content="Copy curl command">

@@ -44,6 +44,7 @@ function AuthTypeDetails() {
     const [searchParams] = useSearchParams();
     const isDataInState = location?.state != undefined && Object.keys(location?.state).length > 0
     const isNameInSearch = searchParams.get("name")
+    const isEditMode = location?.state?.edit
     const isNew = !isDataInState && !isNameInSearch
     const pageTitle = isNew ? "Add auth type" : "Configure auth type"
     const [initialState, setInitialState] = useState({ name: "", active:undefined, headerConditions: [], payloadConditions: [] })
@@ -101,7 +102,7 @@ function AuthTypeDetails() {
                     <TextField
                         id={"name-field"} 
                         label="Name" value={currState.name}
-                        placeholder='New auth type name' onChange={(val) => { isNew ? handleChange({ name: val }) : {} }}
+                        placeholder='New auth type name' onChange={(val) => { (isNew || isEditMode) ? handleChange({ name: val }) : {} }}
                     />
                     {isNew ? null :
                     <Dropdown id={"active-dropdown"} 
@@ -161,7 +162,7 @@ function AuthTypeDetails() {
         } else if (isValidOrError!==true){
             func.setToast(true, true, isValidOrError);
         } else {
-            if(isNew){
+            if(isNew || isEditMode){
                 authTypesApi.addCustomAuthType(name, headerKeys, payloadKeys, true).then((res) => {
                     func.setToast(true, false, "Auth type added successfully");
                     setChange(false);
