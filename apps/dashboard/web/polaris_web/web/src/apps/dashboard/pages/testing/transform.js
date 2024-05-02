@@ -617,6 +617,7 @@ convertSubIntoSubcategory(resp){
   const subCategoryMap = PersistStore.getState().subCategoryMap
   Object.keys(resp).forEach((key)=>{
     const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.shortName : key;
+    const objectKeyName = subCategoryMap[key] ? subCategoryMap[key].superCategory.name : key;
     if(obj.hasOwnProperty(objectKey)){
       let tempObj =  JSON.parse(JSON.stringify(obj[objectKey]));
       let newObj = {
@@ -629,13 +630,15 @@ convertSubIntoSubcategory(resp){
     else if(!subCategoryMap[key]){
       obj[objectKey] = {
         text: resp[key],
-        color: func.getColorForCharts(key)
+        color: func.getColorForCharts(key),
+        filterkey: objectKeyName
       }
       countObj.HIGH+=resp[key]
     }else{
       obj[objectKey] = {
         text: resp[key],
-        color: func.getColorForCharts(subCategoryMap[key].superCategory.name)
+        color: func.getColorForCharts(subCategoryMap[key].superCategory.name),
+        filterkey: objectKeyName
       }
       countObj[subCategoryMap[key].superCategory.severity._name]+=resp[key]
     }
