@@ -132,7 +132,7 @@ function HomeDashboard() {
             <Card key="subcategoryTrend">
                 <VerticalStack gap={5}>
                     <Text variant="bodyLg" fontWeight="semibold">Issues by category</Text>
-                    <ChartypeComponent data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'200px'}/>
+                    <ChartypeComponent navurl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'200px'}/>
                 </VerticalStack>
             </Card>
 
