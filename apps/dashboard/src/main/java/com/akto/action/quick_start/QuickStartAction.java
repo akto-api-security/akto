@@ -485,8 +485,4 @@ public class QuickStartAction extends UserAction {
         return apiToken;
     }
 
-    public void setApiToken(String apiToken) {
-        this.apiToken = apiToken;
-    }
-
 }

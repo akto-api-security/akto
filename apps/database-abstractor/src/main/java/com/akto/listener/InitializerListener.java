@@ -85,9 +85,9 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void createIndices() {
-        SingleTypeInfoDao.instance.createIndicesIfAbsent();
-        SensitiveSampleDataDao.instance.createIndicesIfAbsent();
-        SampleDataDao.instance.createIndicesIfAbsent();
+        // SingleTypeInfoDao.instance.createIndicesIfAbsent();
+        // SensitiveSampleDataDao.instance.createIndicesIfAbsent();
+        // SampleDataDao.instance.createIndicesIfAbsent();
     }
 
     @Override
