@@ -108,14 +108,6 @@ public class AccountSettings {
         this.setupType = setupType;
     }
 
-    // public AccountSettings(int id, List<String> privateCidrList, Boolean redactPayload, SetupType setupType, TelemetrySettings telemetrySettings) {
-    //     this.id = id;
-    //     this.privateCidrList = privateCidrList;
-    //     this.redactPayload = redactPayload;
-    //     this.setupType = setupType;
-    //     this.telemetrySettings = telemetrySettings;
-    // }
-
     public int getGlobalRateLimit() {
         return globalRateLimit;
     }
