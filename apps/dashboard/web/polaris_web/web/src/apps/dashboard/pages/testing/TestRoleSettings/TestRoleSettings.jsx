@@ -39,6 +39,11 @@ const selectOptions = [
             value: 'AND',
         }],
         type: "MAP"
+    },
+    {
+        label: "ALL",
+        value: "All",
+        type: "ALL"
     }
 ]
 

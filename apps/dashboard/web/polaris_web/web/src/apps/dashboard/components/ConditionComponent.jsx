@@ -140,6 +140,7 @@ function ConditionComponent(props) {
         switch (type) {
             case "MAP": return collectionComponent(condition);
             case "NUMBER": return <TextField id={`${id}-param-text-${index}`} disabled/>;
+            case "ALL": return <></>
             default:
                 return <TextField
                 id={`${id}-param-text-${index}`}

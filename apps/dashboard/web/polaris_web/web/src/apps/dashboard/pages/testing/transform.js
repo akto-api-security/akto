@@ -496,6 +496,8 @@ const transform = {
               filteredCondition['predicates'].push({ type: element.type, value: apiKeyInfoList })
             }
           }
+        } else if (element.type === "ALL"){
+          
         }
       }
     });
@@ -537,6 +539,9 @@ const transform = {
     }
     if (testingEndpoint?.orConditions) {
       transform.fillConditions(conditions, testingEndpoint.orConditions.predicates, 'OR')
+    }
+    if(testingEndpoint?.type == "ALL"){
+      conditions.push({ operator: testingEndpoint?.operator, type: testingEndpoint?.type, value: "" })
     }
     return conditions;
   },

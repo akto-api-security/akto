@@ -53,6 +53,12 @@ function TestRolesConditionsPicker(props) {
         </VerticalStack>
     )
 
+    const allChecked = conditions.reduce()
+
+    // const allComponent = (
+    //     <Checkbox label={"Select all endpoints"} checked={} onChange={() => selectAllFunc()}/>
+    // )
+
     return (
         <LegacyCard.Section title={title}>
             {fieldsComponent}
