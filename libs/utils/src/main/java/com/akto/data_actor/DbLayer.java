@@ -1,0 +1,370 @@
+package com.akto.data_actor;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+
+import com.akto.bulk_update_util.ApiInfoBulkUpdate;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
+
+import com.akto.dao.APIConfigsDao;
+import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.AccountsDao;
+import com.akto.dao.AktoDataTypeDao;
+import com.akto.dao.AnalyserLogsDao;
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.ApiInfoDao;
+import com.akto.dao.CustomAuthTypeDao;
+import com.akto.dao.CustomDataTypeDao;
+import com.akto.dao.RuntimeFilterDao;
+import com.akto.dao.RuntimeLogsDao;
+import com.akto.dao.SampleDataDao;
+import com.akto.dao.SensitiveParamInfoDao;
+import com.akto.dao.SensitiveSampleDataDao;
+import com.akto.dao.SetupDao;
+import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.TrafficInfoDao;
+import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.context.Context;
+import com.akto.dao.traffic_metrics.TrafficMetricsDao;
+import com.akto.dto.APIConfig;
+import com.akto.dto.Account;
+import com.akto.dto.AccountSettings;
+import com.akto.dto.AktoDataType;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.CustomAuthType;
+import com.akto.dto.CustomDataType;
+import com.akto.dto.Log;
+import com.akto.dto.SensitiveParamInfo;
+import com.akto.dto.SensitiveSampleData;
+import com.akto.dto.Setup;
+import com.akto.dto.billing.Organization;
+import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.TrafficInfo;
+import com.akto.dto.traffic_metrics.TrafficMetrics;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
+import com.akto.log.LoggerMaker;
+import com.mongodb.BasicDBObject;
+import com.mongodb.bulk.BulkWriteResult;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.BulkWriteOptions;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
+
+public class DbLayer {
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DbLayer.class, LoggerMaker.LogDb.DASHBOARD);
+
+    public DbLayer() {
+    }
+
+    public static List<CustomDataType> fetchCustomDataTypes() {
+        return CustomDataTypeDao.instance.findAll(new BasicDBObject());
+    }
+
+    public static List<AktoDataType> fetchAktoDataTypes() {
+        return AktoDataTypeDao.instance.findAll(new BasicDBObject());
+    }
+
+    public static List<CustomAuthType> fetchCustomAuthTypes() {
+        return CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+    }
+
+    public static void updateApiCollectionName(int vxlanId, String name) {
+        ApiCollectionsDao.instance.getMCollection().updateMany(
+                Filters.eq(ApiCollection.VXLAN_ID, vxlanId),
+                Updates.set(ApiCollection.NAME, name)
+        );
+    }
+
+    public static void updateCidrList(List<String> cidrList) {
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(), Updates.addEachToSet("privateCidrList", cidrList),
+                new UpdateOptions().upsert(true)
+        );
+    }
+
+    public static AccountSettings fetchAccountSettings() {
+        return AccountSettingsDao.instance.findOne(new BasicDBObject());
+    }
+
+    public static AccountSettings fetchAccountSettings(int accountId) {
+        Bson filters = Filters.eq("_id", accountId);
+        return AccountSettingsDao.instance.findOne(filters);
+    }
+
+    public static List<ApiInfo> fetchApiInfos() {
+        return ApiInfoDao.instance.findAll(new BasicDBObject());
+    }
+
+    public static List<ApiInfo> fetchNonTrafficApiInfos() {
+        List<ApiCollection> nonTrafficApiCollections = ApiCollectionsDao.instance.fetchNonTrafficApiCollections();
+        List<Integer> apiCollectionIds = new ArrayList<>();
+        for (ApiCollection apiCollection: nonTrafficApiCollections) {
+            apiCollectionIds.add(apiCollection.getId());
+        }
+        return ApiInfoDao.instance.findAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
+    }
+
+    public static void bulkWriteApiInfo(List<ApiInfo> apiInfoList) {
+        List<WriteModel<ApiInfo>> writesForApiInfo = ApiInfoBulkUpdate.getUpdatesForApiInfo(apiInfoList);
+        ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo);
+    }
+    public static void bulkWriteSingleTypeInfo(List<WriteModel<SingleTypeInfo>> writesForSingleTypeInfo) {
+        BulkWriteResult res = SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForSingleTypeInfo);
+    }
+
+    public static void bulkWriteSampleData(List<WriteModel<SampleData>> writesForSampleData) {
+        SampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
+    }
+
+    public static void bulkWriteSensitiveSampleData(List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData) {
+        SensitiveSampleDataDao.instance.getMCollection().bulkWrite(writesForSensitiveSampleData);
+    }
+
+    public static void bulkWriteTrafficInfo(List<WriteModel<TrafficInfo>> writesForTrafficInfo) {
+        TrafficInfoDao.instance.getMCollection().bulkWrite(writesForTrafficInfo);
+    }
+
+    public static void bulkWriteTrafficMetrics(List<WriteModel<TrafficMetrics>> writesForTrafficMetrics) {
+        TrafficMetricsDao.instance.getMCollection().bulkWrite(writesForTrafficMetrics);
+    }
+
+    public static void bulkWriteSensitiveParamInfo(List<WriteModel<SensitiveParamInfo>> writesForSensitiveParamInfo) {
+        SensitiveParamInfoDao.instance.getMCollection().bulkWrite(writesForSensitiveParamInfo);
+    }
+
+    public static APIConfig fetchApiconfig(String configName) {
+        return APIConfigsDao.instance.findOne(Filters.eq("name", configName));
+    }
+
+    public static List<SingleTypeInfo> fetchSti(Bson filterQ) {
+        // add limit, offset
+        return SingleTypeInfoDao.instance.findAll(filterQ, Projections.exclude(SingleTypeInfo._VALUES));
+    }
+
+//    public static List<SingleTypeInfo> fetchStiBasedOnId(ObjectId id) {
+//        // add limit, offset
+//        Bson filters = Filters.gt("_id", id);
+//        Bson sort = Sorts.descending("_id") ;
+//        return SingleTypeInfoDao.instance.findAll(filters, 0, 20000, sort, Projections.exclude(SingleTypeInfo._VALUES));
+//    }
+
+    public static List<SingleTypeInfo> fetchStiBasedOnHostHeaders() {
+        Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1,false);
+        Bson filterQ = Filters.and(filterForHostHeader, Filters.regex(SingleTypeInfo._URL, "STRING|INTEGER"));
+        return SingleTypeInfoDao.instance.findAll(filterQ, Projections.exclude(SingleTypeInfo._VALUES));
+    }
+
+    public static List<Integer> fetchApiCollectionIds() {
+        List<Integer> apiCollectionIds = new ArrayList<>();
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject(),
+                Projections.include("_id"));
+        for (ApiCollection apiCollection: apiCollections) {
+            apiCollectionIds.add(apiCollection.getId());
+        }
+        return apiCollectionIds;
+    }
+
+    public static long fetchEstimatedDocCount() {
+        return SingleTypeInfoDao.instance.getMCollection().estimatedDocumentCount();
+    }
+
+    public static List<RuntimeFilter> fetchRuntimeFilters() {
+        return RuntimeFilterDao.instance.findAll(new BasicDBObject());
+    }
+
+    public static List<Integer> fetchNonTrafficApiCollectionsIds() {
+        List<ApiCollection> nonTrafficApiCollections = ApiCollectionsDao.instance.fetchNonTrafficApiCollections();
+        List<Integer> apiCollectionIds = new ArrayList<>();
+        for (ApiCollection apiCollection: nonTrafficApiCollections) {
+            apiCollectionIds.add(apiCollection.getId());
+        }
+
+        return apiCollectionIds;
+    }
+
+    public static List<SingleTypeInfo> fetchStiOfCollections() {
+        List<Integer> apiCollectionIds = fetchNonTrafficApiCollectionsIds();
+        Bson filters = Filters.in(SingleTypeInfo._API_COLLECTION_ID, apiCollectionIds);
+        List<SingleTypeInfo> stis = new ArrayList<>();
+        try {
+            stis = SingleTypeInfoDao.instance.findAll(filters);
+            for (SingleTypeInfo sti: stis) {
+                try {
+                    sti.setStrId(sti.getId().toHexString());
+                } catch (Exception e) {
+                    System.out.println("error" + e);
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("error" + e);
+        }
+        return stis;
+    }
+
+    public static List<SensitiveParamInfo> getUnsavedSensitiveParamInfos() {
+        return SensitiveParamInfoDao.instance.findAll(
+                Filters.and(
+                        Filters.or(
+                                Filters.eq(SensitiveParamInfo.SAMPLE_DATA_SAVED,false),
+                                Filters.not(Filters.exists(SensitiveParamInfo.SAMPLE_DATA_SAVED))
+                        ),
+                        Filters.eq(SensitiveParamInfo.SENSITIVE, true)
+                )
+        );
+    }
+
+    public static List<SingleTypeInfo> fetchSingleTypeInfo(int lastFetchTimestamp, String lastSeenObjectId, boolean resolveLoop) {
+        if (resolveLoop) {
+            Bson filters = Filters.eq("timestamp", lastFetchTimestamp);
+            if (lastSeenObjectId != null) {
+                filters = Filters.and(filters, Filters.gt("_id", new ObjectId(lastSeenObjectId)));
+            }
+            Bson sort = Sorts.ascending(Arrays.asList("_id"));
+            return SingleTypeInfoDao.instance.findAll(filters, 0, 1000, sort, Projections.exclude(SingleTypeInfo._VALUES));
+        } else {
+            Bson filters = Filters.gte("timestamp", lastFetchTimestamp);
+            Bson sort = Sorts.ascending("timestamp");
+            return SingleTypeInfoDao.instance.findAll(filters, 0, 1000, sort, Projections.exclude(SingleTypeInfo._VALUES));
+        }
+    }
+
+    public static List<SingleTypeInfo> fetchAllSingleTypeInfo() {
+        return SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES));
+    }
+
+    public static void updateRuntimeVersion(String fieldName, String version) {
+        AccountSettingsDao.instance.updateOne(
+                        AccountSettingsDao.generateFilter(),
+                        Updates.set(fieldName, version)
+                );
+    }
+
+    public static Account fetchActiveAccount() {
+        Bson activeFilter = Filters.or(
+                Filters.exists(Account.INACTIVE_STR, false),
+                Filters.eq(Account.INACTIVE_STR, false)
+        );
+
+        return AccountsDao.instance.findOne(activeFilter);
+    }
+
+    public static void updateKafkaIp(String currentInstanceIp) {
+        AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.CENTRAL_KAFKA_IP, currentInstanceIp+":9092")
+        );
+    }
+
+    public static List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection() {
+        int apiCollectionId = -1;
+        List<Bson> pipeline = new ArrayList<>();
+        BasicDBObject groupedId =
+                new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                        .append("url", "$url")
+                        .append("method", "$method");
+
+        if (apiCollectionId != -1) {
+            pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+        }
+
+        Bson projections = Projections.fields(
+                Projections.include("timestamp", "apiCollectionId", "url", "method")
+        );
+
+        pipeline.add(Aggregates.project(projections));
+        pipeline.add(Aggregates.group(groupedId));
+        pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+
+        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+
+        List<ApiInfo.ApiInfoKey> endpoints = new ArrayList<>();
+        while(endpointsCursor.hasNext()) {
+            BasicDBObject v = endpointsCursor.next();
+            try {
+                BasicDBObject vv = (BasicDBObject) v.get("_id");
+                ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(
+                        (int) vv.get("apiCollectionId"),
+                        (String) vv.get("url"),
+                        URLMethods.Method.fromString((String) vv.get("method"))
+                );
+                endpoints.add(apiInfoKey);
+            } catch (Exception e) {
+                e.printStackTrace();
+
+            }
+        }
+
+        return endpoints;
+    }
+
+    public static void createCollectionSimple(int vxlanId) {
+        UpdateOptions updateOptions = new UpdateOptions();
+        updateOptions.upsert(true);
+
+        ApiCollectionsDao.instance.getMCollection().updateOne(
+                Filters.eq("_id", vxlanId),
+                Updates.combine(
+                        Updates.set(ApiCollection.VXLAN_ID, vxlanId),
+                        Updates.setOnInsert("startTs", Context.now()),
+                        Updates.setOnInsert("urls", new HashSet<>())
+                ),
+                updateOptions
+        );
+    }
+
+    public static void createCollectionForHost(String host, int id) {
+
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+        updateOptions.upsert(true);
+
+        Bson updates = Updates.combine(
+            Updates.setOnInsert("_id", id),
+            Updates.setOnInsert("startTs", Context.now()),
+            Updates.setOnInsert("urls", new HashSet<>())
+        );
+
+        ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
+    }
+
+    public static void insertRuntimeLog(Log log) {
+        RuntimeLogsDao.instance.insertOne(log);
+    }
+
+    public static void insertAnalyserLog(Log log) {
+        AnalyserLogsDao.instance.insertOne(log);
+    }
+
+    public static void modifyHybridSaasSetting(boolean isHybridSaas) {
+        Integer accountId = Context.accountId.get();
+        AccountsDao.instance.updateOne(Filters.eq("_id", accountId), Updates.set(Account.HYBRID_SAAS_ACCOUNT, isHybridSaas));
+    }
+
+    public static Setup fetchSetup() {
+        Setup setup = SetupDao.instance.findOne(new BasicDBObject());
+        return setup;
+    }
+
+    public static List<ApiCollection> fetchApiCollections() {
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject(),
+                Projections.include("_id"));
+        return apiCollections;
+    }
+
+    public static Organization fetchOrganization(int accountId) {
+        return OrganizationsDao.instance.findOne(Filters.eq(Organization.ACCOUNTS, accountId));
+    }
+
+}
