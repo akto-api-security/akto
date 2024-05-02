@@ -45,14 +45,6 @@ public class InitializerListener implements ServletContextListener {
                             calledOnce = true;
                         }
                         checkMongoConnection();
-                        
-                        AccountTask.instance.executeTaskHybridAccounts(new Consumer<Account>() {
-                            @Override
-                            public void accept(Account account) {
-                                logger.info("triggering initialise for db abstractor " + Context.now());
-                                initialize();
-                            }
-                        }, "context-initializer-db-abstractor");
 
                         Cron cron = new Cron();
                         logger.info("triggering merging cron for db abstractor " + Context.now());
@@ -75,19 +67,6 @@ public class InitializerListener implements ServletContextListener {
     private static void checkMongoConnection() throws Exception {
         AccountsDao.instance.getStats();
         connectedToMongo = true;
-    }
-
-    public static void initialize() {
-        System.out.println("init");
-        AccountTask.instance.executeTaskHybridAccounts(t -> {
-            createIndices();
-        }, "initialize-mongoservice-task");
-    }
-
-    public static void createIndices() {
-        // SingleTypeInfoDao.instance.createIndicesIfAbsent();
-        // SensitiveSampleDataDao.instance.createIndicesIfAbsent();
-        // SampleDataDao.instance.createIndicesIfAbsent();
     }
 
     @Override

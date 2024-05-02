@@ -43,5 +43,8 @@
         <listener-class>com.akto.listener.InitializerListener</listener-class>
     </listener>
 
+    <listener>
+        <listener-class>com.akto.listener.RequestEventListener</listener-class>
+    </listener>
    
 </web-app>
