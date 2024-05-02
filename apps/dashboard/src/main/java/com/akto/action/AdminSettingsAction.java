@@ -3,8 +3,6 @@ package com.akto.action;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.User;
 import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
@@ -50,8 +48,9 @@ public class AdminSettingsAction extends UserAction {
     public Boolean enableTelemetry;
 
 	private List<String> partnerIpList;
+    private List<String> allowRedundantEndpointsList;
 
-	public String updateSetupType() {
+    public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.SETUP_TYPE, this.setupType),
@@ -261,6 +260,27 @@ public class AdminSettingsAction extends UserAction {
 
     }
 
+    public String updateUrlSettings() {
+        try {
+            for(String ext : this.allowRedundantEndpointsList){
+                if (ext.matches(".*[\\\\/:*?\"<>|].*")) {
+                    addActionError(ext + " url type is invalid" );
+                    return Action.ERROR.toUpperCase();
+                }
+            }
+            AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.ALLOW_REDUNDANT_ENDPOINTS_LIST, this.allowRedundantEndpointsList),
+                new UpdateOptions().upsert(true)
+            );
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            return ERROR.toUpperCase();
+        }
+        
+    }
+
     public AccountSettings getAccountSettings() {
         return this.accountSettings;
     }
@@ -345,4 +365,8 @@ public class AdminSettingsAction extends UserAction {
     public List<String> getPrivateCidrList() {
 		return privateCidrList;
 	}
+    
+    public void setAllowRedundantEndpointsList(List<String> allowRedundantEndpointsList) {
+        this.allowRedundantEndpointsList = allowRedundantEndpointsList;
+    }   
 }

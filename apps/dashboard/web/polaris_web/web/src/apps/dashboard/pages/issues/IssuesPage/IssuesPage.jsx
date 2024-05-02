@@ -11,6 +11,7 @@ import { Button } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
+import { useEffect } from "react";
 
 const headers = [
     {
@@ -154,7 +155,7 @@ function IssuesPage(){
     const [key, setKey] = useState(false);
     const apiCollectionMap = PersistStore(state => state.collectionsMap);
     const allCollections = PersistStore(state => state.allCollections);
-    const [showEmptyScreen, setShowEmptyScreen] = useState(false)
+    const [showEmptyScreen, setShowEmptyScreen] = useState(true)
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -309,6 +310,12 @@ function IssuesPage(){
             description: "Integrate Akto with GitHub to send all issues to your developers on GitHub."
         }
     ]
+
+  useEffect(() => {
+    if (subCategoryMap && Object.keys(subCategoryMap).length > 0 && apiCollectionMap && Object.keys(apiCollectionMap).length > 0) {
+        setShowEmptyScreen(false)
+    }
+  }, [subCategoryMap, apiCollectionMap])
     
     return (
         <PageWithMultipleCards
@@ -343,7 +350,6 @@ function IssuesPage(){
                     promotedBulkActions={promotedBulkActions}
                     hideQueryField={true}
                     getNextUrl={getNextUrl}
-                    rowClickable={true}
                     getStatus={func.getTestResultStatus}
                     filterStateUrl={"/dashboard/issues"}
                 />

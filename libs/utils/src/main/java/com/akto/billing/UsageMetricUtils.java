@@ -44,6 +44,7 @@ public class UsageMetricUtils {
     private static final Logger logger = LoggerFactory.getLogger(UsageMetricUtils.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricUtils.class);
     private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(UsageMetricUtils.class);
+    private static final OkHttpClient client = new OkHttpClient();
 
     public static void syncUsageMetricWithAkto(UsageMetric usageMetric) {
         try {
@@ -60,7 +61,6 @@ public class UsageMetricUtils {
                     .post(body)
                     .build();
 
-            OkHttpClient client = new OkHttpClient();
             Response response = null;
 
             try {
@@ -228,7 +228,6 @@ public class UsageMetricUtils {
                 .post(body)
                 .build();
 
-        OkHttpClient client = new OkHttpClient();
         Response response = null;
 
         try {
