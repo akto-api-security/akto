@@ -145,7 +145,7 @@ function TrendChart(props) {
 
             let count = 0
             testingRunResultSummaries.forEach((ele)=>{
-                let obj = Object.keys(ele.countIssues).length > 0 ? ele.countIssues : {HIGH: 0, MEDIUM: 0, LOW: 0}
+                let obj = (ele?.countIssues && Object.keys(ele.countIssues).length > 0) ? ele.countIssues : {HIGH: 0, MEDIUM: 0, LOW: 0}
                 count += (obj.HIGH + obj.MEDIUM + obj.LOW)
             })
 
