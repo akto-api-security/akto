@@ -152,7 +152,7 @@ const tcpObj = {
 const hybridSaasObj = {
     icon: '/public/aws.svg',
     label: "Hybrid Saas",
-    text: "You can deploy hybrid saas setup, add more text.",   
+    text: "You can just deploy our agent in your cloud and send the data to Akto's Saas Setup",
     docsUrl: 'https://docs.akto.io/traffic-connections/burp-suite',
     key: "Hybrid Saas",
     component : <HybridSaasSource/>
