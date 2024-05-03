@@ -650,12 +650,7 @@ convertSubIntoSubcategory(resp){
     const prop2 = val2['text'];
     return prop2 - prop1 ;
   });
-
-  console.log( {
-    subCategoryMap: Object.fromEntries(sortedEntries),
-    countMap: countObj
-  })
-
+  
   return {
     subCategoryMap: Object.fromEntries(sortedEntries),
     countMap: countObj
