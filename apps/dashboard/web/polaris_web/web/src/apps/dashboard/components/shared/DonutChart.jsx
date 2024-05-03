@@ -9,8 +9,6 @@ import PersistStore from '../../../main/PersistStore';
 function DonutChart({data, title, size,type,navurl}) {
     const chartComponentRef = useRef(null)
     const navigate = useNavigate()
-
-    const filtersMap = PersistStore(state => state.filtersMap)
     const setFiltersMap = PersistStore(state => state.setFiltersMap)
 
 
@@ -69,22 +67,22 @@ function DonutChart({data, title, size,type,navurl}) {
                             }
                             else if( navurl && navurl==='/dashboard/issues/'){
 
-                                const updatedFiltersMap = { ...filtersMap }; 
+                                const filterurl = '/dashboard/issues'
 
-                                for (const key in updatedFiltersMap) {
-                                  if (updatedFiltersMap.hasOwnProperty(key)) {
+                                let updatedFiltersMap = {} 
+                                updatedFiltersMap[filterurl] = {}
+                                  
+                                const filterobj = [{
 
-                                    updatedFiltersMap[key].filters = [];
-                                    updatedFiltersMap[key].sort = [];
+                                    key: "issueCategory",
+                                    label: point.filterkey,
+                                    value: [point.filterkey]
 
-                                    updatedFiltersMap[key].filters.push({
-                                      key: "issueCategory",
-                                      label: point.filterkey,
-                                      value: [point.filterkey],
-                                    });
-                                  }
                                 }
+                               ]
 
+                                updatedFiltersMap[filterurl]['filters'] = filterobj;
+                                updatedFiltersMap[filterurl]['sort'] = [];
                                 setFiltersMap(updatedFiltersMap)
                                 navigate(`${navurl}`);
                             }
