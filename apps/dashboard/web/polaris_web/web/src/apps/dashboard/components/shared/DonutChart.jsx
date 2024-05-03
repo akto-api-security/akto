@@ -9,6 +9,7 @@ import PersistStore from '../../../main/PersistStore';
 function DonutChart({data, title, size,type,navurl}) {
     const chartComponentRef = useRef(null)
     const navigate = useNavigate()
+    const filtersMap = PersistStore(state => state.filtersMap)
     const setFiltersMap = PersistStore(state => state.setFiltersMap)
 
 
@@ -69,7 +70,7 @@ function DonutChart({data, title, size,type,navurl}) {
 
                                 const filterurl = '/dashboard/issues'
 
-                                let updatedFiltersMap = {} 
+                                let updatedFiltersMap = { ...filtersMap };
                                 updatedFiltersMap[filterurl] = {}
                                   
                                 const filterobj = [{
