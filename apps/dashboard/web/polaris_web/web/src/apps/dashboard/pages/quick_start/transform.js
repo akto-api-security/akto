@@ -1,6 +1,7 @@
 import {Avatar, Badge} from "@shopify/polaris"
 import PostmanSource from "./components/PostmanSource"
 import BurpSource from "./components/BurpSource"
+import HybridSaasSource from "./components/HybridSaasSource"
 import AwsSource from "./components/AwsSource"
 import FargateSource from "./components/FargateSource"
 import Kubernetes from "./components/Kubernetes"
@@ -148,6 +149,15 @@ const tcpObj = {
     component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/tcp-agent" bannerTitle="Setup using TCP Agent" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/tcp-agent#adding-akto-traffic-collector-container" />
 }
 
+const hybridSaasObj = {
+    icon: '/public/aws.svg',
+    label: "Hybrid Saas",
+    text: "You can deploy hybrid saas setup, add more text.",   
+    docsUrl: 'https://docs.akto.io/traffic-connections/burp-suite',
+    key: "Hybrid Saas",
+    component : <HybridSaasSource/>
+}
+
 const apiInventoryFromSourceCodeObj = {
     icon: '/public/favicon.svg',
     badge: "Beta",
@@ -201,15 +211,6 @@ const awsApiGatewayObj = {
     docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/aws-api-gateway',
     component: <FutureConnection />,
     key: "AWS_API_GATEWAY",
-}
-
-const hybridSaaSObj = {
-    icon: '/public/aws.svg',
-    label: "Hybrid SaaS",
-    text: "Send traffic from your cloud environment to Akto SaaS.",
-    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/aws-api-gateway',
-    component: <FutureConnection />,
-    key: "HYBRID_SAAS",
 }
 
 const quick_start_policy_lines= [
@@ -745,8 +746,8 @@ const quickStartFunc = {
     getConnectorsList: function () {
         const connectorsList = [gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
             openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj,
-            harFileUploadObj, kongObj, tcpObj, mirroringObj, apiInventoryFromSourceCodeObj,
-            ebpfObj, ebpfMTLSObj, istioObj, aktoSdkObj, awsApiGatewayObj, hybridSaaSObj
+            harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
+            ebpfObj, ebpfMTLSObj, istioObj, aktoSdkObj, awsApiGatewayObj
         ]
         return connectorsList
     },
