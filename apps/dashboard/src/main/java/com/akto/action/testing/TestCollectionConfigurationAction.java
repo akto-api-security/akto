@@ -19,6 +19,7 @@ import org.bson.conversions.Bson;
 import java.io.IOException;
 import java.util.*;
 
+import static com.akto.dto.ApiInfo.COLLECTION_IDS;
 import static com.akto.dto.OriginalHttpRequest.buildHeadersMap;
 import static com.opensymphony.xwork2.Action.SUCCESS;
 
@@ -53,7 +54,7 @@ public class TestCollectionConfigurationAction {
 
     public Set<String> findNonStandardHeaderKeys(int apiCollectionId) {
         List<SampleData> sampleDataList = new ArrayList<>();
-        Bson filters = Filters.empty();//Filters.eq("_id."+ ApiInfo.ApiInfoKey.API_COLLECTION_ID, apiCollectionId);
+        Bson filters = Filters.eq(COLLECTION_IDS, apiCollectionId);//Filters.eq("_id."+ ApiInfo.ApiInfoKey.API_COLLECTION_ID, apiCollectionId);
         int skip = 0;
         int limit = 100;
         Set<String> headerNames = new HashSet<>();
