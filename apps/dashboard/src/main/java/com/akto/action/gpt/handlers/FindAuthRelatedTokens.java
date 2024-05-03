@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 
 public class FindAuthRelatedTokens implements QueryHandler{
-    private static final Logger logger = LoggerFactory.getLogger(GenerateCurlForTest.class);
+    private static final Logger logger = LoggerFactory.getLogger(FindAuthRelatedTokens.class);
     private final ResultFetcherStrategy<BasicDBObject> resultFetcherStrategy;
 
     public FindAuthRelatedTokens(ResultFetcherStrategy<BasicDBObject> resultFetcherStrategy) {

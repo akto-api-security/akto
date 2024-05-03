@@ -160,7 +160,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
                                     <Button primary onClick={runTests}>Run tests via Akto</Button>
                                 </div>
-                                : queryType === "find_auth_related_tokens" && response?.responses ?
+                                : queryType === "find_auth_related_tokens" && response?.responses?.length>0 ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
                                     <Button primary onClick={() => addAuthTypes("", response.responses)}>Add above Auth Types</Button>
                                 </div>
