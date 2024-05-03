@@ -153,7 +153,7 @@ const hybridSaasObj = {
     icon: '/public/aws.svg',
     label: "Hybrid Saas",
     text: "You can just deploy our agent in your cloud and send the data to Akto's Saas Setup",
-    docsUrl: 'https://docs.akto.io/traffic-connections/burp-suite',
+    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/hybrid-saas',
     key: "Hybrid Saas",
     component : <HybridSaasSource/>
 }
