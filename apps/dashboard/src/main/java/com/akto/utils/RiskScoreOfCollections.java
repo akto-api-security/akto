@@ -142,20 +142,24 @@ public class RiskScoreOfCollections {
         Map<ApiInfoKey, Float> severityScoreMap = getSeverityScoreMap(updatedIssues);
 
         // after getting the severityScoreMap, we write that in DB
-        severityScoreMap.forEach((apiInfoKey, severityScore)->{
-            Bson filter = ApiInfoDao.getFilter(apiInfoKey);
-            Float riskScore = Utils.getRiskScoreFromSeverityScore(severityScore);
-            ApiInfo apiInfo = ApiInfoDao.instance.findOne(filter);
-            if(apiInfo.getIsSensitive()){
-                riskScore += 1;
-            }
-            riskScore += ApiInfoDao.getRiskScoreOfApiInfo(apiInfo);
-            Bson update = Updates.combine(
-                Updates.set(ApiInfo.SEVERITY_SCORE, severityScore),
-                Updates.set(ApiInfo.RISK_SCORE, riskScore)
-            );
-            bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filter, update,new UpdateOptions()));
-        });
+        if(severityScoreMap != null){
+            severityScoreMap.forEach((apiInfoKey, severityScore)->{
+                Bson filter = ApiInfoDao.getFilter(apiInfoKey);
+                Float riskScore = Utils.getRiskScoreFromSeverityScore(severityScore);
+                ApiInfo apiInfo = ApiInfoDao.instance.findOne(filter);
+                if(apiInfo != null){
+                    if(apiInfo.getIsSensitive()){
+                        riskScore += 1;
+                    }
+                    riskScore += ApiInfoDao.getRiskScoreOfApiInfo(apiInfo);
+                }
+                Bson update = Updates.combine(
+                    Updates.set(ApiInfo.SEVERITY_SCORE, severityScore),
+                    Updates.set(ApiInfo.RISK_SCORE, riskScore)
+                );
+                bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filter, update,new UpdateOptions()));
+            });
+        }
 
         if (bulkUpdatesForApiInfo.size() > 0) {
             ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
