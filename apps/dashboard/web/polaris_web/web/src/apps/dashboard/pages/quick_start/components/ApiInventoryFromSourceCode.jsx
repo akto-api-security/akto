@@ -48,9 +48,7 @@ function ApiInventoryFromSourceCode() {
                 <Text variant="headingSm">Extract APIs from github hosted source code using our Github Action</Text>
                 <Text variant="bodyMd">Add a step in your github action workflow based on the following example:</Text>
                 <br/>
-                <Box width="500px">
-                    <JsonComponent title="Github workflow step" toolTipContent="Copy the github workflow step" onClickFunc={() => copyGithubWorkflowStep()} dataString={githubWorkflowStep} language="yaml" minHeight="150px"/>
-                </Box>
+                <JsonComponent title="Github workflow step" toolTipContent="Copy the github workflow step" onClickFunc={() => copyGithubWorkflowStep()} dataString={githubWorkflowStep} language="yaml" minHeight="150px"/>
             </div>
 
             <div>

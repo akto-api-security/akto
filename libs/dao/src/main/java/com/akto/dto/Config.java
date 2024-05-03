@@ -26,7 +26,7 @@ public abstract class Config {
     String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS;
     }
 
     ConfigType configType;
@@ -581,4 +581,39 @@ public abstract class Config {
             this.slackWebhookUrl = slackWebhookUrl;
         }
     }
+
+    @BsonDiscriminator
+    public static class HybridSaasConfig extends Config {
+        String privateKey;
+        String publicKey;
+
+        public HybridSaasConfig() {
+            this.configType = ConfigType.HYBRID_SAAS;
+            this.id = configType.name();
+        }
+
+        public HybridSaasConfig(String privateKey, String publicKey) {
+            this.configType = ConfigType.HYBRID_SAAS;
+            this.id = configType.name();
+            this.privateKey = privateKey;
+            this.publicKey = publicKey;
+        }
+
+        public String getPrivateKey() {
+            return privateKey;
+        }
+
+        public void setPrivateKey(String privateKey) {
+            this.privateKey = privateKey;
+        }
+
+        public String getPublicKey() {
+            return publicKey;
+        }
+
+        public void setPublicKey(String publicKey) {
+            this.publicKey = publicKey;
+        }
+    }
+
 }

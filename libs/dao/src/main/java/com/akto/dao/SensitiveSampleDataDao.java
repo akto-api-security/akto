@@ -7,6 +7,10 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
+
+import java.util.HashMap;
+import java.util.Map;
+
 import org.bson.Document;
 
 import org.bson.conversions.Bson;
@@ -34,6 +38,19 @@ public class SensitiveSampleDataDao extends AccountsContextDao<SensitiveSampleDa
                 Filters.eq("_id.subType", singleTypeInfo.getSubType().getName()),
                 Filters.eq("_id.apiCollectionId", singleTypeInfo.getApiCollectionId())
         );
+    }
+
+    public static Map<String, Object> getFiltersMap(SingleTypeInfo singleTypeInfo) {
+        Map<String, Object> filterMap = new HashMap<>();
+
+        filterMap.put("_id.url", singleTypeInfo.getUrl());
+        filterMap.put("_id.method", singleTypeInfo.getMethod());
+        filterMap.put("_id.responseCode", singleTypeInfo.getResponseCode());
+        filterMap.put("_id.isHeader", singleTypeInfo.getIsHeader());
+        filterMap.put("_id.param", singleTypeInfo.getParam());
+        filterMap.put("_id.subType", singleTypeInfo.getSubType().getName());
+        filterMap.put("_id.apiCollectionId", singleTypeInfo.getApiCollectionId());
+        return filterMap;
     }
 
     public void createIndicesIfAbsent() {
