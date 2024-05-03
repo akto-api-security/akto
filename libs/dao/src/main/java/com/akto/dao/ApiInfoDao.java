@@ -2,6 +2,7 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
@@ -65,6 +66,8 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] {ApiInfo.SEVERITY_SCORE }, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] {ApiInfo.ID_API_COLLECTION_ID, ApiInfo.RISK_SCORE }, false);
     }
     
 
@@ -121,37 +124,18 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         return result;
     }
 
-    public List<Bson> buildRiskScorePipeline(){
-        int oneMonthBefore = Context.now() - Constants.ONE_MONTH_TIMESTAMP;
-        String computedSeverityScore = "{'$cond':[{'$gte':['$severityScore',100]},2,{'$cond':[{'$gte':['$severityScore',10]},1,{'$cond':[{'$gt':['$severityScore',0]},0.5,0]}]}]}";
-        String computedAccessTypeScore = "{ '$cond': { 'if': { '$and': [ { '$gt': [ { '$size': '$apiAccessTypes' }, 0 ] }, { '$in': ['PUBLIC', '$apiAccessTypes'] } ] }, 'then': 1, 'else': 0 } }";
-        String computedLastSeenScore = "{ '$cond': [ { '$gte': ['$lastSeen', " +  oneMonthBefore + " ] }, 1, 0 ] }";
-        String computedIsSensitiveScore = "{ '$cond': [ { '$eq': ['$isSensitive', true] }, 1, 0 ] }";
-
-        List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.project(
-            Projections.fields(
-                Projections.include("_id"),
-                Projections.computed("sensitiveScore",Document.parse(computedIsSensitiveScore)),
-                Projections.computed("isNewScore",Document.parse(computedLastSeenScore)),
-                Projections.computed("accessTypeScore",Document.parse(computedAccessTypeScore)),
-                Projections.computed("severityScore",Document.parse(computedSeverityScore))
-            )
-        ));
-
-        String computedRiskScore = "{ '$add': ['$sensitiveScore', '$isNewScore', '$accessTypeScore', '$severityScore']}";
-
-        pipeline.add(
-            Aggregates.project(
-                Projections.fields(
-                    Projections.include("_id"),
-                    Projections.computed("riskScore", Document.parse(computedRiskScore))
-                )
-            )
-        );
-        return pipeline;
+    public static Float getRiskScoreOfApiInfo(ApiInfo apiInfo){
+        float riskScore = 0;
+        if(apiInfo != null){
+            if(Context.now() - apiInfo.getLastSeen() <= Constants.ONE_MONTH_TIMESTAMP){
+                riskScore += 1;
+            }
+            if(apiInfo.getApiAccessTypes().contains(ApiAccessType.PUBLIC)){
+                riskScore += 1;
+            }
+        }
+        return riskScore;
     }
-
     @Override
     public String getCollName() {
         return "api_info";
