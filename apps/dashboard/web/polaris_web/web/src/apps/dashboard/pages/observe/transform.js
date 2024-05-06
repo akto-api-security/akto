@@ -437,47 +437,14 @@ const transform = {
         }
     },
 
-    getRiskScoreValue(severity){
-        if(severity >= 100){
-            return 2
-        }else if(severity >= 10){
-            return 1
-        }else if(severity > 0){
-            return 0.5
-        }else{
-            return 0
-        }
-    },
-
     isNewEndpoint(lastSeen){
         let lastMonthEpoch = func.timeNow() - (30 * 24 * 60 * 60);
         return lastSeen > lastMonthEpoch
     },
 
-    getRiskScoreForEndpoint(url){
-        let riskScore = 0 
-        riskScore += this.getRiskScoreValue(url.severityScore);
-
-        if(url.access_type === "Public"){
-            riskScore += 1
-        }
-
-        if(url.isSensitive){
-            riskScore += 1
-        }
-
-        if(this.isNewEndpoint(url.lastSeenTs)){
-            riskScore += 1
-        }
-
-        return riskScore
-    },
-
     prettifyEndpointsData(inventoryData){
         const hostNameMap = PersistStore.getState().hostNameMap
         const prettifyData = inventoryData.map((url) => {
-            const score = this.getRiskScoreForEndpoint(url)
-          
             return{
                 ...url,
                 last_seen: url.last_seen,
@@ -486,8 +453,7 @@ const transform = {
                 auth_type: url.auth_type,
                 endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} isNew={this.isNewEndpoint(url.lastSeenTs)} />,
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
-                riskScoreComp: <Badge status={this.getStatus(score)} size="small">{score.toString()}</Badge>,
-                riskScore: score,
+                riskScoreComp: <Badge status={this.getStatus(url.riskScore)} size="small">{url.riskScore.toString()}</Badge>,
                 isNew: this.isNewEndpoint(url.lastSeenTs),
                 sensitiveDataTags: url?.sensitiveTags.join(" "),
                 codeAnalysisEndpoint: false,
