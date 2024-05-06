@@ -65,13 +65,13 @@ public class SyncCron {
                             long newParams = SingleTypeInfoDao.instance.getMCollection().countDocuments(filter);
                             
                             if(newParams > 0){
-                                ActivitiesDao.instance.insertActivity("Parameters detected",newParams + " new parameters detected.");
+                                ActivitiesDao.instance.insertActivity("Parameters detected",newParams + " new parameters detected");
                             }
 
                              // synced new endpoints from APIinfo and then inserted into activities
                             long newEndpoints  = new InventoryAction().fetchRecentEndpoints(startTs,endTs).size();
                             if(newEndpoints > 0){
-                                ActivitiesDao.instance.insertActivity("Endpoints detected",newEndpoints + " new endpoints detected in dashboard");
+                                ActivitiesDao.instance.insertActivity("Endpoints detected",newEndpoints + " new endpoints detected");
                             }
 
                             // updated {Severity score field in APIinfo}
