@@ -51,6 +51,8 @@ function DropdownSearch(props) {
             }
             if(preSelected.length === totalItems){
                 setChecked(true)
+            }else{
+                setChecked(false)
             }
         }
     }, [deselectedOptions, value, preSelected])
@@ -140,7 +142,7 @@ function DropdownSearch(props) {
                     );
                 })
             }else{
-                deselectedOptions.map((opt) => opt.value)
+                deselectedOptions.map((opt) => valueArr.push(opt.value))
             }
             updateSelection(valueArr)
             setChecked(true)

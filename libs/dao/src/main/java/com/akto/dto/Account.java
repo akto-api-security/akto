@@ -6,8 +6,15 @@ public class Account {
     private boolean isDefault = false;
     private String timezone = "US/Pacific";
     public static final String INACTIVE_STR = "inactive";
+
+    public static final String HYBRID_SAAS_ACCOUNT = "hybridSaasAccount";
     private boolean inactive = false;
     private int statusChangeTimestamp = 0;
+
+    private boolean hybridSaasAccount;
+    private boolean mergingRunning = false;
+
+    private int mergingInitiateTs = 0;
     public Account() {}
 
     public Account(int id, String name) {
@@ -62,4 +69,29 @@ public class Account {
     public void setStatusChangeTimestamp(int statusChangeTimestamp) {
         this.statusChangeTimestamp = statusChangeTimestamp;
     }
+
+    public boolean getMergingRunning() {
+        return mergingRunning;
+    }
+
+    public void setMergingRunning(boolean mergingRunning) {
+        this.mergingRunning = mergingRunning;
+    }
+
+    public int getMergingInitiateTs() {
+        return mergingInitiateTs;
+    }
+
+    public void setMergingInitiateTs(int mergingInitiateTs) {
+        this.mergingInitiateTs = mergingInitiateTs;
+    }
+
+    public boolean getHybridSaasAccount() {
+        return hybridSaasAccount;
+    }
+
+    public void setHybridSaasAccount(boolean hybridSaasAccount) {
+        this.hybridSaasAccount = hybridSaasAccount;
+    }
+
 }
