@@ -140,6 +140,12 @@ prettifyEpoch(epoch) {
   },
   flattenObject(obj, prefix = '') {
     return obj && Object.keys(obj).reduce((acc, k) => {
+
+      // skip react objects
+      if(isValidElement(obj[k])){
+        return acc;
+      }
+
       const pre = prefix.length ? `${prefix}.` : '';
       if (
         typeof obj[k] === 'object' &&
@@ -1071,6 +1077,9 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 },
 
 convertToDisambiguateLabelObj(value, convertObj, maxAllowed){
+  if(!value || value.length  === 0 || !Array.isArray(value)){
+    return ""
+  }
   if (value.length > maxAllowed) {
       return `${value.slice(0, maxAllowed)
                      .map(val => convertObj ? convertObj[val] : val)
@@ -1366,6 +1375,36 @@ mapCollectionIdToHostName(apiCollections){
     }
     return hash;
   },
+  getTableTabsContent(tableTabs, countObj, setSelectedTab, selectedTab, currentCount){
+    const finalTabs = tableTabs.map((tab,ind) => {
+      const tabId = this.getKeyFromName(tab)
+      return {
+          content: tab,
+          badge: selectedTab === tabId ? currentCount.toString() : countObj[tabId].toString(),
+          onAction: () => { setSelectedTab(tabId) },
+          id: this.getKeyFromName(tabId),
+          index: ind 
+      }
+    })
+    return finalTabs
+  },
+  getTabsCount(tableTabs, data, initialCountArr = []){
+    const currentState = PersistStore(state => state.tableInitialState)
+    const baseUrl = window.location.href.split('#')[0]
+
+    let finalCountObj = {}
+    tableTabs.forEach((tab,ind) => {
+      const tabId = this.getKeyFromName(tab)
+      const tabKey = baseUrl + '#' + tabId
+      const count = currentState[tabKey] || data[tabId]?.length || initialCountArr[ind] || 0
+      finalCountObj[tabId] = count
+    })
+
+    return finalCountObj
+  },
+  getKeyFromName(key){
+    return key.replace(/[\s/]+/g, '_').toLowerCase();
+  }
 }
 
 export default func

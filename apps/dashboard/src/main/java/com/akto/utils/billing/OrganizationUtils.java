@@ -28,6 +28,8 @@ public class OrganizationUtils {
 
     private static final Logger logger = LoggerFactory.getLogger(OrganizationUtils.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(OrganizationUtils.class);
+    private static final OkHttpClient client = new OkHttpClient();
+
     public static boolean isOverage(HashMap<String, FeatureAccess> featureWiseAllowed) {
 
         if (featureWiseAllowed == null) {
@@ -120,7 +122,6 @@ public class OrganizationUtils {
                 .post(body)
                 .build();
 
-        OkHttpClient client = new OkHttpClient();
         Response response = null;
 
         try {
@@ -195,7 +196,6 @@ public class OrganizationUtils {
                 .post(body)
                 .build();
 
-        OkHttpClient client = new OkHttpClient();
         Response response = null;
                 
         try {
@@ -285,5 +285,10 @@ public class OrganizationUtils {
     public static boolean fetchTelemetryEnabled(BasicDBObject metadata) {
         BasicDBObject additionalMetaData = (BasicDBObject) metadata.getOrDefault("additionalMetaData", new BasicDBObject());
         return additionalMetaData.getString("ENABLE_TELEMETRY", "NA").equalsIgnoreCase("ENABLED");
+    }
+
+    public static boolean fetchTestTelemetryEnabled(BasicDBObject metadata) {
+        BasicDBObject additionalMetaData = (BasicDBObject) metadata.getOrDefault("additionalMetaData", new BasicDBObject());
+        return additionalMetaData.getString("ENABLE_TEST_TELEMETRY", "NA").equalsIgnoreCase("ENABLED");
     }
 }
