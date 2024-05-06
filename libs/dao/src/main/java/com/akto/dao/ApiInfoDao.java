@@ -66,6 +66,10 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] {ApiInfo.SEVERITY_SCORE }, false);
+                
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] {ApiInfo.RISK_SCORE }, false);
+
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] {ApiInfo.ID_API_COLLECTION_ID, ApiInfo.RISK_SCORE }, false);
     }
@@ -124,7 +128,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         return result;
     }
 
-    public static Float getRiskScoreOfApiInfo(ApiInfo apiInfo){
+    public static Float getRiskScoreOfApiInfo(ApiInfo apiInfo, boolean isSensitive, float riskScoreFromSeverityScore){
         float riskScore = 0;
         if(apiInfo != null){
             if(Context.now() - apiInfo.getLastSeen() <= Constants.ONE_MONTH_TIMESTAMP){
@@ -134,6 +138,10 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
                 riskScore += 1;
             }
         }
+        if(isSensitive){
+            riskScore += 1;
+        }
+        riskScore += riskScoreFromSeverityScore;
         return riskScore;
     }
     @Override
