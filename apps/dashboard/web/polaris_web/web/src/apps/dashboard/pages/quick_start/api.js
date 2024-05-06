@@ -128,6 +128,14 @@ const api = {
             method: 'post',
             data: {uploadId},
         })
+    },
+
+    fetchRuntimeHelmCommand() {
+        return request({
+            url: '/api/fetchRuntimeHelmCommand',
+            method: 'post',
+            data: {}
+        })
     }
 }
 

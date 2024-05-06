@@ -140,6 +140,12 @@ prettifyEpoch(epoch) {
   },
   flattenObject(obj, prefix = '') {
     return obj && Object.keys(obj).reduce((acc, k) => {
+
+      // skip react objects
+      if(isValidElement(obj[k])){
+        return acc;
+      }
+
       const pre = prefix.length ? `${prefix}.` : '';
       if (
         typeof obj[k] === 'object' &&
@@ -733,7 +739,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
 
           let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
           let authTypeTag = authType.replace(",", "");
-          let score = apiInfoMap[key] ? apiInfoMap[key]?.severityScore : 0
+          let riskScore = apiInfoMap[key] ? apiInfoMap[key]?.riskScore : 0
           let isSensitive = apiInfoMap[key] ? apiInfoMap[key]?.isSensitive : false
 
           ret[key] = {
@@ -765,7 +771,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
                 return apiGroupsMap[x]
               }) : [],
               isSensitive: isSensitive,
-              severityScore: score,
+              riskScore: riskScore
           }
 
       }
