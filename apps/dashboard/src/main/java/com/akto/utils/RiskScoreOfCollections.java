@@ -145,14 +145,10 @@ public class RiskScoreOfCollections {
         if(severityScoreMap != null){
             severityScoreMap.forEach((apiInfoKey, severityScore)->{
                 Bson filter = ApiInfoDao.getFilter(apiInfoKey);
-                Float riskScore = Utils.getRiskScoreFromSeverityScore(severityScore);
                 ApiInfo apiInfo = ApiInfoDao.instance.findOne(filter);
-                if(apiInfo != null){
-                    if(apiInfo.getIsSensitive()){
-                        riskScore += 1;
-                    }
-                    riskScore += ApiInfoDao.getRiskScoreOfApiInfo(apiInfo);
-                }
+                boolean isSensitive = apiInfo != null ? apiInfo.getIsSensitive() : false;
+                float riskScore = ApiInfoDao.getRiskScoreOfApiInfo(apiInfo, isSensitive, Utils.getRiskScoreFromSeverityScore(severityScore));
+            
                 Bson update = Updates.combine(
                     Updates.set(ApiInfo.SEVERITY_SCORE, severityScore),
                     Updates.set(ApiInfo.RISK_SCORE, riskScore)
@@ -193,15 +189,10 @@ public class RiskScoreOfCollections {
                     Filters.eq("_id.url", ((BasicDBObject) basicDBObject.get("_id")).getString("url"))
                 );
                 ApiInfo apiInfo = ApiInfoDao.instance.findOne(filterQSampleData);
-                float riskScore = 0;
-                if(apiInfo != null){
-                    riskScore += Utils.getRiskScoreFromSeverityScore(apiInfo.getSeverityScore());
+                if(apiInfo == null){
+                    continue;
                 }
-                
-                if(isSensitive){
-                    riskScore += 1;
-                }
-                riskScore += ApiInfoDao.getRiskScoreOfApiInfo(apiInfo);
+                float riskScore = ApiInfoDao.getRiskScoreOfApiInfo(apiInfo, isSensitive, Utils.getRiskScoreFromSeverityScore(apiInfo.getSeverityScore()));
                 Bson update = Updates.combine(
                     Updates.set(ApiInfo.IS_SENSITIVE, isSensitive),
                     Updates.set(ApiInfo.RISK_SCORE, riskScore)
