@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import transform from '../../transform';
 import apiChangesData from '../data/apiChanges';
 import Store from '../../../../store';
@@ -8,30 +8,53 @@ import tableFunc from '../../../../components/tables/transform';
 import api from '../../api';
 import GithubServerTable from '../../../../components/tables/GithubServerTable';
 import { IndexFiltersMode } from '@shopify/polaris';
-import useTable from '../../../../components/tables/TableContext';
 
 function ApiChangesTable(props) {
 
-  const { handleRowClick, tableLoading, startTimeStamp, endTimeStamp, newEndpoints, parametersCount } = props ;
-  const [selectedTab, setSelectedTab] = useState("new_endpoints") ;
+  const { handleRowClick, tableLoading, startTimeStamp, endTimeStamp, newEndpoints, parametersCount, tab } = props ;
+  const [selectedTab, setSelectedTab] = useState("endpoints") ;
   const [selected, setSelected] = useState(0) ;
   const dataTypeNames = Store(state => state.dataTypeNames);
   const apiCollectionMap = PersistStore(state => state.collectionsMap)
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState([])
 
-  const definedTableTabs = ['New endpoints', 'New params']
-  const initialCount = [0 , parametersCount]
+  useEffect(() => {
+    if (tab==1) {
+      setSelected(1);
+      setSelectedTab('param')
+    }
+    else if (tab==0) {
+      setSelected(0);
+      setSelectedTab('endpoints')
+    }
 
-  const { tabsInfo } = useTable()
-  const tableCountObj = func.getTabsCount(definedTableTabs, newEndpoints, initialCount)
-  const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
+  }, [tab]);
+
+
+
+  const tableTabs = [
+    {
+      content: 'New endpoints',
+      index: 0,
+      badge: transform.formatNumberWithCommas(newEndpoints.length),
+      onAction: ()=> {setSelectedTab('endpoints')},
+      id: 'endpoints',
+    },
+    {
+      content: 'New parameters',
+      index: 1,
+      badge: transform.formatNumberWithCommas(parametersCount),
+      onAction: ()=> {setSelectedTab('param')},
+      id: 'param',
+    },
+  ]
 
   const tableDataObj = apiChangesData.getData(selectedTab);
 
   const handleRow = (data) => {
       let headers = []
-      if(selectedTab.includes('param')){
+      if(selectedTab === 'param'){
         headers = transform.getParamHeaders() ;
       }else{
         headers = transform.getDetailsHeaders() ;
@@ -56,7 +79,7 @@ function ApiChangesTable(props) {
   })
 
   function disambiguateLabel(key, value) {
-    if(selectedTab.includes('param')){
+    if(selectedTab === 'param'){
       switch (key) {
           case "apiCollectionId": 
               return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 3)
@@ -77,7 +100,7 @@ function ApiChangesTable(props) {
   }
 
   const fetchTableData = async(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) =>{ 
-    if(selectedTab.includes('param')){
+    if(selectedTab === 'param'){
       setLoading(true);
         let ret = [];
         let total = 0;
@@ -109,12 +132,12 @@ function ApiChangesTable(props) {
       loading={loading || tableLoading}
       onRowClick={(data) => handleRow(data)}
       fetchData={fetchTableData}
-      filters={selectedTab.includes('param') ? paramFilters : filters}
-      hideQueryField={selectedTab.includes('param') ? true : false}
+      filters={selectedTab === 'param' ? paramFilters : filters}
+      hideQueryField={selectedTab === 'param' ? true : false}
       selected={selected}
       onSelect={handleSelectedTab}
       mode={IndexFiltersMode.Default}
-      headings={tableDataObj.headings}
+      headings={tableDataObj.headers}
       useNewRow={true}
       condensedHeight={true}
       tableTabs={tableTabs}

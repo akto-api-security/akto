@@ -41,6 +41,9 @@ public class ApiInfo {
     private float severityScore;
     private List<Integer> collectionIds;
 
+    public static final String RISK_SCORE = "riskScore";
+    private float riskScore;
+
     public enum AuthType {
         UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM
     }
@@ -166,6 +169,7 @@ public class ApiInfo {
         }
         this.isSensitive = that.isSensitive || this.isSensitive;
         this.severityScore = this.severityScore + that.severityScore;
+        this.riskScore = Math.max(this.riskScore, that.riskScore);
 
         for (String k: that.violations.keySet()) {
             if (this.violations.get(k) == null || that.violations.get(k) > this.violations.get(k)) {
@@ -232,6 +236,7 @@ public class ApiInfo {
                 ", accessTypes='" + getApiAccessTypes() + "'" +
                 ", isSensitive='" + getIsSensitive() + "'" +
                 ", severityScore='" + getSeverityScore() + "'" +
+                ", riskScore='" + getRiskScore() + "'" +
                 "}";
     }
 
@@ -308,6 +313,14 @@ public class ApiInfo {
 
     public void setCollectionIds(List<Integer> collectionIds) {
         this.collectionIds = collectionIds;
+    }
+
+    public float getRiskScore() {
+        return riskScore;
+    }
+
+    public void setRiskScore(float riskScore) {
+        this.riskScore = riskScore;
     }
 
 }
