@@ -147,7 +147,7 @@ public class RiskScoreOfCollections {
                 Bson filter = ApiInfoDao.getFilter(apiInfoKey);
                 ApiInfo apiInfo = ApiInfoDao.instance.findOne(filter);
                 boolean isSensitive = apiInfo != null ? apiInfo.getIsSensitive() : false;
-                float riskScore = ApiInfoDao.getRiskScoreOfApiInfo(apiInfo, isSensitive, Utils.getRiskScoreFromSeverityScore(severityScore));
+                float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, Utils.getRiskScoreValueFromSeverityScore(severityScore));
             
                 Bson update = Updates.combine(
                     Updates.set(ApiInfo.SEVERITY_SCORE, severityScore),
@@ -192,7 +192,7 @@ public class RiskScoreOfCollections {
                 if(apiInfo == null){
                     continue;
                 }
-                float riskScore = ApiInfoDao.getRiskScoreOfApiInfo(apiInfo, isSensitive, Utils.getRiskScoreFromSeverityScore(apiInfo.getSeverityScore()));
+                float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, Utils.getRiskScoreValueFromSeverityScore(apiInfo.getSeverityScore()));
                 Bson update = Updates.combine(
                     Updates.set(ApiInfo.IS_SENSITIVE, isSensitive),
                     Updates.set(ApiInfo.RISK_SCORE, riskScore)

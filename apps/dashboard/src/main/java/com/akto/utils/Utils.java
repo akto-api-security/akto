@@ -572,7 +572,7 @@ public class Utils {
         return riskScore;
     }
 
-    public static float getRiskScoreFromSeverityScore(float severityScore){
+    public static float getRiskScoreValueFromSeverityScore(float severityScore){
         if(severityScore >= 100){
             return 2;
         }else if(severityScore >= 10){

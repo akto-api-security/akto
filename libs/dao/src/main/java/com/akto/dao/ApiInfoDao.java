@@ -128,7 +128,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         return result;
     }
 
-    public static Float getRiskScoreOfApiInfo(ApiInfo apiInfo, boolean isSensitive, float riskScoreFromSeverityScore){
+    public static Float getRiskScore(ApiInfo apiInfo, boolean isSensitive, float riskScoreFromSeverityScore){
         float riskScore = 0;
         if(apiInfo != null){
             if(Context.now() - apiInfo.getLastSeen() <= Constants.ONE_MONTH_TIMESTAMP){
