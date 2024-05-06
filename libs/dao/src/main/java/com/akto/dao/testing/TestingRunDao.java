@@ -33,6 +33,9 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
 
         fieldNames = new String[]{"testingEndpoints.apiCollectionId", "endTimestamp"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
+
+        fieldNames = new String[]{TestingRun.STATE, TestingRun.SCHEDULE_TIMESTAMP, TestingRun.PICKED_UP_TIMESTAMP};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,true);
     }
     
     public List<Integer> getTestConfigIdsToDelete(List<ObjectId> testingRunIds){

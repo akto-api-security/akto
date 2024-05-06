@@ -67,7 +67,9 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
         fieldNames = new String[] { TestingRunIssues.TEST_RUN_ISSUES_STATUS, "collectionIds", "_id.testErrorSource",
                 TestingRunIssues.CREATION_TIME };
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
-    
+
+        fieldNames = new String[] {TestingRunIssues.TEST_RUN_ISSUES_STATUS, "_id.testSubCategory", "_id.testErrorSource"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
     }
 
     public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(){
