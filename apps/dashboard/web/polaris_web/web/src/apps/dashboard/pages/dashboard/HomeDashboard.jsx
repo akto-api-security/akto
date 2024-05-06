@@ -132,7 +132,7 @@ function HomeDashboard() {
             <Card key="subcategoryTrend">
                 <VerticalStack gap={5}>
                     <Text variant="bodyLg" fontWeight="semibold">Issues by category</Text>
-                    <ChartypeComponent data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'200px'}/>
+                    <ChartypeComponent navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'200px'}/>
                 </VerticalStack>
             </Card>
 
@@ -168,8 +168,8 @@ function HomeDashboard() {
             <VerticalStack gap={5}>
                 <Text variant="bodyLg" fontWeight="semibold">Sensitive Data</Text>
                 <HorizontalGrid gap={5} columns={2}>
-                    <ChartypeComponent navurl={"/dashboard/observe/sensitive/"} data={sensitiveData.request} title={"Request"} isNormal={true} boxHeight={'100px'}/>
-                    <ChartypeComponent navurl={"/dashboard/observe/sensitive/"} data={sensitiveData.response} title={"Response"} isNormal={true} boxHeight={'100px'}/>
+                    <ChartypeComponent navUrl={"/dashboard/observe/sensitive/"} data={sensitiveData.request} title={"Request"} isNormal={true} boxHeight={'100px'}/>
+                    <ChartypeComponent navUrl={"/dashboard/observe/sensitive/"} data={sensitiveData.response} title={"Response"} isNormal={true} boxHeight={'100px'}/>
                 </HorizontalGrid>
             </VerticalStack>
         </Card>
@@ -246,7 +246,7 @@ function HomeDashboard() {
             <div style={{flex: 3}}>
                 <VerticalStack gap={5}>
                     <InitialSteps initialSteps={initialSteps}/>
-                    <ActivityTracker latestActivity={recentActivities} onLoadMore={handleLoadMore} showLoadMore={checkLoadMore}/>
+                    <ActivityTracker collections={collectionsMap} latestActivity={recentActivities} onLoadMore={handleLoadMore} showLoadMore={checkLoadMore}/>
                     <CoverageCard coverageObj={coverageObj} collections={allCollections} collectionsMap={collectionsMap}/>
                     <Pipeline riskScoreMap={riskScoreObj} collections={allCollections} collectionsMap={collectionsMap}/> 
                 </VerticalStack>
