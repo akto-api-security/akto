@@ -3,21 +3,21 @@ import HighchartsReact from "highcharts-react-official"
 import Highcharts from "highcharts"
 import { useRef } from "react";
 import { useNavigate } from "react-router-dom"
+import PersistStore from '../../../main/PersistStore';
 
 
 function DonutChart({data, title, size,type,navurl}) {
     const chartComponentRef = useRef(null)
     const navigate = useNavigate()
+    const filtersMap = PersistStore(state => state.filtersMap)
+    const setFiltersMap = PersistStore(state => state.setFiltersMap)
 
 
     let seriesData = []
     if(data && Object.keys(data).length > 0){
         seriesData = Object.keys(data).map((ele)=>{
-            return{
-                name: ele,
-                y: data[ele].text,
-                color: data[ele].color,
-            }
+
+            return {...data[ele], y: data[ele].text, name: ele }
         })
     }
 
@@ -63,8 +63,29 @@ function DonutChart({data, title, size,type,navurl}) {
 
                         click: (event) => {
                             const { point } = event;
-                            if(navurl && navurl !=''){
+                            if(navurl && navurl ==='/dashboard/observe/sensitive/'){
                                 navigate(`${navurl}${point.name}?filter=${type.toLowerCase()}`);
+                            }
+                            else if( navurl && navurl==='/dashboard/issues/'){
+
+                                const filterurl = '/dashboard/issues'
+
+                                let updatedFiltersMap = { ...filtersMap };
+                                updatedFiltersMap[filterurl] = {}
+                                  
+                                const filterobj = [{
+
+                                    key: "issueCategory",
+                                    label: point.filterkey,
+                                    value: [point.filterkey]
+
+                                }
+                               ]
+
+                                updatedFiltersMap[filterurl]['filters'] = filterobj;
+                                updatedFiltersMap[filterurl]['sort'] = [];
+                                setFiltersMap(updatedFiltersMap)
+                                navigate(`${navurl}`);
                             }
                         }
                     }
