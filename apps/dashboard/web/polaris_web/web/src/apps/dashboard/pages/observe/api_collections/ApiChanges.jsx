@@ -29,9 +29,6 @@ function ApiChanges() {
     const [tableHeaders,setTableHeaders] = useState([])
 
     const location = useLocation()
-
-
-
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
     
