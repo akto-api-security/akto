@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom"
 import PersistStore from '../../../main/PersistStore';
 
 
-function DonutChart({data, title, size,type,navurl}) {
+function DonutChart({data, title, size,type,navUrl}) {
     const chartComponentRef = useRef(null)
     const navigate = useNavigate()
     const filtersMap = PersistStore(state => state.filtersMap)
@@ -63,29 +63,26 @@ function DonutChart({data, title, size,type,navurl}) {
 
                         click: (event) => {
                             const { point } = event;
-                            if(navurl && navurl ==='/dashboard/observe/sensitive/'){
-                                navigate(`${navurl}${point.name}?filter=${type.toLowerCase()}`);
+                            if(navUrl && navUrl ==='/dashboard/observe/sensitive/'){
+                                navigate(`${navUrl}${point.name}`);
                             }
-                            else if( navurl && navurl==='/dashboard/issues/'){
-
-                                const filterurl = '/dashboard/issues'
+                            else if( navUrl && navUrl==='/dashboard/issues/'){
+                                const filterUrl = '/dashboard/issues'
 
                                 let updatedFiltersMap = { ...filtersMap };
-                                updatedFiltersMap[filterurl] = {}
+                                updatedFiltersMap[filterUrl] = {}
                                   
-                                const filterobj = [{
-
+                                const filterObj = [{
                                     key: "issueCategory",
-                                    label: point.filterkey,
-                                    value: [point.filterkey]
-
+                                    label: point.filterKey,
+                                    value: [point.filterKey]
                                 }
                                ]
 
-                                updatedFiltersMap[filterurl]['filters'] = filterobj;
-                                updatedFiltersMap[filterurl]['sort'] = [];
+                                updatedFiltersMap[filterUrl]['filters'] = filterObj;
+                                updatedFiltersMap[filterUrl]['sort'] = [];
                                 setFiltersMap(updatedFiltersMap)
-                                navigate(`${navurl}`);
+                                navigate(`${navUrl}`);
                             }
                         }
                     }
