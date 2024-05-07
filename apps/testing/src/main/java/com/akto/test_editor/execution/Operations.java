@@ -121,6 +121,9 @@ public class Operations {
     }
 
     public static ExecutorSingleOperationResp deleteGraphqlField(RawApi rawApi, String key) {
+        if (StringUtils.isEmpty(key)) {
+            return new ExecutorSingleOperationResp(true,"");
+        }
         String payload = rawApi.getRequest().getBody();
         String modifiedPayload = GraphQLUtils.getUtils().deleteGraphqlField(payload, key);
         rawApi.getRequest().setBody(modifiedPayload);
@@ -137,7 +140,20 @@ public class Operations {
         return new ExecutorSingleOperationResp(true,"");
     }
 
+    public static ExecutorSingleOperationResp addUniqueGraphqlField(RawApi rawApi, String key, String value) {
+        if (StringUtils.isEmpty(key) || StringUtils.isEmpty(value)) {
+            return new ExecutorSingleOperationResp(true,"");
+        }
+        String payload = rawApi.getRequest().getBody();
+        String modifiedPayload = GraphQLUtils.getUtils().addUniqueGraphqlField(payload, key, value);
+        rawApi.getRequest().setBody(modifiedPayload);
+        return new ExecutorSingleOperationResp(true,"");
+    }
+
     public static ExecutorSingleOperationResp modifyGraphqlField (RawApi rawApi, String key, String value) {
+        if (StringUtils.isEmpty(key) || StringUtils.isEmpty(value)) {
+            return new ExecutorSingleOperationResp(true,"");
+        }
         String payload = rawApi.getRequest().getBody();
         String modifiedPayload = GraphQLUtils.getUtils().modifyGraphqlField(payload, key, value);
         rawApi.getRequest().setBody(modifiedPayload);

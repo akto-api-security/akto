@@ -129,18 +129,22 @@ public class GraphQLUtils {//Singleton class
     }
 
     public String deleteGraphqlField(String payload, String field) {
-        return editGraphqlField(payload, field, "", "DELETE");
+        return editGraphqlField(payload, field, "", "DELETE", false);
     }
 
     public String addGraphqlField(String payload, String field, String value) {
-        return editGraphqlField(payload, field, value, "ADD");
+        return editGraphqlField(payload, field, value, "ADD", false);
+    }
+
+    public String addUniqueGraphqlField(String payload, String field, String value) {
+        return editGraphqlField(payload, field, value, "ADD", true);
     }
 
     public String modifyGraphqlField(String payload, String field, String value) {
-        return editGraphqlField(payload, field, value, "MODIFY");
+        return editGraphqlField(payload, field, value, "MODIFY", false);
     }
 
-    private String editGraphqlField(String payload, String field, String value, String type) {
+    private String editGraphqlField(String payload, String field, String value, String type, boolean unique) {
         String tempVariable = "__tempDummyVariableToReplace";
         Object payloadObj = JSON.parse(payload);
         Object[] payloadList;
@@ -158,18 +162,31 @@ public class GraphQLUtils {//Singleton class
                 public TraversalControl visitInlineFragment(InlineFragment node, TraverserContext<Node> context) {
                     switch (type) {
                         case "ADD":
-                            if (field.equals(node.getTypeCondition().getName())) {
-                                Field field1 = Field.newField(tempVariable).build();
-                                if (node.getSelectionSet() != null) {
-                                    SelectionSet newSelectionSet = node.getSelectionSet().transform((builder -> {
-                                        builder.selection(field1);
-                                    }));
-                                    Node newNode = node.transform((builder -> {
-                                        builder.selectionSet(newSelectionSet);
-                                    }));
-                                    return TreeTransformerUtil.changeNode(context, newNode);
-                                } else {
-                                    return super.visitInlineFragment(node, context);
+                            boolean found = false;
+                            if (unique) {
+                                List<Selection> selectionList = node.getSelectionSet().getSelections();
+                                for (Selection selection : selectionList) {
+                                    if (selection instanceof Field) {
+                                        if (value.equals(((Field) selection).getName())) {
+                                            found = true;
+                                        }
+                                    }
+                                }
+                            }
+                            if (!found) {
+                                if (field.equals(node.getTypeCondition().getName())) {
+                                    Field field1 = Field.newField(tempVariable).build();
+                                    if (node.getSelectionSet() != null) {
+                                        SelectionSet newSelectionSet = node.getSelectionSet().transform((builder -> {
+                                            builder.selection(field1);
+                                        }));
+                                        Node newNode = node.transform((builder -> {
+                                            builder.selectionSet(newSelectionSet);
+                                        }));
+                                        return TreeTransformerUtil.changeNode(context, newNode);
+                                    } else {
+                                        return super.visitInlineFragment(node, context);
+                                    }
                                 }
                             }
                     }
@@ -186,30 +203,32 @@ public class GraphQLUtils {//Singleton class
                             case "DELETE":
                                 return TreeTransformerUtil.changeNode(context, parser.parseValue(tempVariable));
                             case "ADD":
-//                                List<Selection> selectionList = node.getSelectionSet().getSelections();
-//                                boolean found = false;
-//                                for (Selection selection : selectionList) {
-//                                    if (selection instanceof Field) {
-//                                        if (value.equals(((Field) selection).getName())) {
-//                                            found = true;
-//                                        }
-//                                    }
-//                                }
-//                                if (!found) {
-                                Field field1 = Field.newField(tempVariable).build();
-                                if (node.getSelectionSet() != null) {
-                                    SelectionSet newSelectionSet = node.getSelectionSet().transform((builder -> {
-                                        builder.selection(field1);
-                                    }));
-                                    Node newNode = node.transform((builder -> {
-                                        builder.selectionSet(newSelectionSet);
-                                    }));
-                                    return TreeTransformerUtil.changeNode(context, newNode);
-                                } else {
-                                    return super.visitField(node, context);
+                                boolean found = false;
+                                if (unique) {
+                                    List<Selection> selectionList = node.getSelectionSet().getSelections();
+                                    for (Selection selection : selectionList) {
+                                        if (selection instanceof Field) {
+                                            if (value.equals(((Field) selection).getName())) {
+                                                found = true;
+                                            }
+                                        }
+                                    }
                                 }
-//                                }
-//                                return super.visitField(node, context);
+                                if (!found) {
+                                    Field field1 = Field.newField(tempVariable).build();
+                                    if (node.getSelectionSet() != null) {
+                                        SelectionSet newSelectionSet = node.getSelectionSet().transform((builder -> {
+                                            builder.selection(field1);
+                                        }));
+                                        Node newNode = node.transform((builder -> {
+                                            builder.selectionSet(newSelectionSet);
+                                        }));
+                                        return TreeTransformerUtil.changeNode(context, newNode);
+                                    } else {
+                                        return super.visitField(node, context);
+                                    }
+                                }
+                                return super.visitField(node, context);
                             default:
                                 return super.visitField(node, context);
                         }
@@ -234,7 +253,7 @@ public class GraphQLUtils {//Singleton class
 
     public static void main(String[] args) {
         String query = "[{\"operationName\":\"GetPublishedFolders\",\"variables\":{\"first\":4,\"after\":null,\"parentFolderId\":\"b2b54d60f1b145cba2ad84ee19501799\",\"source\":\"ACTIVE\",\"sortOrder\":\"DESC\",\"sortType\":\"RECENT\",\"filters\":[{\"type\":\"CREATED_BY_ME\"}],\"timeRange\":null},\"query\":\"query GetPublishedFolders($first: Int!, $after: String, $source: FolderSource!, $sourceValue: String, $sortType: LoomsSortType!, $sortOrder: LoomsSortOrder!, $parentFolderId: String, $workspaceId: ID, $filters: [LoomsCollectionFilter!], $timeRange: TimeRange) {\\n  getPublishedFolders {\\n    __typename\\n    ... on GetPublishedFoldersPayload {\\n      folders(\\n        first: $first\\n        after: $after\\n        source: $source\\n        sourceValue: $sourceValue\\n        sortType: $sortType\\n        sortOrder: $sortOrder\\n        parentFolderId: $parentFolderId\\n        workspaceId: $workspaceId\\n        filters: $filters\\n        timeRange: $timeRange\\n      ) {\\n        totalCount\\n        edges {\\n          cursor\\n          node {\\n            ...FolderFragment\\n            __typename\\n          }\\n          __typename\\n        }\\n        pageInfo {\\n          endCursor\\n          hasNextPage\\n          __typename\\n        }\\n        __typename\\n      }\\n      __typename\\n    }\\n  }\\n}\\n\\nfragment FolderFragment on RegularUserFolder {\\n  id\\n  contentLastUpdated\\n  isArchived\\n  currentUserCanEdit\\n  name\\n  organization_id\\n  owner_id\\n  shared\\n  special_id\\n  visibility\\n  totalNestedVideos\\n  isTopLevelFolder\\n  hasSubFolders\\n  personalizedVideo {\\n    id\\n    __typename\\n  }\\n  space {\\n    id\\n    name\\n    is_primary\\n    __typename\\n  }\\n  owner {\\n    email\\n    first_name\\n    last_name\\n    id\\n    avatars {\\n      name\\n      thumb\\n      __typename\\n    }\\n    __typename\\n  }\\n  organization {\\n    id\\n    name\\n    __typename\\n  }\\n  parent_folder {\\n    id\\n    name\\n    special_id\\n    owner_id\\n    owner {\\n      email\\n      first_name\\n      last_name\\n      __typename\\n    }\\n    __typename\\n  }\\n  __typename\\n}\\n\"},{\"operationName\":\"GetPublishedFolders\",\"variables\":{\"first\":4,\"after\":null,\"source\":\"ACTIVE\",\"sortOrder\":\"DESC\",\"sortType\":\"RECENT\",\"filters\":[{\"type\":\"CREATED_BY_ME\"}],\"timeRange\":null},\"query\":\"query GetPublishedFolders($first: Int!, $after: String, $source: FolderSource!, $sourceValue: String, $sortType: LoomsSortType!, $sortOrder: LoomsSortOrder!, $parentFolderId: String, $workspaceId: ID, $filters: [LoomsCollectionFilter!], $timeRange: TimeRange) {\\n  getPublishedFolders {\\n    __typename\\n    ... on GetPublishedFoldersPayload {\\n      folders(\\n        first: $first\\n        after: $after\\n        source: $source\\n        sourceValue: $sourceValue\\n        sortType: $sortType\\n        sortOrder: $sortOrder\\n        parentFolderId: $parentFolderId\\n        workspaceId: $workspaceId\\n        filters: $filters\\n        timeRange: $timeRange\\n      ) {\\n        totalCount\\n        edges {\\n          cursor\\n          node {\\n            ...FolderFragment\\n            __typename\\n          }\\n          __typename\\n        }\\n        pageInfo {\\n          endCursor\\n          hasNextPage\\n          __typename\\n        }\\n        __typename\\n      }\\n      __typename\\n    }\\n  }\\n}\\n\\nfragment FolderFragment on RegularUserFolder {\\n  id\\n  contentLastUpdated\\n  isArchived\\n  currentUserCanEdit\\n  name\\n  organization_id\\n  owner_id\\n  shared\\n  special_id\\n  visibility\\n  totalNestedVideos\\n  isTopLevelFolder\\n  hasSubFolders\\n  personalizedVideo {\\n    id\\n    __typename\\n  }\\n  space {\\n    id\\n    name\\n    is_primary\\n    __typename\\n  }\\n  owner {\\n    email\\n    first_name\\n    last_name\\n    id\\n    avatars {\\n      name\\n      thumb\\n      __typename\\n    }\\n    __typename\\n  }\\n  organization {\\n    id\\n    name\\n    __typename\\n  }\\n  parent_folder {\\n    id\\n    name\\n    special_id\\n    owner_id\\n    owner {\\n      email\\n      first_name\\n      last_name\\n      __typename\\n    }\\n    __typename\\n  }\\n  __typename\\n}\\n\"},{\"operationName\":\"GetUserByIdWithProfile\",\"variables\":{\"userId\":\"28411178\"},\"query\":\"query GetUserByIdWithProfile($userId: ID!) {\\n  user: getUserById(userId: $userId) {\\n    __typename\\n    ... on RegularUserPayload {\\n      user {\\n        id\\n        email\\n        first_name\\n        last_name\\n        avatars {\\n          thumb\\n          large\\n          __typename\\n        }\\n        profile {\\n          profileUrl\\n          profileVideoCount\\n          communityVideoCount\\n          profileInfo {\\n            role\\n            location\\n            __typename\\n          }\\n          __typename\\n        }\\n        __typename\\n      }\\n      __typename\\n    }\\n    ... on CommunityUserPayload {\\n      user {\\n        id\\n        first_name\\n        last_name\\n        avatars {\\n          thumb\\n          large\\n          __typename\\n        }\\n        profile {\\n          profileUrl\\n          communityVideoCount\\n          profileInfo {\\n            role\\n            location\\n            __typename\\n          }\\n          __typename\\n        }\\n        __typename\\n      }\\n      __typename\\n    }\\n  }\\n}\\n\"}]";
-        GraphQLUtils.getUtils().editGraphqlField(query, "GetPublishedFoldersPayload", "email", "ADD");
+        GraphQLUtils.getUtils().editGraphqlField(query, "GetPublishedFoldersPayload", "email", "ADD", false);
     }
 
     private void updateResponseParamList(HttpResponseParams responseParams, List<HttpResponseParams> responseParamsList, String path, Map mapOfRequestPayload) {
