@@ -142,41 +142,75 @@ public class GraphQLUtils {//Singleton class
 
     private String editGraphqlField(String payload, String field, String value, String type) {
         String tempVariable = "__tempDummyVariableToReplace";
-        Object[] payloadList = (Object []) JSON.parse(payload);
+        Object payloadObj = JSON.parse(payload);
+        Object[] payloadList;
+        if (payloadObj instanceof Object[]) {
+            payloadList = (Object []) payloadObj;
+        } else {
+            payloadList = new Object[]{payloadObj};
+        }
         for (Object operationObj: payloadList) {
             Map<String, Object> operation = (Map) operationObj;
             String query = (String) operation.get("query");
             Node result = new AstTransformer().transform(parser.parseDocument(query), new NodeVisitorStub() {
 
                 @Override
+                public TraversalControl visitInlineFragment(InlineFragment node, TraverserContext<Node> context) {
+                    switch (type) {
+                        case "ADD":
+                            if (field.equals( node.getTypeCondition().getName())) {
+
+                            }
+                            Field field1 = Field.newField(tempVariable).build();
+                            if (node.getSelectionSet() != null) {
+                                SelectionSet newSelectionSet =  node.getSelectionSet().transform((builder -> {
+                                    builder.selection(field1);
+                                }));
+                                Node newNode = node.transform((builder -> {
+                                    builder.selectionSet(newSelectionSet);
+                                }));
+                                return TreeTransformerUtil.changeNode(context, newNode);
+                            } else {
+                                return super.visitInlineFragment(node, context);
+                            }
+                    }
+                    return super.visitInlineFragment(node, context);
+                }
+
+                @Override
                 public TraversalControl visitField(Field node, TraverserContext<Node> context) {
                     String nodeName = node.getName();
-                    if (nodeName != null && nodeName.equalsIgnoreCase(field)) {
+                    String alias = node.getAlias();
+                    if (nodeName != null && (nodeName.equalsIgnoreCase(field) || field.equals(alias))) {
                         switch (type) {
                             case "MODIFY":
                             case "DELETE":
                                 return TreeTransformerUtil.changeNode(context, parser.parseValue(tempVariable));
                             case "ADD":
-                                List<Selection> selectionList = node.getSelectionSet().getSelections();
-                                boolean found = false;
-                                for (Selection selection : selectionList) {
-                                    if (selection instanceof Field) {
-                                        if (value.equals(((Field) selection).getName())) {
-                                            found = true;
-                                        }
+//                                List<Selection> selectionList = node.getSelectionSet().getSelections();
+//                                boolean found = false;
+//                                for (Selection selection : selectionList) {
+//                                    if (selection instanceof Field) {
+//                                        if (value.equals(((Field) selection).getName())) {
+//                                            found = true;
+//                                        }
+//                                    }
+//                                }
+//                                if (!found) {
+                                    Field field1 = Field.newField(tempVariable).build();
+                                    if (node.getSelectionSet() != null) {
+                                        SelectionSet newSelectionSet =  node.getSelectionSet().transform((builder -> {
+                                            builder.selection(field1);
+                                        }));
+                                        Node newNode = node.transform((builder -> {
+                                            builder.selectionSet(newSelectionSet);
+                                        }));
+                                        return TreeTransformerUtil.changeNode(context, newNode);
+                                    } else {
+                                        return super.visitField(node, context);
                                     }
-                                }
-                                if (!found) {
-                                    Field field = Field.newField(tempVariable).build();
-                                    SelectionSet newSelectionSet =  node.getSelectionSet().transform((builder -> {
-                                        builder.selection(field);
-                                    }));
-                                    Node newNode = node.transform((builder -> {
-                                        builder.selectionSet(newSelectionSet);
-                                    }));
-                                    return TreeTransformerUtil.changeNode(context, newNode);
-                                }
-                                return super.visitField(node, context);
+//                                }
+//                                return super.visitField(node, context);
                             default:
                                 return super.visitField(node, context);
                         }
@@ -186,16 +220,22 @@ public class GraphQLUtils {//Singleton class
                 }
             });
             String modifiedQuery = AstPrinter.printAst(result);
-            modifiedQuery = modifiedQuery.replace(tempVariable, value);
+            if (modifiedQuery.contains(tempVariable)) {
+                modifiedQuery = modifiedQuery.replace(tempVariable, value);
+            }
             operation.replace("query", modifiedQuery);
         }
-        return gson.toJson(payloadList);
+        if (payloadObj instanceof Object[]) {
+            return gson.toJson(payloadList);
+        } else {
+            return gson.toJson(payloadList[0]);
+        }
     }
 
 
     public static void main(String[] args) {
         String query = "[{\"operationName\":\"GetPublishedFolders\",\"variables\":{\"first\":4,\"after\":null,\"parentFolderId\":\"b2b54d60f1b145cba2ad84ee19501799\",\"source\":\"ACTIVE\",\"sortOrder\":\"DESC\",\"sortType\":\"RECENT\",\"filters\":[{\"type\":\"CREATED_BY_ME\"}],\"timeRange\":null},\"query\":\"query GetPublishedFolders($first: Int!, $after: String, $source: FolderSource!, $sourceValue: String, $sortType: LoomsSortType!, $sortOrder: LoomsSortOrder!, $parentFolderId: String, $workspaceId: ID, $filters: [LoomsCollectionFilter!], $timeRange: TimeRange) {\\n  getPublishedFolders {\\n    __typename\\n    ... on GetPublishedFoldersPayload {\\n      folders(\\n        first: $first\\n        after: $after\\n        source: $source\\n        sourceValue: $sourceValue\\n        sortType: $sortType\\n        sortOrder: $sortOrder\\n        parentFolderId: $parentFolderId\\n        workspaceId: $workspaceId\\n        filters: $filters\\n        timeRange: $timeRange\\n      ) {\\n        totalCount\\n        edges {\\n          cursor\\n          node {\\n            ...FolderFragment\\n            __typename\\n          }\\n          __typename\\n        }\\n        pageInfo {\\n          endCursor\\n          hasNextPage\\n          __typename\\n        }\\n        __typename\\n      }\\n      __typename\\n    }\\n  }\\n}\\n\\nfragment FolderFragment on RegularUserFolder {\\n  id\\n  contentLastUpdated\\n  isArchived\\n  currentUserCanEdit\\n  name\\n  organization_id\\n  owner_id\\n  shared\\n  special_id\\n  visibility\\n  totalNestedVideos\\n  isTopLevelFolder\\n  hasSubFolders\\n  personalizedVideo {\\n    id\\n    __typename\\n  }\\n  space {\\n    id\\n    name\\n    is_primary\\n    __typename\\n  }\\n  owner {\\n    email\\n    first_name\\n    last_name\\n    id\\n    avatars {\\n      name\\n      thumb\\n      __typename\\n    }\\n    __typename\\n  }\\n  organization {\\n    id\\n    name\\n    __typename\\n  }\\n  parent_folder {\\n    id\\n    name\\n    special_id\\n    owner_id\\n    owner {\\n      email\\n      first_name\\n      last_name\\n      __typename\\n    }\\n    __typename\\n  }\\n  __typename\\n}\\n\"},{\"operationName\":\"GetPublishedFolders\",\"variables\":{\"first\":4,\"after\":null,\"source\":\"ACTIVE\",\"sortOrder\":\"DESC\",\"sortType\":\"RECENT\",\"filters\":[{\"type\":\"CREATED_BY_ME\"}],\"timeRange\":null},\"query\":\"query GetPublishedFolders($first: Int!, $after: String, $source: FolderSource!, $sourceValue: String, $sortType: LoomsSortType!, $sortOrder: LoomsSortOrder!, $parentFolderId: String, $workspaceId: ID, $filters: [LoomsCollectionFilter!], $timeRange: TimeRange) {\\n  getPublishedFolders {\\n    __typename\\n    ... on GetPublishedFoldersPayload {\\n      folders(\\n        first: $first\\n        after: $after\\n        source: $source\\n        sourceValue: $sourceValue\\n        sortType: $sortType\\n        sortOrder: $sortOrder\\n        parentFolderId: $parentFolderId\\n        workspaceId: $workspaceId\\n        filters: $filters\\n        timeRange: $timeRange\\n      ) {\\n        totalCount\\n        edges {\\n          cursor\\n          node {\\n            ...FolderFragment\\n            __typename\\n          }\\n          __typename\\n        }\\n        pageInfo {\\n          endCursor\\n          hasNextPage\\n          __typename\\n        }\\n        __typename\\n      }\\n      __typename\\n    }\\n  }\\n}\\n\\nfragment FolderFragment on RegularUserFolder {\\n  id\\n  contentLastUpdated\\n  isArchived\\n  currentUserCanEdit\\n  name\\n  organization_id\\n  owner_id\\n  shared\\n  special_id\\n  visibility\\n  totalNestedVideos\\n  isTopLevelFolder\\n  hasSubFolders\\n  personalizedVideo {\\n    id\\n    __typename\\n  }\\n  space {\\n    id\\n    name\\n    is_primary\\n    __typename\\n  }\\n  owner {\\n    email\\n    first_name\\n    last_name\\n    id\\n    avatars {\\n      name\\n      thumb\\n      __typename\\n    }\\n    __typename\\n  }\\n  organization {\\n    id\\n    name\\n    __typename\\n  }\\n  parent_folder {\\n    id\\n    name\\n    special_id\\n    owner_id\\n    owner {\\n      email\\n      first_name\\n      last_name\\n      __typename\\n    }\\n    __typename\\n  }\\n  __typename\\n}\\n\"},{\"operationName\":\"GetUserByIdWithProfile\",\"variables\":{\"userId\":\"28411178\"},\"query\":\"query GetUserByIdWithProfile($userId: ID!) {\\n  user: getUserById(userId: $userId) {\\n    __typename\\n    ... on RegularUserPayload {\\n      user {\\n        id\\n        email\\n        first_name\\n        last_name\\n        avatars {\\n          thumb\\n          large\\n          __typename\\n        }\\n        profile {\\n          profileUrl\\n          profileVideoCount\\n          communityVideoCount\\n          profileInfo {\\n            role\\n            location\\n            __typename\\n          }\\n          __typename\\n        }\\n        __typename\\n      }\\n      __typename\\n    }\\n    ... on CommunityUserPayload {\\n      user {\\n        id\\n        first_name\\n        last_name\\n        avatars {\\n          thumb\\n          large\\n          __typename\\n        }\\n        profile {\\n          profileUrl\\n          communityVideoCount\\n          profileInfo {\\n            role\\n            location\\n            __typename\\n          }\\n          __typename\\n        }\\n        __typename\\n      }\\n      __typename\\n    }\\n  }\\n}\\n\"}]";
-        GraphQLUtils.getUtils().editGraphqlField(query, "avatars", "email", "ADD");
+        GraphQLUtils.getUtils().editGraphqlField(query, "GetPublishedFoldersPayload", "email", "ADD");
     }
 
     private void updateResponseParamList(HttpResponseParams responseParams, List<HttpResponseParams> responseParamsList, String path, Map mapOfRequestPayload) {
