@@ -598,6 +598,8 @@ public class Executor {
                 return Operations.deleteGraphqlField(rawApi, key == null ? "": key.toString());
             case "add_graphql_field":
                 return Operations.addGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
+            case "add_unique_graphql_field":
+                return Operations.addUniqueGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
             case "modify_graphql_field":
                 return Operations.modifyGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
             case "delete_body_param":
