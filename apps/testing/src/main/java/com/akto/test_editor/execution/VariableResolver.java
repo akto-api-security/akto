@@ -665,7 +665,7 @@ public class VariableResolver {
         }
         for (String s : wordListSet) {
             wordListVal.add(s);
-            if (wordListVal.size() >= 10) {
+            if (wordListVal.size() >= 10 && !"terminal_keys".equals(location)) {
                 break;
             }
         }
