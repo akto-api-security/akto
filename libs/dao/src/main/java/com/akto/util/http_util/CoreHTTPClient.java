@@ -8,14 +8,24 @@ import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URL;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
+
+import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.akto.util.Util;
+
+import inet.ipaddr.IPAddressString;
 import okhttp3.Authenticator;
 import okhttp3.Credentials;
 
@@ -30,20 +40,48 @@ public class CoreHTTPClient {
     private static final Logger logger = LoggerFactory.getLogger(CoreHTTPClient.class);
 
     /*
-     * The implementation is based on proxy API and not jvm system properties 
+     * The implementation is based on proxy API and not jvm system properties
      * (Ref: https://docs.oracle.com/javase/8/docs/technotes/guides/net/proxies.html) ,
      * which would have been much cleaner.
      * This is due to the implementation of the net.authentication in the okHttp library.
-     * Ref: https://github.com/square/okhttp/issues/4248 
+     * Ref: https://github.com/square/okhttp/issues/4248
      */
 
+    public static final TrustManager[] trustAllCerts = new TrustManager[] {
+            new X509TrustManager() {
+                @Override
+                public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType)
+                        throws CertificateException {
+                }
+
+                @Override
+                public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType)
+                        throws CertificateException {
+                }
+
+                @Override
+                public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                    return new java.security.cert.X509Certificate[] {};
+                }
+            }
+    };
+    public static final SSLContext trustAllSslContext;
+    static {
+        try {
+            trustAllSslContext = SSLContext.getInstance("SSL");
+            trustAllSslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+        } catch (NoSuchAlgorithmException | KeyManagementException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    public static final SSLSocketFactory trustAllSslSocketFactory = trustAllSslContext.getSocketFactory();
     static {
         initialize();
     }
 
     private static void initialize() {
 
-        String proxyURI = System.getenv("PROXY_URI");
+        String proxyURI = Util.getEnvironmentVariable("PROXY_URI");
         if (proxyURI == null || proxyURI.isEmpty()) {
             return;
         }
@@ -75,7 +113,7 @@ public class CoreHTTPClient {
             return;
         }
 
-        String noProxy = System.getenv("NO_PROXY");
+        String noProxy = Util.getEnvironmentVariable("NO_PROXY");
         boolean matchAllHosts = matchAllHosts(noProxy);
 
         if (matchAllHosts) {
@@ -138,8 +176,14 @@ public class CoreHTTPClient {
         logger.info(infoMessage);
 
         if (isTLS) {
+            /*
+             * In case of a TLS proxy, 
+             * since we do not have the TLS certificate, 
+             * we trust all certificates. 
+             * The connection is reset without this.
+             */
             client = client.newBuilder()
-                    .socketFactory(new DelegatingSocketFactory(SSLSocketFactory.getDefault()))
+                    .socketFactory(new DelegatingSocketFactory(trustAllSslSocketFactory))
                     .build();
             infoMessage = "TLS enabled on proxy for HTTP client";
             logger.info(infoMessage);
@@ -181,17 +225,36 @@ public class CoreHTTPClient {
         return noProxyList;
     }
 
-    private static boolean matchHost(List<String> hosts, String host) {
+    public static boolean matchHost(List<String> hosts, String host) {
         for (String entry : hosts) {
-            /*
-             * This matches .example.com with all subdomains of example.com
-             */
-            if (host.endsWith(entry)) {
+            if (hostMatch(entry, host) || ipContains(entry, host)) {
                 return true;
             }
-            // TODO: match for subnet range as well.
         }
         return false;
     }
 
+    public static boolean hostMatch(String pattern, String match) {
+        /*
+         * matches .example.com with all subdomains of example.com
+         */
+        if ((pattern.startsWith(".") && match.endsWith(pattern))
+                || pattern.equals(match)) {
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean ipContains(String network, String address) {
+        try {
+            /*
+             * matches ipv4 and ipv6 CIDR and subnet ranges.
+             */
+            IPAddressString one = new IPAddressString(network);
+            IPAddressString two = new IPAddressString(address);
+            return one.contains(two);
+        } catch (Exception e) {
+            return false;
+        }
+    }
 }
