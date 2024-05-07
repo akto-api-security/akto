@@ -106,7 +106,7 @@ public class GraphQLUtils {//Singleton class
             Object obj = JSON.parse(requestPayload);
             if (obj instanceof Map) {
                 mapOfRequestPayload = (Map) obj;
-            } else if (obj instanceof Object[]){
+            } else if (obj instanceof Object[]) {
                 listOfRequestPayload = (Object[]) obj;
             } else {
                 return responseParamsList;
@@ -145,11 +145,11 @@ public class GraphQLUtils {//Singleton class
         Object payloadObj = JSON.parse(payload);
         Object[] payloadList;
         if (payloadObj instanceof Object[]) {
-            payloadList = (Object []) payloadObj;
+            payloadList = (Object[]) payloadObj;
         } else {
             payloadList = new Object[]{payloadObj};
         }
-        for (Object operationObj: payloadList) {
+        for (Object operationObj : payloadList) {
             Map<String, Object> operation = (Map) operationObj;
             String query = (String) operation.get("query");
             Node result = new AstTransformer().transform(parser.parseDocument(query), new NodeVisitorStub() {
@@ -158,12 +158,12 @@ public class GraphQLUtils {//Singleton class
                 public TraversalControl visitInlineFragment(InlineFragment node, TraverserContext<Node> context) {
                     switch (type) {
                         case "ADD":
-                            if (field.equals( node.getTypeCondition().getName())) {
+                            if (field.equals(node.getTypeCondition().getName())) {
 
                             }
                             Field field1 = Field.newField(tempVariable).build();
                             if (node.getSelectionSet() != null) {
-                                SelectionSet newSelectionSet =  node.getSelectionSet().transform((builder -> {
+                                SelectionSet newSelectionSet = node.getSelectionSet().transform((builder -> {
                                     builder.selection(field1);
                                 }));
                                 Node newNode = node.transform((builder -> {
@@ -197,18 +197,18 @@ public class GraphQLUtils {//Singleton class
 //                                    }
 //                                }
 //                                if (!found) {
-                                    Field field1 = Field.newField(tempVariable).build();
-                                    if (node.getSelectionSet() != null) {
-                                        SelectionSet newSelectionSet =  node.getSelectionSet().transform((builder -> {
-                                            builder.selection(field1);
-                                        }));
-                                        Node newNode = node.transform((builder -> {
-                                            builder.selectionSet(newSelectionSet);
-                                        }));
-                                        return TreeTransformerUtil.changeNode(context, newNode);
-                                    } else {
-                                        return super.visitField(node, context);
-                                    }
+                                Field field1 = Field.newField(tempVariable).build();
+                                if (node.getSelectionSet() != null) {
+                                    SelectionSet newSelectionSet = node.getSelectionSet().transform((builder -> {
+                                        builder.selection(field1);
+                                    }));
+                                    Node newNode = node.transform((builder -> {
+                                        builder.selectionSet(newSelectionSet);
+                                    }));
+                                    return TreeTransformerUtil.changeNode(context, newNode);
+                                } else {
+                                    return super.visitField(node, context);
+                                }
 //                                }
 //                                return super.visitField(node, context);
                             default:
@@ -241,7 +241,7 @@ public class GraphQLUtils {//Singleton class
     private void updateResponseParamList(HttpResponseParams responseParams, List<HttpResponseParams> responseParamsList, String path, Map mapOfRequestPayload) {
         List<OperationDefinition> operationDefinitions = parseGraphQLRequest(mapOfRequestPayload);
 
-        if (!operationDefinitions.isEmpty())  {
+        if (!operationDefinitions.isEmpty()) {
             for (OperationDefinition definition : operationDefinitions) {
                 OperationDefinition.Operation operation = definition.getOperation();
                 SelectionSet selectionSets = definition.getSelectionSet();
@@ -249,12 +249,12 @@ public class GraphQLUtils {//Singleton class
                 for (Selection selection : selectionList) {
                     if (selection instanceof Field) {
                         Field field = (Field) selection;
-                        String defName =  definition.getName() == null ? "" : ( "/" + definition.getName());
+                        String defName = definition.getName() == null ? "" : ("/" + definition.getName());
 
-                        String graphqlPath = path.split("\\?")[0] + "/" + operation.name().toLowerCase() + defName + "/"+ field.getName();
+                        String graphqlPath = path.split("\\?")[0] + "/" + operation.name().toLowerCase() + defName + "/" + field.getName();
 
                         if (path.contains("?")) {
-                            graphqlPath += ("?"+path.split("\\?")[1]);
+                            graphqlPath += ("?" + path.split("\\?")[1]);
                         }
 
                         HttpResponseParams httpResponseParamsCopy = responseParams.copy();
@@ -262,12 +262,12 @@ public class GraphQLUtils {//Singleton class
                         try {
                             Map<String, Object> map = fieldTraversal(field);
                             HashMap hashMap = new HashMap(mapOfRequestPayload);
-                                for (String key : map.keySet()) {
-                                    hashMap.put(GraphQLUtils.QUERY + key, map.get(key));
-                                }
-                                hashMap.remove(GraphQLUtils.QUERY);
-                                httpResponseParamsCopy.requestParams.setPayload(JSON.toString(hashMap));
-                                responseParamsList.add(httpResponseParamsCopy);
+                            for (String key : map.keySet()) {
+                                hashMap.put(GraphQLUtils.QUERY + key, map.get(key));
+                            }
+                            hashMap.remove(GraphQLUtils.QUERY);
+                            httpResponseParamsCopy.requestParams.setPayload(JSON.toString(hashMap));
+                            responseParamsList.add(httpResponseParamsCopy);
                         } catch (Exception e) {
                             //eat exception, No changes to request payload, parse Exception
                         }
