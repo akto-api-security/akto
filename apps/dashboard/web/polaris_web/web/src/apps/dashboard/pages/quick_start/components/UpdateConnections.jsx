@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import quickStartFunc from '../transform';
-import { Badge, Button, Card, HorizontalStack, Page, Scrollable, Tag, Text } from '@shopify/polaris';
-import {CancelMajor} from "@shopify/polaris-icons"
+import { Badge,HorizontalStack, Page, Tag, Text } from '@shopify/polaris';
 import RowCard from './RowCard';
 import GridRows from '../../../components/shared/GridRows';
 import QuickStartStore from '../quickStartStore';
+import TitleWithInfo from '../../../components/shared/TitleWithInfo';
+import FlyLayout from '../../../components/layouts/FlyLayout';
 
 function UpdateConnections(props) {
 
@@ -30,8 +31,23 @@ function UpdateConnections(props) {
         setCurrentCardObj(null)
     },[])
 
+    const components = [
+        currentCardObj ? <HorizontalStack gap="1">
+            <Text variant="headingMd" as="h6">{currentCardObj.label} </Text>
+            {currentCardObj.badge ? <Badge size='small' status='info'>{currentCardObj.badge}</Badge> : null}
+        </HorizontalStack> : null,
+        currentCardObj ? currentCardObj.component : null
+    ]
+
     return (
-        <Page divider title='Quick start' fullWidth>
+        <Page 
+            divider fullWidth
+            title={<TitleWithInfo 
+                        tooltipContent={"Akto traffic connectors"} 
+                        titleText={"Quick start"}  
+                        docsUrl={"https://docs.akto.io/traffic-connections/traffic-data-sources"}
+                    />}
+        >
             <div style={{marginBottom: '16px'}}>
             <HorizontalStack gap={"3"}>
                 <Text variant="headingMd" as="h6" color='subdued'> Your connections </Text>
@@ -53,29 +69,24 @@ function UpdateConnections(props) {
                 items={obj.moreConnections} buttonText="Connect" onButtonClick={onButtonClick}     
                 changedColumns={newCol}
             />
-
-            {
-                currentCardObj ? 
-                <div className="right-card">
-                    <Card>
-                        <Scrollable shadow style={{maxHeight: '85vh'}} focusable>
-                            <div className='settings'>
-                                <Text variant="headingMd" as="h6">Setup guide </Text>
-                                <Button plain icon={CancelMajor} onClick={closeAction} />
-                            </div>
-                            <HorizontalStack gap="1">
-                                <Text variant="headingMd" as="h6">{currentCardObj.label} </Text>
-                                {currentCardObj.badge ? <Badge size='small' status='info'>{currentCardObj.badge}</Badge> : null}
-                            </HorizontalStack>
-                            {currentCardObj.component}
-                        </Scrollable>
-                    </Card>
-                </div>
-                : null
-            }
-
+                {currentCardObj ?<FlyLayout
+                    width={"27vw"}
+                    titleComp={
+                        <TitleWithInfo 
+                                tooltipContent={"Automate traffic to Akto"} 
+                                titleText={"Set up guide"}  
+                                docsUrl={currentCardObj.docsUrl}
+                            />
+                        }
+                    show={currentCardObj !== null}
+                    components={components}
+                    isHandleClose={true}
+                    handleClose={closeAction}
+                    setShow={() => {}}
+                />: null}
         </Page>
     )
 }
 
 export default UpdateConnections
+                            

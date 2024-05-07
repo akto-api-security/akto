@@ -288,6 +288,7 @@ function DataTypes() {
             textProps={{variant: 'headingMd'}} 
             titleText={"Redact"} 
             tooltipContent={"Redact the current subtype"}
+            docsUrl={"https://docs.akto.io/api-inventory/how-to/redact-sensitive-data"}
           />}
       >
         <div className='card-items'>
