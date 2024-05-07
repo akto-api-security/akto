@@ -254,7 +254,7 @@ public class RiskScoreOfCollections {
 
         List<WriteModel<ApiInfo>> bulkUpdates = new ArrayList<>();
         Bson filter = Filters.or(
-            Filters.not(Filters.exists(ApiInfo.LAST_CALCULATED_TIME)),
+            Filters.exists(ApiInfo.LAST_CALCULATED_TIME, false),
             Filters.lte(ApiInfo.LAST_CALCULATED_TIME, timeStamp)
         );
         Bson projection = Projections.include("_id", ApiInfo.API_ACCESS_TYPES, ApiInfo.LAST_SEEN, ApiInfo.SEVERITY_SCORE, ApiInfo.IS_SENSITIVE);
