@@ -159,19 +159,18 @@ public class GraphQLUtils {//Singleton class
                     switch (type) {
                         case "ADD":
                             if (field.equals(node.getTypeCondition().getName())) {
-
-                            }
-                            Field field1 = Field.newField(tempVariable).build();
-                            if (node.getSelectionSet() != null) {
-                                SelectionSet newSelectionSet = node.getSelectionSet().transform((builder -> {
-                                    builder.selection(field1);
-                                }));
-                                Node newNode = node.transform((builder -> {
-                                    builder.selectionSet(newSelectionSet);
-                                }));
-                                return TreeTransformerUtil.changeNode(context, newNode);
-                            } else {
-                                return super.visitInlineFragment(node, context);
+                                Field field1 = Field.newField(tempVariable).build();
+                                if (node.getSelectionSet() != null) {
+                                    SelectionSet newSelectionSet = node.getSelectionSet().transform((builder -> {
+                                        builder.selection(field1);
+                                    }));
+                                    Node newNode = node.transform((builder -> {
+                                        builder.selectionSet(newSelectionSet);
+                                    }));
+                                    return TreeTransformerUtil.changeNode(context, newNode);
+                                } else {
+                                    return super.visitInlineFragment(node, context);
+                                }
                             }
                     }
                     return super.visitInlineFragment(node, context);
