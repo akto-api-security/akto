@@ -32,6 +32,7 @@ import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UpdateManyModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -246,4 +247,37 @@ public class RiskScoreOfCollections {
         }
     }
 
+    public void calculateRiskScoreForAllApis() {
+        int timeStamp = Context.now() - 24*60*60;
+        int limit = 1000;
+        int count = 0; 
+
+        List<WriteModel<ApiInfo>> bulkUpdates = new ArrayList<>();
+        Bson filter = Filters.or(
+            Filters.not(Filters.exists(ApiInfo.LAST_CALCULATED_TIME)),
+            Filters.lte(ApiInfo.LAST_CALCULATED_TIME, timeStamp)
+        );
+        Bson projection = Projections.include("_id", ApiInfo.API_ACCESS_TYPES, ApiInfo.LAST_SEEN, ApiInfo.SEVERITY_SCORE, ApiInfo.IS_SENSITIVE);
+        while(count < 100){
+            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter,0, limit, Sorts.descending(ApiInfo.LAST_CALCULATED_TIME), projection);
+            for(ApiInfo apiInfo: apiInfos){
+                float riskScore = ApiInfoDao.getRiskScore(apiInfo, apiInfo.getIsSensitive(), Utils.getRiskScoreValueFromSeverityScore(apiInfo.getSeverityScore()));
+                Bson update = Updates.combine(
+                    Updates.set(ApiInfo.RISK_SCORE, riskScore),
+                    Updates.set(ApiInfo.LAST_CALCULATED_TIME, Context.now())
+                );
+                Bson filterQ = ApiInfoDao.getFilter(apiInfo.getId());
+                
+                bulkUpdates.add(new UpdateManyModel<>(filterQ, update, new UpdateOptions().upsert(false)));
+            }
+            if(bulkUpdates.size() > 0){
+                ApiInfoDao.instance.bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
+            }
+            bulkUpdates.clear();
+            count++;
+            if(apiInfos.size() < limit){
+                break;
+            }
+        }
+    }
 }
