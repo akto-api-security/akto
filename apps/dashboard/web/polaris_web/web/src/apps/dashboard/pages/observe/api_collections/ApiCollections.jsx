@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList } from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, Link, Tooltip } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
@@ -15,6 +15,8 @@ import TooltipText from "@/apps/dashboard/components/shared/TooltipText"
 import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo"
 import CollectionsPageBanner from "./component/CollectionsPageBanner"
 import useTable from "@/apps/dashboard/components/tables/TableContext"
+import TitleWithInfo from "../../../components/shared/TitleWithInfo"
+import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
 
 const headers = [
     {
@@ -32,7 +34,7 @@ const headers = [
         sortActive: true
     },
     {
-        title: 'Risk score',
+        title: <HeadingWithTooltip content={<Text variant="bodySm">Risk score of collection is maximum risk score of the endpoint inside this collection</Text>} title="Risk score" />,
         value: 'riskScoreComp',
         sortActive: true
     },
@@ -41,37 +43,41 @@ const headers = [
         text: 'Test coverage', 
         value: 'coverage',
         isText: CellType.TEXT,
+        tooltipContent: (<Text variant="bodySm">Percentage of endpoints tested successfully in the collection</Text>)
     },
     {
         title: 'Issues', 
         text: 'Issues', 
         value: 'issuesArr',
+        tooltipContent: (<Text variant="bodySm">Severity and count of issues present in the collection</Text>)
     },
     {   
         title: 'Sensitive data' , 
         text: 'Sensitive data' , 
         value: 'sensitiveSubTypes',
+        tooltipContent: (<Text variant="bodySm">Types of data type present in response of endpoint inside the collection</Text>)
     },
     {
         text: 'Collection type',
         title: 'Collection type',
         value: 'envTypeComp',
         filterKey: "envType",
-        showFilter: true
+        showFilter: true,
+        tooltipContent: (<Text variant="bodySm">Environment type for an API collection, Staging or Production </Text>)
     },
     {   
-        title: 'Last traffic seen', 
+        title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time an endpoint within collection was either discovered for the first time or accessed again</Text>} title="Last traffic seen" />, 
         text: 'Last traffic seen', 
         value: 'lastTraffic',
         isText: CellType.TEXT,
         sortActive: true
     },
     {
-        title: 'Discovered',
+        title: <HeadingWithTooltip content={<Text variant="bodySm">Time when collection was created</Text>} title="Discovered" />,
         text: 'Discovered',
         value: 'discovered',
         isText: CellType.TEXT,
-        sortActive: true
+        sortActive: true,
     }
 ]
 
@@ -355,12 +361,12 @@ function ApiCollections() {
 
     return(
         <PageWithMultipleCards
-        title={
-                <Text variant='headingLg' truncate>
-            {
-                "API Collections"
-            }
-        </Text>
+            title={
+                <TitleWithInfo 
+                    tooltipContent={"API inventory"} 
+                    titleText={"API collections"} 
+                    docsUrl={"https://docs.akto.io/api-inventory/concepts"}
+                />
             }
             primaryAction={<Button id={"create-new-collection-popup"} primary secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
             isFirstPage={true}
