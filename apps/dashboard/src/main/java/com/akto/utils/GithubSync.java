@@ -29,12 +29,13 @@ import com.akto.github.GithubFile;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Pair;
+import com.akto.util.http_util.CoreHTTPClient;
 
 import javassist.bytecode.ByteArray;
 
 public class GithubSync {
     private static final LoggerMaker loggerMaker = new LoggerMaker(GithubSync.class);
-    private static final OkHttpClient client = new OkHttpClient();
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
 
     public GithubFile syncFile(String repo, String filePath, String latestSha, Map<String, String> githubFileShaMap) {
         String[] filePathSplit = filePath.split("/");

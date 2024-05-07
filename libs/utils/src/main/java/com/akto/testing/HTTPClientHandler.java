@@ -2,6 +2,8 @@ package com.akto.testing;
 
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.util.http_util.CoreHTTPClient;
+
 import okhttp3.*;
 import okio.Buffer;
 import org.jetbrains.annotations.NotNull;
@@ -24,7 +26,7 @@ public class HTTPClientHandler {
     private final OkHttpClient clientWithFollowRedirect;
 
     private static OkHttpClient.Builder builder(boolean followRedirects, int readTimeout) {
-        return new OkHttpClient().newBuilder()
+        return CoreHTTPClient.client.newBuilder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(readTimeout, TimeUnit.SECONDS)
                 .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))

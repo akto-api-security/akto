@@ -7,6 +7,7 @@ import com.akto.dto.Log;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.util.EmailAccountName;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -120,7 +121,7 @@ public class TelemetryJob {
         }while (logs.size() == limit);
     }
 
-    private static final OkHttpClient client = new OkHttpClient().newBuilder()
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
                 .writeTimeout(1,TimeUnit.SECONDS)
                 .readTimeout(1, TimeUnit.SECONDS)
                 .callTimeout(1, TimeUnit.SECONDS)
