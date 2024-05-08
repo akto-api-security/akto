@@ -243,8 +243,8 @@ public class GraphQLUtils {//Singleton class
             String modifiedQuery = AstPrinter.printAst(result);
             if (modifiedQuery.contains(tempVariable)) {
                 modifiedQuery = modifiedQuery.replace(tempVariable, value);
+                operation.replace("query", modifiedQuery);
             }
-            operation.replace("query", modifiedQuery);
         }
         if (payloadObj instanceof Object[]) {
             return gson.toJson(payloadList);
