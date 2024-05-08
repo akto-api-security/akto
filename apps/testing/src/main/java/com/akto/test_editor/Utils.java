@@ -344,18 +344,6 @@ public class Utils {
         return values;
     }
 
-    public static void main(String[] args) {
-        String json = "[{\"json\": {\"user\": \"abc\"}, \"json1\": {\"user1\": \"abc1\"}, \"json2\": \"abcd\"}]";
-        JsonParser jp;
-        JsonNode node;
-        try {
-            jp = factory.createParser(json);
-            node = mapper.readTree(jp);
-            System.out.println(node.toString());
-        } catch (IOException e) {
-        }
-    }
-
     public static void findAllKeys(JsonNode node, String key, List<String> values, boolean found) {
         if (found) {
             if (node.isArray()) {
