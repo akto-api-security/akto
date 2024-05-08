@@ -156,6 +156,9 @@ public class GraphQLUtils {//Singleton class
         for (Object operationObj : payloadList) {
             Map<String, Object> operation = (Map) operationObj;
             String query = (String) operation.get("query");
+            if (query == null) {
+                continue;
+            }
             Node result = new AstTransformer().transform(parser.parseDocument(query), new NodeVisitorStub() {
 
                 @Override
