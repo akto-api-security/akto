@@ -199,7 +199,7 @@ public class CoreHTTPClient {
                             .build();
                 }
             };
-            client = client.newBuilder().authenticator(proxyAuthenticator).build();
+            client = client.newBuilder().proxyAuthenticator(proxyAuthenticator).build();
             infoMessage = String.format("Proxy auth configured for HTTP client with user: %s pass: %s", finalProxyUser,
                     finalProxyPass);
             logger.info(infoMessage);
