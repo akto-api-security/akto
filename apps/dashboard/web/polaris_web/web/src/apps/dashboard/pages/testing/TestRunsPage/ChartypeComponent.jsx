@@ -4,7 +4,6 @@ import DonutChart from '../../../components/shared/DonutChart'
 import ConcentricCirclesChart from '../../../components/shared/ConcentricCirclesChart'
 
 function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navurl}) {
-    const maxBoxHeight = boxHeight || '200px'
     let tableRows = []
     if(data && Object.keys(data).length > 0)
     {
