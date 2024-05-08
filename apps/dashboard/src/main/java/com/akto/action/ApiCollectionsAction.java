@@ -418,6 +418,9 @@ public class ApiCollectionsAction extends UserAction {
         Map<Integer, Double> riskScoreMap = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupId = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
+        pipeline.add(Aggregates.sort(
+            Sorts.descending(ApiInfo.RISK_SCORE)
+        ));
         pipeline.add(Aggregates.group(groupId,
             Accumulators.max(ApiInfo.RISK_SCORE, "$riskScore")
         ));
