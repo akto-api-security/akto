@@ -568,6 +568,13 @@ public class Utils {
         return urlModifierPayload;
     }
 
+    public static String jsonifyIfArray(String payload) {
+        if (payload != null && payload.startsWith("[")) {
+            payload = "{\"json\": "+payload+"}";
+        }
+        return payload;
+    }
+
     public static String buildNewUrl(UrlModifierPayload urlModifierPayload, String oldUrl) {
         String url = "";
         if (urlModifierPayload.getOperationType().equalsIgnoreCase("regex_replace") || urlModifierPayload.getOperationType().equalsIgnoreCase("token_replace")) {

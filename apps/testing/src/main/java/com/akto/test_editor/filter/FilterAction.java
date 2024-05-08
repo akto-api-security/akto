@@ -285,9 +285,7 @@ public final class FilterAction {
 
         BasicDBObject payloadObj = new BasicDBObject();
         try {
-            if (payload != null && payload.startsWith("[")) {
-                payload = "{\"json\": "+payload+"}";
-            }
+            payload = Utils.jsonifyIfArray(payload);
             payloadObj =  BasicDBObject.parse(payload);
         } catch(Exception e) {
             // add log
@@ -392,6 +390,7 @@ public final class FilterAction {
         String key = querySet.get(0);
         BasicDBObject reqObj = new BasicDBObject();
         try {
+            payload = Utils.jsonifyIfArray(payload);
             reqObj =  BasicDBObject.parse(payload);
         } catch(Exception e) {
             // add log
@@ -1381,6 +1380,7 @@ public final class FilterAction {
         String payload = rawApi.getRequest().getJsonRequestBody();
         BasicDBObject reqObj = new BasicDBObject();
         try {
+            payload = Utils.jsonifyIfArray(payload);
             reqObj =  BasicDBObject.parse(payload);
         } catch(Exception e) {
             // add log
@@ -1404,6 +1404,7 @@ public final class FilterAction {
         String responsePayload = rawApi.getResponse().getJsonResponseBody();
         BasicDBObject respObj = new BasicDBObject();
         try {
+            responsePayload = Utils.jsonifyIfArray(responsePayload);
             respObj =  BasicDBObject.parse(responsePayload);
         } catch(Exception e) {
             // add log
