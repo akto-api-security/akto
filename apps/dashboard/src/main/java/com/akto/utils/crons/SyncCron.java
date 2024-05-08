@@ -1,7 +1,5 @@
 package com.akto.utils.crons;
 
-import java.time.DayOfWeek;
-import java.time.LocalDate;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -12,12 +10,10 @@ import org.bson.conversions.Bson;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ActivitiesDao;
-import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -82,19 +78,20 @@ public class SyncCron {
                                 Updates.set((AccountSettings.LAST_UPDATED_CRON_INFO + "."+ LastCronRunInfo.LAST_UPDATED_SEVERITY), endTs)
                             );
 
-                            // invoke reset once in a week
-                            LocalDate today = LocalDate.now();
-                            DayOfWeek dayOfWeek = today.getDayOfWeek();
-                            int resetTime = 6 * 24 * 60 * 60;
-                            if((endTs - resetTs) >= resetTime && dayOfWeek == DayOfWeek.SUNDAY){
-                                // change severity score to 0 for which they are greater than 0
-                                ApiInfoDao.instance.updateMany(Filters.gt(ApiInfo.SEVERITY_SCORE, 0), Updates.set(ApiInfo.SEVERITY_SCORE, 0));
-                                startTsSeverity = 0 ;
-                                update = Updates.combine(update,  
-                                        Updates.set((AccountSettings.LAST_UPDATED_CRON_INFO + "."+ LastCronRunInfo.LAST_INFO_RESETTED), endTs));
-                            }
+                            // invoke reset once everyday
+                            int resetTime = 24 * 60 * 60;
 
-                            updateRiskScore.updateSeverityScoreInApiInfo(startTsSeverity);
+                            if((endTs - resetTs) >= resetTime){
+                                // if reset is called, calculate riskScore for each api whose last updated is here while resetting isSensitive false and severityScore 0
+                                updateRiskScore.calculateRiskScoreForAllApis();
+
+                                // update account settings docs
+                                update = Updates.combine(update,  
+                                        Updates.set((AccountSettings.LAST_UPDATED_CRON_INFO + "."+ LastCronRunInfo.LAST_INFO_RESETTED), endTs)
+                                    );
+                            }else{
+                                updateRiskScore.updateSeverityScoreInApiInfo(startTsSeverity);
+                            }
 
                             AccountSettingsDao.instance.getMCollection().updateOne(
                                 AccountSettingsDao.generateFilter(),
