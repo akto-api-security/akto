@@ -41,6 +41,12 @@ public class ApiInfo {
     private float severityScore;
     private List<Integer> collectionIds;
 
+    public static final String RISK_SCORE = "riskScore";
+    private float riskScore;
+
+    public static final String LAST_CALCULATED_TIME = "lastCalculatedTime";
+    private int lastCalculatedTime;
+
     public enum AuthType {
         UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM
     }
@@ -132,6 +138,8 @@ public class ApiInfo {
         this.lastTested = 0 ;
         this.isSensitive = false;
         this.severityScore = 0;
+        this.riskScore = 0 ;
+        this.lastCalculatedTime = 0;
         if(apiInfoKey != null){
             this.collectionIds = Arrays.asList(apiInfoKey.getApiCollectionId());
         }
@@ -166,6 +174,12 @@ public class ApiInfo {
         }
         this.isSensitive = that.isSensitive || this.isSensitive;
         this.severityScore = this.severityScore + that.severityScore;
+        this.riskScore = Math.max(this.riskScore, that.riskScore);
+
+        if (that.lastCalculatedTime > this.lastCalculatedTime) {
+            this.lastCalculatedTime = that.lastCalculatedTime;
+        }
+        
 
         for (String k: that.violations.keySet()) {
             if (this.violations.get(k) == null || that.violations.get(k) > this.violations.get(k)) {
@@ -232,6 +246,8 @@ public class ApiInfo {
                 ", accessTypes='" + getApiAccessTypes() + "'" +
                 ", isSensitive='" + getIsSensitive() + "'" +
                 ", severityScore='" + getSeverityScore() + "'" +
+                ", riskScore='" + getRiskScore() + "'" +
+                ", lastCalculatedTime='" + getLastCalculatedTime() + "'" +
                 "}";
     }
 
@@ -308,6 +324,22 @@ public class ApiInfo {
 
     public void setCollectionIds(List<Integer> collectionIds) {
         this.collectionIds = collectionIds;
+    }
+
+    public float getRiskScore() {
+        return riskScore;
+    }
+
+    public void setRiskScore(float riskScore) {
+        this.riskScore = riskScore;
+    }
+
+    public int getLastCalculatedTime() {
+        return lastCalculatedTime;
+    }
+
+    public void setLastCalculatedTime(int lastCalculatedTime) {
+        this.lastCalculatedTime = lastCalculatedTime;
     }
 
 }
