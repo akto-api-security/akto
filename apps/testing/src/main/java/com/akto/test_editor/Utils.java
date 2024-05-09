@@ -24,6 +24,7 @@ import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.UrlModifierPayload;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -43,7 +44,7 @@ public class Utils {
     private static final JsonFactory factory = mapper.getFactory();
     private static final Gson gson = new Gson();
 
-    private static final OkHttpClient client = new OkHttpClient().newBuilder()
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
         .writeTimeout(5, TimeUnit.SECONDS)
         .readTimeout(5, TimeUnit.SECONDS)
         .callTimeout(5, TimeUnit.SECONDS)
