@@ -4,15 +4,15 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
 
-import okhttp3.MediaType;
+import okhttp3.FormBody;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import org.apache.http.*;
 import org.apache.http.client.HttpResponseException;
-import org.json.JSONObject;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -32,10 +32,18 @@ public class CustomHttpRequest {
         return s(request);
     }
 
-    public static Map<String, Object> postRequest(String url, JSONObject params) throws HttpResponseException {
+    public static RequestBody createFormEncodedRequestBody(BasicDBObject params) {
+        FormBody.Builder formBuilder = new FormBody.Builder();
+        if (params != null) {
+            for (Map.Entry<String, Object> param : params.entrySet()) {
+                formBuilder.addEncoded(param.getKey(), param.getValue().toString());
+            }
+        }
+        return formBuilder.build();
+    }
 
-        MediaType encoded = MediaType.parse(FORM_URL_ENCODED_CONTENT_TYPE);
-        RequestBody requestBody = RequestBody.create(params.toString(), encoded);
+    public static Map<String, Object> postRequest(String url, BasicDBObject params) throws HttpResponseException {
+        RequestBody requestBody = createFormEncodedRequestBody(params);
         Request request = new Request.Builder()
                 .url(url)
                 .post(requestBody)
@@ -45,11 +53,9 @@ public class CustomHttpRequest {
         return s(request);
     }
 
-    public static Map<String, Object> postRequestEncodedType(String url, JSONObject params)
+    public static Map<String, Object> postRequestEncodedType(String url, BasicDBObject params)
             throws HttpResponseException {
-
-        MediaType encoded = MediaType.parse(FORM_URL_ENCODED_CONTENT_TYPE);
-        RequestBody requestBody = RequestBody.create(params.toString(), encoded);
+        RequestBody requestBody = createFormEncodedRequestBody(params);
         Request request = new Request.Builder()
                 .url(url)
                 .post(requestBody)
