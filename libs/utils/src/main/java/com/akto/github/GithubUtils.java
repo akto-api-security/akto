@@ -172,7 +172,7 @@ public class GithubUtils {
             GHAppInstallation appInstallation = appInstallations.get(0);
             GHAppCreateTokenBuilder builder = appInstallation.createToken();
             GHAppInstallationToken token = builder.create();
-            GitHub githubAccount =  new GitHubBuilder().withConnector(connector).withConnector(connector).withAppInstallationToken(token.getToken())
+            GitHub githubAccount =  new GitHubBuilder().withConnector(connector).withAppInstallationToken(token.getToken())
                     .build();
 
             GHRepository ghRepository = githubAccount.getRepository(repository);
