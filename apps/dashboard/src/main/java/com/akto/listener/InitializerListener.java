@@ -1115,7 +1115,7 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    public static void createApiGroup(int id, String name, String regex) {
+    public static void createLoginApiGroup(int id, String name, String regex) {
         ApiCollection loginGroup = new ApiCollection(id, name, Context.now(), new HashSet<>(), null, 0, false, false);
         loginGroup.setType(ApiCollection.Type.API_GROUP);
         ArrayList<TestingEndpoints> loginConditions = new ArrayList<>();
@@ -1130,15 +1130,40 @@ public class InitializerListener implements ServletContextListener {
     public static void createLoginSignupGroups(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getLoginSignupGroups() == 0) {
 
-            createApiGroup(111_111_128, "Login APIs", "^((https?):\\/\\/)?(www\\.)?.*?(login|signin|sign-in|authenticate|session)(.*?)(\\?.*|\\/?|#.*?)?$");
-            createApiGroup(111_111_129, "Signup APIs", "^((https?):\\/\\/)?(www\\.)?.*?(register|signup|sign-up|users\\/create|account\\/create|account_create|create_account)(.*?)(\\?.*|\\/?|#.*?)?$");
-            createApiGroup(111_111_130, "Password Reset APIs", "^((https?):\\/\\/)?(www\\.)?.*?(password-reset|reset-password|forgot-password|user\\/reset|account\\/recover|api\\/password_reset|password\\/reset|account\\/reset-password-request|password_reset_request|account_recovery)(.*?)(\\?.*|\\/?|#.*?)?$");
+            createLoginApiGroup(111_111_128, "Login APIs", "^((https?):\\/\\/)?(www\\.)?.*?(login|signin|sign-in|authenticate|session)(.*?)(\\?.*|\\/?|#.*?)?$");
+            createLoginApiGroup(111_111_129, "Signup APIs", "^((https?):\\/\\/)?(www\\.)?.*?(register|signup|sign-up|users\\/create|account\\/create|account_create|create_account)(.*?)(\\?.*|\\/?|#.*?)?$");
+            createLoginApiGroup(111_111_130, "Password Reset APIs", "^((https?):\\/\\/)?(www\\.)?.*?(password-reset|reset-password|forgot-password|user\\/reset|account\\/recover|api\\/password_reset|password\\/reset|account\\/reset-password-request|password_reset_request|account_recovery)(.*?)(\\?.*|\\/?|#.*?)?$");
 
             BackwardCompatibilityDao.instance.updateOne(
                     Filters.eq("_id", backwardCompatibility.getId()),
                     Updates.set(BackwardCompatibility.LOGIN_SIGNUP_GROUPS, Context.now())
             );
 
+        }
+    }
+
+    public static void createRiskScoreApiGroup(int id, String name, RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType) {
+        // ApiCollection riskScoreGroup = new ApiCollection(id, name, Context.now(), new HashSet<>(), null, 0, false, false);
+        // riskScoreGroup.setType(ApiCollection.Type.API_GROUP);
+        // ArrayList<TestingEndpoints> riskScoreConditions = new ArrayList<>();
+        // riskScoreConditions.add(new RiskScoreTestingEndpoints(riskScoreGroupType));
+        // riskScoreGroup.setConditions(riskScoreConditions);
+
+        // ApiCollectionsDao.instance.insertOne(riskScoreGroup);
+
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(name);
+        
+    }
+
+    public static void createRiskScoreGroups(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getRiskScoreGroups() == 0) {
+
+            createRiskScoreApiGroup(111_111_148, "Low Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.LOW);
+
+            // BackwardCompatibilityDao.instance.updateOne(
+            //         Filters.eq("_id", backwardCompatibility.getId()),
+            //         Updates.set(BackwardCompatibility.RISK_SCORE_GROUPS, Context.now())
+            // );
         }
     }
 
@@ -1975,6 +2000,7 @@ public class InitializerListener implements ServletContextListener {
         dropAuthMechanismData(backwardCompatibility);
         moveAuthMechanismDataToRole(backwardCompatibility);
         createLoginSignupGroups(backwardCompatibility);
+        createRiskScoreGroups(backwardCompatibility);
         deleteAccessListFromApiToken(backwardCompatibility);
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
