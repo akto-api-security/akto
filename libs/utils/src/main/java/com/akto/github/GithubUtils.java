@@ -10,13 +10,18 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.log.LoggerMaker;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.client.model.Filters;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.lang.RuntimeEnvironment;
+import okhttp3.OkHttpClient;
+
 import org.apache.commons.lang3.StringUtils;
 import org.kohsuke.github.*;
+import org.kohsuke.github.connector.GitHubConnector;
+import org.kohsuke.github.extras.okhttp3.OkHttpGitHubConnector;
 
 import java.security.Key;
 import java.security.KeyFactory;
@@ -30,6 +35,9 @@ import static com.akto.dao.MCollection.ID;
 public class GithubUtils {
 
     private GithubUtils() {}
+
+    static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
+    static final GitHubConnector connector = new OkHttpGitHubConnector(client);
 
     static {
         RuntimeEnvironment.enableBouncyCastleIfPossible();
@@ -90,7 +98,7 @@ public class GithubUtils {
                 return;
             }
             jwtToken = createJWT(githubAppId,privateKey, 10 * 60 * 1000);
-            GitHub gitHub = new GitHubBuilder().withJwtToken(jwtToken).build();
+            GitHub gitHub = new GitHubBuilder().withConnector(connector).withJwtToken(jwtToken).build();
             GHApp ghApp = gitHub.getApp();
 
             //Getting appInstallations
@@ -103,7 +111,7 @@ public class GithubUtils {
             GHAppInstallation appInstallation = appInstallations.get(0);
             GHAppCreateTokenBuilder builder = appInstallation.createToken();
             GHAppInstallationToken token = builder.create();
-            GitHub githubAccount =  new GitHubBuilder().withAppInstallationToken(token.getToken())
+            GitHub githubAccount =  new GitHubBuilder().withConnector(connector).withAppInstallationToken(token.getToken())
                     .build();
 
             GHRepository ghRepository = githubAccount.getRepository(repository);
@@ -152,7 +160,7 @@ public class GithubUtils {
             String jwtToken = GithubUtils.createJWT(githubAppId,privateKey, 10 * 60 * 1000);
 
             //Github app invocation
-            GitHub gitHub = new GitHubBuilder().withJwtToken(jwtToken).build();
+            GitHub gitHub = new GitHubBuilder().withConnector(connector).withJwtToken(jwtToken).build();
             GHApp ghApp = gitHub.getApp();
 
             //Getting appInstallations
@@ -164,7 +172,7 @@ public class GithubUtils {
             GHAppInstallation appInstallation = appInstallations.get(0);
             GHAppCreateTokenBuilder builder = appInstallation.createToken();
             GHAppInstallationToken token = builder.create();
-            GitHub githubAccount =  new GitHubBuilder().withAppInstallationToken(token.getToken())
+            GitHub githubAccount =  new GitHubBuilder().withConnector(connector).withConnector(connector).withAppInstallationToken(token.getToken())
                     .build();
 
             GHRepository ghRepository = githubAccount.getRepository(repository);
