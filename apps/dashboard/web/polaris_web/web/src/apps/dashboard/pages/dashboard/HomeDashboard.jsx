@@ -19,6 +19,7 @@ import ActivityTracker from './components/ActivityTracker';
 import NullData from './components/NullData';
 import {DashboardBanner} from './components/DashboardBanner';
 import RiskScoreTrend from './components/RiskScoreTrend';
+import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo';
 
 function HomeDashboard() {
 
@@ -131,7 +132,11 @@ function HomeDashboard() {
         Object.keys(subCategoryInfo).length > 0 ? 
             <Card key="subcategoryTrend">
                 <VerticalStack gap={5}>
-                    <Text variant="bodyLg" fontWeight="semibold">Issues by category</Text>
+                    <TitleWithInfo
+                        titleText={"Issues by category"}
+                        tooltipContent={"Chart of testing run issues present in dashboard categorised by subcategory of tests"}
+                        textProps={{variant: "headingMd"}}
+                    />
                     <ChartypeComponent data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'200px'}/>
                 </VerticalStack>
             </Card>
@@ -166,7 +171,12 @@ function HomeDashboard() {
         :
         <Card key="sensitiveTrend">
             <VerticalStack gap={5}>
-                <Text variant="bodyLg" fontWeight="semibold">Sensitive Data</Text>
+                <TitleWithInfo
+                    titleText={"Sensitive data"}
+                    tooltipContent={"Count of endpoints per Datatype present in dashboard"}
+                    textProps={{variant: "headingMd"}}
+                    docsUrl={"https://docs.akto.io/api-inventory/concepts/sensitive-data"}
+                />
                 <HorizontalGrid gap={5} columns={2}>
                     <ChartypeComponent navurl={"/dashboard/observe/sensitive/"} data={sensitiveData.request} title={"Request"} isNormal={true} boxHeight={'100px'}/>
                     <ChartypeComponent navurl={"/dashboard/observe/sensitive/"} data={sensitiveData.response} title={"Response"} isNormal={true} boxHeight={'100px'}/>
@@ -179,7 +189,11 @@ function HomeDashboard() {
         (issuesTrendMap.allSubCategories.length > 0 && issuesTrendMap.trend.length > 0) ? 
         <Card key="issuesTrend">
             <VerticalStack gap={5}>
-                <Text variant="bodyLg" fontWeight="semibold">Issues timeline</Text>
+                <TitleWithInfo
+                    titleText={"Issues timeline"}
+                    tooltipContent={"Count of issues per category against the time they were last seen"}
+                    textProps={{variant: "headingMd"}}
+                />
                 <VerticalStack gap={3}>
                     <HorizontalStack align="end">
                         <Scrollable style={{ width: '350px' }} shadow>

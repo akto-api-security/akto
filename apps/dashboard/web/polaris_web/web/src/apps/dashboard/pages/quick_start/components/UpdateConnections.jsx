@@ -4,7 +4,7 @@ import { Badge,HorizontalStack, Page, Tag, Text } from '@shopify/polaris';
 import RowCard from './RowCard';
 import GridRows from '../../../components/shared/GridRows';
 import QuickStartStore from '../quickStartStore';
-import TitleWithInfo from '../../../components/shared/TitleWithInfo';
+import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo';
 import FlyLayout from '../../../components/layouts/FlyLayout';
 
 function UpdateConnections(props) {

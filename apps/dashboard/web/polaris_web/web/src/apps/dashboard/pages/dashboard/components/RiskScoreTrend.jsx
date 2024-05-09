@@ -4,6 +4,7 @@ import { Badge, Box, Card, Divider, HorizontalGrid, HorizontalStack, Text, Verti
 import HighchartsReact from 'highcharts-react-official'
 import transform from '../transform'
 import Highcharts from "highcharts"
+import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
 
 function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
 
@@ -17,7 +18,12 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
     const dataComponent = (
         <Card key="scoreTrend">
             <VerticalStack gap={5}>
-                <Text variant="bodyLg" fontWeight="semibold">APIS by risk score</Text>
+                <TitleWithInfo
+                    titleText={"APIS by risk score"}
+                    tooltipContent={"All the endpoints in dashboard grouped on the basis of their Risk score"}
+                    textProps={{variant: "headingMd"}}
+                    docsUrl={"https://docs.akto.io/api-inventory/concepts/risk-score"}
+                />
                 <HorizontalGrid columns={2} gap={5}>
                 <HighchartsReact
                     highcharts={Highcharts}

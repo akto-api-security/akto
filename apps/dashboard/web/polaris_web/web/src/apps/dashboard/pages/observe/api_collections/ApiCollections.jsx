@@ -15,7 +15,7 @@ import TooltipText from "@/apps/dashboard/components/shared/TooltipText"
 import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo"
 import CollectionsPageBanner from "./component/CollectionsPageBanner"
 import useTable from "@/apps/dashboard/components/tables/TableContext"
-import TitleWithInfo from "../../../components/shared/TitleWithInfo"
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
 
 const headers = [

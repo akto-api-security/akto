@@ -1,5 +1,4 @@
-import { Box, HorizontalStack, Icon, Link, Popover, Text } from '@shopify/polaris'
-import { InfoMinor } from "@shopify/polaris-icons"
+import { Avatar, Box, HorizontalStack, Link, Popover, Text } from '@shopify/polaris'
 import React, { useState } from 'react'
 
 function TitleWithInfo({titleComp, textProps, titleText, tooltipContent, docsUrl}) {
@@ -27,9 +26,9 @@ function TitleWithInfo({titleComp, textProps, titleText, tooltipContent, docsUrl
                             setActive(false)
                         },100)}
                     > 
-                        <Box width='20px' minHeight='20px'>
-                            <Icon source={InfoMinor} color="subdued" />
-                        </Box> 
+                        <div className='reduce-size'>
+                            <Avatar shape="round" size="extraSmall" source='/public/info_filled_icon.svg'/>
+                        </div> 
                     </div>
                 }
                 preferredPosition="top"

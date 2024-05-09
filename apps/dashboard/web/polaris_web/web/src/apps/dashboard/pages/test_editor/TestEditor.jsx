@@ -16,7 +16,7 @@ import testEditorRequests from "./api"
 import convertFunc from "./transform"
 import { learnMoreObject } from "../../../main/onboardingData"
 import LearnPopoverComponent from "../../components/layouts/LearnPopoverComponent"
-import TitleWithInfo from "../../components/shared/TitleWithInfo"
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 
 const TestEditor = () => {
     const navigate = useNavigate()
