@@ -38,6 +38,66 @@ public class TestGraphQLUtils{
         }
     }
 
+    @Test
+    public void testAddGraphqlField() throws Exception {
+        HAR har = new HAR();
+        List<String> requests = har.getMessages(harString, 0, 1_000_000);
+
+        for (String request : requests) {
+            HttpResponseParams responseParams = parseKafkaMessage(request);
+            String payload = responseParams.getRequestParams().getPayload();
+            if (payload.contains("query")) {
+                String modifiedPayload = GraphQLUtils.getUtils().addGraphqlField(payload, "types", "email");
+                Assert.assertTrue(modifiedPayload.contains("email"));
+            }
+        }
+    }
+
+    @Test
+    public void testDeleteGraphqlField() throws Exception {
+        HAR har = new HAR();
+        List<String> requests = har.getMessages(harString, 0, 1_000_000);
+
+        for (String request : requests) {
+            HttpResponseParams responseParams = parseKafkaMessage(request);
+            String payload = responseParams.getRequestParams().getPayload();
+            if (payload.contains("query")) {
+                String modifiedPayload = GraphQLUtils.getUtils().deleteGraphqlField(payload, "types");
+                Assert.assertTrue(!modifiedPayload.contains("types"));
+            }
+        }
+    }
+
+    @Test
+    public void testModifyGraphqlField() throws Exception {
+        HAR har = new HAR();
+        List<String> requests = har.getMessages(harString, 0, 1_000_000);
+
+        for (String request : requests) {
+            HttpResponseParams responseParams = parseKafkaMessage(request);
+            String payload = responseParams.getRequestParams().getPayload();
+            if (payload.contains("query")) {
+                String modifiedPayload = GraphQLUtils.getUtils().modifyGraphqlField(payload, "types", "email");
+                Assert.assertTrue(modifiedPayload.contains("email") && !modifiedPayload.contains("types") );
+            }
+        }
+    }
+
+    @Test
+    public void testAddUniqueGraphqlField() throws Exception {
+        HAR har = new HAR();
+        List<String> requests = har.getMessages(harString, 0, 1_000_000);
+
+        for (String request : requests) {
+            HttpResponseParams responseParams = parseKafkaMessage(request);
+            String payload = responseParams.getRequestParams().getPayload();
+            if (payload.contains("query")) {
+                String modifiedPayload = GraphQLUtils.getUtils().addUniqueGraphqlField(payload, "types", "email");
+                Assert.assertTrue(modifiedPayload.contains("email"));
+            }
+        }
+    }
+
     private static HttpResponseParams parseKafkaMessage(String message) throws Exception {
 
         //convert java object to JSON format
