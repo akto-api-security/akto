@@ -424,7 +424,7 @@ const components = !hasUserInitiatedTestRuns ? [<SummaryCardComponent key={"summ
       title={
         <TitleWithInfo
           titleText={"Test results"}
-          tooltipContent={"See testing run results of your dashboard with compact summary of issues"}
+          tooltipContent={"See testing run results along with compact summary of issues."}
         />
       }
       isFirstPage={true}

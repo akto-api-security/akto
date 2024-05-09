@@ -43,7 +43,7 @@ function UpdateConnections(props) {
         <Page 
             divider fullWidth
             title={<TitleWithInfo 
-                        tooltipContent={"Akto traffic connectors"} 
+                        tooltipContent={"Learn how to send API traffic data from traffic connectors to Akto Dashboard. "} 
                         titleText={"Quick start"}  
                         docsUrl={"https://docs.akto.io/traffic-connections/traffic-data-sources"}
                     />}

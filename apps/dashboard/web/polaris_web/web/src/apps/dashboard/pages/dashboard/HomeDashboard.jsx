@@ -134,7 +134,7 @@ function HomeDashboard() {
                 <VerticalStack gap={5}>
                     <TitleWithInfo
                         titleText={"Issues by category"}
-                        tooltipContent={"Chart of testing run issues present in dashboard categorised by subcategory of tests"}
+                        tooltipContent={"Testing run issues present in dashboard categorised by subcategory of tests."}
                         textProps={{variant: "headingMd"}}
                     />
                     <ChartypeComponent navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'200px'}/>
@@ -173,7 +173,7 @@ function HomeDashboard() {
             <VerticalStack gap={5}>
                 <TitleWithInfo
                     titleText={"Sensitive data"}
-                    tooltipContent={"Count of endpoints per Datatype present in dashboard"}
+                    tooltipContent={"Count of endpoints per data type."}
                     textProps={{variant: "headingMd"}}
                     docsUrl={"https://docs.akto.io/api-inventory/concepts/sensitive-data"}
                 />

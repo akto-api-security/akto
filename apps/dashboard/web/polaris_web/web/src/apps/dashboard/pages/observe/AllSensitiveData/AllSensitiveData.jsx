@@ -166,7 +166,7 @@ function AllSensitiveData() {
             title={
                 <TitleWithInfo 
                     titleText={"Sensitive data exposure"} 
-                    tooltipContent={"Akto allows you to identify which sensitive data an API is sharing."}
+                    tooltipContent={"Akto allows you to identify which sensitive data an API contains in request or response."}
                     docsUrl="https://docs.akto.io/api-inventory/concepts/sensitive-data" 
                 />
             }
