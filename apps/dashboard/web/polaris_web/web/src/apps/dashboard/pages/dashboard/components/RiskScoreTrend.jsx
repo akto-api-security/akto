@@ -12,15 +12,15 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
     const riskScoreTrendRef = useRef(null)
 
     const nullComponent = (
-        <NullData text={"APIS by risk score"} url={"/dashboard/observe/inventory"} urlText={"to create a collection and upload traffic in it."} description={"No apis found."} key={"riskScoreNullTrend"}/>
+        <NullData text={"APIs by risk score"} url={"/dashboard/observe/inventory"} urlText={"to create a collection and upload traffic in it."} description={"No apis found."} key={"riskScoreNullTrend"}/>
     )
 
     const dataComponent = (
         <Card key="scoreTrend">
             <VerticalStack gap={5}>
                 <TitleWithInfo
-                    titleText={"APIS by risk score"}
-                    tooltipContent={"All the endpoints in dashboard grouped on the basis of their Risk score"}
+                    titleText={"APIs by risk score"}
+                    tooltipContent={"All your endpoints grouped on the basis of their risk score."}
                     textProps={{variant: "headingMd"}}
                     docsUrl={"https://docs.akto.io/api-inventory/concepts/risk-score"}
                 />

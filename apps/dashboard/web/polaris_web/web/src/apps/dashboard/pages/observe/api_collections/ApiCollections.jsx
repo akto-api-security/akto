@@ -34,7 +34,7 @@ const headers = [
         sortActive: true
     },
     {
-        title: <HeadingWithTooltip content={<Text variant="bodySm">Risk score of collection is maximum risk score of the endpoint inside this collection</Text>} title="Risk score" />,
+        title: <HeadingWithTooltip content={<Text variant="bodySm">Risk score of collection is maximum risk score of the endpoints inside this collection</Text>} title="Risk score" />,
         value: 'riskScoreComp',
         sortActive: true
     },
@@ -66,7 +66,7 @@ const headers = [
         tooltipContent: (<Text variant="bodySm">Environment type for an API collection, Staging or Production </Text>)
     },
     {   
-        title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time an endpoint within collection was either discovered for the first time or accessed again</Text>} title="Last traffic seen" />, 
+        title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time an endpoint within collection was either discovered for the first time or seen again</Text>} title="Last traffic seen" />, 
         text: 'Last traffic seen', 
         value: 'lastTraffic',
         isText: CellType.TEXT,
@@ -363,7 +363,7 @@ function ApiCollections() {
         <PageWithMultipleCards
             title={
                 <TitleWithInfo 
-                    tooltipContent={"API inventory"} 
+                    tooltipContent={"Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
                     titleText={"API collections"} 
                     docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                 />

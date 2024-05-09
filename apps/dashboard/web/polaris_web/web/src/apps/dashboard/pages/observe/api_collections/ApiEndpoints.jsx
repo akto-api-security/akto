@@ -42,7 +42,7 @@ const headings = [
         text: "Risk score",
         title: <HeadingWithTooltip 
             title={"Risk score"}
-            content={"Risk score of the API, displays severity of the api."}
+            content={"Risk score is calculated based on the amount of sensitive information the API shares and its current status regarding security issues."}
         />,
         value: "riskScoreComp",
         textValue: "riskScore",
@@ -62,7 +62,7 @@ const headings = [
         title:"Access Type",
         showFilter: true,
         type: CellType.TEXT,
-        tooltipContent: "Access type of the api. Can be public, private, partner"
+        tooltipContent: "Access type of the API. It can be public, private, partner"
     },
     {
         text: 'Auth Type',
@@ -70,7 +70,7 @@ const headings = [
         value: 'auth_type',
         showFilter: true,
         textValue: 'authTypeTag',
-        tooltipContent: "Authentication type of the api"
+        tooltipContent: "Authentication type of the API."
     },
     {
         text: 'Sensitive Params',
@@ -84,7 +84,7 @@ const headings = [
         text: 'Last Seen',
         title: <HeadingWithTooltip 
                 title={"Last Seen"}
-                content={"Time when api was last detected in traffic."}
+                content={"Time when API was last detected in traffic."}
             />,
         value: 'last_seen',
         isText: true,

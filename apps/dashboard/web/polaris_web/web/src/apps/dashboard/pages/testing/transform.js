@@ -354,9 +354,7 @@ const transform = {
     //<Box width="300px"><Button onClick={createJiraTicket} plain disabled={window.JIRA_INTEGRATED != "true"}>Click here to create a new ticket</Button></Box>
     let filledSection = []
     moreInfoSections.forEach((section) => {
-      let sectionLocal = {}
-      sectionLocal.icon = section.icon
-      sectionLocal.title = section.title
+      let sectionLocal = {...section}
       switch (section.title) {
         case "Description":
         if(category?.issueDetails == null || category?.issueDetails == undefined){

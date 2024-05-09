@@ -11,7 +11,7 @@ const endpointHeadings = [
         text: "Risk score",
         title: "Risk score",
         value: "riskScoreComp",
-        tooltipContent: "Risk score of the API, displays severity of the api."
+        tooltipContent: "Risk score is calculated based on the amount of sensitive information the API shares and its current status regarding security issues."
     },
     {
         text: "Hostname",
@@ -107,7 +107,7 @@ const newParametersHeaders = [
         showFilterMenu: true,
         type: CellType.TEXT,
         maxWidth: '120px',
-        tooltipContent: "Location {request/response} of where the parameter is detected"
+        tooltipContent: "Location (request/response) of where the parameter is detected."
     },
     {
         text: 'Values',

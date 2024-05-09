@@ -203,7 +203,7 @@ function ApiChanges() {
                 <TitleWithInfo
                     titleText={"API changes"}
                     docsUrl={"https://docs.akto.io/api-inventory/concepts/api-changes"}
-                    tooltipContent={"Info about endpoints and parameters found in your inventory."}
+                    tooltipContent={"Information about endpoints and parameters found in your inventory."}
                 />
             }
             isFirstPage={true}
