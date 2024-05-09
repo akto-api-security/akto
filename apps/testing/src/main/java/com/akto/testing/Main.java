@@ -470,9 +470,17 @@ public class Main {
             if (!severityCount.containsKey(key)) {
                 severityCount.put(key, 0);
             }
-            int val = severityCount.get(key);
-            severityCount.put(key, val+1);
-            apisAffectedCount.put(testingRunIssues.getId().getTestSubCategory(), apisAffectedCount.getOrDefault(testingRunIssues.getId().getTestSubCategory(), 0)+1);
+
+            int issuesSeverityCount = severityCount.get(key);
+            severityCount.put(key, issuesSeverityCount+1);
+
+            String testSubCategory = testingRunIssues.getId().getTestSubCategory();
+            int totalApisAffected = apisAffectedCount.getOrDefault(testSubCategory, 0)+1;
+
+            apisAffectedCount.put(
+                    testSubCategory,
+                    totalApisAffected
+            );
 
             if(testingRunIssues.getCreationTime() > testingRunResultSummary.getStartTimestamp()) {
                 newIssues++;
