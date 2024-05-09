@@ -10,7 +10,7 @@ import api from '../api'
 import {produce} from "immer"
 import DetailsPage from '../../../components/DetailsPage'
 import InformationBannerComponent from '../../quick_start/components/shared/InformationBannerComponent'
-import TitleWithInfo from '../../../components/shared/TitleWithInfo'
+import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
 
 const statusItems = [
   {

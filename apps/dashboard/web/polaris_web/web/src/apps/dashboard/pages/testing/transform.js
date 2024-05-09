@@ -6,12 +6,11 @@ import {ResourcesMajor,
   MarketingMajor,
   FraudProtectMajor, RiskMajor} from '@shopify/polaris-icons';
 import React, {  } from 'react'
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Tag} from '@shopify/polaris';
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Tag, Tooltip} from '@shopify/polaris';
 import { history } from "@/util/history";
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
-import { circle_cancel, circle_tick_minor } from "../../components/icons";
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -173,22 +172,12 @@ const transform = {
       };
       return obj;
     },
-    prettifyTestName: (testName, icon, iconColor, state)=>{
-      let iconComp
-      switch(state){
-        case "COMPLETED":
-          iconComp = (<Box><Icon source={circle_tick_minor} /></Box>)
-          break;
-        case "STOPPED":
-          iconComp = (<Box><Icon source={circle_cancel} /></Box>)
-          break;
-        default:
-          iconComp = (<Box><Icon source={icon} color={iconColor}/></Box>)
-          break;
-      }
+    prettifyTestName: (testName, icon, iconColor, iconToolTipContent)=>{
       return(
         <HorizontalStack gap={4}>
-          {iconComp}
+          <Tooltip content={iconToolTipContent} hoverDelay={"300"} dismissOnMouseOut>
+            <Box><Icon source={icon} color={iconColor}/></Box>
+          </Tooltip>
           <Box maxWidth="350px">
             <TooltipText text={testName} tooltip={testName} textProps={{fontWeight: 'medium'}} />
           </Box>
@@ -221,11 +210,13 @@ const transform = {
       state = 'FAIL'
     }
 
+    const iconObj = func.getTestingRunIconObj(state)
+
       obj['id'] = data.hexId;
       obj['testingRunResultSummaryHexId'] = testingRunResultSummary?.hexId;
       obj['orderPriority'] = getOrderPriority(state)
-      obj['icon'] = func.getTestingRunIcon(state);
-      obj['iconColor'] = func.getTestingRunIconColor(state)
+      obj['icon'] = iconObj.icon;
+      obj['iconColor'] = iconObj.color
       obj['name'] = data.name || "Test"
       obj['number_of_tests'] = data.testIdConfig == 1 ? "-" : getTestsInfo(testingRunResultSummary?.testResultsCount, state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
@@ -244,9 +235,10 @@ const transform = {
       obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
       if(prettified){
+        
         const prettifiedTest={
           ...obj,
-          testName: transform.prettifyTestName(data.name || "Test", func.getTestingRunIcon(state),func.getTestingRunIconColor(state), state),
+          testName: transform.prettifyTestName(data.name || "Test", iconObj.icon,iconObj.color, iconObj.tooltipContent),
           severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues))
         }
         return prettifiedTest
@@ -572,37 +564,44 @@ getInfoSectionsHeaders(){
     {
       icon: RiskMajor,
       title: "Impact",
-      content: ""
+      content: "",
+      tooltipContent: 'The impact of the test on apis in general scenario.'
     },
     {
       icon: CollectionsMajor,
       title: "Tags",
-      content: ""
+      content: "",
+      tooltipContent: 'Category info about the test.'
     },
     {
       icon: CreditCardSecureMajor,
       title: "CWE",
-      content: ""
+      content: "",
+      tooltipContent: "CWE tags associated with the test from akto's test library"
     },
     {
       icon: FraudProtectMajor,
       title: "CVE",
-      content: ""
+      content: "",
+      tooltipContent: "CVE tags associated with the test from akto's test library"
     },
     {
       icon: MarketingMajor,
       title: "API endpoints affected",
-      content: ""
+      content: "",
+      tooltipContent: "Affecting endpoints in your inventory for the same test"
     },
     {
       icon: ResourcesMajor,
       title: "References",
-      content: ""
+      content: "",
+      tooltipContent: "References for the above test."
     },
     {
       icon: ResourcesMajor,
       title: "Jira",
-      content: ""
+      content: "",
+      tooltipContent: "Jira ticket number attached to the testing run issue"
     }
   ]
   return moreInfoSections
@@ -783,7 +782,8 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
   const rowItems = [
     {
       title: 'Severity',
-      value: <Text fontWeight="semibold" color={observeFunc.getColor(severity)}>{severity}</Text>
+      value: <Text fontWeight="semibold" color={observeFunc.getColor(severity)}>{severity}</Text>,
+      tooltipContent: "Severity of the test run result"
     },
     {
       title: "API",
@@ -792,19 +792,23 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
           <Text color="subdued" fontWeight="semibold">{apiInfo.id.method}</Text>
           <TextComp value={observeFunc.getTruncatedUrl(apiInfo.id.url)} />
         </HorizontalStack>
-      )
+      ),
+      tooltipContent: "Name of the api on which test is run"
     },
     {
       title: 'Hostname',
-      value: <TextComp value={observeFunc.getHostName(apiInfo.id.url)} />
+      value: <TextComp value={observeFunc.getHostName(apiInfo.id.url)} />,
+      tooltipContent: "Hostname of the api on which test is run"
     },
     {
       title: "Auth type",
-      value:<TextComp value={(auth_type || "").toLowerCase()} />
+      value:<TextComp value={(auth_type || "").toLowerCase()} />,
+      tooltipContent: "Authentication type of the api on which test is run"
     },
     {
       title: "Access type",
-      value: <TextComp value={access_type} />
+      value: <TextComp value={access_type} />,
+      tooltipContent: "Access type of the api on which test is run"
     },
     {
       title: "Sensitive Data",
@@ -816,7 +820,8 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
     },
     {
       title: "Jira",
-      value: jiraComponent
+      value: jiraComponent,
+      tooltipContent:"Jira ticket number attached to the testing run issue"
     }
   ]
   return rowItems

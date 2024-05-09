@@ -9,7 +9,7 @@ import TestEditorStore from "../testEditorStore"
 import convertFunc from "../transform"
 
 import "../TestEditor.css"
-import TitleWithInfo from "../../../components/shared/TitleWithInfo"
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 
 const TestEditorFileExplorer = ({addCustomTest}) => {
 

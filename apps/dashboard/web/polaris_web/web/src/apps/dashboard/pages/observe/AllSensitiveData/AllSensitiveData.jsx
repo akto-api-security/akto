@@ -12,7 +12,7 @@ import {
 import { useNavigate } from "react-router-dom"
 import dashboardFunc from "../../transform"
 import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
-import TitleWithInfo from "../../../components/shared/TitleWithInfo"
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 
 const headers = [
     {
