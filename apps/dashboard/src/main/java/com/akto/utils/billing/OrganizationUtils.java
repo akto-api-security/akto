@@ -13,6 +13,7 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.util.UsageUtils;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -28,7 +29,7 @@ public class OrganizationUtils {
 
     private static final Logger logger = LoggerFactory.getLogger(OrganizationUtils.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(OrganizationUtils.class);
-    private static final OkHttpClient client = new OkHttpClient();
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
 
     public static boolean isOverage(HashMap<String, FeatureAccess> featureWiseAllowed) {
 
