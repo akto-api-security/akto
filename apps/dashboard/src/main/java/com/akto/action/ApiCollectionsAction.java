@@ -430,9 +430,13 @@ public class ApiCollectionsAction extends UserAction {
             try {
                 BasicDBObject basicDBObject = cursor.next();
                 BasicDBObject id = (BasicDBObject) basicDBObject.get("_id");
-                riskScoreMap.put(id.getInt("apiCollectionId"), basicDBObject.getDouble(ApiInfo.RISK_SCORE));
+                double riskScore = 0;
+                if(basicDBObject.get(ApiInfo.RISK_SCORE) != null){
+                    riskScore = basicDBObject.getDouble(ApiInfo.RISK_SCORE);
+                }
+                riskScoreMap.put(id.getInt("apiCollectionId"), riskScore);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error in calculating risk score for collections " + e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e,"error in calculating risk score for collections " + e.toString(), LogDb.DASHBOARD);
                 e.printStackTrace();
             }
         }
