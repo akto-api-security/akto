@@ -34,6 +34,7 @@ let headers = [
   {
     value: "nameComp",
     title: 'Issue name',
+    tooltipContent: 'Name of the test as in our test editor'
   },
   {
     title: 'Severity',
@@ -44,10 +45,12 @@ let headers = [
     value: 'testCategory',
     title: 'Category',
     type: CellType.TEXT,
+    tooltipContent: 'Name of the subcategory of the test'
   },
   {
     title: 'CWE tags',
     value: 'cweDisplayComp',
+    tooltipContent: "CWE tags associated with the test from akto's test library"
   },
   {
     title: 'Number of urls',

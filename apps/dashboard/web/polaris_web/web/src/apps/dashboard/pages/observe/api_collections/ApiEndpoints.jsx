@@ -28,6 +28,7 @@ import {TestrunsBannerComponent} from "../../testing/TestRunsPage/TestrunsBanner
 import GetPrettifyEndpoint from "../GetPrettifyEndpoint"
 import SourceLocation from "./component/SourceLocation"
 import useTable from "../../../components/tables/TableContext"
+import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
 
 const headings = [
     {
@@ -39,10 +40,14 @@ const headings = [
     },
     {
         text: "Risk score",
-        title: "Risk score",
+        title: <HeadingWithTooltip 
+            title={"Risk score"}
+            content={"Risk score is calculated based on the amount of sensitive information the API shares and its current status regarding security issues."}
+        />,
         value: "riskScoreComp",
         textValue: "riskScore",
-        sortActive: true
+        sortActive: true,
+        
     },
     {
         text: "Hostname",
@@ -53,11 +58,11 @@ const headings = [
     },
     {
         text: 'Access Type',
-        value: 'access_type',
-        title: 'Access type',
+        value: 'access_type', 
+        title:"Access Type",
         showFilter: true,
         type: CellType.TEXT,
-        sortActive: true
+        tooltipContent: "Access type of the API. It can be public, private, partner"
     },
     {
         text: 'Auth Type',
@@ -65,7 +70,7 @@ const headings = [
         value: 'auth_type',
         showFilter: true,
         textValue: 'authTypeTag',
-        sortActive: true
+        tooltipContent: "Authentication type of the API."
     },
     {
         text: 'Sensitive Params',
@@ -77,17 +82,22 @@ const headings = [
     },
     {
         text: 'Last Seen',
-        title: 'Last seen',
+        title: <HeadingWithTooltip 
+                title={"Last Seen"}
+                content={"Time when API was last detected in traffic."}
+            />,
         value: 'last_seen',
         isText: true,
         type: CellType.TEXT,
-        sortActive: true
+        sortActive: true,
+        
     },
     {
         text: "Source location",
         value: "sourceLocationComp",
         textValue: "sourceLocation",
-        title: "Source location"    
+        title: "Source location",
+        tooltipContent: "Exact location of the URL in case detected from the source code."    
     }
 ]
 
@@ -108,10 +118,6 @@ const sortOptions = [
     { label: 'Method', value: 'method desc', directionLabel: 'Z-A', sortKey: 'method', columnIndex: 8 },
     { label: 'Endpoint', value: 'endpoint asc', directionLabel: 'A-Z', sortKey: 'endpoint', columnIndex: 1 },
     { label: 'Endpoint', value: 'endpoint desc', directionLabel: 'Z-A', sortKey: 'endpoint', columnIndex: 1 },
-    { label: 'Auth Type', value: 'auth_type asc', directionLabel: 'A-Z', sortKey: 'auth_type', columnIndex: 5 },
-    { label: 'Auth Type', value: 'auth_type desc', directionLabel: 'Z-A', sortKey: 'auth_type', columnIndex: 5 },
-    { label: 'Access Type', value: 'access_type asc', directionLabel: 'A-Z', sortKey: 'access_type', columnIndex: 4 },
-    { label: 'Access Type', value: 'access_type desc', directionLabel: 'Z-A', sortKey: 'access_type', columnIndex: 4 },
     { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs', columnIndex: 7 },
     { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 7 }
 ];

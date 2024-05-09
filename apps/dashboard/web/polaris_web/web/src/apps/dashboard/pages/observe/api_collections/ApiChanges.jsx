@@ -13,6 +13,7 @@ import PersistStore from "../../../../main/PersistStore";
 import ApiChangesTable from "./component/ApiChangesTable";
 import SummaryCardInfo from "../../../components/shared/SummaryCardInfo";
 import StackedChart from "../../../components/charts/StackedChart";
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import { useLocation } from "react-router-dom";
 
 
@@ -199,9 +200,11 @@ function ApiChanges() {
     return (
         <PageWithMultipleCards
             title={
-                <Text variant='headingLg'>
-                    API changes
-                </Text>
+                <TitleWithInfo
+                    titleText={"API changes"}
+                    docsUrl={"https://docs.akto.io/api-inventory/concepts/api-changes"}
+                    tooltipContent={"Information about endpoints and parameters found in your inventory."}
+                />
             }
             isFirstPage={true}
             primaryAction={<DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>}
