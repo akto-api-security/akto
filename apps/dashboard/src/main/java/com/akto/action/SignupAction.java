@@ -443,7 +443,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         if (githubConfig == null) {
             return ERROR.toUpperCase();
         }
-        JSONObject params = new JSONObject();
+        BasicDBObject params = new BasicDBObject();
         params.put("client_id", githubConfig.getClientId());
         params.put("client_secret", githubConfig.getClientSecret());
         params.put("code", this.code);
@@ -486,7 +486,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         String clientSecret = oktaConfig.getClientSecret();
         String redirectUri = oktaConfig.getRedirectUri();
 
-        JSONObject params = new JSONObject();
+        BasicDBObject params = new BasicDBObject();
         params.put("grant_type", "authorization_code");
         params.put("code", this.code);
         params.put("client_id", clientId);
