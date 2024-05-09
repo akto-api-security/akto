@@ -11,12 +11,11 @@ import {ResourcesMajor,
   PlayMinor,
 } from '@shopify/polaris-icons';
 import React, {  } from 'react'
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Tag} from '@shopify/polaris';
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Tag, Tooltip} from '@shopify/polaris';
 import { history } from "@/util/history";
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
-import { circle_cancel, circle_tick_minor } from "../../components/icons";
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -178,22 +177,12 @@ const transform = {
       };
       return obj;
     },
-    prettifyTestName: (testName, icon, iconColor, state)=>{
-      let iconComp
-      switch(state){
-        case "COMPLETED":
-          iconComp = (<Box><Icon source={circle_tick_minor} /></Box>)
-          break;
-        case "STOPPED":
-          iconComp = (<Box><Icon source={circle_cancel} /></Box>)
-          break;
-        default:
-          iconComp = (<Box><Icon source={icon} color={iconColor}/></Box>)
-          break;
-      }
+    prettifyTestName: (testName, icon, iconColor, iconToolTipContent)=>{
       return(
         <HorizontalStack gap={4}>
-          {iconComp}
+          <Tooltip content={iconToolTipContent} hoverDelay={"300"} dismissOnMouseOut>
+            <Box><Icon source={icon} color={iconColor}/></Box>
+          </Tooltip>
           <Box maxWidth="350px">
             <TooltipText text={testName} tooltip={testName} textProps={{fontWeight: 'medium'}} />
           </Box>
@@ -230,12 +219,13 @@ const transform = {
     if(Object.keys(data).length > 0){
       apiCollectionId = data?.testingEndpoints?.apiCollectionId || data?.testingEndpoints?.apisList[0]?.apiCollectionId
     }
+    const iconObj = func.getTestingRunIconObj(state)
 
       obj['id'] = data.hexId;
       obj['testingRunResultSummaryHexId'] = testingRunResultSummary?.hexId;
       obj['orderPriority'] = getOrderPriority(state)
-      obj['icon'] = func.getTestingRunIcon(state);
-      obj['iconColor'] = func.getTestingRunIconColor(state)
+      obj['icon'] = iconObj.icon;
+      obj['iconColor'] = iconObj.color
       obj['name'] = data.name || "Test"
       obj['number_of_tests'] = data.testIdConfig == 1 ? "-" : getTestsInfo(testingRunResultSummary?.testResultsCount, state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
@@ -255,9 +245,10 @@ const transform = {
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
       obj['apiCollectionId'] = apiCollectionId
       if(prettified){
+        
         const prettifiedTest={
           ...obj,
-          testName: transform.prettifyTestName(data.name || "Test", func.getTestingRunIcon(state),func.getTestingRunIconColor(state), state),
+          testName: transform.prettifyTestName(data.name || "Test", iconObj.icon,iconObj.color, iconObj.tooltipContent),
           severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues))
         }
         return prettifiedTest
@@ -373,9 +364,7 @@ const transform = {
     //<Box width="300px"><Button onClick={createJiraTicket} plain disabled={window.JIRA_INTEGRATED != "true"}>Click here to create a new ticket</Button></Box>
     let filledSection = []
     moreInfoSections.forEach((section) => {
-      let sectionLocal = {}
-      sectionLocal.icon = section.icon
-      sectionLocal.title = section.title
+      let sectionLocal = {...section}
       switch (section.title) {
         case "Description":
         if(category?.issueDetails == null || category?.issueDetails == undefined){
@@ -583,37 +572,44 @@ getInfoSectionsHeaders(){
     {
       icon: RiskMajor,
       title: "Impact",
-      content: ""
+      content: "",
+      tooltipContent: 'The impact of the test on apis in general scenario.'
     },
     {
       icon: CollectionsMajor,
       title: "Tags",
-      content: ""
+      content: "",
+      tooltipContent: 'Category info about the test.'
     },
     {
       icon: CreditCardSecureMajor,
       title: "CWE",
-      content: ""
+      content: "",
+      tooltipContent: "CWE tags associated with the test from akto's test library"
     },
     {
       icon: FraudProtectMajor,
       title: "CVE",
-      content: ""
+      content: "",
+      tooltipContent: "CVE tags associated with the test from akto's test library"
     },
     {
       icon: MarketingMajor,
       title: "API endpoints affected",
-      content: ""
+      content: "",
+      tooltipContent: "Affecting endpoints in your inventory for the same test"
     },
     {
       icon: ResourcesMajor,
       title: "References",
-      content: ""
+      content: "",
+      tooltipContent: "References for the above test."
     },
     {
       icon: ResourcesMajor,
       title: "Jira",
-      content: ""
+      content: "",
+      tooltipContent: "Jira ticket number attached to the testing run issue"
     }
   ]
   return moreInfoSections
@@ -628,6 +624,7 @@ convertSubIntoSubcategory(resp){
   const subCategoryMap = PersistStore.getState().subCategoryMap
   Object.keys(resp).forEach((key)=>{
     const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.shortName : key;
+    const objectKeyName = subCategoryMap[key] ? subCategoryMap[key].superCategory.name : key;
     if(obj.hasOwnProperty(objectKey)){
       let tempObj =  JSON.parse(JSON.stringify(obj[objectKey]));
       let newObj = {
@@ -640,13 +637,15 @@ convertSubIntoSubcategory(resp){
     else if(!subCategoryMap[key]){
       obj[objectKey] = {
         text: resp[key],
-        color: func.getColorForCharts(key)
+        color: func.getColorForCharts(key),
+        filterkey: objectKeyName
       }
       countObj.HIGH+=resp[key]
     }else{
       obj[objectKey] = {
         text: resp[key],
-        color: func.getColorForCharts(subCategoryMap[key].superCategory.name)
+        color: func.getColorForCharts(subCategoryMap[key].superCategory.name),
+        filterkey: objectKeyName
       }
       countObj[subCategoryMap[key].superCategory.severity._name]+=resp[key]
     }
@@ -658,7 +657,7 @@ convertSubIntoSubcategory(resp){
     const prop2 = val2['text'];
     return prop2 - prop1 ;
   });
-
+  
   return {
     subCategoryMap: Object.fromEntries(sortedEntries),
     countMap: countObj
@@ -794,7 +793,8 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
   const rowItems = [
     {
       title: 'Severity',
-      value: <Text fontWeight="semibold" color={observeFunc.getColor(severity)}>{severity}</Text>
+      value: <Text fontWeight="semibold" color={observeFunc.getColor(severity)}>{severity}</Text>,
+      tooltipContent: "Severity of the test run result"
     },
     {
       title: "API",
@@ -803,19 +803,23 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
           <Text color="subdued" fontWeight="semibold">{apiInfo.id.method}</Text>
           <TextComp value={observeFunc.getTruncatedUrl(apiInfo.id.url)} />
         </HorizontalStack>
-      )
+      ),
+      tooltipContent: "Name of the api on which test is run"
     },
     {
       title: 'Hostname',
-      value: <TextComp value={observeFunc.getHostName(apiInfo.id.url)} />
+      value: <TextComp value={observeFunc.getHostName(apiInfo.id.url)} />,
+      tooltipContent: "Hostname of the api on which test is run"
     },
     {
       title: "Auth type",
-      value:<TextComp value={(auth_type || "").toLowerCase()} />
+      value:<TextComp value={(auth_type || "").toLowerCase()} />,
+      tooltipContent: "Authentication type of the api on which test is run"
     },
     {
       title: "Access type",
-      value: <TextComp value={access_type} />
+      value: <TextComp value={access_type} />,
+      tooltipContent: "Access type of the api on which test is run"
     },
     {
       title: "Sensitive Data",
@@ -827,7 +831,8 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
     },
     {
       title: "Jira",
-      value: jiraComponent
+      value: jiraComponent,
+      tooltipContent:"Jira ticket number attached to the testing run issue"
     }
   ]
   return rowItems
