@@ -9,14 +9,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.http.HttpEntity;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.mime.MultipartEntityBuilder;
-import org.apache.http.entity.mime.content.FileBody;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.JiraIntegrationDao;
@@ -29,14 +21,23 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 public class JiraIntegrationAction extends UserAction {
 
@@ -64,6 +65,7 @@ public class JiraIntegrationAction extends UserAction {
     private final String CREATE_ISSUE_ENDPOINT = "/rest/api/3/issue";
     private final String ATTACH_FILE_ENDPOINT = "/attachments";
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
 
     public String testIntegration() {
 
@@ -292,27 +294,32 @@ public class JiraIntegrationAction extends UserAction {
             FileUtils.writeStringToFile(new File(tmpOutputFile.getPath()), resp + "\n\n", (String) null, true);
 
 
-            CloseableHttpClient httpClient = HttpClients.createDefault();
+            MediaType mType = MediaType.parse("application/octet-stream");
+            RequestBody requestBody = new MultipartBody.Builder().setType(MultipartBody.FORM)
+                    .addFormDataPart("file", tmpOutputFile.getName(),
+                            RequestBody.create(tmpOutputFile, mType))
+                    .build();
 
+            Request request = new Request.Builder()
+                    .url(url)
+                    .post(requestBody)
+                    .header("Authorization", "Basic " + authHeader)
+                    .header("X-Atlassian-Token", "nocheck")
+                    .build();
 
-            MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-            builder.addPart("file", new FileBody(tmpOutputFile, ContentType.DEFAULT_BINARY));
+            Response response = null;
 
-            HttpEntity multipart = builder.build();
-
-
-            HttpPost uploadFile = new HttpPost(url);
-            uploadFile.addHeader("Authorization", "Basic " + authHeader);
-            uploadFile.addHeader("X-Atlassian-Token", "nocheck");
-            uploadFile.setEntity(multipart);
-
-            try (CloseableHttpResponse response = httpClient.execute(uploadFile)) {
-                HttpEntity responseEntity = response.getEntity();
-                int statusCode = response.getStatusLine().getStatusCode();
-
+            try {
+                response = client.newCall(request).execute();
+            } catch (Exception ex) {
+                loggerMaker.errorAndAddToDb(ex,
+                        String.format("Failed to call jira from url %s. Error %s", url, ex.getMessage()),
+                        LogDb.DASHBOARD);
+            } finally {
+                if (response != null) {
+                    response.close();
+                }
             }
-
-            httpClient.close();
 
         } catch (Exception ex) {
                 ex.printStackTrace();
