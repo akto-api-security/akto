@@ -321,6 +321,69 @@ public class Utils {
         }
     }
 
+    /*
+        key = users
+        payload = {data : {users : { __typename: "abc", email: "abc@abc.com", info : {id: "werasdf", token: "asdfa"} }}}
+
+        returns  __typename, email
+
+    */
+
+    public static List<String> findAllTerminalKeys(String payload, String key) {
+
+        JsonParser jp;
+        JsonNode node;
+        List<String> values = new ArrayList<>();
+        try {
+            jp = factory.createParser(payload);
+            node = mapper.readTree(jp);
+        } catch (IOException e) {
+            return values;
+        }
+
+        findAllKeys(node, key, values, false);
+        return values;
+    }
+
+    public static void findAllKeys(JsonNode node, String key, List<String> values, boolean found) {
+        if (found) {
+            if (node.isArray()) {
+                ArrayNode arrayNode = (ArrayNode) node;
+                for (int i = 0; i < arrayNode.size(); i++) {
+                    JsonNode arrayElement = arrayNode.get(i);
+                    findAllKeys(arrayElement, key, values, found);
+                }
+            } else {
+                Iterator<String> fieldNames = node.fieldNames();
+                while(fieldNames.hasNext()) {
+                    String fieldName = fieldNames.next();
+                    JsonNode jsonNode = node.get(fieldName);
+                    if (jsonNode.isValueNode()) {
+                        values.add(fieldName);
+                    }
+                }
+            }
+        }
+        if (node.isArray()) {
+            ArrayNode arrayNode = (ArrayNode) node;
+            for (int i = 0; i < arrayNode.size(); i++) {
+                JsonNode arrayElement = arrayNode.get(i);
+                findAllKeys(arrayElement, key, values, found);
+            }
+        } else {
+            Iterator<String> fieldNames = node.fieldNames();
+            while(fieldNames.hasNext()) {
+                String fieldName = fieldNames.next();
+                if (key.equalsIgnoreCase(fieldName)) {
+                    found = true;
+                }
+                JsonNode jsonNode = node.get(fieldName);
+                findAllKeys(jsonNode, key, values, found);
+                found = false;
+            }
+        }
+    }
+
     public static List<String> findAllValuesForKey(String payload, String key, boolean isRegex) {
         JsonParser jp = null;
         JsonNode node;
@@ -504,6 +567,13 @@ public class Utils {
             return urlModifierPayload;
         }
         return urlModifierPayload;
+    }
+
+    public static String jsonifyIfArray(String payload) {
+        if (payload != null && payload.startsWith("[")) {
+            payload = "{\"json\": "+payload+"}";
+        }
+        return payload;
     }
 
     public static String buildNewUrl(UrlModifierPayload urlModifierPayload, String oldUrl) {
