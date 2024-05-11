@@ -18,7 +18,8 @@ public class TestEditorEnums {
         CONTAINS_JWT,
         COOKIE_EXPIRE_FILTER,
         DATATYPE,
-        BELONGS_TO_COLLECTIONS
+        BELONGS_TO_COLLECTIONS,
+        VALUETYPE
     }
 
     public enum CollectionOperands {
@@ -223,6 +224,7 @@ public class TestEditorEnums {
         MODIFY_BODY_PARAM,
         MODIFY_QUERY_PARAM,
         ADD_GRAPHQL_FIELD,
+        ADD_UNIQUE_GRAPHQL_FIELD,
         MODIFY_GRAPHQL_FIELD
     }
 

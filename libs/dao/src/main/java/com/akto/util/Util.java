@@ -18,4 +18,9 @@ public class Util {
 
         return list;
     }
+
+    public static String getEnvironmentVariable(String var){
+        return System.getenv(var);
+    }
+
 }
