@@ -1121,7 +1121,7 @@ public class InitializerListener implements ServletContextListener {
         ArrayList<TestingEndpoints> loginConditions = new ArrayList<>();
         loginConditions.add(new RegexTestingEndpoints(TestingEndpoints.Operator.OR, regex));
         loginGroup.setConditions(loginConditions);
-        ApiCollectionUsers.removeFromCollectionsForCollectionId(loginGroup.getConditions(), id);
+        ApiCollectionUsers.removeFromCollectionsForCollectionId(loginGroup.getConditions(), id, false);
 
         ApiCollectionsDao.instance.insertOne(loginGroup);
         ApiCollectionUsers.addToCollectionsForCollectionId(loginGroup.getConditions(), loginGroup.getId());
@@ -1143,27 +1143,67 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void createRiskScoreApiGroup(int id, String name, RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType) {
-        // ApiCollection riskScoreGroup = new ApiCollection(id, name, Context.now(), new HashSet<>(), null, 0, false, false);
-        // riskScoreGroup.setType(ApiCollection.Type.API_GROUP);
-        // ArrayList<TestingEndpoints> riskScoreConditions = new ArrayList<>();
-        // riskScoreConditions.add(new RiskScoreTestingEndpoints(riskScoreGroupType));
-        // riskScoreGroup.setConditions(riskScoreConditions);
-
-        // ApiCollectionsDao.instance.insertOne(riskScoreGroup);
-
-        ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(name);
+        loggerMaker.infoAndAddToDb("Creating risk score group: " + name, LogDb.DASHBOARD);
         
+        ApiCollection riskScoreGroup = ApiCollectionsDao.instance.findByName(name);
+
+        if (riskScoreGroup == null) {
+            riskScoreGroup = new ApiCollection(id, name, Context.now(), new HashSet<>(), null, 0, false, false);
+            
+            List<TestingEndpoints> riskScoreConditions = new ArrayList<>();
+            RiskScoreTestingEndpoints riskScoreTestingEndpoints = new RiskScoreTestingEndpoints(riskScoreGroupType);
+            riskScoreConditions.add(riskScoreTestingEndpoints);
+
+            riskScoreGroup.setConditions(riskScoreConditions);
+            riskScoreGroup.setType(ApiCollection.Type.API_GROUP);
+
+            ApiCollectionsDao.instance.insertOne(riskScoreGroup);  
+        }
+        
+        List<TestingEndpoints> riskScoreConditions = riskScoreGroup.getConditions();
+        RiskScoreTestingEndpoints riskScoreTestingEndpoints = (RiskScoreTestingEndpoints) riskScoreConditions.get(0);
+            
+        // Add APIs to the risk score group
+        List<ApiInfo> riskScoreGroupApisList = riskScoreTestingEndpoints.fetchRiskScoreGroupApis();
+
+
+        // Skip API's wwhich have already been added to the risk score group
+        Iterator<ApiInfo> riskScoreGroupApisListIt = riskScoreGroupApisList.iterator();
+        while (riskScoreGroupApisListIt.hasNext()) {
+            ApiInfo riskScoreGroupApi = riskScoreGroupApisListIt.next();
+            List<Integer> collectionIds = riskScoreGroupApi.getCollectionIds();
+
+            if (collectionIds.contains(id)) {
+                riskScoreGroupApisListIt.remove();
+            }
+        }
+
+        loggerMaker.infoAndAddToDb("Adding " + riskScoreGroupApisList.size() + " API's to API group - " + name , LogDb.DASHBOARD);
+        for (int start = 0; start < riskScoreGroupApisList.size(); start += RiskScoreTestingEndpoints.BATCH_SIZE) {
+            int end = Math.min(start + RiskScoreTestingEndpoints.BATCH_SIZE, riskScoreGroupApisList.size());
+
+            List<ApiInfo> batch = riskScoreGroupApisList.subList(start, end);
+
+            riskScoreTestingEndpoints.setFilterRiskScoreGroupApis(batch);
+            ApiCollectionUsers.addToCollectionsForCollectionId(riskScoreConditions, id);
+        } 
     }
 
     public static void createRiskScoreGroups(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getRiskScoreGroups() == 0) {
+            try {
+                createRiskScoreApiGroup(111_111_148, "Low Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.LOW);
+                createRiskScoreApiGroup(111_111_149, "Medium Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.MEDIUM);
+                createRiskScoreApiGroup(111_111_150, "High Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.HIGH);
 
-            createRiskScoreApiGroup(111_111_148, "Low Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.LOW);
-
-            // BackwardCompatibilityDao.instance.updateOne(
-            //         Filters.eq("_id", backwardCompatibility.getId()),
-            //         Updates.set(BackwardCompatibility.RISK_SCORE_GROUPS, Context.now())
-            // );
+                BackwardCompatibilityDao.instance.updateOne(
+                        Filters.eq("_id", backwardCompatibility.getId()),
+                        Updates.set(BackwardCompatibility.RISK_SCORE_GROUPS, Context.now())
+                );
+            }
+            catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error while creating risk score groups: " + e.getMessage(), LogDb.DASHBOARD);
+            }
         }
     }
 
@@ -1555,7 +1595,22 @@ public class InitializerListener implements ServletContextListener {
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         for (ApiCollection apiCollection : apiCollections) {
             if (ApiCollection.Type.API_GROUP.equals(apiCollection.getType())) {
-                ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+                List<TestingEndpoints> conditions = apiCollection.getConditions();
+
+                // Don't update API groups that are delta update based
+                boolean isDeltaUpdateBasedApiGroup = false;
+                for (TestingEndpoints testingEndpoints : conditions) {
+                    if (TestingEndpoints.checkDeltaUpdateBased(testingEndpoints.getType())) {
+                        isDeltaUpdateBasedApiGroup = true;
+                        break;
+                    }
+                }
+
+                if (isDeltaUpdateBasedApiGroup) {
+                    continue;
+                }
+
+                ApiCollectionUsers.computeCollectionsForCollectionId(conditions, apiCollection.getId());
             }
         }
     }

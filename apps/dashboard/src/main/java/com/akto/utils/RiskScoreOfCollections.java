@@ -17,10 +17,14 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.AktoDataType;
+import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.RiskScoreTestingEndpoints;
+import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.testing.RiskScoreTestingEndpoints.RiskScoreGroupType;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -140,7 +144,9 @@ public class RiskScoreOfCollections {
             return ;
         }
 
-        Map<ApiInfoKey, Float> severityScoreMap = getSeverityScoreMap(updatedIssues);
+        Map<ApiInfoKey, Float> severityScoreMap = getSeverityScoreMap(updatedIssues);  
+
+        RiskScoreTestingEndpointsUtils riskScoreTestingEndpointsUtils = new RiskScoreTestingEndpointsUtils();
 
         // after getting the severityScoreMap, we write that in DB
         if(severityScoreMap != null){
@@ -149,6 +155,11 @@ public class RiskScoreOfCollections {
                 ApiInfo apiInfo = ApiInfoDao.instance.findOne(filter);
                 boolean isSensitive = apiInfo != null ? apiInfo.getIsSensitive() : false;
                 float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, Utils.getRiskScoreValueFromSeverityScore(severityScore));
+
+                if (apiInfo.getRiskScore() != riskScore) {
+                    riskScoreTestingEndpointsUtils.updateApiRiskScoreGroup(apiInfo, riskScore);
+                }
+                
             
                 Bson update = Updates.combine(
                     Updates.set(ApiInfo.SEVERITY_SCORE, severityScore),
@@ -161,7 +172,8 @@ public class RiskScoreOfCollections {
         if (bulkUpdatesForApiInfo.size() > 0) {
             ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
         }
-            
+
+        riskScoreTestingEndpointsUtils.syncRiskScoreGroupApis();  
     }
 
     private static void writeUpdatesForSensitiveInfoInApiInfo(List<String> updatedDataTypes, int timeStampFilter){
@@ -258,6 +270,9 @@ public class RiskScoreOfCollections {
             Filters.lte(ApiInfo.LAST_CALCULATED_TIME, timeStamp)
         );
         Bson projection = Projections.include("_id", ApiInfo.API_ACCESS_TYPES, ApiInfo.LAST_SEEN, ApiInfo.SEVERITY_SCORE, ApiInfo.IS_SENSITIVE);
+
+        RiskScoreTestingEndpointsUtils riskScoreTestingEndpointsUtils = new RiskScoreTestingEndpointsUtils();
+
         while(count < 100){
             List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter,0, limit, Sorts.descending(ApiInfo.LAST_CALCULATED_TIME), projection);
             for(ApiInfo apiInfo: apiInfos){
@@ -269,6 +284,10 @@ public class RiskScoreOfCollections {
                 Bson filterQ = ApiInfoDao.getFilter(apiInfo.getId());
                 
                 bulkUpdates.add(new UpdateManyModel<>(filterQ, update, new UpdateOptions().upsert(false)));
+                
+                if (apiInfo.getRiskScore() != riskScore) {
+                    riskScoreTestingEndpointsUtils.updateApiRiskScoreGroup(apiInfo, riskScore);
+                }
             }
             if(bulkUpdates.size() > 0){
                 ApiInfoDao.instance.bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
@@ -279,5 +298,7 @@ public class RiskScoreOfCollections {
                 break;
             }
         }
+
+        riskScoreTestingEndpointsUtils.syncRiskScoreGroupApis();
     }
 }

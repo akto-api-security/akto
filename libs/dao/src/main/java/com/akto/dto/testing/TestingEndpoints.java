@@ -119,4 +119,13 @@ public abstract class TestingEndpoints {
         }
         return filtersMap;
     }    
+
+    public static Boolean checkDeltaUpdateBased(Type type) {
+        switch (type) {
+            case RISK_SCORE:
+                return true;
+            default:
+                return false;
+        }
+    }
 }
