@@ -21,6 +21,7 @@ import values from "@/util/values";
 import {TestrunsBannerComponent} from "./TestrunsBannerComponent";
 import useTable from "../../../components/tables/TableContext";
 import PersistStore from "../../../../main/PersistStore";
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 
 /*
   {
@@ -53,6 +54,7 @@ let headers = [
     value: "number_of_tests",
     itemOrder: 3,
     type: CellType.TEXT,
+    tooltipContent: (<Text variant="bodySm">Count of attempted testing run results</Text>)
   },
   {
     text:"Severity",
@@ -60,6 +62,7 @@ let headers = [
     title: 'Issues',
     filterKey:"severityStatus",
     itemOrder:2,
+    tooltipContent: (<Text variant="bodySm">Severity and count of issues per test run</Text>)
   },
   {
     text: 'Run time',
@@ -418,7 +421,12 @@ const coreTable = (
 const components = !hasUserInitiatedTestRuns ? [<SummaryCardComponent key={"summary"}/>,<TestrunsBannerComponent key={"banner-comp"}/>, coreTable] : [<SummaryCardComponent key={"summary"}/>, coreTable]
   return (
     <PageWithMultipleCards
-      title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}
+      title={
+        <TitleWithInfo
+          titleText={"Test results"}
+          tooltipContent={"See testing run results along with compact summary of issues."}
+        />
+      }
       isFirstPage={true}
       components={components}
       primaryAction={<DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>}
