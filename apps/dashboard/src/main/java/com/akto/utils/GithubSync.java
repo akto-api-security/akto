@@ -1,22 +1,8 @@
 package com.akto.utils;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.http.Header;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.HttpClients;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -28,13 +14,11 @@ import okhttp3.ResponseBody;
 import com.akto.github.GithubFile;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.util.Pair;
-
-import javassist.bytecode.ByteArray;
+import com.akto.util.http_util.CoreHTTPClient;
 
 public class GithubSync {
     private static final LoggerMaker loggerMaker = new LoggerMaker(GithubSync.class);
-    private static final OkHttpClient client = new OkHttpClient();
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
 
     public GithubFile syncFile(String repo, String filePath, String latestSha, Map<String, String> githubFileShaMap) {
         String[] filePathSplit = filePath.split("/");
@@ -127,35 +111,41 @@ public class GithubSync {
     public byte[] syncRepo(String url) {
         byte[] repoZip = null;
 
-        HttpClient httpClient = HttpClients.createDefault();
-        HttpGet httpGet = new HttpGet(url);
+        Request request = new Request.Builder()
+                .url(url)
+                /*
+                 * this header is needed to force the URL 
+                 * to send the content-length header.
+                 */
+                .addHeader("Accept-encoding", "None")
+                .build();
+        Response response = null;
 
         try {
-            HttpResponse response = httpClient.execute(httpGet);
+            response =  client.newCall(request).execute();
 
-            if (response.getStatusLine().getStatusCode() == 200) {
-
+            if (response.isSuccessful()) {
                 long content_length = 0;
-                Header content_length_header = response.getFirstHeader("content-length");
+                String content_length_header = response.header("content-length");
                 if (content_length_header != null) {
-                    content_length = Long.parseLong(content_length_header.getValue());
+                    content_length = Long.parseLong(content_length_header);
                 }
                 if (content_length > REPO_SIZE_LIMIT) {
                     throw new Exception("Repo size is too large, max allowed size is 10 MB");
                 }
 
                 loggerMaker.infoAndAddToDb(String.format("Downloaded github repo archive: %s", url), LogDb.DASHBOARD);
-                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                response.getEntity().writeTo(outputStream);
-                repoZip = outputStream.toByteArray();
+                repoZip = response.body().bytes();
             } else {
-                loggerMaker.errorAndAddToDb(String.format("Failed to download the zip archive from url %s. Status code: %d", url, response.getStatusLine().getStatusCode()), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(String.format("Failed to download the zip archive from url %s. Status code: %d", url, response.code()), LogDb.DASHBOARD);
             }
         } catch (Exception ex) {
             loggerMaker.errorAndAddToDb(ex, String.format("Failed to download the zip archive from url %s. Error %s", url, ex.getMessage()), LogDb.DASHBOARD);
         } 
         finally {
-            httpGet.releaseConnection();
+            if (response != null) {
+                response.close();
+            }
         }
 
         return repoZip;

@@ -3,6 +3,8 @@ import PersistStore from '../apps/main/PersistStore';
 import func from "./func"
 import { history } from './history';
 
+const accessTokenUrl = "/dashboard/accessToken"
+
 // create axios
 const service = axios.create({
   baseURL: window.location.origin, // api base_url
@@ -52,18 +54,21 @@ const err = async (error) => {
       }
 
       const originalRequest = error.config;
-      if (originalRequest._retry) {
+
+      if (originalRequest.url === accessTokenUrl) {
         // if done multiple times, then redirect to login.
         func.setToast(true, true, "Session expired. Redirecting you to login page in some time.")
         setTimeout(()=>{
           window.location.pathname = "/login"
-        },3000)
+        },1500)
+        break
       }
-      originalRequest._retry = true
+
       await service({
-        url: '/dashboard/accessToken',
+        url: accessTokenUrl,
         method: 'get',
       })
+
       return service(originalRequest)
     case 500:
       func.setToast(true, true, "Server Error");

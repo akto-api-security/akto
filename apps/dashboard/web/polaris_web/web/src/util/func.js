@@ -1,8 +1,6 @@
 import {
-  CircleCancelMajor,
   CalendarMinor,
   ClockMinor,
-  CircleTickMajor,
   CircleAlertMajor,
   DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor, InviteMinor, CreditCardMajor, IdentityCardMajor, LocationsMinor,
   PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, ReceiptMajor, MobileMajor, CalendarTimeMinor
@@ -16,6 +14,8 @@ import { current } from 'immer';
 import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
+
+import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
 
 const func = {
   setToast (isActive, isError, message) {
@@ -140,6 +140,12 @@ prettifyEpoch(epoch) {
   },
   flattenObject(obj, prefix = '') {
     return obj && Object.keys(obj).reduce((acc, k) => {
+
+      // skip react objects
+      if(isValidElement(obj[k])){
+        return acc;
+      }
+
       const pre = prefix.length ? `${prefix}.` : '';
       if (
         typeof obj[k] === 'object' &&
@@ -196,27 +202,50 @@ prettifyEpoch(epoch) {
       return (countIssues[key] > 0)
     })
   },
-  getTestingRunIcon(state) {
-    switch (state?._name || state) {
-      case "RUNNING": return ClockMinor;
-      case "SCHEDULED": return CalendarMinor;
-      case "STOPPED": return CircleCancelMajor;
-      case "COMPLETED": return CircleTickMajor;
-      case "FAILED" :
-      case "FAIL": return CircleAlertMajor;
-      default: return ClockMinor;
-    }
-  },
-  getTestingRunIconColor(state) {
-    switch (state?._name || state) {
-      case "RUNNING": return "subdued";
-      case "SCHEDULED": return "warning";
+  getTestingRunIconObj(state) {
+    let testState = state?._name || state
+    switch(testState.toUpperCase()){
+      case "RUNNING": 
+        return {
+          color: "subdued",
+          icon: ClockMinor,
+          tooltipContent: "Test is currently running"
+        }
+
+      case "SCHEDULED": 
+        return {
+          color: "warning",
+          icon: CalendarMinor,
+          tooltipContent: "Test is scheduled and will run in future."
+        }
+
       case "FAILED":
       case "FAIL":
-      case "STOPPED": return "critical";
-      case "COMPLETED": return "success";
-      default: return "base";
-    }
+        return{
+          color: "critical",
+          icon: CircleAlertMajor,
+          tooltipContent: "Error occurred while running the test."
+        }
+
+      case "STOPPED":
+        return{
+          color: "critical",
+          tooltipContent: "Error occurred while running the test.",
+          icon: circle_cancel,
+        }
+      case "COMPLETED": 
+        return {
+          color: "success",
+          tooltipContent: "Test has been completed.",
+          icon: circle_tick_minor
+        }
+      default: 
+        return{
+          color: "critical",
+          icon: CircleAlertMajor,
+          tooltipContent: "Unknown error occurred while running the test."
+        }
+      }
   },
   getSeverity(countIssues) {
     return func.getSeverityStatus(countIssues).map((key) => {
@@ -733,7 +762,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
 
           let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
           let authTypeTag = authType.replace(",", "");
-          let score = apiInfoMap[key] ? apiInfoMap[key]?.severityScore : 0
+          let riskScore = apiInfoMap[key] ? apiInfoMap[key]?.riskScore : 0
           let isSensitive = apiInfoMap[key] ? apiInfoMap[key]?.isSensitive : false
 
           ret[key] = {
@@ -765,7 +794,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
                 return apiGroupsMap[x]
               }) : [],
               isSensitive: isSensitive,
-              severityScore: score,
+              riskScore: riskScore
           }
 
       }

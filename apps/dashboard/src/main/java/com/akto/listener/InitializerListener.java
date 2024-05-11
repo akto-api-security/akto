@@ -77,6 +77,7 @@ import com.akto.util.Pair;
 import com.akto.util.UsageUtils;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.*;
 import com.akto.util.DashboardMode;
@@ -100,7 +101,11 @@ import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.slack.api.Slack;
+import com.slack.api.util.http.SlackHttpClient;
 import com.slack.api.webhook.WebhookResponse;
+
+import okhttp3.OkHttpClient;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
@@ -713,7 +718,9 @@ public class InitializerListener implements ServletContextListener {
                                 return;
                             }
 
-                    Slack slack = Slack.getInstance();
+                    OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
+                    SlackHttpClient slackHttpClient = new SlackHttpClient(httpClient);
+                    Slack slack = Slack.getInstance(slackHttpClient);
 
                     for (SlackWebhook slackWebhook : listWebhooks) {
                         int now = Context.now();

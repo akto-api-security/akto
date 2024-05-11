@@ -25,6 +25,7 @@ import com.akto.mixpanel.AktoMixpanel;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.UsageUtils;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.google.api.client.json.Json;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -44,6 +45,7 @@ public class UsageMetricUtils {
     private static final Logger logger = LoggerFactory.getLogger(UsageMetricUtils.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricUtils.class);
     private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(UsageMetricUtils.class);
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
 
     public static void syncUsageMetricWithAkto(UsageMetric usageMetric) {
         try {
@@ -60,7 +62,6 @@ public class UsageMetricUtils {
                     .post(body)
                     .build();
 
-            OkHttpClient client = new OkHttpClient();
             Response response = null;
 
             try {
@@ -228,7 +229,6 @@ public class UsageMetricUtils {
                 .post(body)
                 .build();
 
-        OkHttpClient client = new OkHttpClient();
         Response response = null;
 
         try {
