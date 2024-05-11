@@ -119,15 +119,20 @@ public class ApiCollectionUsers {
         operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
     }
 
-    public static void removeFromCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
+    public static void removeFromCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, boolean matchExactCondition) {
         Bson update = Updates.pull(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         Bson matchFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
-        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, true);
+
+        if (matchExactCondition) {
+            operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
+        } else {
+            operationForCollectionId(conditions, apiCollectionId, update, matchFilter, true);
+        }
     }
 
     public static void computeCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
         addToCollectionsForCollectionId(conditions, apiCollectionId);
-        removeFromCollectionsForCollectionId(conditions, apiCollectionId);
+        removeFromCollectionsForCollectionId(conditions, apiCollectionId, false);
         updateApiCollection(conditions, apiCollectionId);
     }
 
