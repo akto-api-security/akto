@@ -141,7 +141,9 @@ public class TestRolesAction extends UserAction {
         boolean isAttackerRole = false;
         TestRoles attackerRole = TestCollectionPropertiesDao.fetchTestToleForProp(0,
                 TestCollectionProperty.Id.ATTACKER_TOKEN);
-        isAttackerRole = role.getId().equals(attackerRole.getId());
+        if (attackerRole != null && attackerRole.getId() != null) {
+            isAttackerRole = role.getId().equals(attackerRole.getId());
+        }
         if (isAttackerRole) {
             addActionError("Unable to update endpoint conditions for system role");
             return ERROR.toUpperCase();
