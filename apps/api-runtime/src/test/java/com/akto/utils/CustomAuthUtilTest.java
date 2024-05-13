@@ -39,7 +39,7 @@ public class CustomAuthUtilTest extends MongoBasedTest{
         List<String> headerKeys = new ArrayList<>();
         headerKeys.add("authtoken");
         headerKeys.add("newauthtoken");
-        customAuthTypes.add(new CustomAuthType("auth1", headerKeys,new ArrayList<>(), true, ACCOUNT_ID));
+        customAuthTypes.add(new CustomAuthType("auth1", headerKeys,new ArrayList<>(), true, ACCOUNT_ID, null, null));
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
         singleTypeInfos.add(generateSingleTypeInfo("authtoken",true));
         singleTypeInfos.add(generateSingleTypeInfo("cookie",true));
