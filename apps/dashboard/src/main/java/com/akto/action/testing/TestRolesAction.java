@@ -145,7 +145,7 @@ public class TestRolesAction extends UserAction {
             isAttackerRole = role.getId().equals(attackerRole.getId());
         }
         if (isAttackerRole) {
-            addActionError("Unable to update endpoint conditions for system role");
+            addActionError("Unable to update endpoint conditions for attacker role");
             return ERROR.toUpperCase();
         }
 
