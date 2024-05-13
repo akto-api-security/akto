@@ -4,6 +4,8 @@ import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.dao.testing.config.TestCollectionPropertiesDao;
+import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
@@ -89,7 +91,7 @@ public class TestRolesAction extends UserAction {
                 authParams.add(param);
             }
 
-            AuthMechanism authM = new AuthMechanism(authParams, this.reqData, authAutomationType);
+            AuthMechanism authM = new AuthMechanism(authParams, this.reqData, authAutomationType, null);
             AuthWithCond authWithCond = new AuthWithCond(authM, apiCond, recordedLoginFlowInput);
             TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.push(TestRoles.AUTH_WITH_COND_LIST, authWithCond));
         }
@@ -133,6 +135,17 @@ public class TestRolesAction extends UserAction {
         TestRoles role = getRole();
         if (role == null) {
             addActionError("Role doesn't exists");
+            return ERROR.toUpperCase();
+        }
+
+        boolean isAttackerRole = false;
+        TestRoles attackerRole = TestCollectionPropertiesDao.fetchTestToleForProp(0,
+                TestCollectionProperty.Id.ATTACKER_TOKEN);
+        if (attackerRole != null && attackerRole.getId() != null) {
+            isAttackerRole = role.getId().equals(attackerRole.getId());
+        }
+        if (isAttackerRole) {
+            addActionError("Unable to update endpoint conditions for attacker role");
             return ERROR.toUpperCase();
         }
 
