@@ -31,11 +31,6 @@
     border-radius: unset;
     height: 100% !important;
 }
-.settings {
-    display: flex;
-    justify-content: space-between;
-    padding-bottom: 10px;
-}
 
 .card-items{
     margin-top: 8px;
@@ -48,10 +43,6 @@
     align-items: flex-start !important;
 }
 
-.right-card .Polaris-Text--bodySm{
-    display: flex;
-    align-items: center;
-}
 
 .card-items .Polaris-Box{
     position: unset !important;

@@ -12,9 +12,10 @@ function SummaryCardInfo({summaryItems}) {
                                 <Text color="subdued" variant="headingXs">
                                     {item.title}
                                 </Text>
-                                <Text variant={item.variant ? item.variant : 'bodyMd'} fontWeight="semibold" color={item.color ? item.color :""}>
+                                {item?.isComp ? item.data :<Text variant={item.variant ? item.variant : 'bodyMd'} fontWeight="semibold" color={item.color ? item.color :""}>
                                     {item.data}
                                 </Text>
+                                }
                             </VerticalStack>
                         </Box>
                     ))}

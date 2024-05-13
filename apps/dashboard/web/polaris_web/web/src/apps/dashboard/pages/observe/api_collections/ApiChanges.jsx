@@ -13,6 +13,7 @@ import PersistStore from "../../../../main/PersistStore";
 import ApiChangesTable from "./component/ApiChangesTable";
 import SummaryCardInfo from "../../../components/shared/SummaryCardInfo";
 import StackedChart from "../../../components/charts/StackedChart";
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import { useLocation } from "react-router-dom";
 
 
@@ -91,8 +92,8 @@ function ApiChanges() {
     const infoItems = [
         {
             title: "New endpoints",
-            // data: transform.formatNumberWithCommas(newEndpoints.normal.length),
-            data: <div data-testid="new_endpoints_count">{transform.formatNumberWithCommas(newEndpoints.normal.length)}</div>,
+            isComp: true,
+            data: <div data-testid="new_endpoints_count" style={{fontWeight: 600, color: '#1F2124', fontSize: '14px'}}>{transform.formatNumberWithCommas(newEndpoints.normal.length)}</div>,
         },
         {
             title: "New sensitive endpoints",
@@ -199,9 +200,11 @@ function ApiChanges() {
     return (
         <PageWithMultipleCards
             title={
-                <Text variant='headingLg'>
-                    API changes
-                </Text>
+                <TitleWithInfo
+                    titleText={"API changes"}
+                    docsUrl={"https://docs.akto.io/api-inventory/concepts/api-changes"}
+                    tooltipContent={"Information about endpoints and parameters found in your inventory."}
+                />
             }
             isFirstPage={true}
             primaryAction={<DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>}
