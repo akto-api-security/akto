@@ -69,7 +69,7 @@ public class TestCollectionPropertiesDao extends AccountsContextDao<TestCollecti
         return tProp;
     }
 
-    public static TestCollectionProperty createTestRole(int apiCollectionId, TestCollectionProperty.Id propId) {
+    public static TestRoles fetchTestToleForProp(int apiCollectionId, TestCollectionProperty.Id propId){
         String name = propId.name();
         Bson fApiCollId = Filters.in(API_COLLECTION_IDS, apiCollectionId, 0);
         Bson fName = Filters.regex(TestRoles.NAME, ".*"+name+".*");
@@ -78,7 +78,11 @@ public class TestCollectionPropertiesDao extends AccountsContextDao<TestCollecti
             fApiCollId = Filters.or(Filters.exists(API_COLLECTION_IDS, false), fApiCollId);
 //        }
 
-        TestRoles role = TestRolesDao.instance.findOne(Filters.and(fApiCollId, fName));
+        return TestRolesDao.instance.findOne(Filters.and(fApiCollId, fName));
+    }
+
+    public static TestCollectionProperty createTestRole(int apiCollectionId, TestCollectionProperty.Id propId) {
+        TestRoles role = fetchTestToleForProp(apiCollectionId, propId);
         if (role == null) return null;
         List<String> roleNames = Collections.singletonList(role.getName());
         List<GlobalEnums.TestCategory> testCategoryList = propId.getImpactingCategories();
