@@ -594,11 +594,13 @@ public class Executor {
             case "modify_body_param":
                 return Operations.modifyBodyParam(rawApi, key.toString(), value);
             case "delete_graphql_field":
-                return Operations.deleteGraphqlField(rawApi, key.toString());
+                return Operations.deleteGraphqlField(rawApi, key == null ? "": key.toString());
             case "add_graphql_field":
-                return Operations.addGraphqlField(rawApi, key.toString(), value.toString());
+                return Operations.addGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
+            case "add_unique_graphql_field":
+                return Operations.addUniqueGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
             case "modify_graphql_field":
-                return Operations.modifyGraphqlField(rawApi, key.toString(), value.toString());
+                return Operations.modifyGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
             case "delete_body_param":
                 return Operations.deleteBodyParam(rawApi, key.toString());
             case "replace_body":

@@ -118,7 +118,6 @@ function TestCollectionConfiguration() {
                     }
                 })
 
-                console.log("finalProps: ", finalProps)
                 setTestCollectionProperties(finalProps)
             })
         })
