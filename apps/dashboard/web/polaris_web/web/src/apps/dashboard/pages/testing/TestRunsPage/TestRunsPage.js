@@ -364,7 +364,7 @@ const SummaryCardComponent = () =>{
           <LegacyCard.Subsection>
             <Box paddingBlockStart={3}><Divider/></Box>
             <HorizontalGrid columns={2} gap={6}>
-              <ChartypeComponent data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
+              <ChartypeComponent navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
               <ChartypeComponent data={severityCountMap} reverse={true} title={"Severity"} charTitle={totalVulnerabilites} chartSubtitle={"Total Vulnerabilities"}/>
             </HorizontalGrid>
 
@@ -381,7 +381,7 @@ const SummaryCardComponent = () =>{
       content: <div data-testid="delete_result_button">{`Delete ${selectedTestRuns.length} test run${selectedTestRuns.length==1 ? '' : 's'}`}</div>,
       onAction: async() => {
         await api.deleteTestRuns(selectedTestRuns);
-        func.setToast(true, false, <div data-testid="delete_success_message">{`${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`}</div>),
+        func.setToast(true, false, <div data-testid="delete_success_message">{`${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`}</div>)
         window.location.reload();
       },
     },
