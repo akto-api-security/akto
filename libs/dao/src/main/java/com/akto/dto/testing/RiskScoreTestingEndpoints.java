@@ -69,7 +69,7 @@ public class RiskScoreTestingEndpoints extends TestingEndpoints {
 
     @Override
     public boolean containsApi(ApiInfo.ApiInfoKey key) {
-        throw new NotImplementedException();
+        return false;
     }
 
     private static Bson createApiFilters(CollectionType type, ApiInfo api) {
