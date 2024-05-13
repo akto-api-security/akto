@@ -34,6 +34,7 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.json.JSONArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,6 +147,8 @@ public class RuntimeListener extends AfterMongoConnectListener {
         AuthMechanism authMechanism = new AuthMechanism(
              authParamList, new ArrayList<>(), "HARDCODED", null
         );
+        ObjectId id = new ObjectId();
+        authMechanism.setId(id);
         createAndSaveAttackerRole(authMechanism);
 
         //inserting first time during initialisation of demo collections
