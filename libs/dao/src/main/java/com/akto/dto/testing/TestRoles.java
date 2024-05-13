@@ -26,8 +26,9 @@ public class TestRoles {
     private int createdTs;
     public static final String LAST_UPDATED_TS = "lastUpdatedTs";
     private int lastUpdatedTs;
+    private List<Integer> apiCollectionIds;
     public TestRoles(){}
-    public TestRoles(ObjectId id, String name, ObjectId endpointLogicalGroupId, List<AuthWithCond> authWithCondList, String createdBy, int createdTs, int lastUpdatedTs) {
+    public TestRoles(ObjectId id, String name, ObjectId endpointLogicalGroupId, List<AuthWithCond> authWithCondList, String createdBy, int createdTs, int lastUpdatedTs, List<Integer> apiCollectionIds) {
         this.id = id;
         this.name = name;
         this.endpointLogicalGroupId = endpointLogicalGroupId;
@@ -35,6 +36,7 @@ public class TestRoles {
         this.createdBy = createdBy;
         this.createdTs = createdTs;
         this.lastUpdatedTs = lastUpdatedTs;
+        this.apiCollectionIds = apiCollectionIds;
 	}
     
     public EndpointLogicalGroup fetchEndpointLogicalGroup() {
@@ -114,6 +116,13 @@ public class TestRoles {
 
     public void setHexId(String hexId) {
         this.hexId = hexId;
+    }
+    public List<Integer> getApiCollectionIds() {
+        return apiCollectionIds;
+    }
+
+    public void setApiCollectionIds(List<Integer> apiCollectionIds) {
+        this.apiCollectionIds = apiCollectionIds;
     }
 
     public AuthMechanism getDefaultAuthMechanism(){
