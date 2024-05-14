@@ -12,11 +12,11 @@ const testEditorRequests = {
             }
         })
     },
-    fetchAllSubCategories() {
+    fetchAllSubCategories(mode) {
         return request({
             url: 'api/fetchAllSubCategories',
             method: 'post',
-            data: {}
+            data: { mode }
         })
     },
     

@@ -531,7 +531,7 @@ const transform = {
     return conditions;
   },
   setTestMetadata() {
-    api.fetchAllSubCategories().then((resp) => {
+    api.fetchAllSubCategories(true, "Dashboard").then((resp) => {
       let subCategoryMap = {}
       resp.subCategories.forEach((x) => {
         subCategoryMap[x.name] = x

@@ -34,11 +34,11 @@ export default {
         })
         return resp        
     },
-    async fetchAllSubCategories (fetchOnlyActive) {
+    async fetchAllSubCategories(fetchOnlyActive, mode) {
         const resp = await request({
             url: 'api/fetchAllSubCategories',
             method: 'post',
-            data: {fetchOnlyActive}
+            data: { fetchOnlyActive, mode }
         })
         return resp
     },

@@ -38,7 +38,7 @@ const TestEditor = () => {
     const fetchAllTests = async () => {
         const testId = window.location.pathname.split('/').pop();
 
-        const allSubCategoriesResponse = await testEditorRequests.fetchAllSubCategories()
+        const allSubCategoriesResponse = await testEditorRequests.fetchAllSubCategories("TestEditor")
         if (allSubCategoriesResponse) {
             try {
                 const obj = convertFunc.mapCategoryToSubcategory(allSubCategoriesResponse.subCategories)
