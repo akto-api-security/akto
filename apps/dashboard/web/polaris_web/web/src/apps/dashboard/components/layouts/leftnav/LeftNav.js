@@ -50,12 +50,12 @@ export default function LeftNav(){
                 selected: leftNavSelected === 'dashboard_home',
                 key: '2',
               },
-              {   
-                url: '#',
+              { url: "#",  
                 label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("observe") ? (active === 'active' ? "subdued" : ""): ""}>API Inventory</Text>,
                 icon: InventoryFilledMajor,
                 onClick: ()=>{
-                  handleSelect("_observe")
+                  handleSelect("dashboard_observe_inventory")
+                  navigate('/dashboard/observe/inventory')
                   setActive("normal")
                 },
                 selected: leftNavSelected.includes('_observe'),
@@ -95,8 +95,9 @@ export default function LeftNav(){
                 label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("testing") ? (active === 'active' ? "subdued" : ""): ""}>Testing</Text>,
                 icon: MarketingFilledMinor,
                 onClick: ()=>{
-                    handleSelect('_testing')
-                    setActive("normal")
+                  navigate('/dashboard/testing')
+                  handleSelect('dashboard_testing')
+                  setActive("normal")
                 },
                 selected: leftNavSelected.includes('_testing'),
                 subNavigationItems:[
