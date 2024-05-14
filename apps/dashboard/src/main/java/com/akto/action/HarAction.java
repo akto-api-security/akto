@@ -19,6 +19,7 @@ import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.har.HAR;
 import com.akto.log.LoggerMaker;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.util.DashboardMode;
 import com.akto.utils.GzipUtils;
@@ -37,6 +38,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public class HarAction extends UserAction {
@@ -63,6 +65,14 @@ public class HarAction extends UserAction {
         }
 
         ApiCollection apiCollection = null;
+        
+        /*
+         * We need to allow the first time creation for demo collections 
+         * thus calculating them before creation.
+         */
+        Set<Integer> demoCollections = UsageMetricCalculator.getDemos();
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
         loggerMaker.infoAndAddToDb("HarAction.execute() started", LoggerMaker.LogDb.DASHBOARD);
         if (apiCollectionName != null) {
             apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
@@ -105,6 +115,17 @@ public class HarAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        String commonErrorMessage = "collection can't be used, please create a new collection.";
+
+        if(demoCollections.contains(apiCollectionId)) {
+            addActionError("Demo " + commonErrorMessage);
+            return ERROR.toUpperCase();
+        }
+
+        if(deactivatedCollections.contains(apiCollectionId)) {
+            addActionError("Deactivated " + commonErrorMessage);
+            return ERROR.toUpperCase();
+        }
         if (!skipKafka && KafkaListener.kafka == null) {
             addActionError("Dashboard kafka not running");
             return ERROR.toUpperCase();
