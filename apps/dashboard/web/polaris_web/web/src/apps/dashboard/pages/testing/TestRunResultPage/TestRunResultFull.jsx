@@ -95,7 +95,7 @@ function TestRunResultFull(props) {
         ,
         (testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].length > 0) ?  testLogsComponent : null,
         ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) && testErrorComponent ,
-        (!(selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 && selectedTestRunResult.errors[0].endsWith("skipping execution"))) && selectedTestRunResult.testResults &&
+        (!(selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 && func.showTestSampleData(selectedTestRunResult))) && selectedTestRunResult.testResults &&
         <SampleDataList
           key={"sampleData"}
           sampleData={selectedTestRunResult?.testResults.map((result) => {
