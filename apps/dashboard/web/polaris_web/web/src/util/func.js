@@ -127,6 +127,9 @@ prettifyEpoch(epoch) {
   },
   downloadAsCSV(data, selectedTestRun) {
     // use correct function, this does not expand objects.
+    if(Object.keys(data).length === 0){
+      return;
+    }
     let headerTextToValueMap = Object.keys(data[0])
 
     let csv = headerTextToValueMap.join(",") + "\r\n"
@@ -229,13 +232,11 @@ prettifyEpoch(epoch) {
 
       case "STOPPED":
         return{
-          color: "critical",
           tooltipContent: "Error occurred while running the test.",
           icon: circle_cancel,
         }
       case "COMPLETED": 
         return {
-          color: "success",
           tooltipContent: "Test has been completed.",
           icon: circle_tick_minor
         }
@@ -1147,6 +1148,19 @@ mapCollectionIdToHostName(apiCollections){
         duration += seconds + ` second${seconds==1 ? '' : 's'}`;
     }
     return duration.trim();
+  },
+  getHexColorForSeverity(key){
+    switch(key){
+      case "HIGH":
+        return "#D72C0D"
+      case "MEDIUM":
+        return "#FFD79D"
+      case "LOW":
+        return "#2C6ECB"
+      default:
+        return "#2C6ECB"
+    }
+
   },
 
   getColorForCharts(key){

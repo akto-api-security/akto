@@ -13,6 +13,7 @@ import org.bson.types.ObjectId;
 
 import com.akto.dao.AccountsContextDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBList;
@@ -25,6 +26,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 
 public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunResultSummary> {
@@ -120,6 +122,18 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
         Bson repositoryIndex = Indexes.ascending("metadata.repository");
         createIndexIfAbsent(dbName, getCollName(), repositoryIndex, sparseIndex.name("metadata.repository_1"));
 
+    }
+
+    public List<TestingRunResultSummary> getCurrentRunningTestsSummaries(){
+        int filterTime = Context.now() - 20 * 60;
+        List<TestingRunResultSummary> trrs = TestingRunResultSummariesDao.instance.findAll(
+            Filters.and(
+                Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
+                Filters.gte(TestingRunResultSummary.START_TIMESTAMP, filterTime)
+            ),
+            Projections.include(TestingRunResultSummary.TESTING_RUN_ID, TestingRunResultSummary.TOTAL_APIS)
+        );
+        return trrs;
     }
 
     @Override
