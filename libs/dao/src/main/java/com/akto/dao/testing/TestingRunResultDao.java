@@ -53,17 +53,20 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     }
 
     public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit) {
-        Bson projections = Projections.include(
-                                TestingRunResult.TEST_RUN_ID,
-                                TestingRunResult.API_INFO_KEY,
-                                TestingRunResult.TEST_SUPER_TYPE,
-                                TestingRunResult.TEST_SUB_TYPE,
-                                TestingRunResult.VULNERABLE,
-                                TestingRunResult.CONFIDENCE_PERCENTAGE,
-                                TestingRunResult.START_TIMESTAMP,
-                                TestingRunResult.END_TIMESTAMP,
-                                TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID
-                        );
+        Bson projections = Projections.fields(
+                Projections.include(
+                        TestingRunResult.TEST_RUN_ID,
+                        TestingRunResult.API_INFO_KEY,
+                        TestingRunResult.TEST_SUPER_TYPE,
+                        TestingRunResult.TEST_SUB_TYPE,
+                        TestingRunResult.VULNERABLE,
+                        TestingRunResult.CONFIDENCE_PERCENTAGE,
+                        TestingRunResult.START_TIMESTAMP,
+                        TestingRunResult.END_TIMESTAMP,
+                        TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID
+                ),
+                Projections.computed(TestingRunResult.ERRORS_LIST,Projections.computed("$arrayElemAt", Arrays.asList("$testResults.errors", 0)))
+            );
 
         return fetchLatestTestingRunResult(filters, limit, 0, projections);
     }

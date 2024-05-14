@@ -1,9 +1,9 @@
 package com.akto.dao.testing;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunConfig;
-import com.akto.util.Constants;
-import com.akto.util.enums.GlobalEnums;
+import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.util.enums.MongoDBEnums;
 
 public class TestingRunConfigDao extends AccountsContextDao<TestingRunConfig> {
@@ -15,6 +15,14 @@ public class TestingRunConfigDao extends AccountsContextDao<TestingRunConfig> {
     public static final TestingRunConfigDao instance = new TestingRunConfigDao();
 
     private TestingRunConfigDao() {}
+
+    public int countTotalTestsInitialised(TestingRunResultSummary trrs){
+        TestingRun testingRun = TestingRunDao.instance.findOne("_id", trrs.getTestingRunId());
+        TestingRunConfig config = TestingRunConfigDao.instance.findOne("_id", testingRun.getTestIdConfig());
+
+        int totalCount = trrs.getTotalApis() * config.getTestSubCategoryList().size();
+        return totalCount;
+    }
 
     @Override
     public Class<TestingRunConfig> getClassT() {
