@@ -389,13 +389,13 @@ const transform = {
                 displayName: c.displayName,
                 displayNameComp: c.displayNameComp,
                 endpoints: c.endpoints,
-                riskScoreComp: <Badge status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
+                riskScoreComp: <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
                 coverage: calcCoverage,
                 issuesArr: this.getIssuesList(c.severityInfo),
                 sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes),
                 lastTraffic: c.detected,
                 riskScore: c.riskScore,
-                envTypeComp: c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null
+                envTypeComp: c.envType ? <Badge key={c.id + "env"} size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null
             }
         })
 
