@@ -16,10 +16,12 @@ import com.akto.action.ApiCollectionsAction;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
+import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.usage.MetricTypes;
@@ -30,6 +32,7 @@ import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.util.Constants;
 import com.akto.util.tasks.OrganizationTask;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
@@ -40,6 +43,17 @@ public class DeactivateCollections {
     final static ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public static void deactivateCollectionsJob() {
+
+        BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
+        // we do not need to run this job for new user.
+        if (backwardCompatibility == null) {
+            return;
+        }
+        // we need to run this job only once.
+        if (backwardCompatibility.getDeactivateCollections() != 0) {
+            return;
+        }
+
         executorService.schedule(new Runnable() {
             public void run() {
                 OrganizationTask.instance.executeTask(new Consumer<Organization>() {
@@ -50,6 +64,15 @@ public class DeactivateCollections {
                 }, "deactivate-collections");
             }
         }, 0, TimeUnit.SECONDS);
+
+        /*
+         * This will update the backward compatibility doc in db,
+         * before the job is completed. 
+         * In case the job fails, we will not run it again.
+         */
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DEACTIVATE_COLLECTIONS, Context.now()));
     }
 
     private static void raiseMixpanelEvent(Organization organization, int accountId, int overage) {
@@ -60,11 +83,11 @@ public class DeactivateCollections {
     }
 
     protected static void sendToSlack(Organization organization, int accountId, int overage, int usageLimit) {
-        if (organization == null){
+        if (organization == null) {
             return;
         }
         String txt = String.format("Overage found for %s %s acc: %s limit: %s overage: %s . Deactivating collections.",
-        organization.getId(), organization.getAdminEmail(), accountId, usageLimit, overage);
+                organization.getId(), organization.getAdminEmail(), accountId, usageLimit, overage);
         UsageMetricUtils.sendToUsageSlack(txt);
     }
 
@@ -80,7 +103,8 @@ public class DeactivateCollections {
             int overage = featureAccess.getUsage() - featureAccess.getUsageLimit();
             String organizationId = organization.getId();
 
-            String infoMessage = String.format("Overage found org: %s , overage: %s , deactivating collections", organizationId, overage);
+            String infoMessage = String.format("Overage found org: %s , overage: %s , deactivating collections",
+                    organizationId, overage);
             loggerMaker.infoAndAddToDb(infoMessage);
 
             for (int accountId : organization.getAccounts()) {
@@ -102,7 +126,7 @@ public class DeactivateCollections {
     }
 
     private static int deactivateCollectionsForAccount(int overage, int measureEpoch) {
-        
+
         ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
         apiCollectionsAction.fetchAllCollections();
         List<ApiCollection> apiCollections = apiCollectionsAction.getApiCollections();
@@ -111,7 +135,7 @@ public class DeactivateCollections {
         apiCollections.removeIf(apiCollection -> demoIds.contains(apiCollection.getId()));
         apiCollections.removeIf(apiCollection -> apiCollection.isDeactivated());
         apiCollections.removeIf(apiCollection -> ApiCollection.Type.API_GROUP.equals(apiCollection.getType()));
-        
+
         Map<Integer, Integer> lastTrafficSeenMap = ApiInfoDao.instance.getLastTrafficSeen();
 
         apiCollections.sort((ApiCollection o1, ApiCollection o2) -> {
@@ -136,10 +160,10 @@ public class DeactivateCollections {
 
             /*
              * Since we take only endpoints lastSeen/discovered after measureEpoch while
-             * calculating endpoints usage, 
+             * calculating endpoints usage,
              * we should only deactivate the collections to which they belong.
              */
-            if(lastTrafficSeenMap.getOrDefault(apiCollection.getId(), 0) <= measureEpoch){
+            if (lastTrafficSeenMap.getOrDefault(apiCollection.getId(), 0) <= measureEpoch) {
                 continue;
             }
 
@@ -149,7 +173,7 @@ public class DeactivateCollections {
 
         ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
                 Updates.set(ApiCollection._DEACTIVATED, true));
-        
+
         String infoMessage = String.format("Deactivated collections : %s", apiCollectionIds.toString());
         loggerMaker.infoAndAddToDb(infoMessage);
 

@@ -66,13 +66,17 @@ public class BackwardCompatibility {
     public static final String VULNERABLE_API_UPDATION_VERSION_V1 = "vulnerableApiUpdationVersionV1";
     private int vulnerableApiUpdationVersionV1;
 
+    public static final String DEACTIVATE_COLLECTIONS = "deactivateCollections";
+    private int deactivateCollections;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
                                  int deleteNullSubCategoryIssues, int enableNewMerging,
                                  int aktoDefaultNewUI, int initializeOrganizationAccountBelongsTo, int orgsInBilling,
                                  int computeIntegratedConnections, int deleteLastCronRunInfo, int moveAuthMechanismToRole,
-                                 int loginSignupGroups, int vulnerableApiUpdationVersionV1) {
+                                 int loginSignupGroups, int vulnerableApiUpdationVersionV1, 
+                                 int deactivateCollections) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -94,6 +98,7 @@ public class BackwardCompatibility {
         this.moveAuthMechanismToRole = moveAuthMechanismToRole;
         this.loginSignupGroups = loginSignupGroups;
         this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
+        this.deactivateCollections = deactivateCollections;
     }
 
     public BackwardCompatibility() {
@@ -282,4 +287,13 @@ public class BackwardCompatibility {
     public void setVulnerableApiUpdationVersionV1(int vulnerableApiUpdationVersionV1) {
         this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
     }
+
+    public int getDeactivateCollections() {
+        return deactivateCollections;
+    }
+
+    public void setDeactivateCollections(int deactivateCollections) {
+        this.deactivateCollections = deactivateCollections;
+    }
+
 }
