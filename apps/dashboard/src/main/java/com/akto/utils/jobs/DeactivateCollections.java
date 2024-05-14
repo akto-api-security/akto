@@ -171,11 +171,14 @@ public class DeactivateCollections {
             apiCollectionIds.add(apiCollection.getId());
         }
 
-        ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
-                Updates.set(ApiCollection._DEACTIVATED, true));
+        /*
+         * Un comment this in next release.
+         */
+        // ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
+        //         Updates.set(ApiCollection._DEACTIVATED, true));
 
-        String infoMessage = String.format("Deactivated collections : %s", apiCollectionIds.toString());
-        loggerMaker.infoAndAddToDb(infoMessage);
+        // String infoMessage = String.format("Deactivated collections : %s", apiCollectionIds.toString());
+        // loggerMaker.infoAndAddToDb(infoMessage);
 
         // TODO: handle case for API groups.
 
