@@ -192,7 +192,7 @@ function TestRunResultFlyout(props) {
             value ? <Box width="224px">
                 <VerticalStack gap={"2"}>
                     <TitleWithInfo
-                        textProps={{variant:"bodyMd", fontWeight:"semibold", color:"subdued"}}
+                        textProps={{variant:"bodyMd", fontWeight:"semibold"}}
                         titleText={title}
                         tooltipContent={tooltipContent}
                     />

@@ -774,7 +774,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               endpoint: x.url,
               parameterisedEndpoint: x.method + " " + this.parameterizeUrl(x.url),
               open: apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].indexOf("UNAUTHENTICATED") !== -1 : false,
-              access_type: access_type || "None",
+              access_type: access_type || "No access type",
               method: x.method,
               color: x.sensitive && x.sensitive.size > 0 ? "#f44336" : "#00bfa5",
               apiCollectionId: x.apiCollectionId,
@@ -782,13 +782,13 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               lastSeenTs: apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs,
               detectedTs: x.startTs,
               changesCount: x.changesCount,
-              changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : '-',
+              changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : 'No new changes',
               added: "Discovered " + this.prettifyEpoch(x.startTs),
               violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
-              auth_type: (authType || "").toLowerCase(),
+              auth_type: (authType || "no auth type found").toLowerCase(),
               sensitiveTags: [...this.convertSensitiveTags(x.sensitive)],
-              authTypeTag: (authTypeTag || "").toLowerCase(),
+              authTypeTag: (authTypeTag || "no auth").toLowerCase(),
               collectionIds: apiInfoMap[key] ? apiInfoMap[key]?.collectionIds.filter(x => {
                 return Object.keys(apiGroupsMap).includes(x) || Object.keys(apiGroupsMap).includes(x.toString())
               }).map( x => {
@@ -1055,6 +1055,7 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
  },
 
  dateRangeReducer(draft, action){
+
   try {
     switch(action.type){
       case "update": {
