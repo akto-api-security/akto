@@ -78,6 +78,10 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         return apiCollectionMap;
     }
 
+    public List<ApiCollection> fetchApiGroups() {
+        return ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
+    }
+
     public ApiCollection findByName(String name) {
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         for (ApiCollection apiCollection: apiCollections) {

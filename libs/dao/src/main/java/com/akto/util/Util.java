@@ -28,4 +28,8 @@ public class Util {
         return DOLLAR + str;
     }
 
+    public static String getEnvironmentVariable(String var){
+        return System.getenv(var);
+    }
+
 }
