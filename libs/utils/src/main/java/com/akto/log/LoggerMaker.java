@@ -195,9 +195,7 @@ public class LoggerMaker  {
     }
 
     public void infoAndAddToDb(String info) {
-        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String infoMessage = "acc: " + accountId + ", " + info;
-        infoAndAddToDb(infoMessage, this.db);
+        infoAndAddToDb(info, this.db);
     }
 
     private Boolean checkUpdate(){
