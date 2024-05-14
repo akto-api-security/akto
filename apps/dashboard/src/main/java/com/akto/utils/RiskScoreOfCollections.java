@@ -285,7 +285,15 @@ public class RiskScoreOfCollections {
                 
                 bulkUpdates.add(new UpdateManyModel<>(filterQ, update, new UpdateOptions().upsert(false)));
                 
-                if (apiInfo.getRiskScore() != riskScore) {
+                List<Integer> collectionIds = apiInfo.getCollectionIds();
+                float oldRiskScore = apiInfo.getRiskScore();
+                RiskScoreTestingEndpoints.RiskScoreGroupType oldRiskScoreGroupType = RiskScoreTestingEndpoints.calculateRiskScoreGroup(oldRiskScore);
+                int oldRiskScoreGroupCollectionId = RiskScoreTestingEndpoints.getApiCollectionId(oldRiskScoreGroupType);
+                
+                if (!collectionIds.contains(oldRiskScoreGroupCollectionId) && oldRiskScore == riskScore) {
+                    // handle case when api has risk score 0 and the new risk score is also 0
+                    riskScoreTestingEndpointsUtils.updateApiRiskScoreGroup(apiInfo, riskScore);
+                } else if (oldRiskScore != riskScore) {
                     riskScoreTestingEndpointsUtils.updateApiRiskScoreGroup(apiInfo, riskScore);
                 }
             }
