@@ -813,11 +813,13 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
     },
     {
       title: "Sensitive Data",
-      value: <TextComp value={sensitiveData} />
+      value: <TextComp value={sensitiveData} />,
+      tooltipContent: "Sensitive parameters detected in API data"
     },
     {
       title: "Detected",
-      value: <TextComp value={func.prettifyEpoch(apiInfo.lastSeen)} />
+      value: <TextComp value={func.prettifyEpoch(apiInfo.lastSeen)} />,
+      tooltipContent: "Discovered time of the API"
     },
     {
       title: "Jira",
