@@ -129,4 +129,19 @@ public class TestingRunIssues {
         this.lastUpdated = lastUpdated;
     }
 
+    @Override
+    public String toString() {
+        return "TestingRunIssues{" +
+                "testRunIssueStatus=" + testRunIssueStatus.toString() +
+                ", id=" + id.toString() +
+                ", lastSeen=" + lastSeen +
+                ", creationTime=" + creationTime +
+                ", severity=" + severity.toString() +
+                ", latestTestingRunSummaryId=" + latestTestingRunSummaryId.toString() +
+                ", ignoreReason='" + ignoreReason + '\'' +
+                ", jiraIssueUrl='" + jiraIssueUrl + '\'' +
+                ", lastUpdated=" + lastUpdated +
+                ", collectionIds=" + collectionIds +
+                '}';
+    }
 }

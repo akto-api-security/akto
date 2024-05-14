@@ -186,7 +186,7 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
 
-        ActivitiesDao.instance.insertActivity("Collection created", "Collection named " + this.collectionName + " was created.");
+        ActivitiesDao.instance.insertActivity("Collection created", "new Collection " + this.collectionName + " created");
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -222,7 +222,7 @@ public class ApiCollectionsAction extends UserAction {
         ApiInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         SensitiveParamInfoDao.instance.updateMany(filter, update);
 
-        List<ApiCollection> apiGroups = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
+        List<ApiCollection> apiGroups = ApiCollectionsDao.instance.fetchApiGroups();
         for(ApiCollection collection: apiGroups){
             List<TestingEndpoints> conditions = collection.getConditions();
             for (TestingEndpoints it : conditions) {
@@ -424,29 +424,33 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchRiskScoreInfo(){
-        int criticalCount = 0 ;
         Map<Integer, Double> riskScoreMap = new HashMap<>();
-        List<Bson> pipeline = ApiInfoDao.instance.buildRiskScorePipeline();
+        List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupId = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
+        pipeline.add(Aggregates.sort(
+            Sorts.descending(ApiInfo.RISK_SCORE)
+        ));
         pipeline.add(Aggregates.group(groupId,
-            Accumulators.max("riskScore", "$riskScore"),
-            Accumulators.sum("criticalCounts", new BasicDBObject("$cond", Arrays.asList(new BasicDBObject("$gte", Arrays.asList("$riskScore", 4)), 1, 0)))
+            Accumulators.max(ApiInfo.RISK_SCORE, "$riskScore")
         ));
 
         MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while(cursor.hasNext()){
             try {
                 BasicDBObject basicDBObject = cursor.next();
-                criticalCount += basicDBObject.getInt("criticalCounts");
                 BasicDBObject id = (BasicDBObject) basicDBObject.get("_id");
-                riskScoreMap.put(id.getInt("apiCollectionId"), basicDBObject.getDouble("riskScore"));
+                double riskScore = 0;
+                if(basicDBObject.get(ApiInfo.RISK_SCORE) != null){
+                    riskScore = basicDBObject.getDouble(ApiInfo.RISK_SCORE);
+                }
+                riskScoreMap.put(id.getInt("apiCollectionId"), riskScore);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error in calculating risk score for collections " + e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e,"error in calculating risk score for collections " + e.toString(), LogDb.DASHBOARD);
                 e.printStackTrace();
             }
         }
 
-        this.criticalEndpointsCount = criticalCount;
+        this.criticalEndpointsCount = (int) ApiInfoDao.instance.count(Filters.gte(ApiInfo.RISK_SCORE, 4));
         this.riskScoreOfCollectionsMap = riskScoreMap;
         return Action.SUCCESS.toUpperCase();
     }

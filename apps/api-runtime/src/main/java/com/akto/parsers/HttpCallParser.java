@@ -17,6 +17,7 @@ import com.akto.runtime.Main;
 import com.akto.runtime.URLAggregator;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.JSONUtils;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
@@ -49,7 +50,7 @@ public class HttpCallParser {
     private Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap = new HashMap<>();
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
     private static final String trafficMetricsUrl = "https://logs.akto.io/traffic-metrics";
-    private static final OkHttpClient client = new OkHttpClient().newBuilder()
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
             .writeTimeout(1, TimeUnit.SECONDS)
             .readTimeout(1, TimeUnit.SECONDS)
             .callTimeout(1, TimeUnit.SECONDS)

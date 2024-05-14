@@ -24,6 +24,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.postman.Main;
 import com.akto.util.DashboardMode;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.utils.GzipUtils;
 import com.akto.utils.SampleDataToSTI;
 import com.akto.utils.Utils;
@@ -39,6 +40,8 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
 import io.swagger.v3.oas.models.OpenAPI;
+import okhttp3.OkHttpClient;
+
 import org.apache.commons.lang3.tuple.Pair;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -55,6 +58,13 @@ public class PostmanAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(PostmanAction.class, LogDb.DASHBOARD);
     private static final ObjectMapper mapper = new ObjectMapper();
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
+
+    static{
+        loggerMaker.infoAndAddToDb("Initializing http client for postman operations");
+        ApiRequest.initCommonHttpClient(client);
+    }
+
     @Override
     public String execute() {
         return SUCCESS;

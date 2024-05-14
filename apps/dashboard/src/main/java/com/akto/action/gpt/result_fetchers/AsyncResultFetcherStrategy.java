@@ -1,5 +1,6 @@
 package com.akto.action.gpt.result_fetchers;
 
+import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
 import okhttp3.*;
 import org.slf4j.Logger;
@@ -24,7 +25,7 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
         String requestId = UUID.randomUUID().toString();
         data.put("request_id", requestId);
         logger.info("Request body:" + data.toJson());
-        OkHttpClient client = new OkHttpClient().newBuilder()
+        OkHttpClient client = CoreHTTPClient.client.newBuilder()
                 .writeTimeout(3, TimeUnit.SECONDS)
                 .readTimeout(3, TimeUnit.SECONDS)
                 .callTimeout(3, TimeUnit.SECONDS)
@@ -52,14 +53,7 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
             }
         }
         try{
-            BasicDBObject responseJson = BasicDBObject.parse(resp_body);
-            String status = responseJson.getString("status");
-            if(status.equalsIgnoreCase("ACCEPTED")){
-                return fetchResponse(requestId);
-            }
-            BasicDBObject error = new BasicDBObject();
-            error.put("error", responseJson.getString("error"));
-            return error;
+            return fetchResponse(requestId);
         }catch (Exception e){
             logger.error("Error while parsing response: " + resp_body);
         }
@@ -71,7 +65,7 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
     private BasicDBObject fetchResponse(String requestId) {
         int attempts = 0;
         String status = "";
-        OkHttpClient client = new OkHttpClient().newBuilder()
+        OkHttpClient client = CoreHTTPClient.client.newBuilder()
                 .writeTimeout(2, TimeUnit.SECONDS)
                 .readTimeout(2, TimeUnit.SECONDS)
                 .callTimeout(2, TimeUnit.SECONDS)
