@@ -8,7 +8,11 @@ import java.util.List;
 public class TestResult extends GenericTestResult {
 
     private String message;
+    public static final String _ERRORS = "errors";
     private List<String> errors;
+    
+    public static final String TEST_RESULTS_ERRORS = TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS;
+
     public static final String ERRORS = "errors";
     private String originalMessage;
     private double percentageMatch;
@@ -33,7 +37,8 @@ public class TestResult extends GenericTestResult {
         INVALID_EXECUTION_BLOCK("Invalid test execution block in template", true),
         NO_API_REQUEST("No test requests created", false),
         SKIPPING_EXECUTION_BECAUSE_AUTH("Request API failed authentication check, skipping execution", true),
-        SKIPPING_EXECUTION_BECAUSE_FILTERS("Request API failed to satisfy api_selection_filters block, skipping execution", true);
+        SKIPPING_EXECUTION_BECAUSE_FILTERS("Request API failed to satisfy api_selection_filters block, skipping execution", true),
+        DEACTIVATED_ENDPOINT("This is a deactivated endpoint", true);
         private final String message;
         private final boolean skipTest;
 
