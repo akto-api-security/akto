@@ -64,7 +64,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     async function fetchData() {
         setLoading(true)
 
-        const allSubCategoriesResponse = await testingApi.fetchAllSubCategories(true)
+        const allSubCategoriesResponse = await testingApi.fetchAllSubCategories(true, "RunTest")
         const testRolesResponse = await testingApi.fetchTestRoles()
         var testRoles = testRolesResponse.testRoles.map(testRole => {
             return {

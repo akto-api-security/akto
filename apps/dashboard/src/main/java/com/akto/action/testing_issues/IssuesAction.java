@@ -225,10 +225,29 @@ public class IssuesAction extends UserAction {
     }
 
     private boolean fetchOnlyActive;
+    private String mode;
 
     public String fetchAllSubCategories() {
 
-        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap(true, fetchOnlyActive);
+        boolean includeYamlContent = false;
+
+        switch (mode) {
+            case "RunTests":
+                categories = GlobalEnums.TestCategory.values();
+                break;
+            case "TestEditor":
+                includeYamlContent = true;
+                vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
+                break;
+            case "Dashboard":
+                testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
+                break;
+            default:
+                return "ERROR: Invalid mode";
+        }
+
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(includeYamlContent,
+                fetchOnlyActive);
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             try {
@@ -238,13 +257,10 @@ public class IssuesAction extends UserAction {
                 }
             } catch (Exception e) {
                 String err = "Error while fetching subcategories for " + entry.getKey();
-                loggerMaker.errorAndAddToDb(e,err, LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, err, LogDb.DASHBOARD);
             }
         }
 
-        this.categories = GlobalEnums.TestCategory.values();
-        this.testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
-        this.vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
         return SUCCESS.toUpperCase();
     }
 
@@ -460,5 +476,9 @@ public class IssuesAction extends UserAction {
 
     public void setSampleDataVsCurlMap(Map<String, String> sampleDataVsCurlMap) {
         this.sampleDataVsCurlMap = sampleDataVsCurlMap;
+    }
+
+    public void setMode(String mode) {
+        this.mode = mode;
     }
 }
