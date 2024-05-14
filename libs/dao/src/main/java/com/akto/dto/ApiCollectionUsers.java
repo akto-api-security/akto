@@ -124,6 +124,7 @@ public class ApiCollectionUsers {
         Bson matchFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
 
         if (matchExactCondition) {
+            // Remove collection ids for exact match of filter
             operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
         } else {
             operationForCollectionId(conditions, apiCollectionId, update, matchFilter, true);
