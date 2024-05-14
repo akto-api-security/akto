@@ -370,4 +370,12 @@ export default {
             data: {roleName}
         })
     },
+
+    fetchTestingRunStatus(){
+        return request({
+            url: '/api/fetchActiveTestRunsStatus',
+            method: 'post',
+            data: {}
+        })
+    },
 }

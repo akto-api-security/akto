@@ -12,12 +12,12 @@ import {
   Link,
   Popover,
   ActionList,
-  Modal,
+  Card,
+  ProgressBar
 } from '@shopify/polaris';
 
 import {
   CircleInformationMajor,
-  FileMinor,
   ArchiveMinor,
   PriceLookupMinor,
   ReportMinor
@@ -33,47 +33,9 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import TooltipText from "../../../components/shared/TooltipText";
 import PersistStore from "../../../../main/PersistStore";
 import TrendChart from "./TrendChart";
-import { CellType } from "../../../components/tables/rows/GithubRow";
 import useTable from "../../../components/tables/TableContext";
 import ReRunModal from "./ReRunModal";
-
-let headers = [
-  {
-    value: "nameComp",
-    title: 'Issue name',
-    tooltipContent: 'Name of the test as in our test editor'
-  },
-  {
-    title: 'Severity',
-    value: 'severityComp',
-    sortActive: true
-  },
-  {
-    value: 'testCategory',
-    title: 'Category',
-    type: CellType.TEXT,
-    tooltipContent: 'Name of the subcategory of the test'
-  },
-  {
-    title: 'CWE tags',
-    value: 'cweDisplayComp',
-    tooltipContent: "CWE tags associated with the test from akto's test library"
-  },
-  {
-    title: 'Number of urls',
-    value: 'totalUrls',
-    type: CellType.TEXT
-  },
-  {
-    value: "scanned_time_comp",
-    title: 'Scanned',
-    sortActive: true
-  },
-  {
-    title: '',
-    type: CellType.COLLAPSIBLE
-  }
-]
+import TestingStore from "../testingStore";
 
 const sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 2},
@@ -149,7 +111,13 @@ function SingleTestRunPage() {
   const [selected, setSelected] = useState(0)
   const [workflowTest, setWorkflowTest ] = useState(false);
   const [secondaryPopover, setSecondaryPopover] = useState(false)
-  const [primaryPopover, setPrimaryPopover] = useState(false)
+  const currentTestingRuns = TestingStore((state) => state.currentTestingRuns)
+  const [currentTestRunObj, setCurrentTestObj] = useState({
+    testsInitiated: 0,
+    testsInsertedInDb: 0,
+    testingRunId: -1
+  })
+
   const refreshId = useRef(null);
   const hexId = params.hexId;
 
@@ -243,15 +211,11 @@ function SingleTestRunPage() {
       if(setData){
         setSelectedTestRun(localSelectedTestRun);
       }
-
-      setTimeout(() => {
-        setLoading(false);
-      }, 500)
-
-      if(localSelectedTestRun.testingRunResultSummaryHexId) {
+      if((localSelectedTestRun.testingRunResultSummaryHexId && testRunResults[selectedTab].length === 0) || !setData) {
         await fetchTestingRunResultsData(localSelectedTestRun.testingRunResultSummaryHexId);
         }
       }) 
+      setLoading(false);
     return localSelectedTestRun;
 }
 
@@ -283,11 +247,29 @@ function SingleTestRunPage() {
 
   useEffect(()=>{
     async function loadData(){
-      setLoading(true);
-      await fetchData(true);
+      if(Object.keys(subCategoryMap).length === 0 || testRunResults[selectedTab].length === 0){
+        setLoading(true);
+        await fetchData(true);
+      }
     }
     loadData();
   }, [subCategoryMap])
+
+  useEffect(() => {
+    let found = false
+    for(var ind in currentTestingRuns){
+      let obj = currentTestingRuns[ind]
+      if(obj.testingRunId === hexId){
+        setCurrentTestObj(obj)
+        found = true
+        break
+      }
+    }
+    if(!found){
+      setCurrentTestObj({testsInitiated: 0,testsInsertedInDb: 0,testingRunId: -1})
+    }
+  },[currentTestingRuns])
+
 
 const promotedBulkActions = (selectedDataHexIds) => { 
   return [
@@ -341,6 +323,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
   const { tabsInfo } = useTable()
   const tableCountObj = func.getTabsCount(definedTableTabs, testRunResults)
   const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
+  const tableHeaders = transform.getHeaders(selectedTab)
 
   const handleSelectedTab = (selectedIndex) => {
       setLoading(true)
@@ -349,7 +332,6 @@ const promotedBulkActions = (selectedDataHexIds) => {
           setLoading(false)
       },200)
   }
-  
   const resultTable = (
     <GithubSimpleTable
         key={"table"}
@@ -358,13 +340,13 @@ const promotedBulkActions = (selectedDataHexIds) => {
         resourceName={resourceName}
         filters={filters}
         disambiguateLabel={disambiguateLabel}
-        headers={headers}
+        headers={tableHeaders}
         selectable={false}
         promotedBulkActions={promotedBulkActions}
         loading={loading || ( tempLoading[selectedTab]) || tempLoading.running}
         getStatus={func.getTestResultStatus}
         mode={IndexFiltersMode.Default}
-        headings={headers}
+        headings={tableHeaders}
         useNewRow={true}
         condensedHeight={true}
         useModifiedData={true}
@@ -409,8 +391,21 @@ const promotedBulkActions = (selectedDataHexIds) => {
     )
   }
 
+  const progress = currentTestRunObj.testsInitiated === 0 ? 0 : Math.floor((currentTestRunObj.testsInsertedInDb * 100)/ currentTestRunObj.testsInitiated)
+  const runningTestsComp = (
+    currentTestRunObj.testingRunId !== -1 ?<Card key={"test-progress"}>
+      <VerticalStack gap={"3"}>
+        <Text variant="headingSm">{`Running ${currentTestRunObj.testsInitiated} tests`}</Text>
+        <div style={{display: "flex", gap: '4px', alignItems: 'center'}}>
+          <ProgressBar progress={progress} color="primary" size="small"/>
+          <Text color="subdued">{`${progress}%`}</Text>
+        </div>
+      </VerticalStack>
+    </Card> : null
+  )
+
   const components = [ 
-  <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type!='One-time'}/> , 
+    runningTestsComp,<TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type!='One-time'}/> , 
     metadataComponent(), loading ? <SpinnerCentered key="loading"/> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
   const openVulnerabilityReport = () => {
@@ -444,7 +439,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     )
   }
 
-  const allResultsLength = testRunResults.skipped.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length
+  const allResultsLength = testRunResults.skipped.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length + progress
   const useComponents = (!workflowTest && allResultsLength === 0) ? [<EmptyData key="empty"/>] : components
   const headingComp = (
     <Box paddingBlockStart={1}>
@@ -488,25 +483,14 @@ const promotedBulkActions = (selectedDataHexIds) => {
     </Box>
   )
 
-  const exportActionComp = (
-    <Popover
-      active={primaryPopover}
-      onClose={() => setPrimaryPopover(false)}
-      activator={<Button disclosure primary onClick={() => setPrimaryPopover(!primaryPopover)}>Export results</Button>}
-      autofocusTarget="first-node"
-    >
-      <ActionList
-         actionRole="menuitem"
-         items={[
-          {content: 'Export as CSV', icon: FileMinor, onAction: () => {func.downloadAsCSV((testRunResults[selectedTab]), selectedTestRun)}},
-          {content: 'Export vulnerability report', icon: ReportMinor, onAction: () => openVulnerabilityReport()}
-         ]}
-      />
-    </Popover>
-  )
-
-  const moreActionsList = transform.getActions(selectedTestRun, refreshSummaries)
-
+  let moreActionsList = transform.getActions(selectedTestRun)
+  moreActionsList.push({title: 'Export', items: [
+    {
+     content: 'Export vulnerability report', 
+     icon: ReportMinor, 
+     onAction: () => openVulnerabilityReport()
+    }
+  ]})
   const moreActionsComp = (
     <Popover
       active={secondaryPopover}
@@ -515,9 +499,10 @@ const promotedBulkActions = (selectedDataHexIds) => {
       autofocusTarget="first-node"
     >
       <ActionList
-         actionRole="menuitem"
-         sections={moreActionsList}
+        actionRole="menuitem"
+        sections={moreActionsList}
       />
+       
     </Popover>
   )
 
@@ -526,7 +511,9 @@ const promotedBulkActions = (selectedDataHexIds) => {
       <PageWithMultipleCards
         title={headingComp}
         backUrl={`/dashboard/testing/`}
-        primaryAction={!workflowTest ? exportActionComp: undefined}
+        primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() => 
+          func.downloadAsCSV((testRunResultsText[selectedTab]), selectedTestRun)
+          }>Export results</Button></Box>: undefined}
         secondaryActions={!workflowTest ? moreActionsComp: undefined}
         components={useComponents}
       />
