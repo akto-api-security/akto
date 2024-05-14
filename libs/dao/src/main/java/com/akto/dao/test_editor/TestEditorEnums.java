@@ -18,6 +18,7 @@ public class TestEditorEnums {
         CONTAINS_JWT,
         COOKIE_EXPIRE_FILTER,
         DATATYPE,
+        BELONGS_TO_COLLECTIONS,
         VALUETYPE
     }
 

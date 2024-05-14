@@ -21,8 +21,8 @@ public class TestCustomAuthTypeAction extends MongoBasedTest {
     public void testFetchCustomAuthTypes(){
         CustomAuthTypeDao.instance.getMCollection().drop();
         List<CustomAuthType> customAuthTypes = new ArrayList<>();
-        customAuthTypes.add(new CustomAuthType("auth1", new ArrayList<>(Collections.singletonList("authtoken")),new ArrayList<>(Collections.singletonList("authtoken")), true, ACCOUNT_ID));
-        customAuthTypes.add(new CustomAuthType("auth2", new ArrayList<>(Collections.singletonList("newauthtoken")),new ArrayList<>(Collections.singletonList("authtoken")), true, ACCOUNT_ID));
+        customAuthTypes.add(new CustomAuthType("auth1", new ArrayList<>(Collections.singletonList("authtoken")),new ArrayList<>(Collections.singletonList("authtoken")), true, ACCOUNT_ID, null, null));
+        customAuthTypes.add(new CustomAuthType("auth2", new ArrayList<>(Collections.singletonList("newauthtoken")),new ArrayList<>(Collections.singletonList("authtoken")), true, ACCOUNT_ID, null, null));
         CustomAuthTypeDao.instance.insertMany(customAuthTypes);
 
         CustomAuthTypeAction customAuthTypeAction = new CustomAuthTypeAction();
@@ -56,7 +56,7 @@ public class TestCustomAuthTypeAction extends MongoBasedTest {
     @Test
     public void testUpdateCustomAuthType(){
         CustomAuthTypeDao.instance.getMCollection().drop();
-        CustomAuthType customAuthType = new CustomAuthType("auth1", new ArrayList<>(Collections.singletonList("authtoken")),new ArrayList<>(Collections.singletonList("authtoken")), true, ACCOUNT_ID);
+        CustomAuthType customAuthType = new CustomAuthType("auth1", new ArrayList<>(Collections.singletonList("authtoken")),new ArrayList<>(Collections.singletonList("authtoken")), true, ACCOUNT_ID, null, null);
         CustomAuthTypeDao.instance.insertOne(customAuthType);
         CustomAuthTypeAction customAuthTypeAction = new CustomAuthTypeAction();
 
@@ -81,7 +81,7 @@ public class TestCustomAuthTypeAction extends MongoBasedTest {
     @Test
     public void testUpdateCustomAuthTypeStatus(){
         CustomAuthTypeDao.instance.getMCollection().drop();
-        CustomAuthType customAuthType = new CustomAuthType("auth1", new ArrayList<>(Collections.singletonList("authtoken")),new ArrayList<>(Collections.singletonList("authtoken")), true, ACCOUNT_ID);
+        CustomAuthType customAuthType = new CustomAuthType("auth1", new ArrayList<>(Collections.singletonList("authtoken")),new ArrayList<>(Collections.singletonList("authtoken")), true, ACCOUNT_ID, null, null);
         CustomAuthTypeDao.instance.insertOne(customAuthType);
         CustomAuthTypeAction customAuthTypeAction = new CustomAuthTypeAction();
 

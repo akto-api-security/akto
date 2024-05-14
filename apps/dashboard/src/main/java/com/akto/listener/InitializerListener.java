@@ -44,6 +44,8 @@ import com.akto.dto.pii.PIIType;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.testing.*;
+import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -75,6 +77,7 @@ import com.akto.util.Pair;
 import com.akto.util.UsageUtils;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.*;
 import com.akto.util.DashboardMode;
@@ -98,10 +101,15 @@ import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.slack.api.Slack;
+import com.slack.api.util.http.SlackHttpClient;
 import com.slack.api.webhook.WebhookResponse;
+
+import okhttp3.OkHttpClient;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -710,7 +718,9 @@ public class InitializerListener implements ServletContextListener {
                                 return;
                             }
 
-                    Slack slack = Slack.getInstance();
+                    OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
+                    SlackHttpClient slackHttpClient = new SlackHttpClient(httpClient);
+                    Slack slack = Slack.getInstance(slackHttpClient);
 
                     for (SlackWebhook slackWebhook : listWebhooks) {
                         int now = Context.now();
@@ -1083,6 +1093,60 @@ public class InitializerListener implements ServletContextListener {
                 Filters.eq("_id", authMechanismData.getId()),
                 Updates.set(BackwardCompatibility.AUTH_MECHANISM_DATA, Context.now())
         );
+    }
+
+    public static TestRoles createAndSaveAttackerRole(AuthMechanism authMechanism) {
+        int createdTs = authMechanism.getId().getTimestamp();
+        EndpointLogicalGroup endpointLogicalGroup = new EndpointLogicalGroup(new ObjectId(), createdTs, createdTs, "System", "All", new AllTestingEndpoints());
+        EndpointLogicalGroupDao.instance.insertOne(endpointLogicalGroup);
+        AuthWithCond authWithCond = new AuthWithCond(authMechanism, new HashMap<>(), null);
+        List<AuthWithCond> authWithCondList = Collections.singletonList(authWithCond);
+        TestRoles testRoles = new TestRoles(new ObjectId(), "ATTACKER_TOKEN_ALL", endpointLogicalGroup.getId(), authWithCondList, "System", createdTs, createdTs, null);
+        TestRolesDao.instance.insertOne(testRoles);
+        return testRoles;
+    }
+
+    public static void moveAuthMechanismDataToRole(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getMoveAuthMechanismToRole() == 0) {
+
+            AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+            if (authMechanism != null) {
+                createAndSaveAttackerRole(authMechanism);
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.MOVE_AUTH_MECHANISM_TO_ROLE, Context.now())
+            );
+
+        }
+    }
+
+    public static void createApiGroup(int id, String name, String regex) {
+        ApiCollection loginGroup = new ApiCollection(id, name, Context.now(), new HashSet<>(), null, 0, false, false);
+        loginGroup.setType(ApiCollection.Type.API_GROUP);
+        ArrayList<TestingEndpoints> loginConditions = new ArrayList<>();
+        loginConditions.add(new RegexTestingEndpoints(TestingEndpoints.Operator.OR, regex));
+        loginGroup.setConditions(loginConditions);
+        ApiCollectionUsers.removeFromCollectionsForCollectionId(loginGroup.getConditions(), id);
+
+        ApiCollectionsDao.instance.insertOne(loginGroup);
+        ApiCollectionUsers.addToCollectionsForCollectionId(loginGroup.getConditions(), loginGroup.getId());
+    }
+
+    public static void createLoginSignupGroups(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getLoginSignupGroups() == 0) {
+
+            createApiGroup(111_111_128, "Login APIs", "^((https?):\\/\\/)?(www\\.)?.*?(login|signin|sign-in|authenticate|session)(.*?)(\\?.*|\\/?|#.*?)?$");
+            createApiGroup(111_111_129, "Signup APIs", "^((https?):\\/\\/)?(www\\.)?.*?(register|signup|sign-up|users\\/create|account\\/create|account_create|create_account)(.*?)(\\?.*|\\/?|#.*?)?$");
+            createApiGroup(111_111_130, "Password Reset APIs", "^((https?):\\/\\/)?(www\\.)?.*?(password-reset|reset-password|forgot-password|user\\/reset|account\\/recover|api\\/password_reset|password\\/reset|account\\/reset-password-request|password_reset_request|account_recovery)(.*?)(\\?.*|\\/?|#.*?)?$");
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.LOGIN_SIGNUP_GROUPS, Context.now())
+            );
+
+        }
     }
 
     public static void dropWorkflowTestResultCollection(BackwardCompatibility backwardCompatibility) {
@@ -1916,6 +1980,8 @@ public class InitializerListener implements ServletContextListener {
         addAktoDataTypes(backwardCompatibility);
         updateDeploymentStatus(backwardCompatibility);
         dropAuthMechanismData(backwardCompatibility);
+        moveAuthMechanismDataToRole(backwardCompatibility);
+        createLoginSignupGroups(backwardCompatibility);
         deleteAccessListFromApiToken(backwardCompatibility);
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);

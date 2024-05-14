@@ -53,14 +53,7 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
             }
         }
         try{
-            BasicDBObject responseJson = BasicDBObject.parse(resp_body);
-            String status = responseJson.getString("status");
-            if(status.equalsIgnoreCase("ACCEPTED")){
-                return fetchResponse(requestId);
-            }
-            BasicDBObject error = new BasicDBObject();
-            error.put("error", responseJson.getString("error"));
-            return error;
+            return fetchResponse(requestId);
         }catch (Exception e){
             logger.error("Error while parsing response: " + resp_body);
         }
