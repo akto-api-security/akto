@@ -4,13 +4,59 @@ import {ResourcesMajor,
   CollectionsMajor,
   CreditCardSecureMajor,
   MarketingMajor,
-  FraudProtectMajor, RiskMajor} from '@shopify/polaris-icons';
+  FraudProtectMajor, RiskMajor,
+  CircleCancelMajor,
+  CalendarMinor,
+  ReplayMinor,
+  PlayMinor,
+} from '@shopify/polaris-icons';
 import React, {  } from 'react'
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Tag, Tooltip} from '@shopify/polaris';
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon, Avatar, Tag, Tooltip} from '@shopify/polaris';
 import { history } from "@/util/history";
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
+import TestingStore from "./testingStore";
+
+import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
+
+let headers = [
+    {
+      value: "nameComp",
+      title: 'Issue name',
+      tooltipContent: 'Name of the test as in our test editor'
+    },
+    {
+      title: 'Severity',
+      value: 'severityComp',
+      sortActive: true
+    },
+    {
+      value: 'testCategory',
+      title: 'Category',
+      type: CellType.TEXT,
+      tooltipContent: 'Name of the subcategory of the test'
+    },
+    {
+      title: 'CWE tags',
+      value: 'cweDisplayComp',
+      tooltipContent: "CWE tags associated with the test from akto's test library"
+    },
+    {
+      title: 'Number of urls',
+      value: 'totalUrls',
+      type: CellType.TEXT
+    },
+    {
+      value: "scanned_time_comp",
+      title: 'Scanned',
+      sortActive: true
+    },
+    {
+      title: '',
+      type: CellType.COLLAPSIBLE
+    }
+]
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -211,6 +257,10 @@ const transform = {
       state = 'FAIL'
     }
 
+    let apiCollectionId = -1
+    if(Object.keys(data).length > 0){
+      apiCollectionId = data?.testingEndpoints?.apiCollectionId || data?.testingEndpoints?.apisList[0]?.apiCollectionId
+    }
     const iconObj = func.getTestingRunIconObj(state)
 
       obj['id'] = data.hexId;
@@ -235,6 +285,7 @@ const transform = {
       obj['startTimestamp'] = testingRunResultSummary?.startTimestamp
       obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
+      obj['apiCollectionId'] = apiCollectionId
       if(prettified){
         
         const prettifiedTest={
@@ -279,6 +330,7 @@ const transform = {
       obj['cweDisplay'] = minimizeTagList(obj['cwe'])
       obj['cve'] = subCategoryMap[data.testSubType]?.cve ? subCategoryMap[data.testSubType]?.cve : []
       obj['cveDisplay'] = minimizeTagList(obj['cve'])
+      obj['errorsList'] = data.errorsList || []
       return obj;
     },
     prepareTestRunResults : (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap) => {
@@ -664,38 +716,58 @@ getUrlComp(url){
     <HorizontalStack gap={1}>
       <Box width="54px">
         <HorizontalStack align="end">
-          <Text variant="bodyMd" color="subdued">{method}</Text>
+          <Text variant="bodyMd" fontWeight="medium" color="subdued">{method}</Text>
         </HorizontalStack>
       </Box>
-      <Text variant="bodyMd"><div data-testid="affected_endpoints">{endpoint}</div></Text>
+      <div style={{fontSize: '14px', lineHeight: '20px', color: '#202223'}} data-testid="affected_endpoints">{endpoint}</div>
     </HorizontalStack>
   )
 },
 
-getCollapsibleRow(urls){
+getCollapsibleRow(urls, severity){
+  const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
   return(
-    <tr style={{background: "#EDEEEF"}}>
-      <td colSpan={7}>
-        <Box paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
-          <VerticalStack gap={2}>
-            {urls.map((ele,index)=>{
-              return(
-                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline key={index}>
+    <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+      <td colSpan={7} style={{padding: '0px !important'}}>
+          {urls.map((ele,index)=>{
+            const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
+            return( 
+              <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"4"} key={index}
+                  borderColor="border-subdued" {...borderStyle}
+              >
+                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
                   {this.getUrlComp(ele.url)}
                 </Link>
-              )
-            })}
-          </VerticalStack>
-        </Box>
+              </Box>
+            )
+          })}
       </td>
     </tr>
   )
 },
 
+getTestErrorType(message){
+  const errorsObject = TestingStore.getState().errorsObject
+  for(var key in errorsObject){
+    if(errorsObject[key] === message){
+      return key
+    }
+  }
+  return "UNKNOWN_ERROR_OCCURRED"
+},
+
 getPrettifiedTestRunResults(testRunResults){
+  const errorsObject = TestingStore.getState().errorsObject
   let testRunResultsObj = {}
   testRunResults.forEach((test)=>{
-    const key = test.name + ': ' + test.vulnerable
+    let key = test.name + ': ' + test.vulnerable
+    let error_message = ""
+    if(test?.errorsList.length > 0){
+      const errorType = this.getTestErrorType(test.errorsList[0])
+      key = key + ': ' + errorType
+      error_message = errorsObject[errorType]
+    }
+
     if(testRunResultsObj.hasOwnProperty(key)){
       let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
       let urls = testRunResultsObj[key].urls
@@ -703,19 +775,23 @@ getPrettifiedTestRunResults(testRunResults){
       let obj = {
         ...test,
         urls: urls,
-        endTimestamp: endTimestamp
+        endTimestamp: endTimestamp,
+        errorMessage: error_message
       }
       delete obj["nextUrl"]
       delete obj["url"]
+      delete obj["errorsList"]
       testRunResultsObj[key] = obj
     }else{
       let urls = [{url: test.url, nextUrl: test.nextUrl}]
       let obj={
         ...test,
         urls:urls,
+        errorMessage: error_message
       }
       delete obj["nextUrl"]
       delete obj["url"]
+      delete obj["errorsList"]
       testRunResultsObj[key] = obj
     }
   })
@@ -735,7 +811,7 @@ getPrettifiedTestRunResults(testRunResults){
       </HorizontalStack> : <Text>-</Text>,
       totalUrls: obj.urls.length,
       scanned_time_comp: <Text variant="bodyMd">{func.prettifyEpoch(obj?.endTimestamp)}</Text>,
-      collapsibleRow: this.getCollapsibleRow(obj.urls),
+      collapsibleRow: this.getCollapsibleRow(obj.urls, obj?.severity[0]),
       urlFilters: obj.urls.map((ele) => ele.url)
     }
     prettifiedResults.push(prettifiedObj)
@@ -827,6 +903,92 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
     }
   ]
   return rowItems
+},
+
+stopTest(hexId){
+  api.stopTest(hexId).then((resp) => {
+    func.setToast(true, false, "Test run stopped")
+  }).catch((resp) => {
+    func.setToast(true, true, "Unable to stop test run")
+  });
+},
+
+rerunTest(hexId, refreshSummaries){
+  api.rerunTest(hexId).then((resp) => {
+    func.setToast(true, false, "Test re-run initiated")
+    setTimeout(() => {
+      refreshSummaries();
+    }, 2000)
+  }).catch((resp) => {
+    func.setToast(true, true, "Unable to re-run test")
+  });
+},
+getActionsList(hexId){
+  return [
+  {
+      content: 'Schedule test',
+      icon: CalendarMinor,
+      onAction: () => {console.log("schedule test function")},
+  },
+  {
+      content: 'Re-run',
+      icon: ReplayMinor,
+      onAction: () => TestingStore.getState().setRerunModal(true),
+  },
+  {
+      content: 'Add to CI/CD pipeline',
+      icon: PlayMinor,
+      onAction: () => {window.open('https://docs.akto.io/testing/run-tests-in-cicd', '_blank');},
+  },
+  {
+      content: 'Stop',
+      icon: CircleCancelMajor,
+      destructive:true,
+      onAction: () => {this.stopTest(hexId || "")},
+      disabled: true,
+  }
+]},
+getActions(item){
+  let arr = []
+  let section1 = {title: 'Actions', items:[]}
+  let actionsList = this.getActionsList(item.id);
+  if(item['run_type'] === 'One-time'){
+    section1.items.push(actionsList[1])
+  }
+  if(item['run_type'] !== 'CI/CD'){
+    section1.items.push(actionsList[2])
+  }
+  
+  if(item['orderPriority'] === 1 || item['orderPriority'] === 2){
+      actionsList[3].disabled = false
+  }else{
+      actionsList[3].disabled = true
+  }
+  section1.items.push(actionsList[3]);
+  arr.push(section1)
+  return arr
+},
+getHeaders: (tab)=> {
+  switch(tab){
+
+      case "vulnerable":
+          return headers;
+      
+      case "no_vulnerability_found":
+          return headers.filter((header) => header.title !== "Severity")
+
+      case "skipped":
+          return headers.filter((header) => header.title !== "CWE tags").map((header) => {
+              if (header.title === "Severity") {
+                  // Modify the object as needed
+                  return { type: CellType.TEXT, title: "Error message", value: 'errorMessage' };
+              }
+              return header;
+          })
+
+      default:
+          return headers
+  }
 }
 }
 

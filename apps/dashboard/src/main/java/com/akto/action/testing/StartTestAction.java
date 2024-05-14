@@ -20,10 +20,13 @@ import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRun.TestingRunType;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
+import com.akto.dto.testing.info.CurrentTestsStatus;
+import com.akto.dto.testing.info.CurrentTestsStatus.StatusForIndividualTest;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
@@ -816,6 +819,36 @@ public class StartTestAction extends UserAction {
         return Action.ERROR.toUpperCase();
     }
 
+    private CurrentTestsStatus currentTestsStatus;
+
+    public String getCurrentTestStateStatus(){
+        // polling api 
+        try {
+            List<TestingRunResultSummary> runningTrrs = TestingRunResultSummariesDao.instance.getCurrentRunningTestsSummaries();
+            int totalRunningTests = 0;
+            int totalInitiatedTests = 0;
+            List<StatusForIndividualTest> currentTestsRunningList = new ArrayList<>();
+            for(TestingRunResultSummary summary: runningTrrs){
+                int countInitiatedTestsForSummary = TestingRunConfigDao.instance.countTotalTestsInitialised(summary);
+                totalInitiatedTests += countInitiatedTestsForSummary;
+
+                int currentTestsStoredForSummary = (int) TestingRunResultDao.instance.count(Filters.in(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summary.getId()));
+                totalRunningTests += currentTestsStoredForSummary;
+                currentTestsRunningList.add(new StatusForIndividualTest(summary.getTestingRunId().toHexString(), totalInitiatedTests, totalRunningTests));
+            }
+            int totalTestsQueued = (int) TestingRunDao.instance.count(
+                Filters.eq(TestingRun.STATE, State.SCHEDULED)
+            );
+
+            this.currentTestsStatus = new CurrentTestsStatus(totalTestsQueued, totalRunningTests, totalInitiatedTests, currentTestsRunningList);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in getting status for tests", LogDb.DASHBOARD);
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
 
     public void setType(TestingEndpoints.Type type) {
         this.type = type;
@@ -1137,5 +1170,9 @@ public class StartTestAction extends UserAction {
 
     public void setTestRoleId(String testRoleId) {
         this.testRoleId = testRoleId;
+    }
+
+    public CurrentTestsStatus getCurrentTestsStatus() {
+        return currentTestsStatus;
     }
 }

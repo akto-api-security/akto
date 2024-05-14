@@ -1,13 +1,6 @@
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider} from '@shopify/polaris';
-import {
-  CircleCancelMajor,
-  CalendarMinor,
-  ReplayMinor,
-  PlayMinor,
-  ChevronDownMinor,
-  ChevronUpMinor
-} from '@shopify/polaris-icons';
+import { ChevronDownMinor , ChevronUpMinor } from '@shopify/polaris-icons';
 import api from "../api";
 import { useEffect, useReducer, useState } from 'react';
 import transform from "../transform";
@@ -109,22 +102,6 @@ let filters = [
 
 function TestRunsPage() {
 
-  const stopTest = (hexId) =>{
-    api.stopTest(hexId).then((resp) => {
-      func.setToast(true, false, "Test run stopped")
-    }).catch((resp) => {
-      func.setToast(true, true, "Unable to stop test run")
-    });
-  }
-
-  const rerunTest = async (hexId) =>{
-    await api.rerunTest(hexId)
-    func.setToast(true, false, "Test re-run")
-      setTimeout(() => {
-        refreshSummaries();
-      }, 2000)
-  }
-
   const apiCollectionMap = PersistStore(state => state.collectionsMap)
 
   function disambiguateLabel(key, value) {
@@ -139,61 +116,6 @@ function TestRunsPage() {
   }
 
   filters = func.getCollectionFilters(filters)
-
-const getActionsList = (hexId) => {
-  return [
-  {
-      content: 'Schedule test',
-      icon: CalendarMinor,
-      onAction: () => {console.log("schedule test function")},
-  },
-  {
-      content: 'Re-run',
-      icon: ReplayMinor,
-      onAction: () => {rerunTest(hexId || "")},
-  },
-  {
-      content: 'Add to CI/CD pipeline',
-      icon: PlayMinor,
-      onAction: () => {window.open('https://docs.akto.io/testing/run-tests-in-cicd', '_blank');},
-  },
-  {
-      content: 'Stop',
-      icon: CircleCancelMajor,
-      destructive:true,
-      onAction: () => {stopTest(hexId || "")},
-      disabled: true,
-  }
-]}
-
-function getActions(item){
-  let arr = []
-  let section1 = {items:[]}
-  let actionsList = getActionsList(item.id);
-  if(item['run_type'] === 'One-time'){
-    // section1.items.push(actionsList[0])
-  }else{
-    section1.items.push(actionsList[1])
-  }
-
-  if(item['run_type'] === 'CI/CD'){
-    // section1.items.push(actionsList[0])
-  }else{
-    section1.items.push(actionsList[2])
-  }
-  
-  if(item['orderPriority'] === 1 || item['orderPriority'] === 2){
-      actionsList[3].disabled = false
-  }else{
-      actionsList[3].disabled = true
-  }
-
-  arr.push(section1)
-  let section2 = {items:[]}
-  section2.items.push(actionsList[3]);
-  arr.push(section2);
-  return arr
-}
 
 const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
 const getTimeEpoch = (key) => {
@@ -351,21 +273,21 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
 const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
 const SummaryCardComponent = () =>{
-  let totalVulnerabilites = severityCountMap?.HIGH?.text + severityCountMap?.MEDIUM?.text +  severityCountMap?.LOW?.text 
+  let totalVulnerabilities = severityCountMap?.HIGH?.text + severityCountMap?.MEDIUM?.text +  severityCountMap?.LOW?.text 
   return(
     <LegacyCard>
       <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
         <HorizontalStack align="space-between">
-          <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilites} vulnerabilities in total</Text>
+          <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
           <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
         </HorizontalStack>
-        {totalVulnerabilites > 0 ? 
+        {totalVulnerabilities > 0 ? 
         <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
           <LegacyCard.Subsection>
             <Box paddingBlockStart={3}><Divider/></Box>
             <HorizontalGrid columns={2} gap={6}>
               <ChartypeComponent navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
-              <ChartypeComponent data={severityCountMap} reverse={true} title={"Severity"} charTitle={totalVulnerabilites} chartSubtitle={"Total Vulnerabilities"}/>
+              <ChartypeComponent data={severityCountMap} reverse={true} title={"Severity"} charTitle={totalVulnerabilities} chartSubtitle={"Total Vulnerabilities"}/>
             </HorizontalGrid>
 
           </LegacyCard.Subsection>
@@ -378,7 +300,7 @@ const SummaryCardComponent = () =>{
   const promotedBulkActions = (selectedTestRuns) => { 
     return [
     {
-      content: <div data-testid="delete_result_button">{`Delete ${selectedTestRuns.length} test run${selectedTestRuns.length==1 ? '' : 's'}`}</div>,
+      content: <div data-testid="delete_result_button">{`Delete ${selectedTestRuns.length} test run${selectedTestRuns.length ===1 ? '' : 's'}`}</div>,
       onAction: async() => {
         await api.deleteTestRuns(selectedTestRuns);
         func.setToast(true, false, <div data-testid="delete_success_message">{`${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`}</div>)
@@ -388,7 +310,6 @@ const SummaryCardComponent = () =>{
   ]};
 
   const key = currentTab + startTimestamp + endTimestamp + updateTable;
-
 const coreTable = (
 <GithubServerTable
     key={key}
@@ -399,7 +320,7 @@ const coreTable = (
     filters={filters}
     disambiguateLabel={disambiguateLabel} 
     headers={headers}
-    getActions = {getActions}
+    getActions = {(item) => transform.getActions(item)}
     hasRowActions={true}
     loading={loading}
     getStatus={func.getTestResultStatus}
