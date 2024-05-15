@@ -89,10 +89,14 @@ public class RiskScoreTestingEndpointsUtils {
     public void syncRiskScoreGroupApis() {
         int accountId = Context.accountId.get();
         
-        executorService.submit(() -> {
-            Context.accountId.set(accountId);
-            loggerMaker.infoAndAddToDb("Updating risk score API groups", LogDb.DASHBOARD);
-            updateRiskScoreApiGroups();
-        });
+        try {
+            executorService.submit(() -> {
+                Context.accountId.set(accountId);
+                loggerMaker.infoAndAddToDb("Updating risk score API groups", LogDb.DASHBOARD);
+                updateRiskScoreApiGroups();
+            });
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error syncing risk score group APIs - " + e.getMessage(), LogDb.DASHBOARD);
+        }
     }
 }
