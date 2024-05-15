@@ -1152,65 +1152,69 @@ public class InitializerListener implements ServletContextListener {
     public static void createRiskScoreApiGroup(int id, String name, RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType) {
         loggerMaker.infoAndAddToDb("Creating risk score group: " + name, LogDb.DASHBOARD);
         
-        ApiCollection riskScoreGroup = ApiCollectionsDao.instance.findByName(name);
-
-        if (riskScoreGroup == null) {
-            riskScoreGroup = new ApiCollection(id, name, Context.now(), new HashSet<>(), null, 0, false, false);
+        //ApiCollection riskScoreGroup = ApiCollectionsDao.instance.findByName(name);
+        ApiCollection riskScoreGroup = new ApiCollection(id, name, Context.now(), new HashSet<>(), null, 0, false, false);
             
-            List<TestingEndpoints> riskScoreConditions = new ArrayList<>();
-            RiskScoreTestingEndpoints riskScoreTestingEndpoints = new RiskScoreTestingEndpoints(riskScoreGroupType);
-            riskScoreConditions.add(riskScoreTestingEndpoints);
+        List<TestingEndpoints> riskScoreConditions = new ArrayList<>();
+        RiskScoreTestingEndpoints riskScoreTestingEndpoints = new RiskScoreTestingEndpoints(riskScoreGroupType);
+        riskScoreConditions.add(riskScoreTestingEndpoints);
 
-            riskScoreGroup.setConditions(riskScoreConditions);
-            riskScoreGroup.setType(ApiCollection.Type.API_GROUP);
+        riskScoreGroup.setConditions(riskScoreConditions);
+        riskScoreGroup.setType(ApiCollection.Type.API_GROUP);
 
-            ApiCollectionsDao.instance.insertOne(riskScoreGroup);  
-        }
+        ApiCollectionsDao.instance.insertOne(riskScoreGroup); 
+
+        // if (riskScoreGroup == null) {
+        //     riskScoreGroup = new ApiCollection(id, name, Context.now(), new HashSet<>(), null, 0, false, false);
+            
+        //     List<TestingEndpoints> riskScoreConditions = new ArrayList<>();
+        //     RiskScoreTestingEndpoints riskScoreTestingEndpoints = new RiskScoreTestingEndpoints(riskScoreGroupType);
+        //     riskScoreConditions.add(riskScoreTestingEndpoints);
+
+        //     riskScoreGroup.setConditions(riskScoreConditions);
+        //     riskScoreGroup.setType(ApiCollection.Type.API_GROUP);
+
+        //     ApiCollectionsDao.instance.insertOne(riskScoreGroup);  
+        // }
         
-        List<TestingEndpoints> riskScoreConditions = riskScoreGroup.getConditions();
-        RiskScoreTestingEndpoints riskScoreTestingEndpoints = (RiskScoreTestingEndpoints) riskScoreConditions.get(0);
+        // List<TestingEndpoints> riskScoreConditions = riskScoreGroup.getConditions();
+        // RiskScoreTestingEndpoints riskScoreTestingEndpoints = (RiskScoreTestingEndpoints) riskScoreConditions.get(0);
             
-        // Add APIs to the risk score group
-        List<ApiInfo> riskScoreGroupApisList = riskScoreTestingEndpoints.fetchRiskScoreGroupApis();
+        // // Add APIs to the risk score group
+        // List<ApiInfo> riskScoreGroupApisList = riskScoreTestingEndpoints.fetchRiskScoreGroupApis();
 
+        // // Skip API's wwhich have already been added to the risk score group
+        // Iterator<ApiInfo> riskScoreGroupApisListIt = riskScoreGroupApisList.iterator();
+        // while (riskScoreGroupApisListIt.hasNext()) {
+        //     ApiInfo riskScoreGroupApi = riskScoreGroupApisListIt.next();
+        //     List<Integer> collectionIds = riskScoreGroupApi.getCollectionIds();
 
-        // Skip API's wwhich have already been added to the risk score group
-        Iterator<ApiInfo> riskScoreGroupApisListIt = riskScoreGroupApisList.iterator();
-        while (riskScoreGroupApisListIt.hasNext()) {
-            ApiInfo riskScoreGroupApi = riskScoreGroupApisListIt.next();
-            List<Integer> collectionIds = riskScoreGroupApi.getCollectionIds();
+        //     if (collectionIds.contains(id)) {
+        //         riskScoreGroupApisListIt.remove();
+        //     }
+        // }
 
-            if (collectionIds.contains(id)) {
-                riskScoreGroupApisListIt.remove();
-            }
-        }
+        // loggerMaker.infoAndAddToDb("Adding " + riskScoreGroupApisList.size() + " API's to API group - " + name , LogDb.DASHBOARD);
+        // for (int start = 0; start < riskScoreGroupApisList.size(); start += RiskScoreTestingEndpoints.BATCH_SIZE) {
+        //     int end = Math.min(start + RiskScoreTestingEndpoints.BATCH_SIZE, riskScoreGroupApisList.size());
 
-        loggerMaker.infoAndAddToDb("Adding " + riskScoreGroupApisList.size() + " API's to API group - " + name , LogDb.DASHBOARD);
-        for (int start = 0; start < riskScoreGroupApisList.size(); start += RiskScoreTestingEndpoints.BATCH_SIZE) {
-            int end = Math.min(start + RiskScoreTestingEndpoints.BATCH_SIZE, riskScoreGroupApisList.size());
+        //     List<ApiInfo> batch = riskScoreGroupApisList.subList(start, end);
 
-            List<ApiInfo> batch = riskScoreGroupApisList.subList(start, end);
-
-            riskScoreTestingEndpoints.setFilterRiskScoreGroupApis(batch);
-            ApiCollectionUsers.addToCollectionsForCollectionId(riskScoreConditions, id);
-        } 
+        //     riskScoreTestingEndpoints.setFilterRiskScoreGroupApis(batch);
+        //     ApiCollectionUsers.addToCollectionsForCollectionId(riskScoreConditions, id);
+        // } 
     }
 
     public static void createRiskScoreGroups(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getRiskScoreGroups() == 0) {
-            try {
-                createRiskScoreApiGroup(111_111_148, "Low Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.LOW);
-                createRiskScoreApiGroup(111_111_149, "Medium Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.MEDIUM);
-                createRiskScoreApiGroup(111_111_150, "High Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.HIGH);
+            createRiskScoreApiGroup(111_111_148, "Low Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.LOW);
+            createRiskScoreApiGroup(111_111_149, "Medium Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.MEDIUM);
+            createRiskScoreApiGroup(111_111_150, "High Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.HIGH);
 
-                BackwardCompatibilityDao.instance.updateOne(
-                        Filters.eq("_id", backwardCompatibility.getId()),
-                        Updates.set(BackwardCompatibility.RISK_SCORE_GROUPS, Context.now())
-                );
-            }
-            catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error while creating risk score groups: " + e.getMessage(), LogDb.DASHBOARD);
-            }
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.RISK_SCORE_GROUPS, Context.now())
+            );
         }
     }
 
