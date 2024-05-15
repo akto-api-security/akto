@@ -636,6 +636,17 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private Bson getSearchFilters(){
+        if(this.searchString == null || this.searchString.length() == 0){
+            return Filters.empty();
+        }
+        Bson filter = Filters.or(
+            Filters.regex(SingleTypeInfo._PARAM, this.searchString, "i")
+        );
+        return filter;
+    }
+
+    private String searchString;
     private List<SingleTypeInfo> getMongoResults() {
 
         List<String> sortFields = new ArrayList<>();
@@ -644,7 +655,7 @@ public class InventoryAction extends UserAction {
         Bson sort = sortOrder == 1 ? Sorts.ascending(sortFields) : Sorts.descending(sortFields);
 
         loggerMaker.infoAndAddToDb(String.format("skip: %s, limit: %s, sort: %s", skip, limit, sort), LogDb.DASHBOARD);
-        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.and(prepareFilters()), skip, limit, sort);
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.and(prepareFilters(), getSearchFilters()), skip, limit, sort);
         return list;        
     }
 
@@ -897,5 +908,9 @@ public class InventoryAction extends UserAction {
     
     public void setSubType(String subType) {
         this.subType = subType;
+    }
+
+    public void setSearchString(String searchString) {
+        this.searchString = searchString;
     }
 }
