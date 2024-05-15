@@ -66,6 +66,7 @@ public final class FilterAction {
         put("cookie_expire_filter", new CookieExpireFilter());
         put("datatype", new DatatypeFilter());
         put("ssrf_url_hit", new SsrfUrlHitFilter());
+        put("belongs_to_collections", new ApiCollectionFilter());
     }};
 
     public FilterAction() { }
@@ -285,6 +286,7 @@ public final class FilterAction {
 
         BasicDBObject payloadObj = new BasicDBObject();
         try {
+            payload = Utils.jsonifyIfArray(payload);
             payloadObj =  BasicDBObject.parse(payload);
         } catch(Exception e) {
             // add log
@@ -389,6 +391,7 @@ public final class FilterAction {
         String key = querySet.get(0);
         BasicDBObject reqObj = new BasicDBObject();
         try {
+            payload = Utils.jsonifyIfArray(payload);
             reqObj =  BasicDBObject.parse(payload);
         } catch(Exception e) {
             // add log
@@ -839,19 +842,28 @@ public final class FilterAction {
                 }
                 Object value = basicDBObject.get(key);
                 doAllSatisfy = getMatchingKeysForPayload(value, key, querySet, operand, matchingKeys, doAllSatisfy);
+                if (parentKey != null && TestEditorEnums.DataOperands.VALUETYPE.toString().equals(operand)) {
+                    matchingKeys.add(parentKey);
+                }
                 
             }
         } else if (obj instanceof BasicDBList) {
             for(Object elem: (BasicDBList) obj) {
                 doAllSatisfy = getMatchingKeysForPayload(elem, parentKey, querySet, operand, matchingKeys, doAllSatisfy);
             }
-        } else {
-            DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(parentKey, querySet, operand);
-            res = invokeFilter(dataOperandFilterRequest);
-            if (res) {
+            if (parentKey != null && TestEditorEnums.DataOperands.VALUETYPE.toString().equals(operand)) {
                 matchingKeys.add(parentKey);
             }
-            doAllSatisfy = Utils.evaluateResult("and", doAllSatisfy, res);
+
+        } else {
+            if (!TestEditorEnums.DataOperands.VALUETYPE.toString().equals(operand)) {
+                DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(parentKey, querySet, operand);
+                res = invokeFilter(dataOperandFilterRequest);
+                if (res) {
+                    matchingKeys.add(parentKey);
+                }
+                doAllSatisfy = Utils.evaluateResult("and", doAllSatisfy, res);
+            }
         }
         return doAllSatisfy;
     }
@@ -1369,6 +1381,7 @@ public final class FilterAction {
         String payload = rawApi.getRequest().getJsonRequestBody();
         BasicDBObject reqObj = new BasicDBObject();
         try {
+            payload = Utils.jsonifyIfArray(payload);
             reqObj =  BasicDBObject.parse(payload);
         } catch(Exception e) {
             // add log
@@ -1392,6 +1405,7 @@ public final class FilterAction {
         String responsePayload = rawApi.getResponse().getJsonResponseBody();
         BasicDBObject respObj = new BasicDBObject();
         try {
+            responsePayload = Utils.jsonifyIfArray(responsePayload);
             respObj =  BasicDBObject.parse(responsePayload);
         } catch(Exception e) {
             // add log

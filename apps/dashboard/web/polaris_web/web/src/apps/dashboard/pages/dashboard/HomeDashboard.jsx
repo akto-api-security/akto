@@ -19,6 +19,7 @@ import ActivityTracker from './components/ActivityTracker';
 import NullData from './components/NullData';
 import {DashboardBanner} from './components/DashboardBanner';
 import RiskScoreTrend from './components/RiskScoreTrend';
+import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo';
 
 function HomeDashboard() {
 
@@ -131,8 +132,12 @@ function HomeDashboard() {
         Object.keys(subCategoryInfo).length > 0 ? 
             <Card key="subcategoryTrend">
                 <VerticalStack gap={5}>
-                    <Text variant="bodyLg" fontWeight="semibold">Issues by category</Text>
-                    <ChartypeComponent data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'200px'}/>
+                    <TitleWithInfo
+                        titleText={"Issues by category"}
+                        tooltipContent={"Testing run issues present in dashboard categorised by subcategory of tests."}
+                        textProps={{variant: "headingMd"}}
+                    />
+                    <ChartypeComponent navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'200px'}/>
                 </VerticalStack>
             </Card>
 
@@ -166,10 +171,15 @@ function HomeDashboard() {
         :
         <Card key="sensitiveTrend">
             <VerticalStack gap={5}>
-                <Text variant="bodyLg" fontWeight="semibold">Sensitive Data</Text>
+                <TitleWithInfo
+                    titleText={"Sensitive data"}
+                    tooltipContent={"Count of endpoints per data type."}
+                    textProps={{variant: "headingMd"}}
+                    docsUrl={"https://docs.akto.io/api-inventory/concepts/sensitive-data"}
+                />
                 <HorizontalGrid gap={5} columns={2}>
-                    <ChartypeComponent navurl={"/dashboard/observe/sensitive/"} data={sensitiveData.request} title={"Request"} isNormal={true} boxHeight={'100px'}/>
-                    <ChartypeComponent navurl={"/dashboard/observe/sensitive/"} data={sensitiveData.response} title={"Response"} isNormal={true} boxHeight={'100px'}/>
+                    <ChartypeComponent navUrl={"/dashboard/observe/sensitive/"} data={sensitiveData.request} title={"Request"} isNormal={true} boxHeight={'100px'}/>
+                    <ChartypeComponent navUrl={"/dashboard/observe/sensitive/"} data={sensitiveData.response} title={"Response"} isNormal={true} boxHeight={'100px'}/>
                 </HorizontalGrid>
             </VerticalStack>
         </Card>
@@ -179,7 +189,11 @@ function HomeDashboard() {
         (issuesTrendMap.allSubCategories.length > 0 && issuesTrendMap.trend.length > 0) ? 
         <Card key="issuesTrend">
             <VerticalStack gap={5}>
-                <Text variant="bodyLg" fontWeight="semibold">Issues timeline</Text>
+                <TitleWithInfo
+                    titleText={"Issues timeline"}
+                    tooltipContent={"Count of issues per category against the time they were last seen"}
+                    textProps={{variant: "headingMd"}}
+                />
                 <VerticalStack gap={3}>
                     <HorizontalStack align="end">
                         <Scrollable style={{ width: '350px' }} shadow>
@@ -246,7 +260,7 @@ function HomeDashboard() {
             <div style={{flex: 3}}>
                 <VerticalStack gap={5}>
                     <InitialSteps initialSteps={initialSteps}/>
-                    <ActivityTracker latestActivity={recentActivities} onLoadMore={handleLoadMore} showLoadMore={checkLoadMore}/>
+                    <ActivityTracker collections={collectionsMap} latestActivity={recentActivities} onLoadMore={handleLoadMore} showLoadMore={checkLoadMore}/>
                     <CoverageCard coverageObj={coverageObj} collections={allCollections} collectionsMap={collectionsMap}/>
                     <Pipeline riskScoreMap={riskScoreObj} collections={allCollections} collectionsMap={collectionsMap}/> 
                 </VerticalStack>

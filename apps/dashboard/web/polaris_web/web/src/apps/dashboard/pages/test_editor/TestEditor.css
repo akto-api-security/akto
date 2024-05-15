@@ -45,7 +45,11 @@
 .editor-navbar .Polaris-Navigation__SecondaryNavigation .Polaris-Navigation__ItemWrapper {
     margin-left: 2.2vw;
     max-width: 17vw;
-} 
+}
+
+.editor-navbar .Polaris-Icon--applyColor {
+    color: unset !important;
+}
 
 .editor-header {
     display: flex;
