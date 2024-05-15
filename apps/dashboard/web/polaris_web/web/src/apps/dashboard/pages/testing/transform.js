@@ -153,9 +153,10 @@ const transform = {
       if(checkTestFailure(state, testRunState)){
         state = 'FAIL'
       }
+      const iconObj = func.getTestingRunIconObj(state)
       obj['orderPriority'] = getOrderPriority(state)
-      obj['icon'] = func.getTestingRunIcon(state);
-      obj['iconColor'] = func.getTestingRunIconColor(state)
+      obj['icon'] = iconObj.icon;
+      obj['iconColor'] = iconObj.iconColor
       obj['summaryState'] = getStatus(state)
       obj['startTimestamp'] = data?.startTimestamp
       obj['endTimestamp'] = data?.endTimestamp
