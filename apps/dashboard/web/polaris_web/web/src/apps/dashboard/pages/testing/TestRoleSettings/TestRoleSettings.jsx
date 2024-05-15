@@ -6,11 +6,14 @@ import func from "@/util/func";
 import api from '../api';
 import transform from '../transform';
 import DetailsPage from '../../../components/DetailsPage';
-import {produce} from "immer"
+import {produce, current} from "immer"
 import HardCoded from '../user_config/HardCoded';
 import LoginStepBuilder from '../user_config/LoginStepBuilder';
 import { ChevronRightMinor, ChevronDownMinor, InfoMinor } from '@shopify/polaris-icons';
 import ParamsCard from './ParamsCard';
+import JsonRecording from '../user_config/JsonRecording';
+import Dropdown from '../../../components/layouts/Dropdown';
+import { useSearchParams } from 'react-router-dom';
 
 const selectOptions = [
     {
@@ -40,14 +43,18 @@ const selectOptions = [
 ]
 
 function TestRoleSettings() {
-
     const location = useLocation();
     const navigate = useNavigate()
-    const isNew = location?.state != undefined && Object.keys(location?.state).length > 0 ? false : true
+    const [searchParams] = useSearchParams();
+    const systemRole = searchParams.get("system")
+
+    const isDataInState = location?.state != undefined && Object.keys(location?.state).length > 0
+    const isDataInSearch = searchParams.get("name")
+    const isNew = !isDataInState && !isDataInSearch
     const pageTitle = isNew ? "Add test role" : "Configure test role"
-    const initialItems = isNew ? { name: "" } : location.state;
+    const [initialItems, setInitialItems] = useState({ name: "" })
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => conditionsReducer(draft, action)), []);
-    const [roleName, setRoleName] = useState("");
+    const [roleName, setRoleName] = useState(systemRole || "");
     const [change, setChange] = useState(false);
     const [currentInfo, setCurrentInfo] = useState({steps: [], authParams: {}});
     const [hardCodeAuthInfo, setHardCodeAuthInfo] = useState({authHeaderKey: '',authHeaderValue: ''})
@@ -56,15 +63,49 @@ function TestRoleSettings() {
     const [deletedIndex, setDeletedIndex] = useState(-1);
     const [headerKey, setHeaderKey] = useState('') ;
     const [headerValue, setHeaderValue] = useState('');
+    const [automationType, setAutomationType] = useState("LOGIN_STEP_BUILDER")
+    const automationOptions = [
+        { label: "Login Step Builder", value: "LOGIN_STEP_BUILDER" },
+        { label: "JSON Recording", value: "RECORDED_FLOW" },
+    ]
 
-    const authWithCondList = isNew ? null : location.state.authWithCondList;
-    const resetFunc = () => {
+    function getAuthWithCondList() {
+        return  initialItems?.authWithCondList
+    }
+
+    const resetFunc = (newItems) => {
         setChange(false);
-        setRoleName(initialItems.name ? initialItems.name : "");
-        dispatchConditions({type:"replace", conditions:transform.createConditions(initialItems.endpoints)})
+        setRoleName(newItems.name || systemRole || "");
+        dispatchConditions({type:"replace", conditions:transform.createConditions(newItems.endpoints)})
     }
     useEffect(() => {
-        resetFunc()
+        if (!isNew) {
+
+            let newItems = initialItems
+
+            if (isDataInState) {
+                newItems = location.state
+                setInitialItems(location.state);
+                resetFunc(newItems)
+            } else {
+                async function fetchData(){
+                    await api.fetchTestRoles().then((res) => {
+                        let testRole = res.testRoles.find((testRole) => testRole.name === searchParams.get("name"));
+                        if (testRole) {
+                            let oo = {...testRole, endpoints: testRole.endpointLogicalGroup.testingEndpoints}
+                            setInitialItems(oo)
+                            resetFunc(oo)
+                        } else {
+                            resetFunc(newItems)
+                        }
+                    })
+                }
+                fetchData();
+
+            }
+        } else {
+            resetFunc(initialItems)
+        }
     }, [])
 
     useEffect(() => {
@@ -77,6 +118,10 @@ function TestRoleSettings() {
 
     const compareFunc = () => {
         return !change
+    }
+
+    const handleSelectAutomationType = async(type) => {
+        setAutomationType(type)
     }
 
     const saveAction = async (updatedAuth=false, authWithCondLists = null) => {
@@ -102,7 +147,6 @@ function TestRoleSettings() {
                 }).catch((err) => {
                     func.setToast(true, true, "Unable to update test role")
                 })
-
                 if(!updatedAuth){
                     func.setToast(true, false, "Test role updated successfully.")
                 }
@@ -140,7 +184,7 @@ function TestRoleSettings() {
             <LegacyCard.Section>
                 <HorizontalGrid gap="4" columns={2}>
                     <TextField
-                        label="Name" value={roleName}
+                        label="Name" value={roleName} disabled={systemRole}
                         placeholder='New test role name' onChange={isNew ? handleTextChange : () => { }}
                     />
                 </HorizontalGrid>
@@ -165,7 +209,7 @@ function TestRoleSettings() {
                     draft[action.index].operator = func.getConditions(selectOptions, action.obj.type)[0].label
                 }
                 draft[action.index] = {...draft[action.index], ...action.obj}; break;
-            case "delete": draft = draft.filter((item, index) => index !== action.index);
+            case "delete": return draft.filter((item, index) => index !== action.index);
             default: break;
         }
     }
@@ -199,13 +243,13 @@ function TestRoleSettings() {
     )
 
     const savedParamComponent = (
-        authWithCondList ?
+        getAuthWithCondList() ?
         <LegacyCard title={<Text variant="headingMd">Configured auth details</Text>} key={"savedAuth"}>
             <br/>
             <Divider />
             <LegacyCard.Section>
                 <VerticalStack gap={6}>
-                    {authWithCondList.map((authObj,index)=> {
+                    {getAuthWithCondList().map((authObj,index)=> {
                         return(
                             <ParamsCard dataObj={authObj} key={JSON.stringify(authObj)} handleDelete={() => {setDeletedIndex(index); setShowAuthDeleteModal(true)}}/>
                         )
@@ -227,12 +271,12 @@ function TestRoleSettings() {
             steps: obj.steps,
             authParams: obj.authParams
         }))
-
+    
     }
 
     const addAuthButton = (
         <HorizontalStack align="end" key="auth-button">
-            {isNew ? <Tooltip content= "Save the role first"><Button disabled>Add auth</Button></Tooltip> : <Button primary onClick={() => setShowAuthComponent(true)}>Add auth</Button>}
+            {isNew ? <Tooltip content= "Save the role first"><Button disabled>Add auth</Button></Tooltip> : <Button primary onClick={() => setShowAuthComponent(true)}><div data-testid="add_auth_button">Add auth</div></Button>}
         </HorizontalStack>
     )
 
@@ -251,10 +295,23 @@ function TestRoleSettings() {
             const automationType = "HardCoded";
             const authParamData = [{key: hardCodeAuthInfo.authHeaderKey, value: hardCodeAuthInfo.authHeaderValue, where: "HEADER"}]
             resp = await api.addAuthToRole(initialItems.name, apiCond, authParamData, automationType, null)
-
+            
         }else{
             const automationType = "LOGIN_REQUEST";
-            resp = await api.addAuthToRole(initialItems.name, apiCond, currentInfo.authParams, automationType, currentInfo.steps)
+            
+            let recordedLoginFlowInput = null;
+            if(currentInfo.steps && currentInfo.steps.length > 0){
+                if (currentInfo.steps[0].type === "RECORDED_FLOW") {
+                    recordedLoginFlowInput = {
+                        content: currentInfo.steps[0].content,
+                        tokenFetchCommand: currentInfo.steps[0].tokenFetchCommand,
+                        outputFilePath: null,
+                        errorFilePath: null,
+                    }
+                }
+            }
+
+            resp = await api.addAuthToRole(initialItems.name, apiCond, currentInfo.authParams, automationType, currentInfo.steps, recordedLoginFlowInput)
         }
         handleCancel()
         await saveAction(true, resp.selectedRole.authWithCondList)
@@ -262,7 +319,7 @@ function TestRoleSettings() {
     }
 
     const authCard = (
-            <LegacyCard title="Authentication details" key="auth" secondaryFooterActions={[{content: 'Cancel' ,destructive: true, onAction: handleCancel}]} primaryFooterAction={{content: 'Save', onAction: handleSaveAuthMechanism}}>
+            <LegacyCard title="Authentication details" key="auth" secondaryFooterActions={[{content: 'Cancel' ,destructive: true, onAction: handleCancel}]} primaryFooterAction={{content: <div data-testid="save_token_details_button">Save</div>, onAction: handleSaveAuthMechanism}}>
                 <LegacyCard.Section title="Header details">
                     <div>
                         <Text variant="headingMd">Api header conditions</Text>
@@ -282,7 +339,7 @@ function TestRoleSettings() {
                                 value={headerKey}
                                 onChange={setHeaderKey}
                                 />
-                            <TextField
+                            <TextField 
                                 id={"auth-header-value-field"}
                                 label={(
                                     <HorizontalStack gap="2">
@@ -320,7 +377,7 @@ function TestRoleSettings() {
                             <HardCoded showOnlyApi={true} extractInformation={true} setInformation={setHardCodedInfo}/>
                         </Collapsible>
                     </LegacyStack>
-
+                
                     <LegacyStack vertical>
                         <Button
                             id={"automated-token-expand-button"}
@@ -337,7 +394,19 @@ function TestRoleSettings() {
                             transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}
                             expandOnPrint
                         >
-                            <LoginStepBuilder extractInformation = {true} showOnlyApi={true} setStoreData={handleLoginInfo}/>
+
+                            <div style={{ display: "grid", gridTemplateColumns: "max-content max-content", gap: "10px", alignItems: "center" }}>
+                                <Text>Select automation type:</Text>
+                                <Dropdown
+                                    selected={handleSelectAutomationType}
+                                    menuItems={automationOptions}
+                                    initial={automationType}
+                                />
+                            </div>
+                            <br />
+
+                            { automationType === "LOGIN_STEP_BUILDER" && <LoginStepBuilder extractInformation = {true} showOnlyApi={true} setStoreData={handleLoginInfo}/> }
+                            { automationType === "RECORDED_FLOW" && <JsonRecording extractInformation = {true} showOnlyApi={true} setStoreData={handleLoginInfo}/> }
                         </Collapsible>
                     </LegacyStack>
                 </LegacyCard.Section>
@@ -354,7 +423,7 @@ function TestRoleSettings() {
         pageTitle={pageTitle}
         backUrl="/dashboard/testing/roles"
         saveAction={saveAction}
-        discardAction={resetFunc}
+        discardAction={() => resetFunc(initialItems)}
         isDisabled={compareFunc}
         components={components}
         />

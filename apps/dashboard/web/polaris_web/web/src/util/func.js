@@ -1,8 +1,6 @@
 import {
-  CircleCancelMajor,
   CalendarMinor,
   ClockMinor,
-  CircleTickMajor,
   CircleAlertMajor,
   DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor, InviteMinor, CreditCardMajor, IdentityCardMajor, LocationsMinor,
   PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, ReceiptMajor, MobileMajor, CalendarTimeMinor
@@ -13,9 +11,11 @@ import inventoryApi from "../apps/dashboard/pages/observe/api"
 import { isValidElement } from 'react';
 import Store from '../apps/dashboard/store';
 import { current } from 'immer';
+import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
-import homeFunctions from '../apps/dashboard/pages/home/module';
+
+import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
 
 const func = {
   setToast (isActive, isError, message) {
@@ -140,6 +140,12 @@ prettifyEpoch(epoch) {
   },
   flattenObject(obj, prefix = '') {
     return obj && Object.keys(obj).reduce((acc, k) => {
+
+      // skip react objects
+      if(isValidElement(obj[k])){
+        return acc;
+      }
+
       const pre = prefix.length ? `${prefix}.` : '';
       if (
         typeof obj[k] === 'object' &&
@@ -196,27 +202,50 @@ prettifyEpoch(epoch) {
       return (countIssues[key] > 0)
     })
   },
-  getTestingRunIcon(state) {
-    switch (state?._name || state) {
-      case "RUNNING": return ClockMinor;
-      case "SCHEDULED": return CalendarMinor;
-      case "STOPPED": return CircleCancelMajor;
-      case "COMPLETED": return CircleTickMajor;
-      case "FAILED" :
-      case "FAIL": return CircleAlertMajor;
-      default: return ClockMinor;
-    }
-  },
-  getTestingRunIconColor(state) {
-    switch (state?._name || state) {
-      case "RUNNING": return "subdued";
-      case "SCHEDULED": return "warning";
+  getTestingRunIconObj(state) {
+    let testState = state?._name || state
+    switch(testState.toUpperCase()){
+      case "RUNNING": 
+        return {
+          color: "subdued",
+          icon: ClockMinor,
+          tooltipContent: "Test is currently running"
+        }
+
+      case "SCHEDULED": 
+        return {
+          color: "warning",
+          icon: CalendarMinor,
+          tooltipContent: "Test is scheduled and will run in future."
+        }
+
       case "FAILED":
       case "FAIL":
-      case "STOPPED": return "critical";
-      case "COMPLETED": return "success";
-      default: return "base";
-    }
+        return{
+          color: "critical",
+          icon: CircleAlertMajor,
+          tooltipContent: "Error occurred while running the test."
+        }
+
+      case "STOPPED":
+        return{
+          color: "critical",
+          tooltipContent: "Error occurred while running the test.",
+          icon: circle_cancel,
+        }
+      case "COMPLETED": 
+        return {
+          color: "success",
+          tooltipContent: "Test has been completed.",
+          icon: circle_tick_minor
+        }
+      default: 
+        return{
+          color: "critical",
+          icon: CircleAlertMajor,
+          tooltipContent: "Unknown error occurred while running the test."
+        }
+      }
   },
   getSeverity(countIssues) {
     return func.getSeverityStatus(countIssues).map((key) => {
@@ -257,8 +286,8 @@ prettifyEpoch(epoch) {
       let a = testSubType.superCategory["severity"]["_name"]
       return a
     }
-  }
-  ,
+  },
+
   copyToClipboard(text, ref, toastMessage) {
     if (!navigator.clipboard) {
       // Fallback for older browsers (e.g., Internet Explorer)
@@ -724,13 +753,16 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
                   access_type = null
               } else if (access_types.indexOf("PUBLIC") !== -1) {
                   access_type = "Public"
-              } else {
+              } else if (access_types.indexOf("PARTNER") !== -1){
+                  access_type = "Partner"
+              }else{
                   access_type = "Private"
               }
           }
 
           let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
-          let score = apiInfoMap[key] ? apiInfoMap[key]?.severityScore : 0
+          let authTypeTag = authType.replace(",", "");
+          let riskScore = apiInfoMap[key] ? apiInfoMap[key]?.riskScore : 0
           let isSensitive = apiInfoMap[key] ? apiInfoMap[key]?.isSensitive : false
 
           ret[key] = {
@@ -755,13 +787,14 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               auth_type: (authType || "").toLowerCase(),
               sensitiveTags: [...this.convertSensitiveTags(x.sensitive)],
+              authTypeTag: (authTypeTag || "").toLowerCase(),
               collectionIds: apiInfoMap[key] ? apiInfoMap[key]?.collectionIds.filter(x => {
                 return Object.keys(apiGroupsMap).includes(x) || Object.keys(apiGroupsMap).includes(x.toString())
               }).map( x => {
                 return apiGroupsMap[x]
               }) : [],
               isSensitive: isSensitive,
-              severityScore: score,
+              riskScore: riskScore
           }
 
       }
@@ -1067,6 +1100,9 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 },
 
 convertToDisambiguateLabelObj(value, convertObj, maxAllowed){
+  if(!value || value.length  === 0 || !Array.isArray(value)){
+    return ""
+  }
   if (value.length > maxAllowed) {
       return `${value.slice(0, maxAllowed)
                      .map(val => convertObj ? convertObj[val] : val)
@@ -1290,6 +1326,13 @@ mapCollectionIdToHostName(apiCollections){
       funcToCall();
     }
   },
+  async refreshApiCollections() {
+    let apiCollections = await homeFunctions.getAllCollections()
+    const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
+
+    PersistStore.getState().setAllCollections(apiCollections);
+    PersistStore.getState().setCollectionsMap(allCollectionsMap);
+  },
 
   convertParamToDotNotation(str) {
     return str.replace(/[#\$]+/g, '.');;
@@ -1345,8 +1388,72 @@ mapCollectionIdToHostName(apiCollections){
     transformedString = segments.join('/');
     transformedString = transformedString.replace(/[/|-]/g, '_');
     return transformedString;
-}
+},
+showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
+  Store.getState().setConfirmationModalConfig({
+    modalContent: modalContent,
+    primaryActionContent: primaryActionContent,
+    primaryAction: primaryAction,
+    show: true
+  })
+},
+  hashCode(str) {
+    var hash = 0;
+    for (var i = 0; i < str.length; i++) {
+        var character = str.charCodeAt(i);
+        hash = ((hash<<5)-hash)+character;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    return hash;
+  },
+  getTableTabsContent(tableTabs, countObj, setSelectedTab, selectedTab, currentCount){
+    const finalTabs = tableTabs.map((tab,ind) => {
+      const tabId = this.getKeyFromName(tab)
+      return {
+          content: tab,
+          badge: selectedTab === tabId ? currentCount.toString() : countObj[tabId].toString(),
+          onAction: () => { setSelectedTab(tabId) },
+          id: this.getKeyFromName(tabId),
+          index: ind 
+      }
+    })
+    return finalTabs
+  },
+  getTabsCount(tableTabs, data, initialCountArr = []){
+    const currentState = PersistStore(state => state.tableInitialState)
+    const baseUrl = window.location.href.split('#')[0]
 
+    let finalCountObj = {}
+    tableTabs.forEach((tab,ind) => {
+      const tabId = this.getKeyFromName(tab)
+      const tabKey = baseUrl + '#' + tabId
+      const count = currentState[tabKey] || data[tabId]?.length || initialCountArr[ind] || 0
+      finalCountObj[tabId] = count
+    })
+
+    return finalCountObj
+  },
+  getKeyFromName(key){
+    return key.replace(/[\s/]+/g, '_').toLowerCase();
+  },
+  showTestSampleData(selectedTestRunResult){
+
+    let skipList = [
+      "skipping execution",
+      "deactivated"
+    ]
+
+    let errors = selectedTestRunResult.errors;
+
+    if (errors && errors.length > 0) {
+      let errorInSkipList = errors.filter(x => {
+        return skipList.some(y => x.includes(y))
+      }).length > 0
+
+      return !errorInSkipList
+    }
+    return true;
+  }
 }
 
 export default func

@@ -1,4 +1,4 @@
-import { Button, Collapsible, Divider, LegacyCard, LegacyStack, Text } from "@shopify/polaris"
+import { Box, Button, Collapsible, Divider, LegacyCard, LegacyStack, Text } from "@shopify/polaris"
 import { ChevronRightMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import { useState } from "react";
 import api from "../api"
@@ -9,6 +9,9 @@ import TestingStore from "../testingStore";
 import Automated from "./Automated";
 import Store from "../../../store";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
+import Dropdown from "../../../components/layouts/Dropdown";
+import settingRequests from "../../settings/api";
+import TestCollectionConfiguration from '../configurations/TestCollectionConfiguration'
 
 function UserConfig() {
 
@@ -16,6 +19,7 @@ function UserConfig() {
     const setAuthMechanism = TestingStore(state => state.setAuthMechanism)
     const [isLoading, setIsLoading] = useState(true)
     const [hardcodedOpen, setHardcodedOpen] = useState(true);
+    const [initialLimit, setInitialLimit] = useState(0);
 
     const handleToggleHardcodedOpen = () => setHardcodedOpen((prev) => !prev)
 
@@ -28,6 +32,10 @@ function UserConfig() {
             if (authMechanism.type === "HARDCODED") setHardcodedOpen(true)
             else setHardcodedOpen(false)
         }
+
+        await settingRequests.fetchAdminSettings().then((resp)=> {
+            setInitialLimit(resp.accountSettings.globalRateLimit);
+        })
         setIsLoading(false)
     }
 
@@ -35,12 +43,26 @@ function UserConfig() {
         fetchAuthMechanismData()
     }, [])
 
-    async function handleStopAlltests() {
+    async function handleStopAllTests() {
         await api.stopAllTests()
         setToastConfig({ isActive: true, isError: false, message: "All tests stopped!" })
     }
 
-    const bodyComponent = (
+    const requestPerMinValues = [0, 10, 20, 30, 60, 80, 100, 200, 300, 400, 600, 1000]
+    const dropdownItems = requestPerMinValues.map((x)=> {
+        return{
+            label : x === 0 ? "No limit" : x.toString(),
+            value: x
+        }
+    })
+
+    const handleSelect = async(limit) => {
+        setInitialLimit(limit)
+        await api.updateGlobalRateLimit(limit)
+        setToastConfig({ isActive: true, isError: false, message: `Global rate limit set successfully` })
+    }
+
+    const authTokenComponent = (
         <LegacyCard sectioned title="Choose auth token configuration" key="bodyComponent">
             <Divider />
             <LegacyCard.Section>
@@ -88,10 +110,32 @@ function UserConfig() {
                 </LegacyStack>
             </LegacyCard.Section>
 
+
+        
+
         </LegacyCard>
     )
 
-    const components = [bodyComponent]
+    const rateLimit = (
+        <LegacyCard sectioned title="Configure global rate limit" key="globalRateLimit">
+            <Divider />
+            <LegacyCard.Section>
+                <div style={{ display: "grid", gridTemplateColumns: "max-content max-content", gap: "10px", alignItems: "center" }}>
+                    <Text>Allowed requests / min:</Text>
+                    <Dropdown
+                        selected={handleSelect}
+                        menuItems={dropdownItems}
+                        initial={initialLimit}
+                    />
+
+                </div>
+            </LegacyCard.Section>
+
+            
+        </LegacyCard>
+    )
+
+    const components = [<TestCollectionConfiguration/>, rateLimit]
 
     return (
         isLoading ? <SpinnerCentered /> 
@@ -104,7 +148,7 @@ function UserConfig() {
                         User config
                     </Text>
                 }
-                primaryAction={{ content: 'Stop all tests', onAction: handleStopAlltests }}
+                primaryAction={{ content: 'Stop all tests', onAction: handleStopAllTests }}
             />
 
     )

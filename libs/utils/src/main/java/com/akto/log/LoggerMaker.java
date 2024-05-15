@@ -2,6 +2,9 @@ package com.akto.log;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.Log;
 import com.mongodb.BasicDBList;
@@ -31,6 +34,7 @@ public class LoggerMaker  {
     private static String slackWebhookUrl;
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     protected static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
 
@@ -61,9 +65,39 @@ public class LoggerMaker  {
     private LogDb db;
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER
     }
 
+    private static AccountSettings accountSettings = null;
+
+    private static final ScheduledExecutorService scheduler2 = Executors.newScheduledThreadPool(1);
+
+    static {
+        scheduler2.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                String cliTestIds = System.getenv("TEST_IDS");
+                if(cliTestIds==null && Context.accountId.get() == 1_000_000){
+                    updateAccountSettings();
+                }
+            }
+        }, 0, 2, TimeUnit.MINUTES);
+    }
+
+
+    private static void updateAccountSettings() {
+        try {
+            internalLogger.info("Running updateAccountSettings....................................");
+            Context.accountId.set(1_000_000);
+            accountSettings = dataActor.fetchAccountSettingsForAccount(1_000_000);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
+
+    @Deprecated
     public LoggerMaker(Class<?> c) {
         aClass = c;
         logger = LoggerFactory.getLogger(c);
@@ -75,12 +109,12 @@ public class LoggerMaker  {
         this.db = db;
     }
 
-    protected static void sendToSlack(String err) {
+    public static void sendToSlack(String slackWebhookUrl, String message){
         if (slackWebhookUrl != null) {
             try {
                 Slack slack = Slack.getInstance();
                 BasicDBList sectionsList = new BasicDBList();
-                BasicDBObject textObj = new BasicDBObject("type", "mrkdwn").append("text", err + "\n");
+                BasicDBObject textObj = new BasicDBObject("type", "mrkdwn").append("text", message + "\n");
                 BasicDBObject section = new BasicDBObject("type", "section").append("text", textObj);
                 sectionsList.add(section);
                 BasicDBObject ret = new BasicDBObject("blocks", sectionsList);
@@ -90,6 +124,10 @@ public class LoggerMaker  {
                 internalLogger.error("Can't send to Slack: " + e.getMessage(), e);
             }
         }
+    }
+
+    protected static void sendToSlack(String err) {
+        sendToSlack(slackWebhookUrl, err);
     }
 
     protected String basicError(String err, LogDb db) {
@@ -117,6 +155,15 @@ public class LoggerMaker  {
         }
     }
 
+    public void errorAndAddToDb(Exception e, String err) {
+        errorAndAddToDb(e, err, this.db);
+    }
+
+    public void debugInfoAddToDb(String info, LogDb db) {
+        if (accountSettings == null || !accountSettings.isEnableDebugLogs()) return;
+        infoAndAddToDb(info, db);
+    }
+
     public void errorAndAddToDb(Exception e, String err, LogDb db) {
         try {
             if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
@@ -133,9 +180,11 @@ public class LoggerMaker  {
     }
 
     public void infoAndAddToDb(String info, LogDb db) {
-        logger.info(info);
+        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
+        String infoMessage = "acc: " + accountId + ", " + info;
+        logger.info(infoMessage);
         try{
-            insert(info, "info",db);
+            insert(infoMessage, "info",db);
         } catch (Exception e){
 
         }
@@ -171,10 +220,13 @@ public class LoggerMaker  {
                     LogsDao.instance.insertOne(log);
                     break;
                 case RUNTIME: 
-                    RuntimeLogsDao.instance.insertOne(log);
+                    dataActor.insertRuntimeLog(log);
                     break;
                 case DASHBOARD: 
                     DashboardLogsDao.instance.insertOne(log);
+                    break;
+                case ANALYSER:
+                    dataActor.insertAnalyserLog(log);
                     break;
                 case BILLING:
                     BillingLogsDao.instance.insertOne(log);
@@ -196,7 +248,7 @@ public class LoggerMaker  {
         
         Bson filters = Filters.and(
             Filters.gte(Log.TIMESTAMP, logFetchStartTime),
-            Filters.lte(Log.TIMESTAMP, logFetchEndTime)
+            Filters.lt(Log.TIMESTAMP, logFetchEndTime)
         );
         switch(db){
             case TESTING: 
@@ -207,6 +259,9 @@ public class LoggerMaker  {
                 break;
             case DASHBOARD: 
                 logs = DashboardLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
+            case ANALYSER:
+                logs = AnalyserLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
                 break;
             case BILLING:
                 logs = BillingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));

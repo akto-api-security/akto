@@ -1,5 +1,6 @@
 package com.akto.har;
 
+import com.akto.dao.context.Context;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -51,7 +52,6 @@ public class HAR {
     public static Map<String,String> getResultMap(HarEntry entry, int accountId) throws Exception {
         HarRequest request = entry.getRequest();
         HarResponse response = entry.getResponse();
-        Date dateTime = entry.getStartedDateTime();
 
         List<HarHeader> requestHarHeaders = request.getHeaders();
         List<HarHeader> responseHarHeaders = response.getHeaders();
@@ -70,8 +70,8 @@ public class HAR {
         String responseHeaders = mapper.writeValueAsString(responseHeaderMap);
         String method = request.getMethod().toString();
         String responsePayload = response.getContent().getText();;
-        String ip = "null"; 
-        String time = (int) (dateTime.getTime() / 1000) + "";
+        String ip = "null"; // TODO:
+        String time = Context.now() + "";
         String statusCode = response.getStatus() + "";
         String type = request.getHttpVersion();
         String status = response.getStatusText();
@@ -126,6 +126,7 @@ public class HAR {
      }
 
     public static void addQueryStringToMap(List<HarQueryParam> params, Map<String,Object> paramsMap) {
+        // TODO: which will take preference querystring or post value
         for (HarQueryParam param: params) {
             paramsMap.put(param.getName(), param.getValue());
         }

@@ -36,7 +36,10 @@ function CreateNewCollectionModal(props) {
     }
 
     const createNewCollection = async () => {
-
+        if(newCollectionName.length === 0){
+            func.setToast(true,true, "Collection name cannot be empty")
+            return
+        }
         if (showApiSelector) {
             let dt = prepareData();
             await api.createCustomCollection(newCollectionName, dt);
@@ -46,7 +49,8 @@ function CreateNewCollectionModal(props) {
         }
         fetchData()
         setActive(false)
-        func.setToast(true, false, "API collection created successfully")
+        func.setToast(true, false, <div data-testid="collection_creation_message">{"API collection created successfully"}</div>)
+
     }
 
     const handleNewCollectionNameChange =
@@ -126,6 +130,7 @@ function CreateNewCollectionModal(props) {
                         <Text>{newCollectionName.length}/24</Text>
                     )}
                     autoFocus
+                    {...newCollectionName.length === 0 ? {error: "Collection name cannot be empty"} : {}}
                 />
                 <span>
                     <Button plain onClick={() => setShowApiSelector(!showApiSelector)}>

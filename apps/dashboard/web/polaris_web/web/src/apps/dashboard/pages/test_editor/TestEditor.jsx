@@ -16,6 +16,7 @@ import testEditorRequests from "./api"
 import convertFunc from "./transform"
 import { learnMoreObject } from "../../../main/onboardingData"
 import LearnPopoverComponent from "../../components/layouts/LearnPopoverComponent"
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 
 const TestEditor = () => {
     const navigate = useNavigate()
@@ -77,7 +78,7 @@ const TestEditor = () => {
             <HorizontalStack gap="5">
                 <Button onClick={handleExit} icon={ExitMajor} plain/>
                 <HorizontalStack gap={"2"}>
-                    <Text variant="headingLg" as="h3">Test Editor</Text>
+                    <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={"Test Editor"} />
                     <Badge status="success">Beta</Badge>
                 </HorizontalStack>
             </HorizontalStack>

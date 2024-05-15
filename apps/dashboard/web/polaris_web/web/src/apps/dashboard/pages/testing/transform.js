@@ -1,12 +1,16 @@
 import func from "@/util/func";
 import api from "./api";
+import {ResourcesMajor,
+  CollectionsMajor,
+  CreditCardSecureMajor,
+  MarketingMajor,
+  FraudProtectMajor, RiskMajor} from '@shopify/polaris-icons';
 import React, {  } from 'react'
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Button, ButtonGroup} from '@shopify/polaris';
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Tag, Tooltip} from '@shopify/polaris';
 import { history } from "@/util/history";
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
-import { circle_cancel, circle_tick_minor } from "../../components/icons";
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -56,17 +60,19 @@ function getTotalSeverityTestRunResult(severity) {
 function getRuntime(scheduleTimestamp, endTimestamp, state) {
   let status = getStatus(state);
   if (status === 'RUNNING') {
-    return "Currently running";
+    return <div data-testid="test_run_status">Currently running</div>;
   }
   const currTime = Date.now();
   if (endTimestamp <= 0) {
     if (currTime > scheduleTimestamp) {
-      return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
+      return <div data-testid="test_run_status">Was scheduled for {func.prettifyEpoch(scheduleTimestamp)}</div>;
+
     } else {
-      return "Next run in " + func.prettifyEpoch(scheduleTimestamp)
+      return <div data-testid="test_run_status">Next run in {func.prettifyEpoch(scheduleTimestamp)}</div>;
     }
   }
-  return 'Last run ' + func.prettifyEpoch(endTimestamp);
+  return <div data-testid="test_run_status">Last run {func.prettifyEpoch(endTimestamp)}</div>;
+
 }
 
 function getAlternateTestsInfo(state) {
@@ -166,22 +172,12 @@ const transform = {
       };
       return obj;
     },
-    prettifyTestName: (testName, icon, iconColor, state)=>{
-      let iconComp
-      switch(state){
-        case "COMPLETED":
-          iconComp = (<Box><Icon source={circle_tick_minor} /></Box>)
-          break;
-        case "STOPPED":
-          iconComp = (<Box><Icon source={circle_cancel} /></Box>)
-          break;
-        default:
-          iconComp = (<Box><Icon source={icon} color={iconColor}/></Box>)
-          break;
-      }
+    prettifyTestName: (testName, icon, iconColor, iconToolTipContent)=>{
       return(
         <HorizontalStack gap={4}>
-          {iconComp}
+          <Tooltip content={iconToolTipContent} hoverDelay={"300"} dismissOnMouseOut>
+            <Box><Icon source={icon} color={iconColor}/></Box>
+          </Tooltip>
           <Box maxWidth="350px">
             <TooltipText text={testName} tooltip={testName} textProps={{fontWeight: 'medium'}} />
           </Box>
@@ -214,11 +210,13 @@ const transform = {
       state = 'FAIL'
     }
 
+    const iconObj = func.getTestingRunIconObj(state)
+
       obj['id'] = data.hexId;
       obj['testingRunResultSummaryHexId'] = testingRunResultSummary?.hexId;
       obj['orderPriority'] = getOrderPriority(state)
-      obj['icon'] = func.getTestingRunIcon(state);
-      obj['iconColor'] = func.getTestingRunIconColor(state)
+      obj['icon'] = iconObj.icon;
+      obj['iconColor'] = iconObj.color
       obj['name'] = data.name || "Test"
       obj['number_of_tests'] = data.testIdConfig == 1 ? "-" : getTestsInfo(testingRunResultSummary?.testResultsCount, state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
@@ -237,9 +235,10 @@ const transform = {
       obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
       if(prettified){
+        
         const prettifiedTest={
           ...obj,
-          testName: transform.prettifyTestName(data.name || "Test", func.getTestingRunIcon(state),func.getTestingRunIconColor(state), state),
+          testName: transform.prettifyTestName(data.name || "Test", iconObj.icon,iconObj.color, iconObj.tooltipContent),
           severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues))
         }
         return prettifiedTest
@@ -335,20 +334,32 @@ const transform = {
     return details.replace(/{{percentageMatch}}/g, func.prettifyShort(percentageMatch))
   },
 
-  fillMoreInformation(category, moreInfoSections, affectedEndpoints) {
-
+  fillMoreInformation(category, moreInfoSections, affectedEndpoints, jiraIssueUrl, createJiraTicket) {
+    var key = /[^/]*$/.exec(jiraIssueUrl)[0];
+    const jiraComponent = jiraIssueUrl?.length > 0 ? (
+      <Box>
+              <Tag>
+                  <HorizontalStack gap={1}>
+                    <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
+                    <Link url={jiraIssueUrl}>
+                      <Text>
+                        {key}
+                      </Text>
+                    </Link>
+                  </HorizontalStack>
+                </Tag>
+          </Box>
+    ) : <Text> No Jira ticket created. Click on the top right button to create a new ticket.</Text>
+    
+    //<Box width="300px"><Button onClick={createJiraTicket} plain disabled={window.JIRA_INTEGRATED != "true"}>Click here to create a new ticket</Button></Box>
     let filledSection = []
     moreInfoSections.forEach((section) => {
-      let sectionLocal = {}
-      sectionLocal.icon = section.icon
-      sectionLocal.title = section.title
+      let sectionLocal = {...section}
       switch (section.title) {
         case "Description":
-
-          if (category?.issueDetails == null || category?.issueDetails == undefined) {
-            return;
-          }
-
+        if(category?.issueDetails == null || category?.issueDetails == undefined){
+          return;
+        }
           sectionLocal.content = (
             <Text color='subdued'>
               {transform.replaceTags(category?.issueDetails, category?.vulnerableTestingRunResults) || "No impact found"}
@@ -356,13 +367,11 @@ const transform = {
           )
           break;
         case "Impact":
-
-          if (category?.issueImpact == null || category?.issueImpact == undefined) {
+          if(category?.issueImpact == null || category?.issueImpact == undefined){
             return;
           }
-
           sectionLocal.content = (
-            <Text color='subdued'>
+            <Text>
               {category?.issueImpact || "No impact found"}
             </Text>
           )
@@ -371,7 +380,6 @@ const transform = {
           if (category?.issueTags == null || category?.issueTags == undefined || category?.issueTags.length == 0) {
             return;
           }
-
           sectionLocal.content = (
             <HorizontalStack gap="2">
               {
@@ -379,7 +387,6 @@ const transform = {
               }
             </HorizontalStack>
           )
-
           break;
         case "CWE":
           if (category?.cwe == null || category?.cwe == undefined || category?.cwe.length == 0) {
@@ -406,11 +413,9 @@ const transform = {
           )
           break;
         case "References":
-
           if (category?.references == null || category?.references == undefined || category?.references.length == 0) {
             return;
           }
-
           sectionLocal.content = (
             <List type='bullet' spacing="extraTight">
               {
@@ -418,7 +423,7 @@ const transform = {
                   return (
                     <List.Item key={reference}>
                       <Link key={reference} url={reference} monochrome removeUnderline target="_blank">
-                        <Text color='subdued'>
+                        <Text>
                           {reference}
                         </Text>
                       </Link>
@@ -430,32 +435,30 @@ const transform = {
           )
           break;
         case "API endpoints affected":
-
           if (affectedEndpoints == null || affectedEndpoints == undefined || affectedEndpoints.length == 0) {
             return;
           }
-
           sectionLocal.content = (
             <List type='bullet'>
               {
                 affectedEndpoints?.map((item, index) => {
                   return (
                     <List.Item key={index}>
-                      <Text color='subdued'>
-                        {item.id.apiInfoKey.method} {item.id.apiInfoKey.url}
-                      </Text>
+                      <TooltipText text={item.id.apiInfoKey.method + " "  + item.id.apiInfoKey.url}  tooltip={item.id.apiInfoKey.method + " "  + item.id.apiInfoKey.url} />
                     </List.Item>)
                 })
               }
             </List>
           )
           break;
+          case "Jira":
+              sectionLocal.content = jiraComponent
+              break;
           default:
-            break;
+            sectionLocal.content = section.content
       }
       filledSection.push(sectionLocal)
     })
-
     return filledSection;
   },
 
@@ -552,6 +555,54 @@ const transform = {
       }
     })
     return summaries;
+},
+
+getInfoSectionsHeaders(){
+  let moreInfoSections = [
+    {
+      icon: RiskMajor,
+      title: "Impact",
+      content: "",
+      tooltipContent: 'The impact of the test on apis in general scenario.'
+    },
+    {
+      icon: CollectionsMajor,
+      title: "Tags",
+      content: "",
+      tooltipContent: 'Category info about the test.'
+    },
+    {
+      icon: CreditCardSecureMajor,
+      title: "CWE",
+      content: "",
+      tooltipContent: "CWE tags associated with the test from akto's test library"
+    },
+    {
+      icon: FraudProtectMajor,
+      title: "CVE",
+      content: "",
+      tooltipContent: "CVE tags associated with the test from akto's test library"
+    },
+    {
+      icon: MarketingMajor,
+      title: "API endpoints affected",
+      content: "",
+      tooltipContent: "Affecting endpoints in your inventory for the same test"
+    },
+    {
+      icon: ResourcesMajor,
+      title: "References",
+      content: "",
+      tooltipContent: "References for the above test."
+    },
+    {
+      icon: ResourcesMajor,
+      title: "Jira",
+      content: "",
+      tooltipContent: "Jira ticket number attached to the testing run issue"
+    }
+  ]
+  return moreInfoSections
   },
 convertSubIntoSubcategory(resp){
   let obj = {}
@@ -562,8 +613,8 @@ convertSubIntoSubcategory(resp){
   }
   const subCategoryMap = PersistStore.getState().subCategoryMap
   Object.keys(resp).forEach((key)=>{
-
     const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.shortName : key;
+    const objectKeyName = subCategoryMap[key] ? subCategoryMap[key].superCategory.name : key;
     if(obj.hasOwnProperty(objectKey)){
       let tempObj =  JSON.parse(JSON.stringify(obj[objectKey]));
       let newObj = {
@@ -576,13 +627,15 @@ convertSubIntoSubcategory(resp){
     else if(!subCategoryMap[key]){
       obj[objectKey] = {
         text: resp[key],
-        color: func.getColorForCharts(key)
+        color: func.getColorForCharts(key),
+        filterkey: objectKeyName
       }
       countObj.HIGH+=resp[key]
     }else{
       obj[objectKey] = {
         text: resp[key],
-        color: func.getColorForCharts(subCategoryMap[key].superCategory.name)
+        color: func.getColorForCharts(subCategoryMap[key].superCategory.name),
+        filterkey: objectKeyName
       }
       countObj[subCategoryMap[key].superCategory.severity._name]+=resp[key]
     }
@@ -594,14 +647,13 @@ convertSubIntoSubcategory(resp){
     const prop2 = val2['text'];
     return prop2 - prop1 ;
   });
-
+  
   return {
     subCategoryMap: Object.fromEntries(sortedEntries),
     countMap: countObj
   }
 
 },
-
 getUrlComp(url){
   let arr = url.split(' ')
   const method = arr[0]
@@ -614,7 +666,7 @@ getUrlComp(url){
           <Text variant="bodyMd" color="subdued">{method}</Text>
         </HorizontalStack>
       </Box>
-      <Text variant="bodyMd">{endpoint}</Text>
+      <Text variant="bodyMd"><div data-testid="affected_endpoints">{endpoint}</div></Text>
     </HorizontalStack>
   )
 },
@@ -671,7 +723,7 @@ getPrettifiedTestRunResults(testRunResults){
     let obj = testRunResultsObj[key]
     let prettifiedObj = {
       ...obj,
-      nameComp: <Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box>,
+      nameComp: <div data-testid={obj.name}><Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box></div>,
       severityComp: obj?.vulnerable === true ? <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge> : <Text>-</Text>,
       cweDisplayComp: obj?.cweDisplay?.length > 0 ? <HorizontalStack gap={1}>
         {obj.cweDisplay.map((ele,index)=>{
@@ -688,6 +740,92 @@ getPrettifiedTestRunResults(testRunResults){
     prettifiedResults.push(prettifiedObj)
   })
   return prettifiedResults
+},
+getTestingRunResultUrl(testingResult){
+  let urlString = testingResult.url
+  const methodObj = func.toMethodUrlObject(urlString)
+  const truncatedUrl = observeFunc.getTruncatedUrl(methodObj.url)
+  
+  return methodObj.method + " " + truncatedUrl
+  
+},
+getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
+  let auth_type = apiInfo["allAuthTypesFound"].join(", ")
+  let access_type = null
+  let access_types = apiInfo["apiAccessTypes"]
+  if (!access_types || access_types.length == 0) {
+      access_type = "none"
+  } else if (access_types.indexOf("PUBLIC") !== -1) {
+      access_type = "Public"
+  } else {
+      access_type = "Private"
+  }
+
+  function TextComp ({value}) {
+    return <Text breakWord variant="bodyMd">{value}</Text>
+  }
+  const key = /[^/]*$/.exec(jiraIssueUrl)[0];
+  const jiraComponent = jiraIssueUrl?.length > 0 ? (
+    <Box>
+      <Tag>
+          <HorizontalStack gap={1}>
+            <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
+            <Link url={jiraIssueUrl}>
+              <Text>
+                {key}
+              </Text>
+            </Link>
+          </HorizontalStack>
+        </Tag>
+    </Box>
+  ) : null
+
+  const rowItems = [
+    {
+      title: 'Severity',
+      value: <Text fontWeight="semibold" color={observeFunc.getColor(severity)}>{severity}</Text>,
+      tooltipContent: "Severity of the test run result"
+    },
+    {
+      title: "API",
+      value: (
+        <HorizontalStack gap={"1"}>
+          <Text color="subdued" fontWeight="semibold">{apiInfo.id.method}</Text>
+          <TextComp value={observeFunc.getTruncatedUrl(apiInfo.id.url)} />
+        </HorizontalStack>
+      ),
+      tooltipContent: "Name of the api on which test is run"
+    },
+    {
+      title: 'Hostname',
+      value: <TextComp value={observeFunc.getHostName(apiInfo.id.url)} />,
+      tooltipContent: "Hostname of the api on which test is run"
+    },
+    {
+      title: "Auth type",
+      value:<TextComp value={(auth_type || "").toLowerCase()} />,
+      tooltipContent: "Authentication type of the api on which test is run"
+    },
+    {
+      title: "Access type",
+      value: <TextComp value={access_type} />,
+      tooltipContent: "Access type of the api on which test is run"
+    },
+    {
+      title: "Sensitive Data",
+      value: <TextComp value={sensitiveData} />
+    },
+    {
+      title: "Detected",
+      value: <TextComp value={func.prettifyEpoch(apiInfo.lastSeen)} />
+    },
+    {
+      title: "Jira",
+      value: jiraComponent,
+      tooltipContent:"Jira ticket number attached to the testing run issue"
+    }
+  ]
+  return rowItems
 }
 }
 

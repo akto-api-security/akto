@@ -1,8 +1,13 @@
 package com.akto.graphql;
 
 import com.akto.dto.HttpResponseParams;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import graphql.language.*;
 import graphql.parser.Parser;
+import graphql.util.TraversalControl;
+import graphql.util.TraverserContext;
+import graphql.util.TreeTransformerUtil;
 import graphql.validation.DocumentVisitor;
 import graphql.validation.LanguageTraversal;
 import org.mortbay.util.ajax.JSON;
@@ -11,6 +16,8 @@ import java.util.*;
 
 public class GraphQLUtils {//Singleton class
     Parser parser = new Parser();
+    private static final ObjectMapper mapper = new ObjectMapper();
+    private static final Gson gson = new Gson();
     LanguageTraversal traversal = new LanguageTraversal();
     public static final String __ARGS = "__args";
     public static final String QUERY = "query";
@@ -99,7 +106,7 @@ public class GraphQLUtils {//Singleton class
             Object obj = JSON.parse(requestPayload);
             if (obj instanceof Map) {
                 mapOfRequestPayload = (Map) obj;
-            } else if (obj instanceof Object[]){
+            } else if (obj instanceof Object[]) {
                 listOfRequestPayload = (Object[]) obj;
             } else {
                 return responseParamsList;
@@ -121,10 +128,136 @@ public class GraphQLUtils {//Singleton class
         return responseParamsList;
     }
 
+    public String deleteGraphqlField(String payload, String field) {
+        return editGraphqlField(payload, field, "", "DELETE", false);
+    }
+
+    public String addGraphqlField(String payload, String field, String value) {
+        return editGraphqlField(payload, field, value, "ADD", false);
+    }
+
+    public String addUniqueGraphqlField(String payload, String field, String value) {
+        return editGraphqlField(payload, field, value, "ADD", true);
+    }
+
+    public String modifyGraphqlField(String payload, String field, String value) {
+        return editGraphqlField(payload, field, value, "MODIFY", false);
+    }
+
+    private String editGraphqlField(String payload, String field, String value, String type, boolean unique) {
+        String tempVariable = "__tempDummyVariableToReplace";
+        Object payloadObj = JSON.parse(payload);
+        Object[] payloadList;
+        if (payloadObj instanceof Object[]) {
+            payloadList = (Object[]) payloadObj;
+        } else {
+            payloadList = new Object[]{payloadObj};
+        }
+        for (Object operationObj : payloadList) {
+            Map<String, Object> operation = (Map) operationObj;
+            String query = (String) operation.get("query");
+            if (query == null) {
+                continue;
+            }
+            Node result = new AstTransformer().transform(parser.parseDocument(query), new NodeVisitorStub() {
+
+                @Override
+                public TraversalControl visitInlineFragment(InlineFragment node, TraverserContext<Node> context) {
+                    switch (type) {
+                        case "ADD":
+                            boolean found = false;
+                            if (unique) {
+                                List<Selection> selectionList = node.getSelectionSet().getSelections();
+                                for (Selection selection : selectionList) {
+                                    if (selection instanceof Field) {
+                                        if (value.equals(((Field) selection).getName())) {
+                                            found = true;
+                                        }
+                                    }
+                                }
+                            }
+                            if (!found) {
+                                if (field.equals(node.getTypeCondition().getName())) {
+                                    Field field1 = Field.newField(tempVariable).build();
+                                    if (node.getSelectionSet() != null) {
+                                        SelectionSet newSelectionSet = node.getSelectionSet().transform((builder -> {
+                                            builder.selection(field1);
+                                        }));
+                                        Node newNode = node.transform((builder -> {
+                                            builder.selectionSet(newSelectionSet);
+                                        }));
+                                        return TreeTransformerUtil.changeNode(context, newNode);
+                                    } else {
+                                        return super.visitInlineFragment(node, context);
+                                    }
+                                }
+                            }
+                    }
+                    return super.visitInlineFragment(node, context);
+                }
+
+                @Override
+                public TraversalControl visitField(Field node, TraverserContext<Node> context) {
+                    String nodeName = node.getName();
+                    String alias = node.getAlias();
+                    if (nodeName != null && (nodeName.equalsIgnoreCase(field) || field.equals(alias))) {
+                        switch (type) {
+                            case "MODIFY":
+                            case "DELETE":
+                                return TreeTransformerUtil.changeNode(context, parser.parseValue(tempVariable));
+                            case "ADD":
+                                boolean found = false;
+                                if (unique) {
+                                    List<Selection> selectionList = node.getSelectionSet().getSelections();
+                                    for (Selection selection : selectionList) {
+                                        if (selection instanceof Field) {
+                                            if (value.equals(((Field) selection).getName())) {
+                                                found = true;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!found) {
+                                    Field field1 = Field.newField(tempVariable).build();
+                                    if (node.getSelectionSet() != null) {
+                                        SelectionSet newSelectionSet = node.getSelectionSet().transform((builder -> {
+                                            builder.selection(field1);
+                                        }));
+                                        Node newNode = node.transform((builder -> {
+                                            builder.selectionSet(newSelectionSet);
+                                        }));
+                                        return TreeTransformerUtil.changeNode(context, newNode);
+                                    } else {
+                                        return super.visitField(node, context);
+                                    }
+                                }
+                                return super.visitField(node, context);
+                            default:
+                                return super.visitField(node, context);
+                        }
+                    } else {
+                        return super.visitField(node, context);
+                    }
+                }
+            });
+            String modifiedQuery = AstPrinter.printAst(result);
+            if (modifiedQuery.contains(tempVariable)) {
+                modifiedQuery = modifiedQuery.replace(tempVariable, value);
+                operation.replace("query", modifiedQuery);
+            }
+        }
+        if (payloadObj instanceof Object[]) {
+            return gson.toJson(payloadList);
+        } else {
+            return gson.toJson(payloadList[0]);
+        }
+    }
+
+
     private void updateResponseParamList(HttpResponseParams responseParams, List<HttpResponseParams> responseParamsList, String path, Map mapOfRequestPayload) {
         List<OperationDefinition> operationDefinitions = parseGraphQLRequest(mapOfRequestPayload);
 
-        if (!operationDefinitions.isEmpty())  {
+        if (!operationDefinitions.isEmpty()) {
             for (OperationDefinition definition : operationDefinitions) {
                 OperationDefinition.Operation operation = definition.getOperation();
                 SelectionSet selectionSets = definition.getSelectionSet();
@@ -132,12 +265,12 @@ public class GraphQLUtils {//Singleton class
                 for (Selection selection : selectionList) {
                     if (selection instanceof Field) {
                         Field field = (Field) selection;
-                        String defName =  definition.getName() == null ? "" : ( "/" + definition.getName());
+                        String defName = definition.getName() == null ? "" : ("/" + definition.getName());
 
-                        String graphqlPath = path.split("\\?")[0] + "/" + operation.name().toLowerCase() + defName + "/"+ field.getName();
+                        String graphqlPath = path.split("\\?")[0] + "/" + operation.name().toLowerCase() + defName + "/" + field.getName();
 
                         if (path.contains("?")) {
-                            graphqlPath += ("?"+path.split("\\?")[1]);
+                            graphqlPath += ("?" + path.split("\\?")[1]);
                         }
 
                         HttpResponseParams httpResponseParamsCopy = responseParams.copy();
@@ -145,12 +278,12 @@ public class GraphQLUtils {//Singleton class
                         try {
                             Map<String, Object> map = fieldTraversal(field);
                             HashMap hashMap = new HashMap(mapOfRequestPayload);
-                                for (String key : map.keySet()) {
-                                    hashMap.put(GraphQLUtils.QUERY + key, map.get(key));
-                                }
-                                hashMap.remove(GraphQLUtils.QUERY);
-                                httpResponseParamsCopy.requestParams.setPayload(JSON.toString(hashMap));
-                                responseParamsList.add(httpResponseParamsCopy);
+                            for (String key : map.keySet()) {
+                                hashMap.put(GraphQLUtils.QUERY + key, map.get(key));
+                            }
+                            hashMap.remove(GraphQLUtils.QUERY);
+                            httpResponseParamsCopy.requestParams.setPayload(JSON.toString(hashMap));
+                            responseParamsList.add(httpResponseParamsCopy);
                         } catch (Exception e) {
                             //eat exception, No changes to request payload, parse Exception
                         }
@@ -178,5 +311,4 @@ public class GraphQLUtils {//Singleton class
         }
         return result;
     }
-
 }

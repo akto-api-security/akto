@@ -32,13 +32,13 @@ import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UpdateManyModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
 import static com.akto.utils.Utils.calculateRiskValueForSeverity;
-
 public class RiskScoreOfCollections {
     private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreOfCollections.class);
 
@@ -143,14 +143,20 @@ public class RiskScoreOfCollections {
         Map<ApiInfoKey, Float> severityScoreMap = getSeverityScoreMap(updatedIssues);
 
         // after getting the severityScoreMap, we write that in DB
-        severityScoreMap.forEach((apiInfoKey, severityScore)->{
-            Bson filter = Filters.and(
-                Filters.eq("_id.apiCollectionId",apiInfoKey.getApiCollectionId()),
-                Filters.eq("_id.method", apiInfoKey.getMethod()),
-                Filters.eq("_id.url", apiInfoKey.getUrl())
-            );
-            bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filter, Updates.set(ApiInfo.SEVERITY_SCORE, (float) severityScore), new UpdateOptions()));
-        });
+        if(severityScoreMap != null){
+            severityScoreMap.forEach((apiInfoKey, severityScore)->{
+                Bson filter = ApiInfoDao.getFilter(apiInfoKey);
+                ApiInfo apiInfo = ApiInfoDao.instance.findOne(filter);
+                boolean isSensitive = apiInfo != null ? apiInfo.getIsSensitive() : false;
+                float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, Utils.getRiskScoreValueFromSeverityScore(severityScore));
+            
+                Bson update = Updates.combine(
+                    Updates.set(ApiInfo.SEVERITY_SCORE, severityScore),
+                    Updates.set(ApiInfo.RISK_SCORE, riskScore)
+                );
+                bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filter, update,new UpdateOptions()));
+            });
+        }
 
         if (bulkUpdatesForApiInfo.size() > 0) {
             ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
@@ -183,7 +189,16 @@ public class RiskScoreOfCollections {
                     Filters.eq("_id.method", ((BasicDBObject) basicDBObject.get("_id")).getString("method")),
                     Filters.eq("_id.url", ((BasicDBObject) basicDBObject.get("_id")).getString("url"))
                 );
-                bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filterQSampleData, Updates.set(ApiInfo.IS_SENSITIVE, isSensitive), new UpdateOptions()));
+                ApiInfo apiInfo = ApiInfoDao.instance.findOne(filterQSampleData);
+                if(apiInfo == null){
+                    continue;
+                }
+                float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, Utils.getRiskScoreValueFromSeverityScore(apiInfo.getSeverityScore()));
+                Bson update = Updates.combine(
+                    Updates.set(ApiInfo.IS_SENSITIVE, isSensitive),
+                    Updates.set(ApiInfo.RISK_SCORE, riskScore)
+                );
+                bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filterQSampleData, update, new UpdateOptions()));
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -232,4 +247,37 @@ public class RiskScoreOfCollections {
         }
     }
 
+    public void calculateRiskScoreForAllApis() {
+        int timeStamp = Context.now() - 24*60*60;
+        int limit = 1000;
+        int count = 0; 
+
+        List<WriteModel<ApiInfo>> bulkUpdates = new ArrayList<>();
+        Bson filter = Filters.or(
+            Filters.exists(ApiInfo.LAST_CALCULATED_TIME, false),
+            Filters.lte(ApiInfo.LAST_CALCULATED_TIME, timeStamp)
+        );
+        Bson projection = Projections.include("_id", ApiInfo.API_ACCESS_TYPES, ApiInfo.LAST_SEEN, ApiInfo.SEVERITY_SCORE, ApiInfo.IS_SENSITIVE);
+        while(count < 100){
+            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter,0, limit, Sorts.descending(ApiInfo.LAST_CALCULATED_TIME), projection);
+            for(ApiInfo apiInfo: apiInfos){
+                float riskScore = ApiInfoDao.getRiskScore(apiInfo, apiInfo.getIsSensitive(), Utils.getRiskScoreValueFromSeverityScore(apiInfo.getSeverityScore()));
+                Bson update = Updates.combine(
+                    Updates.set(ApiInfo.RISK_SCORE, riskScore),
+                    Updates.set(ApiInfo.LAST_CALCULATED_TIME, Context.now())
+                );
+                Bson filterQ = ApiInfoDao.getFilter(apiInfo.getId());
+                
+                bulkUpdates.add(new UpdateManyModel<>(filterQ, update, new UpdateOptions().upsert(false)));
+            }
+            if(bulkUpdates.size() > 0){
+                ApiInfoDao.instance.bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
+            }
+            bulkUpdates.clear();
+            count++;
+            if(apiInfos.size() < limit){
+                break;
+            }
+        }
+    }
 }

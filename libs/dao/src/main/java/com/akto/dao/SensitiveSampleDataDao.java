@@ -7,6 +7,10 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
+
+import java.util.HashMap;
+import java.util.Map;
+
 import org.bson.Document;
 
 import org.bson.conversions.Bson;
@@ -36,6 +40,19 @@ public class SensitiveSampleDataDao extends AccountsContextDao<SensitiveSampleDa
         );
     }
 
+    public static Map<String, Object> getFiltersMap(SingleTypeInfo singleTypeInfo) {
+        Map<String, Object> filterMap = new HashMap<>();
+
+        filterMap.put("_id.url", singleTypeInfo.getUrl());
+        filterMap.put("_id.method", singleTypeInfo.getMethod());
+        filterMap.put("_id.responseCode", singleTypeInfo.getResponseCode());
+        filterMap.put("_id.isHeader", singleTypeInfo.getIsHeader());
+        filterMap.put("_id.param", singleTypeInfo.getParam());
+        filterMap.put("_id.subType", singleTypeInfo.getSubType().getName());
+        filterMap.put("_id.apiCollectionId", singleTypeInfo.getApiCollectionId());
+        return filterMap;
+    }
+
     public void createIndicesIfAbsent() {
         boolean exists = false;
         for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
@@ -49,23 +66,13 @@ public class SensitiveSampleDataDao extends AccountsContextDao<SensitiveSampleDa
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
 
-        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
-        int counter = 0;
-        while (cursor.hasNext()) {
-            counter++;
-            cursor.next();
-        }
-
-        if (counter == 1) {
-            String[] fieldNames = {"_id.url", "_id.apiCollectionId", "_id.method"};
-            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
-        }
+        String[] fieldNames = {"_id.url", "_id.apiCollectionId", "_id.method"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { ApiInfo.ID_URL, SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_METHOD }, true);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
-
     }
 }

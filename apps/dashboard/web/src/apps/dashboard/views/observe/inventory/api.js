@@ -205,7 +205,7 @@ export default {
     },
     convertSampleDataToCurl(sampleData) {
         return request({
-            url: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true' ? '/tools/convertSampleDataToCurl' :'/api/convertSampleDataToCurl',
+            url: '/api/convertSampleDataToCurl',
             method: 'post',
             data: {sampleData}
         }).then((resp) => {
@@ -214,7 +214,7 @@ export default {
     },
     convertSampleDataToBurpRequest(sampleData) {
         return request({
-            url: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true' ? '/tools/convertSamleDataToBurpRequest' : '/api/convertSamleDataToBurpRequest',
+            url: '/api/convertSamleDataToBurpRequest',
             method: 'post',
             data: {sampleData}
         }).then((resp) => {
@@ -372,6 +372,15 @@ export default {
             url: '/api/fetchAktoGptConfig',
             method: 'post',
             data: {apiCollectionId}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    deMergeApi(apiCollectionId, url, method){
+        return request({
+            url: '/api/deMergeApi',
+            method: 'post',
+            data: {apiCollectionId, url, method}
         }).then((resp) => {
             return resp
         })

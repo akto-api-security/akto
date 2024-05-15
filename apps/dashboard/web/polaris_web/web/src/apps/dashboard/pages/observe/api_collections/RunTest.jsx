@@ -27,7 +27,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         authMechanismPresent: false,
         testRoleLabel: "No test role selected",
         testRoleId: "",
-
     }
 
     const navigate = useNavigate()
@@ -37,8 +36,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     })
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const [loading, setLoading] = useState(true)
-    const [active, setActive] = useState(runTestFromOutside || false);
     const [testRolesArr, setTestRolesArr] = useState([])
+    const [active, setActive] = useState(runTestFromOutside || false);
 
     const runTestRef = useRef(null);
 
@@ -75,7 +74,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         })
         testRoles.unshift({"label": "No test role selected", "value": ""})
         setTestRolesArr(testRoles)
-
         const businessLogicSubcategories = allSubCategoriesResponse.subCategories
         const categories = allSubCategoriesResponse.categories
         const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(businessLogicSubcategories)
@@ -150,7 +148,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const activator = (
         <div ref={runTestRef}>
-            <Button onClick={toggleRunTest} primary disabled={disabled} >Run test</Button>
+            <Button onClick={toggleRunTest} primary disabled={disabled} ><div data-testid="run_test_button">Run test</div></Button>
         </div>
     );
 
@@ -223,6 +221,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 <Checkbox
                     label={label}
                     checked={test.selected}
+                    ariaDescribedBy={test.label}
                     onChange={() => handleTestsSelected(test)}
                 />
             )])
@@ -273,15 +272,17 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     function scheduleString() {
         if (testRun.hourlyLabel === "Now") {
             if (testRun.recurringDaily) {
-                return "Run daily at this time"
+                return <div data-testid="schedule_run_button">Run daily at this time</div>
             } else {
-                return "Run once now"
+                return <div data-testid="schedule_run_button">Run once now</div>
             }
         } else {
             if (testRun.recurringDaily) {
-                return "Run daily at " + testRun.hourlyLabel
+                return <div data-testid="schedule_run_button">Run daily at {testRun.hourlyLabel}</div>
+
             } else {
-                return "Run today at " + testRun.hourlyLabel
+                return <div data-testid="schedule_run_button">Run today at {testRun.hourlyLabel}</div>
+                
             }
         }
     }
@@ -345,12 +346,40 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             </HorizontalStack>
         )
 
-        func.setToast(true, false, forwardLink)
+        func.setToast(true, false, <div data-testid="test_run_created_message">{forwardLink}</div>)
+
     }
 
     function getLabel(objList, value) {
         const obj = objList.find(obj => obj.value === value)
         return obj
+    }
+
+    function getCurrentStatus(){
+        if(!testRun || testRun?.tests === undefined || testRun?.selectedCategory === undefined || testRun.tests[testRun.selectedCategory] === undefined)
+            return false;
+
+        let res = true;
+        const tests = testRun.tests[testRun.selectedCategory];
+        for (let i = 0; i < tests.length; i++) {
+            if (tests[i].selected === false) {
+                res = false;
+                break; 
+            }
+        }
+        return res;
+    }
+
+    const allTestsSelectedOfCategory = getCurrentStatus()
+
+    function toggleTestsSelection(val) {
+        let copyTestRun = testRun
+        copyTestRun.tests[testRun.selectedCategory].forEach((test) => {
+            test.selected = val
+        })
+        setTestRun(prev => {
+            return { ...prev, tests: copyTestRun.tests, testName: convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(copyTestRun.tests).join("_") }
+        })
     }
 
     return (
@@ -407,7 +436,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 />
                             </div>
 
-                            <Button icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll()}>Remove All</Button>
+                            <Button icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Remove All</div></Button>
                         </div>
 
                         <br />
@@ -431,7 +460,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             </div>
                             <div>
                                 <div style={{ padding: "15px", alignItems: "center" }}>
-                                    <Text variant="headingMd">Tests</Text>
+                                    <HorizontalStack gap={"2"}>
+                                        <Checkbox
+                                            checked={allTestsSelectedOfCategory}
+                                            onChange={(val) => toggleTestsSelection(val)}
+                                        />
+                                        <Text variant="headingMd">Tests</Text>
+                                    </HorizontalStack>
                                 </div>
                                 <Divider />
                                 <div style={{ maxHeight: "35vh", overflowY: "auto", paddingTop: "5px" }}>
@@ -537,19 +572,17 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                             }))
                                         }} />
                                 </ButtonGroup>
+                                
                             </Box>
                             <Box>
-                                <ButtonGroup>
+                            <ButtonGroup>
                                     <Text>Select test role:</Text>
                                     <Dropdown
                                         menuItems={testRolesArr}
                                         initial={"No test role selected"}
                                         selected={(requests) => {
                                             let testRole
-                                            console.log(requests);
-                                            if (requests === "No test role selected") maxConcurrentRequests = ""
-                                            else testRole = requests
-
+                                            if (!(requests === "No test role selected")){testRole = requests}
                                             const testRoleOption = getLabel(testRolesArr, requests)
 
                                             setTestRun(prev => ({
@@ -559,7 +592,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                             }))
                                         }} />
                                 </ButtonGroup>
-                            </Box>
+                                </Box>
                         </HorizontalGrid>
                     </Modal.Section>
                 }

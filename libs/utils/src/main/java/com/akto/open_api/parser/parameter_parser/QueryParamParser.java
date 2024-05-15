@@ -57,8 +57,8 @@ public class QueryParamParser {
         String existingExample = CommonParser.getExistingExample(parameter);
         if (existingExample != null) {
             ret = existingExample;
-        } else if (parameter.getStyle().equals(Parameter.StyleEnum.FORM) &&
-                parameter.getExplode().equals(true) &&
+        } else if (Parameter.StyleEnum.FORM.equals(parameter.getStyle()) &&
+                parameter.getExplode() &&
                 parameter.getSchema() != null) {
 
             Example example = ExampleBuilder.fromSchema(parameter.getSchema(), null);

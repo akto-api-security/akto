@@ -3,6 +3,8 @@ package com.akto.filter;
 import com.akto.action.ProfileAction;
 import com.akto.dto.User;
 import com.mongodb.BasicDBObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
@@ -16,9 +18,12 @@ public class MetaInfoFilter implements Filter {
 
     }
 
+    private static final Logger logger = LoggerFactory.getLogger(MetaInfoFilter.class);
+
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
 
+        logger.info("MetaInfoFilter reached");
         HttpServletRequest httpServletRequest= (HttpServletRequest) servletRequest;
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
 

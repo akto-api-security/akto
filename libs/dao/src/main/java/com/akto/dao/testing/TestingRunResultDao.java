@@ -4,14 +4,15 @@ import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.util.Constants;
+import com.akto.util.DbMode;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import com.mongodb.client.model.CreateCollectionOptions;
-import com.mongodb.client.model.IndexOptions;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -21,6 +22,7 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     public static final TestingRunResultDao instance = new TestingRunResultDao();
     public static final int maxDocuments = 5_000_000;
     public static final long sizeInBytes = 50_000_000_000L;
+    public static final String ERRORS_KEY = TestingRunResult.TEST_RESULTS+".0."+TestResult.ERRORS+".0";
 
     @Override
     public String getCollName() {
@@ -93,11 +95,18 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, Constants.ID }, false);
 
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, ERRORS_KEY }, false);
+
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{TestingRunResult.END_TIMESTAMP}, false);
+
+        String[] fieldNames = new String[]{TestingRunResult.END_TIMESTAMP, TestResult.TEST_RESULTS_ERRORS};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
     public void convertToCappedCollection() {
-        if (this.isCapped()) return;
+        if (DbMode.allowCappedCollections() || this.isCapped()) return;
         this.convertToCappedCollection(sizeInBytes);
         this.createIndicesIfAbsent();
     }

@@ -20,7 +20,16 @@ const collections = {
             state.fetchTs = 0
             state.apiCollections = []
         },
-        SAVE_API_COLLECTION (state, {apiCollections}) {
+        SAVE_API_COLLECTION (state, {apiCollections, apiCollectionTestStatus}) {
+            let map = {}
+            for (const obj of apiCollectionTestStatus) {
+                const { apiCollectionId, lastTestedAt, state } = obj
+                map[apiCollectionId] = { lastTestedAt, state }
+            }
+            for(const obj of apiCollections){
+                obj["state"] = map[obj.id].state
+                obj["lastTestedAt"] = map[obj.id].lastTestedAt
+            }
             state.apiCollections = apiCollections
         },
         CREATE_COLLECTION (state, {apiCollections}) {

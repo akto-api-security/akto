@@ -28,5 +28,11 @@ export default {
             data: data
         })
     },
+    fetchTestRoles(){
+        return request({
+            url: '/api/fetchTestRoles',
+            method: 'post'
+        })
+    }
 
 }

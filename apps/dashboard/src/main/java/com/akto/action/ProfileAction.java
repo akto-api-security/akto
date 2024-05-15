@@ -4,11 +4,13 @@ package com.akto.action;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
+import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.JiraIntegration;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
 import com.akto.dto.ApiToken.Utility;
@@ -18,12 +20,21 @@ import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
+import com.akto.utils.Intercom;
 import com.akto.util.DashboardMode;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
+import io.micrometer.core.instrument.util.StringUtils;
+import org.apache.commons.codec.digest.HmacAlgorithms;
+import org.apache.commons.codec.digest.HmacUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
@@ -37,6 +48,8 @@ import static com.mongodb.client.model.Filters.in;
 public class ProfileAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ProfileAction.class);
+    private static final Logger logger = LoggerFactory.getLogger(ProfileAction.class);
+
 
     private int accountId;
 
@@ -72,6 +85,7 @@ public class ProfileAction extends UserAction {
         if (sessionAccId == 0) {
             throw new IllegalStateException("user has no accounts associated");
         } else {
+            logger.error("setting session: " + sessionAccId);
             request.getSession().setAttribute("accountId", sessionAccId);
             Context.accountId.set(sessionAccId);
         }
@@ -98,6 +112,15 @@ public class ProfileAction extends UserAction {
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
 
+        boolean jiraIntegrated = false;
+        try {
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+            if (jiraIntegration != null) {
+                jiraIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
         userDetails.append("accounts", accounts)
                 .append("username",username)
                 .append("avatar", "dummy")
@@ -107,13 +130,25 @@ public class ProfileAction extends UserAction {
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
                 .append("cloudType", Utils.getCloudType())
                 .append("accountName", accountName)
-                .append("aktoUIMode", userFromDB.getAktoUIMode().name());
+                .append("aktoUIMode", userFromDB.getAktoUIMode().name())
+                .append("jiraIntegrated", jiraIntegrated);;
+
+        if (DashboardMode.isOnPremDeployment()) {
+            userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));
+        }
 
         // only external API calls have non-null "utility"
         if (DashboardMode.isMetered() &&  utility == null) {
             Organization organization = OrganizationsDao.instance.findOne(
                     Filters.in(Organization.ACCOUNTS, sessionAccId)
-            ); 
+            );
+            if(organization == null){
+                loggerMaker.infoAndAddToDb("Org not found for user: " + username + " acc: " + sessionAccId + ", creating it now!", LoggerMaker.LogDb.DASHBOARD);
+                InitializerListener.createOrg(sessionAccId);
+                organization = OrganizationsDao.instance.findOne(
+                        Filters.in(Organization.ACCOUNTS, sessionAccId)
+                );
+            }
             String organizationId = organization.getId();
 
             HashMap<String, FeatureAccess> initialFeatureWiseAllowed = organization.getFeatureWiseAllowed();
@@ -142,10 +177,15 @@ public class ProfileAction extends UserAction {
             userDetails.append("organizationName", organization.getName());
             userDetails.append("stiggIsOverage", isOverage);
             BasicDBObject stiggFeatureWiseAllowed = new BasicDBObject();
-            for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
-                stiggFeatureWiseAllowed.append(entry.getKey(), new BasicDBObject()
-                        .append(FeatureAccess.IS_GRANTED, entry.getValue().getIsGranted())
-                        .append(FeatureAccess.IS_OVERAGE_AFTER_GRACE, entry.getValue().checkOverageAfterGrace(gracePeriod)));
+            for (String key : featureWiseAllowed.keySet()) {
+                FeatureAccess featureAccess = featureWiseAllowed.get(key);
+                featureAccess.setGracePeriod(gracePeriod);
+                stiggFeatureWiseAllowed.append(key, new BasicDBObject()
+                        .append(FeatureAccess.IS_GRANTED, featureAccess.getIsGranted())
+                        .append(FeatureAccess.USAGE_LIMIT, featureAccess.getUsageLimit())
+                        .append(FeatureAccess.USAGE, featureAccess.getUsage())
+                        .append(FeatureAccess.OVERAGE_FIRST_DETECTED, featureAccess.getOverageFirstDetected())
+                        .append(FeatureAccess.IS_OVERAGE_AFTER_GRACE, featureAccess.checkInvalidAccess()));
             }
 
             boolean dataIngestionPaused = UsageMetricUtils.checkActiveEndpointOverage(sessionAccId);
@@ -160,6 +200,7 @@ public class ProfileAction extends UserAction {
             userDetails.append("stiggCustomerToken", OrganizationUtils.fetchSignature(organizationId, organization.getAdminEmail()));
             userDetails.append("stiggClientKey", OrganizationUtils.fetchClientKey(organizationId, organization.getAdminEmail()));
             userDetails.append("expired", organization.checkExpirationWithAktoSync());
+            userDetails.append("hotjarSiteId", organization.getHotjarSiteId());
         }
 
         if (versions.length > 2) {
@@ -169,7 +210,6 @@ public class ProfileAction extends UserAction {
                 userDetails.append("releaseVersion", versions[2]);
             }
         }
-
 
         for (String k: userDetails.keySet()) {
             request.setAttribute(k, userDetails.get(k));

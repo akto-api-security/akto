@@ -1,20 +1,21 @@
 package com.akto.open_api.parser;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import javax.ws.rs.core.Response.Status;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.upload.FileUploadError;
+import com.akto.dto.upload.SwaggerUploadLog;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.open_api.parser.parameter_parser.CookieParser;
 import com.akto.open_api.parser.parameter_parser.HeaderParser;
 import com.akto.open_api.parser.parameter_parser.PathParamParser;
 import com.akto.open_api.parser.parameter_parser.QueryParamParser;
+import com.akto.testing.ApiExecutor;
 import com.akto.util.Pair;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,18 +32,21 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.parser.util.ResolverFully;
 
+import static com.akto.dto.RawApi.convertHeaders;
+
 public class Parser {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Parser.class, LogDb.DASHBOARD);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    public static List<String> convertOpenApiToAkto(OpenAPI openAPI) {
+    public static ParserResult convertOpenApiToAkto(OpenAPI openAPI, String uploadId) {
 
+        List<FileUploadError> fileLevelErrors = new ArrayList<>();
+        List<SwaggerUploadLog> uploadLogs = new ArrayList<>();
         // replaces all refs with actual objects from components.
         ResolverFully resolverUtil = new ResolverFully();
         resolverUtil.resolveFully(openAPI);
 
-        List<String> messages = new ArrayList<>();
 
         Paths paths = openAPI.getPaths();
 
@@ -83,6 +87,7 @@ public class Parser {
             }
         } catch (Exception e) {
             loggerMaker.infoAndAddToDb("unable to parse security schemes " + e.getMessage());
+            fileLevelErrors.add(new FileUploadError("unable to parse security schemes " + e.getMessage(), FileUploadError.ErrorType.WARNING));
         }
 
         List<SecurityRequirement> rootSecurity = openAPI.getSecurity();
@@ -90,6 +95,7 @@ public class Parser {
             rootSecurity = new ArrayList<>();
         }
 
+        int count = 0;
         for (String path : paths.keySet()) {
             String originalPath = String.copyValueOf(path.toCharArray());
             PathItem pathItem = paths.get(path);
@@ -101,8 +107,9 @@ public class Parser {
                 List<Server> serversFromPath = pathItem.getServers();
                 List<Parameter> parametersFromPath = pathItem.getParameters();
 
-                for (PathItem.HttpMethod operationType : pathItem.readOperationsMap().keySet()) {
-                    PathItem.HttpMethod method = operationType;
+                for (PathItem.HttpMethod method : pathItem.readOperationsMap().keySet()) {
+                    count++;
+                    List<FileUploadError> apiLevelErrors = new ArrayList<>();
                     Operation operation = pathItem.readOperationsMap().get(method);
 
                     List<Parameter> parametersFromOperation = operation.getParameters();
@@ -113,22 +120,28 @@ public class Parser {
                      * PATH parameters take precedence over ROOT parameters.
                      * OPERATION parameters take precedence over PATH parameters.
                      */
-                    path = PathParamParser.replacePathParameter(originalPath, Arrays.asList(
-                            parametersFromOperation, parametersFromPath));
+                    Map<String, String> requestHeaders = new HashMap<>();
+                    try {
+                        path = PathParamParser.replacePathParameter(originalPath, Arrays.asList(
+                                parametersFromOperation, parametersFromPath));
 
-                    path = QueryParamParser.addQueryParameters(path, Arrays.asList(
-                            parametersFromPath, parametersFromOperation));
+                        path = QueryParamParser.addQueryParameters(path, Arrays.asList(
+                                parametersFromPath, parametersFromOperation));
 
-                    path = ServerParser.addServer(path, Arrays.asList(
-                            serversFromOperation, serversFromPath, servers));
+                        path = ServerParser.addServer(path, Arrays.asList(
+                                serversFromOperation, serversFromPath, servers));
 
-                    Map<String, String> requestHeaders = HeaderParser.buildHeaders(
-                            Arrays.asList(parametersFromPath, parametersFromOperation));
+                       requestHeaders = HeaderParser.buildHeaders(
+                                Arrays.asList(parametersFromPath, parametersFromOperation));
 
-                    Map<String, String> cookieHeaders = CookieParser.getCookieHeader(
-                            Arrays.asList(parametersFromPath, parametersFromOperation));
+                        Map<String, String> cookieHeaders = CookieParser.getCookieHeader(
+                                Arrays.asList(parametersFromPath, parametersFromOperation));
 
-                    requestHeaders.putAll(cookieHeaders);
+                        requestHeaders.putAll(cookieHeaders);
+                    } catch (Exception e) {
+                        loggerMaker.infoAndAddToDb("unable to parse path parameters for " + path + " " + method + " " + e.toString());
+                        apiLevelErrors.add(new FileUploadError("unable to parse path parameters: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
+                    }
 
                     String requestString = "";
                     try {
@@ -146,6 +159,7 @@ public class Parser {
                     } catch (Exception e) {
                         loggerMaker.infoAndAddToDb(
                                 "unable to handle request body for " + path + " " + method + " " + e.toString());
+                        apiLevelErrors.add(new FileUploadError("Unable to parse request body: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
                     }
 
                     List<SecurityRequirement> operationSecurity = operation.getSecurity();
@@ -187,6 +201,7 @@ public class Parser {
                         }
                     } catch (Exception e) {
                         loggerMaker.infoAndAddToDb("unable to parse security schemes " + e.getMessage());
+                        apiLevelErrors.add(new FileUploadError("unable to parse security schemes: " + e.getMessage(), FileUploadError.ErrorType.WARNING));
                     }
 
                     String requestHeadersString = "";
@@ -197,6 +212,7 @@ public class Parser {
                             loggerMaker.infoAndAddToDb(
                                     "unable to parse request headers for " + path + " " + method + " "
                                             + e.getMessage());
+                            apiLevelErrors.add(new FileUploadError("error while converting request headers to string: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
                         }
                     }
 
@@ -205,62 +221,98 @@ public class Parser {
                     List<Map<String, String>> responseObjectList = new ArrayList<>();
 
                     try {
-                        ApiResponses responses = operation.getResponses();
+                        loggerMaker.infoAndAddToDb("Replaying request for" + path + " " + method + ", replaying request");
 
-                        if (responses != null) {
-                            for (String responseCode : responses.keySet()) {
+                        Map<String, List<String>> modifiedHeaders = new HashMap<>();
+                        for (String key : requestHeaders.keySet()) {
+                            modifiedHeaders.put(key, Collections.singletonList(requestHeaders.get(key)));
+                        }
+                        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(path, "", method.toString(), requestString, modifiedHeaders, "http");
+                        String responseHeadersString;
+                        String responsePayload;
+                        String statusCode;
+                        String status;
+                        try {
+                            OriginalHttpResponse res = ApiExecutor.sendRequest(originalHttpRequest, true, null, false, new ArrayList<>());
+                            responseHeadersString = convertHeaders(res.getHeaders());
+                            responsePayload =  res.getBody();
+                            statusCode =  res.getStatusCode()+"";
+                            status =  "";
+                            if(!HttpResponseParams.validHttpResponseCode(res.getStatusCode())){
+                                throw new Exception("Found non 2XX response on replaying the API");
+                            }
+                            Map<String, String> responseObject = new HashMap<>();
+                            responseObject.put(mKeys.responsePayload, responsePayload);
+                            responseObject.put(mKeys.responseHeaders, responseHeadersString);
+                            responseObject.put(mKeys.status, status);
+                            responseObject.put(mKeys.statusCode, statusCode);
+                            responseObjectList.add(responseObject);
+                        } catch (Exception e) {
+                            loggerMaker.infoAndAddToDb("Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.getMessage(), LogDb.DASHBOARD);
+                            ApiResponses responses = operation.getResponses();
+                            if (responses != null) {
+                                for (String responseCode : responses.keySet()) {
 
-                                if (responseCode.equals(ApiResponses.DEFAULT))
-                                    continue;
+                                    if (responseCode.equals(ApiResponses.DEFAULT))
+                                        continue;
 
-                                int statusCode = Integer.parseInt(responseCode);
-                                if (HttpResponseParams.validHttpResponseCode(statusCode)) {
+                                    int statusCodeInt = Integer.parseInt(responseCode);
+                                    if (HttpResponseParams.validHttpResponseCode(statusCodeInt)) {
 
-                                    String responseString = "";
-                                    String responseHeadersString = "";
-                                    Map<String, String> responseObject = new HashMap<>();
+                                        String responseString = "";
+                                        responseHeadersString = "";
+                                        Map<String, String> responseObject = new HashMap<>();
 
-                                    ApiResponse response = responses.get(responseCode);
+                                        ApiResponse response = responses.get(responseCode);
 
-                                    responseObject.put(mKeys.statusCode, responseCode);
-                                    Status status = Status.fromStatusCode(statusCode);
-                                    if (status != null) {
-                                        responseObject.put(mKeys.status, status.getReasonPhrase());
-                                    }
-
-                                    Content content = response.getContent();
-
-                                    Map<String, Header> headers = response.getHeaders();
-                                    Map<String, String> responseHeaders = new HashMap<>();
-                                    if (headers != null) {
-                                        responseHeaders = HeaderParser.buildResponseHeaders(headers);
-                                    }
-
-                                    if (content != null) {
-                                        Pair<String, String> example = ContentParser.getExampleFromContent(content);
-                                        if (!(example.getFirst().isEmpty())) {
-                                            responseHeaders.put("Content-Type", example.getFirst());
+                                        responseObject.put(mKeys.statusCode, responseCode);
+                                        Status statusObj = Status.fromStatusCode(statusCodeInt);
+                                        if (statusObj != null) {
+                                            responseObject.put(mKeys.status, statusObj.getReasonPhrase());
                                         }
-                                        responseString = example.getSecond();
-                                    }
 
-                                    try {
-                                        responseHeadersString = mapper.writeValueAsString(responseHeaders);
-                                    } catch (Exception e) {
-                                        loggerMaker.infoAndAddToDb("unable to handle response headers for " + path + " "
-                                                + method + " " + e.toString());
-                                    }
+                                        Content content = response.getContent();
 
-                                    responseObject.put(mKeys.responsePayload, responseString);
-                                    responseObject.put(mKeys.responseHeaders, responseHeadersString);
-                                    responseObjectList.add(responseObject);
+                                        Map<String, Header> headers = response.getHeaders();
+                                        Map<String, String> responseHeaders = new HashMap<>();
+                                        if (headers != null) {
+                                            responseHeaders = HeaderParser.buildResponseHeaders(headers);
+                                        }
+
+                                        if (content != null) {
+                                            Pair<String, String> example = ContentParser.getExampleFromContent(content);
+                                            if (!(example.getFirst().isEmpty())) {
+                                                responseHeaders.put("Content-Type", example.getFirst());
+                                            }
+                                            responseString = example.getSecond();
+                                        }
+
+                                        try {
+                                            responseHeadersString = mapper.writeValueAsString(responseHeaders);
+                                        } catch (Exception e1) {
+                                            loggerMaker.infoAndAddToDb("unable to handle response headers for " + path + " "
+                                                    + method + " " + e1.getMessage());
+                                            apiLevelErrors.add(new FileUploadError("Replaying the request failed, reason: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
+                                            apiLevelErrors.add(new FileUploadError("Error while converting response headers to string from example: " +e1.getMessage(),FileUploadError.ErrorType.ERROR));
+                                        }
+
+                                        responseObject.put(mKeys.responsePayload, responseString);
+                                        responseObject.put(mKeys.responseHeaders, responseHeadersString);
+                                        responseObjectList.add(responseObject);
+                                    }
                                 }
+                            }
+                            else {
+                                apiLevelErrors.add(new FileUploadError("Replaying the request failed, reason: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
+                                apiLevelErrors.add(new FileUploadError("No example responses found for the API in the uploaded file", FileUploadError.ErrorType.ERROR));
                             }
                         }
 
                     } catch (Exception e) {
                         loggerMaker.infoAndAddToDb(
                                 "unable to handle response body for " + path + " " + method + " " + e.toString());
+                        apiLevelErrors.add(new FileUploadError("Error while converting response to Akto format: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
+
                     }
 
                     messageObject.put(mKeys.akto_account_id, Context.accountId.get().toString());
@@ -287,13 +339,25 @@ public class Parser {
                          */
 
                         fillDummyIfEmptyMessage(messageObject);
+                        SwaggerUploadLog log = new SwaggerUploadLog();
+                        log.setMethod(method.toString());
+                        log.setUrl(path);
+                        log.setUploadId(uploadId);
+
                         try {
                             String s = mapper.writeValueAsString(messageObject);
-                            messages.add(s);
+                            log.setAktoFormat(s);
+
                         } catch (JsonProcessingException e) {
                             loggerMaker.infoAndAddToDb("unable to parse message object for " + path + " " + method + " "
                                     + e.getMessage());
+                            apiLevelErrors.add(new FileUploadError("Error while converting message to Akto format: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
+                            log.setAktoFormat(null);
                         }
+                        if(!apiLevelErrors.isEmpty()) {
+                            log.setErrors(apiLevelErrors);
+                        }
+                        uploadLogs.add(log);
                     }
                 }
 
@@ -302,7 +366,11 @@ public class Parser {
             }
         }
 
-        return messages;
+        ParserResult parserResult = new ParserResult();
+        parserResult.setFileErrors(fileLevelErrors);
+        parserResult.setUploadLogs(uploadLogs);
+        parserResult.setTotalCount(count);
+        return parserResult;
     }
 
     // message keys for akto format.

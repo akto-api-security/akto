@@ -2,9 +2,15 @@ package com.akto.dto;
 
 import com.akto.dto.settings.DefaultPayload;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.akto.dto.type.CollectionReplaceDetails;
 
 import com.akto.util.ConnectionInfo;
 import com.akto.util.LastCronRunInfo;
@@ -29,8 +35,6 @@ public class AccountSettings {
     public static final String CENTRAL_KAFKA_IP = "centralKafkaIp";
     private String centralKafkaIp;
 
-    public static final String AKTO_IGNORE_FLAG = "x-akto-ignore";
-
     public static final String MERGE_ASYNC_OUTSIDE = "mergeAsyncOutside";
     private boolean mergeAsyncOutside;
 
@@ -44,8 +48,30 @@ public class AccountSettings {
 
     public static final String URL_REGEX_MATCHING_ENABLED = "urlRegexMatchingEnabled";
 
+    private String initStackType;
+
+    private boolean enableDebugLogs;
+    public static final String ENABLE_DEBUG_LOGS = "enableDebugLogs";
+
+    public static final String INIT_STACK_TYPE = "initStackType";
+
+    private Map<String, String> filterHeaderValueMap;
+    public static final String FILTER_HEADER_VALUE_MAP = "filterHeaderValueMap";
+
+    private Map<String, CollectionReplaceDetails> apiCollectionNameMapper;
+    public static final String API_COLLECTION_NAME_MAPPER = "apiCollectionNameMapper";
     public static final String GLOBAL_RATE_LIMIT = "globalRateLimit";
     private int globalRateLimit;
+    public static final String ENABLE_TELEMETRY = "enableTelemetry";
+
+    public static final String TELEMETRY_SETTINGS = "telemetrySettings";
+
+    private TelemetrySettings telemetrySettings;
+
+    private Map<String, Integer> telemetryUpdateSentTsMap;
+    public static final String TELEMETRY_UPDATE_SENT_TS_MAP = "telemetryUpdateSentTsMap";
+
+
     public static final String GITHUB_APP_SECRET_KEY = "githubAppSecretKey";
     private String githubAppSecretKey;
     public static final String GITHUB_APP_ID = "githubAppId";
@@ -59,12 +85,18 @@ public class AccountSettings {
 
     public static final String LAST_UPDATED_CRON_INFO = "lastUpdatedCronInfo";
     private LastCronRunInfo lastUpdatedCronInfo;
-    
+
     public static final String CONNECTION_INTEGRATIONS_INFO = "connectionIntegrationsInfo";
     private Map<String,ConnectionInfo> connectionIntegrationsInfo = new HashMap<>();
 
     public static final String TEST_LIBRARIES = "testLibraries";
     private List<TestLibrary> testLibraries;
+
+    public static final String PARTNER_IP_LIST = "partnerIpList";
+    private List<String> partnerIpList;
+
+    public static final String ALLOW_REDUNDANT_ENDPOINTS_LIST = "allowRedundantEndpointsList";
+    private List<String> allowRedundantEndpointsList;
 
     public AccountSettings() {
     }
@@ -104,6 +136,34 @@ public class AccountSettings {
         PROD, QA, STAGING, DEV
     }
 
+    public Map<String, Map<Pattern, String>> convertApiCollectionNameMapperToRegex() {
+        
+         Map<String, Map<Pattern, String>> ret = new HashMap<>();
+
+        if (apiCollectionNameMapper == null) return ret;
+        
+        for(CollectionReplaceDetails collectionReplaceDetails: apiCollectionNameMapper.values()) {
+            try {
+                String headerName = collectionReplaceDetails.getHeaderName();
+                if (StringUtils.isEmpty(headerName)) {
+                    headerName = "host";
+                }
+                headerName = headerName.toLowerCase();
+
+                Map<Pattern, String> regexMapperForGivenHeader = ret.get(headerName);
+                if (regexMapperForGivenHeader == null) {
+                    regexMapperForGivenHeader = new HashMap<>();
+                    ret.put(headerName, regexMapperForGivenHeader);
+                }
+
+                regexMapperForGivenHeader.put(Pattern.compile(collectionReplaceDetails.getRegex()), collectionReplaceDetails.getNewName());
+            } catch (Exception e) {
+                // eat it
+            }
+        }
+        return ret;
+        
+    }
 
     public int getId() {
         return id;
@@ -211,6 +271,37 @@ public class AccountSettings {
         this.urlRegexMatchingEnabled = urlRegexMatchingEnabled;
     }
 
+    public String getInitStackType() {
+        return initStackType;
+    }
+
+    public void setInitStackType(String initStackType) {
+        this.initStackType = initStackType;
+    }
+
+    public boolean isEnableDebugLogs() {
+        return enableDebugLogs;
+    }
+
+    public void setEnableDebugLogs(boolean enableDebugLogs) {
+        this.enableDebugLogs = enableDebugLogs;
+    }
+
+    public Map<String, String> getFilterHeaderValueMap() {
+        return filterHeaderValueMap;
+    }
+
+    public void setFilterHeaderValueMap(Map<String, String> filterHeaderValueMap) {
+        this.filterHeaderValueMap = filterHeaderValueMap;
+    }
+
+    public Map<String,CollectionReplaceDetails> getApiCollectionNameMapper() {
+        return this.apiCollectionNameMapper;
+    }
+
+    public void setApiCollectionNameMapper(Map<String,CollectionReplaceDetails> apiCollectionNameMapper) {
+        this.apiCollectionNameMapper = apiCollectionNameMapper;
+    }
     public int getTrafficAlertThresholdSeconds() {
         return trafficAlertThresholdSeconds;
     }
@@ -219,6 +310,13 @@ public class AccountSettings {
         this.trafficAlertThresholdSeconds = trafficAlertThresholdSeconds;
     }
 
+    public Map<String, Integer> getTelemetryUpdateSentTsMap() {
+        return telemetryUpdateSentTsMap;
+    }
+
+    public void setTelemetryUpdateSentTsMap(Map<String, Integer> telemetryUpdateSentTsMap) {
+        this.telemetryUpdateSentTsMap = telemetryUpdateSentTsMap;
+    }
     public Map<String, DefaultPayload> getDefaultPayloads() {
         return defaultPayloads;
     }
@@ -249,5 +347,40 @@ public class AccountSettings {
 
     public void setConnectionIntegrationsInfo(Map<String, ConnectionInfo> connectionIntegrationsInfo) {
         this.connectionIntegrationsInfo = connectionIntegrationsInfo;
+    }
+
+    public TelemetrySettings getTelemetrySettings() {
+        return telemetrySettings;
+    }
+
+    public void setTelemetrySettings(TelemetrySettings telemetrySettings) {
+        this.telemetrySettings = telemetrySettings;
+    }
+    
+    public List<String> getPartnerIpList() {
+		return partnerIpList;
+	}
+
+	public void setPartnerIpList(List<String> partnerIpList) {
+		this.partnerIpList = partnerIpList;
+	}
+
+    public List<String> getAllowRedundantEndpointsList() {
+        if(this.allowRedundantEndpointsList == null) {
+            List<String> ignoreUrlTypesList = Arrays.asList(
+                "htm","html", "css", "js",   // Web formats
+                "jpg", "jpeg", "png", "gif", "svg", "webp",  // Image formats
+                "mp4", "webm", "ogg", "ogv", "avi", "mov",  // Video formats
+                "mp3", "wav", "oga",  // Audio formats
+                "woff", "woff2", "ttf", "otf", // Font formats
+                ".pptx", ".json" // file formats
+            );
+            return ignoreUrlTypesList;
+        }
+        return allowRedundantEndpointsList;
+    }
+
+    public void setAllowRedundantEndpointsList(List<String> allowRedundantEndpointsList) {
+        this.allowRedundantEndpointsList = allowRedundantEndpointsList;
     }
 }

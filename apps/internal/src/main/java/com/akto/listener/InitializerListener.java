@@ -11,18 +11,21 @@ import com.akto.dao.AccountsDao;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.ConnectionString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class InitializerListener implements ServletContextListener {
     public static boolean connectedToMongo = false;
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
+    private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
 
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
 
         String mongoURI = System.getenv("BILLING_DB_CONN_URL");
-        System.out.println("MONGO URI " + mongoURI);
+        logger.info("MONGO URI " + mongoURI);
 
         executorService.schedule(new Runnable() {
             public void run() {

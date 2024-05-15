@@ -20,6 +20,8 @@ public class ApiCollection {
     public static final String NAME = "name";
     String name;
     int startTs;
+    public static final String _URLS = "urls";
+    public static final String START_TS = "startTs";
     Set<String> urls;
     public static final String URLS_STRING = "urls";
     String hostName;
@@ -38,12 +40,23 @@ public class ApiCollection {
 
     public static final String VXLAN_ID = "vxlanId";
 
+    public static final String _DEACTIVATED = "deactivated";
+    boolean deactivated;
+
     public enum Type {
         API_GROUP
     }
 
+    public enum ENV_TYPE {
+        STAGING,PRODUCTION
+    }
+
     Type type;
     public static final String _TYPE = "type";
+    
+    ENV_TYPE userSetEnvType;
+
+	public static final String USER_ENV_TYPE = "userSetEnvType";
 
     List<TestingEndpoints> conditions;
     public static final String CONDITIONS_STRING = "conditions";
@@ -103,6 +116,19 @@ public class ApiCollection {
         this.urls = urls;
     }
 
+    public ENV_TYPE getEnvType(){
+        if(this.type != null && this.type == Type.API_GROUP) return null;
+        
+        if(this.userSetEnvType == null){
+            if(this.hostName != null && this.hostName.matches(".*(staging|preprod|qa|demo|dev|test\\.).*")){
+                return ENV_TYPE.STAGING;
+            }
+            return null;
+        }else{
+            return this.userSetEnvType;
+        }
+    }
+
     @Override
     public String toString() {
         return "{" +
@@ -136,6 +162,15 @@ public class ApiCollection {
     public void setUrlsCount(int urlsCount) {
         this.urlsCount = urlsCount;
     }
+
+    public boolean isDeactivated() {
+        return deactivated;
+    }
+
+    public void setDeactivated(boolean deactivated) {
+        this.deactivated = deactivated;
+    }
+
     // to be used in front end
     public String getDisplayName() {
         String result;
@@ -229,4 +264,13 @@ public class ApiCollection {
     public void setSampleCollectionsDropped(boolean sampleCollectionsDropped) {
         this.sampleCollectionsDropped = sampleCollectionsDropped;
     }
+
+    public ENV_TYPE getUserSetEnvType() {
+		return userSetEnvType;
+	}
+
+	public void setUserSetEnvType(ENV_TYPE userSetEnvType) {
+		this.userSetEnvType = userSetEnvType;
+	}
+    
 }

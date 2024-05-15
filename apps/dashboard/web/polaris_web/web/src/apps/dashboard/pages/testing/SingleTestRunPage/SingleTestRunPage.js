@@ -28,24 +28,29 @@ import TooltipText from "../../../components/shared/TooltipText";
 import PersistStore from "../../../../main/PersistStore";
 import TrendChart from "./TrendChart";
 import { CellType } from "../../../components/tables/rows/GithubRow";
+import useTable from "../../../components/tables/TableContext";
 
 let headers = [
   {
     value: "nameComp",
     title: 'Issue name',
+    tooltipContent: 'Name of the test as in our test editor'
   },
   {
     title: 'Severity',
     value: 'severityComp',
+    sortActive: true
   },
   {
     value: 'testCategory',
     title: 'Category',
     type: CellType.TEXT,
+    tooltipContent: 'Name of the subcategory of the test'
   },
   {
     title: 'CWE tags',
     value: 'cweDisplayComp',
+    tooltipContent: "CWE tags associated with the test from akto's test library"
   },
   {
     title: 'Number of urls',
@@ -55,6 +60,7 @@ let headers = [
   {
     value: "scanned_time_comp",
     title: 'Scanned',
+    sortActive: true
   },
   {
     title: '',
@@ -63,10 +69,10 @@ let headers = [
 ]
 
 const sortOptions = [
-  { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity' },
-  { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity' },
-  { label: 'Run time', value: 'time asc', directionLabel: 'Newest run', sortKey: 'endTimestamp' },
-  { label: 'Run time', value: 'time desc', directionLabel: 'Oldest run', sortKey: 'endTimestamp' },
+  { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 2},
+  { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity', columnIndex: 2 },
+  { label: 'Run time', value: 'time asc', directionLabel: 'Newest run', sortKey: 'endTimestamp', columnIndex: 6 },
+  { label: 'Run time', value: 'time desc', directionLabel: 'Oldest run', sortKey: 'endTimestamp', columnIndex: 6 },
 ];
 
 const resourceName = {
@@ -124,13 +130,14 @@ let filters = [
 
 function SingleTestRunPage() {
 
-  const [testRunResults, setTestRunResults] = useState({ vulnerable: [], all: [] })
+  const [testRunResults, setTestRunResults] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [] })
+  const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [] })
   const [ selectedTestRun, setSelectedTestRun ] = useState({});
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const subCategoryMap = PersistStore(state => state.subCategoryMap);
   const params= useParams()
   const [loading, setLoading] = useState(false);
-  const [tempLoading , setTempLoading] = useState({vulnerable: false, all: false, running: false})
+  const [tempLoading , setTempLoading] = useState({vulnerable: false, no_vulnerability_found: false, skipped: false, running: false})
   const [selectedTab, setSelectedTab] = useState("vulnerable")
   const [selected, setSelected] = useState(0)
   const [workflowTest, setWorkflowTest ] = useState(false);
@@ -146,6 +153,13 @@ function SingleTestRunPage() {
       prev[key] = false;
       return {...prev};
     });
+  }
+
+  function fillTempData(data, key){
+    setTestRunResultsText((prev) => {
+      prev[key] = data;
+      return {...prev};
+    })
   }
 
   async function setSummary(summary){
@@ -168,21 +182,29 @@ function SingleTestRunPage() {
     setLoading(false);
     setTempLoading((prev) => {
       prev.vulnerable = true;
-      prev.all = true;
+      prev.no_vulnerability_found = true;
+      prev.skipped = true;
       return {...prev};
     });
     let testRunResults = [];
-    await api.fetchTestingRunResults(summaryHexId, true).then(({ testingRunResults }) => {
+    await api.fetchTestingRunResults(summaryHexId, "VULNERABLE").then(({ testingRunResults }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
     })
-    
+    fillTempData(testRunResults, 'vulnerable')
     fillData(transform.getPrettifiedTestRunResults(testRunResults), 'vulnerable')
-    await api.fetchTestingRunResults(summaryHexId).then(({ testingRunResults }) => {
+
+    await api.fetchTestingRunResults(summaryHexId, "SKIPPED_EXEC").then(({ testingRunResults }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
     })
-    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'all')
-  }
+    fillTempData(testRunResults, 'skipped')
+    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'skipped')
 
+    await api.fetchTestingRunResults(summaryHexId, "SECURED").then(({ testingRunResults }) => {
+      testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+    })
+    fillTempData(testRunResults, 'no_vulnerability_found')
+    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'no_vulnerability_found')
+  }
   async function fetchData(setData) {
     let localSelectedTestRun = {}
     await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest, testingRunType }) => {
@@ -261,7 +283,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
   {
     content: `Export ${selectedDataHexIds.length} record${selectedDataHexIds.length==1 ? '' : 's'}`,
     onAction: () => {
-      func.downloadAsCSV((testRunResults[selectedTab]).filter((data) => {return selectedDataHexIds.includes(data.id)}), selectedTestRun)
+      func.downloadAsCSV((testRunResultsText[selectedTab]).filter((data) => {return selectedDataHexIds.includes(data.id)}), selectedTestRun)
     },
   },
 ]};
@@ -303,22 +325,11 @@ const promotedBulkActions = (selectedDataHexIds) => {
     }
   }
 
-  const tableTabs = [
-    {
-      content: 'Vulnerable',
-      index: 0,
-      badge: testRunResults["vulnerable"]?.length?.toString(),
-      onAction: ()=> {setSelectedTab('vulnerable')},
-      id: 'vulnerable',
-    },
-    {
-        content: 'All',
-        index: 1,
-        badge: testRunResults["all"]?.length?.toString(),
-        onAction: ()=> {setSelectedTab('all')},
-        id: 'all',
-    },
-  ]
+  const definedTableTabs = ['Vulnerable', 'Skipped', 'No vulnerability found']
+
+  const { tabsInfo } = useTable()
+  const tableCountObj = func.getTabsCount(definedTableTabs, testRunResults)
+  const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
   const handleSelectedTab = (selectedIndex) => {
       setLoading(true)
@@ -351,6 +362,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
         selected={selected}
         tableTabs={tableTabs}
         onSelect={handleSelectedTab}
+        filterStateUrl={"dashboard/testing/" + selectedTestRun?.id + "/" + selectedTab}
       />
   )
 
@@ -390,15 +402,12 @@ const promotedBulkActions = (selectedDataHexIds) => {
   <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type!='One-time'}/> , 
     metadataComponent(), loading ? <SpinnerCentered key="loading"/> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
-  const rerunTest = (hexId) =>{
-    api.rerunTest(hexId).then((resp) => {
-      func.setToast(true, false, "Test re-run")
+  const rerunTest = async (hexId) =>{
+    await api.rerunTest(hexId)
+    func.setToast(true, false, "Test re-run")
       setTimeout(() => {
         refreshSummaries();
       }, 2000)
-    }).catch((resp) => {
-      func.setToast(true, true, "Unable to re-run test")
-    });
   }
 
   const openVulnerabilityReport = () => {
@@ -422,7 +431,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
                   No test run data found
                 </Text>
               </HorizontalStack>
-              <Text variant="bodyMd">
+              <Text variant="bodyMd" alignment="center">
                 The next summary will be ready with the upcoming test.
               </Text>
             </VerticalStack>
@@ -432,7 +441,8 @@ const promotedBulkActions = (selectedDataHexIds) => {
     )
   }
 
-  const useComponents = (!workflowTest && testRunResults.all.length === 0) ? [<EmptyData key="empty"/>] : components
+  const allResultsLength = testRunResults.skipped.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length
+  const useComponents = (!workflowTest && allResultsLength === 0) ? [<EmptyData key="empty"/>] : components
 
   return (
     <PageWithMultipleCards
@@ -474,10 +484,10 @@ const promotedBulkActions = (selectedDataHexIds) => {
     }
     backUrl={`/dashboard/testing/`}
     primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() => 
-      func.downloadAsCSV((testRunResults[selectedTab]), selectedTestRun)
+      func.downloadAsCSV((testRunResultsText[selectedTab]), selectedTestRun)
       }>Export</Button></Box>: undefined}
       secondaryActions={!workflowTest ? <Button onClick={() => openVulnerabilityReport()}>Export vulnerability report</Button> : undefined}
-      components={components}
+      components={useComponents}
     />
   );
 }

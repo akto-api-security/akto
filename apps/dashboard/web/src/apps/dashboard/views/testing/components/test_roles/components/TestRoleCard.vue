@@ -6,7 +6,12 @@
                     :style="{ 'background-color': item.color, 'padding': '0px !important', 'min-width': '6px' }" />
                 <td class="table-column clickable" @click="dataTypeSelected(item)" style="width: 100%">
                     <div class="table-entry">
-                        <span style="font-weight: bold">{{ item.name }}</span>
+                        <div style="font-weight: bold">{{ item.name }}</div>
+                        <div style="font-weight: bold">
+                            <div v-if="actions && hover && actions.length > 0" class="table-row-actions">
+                                <actions-tray :actions="actions || []" :subject=item></actions-tray>
+                            </div>
+                        </div>
                     </div>
                 </td>
             </tr>
@@ -18,6 +23,8 @@
 <script>
 import obj from "@/util/obj"
 import ActionsTray from "@/apps/dashboard/shared/components/ActionsTray";
+import api from "../api.js"
+
 export default {
     name: "TestRoleCard",
     props: {
@@ -28,7 +35,16 @@ export default {
     },
     data() {
         return {
-
+            actions: [
+                {
+                    isValid: item => true,
+                    icon: item => '$fas_trash',
+                    text: item => 'Delete',
+                    func: item => this.deleteTestRole(item),
+                    success: (resp, item) => this.toggleSuccessFunc(resp, item),
+                    failure: (err, item) => this.toggleFailureFunc(err, item)
+                }
+            ]
         }
     },
     created() {
@@ -36,6 +52,24 @@ export default {
     methods: {
         dataTypeSelected(item) {
             this.$emit("selectedEntry", item)
+        },
+        async deleteTestRole(item) {
+            await api.deleteTestRole(item.name)
+        },
+        toggleSuccessFunc(resp, item) {
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `${item.name}` + ` deleted successfully!`,
+                color: 'green'
+            })
+            this.$emit('refreshRoles')
+        },
+        toggleFailureFunc(err, item) {
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `Error occurred while deleting ${item.name}`,
+                color: 'red'
+            })
         }
     }
 
@@ -51,6 +85,8 @@ export default {
     text-overflow: ellipsis
     overflow : hidden
     white-space: nowrap
+    display: flex
+    justify-content: space-between
 
     &:hover
         text-overflow: clip

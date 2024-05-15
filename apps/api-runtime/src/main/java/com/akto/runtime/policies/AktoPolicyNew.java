@@ -3,9 +3,12 @@ package com.akto.runtime.policies;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLTemplate;
 import com.akto.log.LoggerMaker;
@@ -13,6 +16,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,12 +38,14 @@ public class AktoPolicyNew {
 
     public void fetchFilters() {
         this.filters = RuntimeFilterDao.instance.findAll(new BasicDBObject());
+        loggerMaker.infoAndAddToDb("Fetched " + filters.size() + " filters from db", LogDb.RUNTIME);
     }
 
     public AktoPolicyNew() {
     }
 
     public void buildFromDb(boolean fetchAllSTI) {
+        loggerMaker.infoAndAddToDb("AktoPolicyNew.buildFromDB(), fetchAllSti: " + fetchAllSTI, LogDb.RUNTIME);
         fetchFilters();
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
@@ -81,7 +87,7 @@ public class AktoPolicyNew {
                 loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause(), LogDb.RUNTIME);
             }
         }
-
+        loggerMaker.infoAndAddToDb("Built AktoPolicyNew", LogDb.RUNTIME);
     }
 
     public void syncWithDb() {
@@ -123,6 +129,7 @@ public class AktoPolicyNew {
 
     public void main(List<HttpResponseParams> httpResponseParamsList) throws Exception {
         if (httpResponseParamsList == null) httpResponseParamsList = new ArrayList<>();
+        loggerMaker.infoAndAddToDb("AktoPolicy main: httpResponseParamsList size: " + httpResponseParamsList.size(), LogDb.RUNTIME);
         for (HttpResponseParams httpResponseParams: httpResponseParamsList) {
             try {
                 process(httpResponseParams);
@@ -133,11 +140,33 @@ public class AktoPolicyNew {
         }
     }
 
+    public static ApiInfoKey generateFromHttpResponseParams(HttpResponseParams httpResponseParams) {
+        int apiCollectionId = httpResponseParams.getRequestParams().getApiCollectionId();
+        String url = httpResponseParams.getRequestParams().getURL();
+        url = url.split("\\?")[0];
+        String methodStr = httpResponseParams.getRequestParams().getMethod();
+        URLMethods.Method method = URLMethods.Method.fromString(methodStr);
+        URLTemplate urlTemplate = APICatalogSync.tryParamteresingUrl(new URLStatic(url, method));
+        if (urlTemplate != null) {
+            url = urlTemplate.getTemplateString();
+        }
+        
+        return new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
+    }
+
     public void process(HttpResponseParams httpResponseParams) throws Exception {
         List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(Integer.parseInt(httpResponseParams.getAccountId()));
-        ApiInfo.ApiInfoKey apiInfoKey = ApiInfo.ApiInfoKey.generateFromHttpResponseParams(httpResponseParams);
+        ApiInfo.ApiInfoKey apiInfoKey = generateFromHttpResponseParams(httpResponseParams);
         PolicyCatalog policyCatalog = getApiInfoFromMap(apiInfoKey);
+        policyCatalog.setSeenEarlier(true);
         ApiInfo apiInfo = policyCatalog.getApiInfo();
+
+        List<String> partnerIpsList = new ArrayList<>();
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
+        if(accountSettings != null){
+            partnerIpsList = accountSettings.getPartnerIpList();
+        }
 
         Map<Integer, FilterSampleData> filterSampleDataMap = policyCatalog.getFilterSampleDataMap();
         if (filterSampleDataMap == null) {
@@ -146,7 +175,7 @@ public class AktoPolicyNew {
         }
 
         int statusCode = httpResponseParams.getStatusCode();
-        if (!HttpResponseParams.validHttpResponseCode(statusCode)) return; 
+        if (!HttpResponseParams.validHttpResponseCode(statusCode)) return; //todo: why?
 
         for (RuntimeFilter filter: filters) {
 
@@ -165,7 +194,7 @@ public class AktoPolicyNew {
                     break;
                 case DETERMINE_API_ACCESS_TYPE:
                     try {
-                        saveSample = apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo, filter);
+                        apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo, filter, partnerIpsList);
                     } catch (Exception ignored) {}
                     break;
                 default:
@@ -183,7 +212,7 @@ public class AktoPolicyNew {
             }
         }
 
-        apiInfo.setLastSeen(Context.now());
+        apiInfo.setLastSeen(httpResponseParams.getTimeOrNow());
 
     }
 
@@ -244,6 +273,7 @@ public class AktoPolicyNew {
             policyCatalogList.addAll(templateURLToMethods.values());
 
             for (PolicyCatalog policyCatalog: policyCatalogList) {
+                if (!policyCatalog.isSeenEarlier()) continue;
                 ApiInfo apiInfo = policyCatalog.getApiInfo();
                 if (apiInfo != null) {
                     apiInfoList.add(apiInfo);
@@ -257,8 +287,76 @@ public class AktoPolicyNew {
 
         List<WriteModel<ApiInfo>> updatesForApiInfo = getUpdatesForApiInfo(apiInfoList);
         List<WriteModel<FilterSampleData>> updatesForSampleData = getUpdatesForSampleData(filterSampleDataList);
+        Map<ApiInfoKey, List<Integer>> updatesForApiGroups = getUpdatesForApiGroups(apiInfoList);
+
+        System.out.println(StringUtils.join(updatesForApiGroups));
 
         return new UpdateReturn(updatesForApiInfo, updatesForSampleData);
+    }
+
+    private static Map<ApiInfoKey, List<Integer>> getUpdatesForApiGroups(List<ApiInfo> apiInfoList) {
+        List<ApiCollection> apiGroups = ApiCollectionsDao.instance.fetchApiGroups();
+        Map<ApiInfoKey, List<Integer>> ret = new HashMap<>();
+        Map<Integer, List<TestingEndpoints>> idToAndList = new HashMap<>();
+        Map<Integer, List<TestingEndpoints>> idToOrList = new HashMap<>();
+
+        for(ApiCollection apiGroup: apiGroups) {
+            int id = apiGroup.getId();
+            if (!idToAndList.containsKey(id)) {
+                idToAndList.put(id, new ArrayList<>());
+            }
+            if (!idToOrList.containsKey(id)) {
+                idToOrList.put(id, new ArrayList<>());
+            }
+            List<TestingEndpoints> andList = idToAndList.get(id);
+            List<TestingEndpoints> orList = idToOrList.get(id);
+            for(TestingEndpoints testingEndpoints: apiGroup.getConditions()) {
+                switch (testingEndpoints.getOperator()) {
+                    case AND:
+                        andList.add(testingEndpoints);
+                        break;
+                    case OR:
+                        orList.add(testingEndpoints);
+                        break;
+                }
+            }
+        }
+
+        for(ApiInfo apiInfo: apiInfoList) {
+            ApiInfoKey apiInfoKey = apiInfo.getId();
+            for(ApiCollection apiGroup: apiGroups) {
+                int id = apiGroup.getId();
+                List<TestingEndpoints> andList = idToAndList.get(id);
+                List<TestingEndpoints> orList = idToOrList.get(id);
+
+                boolean andResult = true;
+                for(TestingEndpoints te: andList) {
+                    if (!te.containsApi(apiInfoKey)) {
+                        andResult = false;
+                        break;
+                    }
+                }
+
+                if (andResult) {
+                    boolean orResult = orList.size() == 0;
+                    for(TestingEndpoints te: orList) {
+                        if (te.containsApi(apiInfoKey)) {
+                            orResult = true;
+                            break;
+                        }
+                    }
+
+                    andResult = orResult;
+                }
+
+                if(andResult) {
+                    List<Integer> apiGroupsToAdd = ret.computeIfAbsent(apiInfoKey, k -> new ArrayList<>());
+                    apiGroupsToAdd.add(id);
+                }
+            }
+        }
+
+        return ret;
     }
 
     public static class UpdateReturn {

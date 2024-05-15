@@ -1,19 +1,23 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box } from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, Link, Tooltip } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
-import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
+import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import { CircleTickMajor } from '@shopify/polaris-icons';
 import ObserveStore from "../observeStore"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
-import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-import { CellType } from "../../../components/tables/rows/GithubRow"
+import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered"
+import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
 import CreateNewCollectionModal from "./CreateNewCollectionModal"
-import TooltipText from "../../../components/shared/TooltipText"
-import SummaryCardInfo from "../../../components/shared/SummaryCardInfo"
+import TooltipText from "@/apps/dashboard/components/shared/TooltipText"
+import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo"
+import collectionApi from "./api"
 import CollectionsPageBanner from "./component/CollectionsPageBanner"
+import useTable from "@/apps/dashboard/components/tables/TableContext"
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
+import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
 
 const headers = [
     {
@@ -28,42 +32,67 @@ const headers = [
         text: "Total endpoints",
         value: "endpoints",
         isText: CellType.TEXT,
+        sortActive: true
     },
     {
-        title: 'Risk score',
+        title: <HeadingWithTooltip content={<Text variant="bodySm">Risk score of collection is maximum risk score of the endpoints inside this collection</Text>} title="Risk score" />,
         value: 'riskScoreComp',
+        sortActive: true
     },
     {   
         title: 'Test coverage',
         text: 'Test coverage', 
         value: 'coverage',
         isText: CellType.TEXT,
+        tooltipContent: (<Text variant="bodySm">Percentage of endpoints tested successfully in the collection</Text>)
     },
     {
         title: 'Issues', 
         text: 'Issues', 
         value: 'issuesArr',
+        tooltipContent: (<Text variant="bodySm">Severity and count of issues present in the collection</Text>)
     },
     {   
         title: 'Sensitive data' , 
         text: 'Sensitive data' , 
         value: 'sensitiveSubTypes',
+        tooltipContent: (<Text variant="bodySm">Types of data type present in response of endpoint inside the collection</Text>)
+    },
+    {
+        text: 'Collection type',
+        title: 'Collection type',
+        value: 'envTypeComp',
+        filterKey: "envType",
+        showFilter: true,
+        tooltipContent: (<Text variant="bodySm">Environment type for an API collection, Staging or Production </Text>)
     },
     {   
-        title: 'Last traffic seen', 
+        title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time an endpoint within collection was either discovered for the first time or seen again</Text>} title="Last traffic seen" />, 
         text: 'Last traffic seen', 
         value: 'lastTraffic',
         isText: CellType.TEXT,
+        sortActive: true
+    },
+    {
+        title: <HeadingWithTooltip content={<Text variant="bodySm">Time when collection was created</Text>} title="Discovered" />,
+        text: 'Discovered',
+        value: 'discovered',
+        isText: CellType.TEXT,
+        sortActive: true,
     }
 ]
 
 const sortOptions = [
-    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore' },
-    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' },
-    { label: 'Discovered', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'startTs' },
-    { label: 'Discovered', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'startTs' },
-    { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints' },
-    { label: 'Endpoints', value: 'endpoints desc', directionLabel: 'Less', sortKey: 'endpoints' },
+    { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'deactivatedRiskScore' },
+    { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'activatedRiskScore' },
+    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: 3 },
+    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' , columnIndex: 3},
+    { label: 'Discovered', value: 'discovered asc', directionLabel: 'Recent first', sortKey: 'startTs', columnIndex: 9 },
+    { label: 'Discovered', value: 'discovered desc', directionLabel: 'Oldest first', sortKey: 'startTs' , columnIndex: 9},
+    { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints', columnIndex: 2 },
+    { label: 'Endpoints', value: 'endpoints desc', directionLabel: 'Less', sortKey: 'endpoints' , columnIndex: 2},
+    { label: 'Last traffic seen', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'detected', columnIndex: 8 },
+    { label: 'Last traffic seen', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'detected' , columnIndex: 8},
   ];        
 
 
@@ -85,6 +114,10 @@ function convertToCollectionData(c) {
 const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap) => {
 
     const newData = collectionsArr.map((c) => {
+        if(c.deactivated){
+            c.rowStatus = 'critical',
+            c.disableClick = true
+        }
         return{
             ...c,
             displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
@@ -92,7 +125,9 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
             severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
-            riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0
+            detectedTimestamp : trafficInfoMap[c.id] || 0,
+            riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0,
+            discovered: func.prettifyEpoch(c.startTs || 0),
         }
     })
 
@@ -102,41 +137,22 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 
 function ApiCollections() {
 
-    const [data, setData] = useState({'All':[]})
+    const [data, setData] = useState({'all':[]})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
-    const [selectedTab, setSelectedTab] = useState("All")
+    const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(false)
-    
-    
-    const tableTabs = [
-        {
-            content: 'All',
-            badge: data["All"]?.length?.toString(),
-            onAction: () => { setSelectedTab('All') },
-            id: 'All',
-        },
-        {
-            content: 'Hostname',
-            badge: data["Hostname"]?.length?.toString(),
-            onAction: () => { setSelectedTab('Hostname') },
-            id: 'Hostname',
-        },
-        {
-            content: 'Groups',
-            badge: data["Groups"]?.length?.toString(),
-            onAction: () => { setSelectedTab('Groups') },
-            id: 'Groups',
-        },
-        {
-            content: 'Custom',
-            badge: data["Custom"]?.length?.toString(),
-            onAction: () => { setSelectedTab('Custom') },
-            id: 'Custom',
-        }
-    ]
+    const [envTypeMap, setEnvTypeMap] = useState({})
+    const [refreshData, setRefreshData] = useState(false)
+    const [popover,setPopover] = useState(false)
+
+    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom']
+
+    const { tabsInfo } = useTable()
+    const tableCountObj = func.getTabsCount(definedTableTabs, data)
+    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
     const setInventoryFlyout = ObserveStore(state => state.setInventoryFlyout)
     const setFilteredItems = ObserveStore(state => state.setFilteredItems) 
@@ -154,6 +170,7 @@ function ApiCollections() {
         setActive(true)
     }
 
+    const allCollections = PersistStore(state => state.allCollections)
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
@@ -179,6 +196,11 @@ function ApiCollections() {
         setCoverageMap(coverageInfo)
 
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
+        let envTypeObj = {}
+        tmp.forEach((c) => {
+            envTypeObj[c.id] = c.envType
+        })
+        setEnvTypeMap(envTypeObj)
 
         const issuesObj = await transform.fetchRiskScoreInfo();
         const severityObj = issuesObj.severityObj;
@@ -199,10 +221,10 @@ function ApiCollections() {
         setHostNameMap(allHostNameMap)
         
         tmp = {}
-        tmp.All = dataObj.prettify
-        tmp.Hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
-        tmp.Groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
-        tmp.Custom = tmp.All.filter(x => !tmp.Hostname.includes(x) && !tmp.Groups.includes(x));
+        tmp.all = dataObj.prettify
+        tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
+        tmp.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
+        tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !tmp.groups.includes(x));
 
         setData(tmp);
     }
@@ -215,22 +237,95 @@ function ApiCollections() {
         fetchData()
         resetFunc()    
     }, [])
-
     const createCollectionModalActivatorRef = useRef();
 
-    async function handleRemoveCollections(collectionIdList) {
+    async function handleCollectionsAction(collectionIdList, apiFunction, toastContent){
         const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
-        const response = await api.deleteMultipleCollections(collectionIdListObj)
+        await apiFunction(collectionIdListObj)
         fetchData()
-        func.setToast(true, false, `${collectionIdList.length} API collection${collectionIdList.length > 1 ? "s" : ""} deleted successfully`)
+        func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
     }
 
-    const promotedBulkActions = (selectedResources) => [
-        {
-          content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-          onAction: () => handleRemoveCollections(selectedResources)
-        },
-      ];
+    const promotedBulkActions = (selectedResources) => {
+        let actions = [
+            {
+                content: `Remove collection${func.addPlurality(selectedResources.length)}`,
+                onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
+            }
+        ];
+
+        const deactivated = allCollections.filter(x => { return x.deactivated }).map(x => x.id);
+        const activated = allCollections.filter(x => { return !x.deactivated }).map(x => x.id);
+        if (selectedResources.every(v => { return activated.includes(v) })) {
+            actions.push(
+                {
+                    content: `Deactivate collection${func.addPlurality(selectedResources.length)}`,
+                    onAction: () => {
+                        const message = "Deactivating a collection will stop traffic ingestion and testing for this collection. Please sync the usage data via Settings > billing after deactivating a collection to reflect your updated usage. Are you sure, you want to deactivate this collection ?"
+                        func.showConfirmationModal(message, "Deactivate collection", () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deactivated") )
+                    }
+                }
+            )
+        } else if (selectedResources.every(v => { return deactivated.includes(v) })) {
+            actions.push(
+                {
+                    content: `Reactivate collection${func.addPlurality(selectedResources.length)}`,
+                    onAction: () =>  {
+                        const message = "Please sync the usage data via Settings > billing after reactivating a collection to resume data ingestion and testing."
+                        func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
+                    }
+                }
+            )
+        }
+
+        const toggleTypeContent = (
+            <Popover
+                activator={<div onClick={() => setPopover(!popover)}>Set ENV type</div>}
+                onClose={() => setPopover(false)}
+                active={popover}
+                autofocusTarget="first-node"
+            >
+                <Popover.Pane>
+                    <ActionList
+                        actionRole="menuitem"
+                        items={[
+                            {content: 'Staging', onAction: () => updateEnvType(selectedResources, "STAGING")},
+                            {content: 'Production', onAction: () => updateEnvType(selectedResources, "PRODUCTION")},
+                            {content: 'Reset', onAction: () => updateEnvType(selectedResources, null)},
+                        ]}
+                    />
+                </Popover.Pane>
+            </Popover>
+        )
+
+        const toggleEnvType = {
+            content: toggleTypeContent
+        }
+
+        return [...actions, toggleEnvType];
+    }
+    const updateData = (dataMap) => {
+        let copyObj = data;
+        Object.keys(copyObj).forEach((key) => {
+            data[key].length > 0 && data[key].forEach((c) => {
+                c['envType'] = dataMap[c.id]
+                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" status="info">{func.toSentenceCase(dataMap[c.id])}</Badge> : null
+            })
+        })
+        setData(copyObj)
+        setRefreshData(!refreshData)
+    }
+
+    const updateEnvType = (apiCollectionIds,type) => {
+        let copyObj = JSON.parse(JSON.stringify(envTypeMap))
+        apiCollectionIds.forEach(id => copyObj[id] = type)
+        api.updateEnvTypeOfCollection(type,apiCollectionIds).then((resp) => {
+            func.setToast(true, false, "ENV type updated successfully")
+            setEnvTypeMap(copyObj)
+            updateData(copyObj)
+        })
+        
+    }
 
     const modalComponent = <CreateNewCollectionModal
         key="modal"
@@ -275,7 +370,7 @@ function ApiCollections() {
 
     const tableComponent = (
         <GithubSimpleTable
-            key="table"
+            key={refreshData}
             pageLimit={100}
             data={data[selectedTab]} 
             sortOptions={sortOptions} 
@@ -299,12 +394,12 @@ function ApiCollections() {
 
     return(
         <PageWithMultipleCards
-        title={
-                <Text variant='headingLg' truncate>
-            {
-                "API Collections"
-            }
-        </Text>
+            title={
+                <TitleWithInfo 
+                    tooltipContent={"Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
+                    titleText={"API collections"} 
+                    docsUrl={"https://docs.akto.io/api-inventory/concepts"}
+                />
             }
             primaryAction={<Button id={"create-new-collection-popup"} primary secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
             isFirstPage={true}

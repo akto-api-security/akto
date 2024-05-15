@@ -3,7 +3,7 @@
         <a-card :title="title" color="var(--rgbaColor2)" style="min-height: 600px; flex: 1 1 20%"
             icon_right="$fas_plus" icon_right_color="var(--themeColor)" @icon_right_clicked="openCreateRoleDialog">
             <div v-for="(testRole, index) in testRoles" :key="index">
-                <test-role-card :item="testRole" @selectedEntry="entryUpdated" />
+                <test-role-card :item="testRole" @selectedEntry="entryUpdated" @refreshRoles="refreshRoles"/>
             </div>
         </a-card>
         <div class="details-container">
@@ -27,6 +27,9 @@ export default {
         testRoles: obj.arrR
     },
     methods: {
+        refreshRoles() {
+            this.$emit("refreshRoles")
+        },
         async fetchAllEndpointsForCollection(collectionId) {
             await this.$store.dispatch('test_roles/fetchApiInfoKeyForCollection', {collectionId})
             let collectionsMap = this.$store.state.test_roles.collectionWiseApiInfoKeyMap
@@ -118,5 +121,9 @@ export default {
     
 .details-container
     flex: 1 1 80%
+    margin: 12px 10px 12px 0px
+    border: 1px solid var(--themeColorDark13)
+    border-radius: 4px
+    box-shadow: none !important
 
 </style>

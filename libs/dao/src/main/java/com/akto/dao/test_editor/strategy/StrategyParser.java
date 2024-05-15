@@ -19,6 +19,11 @@ public class StrategyParser {
             strategy.setRunOnce(val.toString());
         }
 
+        Object insertVulnApi = metadataMap.get("insertVulnApi");
+        if (insertVulnApi != null) {
+            strategy.setInsertVulnApi((boolean) insertVulnApi);
+        }
+
         return strategy;
     }
 

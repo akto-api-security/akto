@@ -1,4 +1,4 @@
-import { Autocomplete, Avatar, Icon, TextContainer } from '@shopify/polaris';
+import { Autocomplete, Avatar, Checkbox, Icon, TextContainer } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import React, { useState, useCallback, useEffect } from 'react';
 import func from "@/util/func";
@@ -6,13 +6,14 @@ function DropdownSearch(props) {
 
     const id = props.id ? props.id : "dropdown-search"
 
-    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey} = props
+    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested} = props
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
     const [inputValue, setInputValue] = useState(value ? value : undefined);
     const [options, setOptions] = useState(deselectedOptions);
     const [loading, setLoading] = useState(false);
+    const [checked,setChecked] = useState(false)
 
 
     useEffect(() => {
@@ -39,6 +40,21 @@ function DropdownSearch(props) {
             }
             return deselectedOptions;
         })
+
+        if(allowMultiple){
+            let totalItems = deselectedOptions.length
+            if(isNested){
+                totalItems = 0
+                deselectedOptions.forEach((opt) => {
+                    totalItems += opt.options.length
+                })
+            }
+            if(preSelected.length === totalItems){
+                setChecked(true)
+            }else{
+                setChecked(false)
+            }
+        }
     }, [deselectedOptions, value, preSelected])
 
     const updateText = useCallback(
@@ -57,9 +73,23 @@ function DropdownSearch(props) {
                 }
                 const filterRegex = new RegExp(value, 'i');
                 const searchKey = dropdownSearchKey ? dropdownSearchKey : "label"
-                const resultOptions = deselectedOptions.filter((option) =>
+                let resultOptions = []
+                if(isNested){
+                    deselectedOptions.forEach((opt) => {
+                        const options = opt.options.filter((option) =>
+                          option[searchKey].match(filterRegex),
+                        );
+                
+                        resultOptions.push({
+                          title: opt.title,
+                          options,
+                        });
+                      });
+                }else{
+                    resultOptions = deselectedOptions.filter((option) =>
                     option[searchKey].match(filterRegex)
                 );
+                }
                 setOptions(resultOptions);
                 setLoading(false);
             }, 300);
@@ -102,6 +132,27 @@ function DropdownSearch(props) {
         [options],
     );
 
+    const selectAllFunc = () => {
+        if(!checked){
+            let valueArr = []
+            if(isNested){
+                deselectedOptions.forEach((opt) => {
+                    opt.options.forEach((option) =>
+                      valueArr.push(option.value)
+                    );
+                })
+            }else{
+                deselectedOptions.map((opt) => valueArr.push(opt.value))
+            }
+            updateSelection(valueArr)
+            setChecked(true)
+        }else{
+            setChecked(false)
+            updateSelection([])
+        }
+        
+    }
+
     const textField = (
         <Autocomplete.TextField
             id={id}
@@ -122,6 +173,9 @@ function DropdownSearch(props) {
         />
     );
 
+    const showSelectAll = (allowMultiple && optionsList.length > 5)
+    const checkboxLabel = checked ? "Deselect all" : "Select all"
+
     const emptyState = (
         <React.Fragment>
             <Icon source={SearchMinor} />
@@ -141,6 +195,10 @@ function DropdownSearch(props) {
                 loading={loading}
                 textField={textField}
                 preferredPosition='below'
+                {...(showSelectAll ? {actionBefore:{
+                    content:(<Checkbox label={checkboxLabel} checked={checked} onChange={() => selectAllFunc()}/>),
+                    onAction: () => selectAllFunc(),
+                }} : {})}
             />
     );
 }

@@ -1,6 +1,8 @@
 package com.akto.dto;
 
 
+import com.akto.dao.context.Context;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +65,11 @@ public class HttpResponseParams {
                 this.sourceIP
         );
     }
+
+    public int getTimeOrNow() {
+        return getTime() == 0 ? Context.now() : getTime();
+    }
+
 
     public String getPayload() {
         return payload;

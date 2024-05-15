@@ -1,5 +1,6 @@
 package com.akto.open_api;
 
+import com.akto.dto.type.APICatalog;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
@@ -88,7 +89,7 @@ public class PathBuilder {
             int idx = 0;
             for (int i=0;i< urlList.length; i++) {
                 String u = urlList[i];
-                if (u.equals("INTEGER") || u.equals("STRING")) {
+                if (APICatalog.isTemplateUrl(u)) {
                     idx += 1;
                     String paramName = "{param" + idx + "}";
                     urlList[i] = paramName;

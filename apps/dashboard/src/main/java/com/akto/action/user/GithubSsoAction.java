@@ -10,15 +10,22 @@ import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.User;
+import com.akto.utils.sso.SsoUtils;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.util.DashboardMode;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
+
+import okhttp3.OkHttpClient;
+
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
+import org.kohsuke.github.connector.GitHubConnector;
+import org.kohsuke.github.extras.okhttp3.OkHttpGitHubConnector;
 
 import java.util.ArrayList;
 
@@ -26,6 +33,8 @@ import static com.akto.dao.AccountSettingsDao.generateFilter;
 
 public class GithubSsoAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
+    private static final GitHubConnector connector = new OkHttpGitHubConnector(client);
 
     public String deleteGithubSso() {
 
@@ -99,7 +108,7 @@ public class GithubSsoAction extends UserAction {
 
         try {
             String jwtToken = GithubUtils.createJWT(githubAppId,githubAppSecretKey, 10 * 60 * 1000);
-            GitHub gitHub = new GitHubBuilder().withJwtToken(jwtToken).build();
+            GitHub gitHub = new GitHubBuilder().withConnector(connector).withJwtToken(jwtToken).build();
             gitHub.getApp();
         } catch (Exception e) {
             addActionError("invalid github app Id and secret key");
@@ -129,8 +138,8 @@ public class GithubSsoAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if (ConfigsDao.instance.findOne("_id", "GITHUB-ankush") != null) {
-            addActionError("A Github SSO Integration already exists");
+        if (SsoUtils.isAnySsoActive()) {
+            addActionError("A SSO Integration already exists.");
             return ERROR.toUpperCase();
         }
 
@@ -152,6 +161,10 @@ public class GithubSsoAction extends UserAction {
         }
 
         Config.GithubConfig githubConfig = (Config.GithubConfig) ConfigsDao.instance.findOne("_id", "GITHUB-ankush");
+        if (SsoUtils.isAnySsoActive() && githubConfig == null) {
+            addActionError("A different SSO Integration already exists.");
+            return ERROR.toUpperCase();
+        }
 
         if (githubConfig != null) {
             this.githubClientId = githubConfig.getClientId();

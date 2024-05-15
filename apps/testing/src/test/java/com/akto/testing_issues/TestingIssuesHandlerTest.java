@@ -16,6 +16,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.bson.types.ObjectId;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -54,7 +55,7 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
                 100,
                 Context.now(),
                 Context.now(),
-                summaryId, null);
+                summaryId, null, new ArrayList<>());
     }
 
 //     @Test

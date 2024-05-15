@@ -52,7 +52,16 @@
                 </simple-table>
             </template>
             <template slot="Values">
-                <sample-data-list :messages="sampleData" v-if="sampleData"/>
+                <div  v-if="sampleData">
+                    <div class="d-flex jc-end" style="padding: 12px 24px 0px 0px;" v-if="isTemplateUrl">
+                        <secondary-button
+                            color="var(--themeColorDark)" 
+                            text="De-merge"
+                            @click="deMerge"
+                        />
+                    </div>
+                    <sample-data-list :messages="sampleData"/>
+                </div>
                 <spinner v-else/>
             </template>
             <template slot="Sensitive Values">
@@ -75,6 +84,7 @@ import SensitiveParamsCard from '@/apps/dashboard/shared/components/SensitivePar
 import LineChart from '@/apps/dashboard/shared/components/LineChart'
 import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
+import SecondaryButton from "@/apps/dashboard/shared/components/buttons/SecondaryButton"
 
 import api from '../api'
 import SampleDataList from '@/apps/dashboard/shared/components/SampleDataList'
@@ -90,7 +100,8 @@ export default {
     LineChart,
     Spinner,
     SampleData,
-    SampleDataList
+    SampleDataList,
+    SecondaryButton
 },
     props: {
         urlAndMethod: obj.strR,
@@ -196,6 +207,15 @@ export default {
             let arr =  [...(this.sampleData || []), ...(this.sensitiveSampleData || [])]
             this.$store.commit('inventory/ALL_SAMPLED_DATA',arr)
         },
+        deMerge() {
+            api.deMergeApi(this.apiCollectionId, this.url, this.method).then((resp) => {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: "De-merging successful!! Please refresh the inventory page",
+                    color: 'green'
+                })
+            })
+        }
     },
     computed: {
         ...mapState('inventory', ['parameters', 'parametersLoading']),
@@ -204,6 +224,9 @@ export default {
         },
         method () {
             return this.urlAndMethod.split(" ")[1]
+        },
+        isTemplateUrl() {
+            return this.url.includes("STRING") || this.url.includes("INTEGER") || this.url.includes("OBJECT_ID")
         },
         sensitiveParams() {
             return this.parameters.filter(x => x.subType === "CUSTOM" || func.isSubTypeSensitive(x))

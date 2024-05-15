@@ -34,10 +34,10 @@ export default function Header() {
         [],
     );
 
-    const handleLogOut = async () => {
-        storeAccessToken(null)
-        resetAll();
+    const handleLogOut = async () => {        
         api.logout().then(res => {
+            resetAll();
+            storeAccessToken(null)
             if(res.logoutUrl){
                 window.location.href = res.logoutUrl
             } else {

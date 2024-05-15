@@ -3,6 +3,7 @@ package com.akto.dao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
@@ -44,26 +45,30 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
 
-        MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
-        int counter = 0;
-        while (cursor.hasNext()) {
-            counter++;
-            cursor.next();
-        }
 
-        if (counter == 1) {
-            String[] fieldNames = {"_id.apiCollectionId", "_id.url", "_id.method"};
-            MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
-            counter++;
-        }
+        String[] fieldNames = {"_id.apiCollectionId", "_id.url", "_id.method"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        if (counter == 2) {
-            instance.getMCollection().createIndex(Indexes.ascending("_id.apiCollectionId"));
-        }
+        fieldNames = new String[]{"_id.apiCollectionId"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL, ApiInfo.ID_METHOD }, true);
 
+    }
+
+    public SampleData fetchSampleDataForApi(int apiCollectionId, String url, URLMethods.Method method) {
+        Bson filterQSampleData = filterForSampleData(apiCollectionId, url, method);
+        return SampleDataDao.instance.findOne(filterQSampleData);
+    }
+
+    public static Bson filterForSampleData(int apiCollectionId, String url, URLMethods.Method method) {
+        return Filters.and(
+                Filters.eq("_id.apiCollectionId", apiCollectionId),
+                Filters.eq("_id.url", url),
+                Filters.eq("_id.method", method.name())
+        );
     }
 
     public List<SampleData> fetchSampleDataPaginated(int apiCollectionId, String lastFetchedUrl,

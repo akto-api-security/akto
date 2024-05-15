@@ -105,7 +105,6 @@ function SampleDataComponent(props) {
         let { copyString, snackBarMessage } = await copyContent(type, completeData)
         if (copyString) {
             func.copyToClipboard(copyString, ref, snackBarMessage)
-            func.setToast(true, false, snackBarMessage)
             setPopoverActive({ [reqType]: !popoverActive[reqType] })
         }
     }

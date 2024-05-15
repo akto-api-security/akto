@@ -11,13 +11,27 @@ import { IndexFiltersMode } from '@shopify/polaris';
 
 function ApiChangesTable(props) {
 
-  const { handleRowClick, tableLoading, startTimeStamp, endTimeStamp, newEndpoints, parametersCount } = props ;
+  const { handleRowClick, tableLoading, startTimeStamp, endTimeStamp, newEndpoints, parametersCount, tab } = props ;
   const [selectedTab, setSelectedTab] = useState("endpoints") ;
   const [selected, setSelected] = useState(0) ;
   const dataTypeNames = Store(state => state.dataTypeNames);
   const apiCollectionMap = PersistStore(state => state.collectionsMap)
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState([])
+
+  useEffect(() => {
+    if (tab==1) {
+      setSelected(1);
+      setSelectedTab('param')
+    }
+    else if (tab==0) {
+      setSelected(0);
+      setSelectedTab('endpoints')
+    }
+
+  }, [tab]);
+
+
 
   const tableTabs = [
     {

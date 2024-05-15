@@ -435,4 +435,66 @@ public abstract class SignupInfo {
             this.username = username;
         }
     }
+
+    public static class OktaSignupInfo extends SignupInfo {
+        private String accessToken;
+        private String username;
+
+        public OktaSignupInfo() {
+
+        }
+
+        public OktaSignupInfo(String accessToken, String username) {
+            this.accessToken = accessToken;
+            this.username = username;
+            this.configType = Config.ConfigType.OKTA;
+            this.key = this.configType.name();
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+        
+        public String getAccessToken() {
+            return accessToken;
+        }
+
+        public void setAccessToken(String accessToken) {
+            this.accessToken = accessToken;
+        }
+    }
+
+    public static class AzureSignupInfo extends SignupInfo {
+        private String username;
+        private String email;
+
+        public AzureSignupInfo (){}
+
+        public AzureSignupInfo (String username, String email) {
+            this.username = username ;
+            this.email = email;
+            this.configType = Config.ConfigType.AZURE;
+            this.key = this.configType.name();
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+    }
 }

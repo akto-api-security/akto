@@ -22,6 +22,8 @@ import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.sun.jndi.toolkit.url.Uri;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
@@ -30,6 +32,7 @@ import java.util.*;
 
 public class ExportSampleDataAction extends UserAction {
     private final static ObjectMapper mapper = new ObjectMapper();
+    private static final Logger logger = LoggerFactory.getLogger(ExportSampleDataAction.class);
     private static final JsonFactory factory = mapper.getFactory();
     @Override
     public String execute() {
@@ -115,7 +118,7 @@ public class ExportSampleDataAction extends UserAction {
             try {
                 url = OriginalHttpRequest.makeUrlAbsolute(url,host, protocol);
             } catch (Exception e) {
-
+                logger.error(e.getMessage());
             }
         } else {
             if (!originalHttpRequest.getHeaders().containsKey("host")) {

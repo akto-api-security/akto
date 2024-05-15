@@ -27,6 +27,7 @@ public class InstanceDetails {
                 instanceIp = EntityUtils.toString(entity);
             }
         } catch (Exception exception) {
+            exception.printStackTrace();
         }
     }
 

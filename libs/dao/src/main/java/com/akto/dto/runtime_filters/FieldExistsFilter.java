@@ -35,7 +35,7 @@ public class FieldExistsFilter extends CustomFilter {
             jp = factory.createParser(httpResponseParams.getPayload());
             node = mapper.readTree(jp);
         } catch (IOException e) {
-            ;
+            e.printStackTrace();
             return false;
         }
 
