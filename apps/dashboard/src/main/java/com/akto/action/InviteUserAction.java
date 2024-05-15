@@ -11,15 +11,14 @@ import com.akto.utils.JWT;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 import com.sendgrid.helpers.mail.Mail;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
-import java.util.Calendar;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class InviteUserAction extends UserAction{
 
@@ -109,6 +108,7 @@ public class InviteUserAction extends UserAction{
             e.printStackTrace();
             return ERROR.toUpperCase();
         }
+
         return Action.SUCCESS.toUpperCase();
     }
 

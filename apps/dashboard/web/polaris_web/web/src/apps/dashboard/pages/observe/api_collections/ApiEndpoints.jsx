@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, Link, Tooltip } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -25,17 +25,29 @@ import TooltipText from "../../../components/shared/TooltipText"
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
 import { ENDPOINTS_PAGE_DOCS_URL } from "../../../../main/onboardingData"
 import {TestrunsBannerComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
+import GetPrettifyEndpoint from "../GetPrettifyEndpoint"
+import SourceLocation from "./component/SourceLocation"
+import useTable from "../../../components/tables/TableContext"
+import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
 
 const headings = [
     {
         text: "Endpoint",
         value: "endpointComp",
         title: "Api endpoints",
+        textValue: "endpoint",
+        sortActive: true
     },
     {
         text: "Risk score",
-        title: "Risk score",
+        title: <HeadingWithTooltip 
+            title={"Risk score"}
+            content={"Risk score is calculated based on the amount of sensitive information the API shares and its current status regarding security issues."}
+        />,
         value: "riskScoreComp",
+        textValue: "riskScore",
+        sortActive: true,
+        
     },
     {
         text: "Hostname",
@@ -46,30 +58,46 @@ const headings = [
     },
     {
         text: 'Access Type',
-        value: 'access_type',
-        title: 'Access type',
+        value: 'access_type', 
+        title:"Access Type",
         showFilter: true,
         type: CellType.TEXT,
+        tooltipContent: "Access type of the API. It can be public, private, partner"
     },
     {
         text: 'Auth Type',
         title: 'Auth type',
         value: 'auth_type',
         showFilter: true,
-        type: CellType.TEXT,
+        textValue: 'authTypeTag',
+        tooltipContent: "Authentication type of the API."
     },
     {
         text: 'Sensitive Params',
         title: 'Sensitive params',
         value: 'sensitiveTagsComp',
         filterKey: 'sensitiveTags',
-        showFilter: true
+        showFilter: true,
+        textValue: "sensitiveDataTags"
     },
     {
         text: 'Last Seen',
-        title: 'Last seen',
+        title: <HeadingWithTooltip 
+                title={"Last Seen"}
+                content={"Time when API was last detected in traffic."}
+            />,
         value: 'last_seen',
         isText: true,
+        type: CellType.TEXT,
+        sortActive: true,
+        
+    },
+    {
+        text: "Source location",
+        value: "sourceLocationComp",
+        textValue: "sourceLocation",
+        title: "Source location",
+        tooltipContent: "Exact location of the URL in case detected from the source code."    
     }
 ]
 
@@ -77,23 +105,21 @@ let headers = JSON.parse(JSON.stringify(headings))
 headers.push({
     text: 'Method',
     filterKey: 'method',
-    showFilter: true
+    showFilter: true,
+    textValue: 'method',
+    sortActive: true
 })
 
 
 const sortOptions = [
-    { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore'},
-    { label: 'Risk Score', value: 'riskScore desc', directionLabel: 'Lowest', sortKey: 'riskScore'},
-    { label: 'Method', value: 'method asc', directionLabel: 'A-Z', sortKey: 'method' },
-    { label: 'Method', value: 'method desc', directionLabel: 'Z-A', sortKey: 'method' },
-    { label: 'Endpoint', value: 'endpoint asc', directionLabel: 'A-Z', sortKey: 'endpoint' },
-    { label: 'Endpoint', value: 'endpoint desc', directionLabel: 'Z-A', sortKey: 'endpoint' },
-    { label: 'Auth Type', value: 'auth_type asc', directionLabel: 'A-Z', sortKey: 'auth_type' },
-    { label: 'Auth Type', value: 'auth_type desc', directionLabel: 'Z-A', sortKey: 'auth_type' },
-    { label: 'Access Type', value: 'access_type asc', directionLabel: 'A-Z', sortKey: 'access_type' },
-    { label: 'Access Type', value: 'access_type desc', directionLabel: 'Z-A', sortKey: 'access_type' },
-    { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs' },
-    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs' },
+    { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore', columnIndex: 2},
+    { label: 'Risk Score', value: 'riskScore desc', directionLabel: 'Lowest', sortKey: 'riskScore', columnIndex: 2},
+    { label: 'Method', value: 'method asc', directionLabel: 'A-Z', sortKey: 'method', columnIndex: 8 },
+    { label: 'Method', value: 'method desc', directionLabel: 'Z-A', sortKey: 'method', columnIndex: 8 },
+    { label: 'Endpoint', value: 'endpoint asc', directionLabel: 'A-Z', sortKey: 'endpoint', columnIndex: 1 },
+    { label: 'Endpoint', value: 'endpoint desc', directionLabel: 'Z-A', sortKey: 'endpoint', columnIndex: 1 },
+    { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs', columnIndex: 7 },
+    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 7 }
 ];
 
 function ApiEndpoints() {
@@ -116,7 +142,7 @@ function ApiEndpoints() {
     const [runTests, setRunTests ] = useState(false)
 
     const [endpointData, setEndpointData] = useState([])
-    const [selectedTab, setSelectedTab] = useState("All")
+    const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
     const [loading, setLoading] = useState(true)
     const [apiDetail, setApiDetail] = useState({})
@@ -135,43 +161,12 @@ function ApiEndpoints() {
     const queryParams = new URLSearchParams(location.search);
     const selectedUrl = queryParams.get('selected_url')
     const selectedMethod = queryParams.get('selected_method')
-    const tableTabs = [
-        {
-            content: 'All',
-            index: 0,
-            badge: endpointData["All"]?.length?.toString(),
-            onAction: ()=> {setSelectedTab('All')},
-            id: 'All',
-        },
-        {
-            content: 'New',
-            index: 1,
-            badge: endpointData["New"]?.length?.toString(),
-            onAction: ()=> {setSelectedTab('New')},
-            id: 'New',
-        },
-        {
-            content: 'Sensitive',
-            index: 2,
-            badge: endpointData["Sensitive"]?.length?.toString(),
-            onAction: ()=> {setSelectedTab('Sensitive')},
-            id:'Sensitive',
-        },
-        {
-            content: 'High risk',
-            index: 3,
-            badge: endpointData["Risk"]?.length?.toString(),
-            onAction: ()=> {setSelectedTab('Risk')},
-            id: 'Risk',
-        },
-        {
-            content: 'No auth detected',
-            index: 4,
-            badge: endpointData["No_auth"]?.length?.toString(),
-            onAction: ()=> {setSelectedTab('No_auth')},
-            id: 'No_auth'
-        },
-    ]
+
+    const definedTableTabs = ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow']
+
+    const { tabsInfo } = useTable()
+    const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
+    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
     async function fetchData() {
         setLoading(true)
@@ -202,14 +197,68 @@ function ApiEndpoints() {
 
         let data = {}
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, null)
+
+        // handle code analysis endpoints
+        const codeAnalysisCollectionInfo = apiCollectionData.codeAnalysisCollectionInfo
+        const codeAnalysisApisMap = codeAnalysisCollectionInfo.codeAnalysisApisMap
+        let shadowApis = []
+
+        if (codeAnalysisApisMap) {
+            // Don't show empty screen if there are codeanalysis endpoints present
+            if (codeAnalysisApisMap && Object.keys(codeAnalysisApisMap).length > 0) {
+                setShowEmptyScreen(false)
+            }
+            shadowApis = { ...codeAnalysisApisMap }
+
+            // Find shadow endpoints and map api endpoint location
+            allEndpoints.forEach(api => {
+                let apiEndpoint = transform.getTruncatedUrl(api.endpoint)
+                // ensure apiEndpoint does not end with a slash
+                if (apiEndpoint !== "/" && apiEndpoint.endsWith("/")) 
+                    apiEndpoint = apiEndpoint.slice(0, -1)
+
+                const apiKey = api.method + " " + apiEndpoint
+
+                if (Object.hasOwn(codeAnalysisApisMap, apiKey)) {
+                    const codeAnalysisApi = codeAnalysisApisMap[apiKey]
+                    const location = codeAnalysisApi.location
+                    api.sourceLocation = codeAnalysisApi.location.filePath
+                    api.sourceLocationComp = <SourceLocation location={location} />
+
+                    delete shadowApis[apiKey]
+                }
+                else {
+                    api.source_location = ""
+                }
+            })
+
+            shadowApis = Object.entries(shadowApis).map(([ codeAnalysisApiKey, codeAnalysisApi ]) => {
+                const { method, endpoint, location } = codeAnalysisApi
+
+                return {
+                    id: codeAnalysisApiKey,
+                    endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={false} />,
+                    method: method,
+                    endpoint: endpoint,
+                    codeAnalysisEndpoint: true,
+                    sourceLocation: location.filePath, 
+                    sourceLocationComp: <SourceLocation location={location} />,
+                }
+            })
+        }
+
         const prettifyData = transform.prettifyEndpointsData(allEndpoints)
-        data['All'] = prettifyData
-        data['Sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0)
-        data['Risk'] = prettifyData.filter(x=> x.riskScore >= 4)
-        data['New'] = prettifyData.filter(x=> x.isNew)
-        data['No_auth'] = prettifyData.filter(x => x.open)
+
+        // append shadow endpoints to all endpoints
+        data['all'] = [ ...prettifyData, ...shadowApis ]
+        data['sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0)
+        data['high_risk'] = prettifyData.filter(x=> x.riskScore >= 4)
+        data['new'] = prettifyData.filter(x=> x.isNew)
+        data['no_auth'] = prettifyData.filter(x => x.open)
+        data['shadow'] = [ ...shadowApis ]
+
         setEndpointData(data)
-        setSelectedTab("All")
+        setSelectedTab("all")
         setSelected(0)
 
         setApiEndpoints(apiEndpointsInCollection)
@@ -220,8 +269,8 @@ function ApiEndpoints() {
     }
 
     useEffect(() => {
-        if (!endpointData || !endpointData["All"] || !selectedUrl || !selectedMethod) return
-        let allData = endpointData["All"]
+        if (!endpointData || !endpointData["all"] || !selectedUrl || !selectedMethod) return
+        let allData = endpointData["all"]
 
         const selectedApiDetail = allData.filter((x) => {
             return selectedUrl === x.endpoint && selectedMethod === x.method
@@ -245,7 +294,7 @@ function ApiEndpoints() {
     useEffect(() => {
         fetchData()
         checkGptActive()
-    }, [])
+    }, [apiCollectionId])
 
     const resourceName = {
         singular: 'endpoint',
@@ -257,7 +306,12 @@ function ApiEndpoints() {
     }
 
     function handleRowClick(data) {
+        // Don't show api details for Code analysis endpoints
+        if (data.codeAnalysisEndpoint) 
+            return
+        
         let tmp = { ...data, endpointComp: "", sensitiveTagsComp: "" }
+        
         const sameRow = func.deepComparison(apiDetail, tmp);
         if (!sameRow) {
             setShowDetails(true)
@@ -271,6 +325,8 @@ function ApiEndpoints() {
             return { ...tmp }
         })
     }
+
+
 
     function handleRefresh() {
         fetchData()
@@ -317,15 +373,15 @@ function ApiEndpoints() {
 
             if (!lastFetchedUrl || !lastFetchedMethod) break;
         }
-        func.setToast(true, false, "OpenAPI spec downloaded successfully")
+        func.setToast(true, false, <div data-testid="openapi_spec_download_message">OpenAPI spec downloaded successfully</div>)
     }
 
     function exportCsv() {
         if (!loading) {
-            let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
+            let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.type === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0].length > 0));
 
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
-            const allEndpoints = endpointData['All']
+            const allEndpoints = endpointData['all']
             allEndpoints.forEach(i => {
                 csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
             })
@@ -333,7 +389,7 @@ function ApiEndpoints() {
                 type: "application/csvcharset=UTF-8"
             });
             saveAs(blob, ("All endopints") + ".csv");
-            func.setToast(true, false, "CSV exported successfully")
+            func.setToast(true, false, <div data-testid="csv_download_message">CSV exported successfully</div>)
         }
     }
 
@@ -426,7 +482,7 @@ function ApiEndpoints() {
                 active={exportOpen}
                 activator={(
                     <Button onClick={() => setExportOpen(true)} disclosure>
-                        More Actions
+                        <div data-testid="more_actions_button">More Actions</div>
                     </Button>
                 )}
                 autofocusTarget="first-node"
@@ -465,13 +521,13 @@ function ApiEndpoints() {
                         <VerticalStack gap={2}>
                             <Text>Export as</Text>
                                 <VerticalStack gap={1}>
-                                <div onClick={exportOpenApi} style={{cursor: 'pointer'}}>
+                                <div data-testid="openapi_spec_option" onClick={exportOpenApi} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">OpenAPI spec</Text>
                                 </div>
-                                <div onClick={exportPostman} style={{cursor: 'pointer'}}>
+                                <div data-testid="postman_option" onClick={exportPostman} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">Postman</Text>
                                 </div>
-                                <div onClick={exportCsv} style={{cursor: 'pointer'}}>
+                                <div data-testid="csv_option" onClick={exportCsv} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">CSV</Text>
                                 </div>
                             </VerticalStack>
@@ -506,7 +562,7 @@ function ApiEndpoints() {
             <RunTest
                 apiCollectionId={apiCollectionId}
                 endpoints={filteredEndpoints}
-                filtered={loading ? false : filteredEndpoints.length !== endpointData["All"].length}
+                filtered={loading ? false : filteredEndpoints.length !== endpointData["all"].length}
                 runTestFromOutside={runTests}
                 disabled={showEmptyScreen}
             />
@@ -552,7 +608,7 @@ function ApiEndpoints() {
             )
         } else {
             ret.push({
-                content: 'Add to API group',
+                content: <div data-testid="add_to_api_group_button">Add to API group</div>,
                 onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
             })
         }
@@ -582,7 +638,7 @@ function ApiEndpoints() {
                 <WorkflowTests
                 key={"workflow-tests"}
                 apiCollectionId={apiCollectionId}
-                endpointsList={loading ? [] : endpointData["All"]}
+                endpointsList={loading ? [] : endpointData["all"]}
             />
              ] : showEmptyScreen ? [
                 <EmptyScreensLayout key={"emptyScreen"}

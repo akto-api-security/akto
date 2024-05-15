@@ -1,11 +1,86 @@
 import settingRequests from './api';
 import func from '@/util/func';
+import { parseString } from "xml2js"
 
 const setupOptions = [
   { label: 'STAGING', value: 'STAGING' },
   { label: 'PROD', value: 'PROD' },
   { label: 'QA', value: 'QA' },
   { label: 'DEV', value: 'DEV' }
+]
+
+const urlOptionsList = [
+  {
+    title: 'HTML',
+    options: [
+      {value: 'html', label: '.html'},
+      {value: 'htm', label: '.htm'},
+    ],
+  },
+  {
+    title: 'CSS',
+    options: [
+      {value: 'css', label: '.css'},
+    ],
+  },
+  {
+    title: 'JS files',
+    options: [
+      {value: 'js', label: '.js'},
+    ],
+  },
+  {
+    title: 'Images',
+    options: [
+      {value: 'jpg', label: '.jpg'},
+      {value: 'jpeg', label: '.jpeg'},
+      {value: 'png', label: '.png'},
+      {value: 'gif', label: '.gif'},
+      {value: 'svg', label: '.svg'},
+      {value: 'webp', label: '.webp'},
+    ],
+  },
+  {
+    title: 'Documents',
+    options: [
+      {value: 'json', label: '.json'},
+      {value: 'pdf', label: '.pdf'},
+      {value: 'doc', label: '.doc'},
+      {value: 'docx', label: '.docx'},
+      {value: 'xlsx', label: '.xlsx'},
+      {value: 'xls', label: '.xls'},
+      {value: 'pptx', label: '.pptx'},
+    ],
+  },
+  {
+    title: 'Videos',
+    options: [
+      {value: 'mp4', label: '.mp4'},
+      {value: 'webm', label: '.webm'},
+      {value: 'ogg', label: '.ogg'},
+      {value: 'ogv', label: '.ogv'},
+      {value: 'avi', label: '.avi'},
+      {value: 'mov', label: '.mov'},
+    ],
+  },
+  {
+    title: 'Audio',
+    options: [
+      {value: 'mp3', label: '.mp3'},
+      {value: 'wav', label: '.wav'},
+      {value: 'oga', label: '.oga'},
+      {value: 'ogg', label: '.ogg'},
+    ],
+  },
+  {
+    title: 'Fonts',
+    options: [
+      {value: 'woff', label: '.woff'},
+      {value: 'woff2', label: '.woff2'},
+      {value: 'ttf', label: '.ttf'},
+      {value: 'otf', label: '.otf'},
+    ],
+  },
 ]
 
 const settingFunctions = {
@@ -48,6 +123,13 @@ const settingFunctions = {
       await settingRequests.fetchPostmanWorkspaces(postman_id).then((resp)=>{
         workspaces = resp.workspaces
       })  
+      return workspaces
+    },
+    fetchRuntimeHelmCommand: async function(){
+      let workspaces = []
+      await settingRequests.fetchRuntimeHelmCommand().then((resp)=>{
+        workspaces = resp.workspaces
+      })
       return workspaces
     },
     addOrUpdatePostmanCred: async function(postman_id,workspace_id){
@@ -93,30 +175,39 @@ const settingFunctions = {
             respOrgStr = respOrg.id + " (" + respOrg.adminEmail + ")"
         }
 
-        arr = [
-          // {
-          //   title: 'Organisation',
-          //   text: 'Akto'
-          // },
-          {
-            title: "Organization ID",
-            text: respOrgStr
-          },
-          {
-            title: 'Account ID',
-            text: resp.id,
-          },{
-            title: 'Dashboard Version',
-            text: resp.dashboardVersion,
-          },{
-            title: 'Runtime Version',
-            text: resp.apiRuntimeVersion
-          },
-          {
-            title: 'Last Login',
-            text: loginInfo,
-          },
-        ]
+        if(window.IS_SAAS === "true"){
+          arr = [
+            {
+              title: 'Account ID',
+              text: resp.id,
+            },
+            {
+              title: 'Last Login',
+              text: loginInfo,
+            },
+          ]
+        } else{
+          arr = [
+            {
+              title: "Organization ID",
+              text: respOrgStr
+            },
+            {
+              title: 'Account ID',
+              text: resp.id,
+            },{
+              title: 'Dashboard Version',
+              text: resp.dashboardVersion,
+            },{
+              title: 'Runtime Version',
+              text: resp.apiRuntimeVersion
+            },
+            {
+              title: 'Last Login',
+              text: loginInfo,
+            },
+          ]
+        }
       })
       return {arr,resp}
     },
@@ -136,10 +227,69 @@ const settingFunctions = {
       })
       return trafficData
     },
+    testJiraIntegration: async function(userEmail, apiToken, baseUrl, projId){
+      let issueType = ""
+      await settingRequests.testJiraIntegration(userEmail, apiToken, baseUrl, projId).then((resp)=>{
+        issueType = resp.issueType
+      })
+      return issueType
+    },
+    fetchJiraIntegration: async function(){
+      let jiraInteg = {}
+      await settingRequests.fetchJiraIntegration().then((resp)=>{
+        jiraInteg = resp.jiraIntegration
+      })
+      return jiraInteg
+    },
+    addJiraIntegration: async function(userEmail, apiToken, baseUrl, projId, issueType){
+      let trafficData = {}
+      await settingRequests.addJiraIntegration(userEmail, apiToken, baseUrl, projId, issueType).then((resp)=>{
+      })
+      return trafficData
+    },
 
     getSetupOptions: function(){
       return setupOptions;
-    }
+    },
+
+    getParsedXml: function(xmlText){
+      let entityID = ""
+      let loginUrl= ""
+      let x509Certificate = ""
+
+      parseString(xmlText, (err, result) => {
+        if (err) {
+          console.log(err)
+          return {};
+        } else {
+          const entityDescriptor = result.EntityDescriptor;
+          if (entityDescriptor) {
+            entityID = entityDescriptor.$.entityID;
+            loginUrl = entityDescriptor.IDPSSODescriptor[0].SingleSignOnService[0].$.Location;
+            x509Certificate = entityDescriptor.IDPSSODescriptor[0].KeyDescriptor[0].KeyInfo[0].X509Data[0].X509Certificate[0];
+          }
+        }
+      });
+
+      return {
+        entityId: entityID, 
+        loginUrl: loginUrl,
+        certificate:x509Certificate
+      }
+    },
+
+    getRedundantUrlOptions: function(){
+      let allUrls = []
+      urlOptionsList.forEach((opt) => {
+          opt.options.forEach((option) =>
+            allUrls.push(option.value)
+          );
+      })
+      return {
+        options: urlOptionsList,
+        allUrls: allUrls
+      }
+    },
 }
 
 export default settingFunctions

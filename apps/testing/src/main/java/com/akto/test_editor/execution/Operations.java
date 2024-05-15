@@ -5,11 +5,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.graphql.GraphQLUtils;
+
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.test_editor.Utils;
 import com.akto.util.CookieTransformer;
 import com.mongodb.BasicDBObject;
+import org.apache.commons.lang3.StringUtils;
 
 public class Operations {
     
@@ -117,6 +120,45 @@ public class Operations {
         return new ExecutorSingleOperationResp(true, "");
     }
 
+    public static ExecutorSingleOperationResp deleteGraphqlField(RawApi rawApi, String key) {
+        if (StringUtils.isEmpty(key)) {
+            return new ExecutorSingleOperationResp(true,"");
+        }
+        String payload = rawApi.getRequest().getBody();
+        String modifiedPayload = GraphQLUtils.getUtils().deleteGraphqlField(payload, key);
+        rawApi.getRequest().setBody(modifiedPayload);
+        return new ExecutorSingleOperationResp(true,"");
+    }
+
+    public static ExecutorSingleOperationResp addGraphqlField(RawApi rawApi, String key, String value) {
+        if (StringUtils.isEmpty(key) || StringUtils.isEmpty(value)) {
+            return new ExecutorSingleOperationResp(true,"");
+        }
+        String payload = rawApi.getRequest().getBody();
+        String modifiedPayload = GraphQLUtils.getUtils().addGraphqlField(payload, key, value);
+        rawApi.getRequest().setBody(modifiedPayload);
+        return new ExecutorSingleOperationResp(true,"");
+    }
+
+    public static ExecutorSingleOperationResp addUniqueGraphqlField(RawApi rawApi, String key, String value) {
+        if (StringUtils.isEmpty(key) || StringUtils.isEmpty(value)) {
+            return new ExecutorSingleOperationResp(true,"");
+        }
+        String payload = rawApi.getRequest().getBody();
+        String modifiedPayload = GraphQLUtils.getUtils().addUniqueGraphqlField(payload, key, value);
+        rawApi.getRequest().setBody(modifiedPayload);
+        return new ExecutorSingleOperationResp(true,"");
+    }
+
+    public static ExecutorSingleOperationResp modifyGraphqlField (RawApi rawApi, String key, String value) {
+        if (StringUtils.isEmpty(key) || StringUtils.isEmpty(value)) {
+            return new ExecutorSingleOperationResp(true,"");
+        }
+        String payload = rawApi.getRequest().getBody();
+        String modifiedPayload = GraphQLUtils.getUtils().modifyGraphqlField(payload, key, value);
+        rawApi.getRequest().setBody(modifiedPayload);
+        return new ExecutorSingleOperationResp(true,"");
+    }
     public static ExecutorSingleOperationResp modifyBodyParam(RawApi rawApi, String key, Object value) {
         BasicDBObject payload = rawApi.fetchReqPayload();
         BasicDBObject obj = Utils.fetchJsonObjForString(value);

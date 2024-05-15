@@ -25,7 +25,7 @@ public class UsageInterceptor extends AbstractInterceptor {
         this.featureLabel = featureLabel;
     }
 
-    final static String UNAUTHORIZED = "UNAUTHORIZED";
+    public final static String UNAUTHORIZED = "UNAUTHORIZED";
 
     @Override
     public String intercept(ActionInvocation invocation) throws Exception {
@@ -62,7 +62,8 @@ public class UsageInterceptor extends AbstractInterceptor {
                     continue;
                 }
 
-                FeatureAccess featureAccess = featureWiseAllowed.get(feature);
+                FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(feature, FeatureAccess.noAccess);
+                featureAccess.setGracePeriod(gracePeriod);
 
                 if (UsageInterceptorUtil.checkContextSpecificFeatureAccess(invocation, feature)) {
 
@@ -70,13 +71,12 @@ public class UsageInterceptor extends AbstractInterceptor {
                      * if the feature doesn't exist in the entitlements map,
                      * then the user is unauthorized to access the feature
                      */
-                    if (featureAccess == null ||
-                            !featureAccess.getIsGranted()) {
+                    if (!featureAccess.getIsGranted()) {
                         ((ActionSupport) invocation.getAction())
                                 .addActionError("This feature is not available in your plan.");
                         return UNAUTHORIZED;
                     }
-                    if (featureAccess.checkOverageAfterGrace(gracePeriod)) {
+                    if (featureAccess.checkInvalidAccess()) {
                         ((ActionSupport) invocation.getAction())
                                 .addActionError("You have exceeded the limit of this feature.");
                         return UNAUTHORIZED;
@@ -88,7 +88,7 @@ public class UsageInterceptor extends AbstractInterceptor {
         } catch (Exception e) {
             String api = invocation.getProxy().getActionName();
             String error = "Error in UsageInterceptor for api: " + api + " ERROR: " + e.getMessage();
-            loggerMaker.errorAndAddToDb(error, LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, error, LogDb.DASHBOARD);
         }
 
         return invocation.invoke();

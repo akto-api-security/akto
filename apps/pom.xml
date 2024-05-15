@@ -38,6 +38,28 @@
             </modules>
         </profile>
         <profile>
+            <id>mini-runtime</id>
+            <activation>
+                <file>
+                    <exists>mini-runtime/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>mini-runtime</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>database-abstractor</id>
+            <activation>
+                <file>
+                    <exists>database-abstractor/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>database-abstractor</module>
+            </modules>
+        </profile>
+        <profile>
             <id>testing</id>
             <activation>
                 <file>
@@ -57,6 +79,17 @@
             </activation>
             <modules>
                 <module>billing</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>api-analyser</id>
+            <activation>
+                <file>
+                    <exists>api-analyser/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>api-analyser</module>
             </modules>
         </profile>
         <profile>

@@ -1,39 +1,42 @@
 package com.akto.action.usage;
 
 import java.util.Set;
-import java.util.function.Consumer;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import javax.servlet.http.HttpServletRequest;
 
-import com.akto.util.UsageCalculator;
-import com.akto.util.tasks.OrganizationTask;
+import com.akto.util.UsageUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.usage.UsageMetricsDao;
-import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dto.billing.Organization;
-import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
-import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.dto.usage.metadata.ActiveAccounts;
+import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
-import static com.opensymphony.xwork2.Action.SUCCESS;
+import com.opensymphony.xwork2.ActionSupport;
 
-public class UsageAction implements ServletRequestAware {
+public class UsageAction extends ActionSupport implements ServletRequestAware {
     private UsageMetric usageMetric;
     private HttpServletRequest request;
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageAction.class);
     private int usageLowerBound;
     private int usageUpperBound;
+
+    private String organizationId;
 
     public String ingestUsage() {
         try {
@@ -50,7 +53,7 @@ public class UsageAction implements ServletRequestAware {
             // Check if organization exists
             Organization organization = OrganizationsDao.instance.findOne(Filters.eq(Organization.ID, organizationId));
             if (organization == null) {
-                loggerMaker.errorAndAddToDb(String.format("Organization %s does not exist", organizationId), LogDb.BILLING);
+                loggerMaker.errorAndAddToDb(String.format("Organization %s does not exist, called from %s", organizationId, ipAddress), LogDb.BILLING);
                 return Action.ERROR.toUpperCase();
             }
 
@@ -84,6 +87,45 @@ public class UsageAction implements ServletRequestAware {
         return SUCCESS.toUpperCase();
     }
 
+    public String flushUsageDataForOrg(){
+
+        if(organizationId == null || organizationId.isEmpty()){
+            addActionError("Organization id not provided");
+            return Action.ERROR.toUpperCase();
+        }
+
+        try {
+            Organization organization = OrganizationsDao.instance.findOne(Filters.eq(Organization.ID, organizationId));
+            if (organization == null) {
+                String message = String.format("Organization %s does not exist", organizationId);
+                addActionError(message);
+                loggerMaker.errorAndAddToDb(message, LogDb.BILLING);
+                return Action.ERROR.toUpperCase();
+            }
+            int now = Context.now();
+            /*
+             * since we just recorded and sent the data from dashboard,
+             * we need to set the limits to check for the current epoch,
+             * even though it would be a non-standard epoch.
+             */
+            usageLowerBound = now - UsageUtils.USAGE_UPPER_BOUND_DL/2;
+            usageUpperBound = now + UsageUtils.USAGE_UPPER_BOUND_DL/2;
+            loggerMaker.infoAndAddToDb(String.format("Lower Bound: %d Upper bound: %d", usageLowerBound, usageUpperBound), LogDb.BILLING);
+            executorService.schedule(new Runnable() {
+                public void run() {
+                    InitializerListener.aggregateAndSinkUsageData(organization, usageLowerBound, usageUpperBound);
+                    loggerMaker.infoAndAddToDb(String.format("Flushed usage data for organization %s", organizationId), LogDb.BILLING);
+                }
+            }, 0, TimeUnit.SECONDS);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            String commonMessage = "Error while flushing usage data for organization";
+            loggerMaker.errorAndAddToDb(e, String.format( commonMessage + " %s. Error: %s", organizationId, e.getMessage()), LogDb.BILLING);
+            addActionError(commonMessage);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
     public void setUsageMetric(UsageMetric usageMetric) {
         this.usageMetric = usageMetric;
     }
@@ -107,5 +149,13 @@ public class UsageAction implements ServletRequestAware {
 
     public void setUsageUpperBound(int usageUpperBound) {
         this.usageUpperBound = usageUpperBound;
+    }
+
+    public String getOrganizationId() {
+        return organizationId;
+    }
+
+    public void setOrganizationId(String organizationId) {
+        this.organizationId = organizationId;
     }
 }

@@ -2,11 +2,12 @@ package com.akto.action;
 
 import com.akto.dao.UsersDao;
 import com.akto.dto.User;
-import com.akto.utils.HttpUtils;
 import com.akto.utils.Token;
 import com.opensymphony.xwork2.Action;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
@@ -15,11 +16,14 @@ import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.List;
+import java.util.Objects;
 
 import static com.akto.action.LoginAction.REFRESH_TOKEN_COOKIE_NAME;
 
 public class AccessTokenAction implements Action, ServletResponseAware, ServletRequestAware {
     public static final String ACCESS_TOKEN_HEADER_NAME = "access-token";
+    private static final Logger logger = LoggerFactory.getLogger(AccessTokenAction.class);
+
     @Override
     public String execute() {
         Token token = generateAccessTokenFromServletRequest(servletRequest);
@@ -30,7 +34,6 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         }
         String accessToken = token.getAccessToken();
 
-        // deepcode ignore HttpResponseSplitting: <please specify a reason of ignoring this>
         servletResponse.setHeader(ACCESS_TOKEN_HEADER_NAME, accessToken);
 
         return Action.SUCCESS.toUpperCase();
@@ -41,7 +44,10 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         cookie.setMaxAge(0);
         cookie.setHttpOnly(true);
         cookie.setPath("/dashboard");
-        cookie.setSecure(HttpUtils.isHttpsEnabled());
+        String https = System.getenv("AKTO_HTTPS_FLAG");
+        if (Objects.equals(https, "true")) {
+            cookie.setSecure(true);
+        }
         return cookie;
     }
 
@@ -86,7 +92,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         if (refreshTokens != null && refreshTokens.contains(refreshToken)) {
             return token;
         } else {
-
+            logger.info( "NOT FOUND");
             return null;
         }
 

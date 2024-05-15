@@ -49,7 +49,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
 
         HttpCallParser httpCallParser = new HttpCallParser("", 0, 0, 0, false);
         httpCallParser.syncFunction(httpResponseParamsList, true,true, null);
-        APICatalogSync.mergeUrlsAndSave(1000, true);
+        APICatalogSync.mergeUrlsAndSave(1000, true, true);
 
         List<DependencyNode> nodes = DependencyNodeDao.instance.findAll(new BasicDBObject());
         assertEquals(expectedNodes, nodes.size());
@@ -94,7 +94,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         TreeHelper treeHelper = new TreeHelper();
         treeHelper.buildTree("1000", "/api/m7", "POST");
         Map<Integer, Node> result = treeHelper.result;
-        assertEquals(2, result.size()); // this is because /api/m6 gets best value from /api/m1
+        assertEquals(3, result.size()); // this is because /api/m6 gets best value from /api/m1
 
         Map<String, Connection> connections = result.get(Objects.hash("1000", "/api/m7", "POST")).getConnections();
         assertEquals(1, connections.size());
@@ -161,7 +161,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         TreeHelper treeHelper = new TreeHelper();
         treeHelper.buildTree("1000", "/api/m7", "POST");
         Map<Integer, Node> result = treeHelper.result;
-        assertEquals(6, result.size()); // this is because /api/m6 has 2 parameters getting data
+        assertEquals(7, result.size()); // this is because /api/m6 has 2 parameters getting data
 
         Map<String, Connection> connections = result.get(Objects.hash("1000", "/api/m7", "POST")).getConnections();
         assertEquals(1, connections.size());
@@ -197,7 +197,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         TreeHelper treeHelper = new TreeHelper();
         treeHelper.buildTree("1000", "api/cars/INTEGER", "POST");
         Map<Integer, Node> result = treeHelper.result;
-        assertEquals(1, result.size()); // this is because /api/m6 has 2 parameters getting data
+        assertEquals(2, result.size()); // this is because /api/m6 has 2 parameters getting data
 
         Map<String, Connection> connections = result.get(Objects.hash("1000", "api/cars/INTEGER", "POST")).getConnections();
         assertEquals(1, connections.size());
@@ -248,7 +248,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/hotel/INTEGER", URLMethods.Method.POST), null);
         apiCatalog.setTemplateURLToMethods(templateURLToMethods);
         dbState.put(1000, apiCatalog);
-        DependencyAnalyser dependencyAnalyser = new DependencyAnalyser(dbState);
+        DependencyAnalyser dependencyAnalyser = new DependencyAnalyser(dbState, false);
         dependencyAnalyser.nodes = nodes;
 
         assertEquals(6, dependencyAnalyser.nodes.size());

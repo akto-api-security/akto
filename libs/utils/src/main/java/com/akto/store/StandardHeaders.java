@@ -29,7 +29,6 @@ public class StandardHeaders {
         add("Accept-Language");
         add("Access-Control-Request-Method");
         add("Access-Control-Request-Headers");
-        add("Authorization");
         add("Cache-Control");
         add("Connection");
         add("Content-Encoding");
@@ -63,7 +62,6 @@ public class StandardHeaders {
         add("Via");
         add("Warning");
 
-        add("Field name");
         add("Upgrade-Insecure-Requests");
         add("X-Requested-With");
         add("DNT");
@@ -76,14 +74,15 @@ public class StandardHeaders {
         add("X-Wap-Profile");
         add("Proxy-Connection");
         add("X-UIDH");
-        add("X-Csrf-Token");
         add("X-Request-ID");
         add("X-Correlation-ID");
         add("Save-Data");
 
+        // mpl
         add("sec-ch-ua");
         add("x-amzn-trace-id");
 
+        // todo:
         add("idempotency-key");
 
     }

@@ -1,15 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import SummaryCardInfo from '../../components/shared/SummaryCardInfo';
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Badge, Box, Card, Divider, HorizontalGrid, HorizontalStack, Scrollable, Text, VerticalStack } from '@shopify/polaris';
+import { Box, Card, HorizontalGrid, HorizontalStack, Scrollable, Text, VerticalStack } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import transform from './transform';
 import StackedChart from '../../components/charts/StackedChart';
-import HighchartsReact from 'highcharts-react-official';
-import Highcharts from "highcharts"
 import ChartypeComponent from '../testing/TestRunsPage/ChartypeComponent';
 import testingApi from "../testing/api"
 import testingFunc from "../testing/transform"
@@ -20,7 +18,8 @@ import Pipeline from './components/Pipeline';
 import ActivityTracker from './components/ActivityTracker';
 import NullData from './components/NullData';
 import {DashboardBanner} from './components/DashboardBanner';
-import SpinnerCentered from '../../components/progress/SpinnerCentered';
+import RiskScoreTrend from './components/RiskScoreTrend';
+import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo';
 
 function HomeDashboard() {
 
@@ -42,8 +41,6 @@ function HomeDashboard() {
 
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
-
-    const riskScoreTrendRef = useRef(null)
 
     const fetchData = async() =>{
         setLoading(true)
@@ -135,8 +132,12 @@ function HomeDashboard() {
         Object.keys(subCategoryInfo).length > 0 ? 
             <Card key="subcategoryTrend">
                 <VerticalStack gap={5}>
-                    <Text variant="bodyLg" fontWeight="semibold">Issues by category</Text>
-                    <ChartypeComponent data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'200px'}/>
+                    <TitleWithInfo
+                        titleText={"Issues by category"}
+                        tooltipContent={"Testing run issues present in dashboard categorised by subcategory of tests."}
+                        textProps={{variant: "headingMd"}}
+                    />
+                    <ChartypeComponent navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'200px'}/>
                 </VerticalStack>
             </Card>
 
@@ -160,37 +161,8 @@ function HomeDashboard() {
             status: 'new',
         }
     ]
-
     const riskScoreTrendComp = (
-        (Object.keys(riskScoreRangeMap).length === 0) ? <NullData text={"APIS by risk score"} url={"/dashboard/observe/inventory"} urlText={"to create a collection and upload traffic in it."} description={"No apis found."} key={"riskScoreNullTrend"}/>
-        :
-        <Card key="scoreTrend">
-            <VerticalStack gap={5}>
-                <Text variant="bodyLg" fontWeight="semibold">APIS by risk score</Text>
-                <HorizontalGrid columns={2} gap={5}>
-                <HighchartsReact
-                    highcharts={Highcharts}
-                    options={transform.getRiskScoreTrendOptions(riskScoreRangeMap)}
-                    ref={riskScoreTrendRef}
-                />
-                <Box paddingInlineEnd={4} paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
-                    <VerticalStack gap={3}>
-                        {riskScoreRanges.map((range)=>{
-                            return(
-                                <VerticalStack gap={1} key={range.text}>
-                                    <HorizontalStack align="space-between">
-                                        <Text variant="bodyMd">{range.text}</Text>
-                                        <Badge status={range.status}>{range.range}</Badge>
-                                    </HorizontalStack>
-                                    <Divider />
-                                </VerticalStack>
-                            )
-                        })}
-                    </VerticalStack>
-                </Box>
-                </HorizontalGrid>
-            </VerticalStack>
-        </Card>
+        <RiskScoreTrend  key={"risk-score-trend"} riskScoreRangeMap={riskScoreRangeMap} riskScoreRanges={riskScoreRanges} />
     )
 
     const sensitiveDataTrendComp = (
@@ -199,10 +171,15 @@ function HomeDashboard() {
         :
         <Card key="sensitiveTrend">
             <VerticalStack gap={5}>
-                <Text variant="bodyLg" fontWeight="semibold">Sensitive Data</Text>
+                <TitleWithInfo
+                    titleText={"Sensitive data"}
+                    tooltipContent={"Count of endpoints per data type."}
+                    textProps={{variant: "headingMd"}}
+                    docsUrl={"https://docs.akto.io/api-inventory/concepts/sensitive-data"}
+                />
                 <HorizontalGrid gap={5} columns={2}>
-                    <ChartypeComponent data={sensitiveData.request} title={"Request"} isNormal={true} boxHeight={'100px'}/>
-                    <ChartypeComponent data={sensitiveData.response} title={"Response"} isNormal={true} boxHeight={'100px'}/>
+                    <ChartypeComponent navUrl={"/dashboard/observe/sensitive/"} data={sensitiveData.request} title={"Request"} isNormal={true} boxHeight={'100px'}/>
+                    <ChartypeComponent navUrl={"/dashboard/observe/sensitive/"} data={sensitiveData.response} title={"Response"} isNormal={true} boxHeight={'100px'}/>
                 </HorizontalGrid>
             </VerticalStack>
         </Card>
@@ -212,7 +189,11 @@ function HomeDashboard() {
         (issuesTrendMap.allSubCategories.length > 0 && issuesTrendMap.trend.length > 0) ? 
         <Card key="issuesTrend">
             <VerticalStack gap={5}>
-                <Text variant="bodyLg" fontWeight="semibold">Issues timeline</Text>
+                <TitleWithInfo
+                    titleText={"Issues timeline"}
+                    tooltipContent={"Count of issues per category against the time they were last seen"}
+                    textProps={{variant: "headingMd"}}
+                />
                 <VerticalStack gap={3}>
                     <HorizontalStack align="end">
                         <Scrollable style={{ width: '350px' }} shadow>
@@ -279,7 +260,7 @@ function HomeDashboard() {
             <div style={{flex: 3}}>
                 <VerticalStack gap={5}>
                     <InitialSteps initialSteps={initialSteps}/>
-                    <ActivityTracker latestActivity={recentActivities} onLoadMore={handleLoadMore} showLoadMore={checkLoadMore}/>
+                    <ActivityTracker collections={collectionsMap} latestActivity={recentActivities} onLoadMore={handleLoadMore} showLoadMore={checkLoadMore}/>
                     <CoverageCard coverageObj={coverageObj} collections={allCollections} collectionsMap={collectionsMap}/>
                     <Pipeline riskScoreMap={riskScoreObj} collections={allCollections} collectionsMap={collectionsMap}/> 
                 </VerticalStack>

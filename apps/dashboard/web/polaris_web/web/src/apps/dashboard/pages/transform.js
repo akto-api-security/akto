@@ -21,6 +21,17 @@ const dashboardFunc = {
         const collectionsGptPrompts = [
             {
                 icon: MagicMinor,
+                label: "Find auth-related tokens",
+                prepareQuery: () => { return {
+                    type: "find_auth_related_tokens",
+                    meta: {
+                        "apiCollectionId": apiCollectionId
+                    }                        
+                }},
+                callback: (data) => console.log("callback Find auth-related tokens", data)
+            },
+            {
+                icon: MagicMinor,
                 label: "Create API groups",
                 prepareQuery: () => { return {
                     type: "group_apis_by_functionality",

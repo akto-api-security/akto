@@ -17,27 +17,28 @@ public class TestRoles {
     public static final String NAME = "name";
     private String name;
     private ObjectId endpointLogicalGroupId;
-    private AuthMechanism authMechanism;
-    @BsonIgnore
-    private EndpointLogicalGroup endpointLogicalGroup;
     public static final String AUTH_WITH_COND_LIST = "authWithCondList";
     private List<AuthWithCond> authWithCondList;
+    @BsonIgnore
+    private EndpointLogicalGroup endpointLogicalGroup;
 
     private String createdBy;
     private int createdTs;
     public static final String LAST_UPDATED_TS = "lastUpdatedTs";
     private int lastUpdatedTs;
+    private List<Integer> apiCollectionIds;
     public TestRoles(){}
-    public TestRoles(ObjectId id, String name, ObjectId endpointLogicalGroupId, List<AuthWithCond> authWithCondList, AuthMechanism authMechanism, String createdBy, int createdTs, int lastUpdatedTs) {
+    public TestRoles(ObjectId id, String name, ObjectId endpointLogicalGroupId, List<AuthWithCond> authWithCondList, String createdBy, int createdTs, int lastUpdatedTs, List<Integer> apiCollectionIds) {
         this.id = id;
         this.name = name;
         this.endpointLogicalGroupId = endpointLogicalGroupId;
-        this.authMechanism = authMechanism;
+        this.authWithCondList = authWithCondList;
         this.createdBy = createdBy;
         this.createdTs = createdTs;
         this.lastUpdatedTs = lastUpdatedTs;
-        this.authWithCondList = authWithCondList;
-    }
+        this.apiCollectionIds = apiCollectionIds;
+	}
+    
     public EndpointLogicalGroup fetchEndpointLogicalGroup() {
         if (this.endpointLogicalGroup == null) {
             this.endpointLogicalGroup = EndpointLogicalGroupDao.instance.findOne(Filters.eq(ID, this.endpointLogicalGroupId));
@@ -68,14 +69,6 @@ public class TestRoles {
         this.endpointLogicalGroupId = endpointLogicalGroupId;
     }
 
-    public AuthMechanism getAuthMechanism() {
-        return authMechanism;
-    }
-
-    public void setAuthMechanism(AuthMechanism authMechanism) {
-        this.authMechanism = authMechanism;
-    }
-
     public EndpointLogicalGroup getEndpointLogicalGroup() {
         return endpointLogicalGroup;
     }
@@ -100,13 +93,6 @@ public class TestRoles {
         this.createdTs = createdTs;
     }
 
-    public List<AuthWithCond> getAuthWithCondList() {
-        return authWithCondList;
-    }
-    public void setAuthWithCondList(List<AuthWithCond> authWithCondList) {
-        this.authWithCondList = authWithCondList;
-    }
-
     public int getLastUpdatedTs() {
         return lastUpdatedTs;
     }
@@ -115,6 +101,13 @@ public class TestRoles {
         this.lastUpdatedTs = lastUpdatedTs;
     }
 
+    public List<AuthWithCond> getAuthWithCondList() {
+        return authWithCondList;
+    }
+
+    public void setAuthWithCondList(List<AuthWithCond> authWithCondList) {
+        this.authWithCondList = authWithCondList;
+    }
 
     public String getHexId() {
         if (hexId == null) return this.id.toHexString();
@@ -123,6 +116,13 @@ public class TestRoles {
 
     public void setHexId(String hexId) {
         this.hexId = hexId;
+    }
+    public List<Integer> getApiCollectionIds() {
+        return apiCollectionIds;
+    }
+
+    public void setApiCollectionIds(List<Integer> apiCollectionIds) {
+        this.apiCollectionIds = apiCollectionIds;
     }
 
     public AuthMechanism getDefaultAuthMechanism(){

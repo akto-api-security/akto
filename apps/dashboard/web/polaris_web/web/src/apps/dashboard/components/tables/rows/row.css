@@ -14,8 +14,17 @@
     padding-top: 12px !important;
     padding-bottom: 12px !important;
 }
-.Polaris-IndexTable-Checkbox__TableCellContentContainer {
-    padding-top: 3px !important;
+
+.Polaris-IndexTable__TableCell > .text-subdued{
+    color: #8C9196 !important;
+}
+
+.Polaris-IndexTable__TableCell > .text-subdued > .Polaris-Link > .Polaris-Badge{
+    color: #8C9196 !important;
+}
+
+.icon-deactivated > .Polaris-Icon svg{
+    fill: #BABEC3 !important;
 }
 
 .Polaris-IndexTable {

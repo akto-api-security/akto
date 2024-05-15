@@ -3,6 +3,7 @@ package com.akto.action.testing;
 import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.testing.LoginFlowStepsDao;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.testing.*;
@@ -27,6 +28,7 @@ import java.util.regex.Pattern;
 
 public class AuthMechanismAction extends UserAction {
 
+    //todo: rename requestData, also add len check
     private ArrayList<RequestData> requestData;
 
     private String type;
@@ -46,6 +48,7 @@ public class AuthMechanismAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(AuthMechanismAction.class);
 
     public String addAuthMechanism() {
+        // todo: add more validations
         List<AuthParam> authParams = new ArrayList<>();
 
         type = type != null ? type : LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString();
@@ -73,7 +76,7 @@ public class AuthMechanismAction extends UserAction {
                 authParams.add(new LoginRequestAuthParam(param.getWhere(), param.getKey(), param.getValue(), param.getShowHeader()));
             }
         }
-        AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
+        AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type, null);
 
         AuthMechanismsDao.instance.insertOne(authMechanism);
         return SUCCESS.toUpperCase();
@@ -95,7 +98,7 @@ public class AuthMechanismAction extends UserAction {
             authParams.add(new LoginRequestAuthParam(param.getWhere(), param.getKey(), param.getValue(), param.getShowHeader()));
         }
 
-        AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
+        AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type, null);
 
         TestExecutor testExecutor = new TestExecutor();
         try {
@@ -119,7 +122,7 @@ public class AuthMechanismAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
+        AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type, null);
 
         TestExecutor testExecutor = new TestExecutor();
         try {
@@ -138,12 +141,12 @@ public class AuthMechanismAction extends UserAction {
 
     public String fetchAuthMechanismData() {
 
-        authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+        authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
         return SUCCESS.toUpperCase();
     }
 
     public String fetchAuthMechanismDataDoc() {
-        authMechanismDoc = AuthMechanismsDao.instance.findOneDocument(new BasicDBObject());
+        authMechanismDoc = TestRolesDao.instance.fetchAttackerTokenDoc(0);
         authMechanismDoc.put(AuthMechanism.OBJECT_ID,authMechanismDoc.get(Constants.ID).toString());
         return SUCCESS.toUpperCase();
     }

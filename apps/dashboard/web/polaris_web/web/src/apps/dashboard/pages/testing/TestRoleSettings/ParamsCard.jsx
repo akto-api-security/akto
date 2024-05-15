@@ -33,7 +33,7 @@ function ParamsCard({dataObj, handleDelete}) {
                     return(
                         <HorizontalGrid key={index} columns={2}>
                             <LineComponent title={(param.key || '-') + " :"} value={(param.value || '-')} />
-                            {param.showHeader !== null ?
+                            {param.showHeader !== null ? 
                                 <HorizontalStack gap={1}><Box borderInlineEndWidth='1' borderColor="border-subdued" minHeight='20px'/><LineComponent title={"Position :"} value={param.where}/></HorizontalStack>
                             :null}
                         </HorizontalGrid>
@@ -68,7 +68,7 @@ function ParamsCard({dataObj, handleDelete}) {
 
                 </VerticalStack>
                 <HorizontalStack align="end">
-                    <Button size="slim" onClick={handleDelete} icon={DeleteMajor}>Delete</Button>
+                    <Button size="slim" onClick={handleDelete} icon={DeleteMajor}><div data-testid="delete_button">Delete</div></Button>
                 </HorizontalStack>
             </VerticalStack>
         </Box>

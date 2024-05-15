@@ -6,27 +6,19 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import java.util.*;
 
 import com.akto.MongoBasedTest;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.RuntimeFilterDao;
-import com.akto.dao.SampleDataDao;
-import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.UsersDao;
+import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dto.AktoDataType;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.User;
+import com.akto.dto.*;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.AccountDataTypesInfo;
+import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLTemplate;
-import com.akto.dto.type.SingleTypeInfo.ParamId;
-import com.akto.dto.HttpResponseParams;
 import com.akto.dto.HttpResponseParams.Source;
-import com.akto.dto.IgnoreData;
 import com.akto.runtime.APICatalogSync;
+import com.akto.runtime.Main;
 import com.akto.runtime.URLAggregator;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -55,7 +47,8 @@ public class TestDBSync extends MongoBasedTest {
         aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
         aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
         aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
-        aktoDataTypeMap.put("URL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));        AccountDataTypesInfo info = SingleTypeInfo.getAccountToDataTypesInfo().get(ACCOUNT_ID);
+        aktoDataTypeMap.put("URL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
+        AccountDataTypesInfo info = SingleTypeInfo.getAccountToDataTypesInfo().get(ACCOUNT_ID);
         if (info == null) {
             info = new AccountDataTypesInfo();
         }
@@ -71,6 +64,8 @@ public class TestDBSync extends MongoBasedTest {
 
         // then
         long v = UsersDao.instance.getMCollection().countDocuments();
+
+        System.out.println("some new print" + u + " " +v);
 
         assertEquals(u+1, v);
 
@@ -93,7 +88,7 @@ public class TestDBSync extends MongoBasedTest {
         }
         sync.computeDelta(aggr, true, 0);
         sync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123, true);
+        APICatalogSync.mergeUrlsAndSave(123, true, false);
         sync.buildFromDB(false, true);
 
         assertEquals(0, sync.getDbState(123).getStrictURLToMethods().size());
@@ -139,7 +134,7 @@ public class TestDBSync extends MongoBasedTest {
         parser.syncFunction(responseParams, false, true, null);
         assertTrue(parser.getSyncCount() == 0);
 
-        APICatalogSync.mergeUrlsAndSave(123, true);
+        APICatalogSync.mergeUrlsAndSave(123, true, false);
         parser.apiCatalogSync.buildFromDB(false, true);
 
         SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
@@ -226,7 +221,7 @@ public class TestDBSync extends MongoBasedTest {
         
         sync.computeDelta(aggr2, true, 123);
         sync.syncWithDB(false, true);
-        APICatalogSync.mergeUrlsAndSave(123, true);
+        APICatalogSync.mergeUrlsAndSave(123, true, false);
         sync.buildFromDB(false, true);
 
         assertEquals(0, sync.getDbState(123).getStrictURLToMethods().size());
@@ -254,7 +249,7 @@ public class TestDBSync extends MongoBasedTest {
     @Test
     public void testFilterHttpResponseParamsEmpty() {
         HttpCallParser httpCallParser = new HttpCallParser("",0,0,0, true);
-        List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(new ArrayList<>());
+        List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(new ArrayList<>(), null);
         assertEquals(ss.size(),0);
     }
 
@@ -278,7 +273,7 @@ public class TestDBSync extends MongoBasedTest {
         h2.requestParams.setApiCollectionId(1000);
         h2.setSource(Source.MIRRORING);
 
-        List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(Arrays.asList(h1, h2));
+        List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(Arrays.asList(h1, h2), null);
         assertEquals(ss.size(),2);
         assertEquals(h1.requestParams.getApiCollectionId(), 1000);
         assertTrue(h2.requestParams.getApiCollectionId() != 1000);
@@ -302,7 +297,7 @@ public class TestDBSync extends MongoBasedTest {
         h1.statusCode = 200;
         h1.requestParams.setApiCollectionId(vxlanId1);
 
-        List<HttpResponseParams> filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h1));
+        List<HttpResponseParams> filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h1),null);
 
         Assertions.assertEquals(filterHttpResponseParamsList.size(),1);
         Assertions.assertEquals(filterHttpResponseParamsList.get(0).requestParams.getApiCollectionId(),vxlanId1);
@@ -317,7 +312,7 @@ public class TestDBSync extends MongoBasedTest {
         h2.statusCode = 200;
         h2.requestParams.setApiCollectionId(vxlanId2);
 
-        filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h2));
+        filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h2),null);
 
         Assertions.assertEquals(filterHttpResponseParamsList.size(),1);
         Assertions.assertEquals(filterHttpResponseParamsList.get(0).requestParams.getApiCollectionId(),vxlanId2);
@@ -332,7 +327,7 @@ public class TestDBSync extends MongoBasedTest {
         h3.statusCode = 400;
         h3.requestParams.setApiCollectionId(vxlanId2);
 
-        filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h3));
+        filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h3),null);
 
         Assertions.assertEquals(filterHttpResponseParamsList.size(),0);
         ApiCollection apiCollection3 = ApiCollectionsDao.instance.findOne("_id", vxlanId3);
@@ -364,7 +359,7 @@ public class TestDBSync extends MongoBasedTest {
         h1.statusCode = 200;
         h1.setSource(Source.MIRRORING);
 
-        httpCallParser.filterHttpResponseParams(Collections.singletonList(h1));
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h1),null);
 
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),2);
@@ -390,7 +385,7 @@ public class TestDBSync extends MongoBasedTest {
         h2.statusCode = 200;
         h2.setSource(Source.MIRRORING);
 
-        httpCallParser.filterHttpResponseParams(Collections.singletonList(h2));
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h2),null);
 
         apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),3);
@@ -414,7 +409,7 @@ public class TestDBSync extends MongoBasedTest {
         h3.statusCode = 200;
         h3.setSource(Source.MIRRORING);
 
-        httpCallParser.filterHttpResponseParams(Collections.singletonList(h3));
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h3),null);
 
         apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),4);
@@ -447,7 +442,7 @@ public class TestDBSync extends MongoBasedTest {
         );
         httpCallParser.getHostNameToIdMap().put("hostRandom 1234", dupId);
 
-        httpCallParser.filterHttpResponseParams(Collections.singletonList(h4));
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h4),null);
 
         apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),6);
@@ -472,7 +467,7 @@ public class TestDBSync extends MongoBasedTest {
         h1.setSource(Source.MIRRORING);
 
         HttpCallParser httpCallParser = new HttpCallParser("",0,0,0, true);
-        httpCallParser.filterHttpResponseParams(Collections.singletonList(h1));
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h1),null);
 
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(), 1);
@@ -497,4 +492,83 @@ public class TestDBSync extends MongoBasedTest {
     //     assertEquals(SingleTypeInfoDao.instance.findAll(new BasicDBObject()).size(), 1);
 
     // }
+
+    @Test
+    public void testApiCollectionRegexMapper() throws Exception {
+        String message1 = "{\"method\":\"POST\",\"requestPayload\":\"{}\",\"responsePayload\":\"{\\\"active\\\":false,\\\"createNew\\\":false,\\\"keyConditionFromUsers\\\":null,\\\"keyOperator\\\":null,\\\"name\\\":null,\\\"tagConfig\\\":null,\\\"tagConfigs\\\":{\\\"tagConfigs\\\":[],\\\"usersMap\\\":{\\\"1661879740\\\":\\\"shivansh@akto.io\\\"}}}\",\"ip\":\"null\",\"source\":\"MIRRORING\",\"type\":\"HTTP/1.1\",\"akto_vxlan_id\":\"1000\",\"path\":\"/api/books\",\"requestHeaders\":\"{\\\"Cookie\\\":\\\"JSESSIONID=node0e7rms6jdk2u41w0drvjv8hkoo0.node0; mp_c403d0b00353cc31d7e33d68dc778806_mixpanel=%7B%22distinct_id%22%3A%20%22182edbc00381d9-063588c46d5c5e-26021d51-144000-182edbc0039615%22%2C%22%24device_id%22%3A%20%22182edbc00381d9-063588c46d5c5e-26021d51-144000-182edbc0039615%22%2C%22%24initial_referrer%22%3A%20%22%24direct%22%2C%22%24initial_referring_domain%22%3A%20%22%24direct%22%7D\\\",\\\"Origin\\\":\\\"dev-1.akto.io\\\",\\\"Accept\\\":\\\"application/json, text/plain, */*\\\",\\\"Access-Control-Allow-Origin\\\":\\\"*\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Referer\\\":\\\"https://dev-1.akto.io/dashboard/settings\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"dev-1.akto.io\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"access-token\\\":\\\"eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InNoaXZhbnNoQGFrdG8uaW8iLCJpYXQiOjE2NjE4ODAwNTYsImV4cCI6MTY2MTg4MDk1Nn0.wxDbUhIfhX6i8tITykZcdztg8CZUcrBvdqbLgiZJN0Q4QkGOvhHozZ6lwgFzQe3hTOxuFOv8wxg4E_vzruLMgSRmapHGuTi57qTYFWIJNb-VSUa_Nz__t6aXOaXYckO2nvzN2rp1qeTIEKrhLaC_nV5gZpOB2fnBC2Yr1KasERpdDO7I0xc4dqdLQXQRxrWgP6lKlkGKHziCrkvLEWqC7mXrRsS23m-qv4pELm0MikIqf-fl4wmwj7g42769APwAuoQdIgMnUOx2rT1ewkcW72py3wveX96oomdDyvIM6_y5uYALsTymc0xxr1yZOT9Gseypbjm-sa7byVaSbw2s9g\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\",\\\"sec-ch-ua\\\":\\\"\\\\\\\"Chromium\\\\\\\";v=\\\\\\\"104\\\\\\\", \\\\\\\" Not A;Brand\\\\\\\";v=\\\\\\\"99\\\\\\\", \\\\\\\"Google Chrome\\\\\\\";v=\\\\\\\"104\\\\\\\"\\\",\\\"sec-ch-ua-mobile\\\":\\\"?0\\\",\\\"sec-ch-ua-platform\\\":\\\"\\\\\\\"Windows\\\\\\\"\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.9\\\",\\\"Content-Length\\\":\\\"2\\\",\\\"account\\\":\\\"1000000\\\",\\\"Content-Type\\\":\\\"application/json\\\"}\",\"responseHeaders\":\"{\\\"X-Frame-Options\\\":\\\"deny\\\",\\\"Cache-Control\\\":\\\"no-cache, no-store, must-revalidate, pre-check=0, post-check=0\\\",\\\"Server\\\":\\\"AKTO server\\\",\\\"X-Content-Type-Options\\\":\\\"nosniff\\\",\\\"Content-Encoding\\\":\\\"gzip\\\",\\\"Vary\\\":\\\"Accept-Encoding, User-Agent\\\",\\\"Content-Length\\\":\\\"150\\\",\\\"X-XSS-Protection\\\":\\\"1\\\",\\\"Content-Language\\\":\\\"en-US\\\",\\\"Date\\\":\\\"Tue, 30 Aug 2022 17:22:40 GMT\\\",\\\"Content-Type\\\":\\\"application/json;charset=utf-8\\\"}\",\"time\":\"1661880160\",\"contentType\":\"application/json;charset=utf-8\",\"akto_account_id\":\"1000000\",\"statusCode\":\"200\",\"status\":\"OK\"}";
+        String message2 = "{\"method\":\"POST\",\"requestPayload\":\"{}\",\"responsePayload\":\"{\\\"active\\\":false,\\\"createNew\\\":false,\\\"keyConditionFromUsers\\\":null,\\\"keyOperator\\\":null,\\\"name\\\":null,\\\"tagConfig\\\":null,\\\"tagConfigs\\\":{\\\"tagConfigs\\\":[],\\\"usersMap\\\":{\\\"1661879740\\\":\\\"shivansh@akto.io\\\"}}}\",\"ip\":\"null\",\"source\":\"MIRRORING\",\"type\":\"HTTP/1.1\",\"akto_vxlan_id\":\"1001\",\"path\":\"/api/cars\",\"requestHeaders\":\"{\\\"Cookie\\\":\\\"JSESSIONID=node0e7rms6jdk2u41w0drvjv8hkoo0.node0; mp_c403d0b00353cc31d7e33d68dc778806_mixpanel=%7B%22distinct_id%22%3A%20%22182edbc00381d9-063588c46d5c5e-26021d51-144000-182edbc0039615%22%2C%22%24device_id%22%3A%20%22182edbc00381d9-063588c46d5c5e-26021d51-144000-182edbc0039615%22%2C%22%24initial_referrer%22%3A%20%22%24direct%22%2C%22%24initial_referring_domain%22%3A%20%22%24direct%22%7D\\\",\\\"Origin\\\":\\\"dev-2.akto.io\\\",\\\"Accept\\\":\\\"application/json, text/plain, */*\\\",\\\"Access-Control-Allow-Origin\\\":\\\"*\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Referer\\\":\\\"https://dev-2.akto.io/dashboard/settings\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"dev-2.akto.io\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"access-token\\\":\\\"eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InNoaXZhbnNoQGFrdG8uaW8iLCJpYXQiOjE2NjE4ODAwNTYsImV4cCI6MTY2MTg4MDk1Nn0.wxDbUhIfhX6i8tITykZcdztg8CZUcrBvdqbLgiZJN0Q4QkGOvhHozZ6lwgFzQe3hTOxuFOv8wxg4E_vzruLMgSRmapHGuTi57qTYFWIJNb-VSUa_Nz__t6aXOaXYckO2nvzN2rp1qeTIEKrhLaC_nV5gZpOB2fnBC2Yr1KasERpdDO7I0xc4dqdLQXQRxrWgP6lKlkGKHziCrkvLEWqC7mXrRsS23m-qv4pELm0MikIqf-fl4wmwj7g42769APwAuoQdIgMnUOx2rT1ewkcW72py3wveX96oomdDyvIM6_y5uYALsTymc0xxr1yZOT9Gseypbjm-sa7byVaSbw2s9g\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\",\\\"sec-ch-ua\\\":\\\"\\\\\\\"Chromium\\\\\\\";v=\\\\\\\"104\\\\\\\", \\\\\\\" Not A;Brand\\\\\\\";v=\\\\\\\"99\\\\\\\", \\\\\\\"Google Chrome\\\\\\\";v=\\\\\\\"104\\\\\\\"\\\",\\\"sec-ch-ua-mobile\\\":\\\"?0\\\",\\\"sec-ch-ua-platform\\\":\\\"\\\\\\\"Windows\\\\\\\"\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.9\\\",\\\"Content-Length\\\":\\\"2\\\",\\\"account\\\":\\\"1000001\\\",\\\"Content-Type\\\":\\\"application/json\\\"}\",\"responseHeaders\":\"{\\\"X-Frame-Options\\\":\\\"deny\\\",\\\"Cache-Control\\\":\\\"no-cache, no-store, must-revalidate, pre-check=0, post-check=0\\\",\\\"Server\\\":\\\"AKTO server\\\",\\\"X-Content-Type-Options\\\":\\\"nosniff\\\",\\\"Content-Encoding\\\":\\\"gzip\\\",\\\"Vary\\\":\\\"Accept-Encoding, User-Agent\\\",\\\"Content-Length\\\":\\\"150\\\",\\\"X-XSS-Protection\\\":\\\"1\\\",\\\"Content-Language\\\":\\\"en-US\\\",\\\"Date\\\":\\\"Tue, 30 Aug 2022 17:22:40 GMT\\\",\\\"Content-Type\\\":\\\"application/json;charset=utf-8\\\"}\",\"time\":\"1661880160\",\"contentType\":\"application/json;charset=utf-8\",\"akto_account_id\":\"1000000\",\"statusCode\":\"200\",\"status\":\"OK\"}";
+        String message3 = "{\"method\":\"POST\",\"requestPayload\":\"{}\",\"responsePayload\":\"{\\\"active\\\":false,\\\"createNew\\\":false,\\\"keyConditionFromUsers\\\":null,\\\"keyOperator\\\":null,\\\"name\\\":null,\\\"tagConfig\\\":null,\\\"tagConfigs\\\":{\\\"tagConfigs\\\":[],\\\"usersMap\\\":{\\\"1661879740\\\":\\\"shivansh@akto.io\\\"}}}\",\"ip\":\"null\",\"source\":\"MIRRORING\",\"type\":\"HTTP/1.1\",\"akto_vxlan_id\":\"1001\",\"path\":\"/api/cars\",\"requestHeaders\":\"{\\\"Cookie\\\":\\\"JSESSIONID=node0e7rms6jdk2u41w0drvjv8hkoo0.node0; mp_c403d0b00353cc31d7e33d68dc778806_mixpanel=%7B%22distinct_id%22%3A%20%22182edbc00381d9-063588c46d5c5e-26021d51-144000-182edbc0039615%22%2C%22%24device_id%22%3A%20%22182edbc00381d9-063588c46d5c5e-26021d51-144000-182edbc0039615%22%2C%22%24initial_referrer%22%3A%20%22%24direct%22%2C%22%24initial_referring_domain%22%3A%20%22%24direct%22%7D\\\",\\\"Origin\\\":\\\"api.akto.io\\\",\\\"Accept\\\":\\\"application/json, text/plain, */*\\\",\\\"Access-Control-Allow-Origin\\\":\\\"*\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Referer\\\":\\\"https://api.akto.io/dashboard/settings\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"api.akto.io\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"access-token\\\":\\\"eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InNoaXZhbnNoQGFrdG8uaW8iLCJpYXQiOjE2NjE4ODAwNTYsImV4cCI6MTY2MTg4MDk1Nn0.wxDbUhIfhX6i8tITykZcdztg8CZUcrBvdqbLgiZJN0Q4QkGOvhHozZ6lwgFzQe3hTOxuFOv8wxg4E_vzruLMgSRmapHGuTi57qTYFWIJNb-VSUa_Nz__t6aXOaXYckO2nvzN2rp1qeTIEKrhLaC_nV5gZpOB2fnBC2Yr1KasERpdDO7I0xc4dqdLQXQRxrWgP6lKlkGKHziCrkvLEWqC7mXrRsS23m-qv4pELm0MikIqf-fl4wmwj7g42769APwAuoQdIgMnUOx2rT1ewkcW72py3wveX96oomdDyvIM6_y5uYALsTymc0xxr1yZOT9Gseypbjm-sa7byVaSbw2s9g\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\",\\\"sec-ch-ua\\\":\\\"\\\\\\\"Chromium\\\\\\\";v=\\\\\\\"104\\\\\\\", \\\\\\\" Not A;Brand\\\\\\\";v=\\\\\\\"99\\\\\\\", \\\\\\\"Google Chrome\\\\\\\";v=\\\\\\\"104\\\\\\\"\\\",\\\"sec-ch-ua-mobile\\\":\\\"?0\\\",\\\"sec-ch-ua-platform\\\":\\\"\\\\\\\"Windows\\\\\\\"\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.9\\\",\\\"Content-Length\\\":\\\"2\\\",\\\"account\\\":\\\"1000002\\\",\\\"Content-Type\\\":\\\"application/json\\\"}\",\"responseHeaders\":\"{\\\"X-Frame-Options\\\":\\\"deny\\\",\\\"Cache-Control\\\":\\\"no-cache, no-store, must-revalidate, pre-check=0, post-check=0\\\",\\\"Server\\\":\\\"AKTO server\\\",\\\"X-Content-Type-Options\\\":\\\"nosniff\\\",\\\"Content-Encoding\\\":\\\"gzip\\\",\\\"Vary\\\":\\\"Accept-Encoding, User-Agent\\\",\\\"Content-Length\\\":\\\"150\\\",\\\"X-XSS-Protection\\\":\\\"1\\\",\\\"Content-Language\\\":\\\"en-US\\\",\\\"Date\\\":\\\"Tue, 30 Aug 2022 17:22:40 GMT\\\",\\\"Content-Type\\\":\\\"application/json;charset=utf-8\\\"}\",\"time\":\"1661880160\",\"contentType\":\"application/json;charset=utf-8\",\"akto_account_id\":\"1000000\",\"statusCode\":\"200\",\"status\":\"OK\"}";
+        String message4 = "{\"method\":\"POST\",\"requestPayload\":\"{}\",\"responsePayload\":\"{\\\"active\\\":false,\\\"createNew\\\":false,\\\"keyConditionFromUsers\\\":null,\\\"keyOperator\\\":null,\\\"name\\\":null,\\\"tagConfig\\\":null,\\\"tagConfigs\\\":{\\\"tagConfigs\\\":[],\\\"usersMap\\\":{\\\"1661879740\\\":\\\"shivansh@akto.io\\\"}}}\",\"ip\":\"null\",\"source\":\"MIRRORING\",\"type\":\"HTTP/1.1\",\"akto_vxlan_id\":\"1001\",\"path\":\"/api/cars\",\"requestHeaders\":\"{\\\"Cookie\\\":\\\"JSESSIONID=node0e7rms6jdk2u41w0drvjv8hkoo0.node0; mp_c403d0b00353cc31d7e33d68dc778806_mixpanel=%7B%22distinct_id%22%3A%20%22182edbc00381d9-063588c46d5c5e-26021d51-144000-182edbc0039615%22%2C%22%24device_id%22%3A%20%22182edbc00381d9-063588c46d5c5e-26021d51-144000-182edbc0039615%22%2C%22%24initial_referrer%22%3A%20%22%24direct%22%2C%22%24initial_referring_domain%22%3A%20%22%24direct%22%7D\\\",\\\"Origin\\\":\\\"dev-2.akto.io\\\",\\\"Accept\\\":\\\"application/json, text/plain, */*\\\",\\\"Access-Control-Allow-Origin\\\":\\\"*\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Referer\\\":\\\"https://dev-2.akto.io/dashboard/settings\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"dev-2.akto.io\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"access-token\\\":\\\"eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InNoaXZhbnNoQGFrdG8uaW8iLCJpYXQiOjE2NjE4ODAwNTYsImV4cCI6MTY2MTg4MDk1Nn0.wxDbUhIfhX6i8tITykZcdztg8CZUcrBvdqbLgiZJN0Q4QkGOvhHozZ6lwgFzQe3hTOxuFOv8wxg4E_vzruLMgSRmapHGuTi57qTYFWIJNb-VSUa_Nz__t6aXOaXYckO2nvzN2rp1qeTIEKrhLaC_nV5gZpOB2fnBC2Yr1KasERpdDO7I0xc4dqdLQXQRxrWgP6lKlkGKHziCrkvLEWqC7mXrRsS23m-qv4pELm0MikIqf-fl4wmwj7g42769APwAuoQdIgMnUOx2rT1ewkcW72py3wveX96oomdDyvIM6_y5uYALsTymc0xxr1yZOT9Gseypbjm-sa7byVaSbw2s9g\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\",\\\"sec-ch-ua\\\":\\\"\\\\\\\"Chromium\\\\\\\";v=\\\\\\\"104\\\\\\\", \\\\\\\" Not A;Brand\\\\\\\";v=\\\\\\\"99\\\\\\\", \\\\\\\"Google Chrome\\\\\\\";v=\\\\\\\"104\\\\\\\"\\\",\\\"sec-ch-ua-mobile\\\":\\\"?0\\\",\\\"sec-ch-ua-platform\\\":\\\"\\\\\\\"Windows\\\\\\\"\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.9\\\",\\\"Content-Length\\\":\\\"2\\\",\\\"account\\\":\\\"1000001\\\",\\\"Content-Type\\\":\\\"application/json\\\"}\",\"responseHeaders\":\"{\\\"X-Frame-Options\\\":\\\"deny\\\",\\\"Cache-Control\\\":\\\"no-cache, no-store, must-revalidate, pre-check=0, post-check=0\\\",\\\"Server\\\":\\\"AKTO server\\\",\\\"X-Content-Type-Options\\\":\\\"nosniff\\\",\\\"Content-Encoding\\\":\\\"gzip\\\",\\\"Vary\\\":\\\"Accept-Encoding, User-Agent\\\",\\\"Content-Length\\\":\\\"150\\\",\\\"X-XSS-Protection\\\":\\\"1\\\",\\\"Content-Language\\\":\\\"en-US\\\",\\\"Date\\\":\\\"Tue, 30 Aug 2022 17:22:40 GMT\\\",\\\"Content-Type\\\":\\\"application/json;charset=utf-8\\\"}\",\"time\":\"1661880160\",\"contentType\":\"application/json;charset=utf-8\",\"akto_account_id\":\"1000000\",\"statusCode\":\"200\",\"status\":\"OK\"}";
+        String message5 = "{\"method\":\"POST\",\"requestPayload\":\"{}\",\"responsePayload\":\"{\\\"active\\\":false,\\\"createNew\\\":false,\\\"keyConditionFromUsers\\\":null,\\\"keyOperator\\\":null,\\\"name\\\":null,\\\"tagConfig\\\":null,\\\"tagConfigs\\\":{\\\"tagConfigs\\\":[],\\\"usersMap\\\":{\\\"1661879740\\\":\\\"shivansh@akto.io\\\"}}}\",\"ip\":\"null\",\"source\":\"MIRRORING\",\"type\":\"HTTP/1.1\",\"akto_vxlan_id\":\"1001\",\"path\":\"/api/cars\",\"requestHeaders\":\"{\\\"Cookie\\\":\\\"JSESSIONID=node0e7rms6jdk2u41w0drvjv8hkoo0.node0; mp_c403d0b00353cc31d7e33d68dc778806_mixpanel=%7B%22distinct_id%22%3A%20%22182edbc00381d9-063588c46d5c5e-26021d51-144000-182edbc0039615%22%2C%22%24device_id%22%3A%20%22182edbc00381d9-063588c46d5c5e-26021d51-144000-182edbc0039615%22%2C%22%24initial_referrer%22%3A%20%22%24direct%22%2C%22%24initial_referring_domain%22%3A%20%22%24direct%22%7D\\\",\\\"Origin\\\":\\\"dev-2.pets.io\\\",\\\"Accept\\\":\\\"application/json, text/plain, */*\\\",\\\"Access-Control-Allow-Origin\\\":\\\"*\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Referer\\\":\\\"https://dev-2.pets.io/dashboard/settings\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"dev-2.pets.io\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"access-token\\\":\\\"eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InNoaXZhbnNoQGFrdG8uaW8iLCJpYXQiOjE2NjE4ODAwNTYsImV4cCI6MTY2MTg4MDk1Nn0.wxDbUhIfhX6i8tITykZcdztg8CZUcrBvdqbLgiZJN0Q4QkGOvhHozZ6lwgFzQe3hTOxuFOv8wxg4E_vzruLMgSRmapHGuTi57qTYFWIJNb-VSUa_Nz__t6aXOaXYckO2nvzN2rp1qeTIEKrhLaC_nV5gZpOB2fnBC2Yr1KasERpdDO7I0xc4dqdLQXQRxrWgP6lKlkGKHziCrkvLEWqC7mXrRsS23m-qv4pELm0MikIqf-fl4wmwj7g42769APwAuoQdIgMnUOx2rT1ewkcW72py3wveX96oomdDyvIM6_y5uYALsTymc0xxr1yZOT9Gseypbjm-sa7byVaSbw2s9g\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\",\\\"sec-ch-ua\\\":\\\"\\\\\\\"Chromium\\\\\\\";v=\\\\\\\"104\\\\\\\", \\\\\\\" Not A;Brand\\\\\\\";v=\\\\\\\"99\\\\\\\", \\\\\\\"Google Chrome\\\\\\\";v=\\\\\\\"104\\\\\\\"\\\",\\\"sec-ch-ua-mobile\\\":\\\"?0\\\",\\\"sec-ch-ua-platform\\\":\\\"\\\\\\\"Windows\\\\\\\"\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.9\\\",\\\"Content-Length\\\":\\\"2\\\",\\\"account\\\":\\\"1000004\\\",\\\"Content-Type\\\":\\\"application/json\\\"}\",\"responseHeaders\":\"{\\\"X-Frame-Options\\\":\\\"deny\\\",\\\"Cache-Control\\\":\\\"no-cache, no-store, must-revalidate, pre-check=0, post-check=0\\\",\\\"Server\\\":\\\"AKTO server\\\",\\\"X-Content-Type-Options\\\":\\\"nosniff\\\",\\\"Content-Encoding\\\":\\\"gzip\\\",\\\"Vary\\\":\\\"Accept-Encoding, User-Agent\\\",\\\"Content-Length\\\":\\\"150\\\",\\\"X-XSS-Protection\\\":\\\"1\\\",\\\"Content-Language\\\":\\\"en-US\\\",\\\"Date\\\":\\\"Tue, 30 Aug 2022 17:22:40 GMT\\\",\\\"Content-Type\\\":\\\"application/json;charset=utf-8\\\"}\",\"time\":\"1661880160\",\"contentType\":\"application/json;charset=utf-8\",\"akto_account_id\":\"1000000\",\"statusCode\":\"200\",\"status\":\"OK\"}";
+
+
+        HttpResponseParams httpResponseParams1 = HttpCallParser.parseKafkaMessage(message1);
+        HttpResponseParams httpResponseParams2 = HttpCallParser.parseKafkaMessage(message2);
+        HttpResponseParams httpResponseParams3 = HttpCallParser.parseKafkaMessage(message3);
+        HttpResponseParams httpResponseParams4 = HttpCallParser.parseKafkaMessage(message4);
+        HttpResponseParams httpResponseParams5 = HttpCallParser.parseKafkaMessage(message5);
+
+        List<HttpResponseParams> responseParamsList = new ArrayList<>();
+        responseParamsList.add(httpResponseParams1);
+        responseParamsList.add(httpResponseParams2);
+        responseParamsList.add(httpResponseParams3);
+        responseParamsList.add(httpResponseParams4);
+        responseParamsList.add(httpResponseParams5);
+
+        AccountSettings accountSettings = new AccountSettings();
+        Map<String, CollectionReplaceDetails> apiCollectionNameMapper= new HashMap<>();
+        String regex = "^dev-\\d+\\.akto\\.io$";
+        String newName = "dev.akto.io";
+        apiCollectionNameMapper.put(regex.hashCode()+"", new CollectionReplaceDetails(regex, newName, "host"));
+        accountSettings.setApiCollectionNameMapper(apiCollectionNameMapper);
+
+        Main.filterBasedOnHeaders(responseParamsList, accountSettings);
+
+        assertEquals(5, responseParamsList.size());
+
+        assertHostChange(responseParamsList.get(0), "dev.akto.io");
+        assertHostChange(responseParamsList.get(1), "dev.akto.io");
+        assertHostChange(responseParamsList.get(2), "api.akto.io");
+        assertHostChange(responseParamsList.get(3), "dev.akto.io");
+        assertHostChange(responseParamsList.get(4), "dev-2.pets.io");
+
+        String accIdRegex = "1000001";
+        String newCollName = "acc-1000001";
+
+        apiCollectionNameMapper.clear();
+        apiCollectionNameMapper.put(accIdRegex.hashCode()+"", new CollectionReplaceDetails(accIdRegex, newCollName, "account"));
+        Main.filterBasedOnHeaders(responseParamsList, accountSettings);
+
+        assertHostChange(responseParamsList.get(0), "dev.akto.io");
+        assertHostChange(responseParamsList.get(1), "acc-1000001");
+        assertHostChange(responseParamsList.get(2), "api.akto.io");
+        assertHostChange(responseParamsList.get(3), "acc-1000001");
+        assertHostChange(responseParamsList.get(4), "dev-2.pets.io");
+
+
+    }
+
+    public static void assertHostChange(HttpResponseParams httpResponseParams, String allowedHost) {
+        HttpRequestParams requestParams = httpResponseParams.requestParams;
+        String host = requestParams.getHeaders().get("host").get(0);
+        assertEquals(allowedHost, host);
+    }
+
+    @Test
+    public void testRedundantUrlCheck() {
+
+        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0, true);
+        String url1 = "test1.js";
+        String url2= "test2.jsx";
+        String url3 = "test3.js.js1";
+        String url4 = "test4.js?temp=test";
+        String url5 = "test5.js.js";
+
+        List<String> allowedUrlType = Arrays.asList("js");
+        assertEquals(httpCallParser.isRedundantEndpoint(url1, allowedUrlType), true);
+        assertEquals(httpCallParser.isRedundantEndpoint(url2, allowedUrlType), false);
+        assertEquals(httpCallParser.isRedundantEndpoint(url3, allowedUrlType), false);
+        assertEquals(httpCallParser.isRedundantEndpoint(url4, allowedUrlType), true);
+        assertEquals(httpCallParser.isRedundantEndpoint(url5, allowedUrlType), true);
+    }
 }

@@ -73,12 +73,17 @@ public class TeamAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private enum ActionType {
+        REMOVE_USER,
+        MAKE_ADMIN
+    }
+    
     String email;
-    public String removeUser() {
+    public String performAction(ActionType action) {
         int currUserId = getSUser().getId();
-        RBAC record = RBACDao.instance.findOne("userId", currUserId, "role", Role.ADMIN);
         boolean isAdmin = RBACDao.instance.isAdmin(currUserId, Context.accountId.get());
         if (!isAdmin) {
+            addActionError("You are not authorized to perform this action");
             return Action.ERROR.toUpperCase();
         } else {
             int accId = Context.accountId.get();
@@ -87,21 +92,54 @@ public class TeamAction extends UserAction {
             User userDetails = UsersDao.instance.findOne(findQ);
             boolean userExists =  userDetails != null;
             if (userExists && userDetails.getId() == currUserId) {
+                addActionError("You cannot perform this action on yourself");
                 return Action.ERROR.toUpperCase();
             }
 
-            if (userExists) {
-                UsersDao.instance.updateOne(findQ, Updates.unset("accounts."+accId));
-                return Action.SUCCESS.toUpperCase();
-            } else {
-                DeleteResult delResult = PendingInviteCodesDao.instance.getMCollection().deleteMany(Filters.eq("inviteeEmailId", email));
-                if (delResult.getDeletedCount() > 0) {
-                    return Action.SUCCESS.toUpperCase();
-                } else {
-                    return Action.ERROR.toUpperCase();
-                }
+            switch (action) {
+                case REMOVE_USER:
+                    if (userExists) {
+                        UsersDao.instance.updateOne(findQ, Updates.unset("accounts." + accId));
+                        RBACDao.instance.deleteAll(
+                                Filters.and(
+                                        Filters.eq(RBAC.USER_ID, userDetails.getId()),
+                                        Filters.eq(RBAC.ACCOUNT_ID, accId)));
+                        return Action.SUCCESS.toUpperCase();
+                    } else {
+                        DeleteResult delResult = PendingInviteCodesDao.instance.getMCollection().deleteMany(Filters.eq("inviteeEmailId", email));
+                        if (delResult.getDeletedCount() > 0) {
+                            return Action.SUCCESS.toUpperCase();
+                        } else {
+                            return Action.ERROR.toUpperCase();
+                        }
+                    }
+
+                case MAKE_ADMIN:
+                    if (userExists) {
+                        RBACDao.instance.updateOne(
+                                Filters.and(
+                                        Filters.eq(RBAC.USER_ID, userDetails.getId()),
+                                        Filters.eq(RBAC.ACCOUNT_ID, accId)),
+                                Updates.set(RBAC.ROLE, Role.ADMIN));
+                        return Action.SUCCESS.toUpperCase();
+                    } else {
+                        addActionError("User doesn't exist");
+                        return Action.ERROR.toUpperCase();
+                    }
+
+                default:
+                    break;
             }
         }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String removeUser() {
+        return performAction(ActionType.REMOVE_USER);
+    }
+
+    public String makeAdmin(){
+        return performAction(ActionType.MAKE_ADMIN);
     }
 
     public int getId() {

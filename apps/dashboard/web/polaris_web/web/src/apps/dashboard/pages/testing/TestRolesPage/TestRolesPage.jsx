@@ -48,17 +48,28 @@ function TestRolesPage(){
         navigate("details")
     }
 
+
     const getActions = (item) => {
+
         return [{
             items: [
-            {
-                content: 'Edit',
-                onAction: () => navigate("details", {state: {
-                    name: item.name,
-                    endpoints: item.endpointLogicalGroup.testingEndpoints,
-                    authWithCondList: item.authWithCondList
-                }})
-            }]
+                {
+                    content: 'Edit',
+                    onAction: () => navigate("details", {state: {
+                        name: item.name,
+                        endpoints: item.endpointLogicalGroup.testingEndpoints,
+                        authWithCondList: item.authWithCondList
+                    }})
+                },
+                {
+                    content: 'Access matrix',
+                    onAction: () => navigate("access-matrix", {state: {
+                        name: item.name,
+                        endpoints: item.endpointLogicalGroup.testingEndpoints,
+                        authWithCondList: item.authWithCondList
+                    }})
+                }
+            ]
         }]
     }
 
@@ -82,7 +93,7 @@ function TestRolesPage(){
     return (
         <PageWithMultipleCards
         title={"Test roles"}
-        primaryAction = {<Button primary onClick={handleRedirect}>Create new test role</Button>}
+        primaryAction = {<Button primary onClick={handleRedirect}><div data-testid="new_test_role_button">Create new test role</div></Button>}
         isFirstPage={true}
         components={[
             showEmptyScreen ? 

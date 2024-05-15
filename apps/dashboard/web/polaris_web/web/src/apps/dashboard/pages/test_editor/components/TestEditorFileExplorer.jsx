@@ -9,6 +9,7 @@ import TestEditorStore from "../testEditorStore"
 import convertFunc from "../transform"
 
 import "../TestEditor.css"
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 
 const TestEditorFileExplorer = ({addCustomTest}) => {
 
@@ -26,7 +27,13 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
     const navigate = useNavigate()
 
     const selectedFunc = (val) =>{
-        setSelectedCategory(val)
+        setSelectedCategory((prev) => {
+            if(prev === val){
+                return "none"
+            }else{
+                return val
+            }
+        })
     }
 
     const toggleFunc = (param) =>{
@@ -169,7 +176,12 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                                     <Box>
                                         <Icon source={showCustom ? ChevronDownMinor : ChevronRightMinor}/>
                                     </Box>
-                                    <Text variant="headingMd" as="h5" color="subdued">Custom</Text>
+                                    <TitleWithInfo 
+                                        tooltipContent={"Custom tests"} 
+                                        titleText={"Custom"} 
+                                        textProps={{variant: 'headingMd'}} 
+                                        docsUrl={"https://docs.akto.io/test-editor/concepts/custom-test"}
+                                    />
                                 </HorizontalStack>
                                 <div style={{marginRight: '-2px'}}>
                                     <Badge size="small" status="new">{customItems.count.toString()}</Badge>
@@ -188,7 +200,12 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                                     <Box>
                                         <Icon source={showAkto ? ChevronDownMinor : ChevronRightMinor}/>
                                     </Box>
-                                    <Text variant="headingMd" as="h5" color="subdued">Akto Default</Text>
+                                    <TitleWithInfo 
+                                        tooltipContent={"Akto's test library"} 
+                                        titleText={"Akto default"} 
+                                        textProps={{variant: 'headingMd'}} 
+                                        docsUrl={"https://docs.akto.io/test-editor/concepts/test-library"}
+                                    />
                                 </HorizontalStack>
                                 <div style={{marginRight: '-2px'}}>
                                     <Badge size="small" status="new">{aktoItems.count.toString()}</Badge>

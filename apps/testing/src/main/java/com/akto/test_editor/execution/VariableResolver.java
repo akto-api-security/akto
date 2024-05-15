@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,6 +30,7 @@ import com.akto.util.modifier.AddJWKModifier;
 import com.akto.util.modifier.AddJkuJWTModifier;
 import com.akto.util.modifier.AddKidParamModifier;
 import com.akto.util.modifier.InvalidSignatureJWTModifier;
+import com.akto.util.modifier.JwtKvModifier;
 import com.akto.util.modifier.NoneAlgoJWTModifier;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -66,6 +68,10 @@ public class VariableResolver {
 
         if (VariableResolver.isWordListVariable(key, varMap)) {
             varList = (List) VariableResolver.resolveWordListVar(key.toString(), varMap);
+            for (int i = 0; i < varList.size(); i++) {
+                List<Object> vals = VariableResolver.resolveExpression(varMap, varList.get(i).toString());
+                varList.set(i, vals.get(0).toString());
+            }
             return varList;
         }
 
@@ -117,6 +123,7 @@ public class VariableResolver {
                     String match = matcher.group(0);
                     match = match.substring(2, match.length());
                     match = match.substring(0, match.length() - 1);
+
                     Object val = getValue(varMap, match);
                     if (val == null) {
                         continue;
@@ -130,7 +137,9 @@ public class VariableResolver {
                     if (!(val instanceof ArrayList)) {
                         for (int i = 0; i < expressionList.size(); i++) {
                             param = expressionList.get(i).toString();
-                            expressionList.set(i, param.replaceFirst("(\\$\\{[^}]*\\})", val.toString()));
+
+                            String finalVal = (val instanceof String) ? ((String) val) : val.toString();
+                            expressionList.set(i, param.replaceFirst("(\\$\\{[^}]*\\})", Matcher.quoteReplacement(finalVal)));
                         }
                     } else {
                         expressionList.remove(index);
@@ -236,11 +245,21 @@ public class VariableResolver {
     }
 
     public static Boolean isAuthContext(Object val) {
+        String expression = "";
         if (!(val instanceof String)) {
-            return false;
-        }
+            if (val instanceof Map) {
+                Map<String, Object> valMap = (Map) val;
+                if (valMap.size() != 1) return false;
 
-        String expression = val.toString();
+                expression = valMap.keySet().iterator().next();
+                
+            } else {
+                return false;                
+            }
+
+        } else {
+            expression = val.toString();
+        }
 
         Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
         Matcher matcher = pattern.matcher(expression);
@@ -265,8 +284,8 @@ public class VariableResolver {
                 }
 
                 if (secondParam.equalsIgnoreCase("none_algo_token") || secondParam.equalsIgnoreCase("invalid_signature_token") 
-                    || secondParam.equalsIgnoreCase("jku_added_token") || secondParam.equalsIgnoreCase("jwk_added_token") 
-                    || secondParam.equalsIgnoreCase("kid_added_token")) {
+                    || secondParam.equalsIgnoreCase("jku_added_token") || secondParam.startsWith("modify_jwt")
+                    || secondParam.equalsIgnoreCase("jwk_added_token") || secondParam.equalsIgnoreCase("kid_added_token")) {
                         return true;
                 }
             } catch (Exception e) {
@@ -278,12 +297,30 @@ public class VariableResolver {
 
     }
 
-    public static String resolveAuthContext(String expression, Map<String, List<String>> headers, String headerKey) {
+    public static String resolveAuthContext(Object resolveObj, Map<String, List<String>> headers, String headerKey) {
+
+        String origExpression = null;
+        if (!(resolveObj instanceof String)) {
+            if (resolveObj instanceof Map) {
+                Map<String, Object> resolveMap = (Map) resolveObj;
+                if (resolveMap.size() != 1) return null;
+
+                origExpression = resolveMap.keySet().iterator().next();
+                
+            } else {
+                return null;
+            }
+
+        } else {
+            origExpression = resolveObj.toString();
+        }
+        
+        String expression = origExpression;
         expression = expression.substring(2, expression.length());
         expression = expression.substring(0, expression.length() - 1);
 
-        String[] params = expression.split("\\.");
-        String secondParam = params[1];
+        String authContextConstant = "auth_context.";
+        String secondParam = expression.substring(authContextConstant.length());// params[1];
 
         if (!headers.containsKey(headerKey)) {
             return null;
@@ -318,6 +355,15 @@ public class VariableResolver {
                 } catch(Exception e) {
                     return null;
                 }
+            } else if (secondParam.equalsIgnoreCase("modify_jwt")) {
+                try {
+                    Map<String, Object> kvPairMap = (Map) ((Map)resolveObj).get(origExpression);
+                    String kvKey = kvPairMap.keySet().iterator().next();
+                    JwtKvModifier jwtKvModifier = new JwtKvModifier(kvKey, kvPairMap.get(kvKey).toString());
+                    modifiedHeaderVal = jwtKvModifier.jwtModify("", val);
+                } catch (Exception e) {
+                    return null;
+                }
             } else if (secondParam.equalsIgnoreCase("jwk_added_token")) {
                 AddJWKModifier addJWKModifier = new AddJWKModifier();
                 try {
@@ -335,8 +381,8 @@ public class VariableResolver {
             } 
             finalValue.add(modifiedHeaderVal);
         }
-        
-        return String.join( " ", finalValue);
+
+        return finalValue.isEmpty() ? null : String.join( " ", finalValue);
     }
 
     public static Boolean isWordListVariable(Object key, Map<String, Object> varMap) {
@@ -619,7 +665,7 @@ public class VariableResolver {
         }
         for (String s : wordListSet) {
             wordListVal.add(s);
-            if (wordListVal.size() >= 10) {
+            if (wordListVal.size() >= 10 && !"terminal_keys".equals(location)) {
                 break;
             }
         }
@@ -635,6 +681,11 @@ public class VariableResolver {
             try {
                 httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
                 httpRequestParams = httpResponseParams.getRequestParams();
+
+                if ("terminal_keys".equals(location)) {
+                    worklistVal.addAll(Utils.findAllTerminalKeys(httpResponseParams.getPayload(), key));
+                    continue;
+                }
                 if (location == null || location.equals("header")) {
                     Map<String, List<String>> headers = httpResponseParams.getHeaders();
                     for (String headerName: headers.keySet()) {
