@@ -63,7 +63,7 @@ public class OrganizationUtils {
                     if (metaData != null) {
                         featureLabel = metaData.getString("key", "");
                     }
-                    result.put(featureLabel, new FeatureAccess(isGranted, -1));
+                    result.put(featureLabel, new FeatureAccess(isGranted));
                 } else {
                     loggerMaker.errorAndAddToDb("unable to find feature object for this entitlement " + bO.toString(), LoggerMaker.LogDb.DASHBOARD);
                 }
@@ -81,10 +81,8 @@ public class OrganizationUtils {
                 if (StringUtils.isNumeric(usageLimitObj.toString())) {
                     int usageLimit = Integer.parseInt(usageLimitObj.toString());
                     int usage = Integer.parseInt(bO.getOrDefault("currentUsage", "0").toString());
-                    if (usage > usageLimit) {
-                        result.put(featureLabel, new FeatureAccess(isGranted, now));
-                    }
-
+                    int overageFirstDetected = (usage >= usageLimit) ? now : -1;
+                    result.put(featureLabel, new FeatureAccess(isGranted, overageFirstDetected, usageLimit, usage));
                 }
             } catch (Exception e) {
                 loggerMaker.infoAndAddToDb("unable to parse usage: " + o.toString(), LoggerMaker.LogDb.DASHBOARD);
@@ -146,6 +144,10 @@ public class OrganizationUtils {
                 response.close();
             }
         }
+    }
+
+    public static void flushUsagePipelineForOrg(String organizationId) {
+        UsageMetricUtils.fetchFromBillingService("flushUsageDataForOrg", new BasicDBObject("organizationId", organizationId));
     }
 
     public static BasicDBObject fetchOrgDetails(String orgId) {

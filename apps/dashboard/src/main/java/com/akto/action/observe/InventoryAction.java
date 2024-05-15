@@ -11,6 +11,10 @@ import com.akto.dto.CodeAnalysisApiInfo.CodeAnalysisApiInfoKey;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.interceptor.CollectionInterceptor;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
@@ -68,9 +72,12 @@ public class InventoryAction extends UserAction {
     private int startTimestamp = 0; 
     private int endTimestamp = 0;
 
+    Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
     public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp) {
         List<BasicDBObject> endpoints = new ArrayList<>();
         List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
+        nonHostApiCollectionIds.addAll(deactivatedCollections);
 
         Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
         Bson filterQWithTs = Filters.and(
@@ -91,6 +98,7 @@ public class InventoryAction extends UserAction {
             endpoints.add(endpoint);
         }
         
+        nonHostApiCollectionIds.removeAll(deactivatedCollections);
 
         if (nonHostApiCollectionIds != null && nonHostApiCollectionIds.size() > 0){
             List<Bson> pipeline = new ArrayList<>();
@@ -113,11 +121,6 @@ public class InventoryAction extends UserAction {
         return endpoints;
     }
 
-
-
-
-
-
     private String hostName;
     private List<BasicDBObject> endpoints;
     public String fetchEndpointsBasedOnHostName() {
@@ -131,6 +134,11 @@ public class InventoryAction extends UserAction {
 
         if (apiCollection == null) {
             addActionError("Invalid host");
+            return ERROR.toUpperCase();
+        }
+
+        if (deactivatedCollections.contains(apiCollection.getId())) {
+            addActionError(CollectionInterceptor.errorMessage);
             return ERROR.toUpperCase();
         }
 
@@ -457,6 +465,7 @@ public class InventoryAction extends UserAction {
         pipeline.add(Aggregates.limit(100_000));
         pipeline.add(Aggregates.match(Filters.gte("timestamp", startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte("timestamp", endTimestamp)));
+        pipeline.add(Aggregates.match(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}))));
 
         Bson doyProj = Projections.computed("dayOfYear", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}));
@@ -604,6 +613,7 @@ public class InventoryAction extends UserAction {
             }
         }
 
+        filterList.add(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
         loggerMaker.infoAndAddToDb(filterList.toString(), LogDb.DASHBOARD);
         return Filters.and(filterList);
 
