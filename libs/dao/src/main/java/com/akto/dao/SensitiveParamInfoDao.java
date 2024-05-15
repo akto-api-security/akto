@@ -5,7 +5,9 @@ import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class SensitiveParamInfoDao extends AccountsContextDao<SensitiveParamInfo> {
@@ -43,6 +45,17 @@ public class SensitiveParamInfoDao extends AccountsContextDao<SensitiveParamInfo
     public Set<String> getUniqueEndpoints(int apiCollectionId) {
         Bson filter = Filters.eq("apiCollectionId", apiCollectionId);
         return instance.findDistinctFields("url", String.class, filter);
+    }
+
+    public static Map<String, Object> getFiltersMap(SensitiveParamInfo sensitiveParamInfo) {
+        Map<String, Object> filterMap = new HashMap<>();
+        filterMap.put("url", sensitiveParamInfo.getUrl());
+        filterMap.put("method", sensitiveParamInfo.getMethod());
+        filterMap.put("responseCode", sensitiveParamInfo.getResponseCode());
+        filterMap.put("isHeader", sensitiveParamInfo.getIsHeader());
+        filterMap.put("param", sensitiveParamInfo.getParam());
+        filterMap.put("apiCollectionId", sensitiveParamInfo.getApiCollectionId());
+        return filterMap;
     }
 
     public List<SensitiveParamInfo> getUnsavedSensitiveParamInfos() {

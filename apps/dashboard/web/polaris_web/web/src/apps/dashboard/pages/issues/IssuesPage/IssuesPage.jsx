@@ -11,6 +11,8 @@ import { Button } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
+import { useEffect } from "react";
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 
 const headers = [
     {
@@ -153,8 +155,7 @@ function IssuesPage(){
     const [issuesFilters, setIssuesFilters] = useState({})
     const [key, setKey] = useState(false);
     const apiCollectionMap = PersistStore(state => state.collectionsMap);
-    const allCollections = PersistStore(state => state.allCollections);
-    const [showEmptyScreen, setShowEmptyScreen] = useState(false)
+    const [showEmptyScreen, setShowEmptyScreen] = useState(true)
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -309,10 +310,19 @@ function IssuesPage(){
             description: "Integrate Akto with GitHub to send all issues to your developers on GitHub."
         }
     ]
+
+  useEffect(() => {
+    if (subCategoryMap && Object.keys(subCategoryMap).length > 0 && apiCollectionMap && Object.keys(apiCollectionMap).length > 0) {
+        setShowEmptyScreen(false)
+    }
+  }, [subCategoryMap, apiCollectionMap])
     
     return (
         <PageWithMultipleCards
-            title="Issues"
+            title={<TitleWithInfo
+                    titleText={"Issues"}
+                    tooltipContent={"Issues are created when a test from test library has passed validation and thus a potential vulnerability is found."}
+                />}
             isFirstPage={true}
             components = {[
                 showEmptyScreen ? 

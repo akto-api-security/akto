@@ -53,7 +53,7 @@ public class CustomAuthTypeAction extends UserAction{
             return ERROR.toUpperCase();
         } else {
             active = true;
-            customAuthType = new CustomAuthType(name, headerKeys, payloadKeys, active,user.getId());
+            customAuthType = new CustomAuthType(name, headerKeys, payloadKeys, active,user.getId(), null, null);
             CustomAuthTypeDao.instance.insertOne(customAuthType);
         }
         fetchCustomAuthTypes();

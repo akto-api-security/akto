@@ -2,6 +2,8 @@ package com.akto.log;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.Log;
@@ -32,6 +34,7 @@ public class LoggerMaker  {
     private static String slackWebhookUrl;
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     protected static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
 
@@ -86,7 +89,7 @@ public class LoggerMaker  {
         try {
             internalLogger.info("Running updateAccountSettings....................................");
             Context.accountId.set(1_000_000);
-            accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            accountSettings = dataActor.fetchAccountSettingsForAccount(1_000_000);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -192,9 +195,7 @@ public class LoggerMaker  {
     }
 
     public void infoAndAddToDb(String info) {
-        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String infoMessage = "acc: " + accountId + ", " + info;
-        infoAndAddToDb(infoMessage, this.db);
+        infoAndAddToDb(info, this.db);
     }
 
     private Boolean checkUpdate(){
@@ -219,13 +220,13 @@ public class LoggerMaker  {
                     LogsDao.instance.insertOne(log);
                     break;
                 case RUNTIME: 
-                    RuntimeLogsDao.instance.insertOne(log);
+                    dataActor.insertRuntimeLog(log);
                     break;
                 case DASHBOARD: 
                     DashboardLogsDao.instance.insertOne(log);
                     break;
                 case ANALYSER:
-                    AnalyserLogsDao.instance.insertOne(log);
+                    dataActor.insertAnalyserLog(log);
                     break;
                 case BILLING:
                     BillingLogsDao.instance.insertOne(log);
