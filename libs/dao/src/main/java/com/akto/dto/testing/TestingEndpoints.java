@@ -38,7 +38,7 @@ public abstract class TestingEndpoints {
 
 
     public enum Type {
-        CUSTOM, COLLECTION_WISE, WORKFLOW, LOGICAL_GROUP, METHOD, ALL, REGEX
+        CUSTOM, COLLECTION_WISE, WORKFLOW, LOGICAL_GROUP, METHOD, ALL, REGEX, RISK_SCORE
     }
 
     public Type getType() {
@@ -119,4 +119,13 @@ public abstract class TestingEndpoints {
         }
         return filtersMap;
     }    
+
+    public static Boolean checkDeltaUpdateBased(Type type) {
+        switch (type) {
+            case RISK_SCORE:
+                return true;
+            default:
+                return false;
+        }
+    }
 }
