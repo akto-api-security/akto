@@ -1,4 +1,4 @@
-import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack } from '@shopify/polaris';
+import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button } from '@shopify/polaris';
 import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor } from '@shopify/polaris-icons';
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -175,13 +175,23 @@ export default function Header() {
         />
     );
 
+    const handleTestingNavigate = () => {
+        let navUrl = "/dashboard/testing"
+        if(currentTestsObj.testRunsArr.length === 1){
+            navUrl = navUrl + "/" + currentTestsObj.testRunsArr[0].testingRunId
+        }
+        navigate(navUrl)
+    }
+
     const progress = currentTestsObj.totalTestsInitiated === 0 ? 0 : Math.floor((currentTestsObj.totalTestsCompleted * 100)/ currentTestsObj.totalTestsInitiated)
 
     const secondaryMenuMarkup = (
         <HorizontalStack gap={"4"}>
             {currentTestsObj.testRunsArr.length !== 0 ? 
             <HorizontalStack gap={"2"}>
+                <Button plain monochrome onClick={() => {handleTestingNavigate()}}>
                  <SemiCircleProgress key={"progress"} progress={progress} size={60} height={55} width={75}/>
+                </Button>
                 <VerticalStack gap={"0"}>
                     <Text fontWeight="medium">Test run status</Text>
                     <Text color="subdued" variant="bodySm">{`${currentTestsObj.totalTestsQueued} tests queued`}</Text>
