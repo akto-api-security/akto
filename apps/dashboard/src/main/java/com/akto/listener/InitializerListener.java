@@ -1150,6 +1150,34 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void createRiskScoreApiGroup(int id, String name, RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType) {
+        loggerMaker.infoAndAddToDb("Creating risk score group: " + name, LogDb.DASHBOARD);
+        
+        ApiCollection riskScoreGroup = new ApiCollection(id, name, Context.now(), new HashSet<>(), null, 0, false, false);
+            
+        List<TestingEndpoints> riskScoreConditions = new ArrayList<>();
+        RiskScoreTestingEndpoints riskScoreTestingEndpoints = new RiskScoreTestingEndpoints(riskScoreGroupType);
+        riskScoreConditions.add(riskScoreTestingEndpoints);
+
+        riskScoreGroup.setConditions(riskScoreConditions);
+        riskScoreGroup.setType(ApiCollection.Type.API_GROUP);
+
+        ApiCollectionsDao.instance.insertOne(riskScoreGroup); 
+    }
+
+    public static void createRiskScoreGroups(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getRiskScoreGroups() == 0) {
+            createRiskScoreApiGroup(111_111_148, "Low Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.LOW);
+            createRiskScoreApiGroup(111_111_149, "Medium Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.MEDIUM);
+            createRiskScoreApiGroup(111_111_150, "High Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.HIGH);
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.RISK_SCORE_GROUPS, Context.now())
+            );
+        }
+    }
+
     public static void dropWorkflowTestResultCollection(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDropWorkflowTestResult() == 0) {
             WorkflowTestResultsDao.instance.getMCollection().drop();
@@ -1538,7 +1566,22 @@ public class InitializerListener implements ServletContextListener {
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         for (ApiCollection apiCollection : apiCollections) {
             if (ApiCollection.Type.API_GROUP.equals(apiCollection.getType())) {
-                ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+                List<TestingEndpoints> conditions = apiCollection.getConditions();
+
+                // Don't update API groups that are delta update based
+                boolean isDeltaUpdateBasedApiGroup = false;
+                for (TestingEndpoints testingEndpoints : conditions) {
+                    if (TestingEndpoints.checkDeltaUpdateBased(testingEndpoints.getType())) {
+                        isDeltaUpdateBasedApiGroup = true;
+                        break;
+                    }
+                }
+
+                if (isDeltaUpdateBasedApiGroup) {
+                    continue;
+                }
+
+                ApiCollectionUsers.computeCollectionsForCollectionId(conditions, apiCollection.getId());
             }
         }
     }
@@ -1983,6 +2026,7 @@ public class InitializerListener implements ServletContextListener {
         dropAuthMechanismData(backwardCompatibility);
         moveAuthMechanismDataToRole(backwardCompatibility);
         createLoginSignupGroups(backwardCompatibility);
+        createRiskScoreGroups(backwardCompatibility);
         deleteAccessListFromApiToken(backwardCompatibility);
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
