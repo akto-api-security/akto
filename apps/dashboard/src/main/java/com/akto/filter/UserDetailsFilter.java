@@ -148,6 +148,10 @@ public class UserDetailsFilter implements Filter {
             if (token == null) {
                 Cookie cookie = AccessTokenAction.generateDeleteCookie();
                 httpServletResponse.addCookie(cookie);
+                if (accessTokenFromRequest != null) {
+                    httpServletResponse.sendError(403);
+                    return ;
+                }
                 redirectIfNotLoginURI(filterChain,httpServletRequest,httpServletResponse);
                 return ;
             }

@@ -2,7 +2,6 @@ package com.akto.dao.traffic_metrics;
 
 import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.util.DbMode;
@@ -16,7 +15,9 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class TrafficMetricsDao extends AccountsContextDao<TrafficMetrics> {
 
@@ -45,6 +46,17 @@ public class TrafficMetricsDao extends AccountsContextDao<TrafficMetrics> {
                 Filters.eq(ID + TrafficMetrics.Key.HOST,  key.getHost()),
                 Filters.eq(ID + TrafficMetrics.Key.VXLAN_ID,  key.getVxlanID())
         );
+    }
+
+    public static Map<String, Object> getFiltersMap(TrafficMetrics.Key key) {
+        Map<String, Object> filterMap = new HashMap<>();
+        filterMap.put(ID + TrafficMetrics.Key.NAME, key.getName());
+        filterMap.put(ID + TrafficMetrics.Key.BUCKET_START_EPOCH, key.getBucketStartEpoch());
+        filterMap.put(ID + TrafficMetrics.Key.BUCKET_END_EPOCH, key.getBucketEndEpoch());
+        filterMap.put(ID + TrafficMetrics.Key.IP, key.getIp());
+        filterMap.put(ID + TrafficMetrics.Key.HOST, key.getHost());
+        filterMap.put(ID + TrafficMetrics.Key.VXLAN_ID, key.getVxlanID());
+        return filterMap;
     }
 
     public void createIndicesIfAbsent() {

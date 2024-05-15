@@ -64,7 +64,7 @@ const tableFunc = {
   
           return {value:finalData,total:tempData.length}
     },
-    mergeFilters(filterArray1, filterArray2, labelFunc){
+    mergeFilters(filterArray1, filterArray2, labelFunc, handleRemoveAppliedFilter){
       const combined = [...filterArray1, ...filterArray2];
       const mergedByKey = combined.reduce((acc, {key, value}) => {
         if (acc[key]) {
@@ -87,7 +87,8 @@ const tableFunc = {
         const obj = mergedByKey[key]
         return {
           ...obj,
-          label: labelFunc(obj.key, obj.value)
+          label: labelFunc(obj.key, obj.value),
+          onRemove: handleRemoveAppliedFilter
         }
       })
     },

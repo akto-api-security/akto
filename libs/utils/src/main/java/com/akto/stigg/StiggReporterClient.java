@@ -7,6 +7,7 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import okhttp3.*;
@@ -19,6 +20,7 @@ public class StiggReporterClient {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(StiggReporterClient.class);
     public static final StiggReporterClient instance = new StiggReporterClient();
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
 
     private Config.StiggConfig stiggConfig = null;
     private StiggReporterClient() {
@@ -48,7 +50,6 @@ public class StiggReporterClient {
         if (stiggConfig == null) {
             throw new IllegalStateException("Stigg config is not initialised");
         }
-        OkHttpClient client = new OkHttpClient();
         String requestBody = String.format("{\"query\":\"%s\",\"variables\":%s}", query, vars);
 
         // Set the GraphQL endpoint URL

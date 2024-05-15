@@ -29,8 +29,28 @@ function GithubServerTable(props) {
   const currentPageKey = props?.filterStateUrl || window.location.href
   const pageFiltersMap = filtersMap[currentPageKey]
 
+  const handleRemoveAppliedFilter = (key) => {
+    let temp = appliedFilters
+    temp = temp.filter((filter) => {
+      return filter.key != key
+    })
+    props?.appliedFilters?.forEach((defaultAppliedFilter) => {
+      if (key === defaultAppliedFilter.key) {
+        temp.push(defaultAppliedFilter)
+      }
+    })
+    setAppliedFilters(temp);
+    let tempFilters = filtersMap
+    tempFilters[currentPageKey] = {
+      'filters': temp,
+      'sort': pageFiltersMap?.sort || []
+    }
+    setFiltersMap(tempFilters)
+  }
+  
+
   const filterMode = (pageFiltersMap?.filters?.length > 0) ? IndexFiltersMode.Filtering : (props?.mode ? props.mode : IndexFiltersMode.Filtering)
-  const initialStateFilters = tableFunc.mergeFilters(props.appliedFilters || [], (pageFiltersMap?.filters || []),props.disambiguateLabel)
+  const initialStateFilters = tableFunc.mergeFilters(props.appliedFilters || [], (pageFiltersMap?.filters || []),props.disambiguateLabel, handleRemoveAppliedFilter)
   const { mode, setMode } = useSetIndexFiltersMode(filterMode);
   const [sortSelected, setSortSelected] = useState(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
   const [data, setData] = useState([]);
@@ -103,25 +123,6 @@ function GithubServerTable(props) {
       'sort': sortVal
     }
     setFiltersMap(copyFilters)
-  }
-
-  const handleRemoveAppliedFilter = (key) => {
-    let temp = appliedFilters
-    temp = temp.filter((filter) => {
-      return filter.key != key
-    })
-    props?.appliedFilters?.forEach((defaultAppliedFilter) => {
-      if (key === defaultAppliedFilter.key) {
-        temp.push(defaultAppliedFilter)
-      }
-    })
-    setAppliedFilters(temp);
-    let tempFilters = filtersMap
-    tempFilters[currentPageKey] = {
-      'filters': temp,
-      'sort': pageFiltersMap?.sort || []
-    }
-    setFiltersMap(tempFilters)
   }
 
   const changeAppliedFilters = (key, value) => {
@@ -336,7 +337,7 @@ function GithubServerTable(props) {
               </IndexTable>
             </div>
             </LegacyCard.Section>
-            <LegacyCard.Section>
+            {(total > pageLimit) && <LegacyCard.Section>
               <HorizontalStack
                 align="center">
                 <Pagination
@@ -354,7 +355,7 @@ function GithubServerTable(props) {
                   onNext={onPageNext}
                 />
               </HorizontalStack>
-            </LegacyCard.Section>
+            </LegacyCard.Section>}
           </div>
         }
 
