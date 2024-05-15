@@ -13,6 +13,7 @@ import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
 import CreateNewCollectionModal from "./CreateNewCollectionModal"
 import TooltipText from "@/apps/dashboard/components/shared/TooltipText"
 import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo"
+import collectionApi from "./api"
 import CollectionsPageBanner from "./component/CollectionsPageBanner"
 import useTable from "@/apps/dashboard/components/tables/TableContext"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
@@ -82,6 +83,8 @@ const headers = [
 ]
 
 const sortOptions = [
+    { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'deactivatedRiskScore' },
+    { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'activatedRiskScore' },
     { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: 3 },
     { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' , columnIndex: 3},
     { label: 'Discovered', value: 'discovered asc', directionLabel: 'Recent first', sortKey: 'startTs', columnIndex: 9 },
@@ -111,6 +114,10 @@ function convertToCollectionData(c) {
 const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap) => {
 
     const newData = collectionsArr.map((c) => {
+        if(c.deactivated){
+            c.rowStatus = 'critical',
+            c.disableClick = true
+        }
         return{
             ...c,
             displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
@@ -118,6 +125,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
             severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
+            detectedTimestamp : trafficInfoMap[c.id] || 0,
             riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0,
             discovered: func.prettifyEpoch(c.startTs || 0),
         }
@@ -162,6 +170,7 @@ function ApiCollections() {
         setActive(true)
     }
 
+    const allCollections = PersistStore(state => state.allCollections)
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
@@ -230,41 +239,43 @@ function ApiCollections() {
     }, [])
     const createCollectionModalActivatorRef = useRef();
 
-    async function handleRemoveCollections(collectionIdList) {
+    async function handleCollectionsAction(collectionIdList, apiFunction, toastContent){
         const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
-        const response = await api.deleteMultipleCollections(collectionIdListObj)
+        await apiFunction(collectionIdListObj)
         fetchData()
-        func.setToast(true, false, <div  data-testid="deletion_message">{`${collectionIdList.length} API collection${collectionIdList.length > 1 ? "s" : ""} deleted successfully`}</div>)
-
-    }
-
-    const updateData = (dataMap) => {
-        let copyObj = data;
-        Object.keys(copyObj).forEach((key) => {
-            data[key].length > 0 && data[key].forEach((c) => {
-                c['envType'] = dataMap[c.id]
-                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" status="info">{func.toSentenceCase(dataMap[c.id])}</Badge> : null
-            })
-        })
-        setData(copyObj)
-        setRefreshData(!refreshData)
-    }
-
-    const updateEnvType = (apiCollectionIds,type) => {
-        let copyObj = JSON.parse(JSON.stringify(envTypeMap))
-        apiCollectionIds.forEach(id => copyObj[id] = type)
-        api.updateEnvTypeOfCollection(type,apiCollectionIds).then((resp) => {
-            func.setToast(true, false, "ENV type updated successfully")
-            setEnvTypeMap(copyObj)
-            updateData(copyObj)
-        })
-        
+        func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
     }
 
     const promotedBulkActions = (selectedResources) => {
-        const removeCollectionsObj = {
-            content: <div data-testid="delete_button">{`Remove collection${func.addPlurality(selectedResources.length)}`}</div>,
-            onAction: () => handleRemoveCollections(selectedResources)
+        let actions = [
+            {
+                content: `Remove collection${func.addPlurality(selectedResources.length)}`,
+                onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
+            }
+        ];
+
+        const deactivated = allCollections.filter(x => { return x.deactivated }).map(x => x.id);
+        const activated = allCollections.filter(x => { return !x.deactivated }).map(x => x.id);
+        if (selectedResources.every(v => { return activated.includes(v) })) {
+            actions.push(
+                {
+                    content: `Deactivate collection${func.addPlurality(selectedResources.length)}`,
+                    onAction: () => {
+                        const message = "Deactivating a collection will stop traffic ingestion and testing for this collection. Please sync the usage data via Settings > billing after deactivating a collection to reflect your updated usage. Are you sure, you want to deactivate this collection ?"
+                        func.showConfirmationModal(message, "Deactivate collection", () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deactivated") )
+                    }
+                }
+            )
+        } else if (selectedResources.every(v => { return deactivated.includes(v) })) {
+            actions.push(
+                {
+                    content: `Reactivate collection${func.addPlurality(selectedResources.length)}`,
+                    onAction: () =>  {
+                        const message = "Please sync the usage data via Settings > billing after reactivating a collection to resume data ingestion and testing."
+                        func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
+                    }
+                }
+            )
         }
 
         const toggleTypeContent = (
@@ -291,7 +302,29 @@ function ApiCollections() {
             content: toggleTypeContent
         }
 
-        return [removeCollectionsObj, toggleEnvType]
+        return [...actions, toggleEnvType];
+    }
+    const updateData = (dataMap) => {
+        let copyObj = data;
+        Object.keys(copyObj).forEach((key) => {
+            data[key].length > 0 && data[key].forEach((c) => {
+                c['envType'] = dataMap[c.id]
+                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" status="info">{func.toSentenceCase(dataMap[c.id])}</Badge> : null
+            })
+        })
+        setData(copyObj)
+        setRefreshData(!refreshData)
+    }
+
+    const updateEnvType = (apiCollectionIds,type) => {
+        let copyObj = JSON.parse(JSON.stringify(envTypeMap))
+        apiCollectionIds.forEach(id => copyObj[id] = type)
+        api.updateEnvTypeOfCollection(type,apiCollectionIds).then((resp) => {
+            func.setToast(true, false, "ENV type updated successfully")
+            setEnvTypeMap(copyObj)
+            updateData(copyObj)
+        })
+        
     }
 
     const modalComponent = <CreateNewCollectionModal
