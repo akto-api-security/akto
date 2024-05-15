@@ -281,7 +281,7 @@ public class ApiCollectionsAction extends UserAction {
         CustomTestingEndpoints condition = new CustomTestingEndpoints(apiList, CustomTestingEndpoints.Operator.OR);
         apiCollection.removeFromConditions(condition);
         ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
-        ApiCollectionUsers.removeFromCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId(), false);
+        ApiCollectionUsers.removeFromCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
         fetchAllCollections();
 

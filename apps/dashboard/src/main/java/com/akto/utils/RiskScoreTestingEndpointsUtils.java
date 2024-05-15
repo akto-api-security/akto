@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -32,7 +33,7 @@ public class RiskScoreTestingEndpointsUtils {
         put(RiskScoreTestingEndpoints.RiskScoreGroupType.HIGH, new ArrayList<>());
     }}; 
     
-    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private static final ExecutorService executorService = Executors.newFixedThreadPool(1);
 
     public RiskScoreTestingEndpointsUtils() {
     }
@@ -48,7 +49,6 @@ public class RiskScoreTestingEndpointsUtils {
     }
 
     private void updateRiskScoreApiGroups() {
-        loggerMaker.infoAndAddToDb("Updating risk score API groups", LogDb.DASHBOARD);
         try {
             for(RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType: RiskScoreTestingEndpoints.RiskScoreGroupType.values()) {
                 RiskScoreTestingEndpoints riskScoreTestingEndpoints = new RiskScoreTestingEndpoints(riskScoreGroupType);
@@ -66,7 +66,7 @@ public class RiskScoreTestingEndpointsUtils {
                     List<ApiInfo> batch = removeApisFromRiskScoreGroupList.subList(start, end);
     
                     riskScoreTestingEndpoints.setFilterRiskScoreGroupApis(batch);
-                    ApiCollectionUsers.removeFromCollectionsForCollectionId(testingEndpoints, apiCollectionId, true);
+                    ApiCollectionUsers.removeFromCollectionsForCollectionId(testingEndpoints, apiCollectionId);
                 }
     
                 // Add APIs to the new risk score group
@@ -88,11 +88,11 @@ public class RiskScoreTestingEndpointsUtils {
 
     public void syncRiskScoreGroupApis() {
         int accountId = Context.accountId.get();
-        executorService.schedule( new Runnable() {
-            public void run() {
-                Context.accountId.set(accountId);
-                updateRiskScoreApiGroups();
-            }
-        }, 0, TimeUnit.SECONDS);
+        
+        executorService.submit(() -> {
+            Context.accountId.set(accountId);
+            loggerMaker.infoAndAddToDb("Updating risk score API groups", LogDb.DASHBOARD);
+            updateRiskScoreApiGroups();
+        });
     }
 }

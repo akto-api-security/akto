@@ -1128,7 +1128,7 @@ public class InitializerListener implements ServletContextListener {
         ArrayList<TestingEndpoints> loginConditions = new ArrayList<>();
         loginConditions.add(new RegexTestingEndpoints(TestingEndpoints.Operator.OR, regex));
         loginGroup.setConditions(loginConditions);
-        ApiCollectionUsers.removeFromCollectionsForCollectionId(loginGroup.getConditions(), id, false);
+        ApiCollectionUsers.removeFromCollectionsForCollectionId(loginGroup.getConditions(), id);
 
         ApiCollectionsDao.instance.insertOne(loginGroup);
         ApiCollectionUsers.addToCollectionsForCollectionId(loginGroup.getConditions(), loginGroup.getId());
