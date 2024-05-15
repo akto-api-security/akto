@@ -34,6 +34,9 @@ public class QueryHandlerFactory {
         if(query.equals(GptQuery.FIND_AUTH_RELATED_TOKENS)){
             return new FindAuthRelatedTokens(new AsyncResultFetcherStrategy());
         }
+        if(query.equals(GptQuery.FIND_SENSITIVE_DATA)){
+            return new FindSensitiveData(new AsyncResultFetcherStrategy());
+        }
         throw new IllegalArgumentException("No such query handler");
     }
 }

@@ -21,12 +21,23 @@ const dashboardFunc = {
         const collectionsGptPrompts = [
             {
                 icon: MagicMinor,
+                label: "Find business specific sensitive data",
+                prepareQuery: () => { return {
+                    type: "find_sensitive_data",
+                    meta: {
+                        "apiCollectionId": apiCollectionId
+                    }                        
+                }},
+                callback: (data) => console.log("callback Find business specific sensitive data", data)
+            },
+            {
+                icon: MagicMinor,
                 label: "Find auth-related tokens",
                 prepareQuery: () => { return {
                     type: "find_auth_related_tokens",
                     meta: {
                         "apiCollectionId": apiCollectionId
-                    }                        
+                    }
                 }},
                 callback: (data) => console.log("callback Find auth-related tokens", data)
             },

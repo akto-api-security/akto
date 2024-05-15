@@ -112,6 +112,18 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
         closeModal()
     }
 
+    const addDataTypes = (name, headerKeys) => {
+        const obj = {
+            name: name,
+            active: true,
+            headerConditions: headerKeys,
+            payloadConditions: [],
+            edit: true
+        }
+        navigate("/dashboard/settings/auth-types/details", {state: obj})
+        closeModal()
+    }
+
     const runTests = () => {
         runCustomTests(response.responses[0].tests)
     }
@@ -163,6 +175,10 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                                 : queryType === "find_auth_related_tokens" && response?.responses?.length>0 ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
                                     <Button primary onClick={() => addAuthTypes("", response.responses)}>Add above Auth Types</Button>
+                                </div>
+                                : queryType === "find_sensitive_data" && response?.responses?.length>0 ?
+                                <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
+                                    <Button primary onClick={() => addDataTypes("", response.responses)}>Add above Data Types</Button>
                                 </div>
                                 : queryType === "generate_curl_for_test" && response?.responses[0]?.curl ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>

@@ -1,11 +1,15 @@
 package com.akto.action.testing;
 
 import com.akto.dao.SampleDataDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.testing.config.TestCollectionPropertiesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.KeyTypes;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.store.StandardHeaders;
+import com.akto.types.CappedSet;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -49,6 +53,44 @@ public class TestCollectionConfigurationAction {
             }
         }
 
+        return ret;
+    }
+
+    public Map<String, CappedSet<String>> findSampleValuesInPayload(int apiCollectionId, int skip) {
+        Map<String, CappedSet<String>> ret = new HashMap<>();
+
+        String url = "";
+        String method = "";
+        boolean shouldContinue = true;
+        int limit = 50;
+        do {
+            Bson loopQ = Filters.and(
+                Filters.or(
+                    Filters.and(
+                        Filters.eq(SingleTypeInfo._URL, url),
+                        Filters.gt(SingleTypeInfo._METHOD, method)
+                    ),
+                    Filters.and(
+                        Filters.gt(SingleTypeInfo._URL, url),
+                        Filters.exists(SingleTypeInfo._METHOD)
+                    )
+                ),
+                Filters.gt(SingleTypeInfo._RESPONSE_CODE, -1),
+                Filters.eq(SingleTypeInfo._IS_HEADER, false),
+                Filters.exists(SingleTypeInfo._PARAM),
+                Filters.eq(SingleTypeInfo.SUB_TYPE, SingleTypeInfo.GENERIC.getName()),
+                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                Filters.not(Filters.size(SingleTypeInfo._VALUES, 0))
+            );
+            List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(loopQ, skip, limit, Projections.include(SingleTypeInfo._VALUES));
+            shouldContinue = singleTypeInfos.size() != limit;
+            skip += singleTypeInfos.size();
+            for(SingleTypeInfo sti: singleTypeInfos) {
+                ret.put(sti.getParam(), sti.getValues());
+            }
+        } while (shouldContinue && ret.size() > 30);
+
+        ret.put("skip", new CappedSet<>(Collections.singleton(""+skip)));
         return ret;
     }
 
