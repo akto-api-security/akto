@@ -290,11 +290,12 @@ public class RiskScoreOfCollections {
                 float oldRiskScore = apiInfo.getRiskScore();
                 RiskScoreTestingEndpoints.RiskScoreGroupType oldRiskScoreGroupType = RiskScoreTestingEndpoints.calculateRiskScoreGroup(oldRiskScore);
                 int oldRiskScoreGroupCollectionId = RiskScoreTestingEndpoints.getApiCollectionId(oldRiskScoreGroupType);
-                
-                if (!collectionIds.contains(oldRiskScoreGroupCollectionId) && oldRiskScore == riskScore) {
-                    // handle case when api has risk score 0 and the new risk score is also 0
+
+                if (!collectionIds.contains(oldRiskScoreGroupCollectionId)) {
+                    // Add API to risk score API group if it is not already added
                     riskScoreTestingEndpointsUtils.updateApiRiskScoreGroup(apiInfo, riskScore);
                 } else if (oldRiskScore != riskScore) {
+                    // Update API in risk score API group if risk score has changed
                     riskScoreTestingEndpointsUtils.updateApiRiskScoreGroup(apiInfo, riskScore);
                 }
             }

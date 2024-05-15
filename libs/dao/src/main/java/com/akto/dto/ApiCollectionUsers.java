@@ -119,21 +119,30 @@ public class ApiCollectionUsers {
         operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
     }
 
-    public static void removeFromCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, boolean matchExactCondition) {
+    public static void removeFromCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
         Bson update = Updates.pull(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         Bson matchFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
 
-        if (matchExactCondition) {
-            // Remove collection ids for exact match of filter
+        // Check if any of the conditions is delta update based
+        boolean isDeltaUpdateBasedApiGroup = false;
+        for (TestingEndpoints testingEndpoints : conditions) {
+            if (TestingEndpoints.checkDeltaUpdateBased(testingEndpoints.getType())) {
+                isDeltaUpdateBasedApiGroup = true;
+                break;
+            }
+        }
+
+        if (isDeltaUpdateBasedApiGroup) {
             operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
         } else {
             operationForCollectionId(conditions, apiCollectionId, update, matchFilter, true);
         }
+
     }
 
     public static void computeCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
         addToCollectionsForCollectionId(conditions, apiCollectionId);
-        removeFromCollectionsForCollectionId(conditions, apiCollectionId, false);
+        removeFromCollectionsForCollectionId(conditions, apiCollectionId);
         updateApiCollection(conditions, apiCollectionId);
     }
 
