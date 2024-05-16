@@ -31,7 +31,7 @@ Sentry.init({
 const container = document.getElementById("root");
 const root = createRoot(container);
 
-let expired = false;
+let expired = true;
 
 if (
   window.STIGG_CUSTOMER_ID &&
