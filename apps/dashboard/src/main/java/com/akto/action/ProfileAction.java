@@ -163,8 +163,9 @@ public class ProfileAction extends UserAction {
 
                 organization = InitializerListener.fetchAndSaveFeatureWiseAllowed(organization);
                 gracePeriod = organization.getGracePeriod();
-                if (organization.getFeatureWiseAllowed() != null) {
-                    featureWiseAllowed = organization.getFeatureWiseAllowed();
+                featureWiseAllowed = organization.getFeatureWiseAllowed();
+                if (featureWiseAllowed == null) {
+                    featureWiseAllowed = new HashMap<>();
                 }
 
                 isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
@@ -198,6 +199,7 @@ public class ProfileAction extends UserAction {
             userDetails.append("stiggCustomerId", organizationId);
             userDetails.append("stiggCustomerToken", OrganizationUtils.fetchSignature(organizationId, organization.getAdminEmail()));
             userDetails.append("stiggClientKey", OrganizationUtils.fetchClientKey(organizationId, organization.getAdminEmail()));
+            userDetails.append("expired", organization.checkExpirationWithAktoSync());
             userDetails.append("hotjarSiteId", organization.getHotjarSiteId());
         }
 

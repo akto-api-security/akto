@@ -10,6 +10,7 @@ import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.RBAC;
 import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.OrgMetaData;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.util.UsageUtils;
@@ -253,9 +254,8 @@ public class OrganizationUtils {
         return (BasicDBList) (ret.get("entitlements"));
     }
 
-    public static int fetchOrgGracePeriodFromMetaData(BasicDBObject metadata) {
-        BasicDBObject additionalMetaData = (BasicDBObject) metadata.getOrDefault("additionalMetaData", new BasicDBObject());
-        String gracePeriodStr = (String) additionalMetaData.getOrDefault("GRACE_PERIOD_END_EPOCH", "");
+    public static int fetchOrgGracePeriodFromMetaData(BasicDBObject additionalMetaData) {
+        String gracePeriodStr = (String) additionalMetaData.getOrDefault(OrgMetaData.GRACE_PERIOD_END_EPOCH.name(), "");
 
         int gracePeriod = 0;
 
@@ -277,21 +277,26 @@ public class OrganizationUtils {
         String orgIdUUID = UUID.fromString(orgId).toString();
         BasicDBObject reqBody = new BasicDBObject("orgId", orgIdUUID).append("adminEmail", adminEmail);
         BasicDBObject orgMetaData = UsageMetricUtils.fetchFromBillingService("fetchOrgMetaData", reqBody);
-        return orgMetaData == null ? new BasicDBObject() : orgMetaData;
+        orgMetaData = orgMetaData == null ? new BasicDBObject() : orgMetaData;
+        BasicDBObject additionalMetaData = (BasicDBObject) orgMetaData.getOrDefault("additionalMetaData", new BasicDBObject());
+        return additionalMetaData;
     }
 
-    public static String fetchHotjarSiteId(BasicDBObject metadata) {
-        BasicDBObject additionalMetaData = (BasicDBObject) metadata.getOrDefault("additionalMetaData", new BasicDBObject());
+    public static boolean fetchExpired(BasicDBObject additionalMetaData) {
+        String expiredStr = (String) additionalMetaData.getOrDefault(OrgMetaData.EXPIRED.name(), "false");
+        boolean expired = Boolean.TRUE.toString().equalsIgnoreCase(expiredStr);
+        return expired;
+    }
+
+    public static String fetchHotjarSiteId(BasicDBObject additionalMetaData) {
         return additionalMetaData.getString("HOTJAR_SITE_ID", "");
     }
 
-    public static boolean fetchTelemetryEnabled(BasicDBObject metadata) {
-        BasicDBObject additionalMetaData = (BasicDBObject) metadata.getOrDefault("additionalMetaData", new BasicDBObject());
+    public static boolean fetchTelemetryEnabled(BasicDBObject additionalMetaData) {
         return additionalMetaData.getString("ENABLE_TELEMETRY", "NA").equalsIgnoreCase("ENABLED");
     }
 
-    public static boolean fetchTestTelemetryEnabled(BasicDBObject metadata) {
-        BasicDBObject additionalMetaData = (BasicDBObject) metadata.getOrDefault("additionalMetaData", new BasicDBObject());
+    public static boolean fetchTestTelemetryEnabled(BasicDBObject additionalMetaData) {
         return additionalMetaData.getString("ENABLE_TEST_TELEMETRY", "NA").equalsIgnoreCase("ENABLED");
     }
 }
