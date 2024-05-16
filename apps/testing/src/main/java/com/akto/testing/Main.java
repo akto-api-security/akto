@@ -200,8 +200,10 @@ public class Main {
         if (!SKIP_SSRF_CHECK) {
             Setup setup = SetupDao.instance.findOne(new BasicDBObject());
             String dashboardMode = setup.getDashboardMode();
-            boolean isOnPrem = dashboardMode.equalsIgnoreCase(DashboardMode.ON_PREM.name());
-            if (isOnPrem) SKIP_SSRF_CHECK = true;
+            if (dashboardMode != null) {
+                boolean isOnPrem = dashboardMode.equalsIgnoreCase(DashboardMode.ON_PREM.name());
+                if (isOnPrem) SKIP_SSRF_CHECK = true;
+            }
         }
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
