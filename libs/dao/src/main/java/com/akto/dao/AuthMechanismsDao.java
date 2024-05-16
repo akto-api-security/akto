@@ -14,18 +14,6 @@ public class AuthMechanismsDao extends AccountsContextDao<AuthMechanism> {
 
     public static AuthMechanismsDao instance = new AuthMechanismsDao();
 
-    public BasicDBObject findOneDocument(Bson q) {
-        List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.match(q));
-        MongoCursor<BasicDBObject> cursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-
-        while(cursor.hasNext()) {
-            return cursor.next();
-        }
-
-        return new BasicDBObject();
-    }
-
     @Override
     public String getCollName() {
         return "auth_mechanisms";

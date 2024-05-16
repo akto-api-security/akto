@@ -7,6 +7,7 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import okhttp3.*;
@@ -19,7 +20,7 @@ public class StiggReporterClient {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(StiggReporterClient.class);
     public static final StiggReporterClient instance = new StiggReporterClient();
-    private static final OkHttpClient client = new OkHttpClient();
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
 
     private Config.StiggConfig stiggConfig = null;
     private StiggReporterClient() {

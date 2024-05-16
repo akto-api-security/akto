@@ -6,7 +6,8 @@ public enum GptQuery {
     LIST_SENSITIVE_PARAMS("list_sensitive_params"),
     GENERATE_CURL_FOR_TEST("generate_curl_for_test"),
     GENERATE_REGEX("generate_regex"),
-    SUGGEST_TESTS("suggest_tests");
+    SUGGEST_TESTS("suggest_tests"),
+    FIND_AUTH_RELATED_TOKENS("find_auth_related_tokens");
 
     private final String name;
 

@@ -205,7 +205,6 @@ public class Executor {
     public void overrideTestUrl(RawApi rawApi, TestingRunConfig testingRunConfig) {
         try {
             String url = "";
-            loggerMaker.infoAndAddToDb("override url received - " + testingRunConfig.getOverriddenTestAppUrl(), LogDb.TESTING);
             List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
             if (!originalHostHeaders.isEmpty() && testingRunConfig != null
                 && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
@@ -595,11 +594,13 @@ public class Executor {
             case "modify_body_param":
                 return Operations.modifyBodyParam(rawApi, key.toString(), value);
             case "delete_graphql_field":
-                return Operations.deleteGraphqlField(rawApi, key.toString());
+                return Operations.deleteGraphqlField(rawApi, key == null ? "": key.toString());
             case "add_graphql_field":
-                return Operations.addGraphqlField(rawApi, key.toString(), value.toString());
+                return Operations.addGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
+            case "add_unique_graphql_field":
+                return Operations.addUniqueGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
             case "modify_graphql_field":
-                return Operations.modifyGraphqlField(rawApi, key.toString(), value.toString());
+                return Operations.modifyGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
             case "delete_body_param":
                 return Operations.deleteBodyParam(rawApi, key.toString());
             case "replace_body":
@@ -739,9 +740,12 @@ public class Executor {
                     if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().size() == 0) {
                         return new ExecutorSingleOperationResp(false, "auth headers missing");
                     }
-                    authVal = authMechanism.getAuthParams().get(0).getValue();
-                    ExecutorSingleOperationResp result = Operations.modifyHeader(rawApi, authHeader, authVal);
-                    modifiedAtLeastOne = modifiedAtLeastOne || result.getSuccess();
+
+                    for (AuthParam authParam: authMechanism.getAuthParams()) {
+                        authVal = authParam.getValue();
+                        ExecutorSingleOperationResp result = Operations.modifyHeader(rawApi, authParam.getKey(), authVal);
+                        modifiedAtLeastOne = modifiedAtLeastOne || result.getSuccess();
+                    }
                 }
 
                 // once all the replacement has been done.. .remove all the auth keys that were not impacted by the change by comparing it with initial request

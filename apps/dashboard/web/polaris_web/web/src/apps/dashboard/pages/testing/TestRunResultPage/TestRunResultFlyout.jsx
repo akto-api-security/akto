@@ -9,6 +9,7 @@ import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import GridRows from '../../../components/shared/GridRows'
 import { useNavigate } from 'react-router-dom'
+import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
 
 function TestRunResultFlyout(props) {
 
@@ -145,7 +146,7 @@ function TestRunResultFlyout(props) {
     const ValuesTab = {
         id: 'values',
         content: "Values",
-        component: (!(selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 && selectedTestRunResult.errors[0].endsWith("skipping execution"))) && selectedTestRunResult.testResults &&
+        component: (!(selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 && func.showTestSampleData(selectedTestRunResult))) && selectedTestRunResult.testResults &&
         <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
             key="Sample values"
             heading={"Attempt"}
@@ -169,7 +170,11 @@ function TestRunResultFlyout(props) {
                         <VerticalStack gap={"2"} >
                             <HorizontalStack gap="1_5-experimental">
                                 <Box><Icon source={item.icon} color='subdued'/></Box>
-                                <Text variant="bodyMd" fontWeight="semibold" color="subdued">{item.title}</Text>
+                                <TitleWithInfo
+                                    textProps={{variant:"bodyMd", fontWeight:"semibold", color:"subdued"}}
+                                    titleText={item.title}
+                                    tooltipContent={item.tooltipContent}
+                                />
                             </HorizontalStack>
                             {item?.content}
                         </VerticalStack>
@@ -182,11 +187,15 @@ function TestRunResultFlyout(props) {
     )
 
     function RowComp ({cardObj}){
-        const {title, value} = cardObj
+        const {title, value, tooltipContent} = cardObj
         return(
             value ? <Box width="224px">
                 <VerticalStack gap={"2"}>
-                    <Text variant="bodyMd" fontWeight="semibold" color="subdued">{title}</Text>
+                    <TitleWithInfo
+                        textProps={{variant:"bodyMd", fontWeight:"semibold", color:"subdued"}}
+                        titleText={title}
+                        tooltipContent={tooltipContent}
+                    />
                     {value}
                 </VerticalStack>
             </Box>: null
@@ -201,9 +210,11 @@ function TestRunResultFlyout(props) {
         <Box padding={"4"}>
             <VerticalStack gap={"5"}>
                 <VerticalStack gap={"2"}>
-                    <Text variant="bodyMd" fontWeight="semibold" color="subdued">
-                        Description
-                    </Text>
+                    <TitleWithInfo
+                        textProps={{variant:"bodyMd", fontWeight:"semibold", color:"subdued"}}
+                        titleText={"Description"}
+                        tooltipContent={"A brief description about the test from test library"}
+                    />
                     <Box as="span">
                         {
                             getDescriptionText(fullDescription) 

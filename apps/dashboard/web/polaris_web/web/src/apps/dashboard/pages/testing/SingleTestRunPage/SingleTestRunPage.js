@@ -34,6 +34,7 @@ let headers = [
   {
     value: "nameComp",
     title: 'Issue name',
+    tooltipContent: 'Name of the test as in our test editor'
   },
   {
     title: 'Severity',
@@ -44,10 +45,12 @@ let headers = [
     value: 'testCategory',
     title: 'Category',
     type: CellType.TEXT,
+    tooltipContent: 'Name of the subcategory of the test'
   },
   {
     title: 'CWE tags',
     value: 'cweDisplayComp',
+    tooltipContent: "CWE tags associated with the test from akto's test library"
   },
   {
     title: 'Number of urls',
@@ -399,15 +402,12 @@ const promotedBulkActions = (selectedDataHexIds) => {
   <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type!='One-time'}/> , 
     metadataComponent(), loading ? <SpinnerCentered key="loading"/> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
-  const rerunTest = (hexId) =>{
-    api.rerunTest(hexId).then((resp) => {
-      func.setToast(true, false, "Test re-run")
+  const rerunTest = async (hexId) =>{
+    await api.rerunTest(hexId)
+    func.setToast(true, false, "Test re-run")
       setTimeout(() => {
         refreshSummaries();
       }, 2000)
-    }).catch((resp) => {
-      func.setToast(true, true, "Unable to re-run test")
-    });
   }
 
   const openVulnerabilityReport = () => {

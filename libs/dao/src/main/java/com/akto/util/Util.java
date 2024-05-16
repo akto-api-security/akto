@@ -18,4 +18,18 @@ public class Util {
 
         return list;
     }
+
+    private static final String DOLLAR = "$";
+
+    public static String prefixDollar(String str) {
+        if (str == null) {
+            return null;
+        }
+        return DOLLAR + str;
+    }
+
+    public static String getEnvironmentVariable(String var){
+        return System.getenv(var);
+    }
+
 }

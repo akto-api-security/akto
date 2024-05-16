@@ -58,16 +58,27 @@ public class BackwardCompatibility {
 
     public static final String DEFAULT_TELEMETRY_SETTINGS = "defaultTelemetrySettings";
     private int defaultTelemetrySettings;
+    public static final String MOVE_AUTH_MECHANISM_TO_ROLE = "moveAuthMechanismToRole";
+    private int moveAuthMechanismToRole;
+    public static final String LOGIN_SIGNUP_GROUPS = "loginSignupGroups";
+    private int loginSignupGroups;
 
     public static final String VULNERABLE_API_UPDATION_VERSION_V1 = "vulnerableApiUpdationVersionV1";
     private int vulnerableApiUpdationVersionV1;
+
+    public static final String RISK_SCORE_GROUPS = "riskScoreGroups";
+    private int riskScoreGroups;
+    public static final String DEACTIVATE_COLLECTIONS = "deactivateCollections";
+    private int deactivateCollections;
 
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
                                  int deleteNullSubCategoryIssues, int enableNewMerging,
                                  int aktoDefaultNewUI, int initializeOrganizationAccountBelongsTo, int orgsInBilling,
-                                 int computeIntegratedConnections, int deleteLastCronRunInfo, int vulnerableApiUpdationVersionV1) {
+                                 int computeIntegratedConnections, int deleteLastCronRunInfo, int moveAuthMechanismToRole,
+                                 int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
+                                 int deactivateCollections) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -86,7 +97,11 @@ public class BackwardCompatibility {
         this.initializeOrganizationAccountBelongsTo = initializeOrganizationAccountBelongsTo;
         this.orgsInBilling = orgsInBilling;
         this.deleteLastCronRunInfo = deleteLastCronRunInfo;
+        this.moveAuthMechanismToRole = moveAuthMechanismToRole;
+        this.loginSignupGroups = loginSignupGroups;
         this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
+        this.riskScoreGroups = riskScoreGroups;
+        this.deactivateCollections = deactivateCollections;
     }
 
     public BackwardCompatibility() {
@@ -252,6 +267,22 @@ public class BackwardCompatibility {
         this.defaultTelemetrySettings = defaultTelemetrySettings;
     }
 
+    public int getMoveAuthMechanismToRole() {
+        return this.moveAuthMechanismToRole;
+    }
+
+    public void setMoveAuthMechanismToRole(int moveAuthMechanismToRole) {
+        this.moveAuthMechanismToRole = moveAuthMechanismToRole;
+    }
+
+    public int getLoginSignupGroups() {
+        return loginSignupGroups;
+    }
+
+    public void setLoginSignupGroups(int loginSignupGroups) {
+        this.loginSignupGroups = loginSignupGroups;
+    }
+    
     public int getVulnerableApiUpdationVersionV1() {
         return vulnerableApiUpdationVersionV1;
     }
@@ -259,4 +290,21 @@ public class BackwardCompatibility {
     public void setVulnerableApiUpdationVersionV1(int vulnerableApiUpdationVersionV1) {
         this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
     }
+
+    public int getRiskScoreGroups() {
+        return riskScoreGroups;
+    }
+
+    public void setRiskScoreGroups(int riskScoreGroups) {
+        this.riskScoreGroups = riskScoreGroups;
+    }
+    
+    public int getDeactivateCollections() {
+        return deactivateCollections;
+    }
+
+    public void setDeactivateCollections(int deactivateCollections) {
+        this.deactivateCollections = deactivateCollections;
+    }
+
 }
