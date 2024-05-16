@@ -109,12 +109,12 @@ public class LoggerMaker  {
         this.db = db;
     }
 
-    protected static void sendToSlack(String err) {
+    public static void sendToSlack(String slackWebhookUrl, String message){
         if (slackWebhookUrl != null) {
             try {
                 Slack slack = Slack.getInstance();
                 BasicDBList sectionsList = new BasicDBList();
-                BasicDBObject textObj = new BasicDBObject("type", "mrkdwn").append("text", err + "\n");
+                BasicDBObject textObj = new BasicDBObject("type", "mrkdwn").append("text", message + "\n");
                 BasicDBObject section = new BasicDBObject("type", "section").append("text", textObj);
                 sectionsList.add(section);
                 BasicDBObject ret = new BasicDBObject("blocks", sectionsList);
@@ -124,6 +124,10 @@ public class LoggerMaker  {
                 internalLogger.error("Can't send to Slack: " + e.getMessage(), e);
             }
         }
+    }
+
+    protected static void sendToSlack(String err) {
+        sendToSlack(slackWebhookUrl, err);
     }
 
     protected String basicError(String err, LogDb db) {
@@ -191,9 +195,7 @@ public class LoggerMaker  {
     }
 
     public void infoAndAddToDb(String info) {
-        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String infoMessage = "acc: " + accountId + ", " + info;
-        infoAndAddToDb(infoMessage, this.db);
+        infoAndAddToDb(info, this.db);
     }
 
     private Boolean checkUpdate(){

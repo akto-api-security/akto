@@ -1,20 +1,22 @@
 package com.akto.filter;
 
 import com.akto.action.AccessTokenAction;
-import com.akto.action.ApiTokenAction;
 import com.akto.action.ProfileAction;
 import com.akto.dao.ApiTokensDao;
 import com.akto.dao.SignupDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiToken;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
+import com.akto.dto.billing.Organization;
+import com.akto.listener.InitializerListener;
+import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
 import com.akto.utils.Token;
 import com.mongodb.BasicDBObject;
-import com.opensymphony.xwork2.Action;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import org.apache.commons.lang3.StringUtils;
@@ -27,13 +29,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-
-import static com.akto.action.LoginAction.REFRESH_TOKEN_COOKIE_NAME;
 
 // This is the first filter which will hit for every request to server
 // First checks if the access token is valid or not (from header)
@@ -300,6 +298,27 @@ public class UserDetailsFilter implements Filter {
             redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
             return ;
         }
+
+        if (DashboardMode.isOnPremDeployment() &&
+                httpServletRequest.getRequestURI().contains(API_URI)) {
+            int accountId = Context.accountId.get();
+            Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
+
+            /*
+             * In case org is not present, it is recreated on login.
+             */
+            if (organization != null && organization.checkExpirationWithAktoSync()) {
+
+                // attempt to sync with billing once more
+                organization = InitializerListener.fetchAndSaveFeatureWiseAllowed(organization);
+                if (organization.checkExpirationWithAktoSync()) {
+                    httpServletResponse.sendError(403);
+                    return;
+                }
+            }
+
+        }
+
         filterChain.doFilter(servletRequest, servletResponse);
     }
 

@@ -1,7 +1,5 @@
 package com.akto.listener;
 
-import java.io.IOException;
-import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -17,18 +15,12 @@ import com.akto.dao.billing.OrganizationUsageDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dao.usage.UsageSyncDao;
 import com.akto.dto.billing.Organization;
-import com.akto.dto.billing.OrganizationUsage;
-import com.akto.dto.billing.OrganizationUsage.DataSink;
-import com.akto.dto.usage.MetricTypes;
-import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageSync;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.stigg.StiggReporterClient;
 import com.akto.util.UsageCalculator;
 import com.akto.util.UsageUtils;
 import com.akto.util.tasks.OrganizationTask;
-import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -133,9 +125,7 @@ public class InitializerListener implements ServletContextListener {
                     OrganizationTask.instance.executeTask(new Consumer<Organization>() {
                         @Override
                         public void accept(Organization o) {
-                            UsageCalculator.instance.aggregateUsageForOrg(o, finalUsageLowerBound, finalUsageUpperBound);
-                            UsageCalculator.instance.sendOrgUsageDataToAllSinks(o);
-                        }
+                            aggregateAndSinkUsageData(o, finalUsageLowerBound, finalUsageUpperBound);                        }
                     }, "usage-reporting-scheduler");
 
                     UsageSyncDao.instance.updateOne(
@@ -147,6 +137,11 @@ public class InitializerListener implements ServletContextListener {
                 }
             }
         }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
+    }
+
+    public static void aggregateAndSinkUsageData(Organization organization, int usageLowerBound, int usageUpperBound) {
+        UsageCalculator.instance.aggregateUsageForOrg(organization, usageLowerBound, usageUpperBound);
+        UsageCalculator.instance.sendOrgUsageDataToAllSinks(organization);
     }
 
 }

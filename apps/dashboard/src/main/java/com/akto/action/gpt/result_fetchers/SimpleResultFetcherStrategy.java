@@ -1,5 +1,6 @@
 package com.akto.action.gpt.result_fetchers;
 
+import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
 import okhttp3.*;
 import org.slf4j.Logger;
@@ -28,7 +29,7 @@ public class SimpleResultFetcherStrategy implements ResultFetcherStrategy<BasicD
         String requestId = UUID.randomUUID().toString();
         data.put("request_id", requestId);
         logger.info("Request body:" + data.toJson() );
-        OkHttpClient client = new OkHttpClient().newBuilder()
+        OkHttpClient client = CoreHTTPClient.client.newBuilder()
                 .writeTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
                 .readTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
                 .callTimeout(45, java.util.concurrent.TimeUnit.SECONDS)

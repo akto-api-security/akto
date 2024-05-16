@@ -17,4 +17,5 @@ libawesome.dylib
 temp_*
 *.templates-config.json
 https:
+**/target_test-classes
 

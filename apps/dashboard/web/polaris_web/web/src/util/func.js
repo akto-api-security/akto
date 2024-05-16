@@ -1,8 +1,6 @@
 import {
-  CircleCancelMajor,
   CalendarMinor,
   ClockMinor,
-  CircleTickMajor,
   CircleAlertMajor,
   DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor, InviteMinor, CreditCardMajor, IdentityCardMajor, LocationsMinor,
   PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, ReceiptMajor, MobileMajor, CalendarTimeMinor
@@ -16,6 +14,8 @@ import { current } from 'immer';
 import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
+
+import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
 
 const func = {
   setToast (isActive, isError, message) {
@@ -202,27 +202,50 @@ prettifyEpoch(epoch) {
       return (countIssues[key] > 0)
     })
   },
-  getTestingRunIcon(state) {
-    switch (state?._name || state) {
-      case "RUNNING": return ClockMinor;
-      case "SCHEDULED": return CalendarMinor;
-      case "STOPPED": return CircleCancelMajor;
-      case "COMPLETED": return CircleTickMajor;
-      case "FAILED" :
-      case "FAIL": return CircleAlertMajor;
-      default: return ClockMinor;
-    }
-  },
-  getTestingRunIconColor(state) {
-    switch (state?._name || state) {
-      case "RUNNING": return "subdued";
-      case "SCHEDULED": return "warning";
+  getTestingRunIconObj(state) {
+    let testState = state?._name || state
+    switch(testState.toUpperCase()){
+      case "RUNNING": 
+        return {
+          color: "subdued",
+          icon: ClockMinor,
+          tooltipContent: "Test is currently running"
+        }
+
+      case "SCHEDULED": 
+        return {
+          color: "warning",
+          icon: CalendarMinor,
+          tooltipContent: "Test is scheduled and will run in future."
+        }
+
       case "FAILED":
       case "FAIL":
-      case "STOPPED": return "critical";
-      case "COMPLETED": return "success";
-      default: return "base";
-    }
+        return{
+          color: "critical",
+          icon: CircleAlertMajor,
+          tooltipContent: "Error occurred while running the test."
+        }
+
+      case "STOPPED":
+        return{
+          color: "critical",
+          tooltipContent: "Error occurred while running the test.",
+          icon: circle_cancel,
+        }
+      case "COMPLETED": 
+        return {
+          color: "success",
+          tooltipContent: "Test has been completed.",
+          icon: circle_tick_minor
+        }
+      default: 
+        return{
+          color: "critical",
+          icon: CircleAlertMajor,
+          tooltipContent: "Unknown error occurred while running the test."
+        }
+      }
   },
   getSeverity(countIssues) {
     return func.getSeverityStatus(countIssues).map((key) => {
@@ -1365,7 +1388,15 @@ mapCollectionIdToHostName(apiCollections){
     transformedString = segments.join('/');
     transformedString = transformedString.replace(/[/|-]/g, '_');
     return transformedString;
-  },
+},
+showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
+  Store.getState().setConfirmationModalConfig({
+    modalContent: modalContent,
+    primaryActionContent: primaryActionContent,
+    primaryAction: primaryAction,
+    show: true
+  })
+},
   hashCode(str) {
     var hash = 0;
     for (var i = 0; i < str.length; i++) {
@@ -1404,6 +1435,24 @@ mapCollectionIdToHostName(apiCollections){
   },
   getKeyFromName(key){
     return key.replace(/[\s/]+/g, '_').toLowerCase();
+  },
+  showTestSampleData(selectedTestRunResult){
+
+    let skipList = [
+      "skipping execution",
+      "deactivated"
+    ]
+
+    let errors = selectedTestRunResult.errors;
+
+    if (errors && errors.length > 0) {
+      let errorInSkipList = errors.filter(x => {
+        return skipList.some(y => x.includes(y))
+      }).length > 0
+
+      return !errorInSkipList
+    }
+    return true;
   }
 }
 
