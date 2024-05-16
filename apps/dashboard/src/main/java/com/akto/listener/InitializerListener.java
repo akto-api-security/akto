@@ -1901,6 +1901,7 @@ public class InitializerListener implements ServletContextListener {
             BasicDBObject metaData = OrganizationUtils.fetchOrgMetaData(organizationId, organization.getAdminEmail());
             gracePeriod = OrganizationUtils.fetchOrgGracePeriodFromMetaData(metaData);
             hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
+            boolean expired = OrganizationUtils.fetchExpired(metaData);
             boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
             setTelemetrySettings(organization, telemetryEnabled);
             boolean testTelemetryEnabled = OrganizationUtils.fetchTestTelemetryEnabled(metaData);
@@ -1912,8 +1913,16 @@ public class InitializerListener implements ServletContextListener {
 
             organization.setGracePeriod(gracePeriod);
             organization.setFeatureWiseAllowed(featureWiseAllowed);
+            organization.setExpired(expired);
 
-            lastFeatureMapUpdate = Context.now();
+            /*
+             * only update this field if we were able to update
+             * i.e. if we were able to reach akto
+             * or this is the first time being updated.
+             */
+            if (lastFeatureMapUpdate == 0 || (featureWiseAllowed != null && !featureWiseAllowed.isEmpty())) {
+                lastFeatureMapUpdate = Context.now();
+            }
             organization.setLastFeatureMapUpdate(lastFeatureMapUpdate);
 
             OrganizationsDao.instance.updateOne(
@@ -1921,6 +1930,7 @@ public class InitializerListener implements ServletContextListener {
                     Updates.combine(
                             Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed),
                             Updates.set(Organization.GRACE_PERIOD, gracePeriod),
+                            Updates.set(Organization._EXPIRED, expired),
                             Updates.set(Organization.HOTJAR_SITE_ID, hotjarSiteId),
                             Updates.set(Organization.TEST_TELEMETRY_ENABLED, testTelemetryEnabled),
                             Updates.set(Organization.LAST_FEATURE_MAP_UPDATE, lastFeatureMapUpdate)));
