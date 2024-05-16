@@ -201,8 +201,8 @@ public class Main {
             Setup setup = SetupDao.instance.findOne(new BasicDBObject());
             String dashboardMode = setup.getDashboardMode();
             if (dashboardMode != null) {
-                boolean isOnPrem = dashboardMode.equalsIgnoreCase(DashboardMode.ON_PREM.name());
-                if (isOnPrem) SKIP_SSRF_CHECK = true;
+                boolean isSaas = dashboardMode.equalsIgnoreCase(DashboardMode.SAAS.name());
+                if (!isSaas) SKIP_SSRF_CHECK = true;
             }
         }
 
