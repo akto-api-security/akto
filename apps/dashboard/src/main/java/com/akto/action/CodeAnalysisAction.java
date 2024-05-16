@@ -8,6 +8,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.bson.types.Code;
 import org.bson.types.ObjectId;
@@ -20,6 +24,7 @@ import com.akto.dao.CodeAnalysisApiInfoDao;
 import com.akto.dao.CodeAnalysisCollectionDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.CodeAnalysisApi;
@@ -52,11 +57,13 @@ public class CodeAnalysisAction extends UserAction {
     public static final int MAX_BATCH_SIZE = 100;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class);
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public void sendMixpanelEvent() {
         try {
+            int accountId = Context.accountId.get();
             DashboardMode dashboardMode = DashboardMode.getDashboardMode();        
-            RBAC record = RBACDao.instance.findOne("role", Role.ADMIN);
+            RBAC record = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
             if (record == null) {
                 return;
             }
@@ -305,7 +312,15 @@ public class CodeAnalysisAction extends UserAction {
         loggerMaker.infoAndAddToDb("Updated code analysis collection: " + apiCollectionName, LogDb.DASHBOARD);
         loggerMaker.infoAndAddToDb("Source code endpoints count: " + codeAnalysisApisMap.size(), LogDb.DASHBOARD);
 
-        sendMixpanelEvent();
+        // Send mixpanel event
+        int accountId = Context.accountId.get();
+        executorService.schedule( new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                sendMixpanelEvent();
+            }
+        }, 0, TimeUnit.SECONDS);
+        
 
         return SUCCESS.toUpperCase();
     }
