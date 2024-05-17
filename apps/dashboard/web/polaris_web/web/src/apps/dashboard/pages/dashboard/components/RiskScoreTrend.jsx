@@ -30,7 +30,7 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
                 <HorizontalGrid columns={2} gap={5}>
                 <HighchartsReact
                     highcharts={Highcharts}
-                    options={transform.getRiskScoreTrendOptions(riskScoreRangeMap)}
+                    options={transform.getRiskScoreTrendOptions(riskScoreRangeMap, riskScoreRanges)}
                     ref={riskScoreTrendRef}
                 />
                 <Box paddingInlineEnd={4} paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
@@ -41,9 +41,7 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
                                     <HorizontalStack align="space-between">
                                         <Button plain monochrome removeUnderline 
                                             onClick={() => navigate(`/dashboard/observe/inventory/${range.apiCollectionId}`)}>
-                                            <div className="customButton" > 
                                                 <Text variant="bodyMd" color="semibold" >{range.text}</Text>
-                                            </div>    
                                         </Button>
                                         <Badge status={range.status}>{range.range}</Badge>  
                                     </HorizontalStack>

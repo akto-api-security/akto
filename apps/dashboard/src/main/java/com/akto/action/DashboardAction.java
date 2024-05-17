@@ -52,9 +52,7 @@ public class DashboardAction extends UserAction {
             try {
                 ApiInfo apiInfo = apiCursor.next();
                 float riskScore = apiInfo.getRiskScore();
-                if (isBetween(0, 2, riskScore)) {
-                    riskScoreCounts.put(2, riskScoreCounts.getOrDefault(2,0) + 1);
-                } else if (isBetween(2, 3, riskScore)) {
+                if (isBetween(0, 3, riskScore)) {
                     riskScoreCounts.put(3, riskScoreCounts.getOrDefault(3,0) + 1);
                 } else if (isBetween(3, 4, riskScore)) {
                     riskScoreCounts.put(4, riskScoreCounts.getOrDefault(4,0) + 1);
