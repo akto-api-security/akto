@@ -239,11 +239,11 @@ public class IssuesAction extends UserAction {
                 includeYamlContent = true;
                 vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
                 break;
-            case "Dashboard":
-                testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
-                break;
             default:
-                return "ERROR: Invalid mode";
+                includeYamlContent = true;
+                categories = GlobalEnums.TestCategory.values();
+                vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
+                testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(includeYamlContent,

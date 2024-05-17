@@ -23,6 +23,8 @@ function Dashboard() {
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
 
+    const subCategoryMap = PersistStore(state => state.subCategoryMap)
+
     const fetchAllCollections = async () => {
         let apiCollections = await homeFunctions.getAllCollections()
         const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
@@ -32,11 +34,17 @@ function Dashboard() {
         setAllCollections(apiCollections)
     }
 
+    const fetchMetadata = async () => {
+        await transform.setTestMetadata();
+    };
+
     useEffect(() => {
         if((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)){
             fetchAllCollections()
         }
-        transform.setTestMetadata();
+        if (!subCategoryMap || (Object.keys(subCategoryMap).length === 0)) {
+            fetchMetadata();
+        }
         if(location.hash?.length > 0){
             let newPath = location.pathname
             if(location.hash.includes("Data")){
