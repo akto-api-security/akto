@@ -28,6 +28,7 @@ import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
+import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBObject;
@@ -57,7 +58,7 @@ public class Main {
 
     public static final ScheduledExecutorService schedulerAccessMatrix = Executors.newScheduledThreadPool(2);
 
-    public static final boolean SKIP_SSRF_CHECK = "true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK"));
+    public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
 
     private static TestingRunResultSummary createTRRSummaryIfAbsent(TestingRun testingRun, int start){
@@ -195,6 +196,15 @@ public class Main {
         } while (!connectedToMongo);
 
         setupRateLimitWatcher();
+
+        if (!SKIP_SSRF_CHECK) {
+            Setup setup = SetupDao.instance.findOne(new BasicDBObject());
+            String dashboardMode = setup.getDashboardMode();
+            if (dashboardMode != null) {
+                boolean isSaas = dashboardMode.equalsIgnoreCase(DashboardMode.SAAS.name());
+                if (!isSaas) SKIP_SSRF_CHECK = true;
+            }
+        }
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 

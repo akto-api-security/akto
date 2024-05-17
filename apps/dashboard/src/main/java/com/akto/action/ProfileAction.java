@@ -32,6 +32,8 @@ import com.mongodb.client.model.Updates;
 import io.micrometer.core.instrument.util.StringUtils;
 import org.apache.commons.codec.digest.HmacAlgorithms;
 import org.apache.commons.codec.digest.HmacUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -197,9 +199,8 @@ public class ProfileAction extends UserAction {
             userDetails.append("stiggCustomerId", organizationId);
             userDetails.append("stiggCustomerToken", OrganizationUtils.fetchSignature(organizationId, organization.getAdminEmail()));
             userDetails.append("stiggClientKey", OrganizationUtils.fetchClientKey(organizationId, organization.getAdminEmail()));
-            userDetails.append("hotjarSiteId", organization.getHotjarSiteId());
             userDetails.append("expired", organization.checkExpirationWithAktoSync());
-
+            userDetails.append("hotjarSiteId", organization.getHotjarSiteId());
         }
 
         if (versions.length > 2) {

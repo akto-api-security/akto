@@ -13,6 +13,7 @@ import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UnwindOptions;
 import com.mongodb.client.model.Updates;
 
 import org.bson.Document;
@@ -91,7 +92,11 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         int oneMonthAgo = Context.now() - Constants.ONE_MONTH_TIMESTAMP ;
         pipeline.add(Aggregates.match(Filters.gte("lastTested", oneMonthAgo)));
 
-        BasicDBObject groupedId2 = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
+        UnwindOptions unwindOptions = new UnwindOptions();
+        unwindOptions.preserveNullAndEmptyArrays(false);  
+        pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+
+        BasicDBObject groupedId2 = new BasicDBObject("apiCollectionId", "$collectionIds");
         pipeline.add(Aggregates.group(groupedId2, Accumulators.sum("count",1)));
         pipeline.add(Aggregates.project(
             Projections.fields(
@@ -115,7 +120,12 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
     public Map<Integer,Integer> getLastTrafficSeen(){
         Map<Integer,Integer> result = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
+
+        UnwindOptions unwindOptions = new UnwindOptions();
+        unwindOptions.preserveNullAndEmptyArrays(false);  
+        pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$collectionIds");
         pipeline.add(Aggregates.sort(Sorts.orderBy(Sorts.descending(ApiInfo.ID_API_COLLECTION_ID), Sorts.descending(ApiInfo.LAST_SEEN))));
         pipeline.add(Aggregates.group(groupedId, Accumulators.first(ApiInfo.LAST_SEEN, "$lastSeen")));
         

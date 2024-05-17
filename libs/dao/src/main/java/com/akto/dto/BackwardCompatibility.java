@@ -66,6 +66,8 @@ public class BackwardCompatibility {
     public static final String VULNERABLE_API_UPDATION_VERSION_V1 = "vulnerableApiUpdationVersionV1";
     private int vulnerableApiUpdationVersionV1;
 
+    public static final String RISK_SCORE_GROUPS = "riskScoreGroups";
+    private int riskScoreGroups;
     public static final String DEACTIVATE_COLLECTIONS = "deactivateCollections";
     private int deactivateCollections;
 
@@ -75,7 +77,7 @@ public class BackwardCompatibility {
                                  int deleteNullSubCategoryIssues, int enableNewMerging,
                                  int aktoDefaultNewUI, int initializeOrganizationAccountBelongsTo, int orgsInBilling,
                                  int computeIntegratedConnections, int deleteLastCronRunInfo, int moveAuthMechanismToRole,
-                                 int loginSignupGroups, int vulnerableApiUpdationVersionV1, 
+                                 int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
                                  int deactivateCollections) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
@@ -98,6 +100,7 @@ public class BackwardCompatibility {
         this.moveAuthMechanismToRole = moveAuthMechanismToRole;
         this.loginSignupGroups = loginSignupGroups;
         this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
+        this.riskScoreGroups = riskScoreGroups;
         this.deactivateCollections = deactivateCollections;
     }
 
@@ -288,6 +291,14 @@ public class BackwardCompatibility {
         this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
     }
 
+    public int getRiskScoreGroups() {
+        return riskScoreGroups;
+    }
+
+    public void setRiskScoreGroups(int riskScoreGroups) {
+        this.riskScoreGroups = riskScoreGroups;
+    }
+    
     public int getDeactivateCollections() {
         return deactivateCollections;
     }

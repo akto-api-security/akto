@@ -328,7 +328,7 @@ const router = createBrowserRouter([
   {
     path: "*",
     element: <Navigate to="/dashboard/home" />,
-  }
+  },
 ])
 
 function App() {

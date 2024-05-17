@@ -145,10 +145,14 @@ public class Organization {
 
     public boolean checkExpirationWithAktoSync() {
 
-        if (expired ||
-                (((lastFeatureMapUpdate > 0) &&
-                        (lastFeatureMapUpdate + Organization.NO_SYNC_PERIOD < Context.now())) &&
-                        (featureWiseAllowed == null || featureWiseAllowed.isEmpty()))) {
+        boolean noConnectivity = (((lastFeatureMapUpdate > 0) &&
+                (lastFeatureMapUpdate + Organization.NO_SYNC_PERIOD < Context.now())) &&
+                (featureWiseAllowed == null || featureWiseAllowed.isEmpty()));
+
+        /*
+         * TODO: no connectivity check to be added later.
+         */
+        if (expired) {
             return true;
         }
 

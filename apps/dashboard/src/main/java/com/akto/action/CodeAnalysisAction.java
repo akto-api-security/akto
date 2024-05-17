@@ -4,29 +4,43 @@ import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.bson.types.Code;
 import org.bson.types.ObjectId;
 import org.checkerframework.checker.units.qual.s;
+import org.json.JSONObject;
 
 import com.akto.action.observe.Utils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.CodeAnalysisApiInfoDao;
 import com.akto.dao.CodeAnalysisCollectionDao;
+import com.akto.dao.RBACDao;
+import com.akto.dao.UsersDao;
+import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.CodeAnalysisApi;
 import com.akto.dto.CodeAnalysisApiInfo;
 import com.akto.dto.CodeAnalysisApiLocation;
 import com.akto.dto.CodeAnalysisCollection;
+import com.akto.dto.RBAC;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mixpanel.AktoMixpanel;
+import com.akto.util.DashboardMode;
+import com.akto.util.EmailAccountName;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOneModel;
@@ -43,6 +57,52 @@ public class CodeAnalysisAction extends UserAction {
     public static final int MAX_BATCH_SIZE = 100;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class);
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
+    public void sendMixpanelEvent() {
+        try {
+            int accountId = Context.accountId.get();
+            DashboardMode dashboardMode = DashboardMode.getDashboardMode();        
+            RBAC record = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
+            if (record == null) {
+                return;
+            }
+            BasicDBObject mentionedUser = UsersDao.instance.getUserInfo(record.getUserId());
+            String userEmail = (String) mentionedUser.get("name");
+            String distinct_id = userEmail + "_" + dashboardMode;
+            EmailAccountName emailAccountName = new EmailAccountName(userEmail);
+            String accountName = emailAccountName.getAccountName();
+
+            JSONObject props = new JSONObject();
+            props.put("Email ID", userEmail);
+            props.put("Dashboard Mode", dashboardMode);
+            props.put("Account Name", accountName);
+
+            int codeAnalysisApiCount = 0;
+            Set<String> fileExtensions = new HashSet<>();
+            if (codeAnalysisApisList != null) {
+                codeAnalysisApiCount = codeAnalysisApisList.size();
+
+                for (CodeAnalysisApi codeAnalysisApi: codeAnalysisApisList) {
+                    CodeAnalysisApiLocation location = codeAnalysisApi.getLocation();
+                    if (location != null) {
+                        String fileName = location.getFileName();
+                        String[] fileNameParts = fileName.split("\\.");
+                        if (fileNameParts.length > 1) {
+                            fileExtensions.add(fileNameParts[fileNameParts.length - 1]);
+                        }
+                    }
+                }
+            } 
+            props.put("codeAnalysisApiCount", codeAnalysisApiCount);
+            props.put("fileExtensions", fileExtensions);
+
+            AktoMixpanel aktoMixpanel = new AktoMixpanel();
+            aktoMixpanel.sendEvent(distinct_id, "CODE_ANALYSIS_SYNC", props);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error sending CODE_ANALYSIS_SYNC mixpanel event: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
     
     public String syncExtractedAPIs() {
         loggerMaker.infoAndAddToDb("Syncing code analysis endpoints for collection: " + apiCollectionName, LogDb.DASHBOARD);
@@ -251,6 +311,16 @@ public class CodeAnalysisAction extends UserAction {
 
         loggerMaker.infoAndAddToDb("Updated code analysis collection: " + apiCollectionName, LogDb.DASHBOARD);
         loggerMaker.infoAndAddToDb("Source code endpoints count: " + codeAnalysisApisMap.size(), LogDb.DASHBOARD);
+
+        // Send mixpanel event
+        int accountId = Context.accountId.get();
+        executorService.schedule( new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                sendMixpanelEvent();
+            }
+        }, 0, TimeUnit.SECONDS);
+        
 
         return SUCCESS.toUpperCase();
     }
