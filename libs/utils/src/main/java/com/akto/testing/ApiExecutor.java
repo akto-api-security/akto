@@ -218,6 +218,7 @@ public class ApiExecutor {
         headersMap.put(Constants.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
         for (String headerName: headersMap.keySet()) {
             if (forbiddenHeaders.contains(headerName)) continue;
+            if (headerName.contains(" ")) continue;
             List<String> headerValueList = headersMap.get(headerName);
             if (headerValueList == null || headerValueList.isEmpty()) continue;
             for (String headerValue: headerValueList) {

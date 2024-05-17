@@ -72,7 +72,8 @@ public class TestProfileExpired extends MongoBasedTest {
 
             // If akto-usage-service is unreachable for more than NO_SYNC_PERIOD
             org.setLastFeatureMapUpdate(Context.now() - Organization.NO_SYNC_PERIOD - 60);
-            assertEquals(true, org.checkExpirationWithAktoSync());
+            // TODO: update this when no connectivity check is enabled.
+            assertEquals(false, org.checkExpirationWithAktoSync());
         }
     }
 

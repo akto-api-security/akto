@@ -33,12 +33,11 @@ const root = createRoot(container);
 
 let expired = false;
 
-if (window.DASHBOARD_MODE == 'ON_PREM' && (
-  !window.STIGG_CUSTOMER_ID ||
-  (window.EXPIRED && window.EXPIRED == 'true') )) {
+if (
+  window.STIGG_CUSTOMER_ID &&
+  (window.EXPIRED && window.EXPIRED == 'true')) {
 
   expired = true;
-
 }
 
 if (expired) {
