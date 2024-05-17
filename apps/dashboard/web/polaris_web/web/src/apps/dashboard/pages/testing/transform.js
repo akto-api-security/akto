@@ -530,19 +530,18 @@ const transform = {
     }
     return conditions;
   },
-  setTestMetadata() {
-    api.fetchAllSubCategories(true, "Dashboard").then((resp) => {
-      let subCategoryMap = {}
-      resp.subCategories.forEach((x) => {
-        subCategoryMap[x.name] = x
-      })
-      let subCategoryFromSourceConfigMap = {}
-      resp.testSourceConfigs.forEach((x) => {
-        subCategoryFromSourceConfigMap[x.id] = x
-      })
-      PersistStore.getState().setSubCategoryMap(subCategoryMap)
-      PersistStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap)
-    })
+  async setTestMetadata() {
+    const resp = await api.fetchAllSubCategories(true, "Dashboard");
+    let subCategoryMap = {};
+    resp.subCategories.forEach((x) => {
+      subCategoryMap[x.name] = x;
+    });
+    let subCategoryFromSourceConfigMap = {};
+    resp.testSourceConfigs.forEach((x_1) => {
+      subCategoryFromSourceConfigMap[x_1.id] = x_1;
+    });
+    PersistStore.getState().setSubCategoryMap(subCategoryMap);
+    PersistStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap);
   },
   prettifySummaryTable(summaries) {
     summaries = summaries.map((obj) => {
