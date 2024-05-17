@@ -10,14 +10,9 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.Account;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.Setup;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.TestingRun;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -218,6 +213,25 @@ public class Main {
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
+        schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(account -> {
+                    AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
+                    try {
+                        matrixAnalyzer.run();
+                    } catch (Exception e) {
+                        loggerMaker.infoAndAddToDb("could not run matrixAnalyzer: " + e.getMessage(), LogDb.TESTING);
+                    }
+                },"matrix-analyser-task");
+            }
+        }, 0, 1, TimeUnit.MINUTES);
+
+
+
+        loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
+
         while (true) {
             AccountTask.instance.executeTask(account -> {
                 int accountId = account.getId();
@@ -240,7 +254,24 @@ public class Main {
                     return;
                 }
 
+                if (testingRun.getState().equals(State.STOPPED)) {
+                    loggerMaker.infoAndAddToDb("Testing run stopped");
+                    if (trrs != null) {
+                        loggerMaker.infoAndAddToDb("Stopping TRRS: " + trrs.getId());
+                        TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                                Filters.eq(Constants.ID, trrs.getId()),
+                                Updates.set(TestingRunResultSummary.STATE, State.STOPPED)
+                        );
+                        loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
+                    }
+                    return;
+                }
+
                 FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
+
+                loggerMaker.infoAndAddToDb("Starting test for accountID: " + accountId);
+
+                boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
 
                 if (featureAccess.checkInvalidAccess()) {
                     loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId + ". Failing test run at " + start, LogDb.TESTING);
@@ -257,8 +288,6 @@ public class Main {
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
                 // saving the initial usageLeft, to calc delta later.
                 int usageLeft = syncLimit.getUsageLeft();
-
-                boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
 
                 try {
                     setTestingRunConfig(testingRun, trrs);
@@ -369,7 +398,26 @@ public class Main {
                     TestExecutor.updateTestSummary(summaryId);
                 }
 
-                loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds for account: " + accountId, LogDb.TESTING);
+
+                Organization organization = OrganizationsDao.instance.findOne(
+                        Filters.in(Organization.ACCOUNTS, Context.accountId.get()));
+
+                if(organization.getTestTelemetryEnabled()){
+                    loggerMaker.infoAndAddToDb("Test telemetry enabled for account: " + accountId + ", sending results", LogDb.TESTING);
+                    ObjectId finalSummaryId = summaryId;
+                    testTelemetryScheduler.execute(() -> {
+                        Context.accountId.set(accountId);
+                        try {
+                            com.akto.onprem.Constants.sendTestResults(finalSummaryId, organization);
+                            loggerMaker.infoAndAddToDb("Test telemetry sent for account: " + accountId, LogDb.TESTING);
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, "Error in sending test telemetry for account: " + accountId);
+                        }
+                    });
+                } else {
+                    loggerMaker.infoAndAddToDb("Test telemetry disabled for account: " + accountId, LogDb.TESTING);
+                }
 
                 // update usage after test is completed.
                  int deltaUsage = 0;
