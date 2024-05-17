@@ -637,12 +637,12 @@ public class InventoryAction extends UserAction {
     }
 
     private Bson getSearchFilters(){
-        if(this.searchString == null || this.searchString.length() == 0){
+        if(this.searchString == null || this.searchString.length() < 3){
             return Filters.empty();
         }
-        Bson filter = Filters.or(
-            Filters.regex(SingleTypeInfo._PARAM, this.searchString, "i")
-        );
+        String escapedPrefix = Utils.escapeSpecialCharacters(this.searchString);
+        String regexPattern = "^" + escapedPrefix + ".*";
+        Bson filter = Filters.regex(SingleTypeInfo._PARAM, regexPattern, "i");
         return filter;
     }
 
@@ -655,12 +655,22 @@ public class InventoryAction extends UserAction {
         Bson sort = sortOrder == 1 ? Sorts.ascending(sortFields) : Sorts.descending(sortFields);
 
         loggerMaker.infoAndAddToDb(String.format("skip: %s, limit: %s, sort: %s", skip, limit, sort), LogDb.DASHBOARD);
-        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.and(prepareFilters(), getSearchFilters()), skip, limit, sort);
+        if(skip < 0){
+            skip *= -1;
+        }
+
+        if(limit < 0){
+            limit *= -1;
+        }
+
+        int pageLimit = Math.min(limit == 0 ? 50 : limit, 10_000);
+
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.and(prepareFilters(), getSearchFilters()), skip,pageLimit, sort);
         return list;        
     }
 
     private long getTotalParams() {
-        return SingleTypeInfoDao.instance.getMCollection().countDocuments(prepareFilters());
+        return SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.and(prepareFilters(), getSearchFilters()));
     }
 
     public String fetchChanges() {
