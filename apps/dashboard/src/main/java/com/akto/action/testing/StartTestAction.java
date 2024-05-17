@@ -1,9 +1,7 @@
 package com.akto.action.testing;
 
-import com.akto.DaoInit;
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
-import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
@@ -26,13 +24,10 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
-import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
-import com.mongodb.BasicDBList;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -48,6 +43,7 @@ import org.bson.types.ObjectId;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class StartTestAction extends UserAction {
@@ -222,8 +218,9 @@ public class StartTestAction extends UserAction {
 
         if (utility != null
                 && (Utility.CICD.toString().equals(utility) || Utility.EXTERNAL_API.toString().equals(utility))) {
+            int testsCounts = this.selectedTests != null ? this.selectedTests.size() : 0;
             TestingRunResultSummary summary = new TestingRunResultSummary(scheduleTimestamp, 0, new HashMap<>(),
-                    0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0, this.testIdConfig);
+                    0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0, this.testIdConfig,testsCounts );
             summary.setState(TestingRun.State.SCHEDULED);
             if (metadata != null) {
                 loggerMaker.infoAndAddToDb("CICD test triggered at " + Context.now(), LogDb.DASHBOARD);
@@ -351,11 +348,13 @@ public class StartTestAction extends UserAction {
     }
 
     private Bson getSearchFilters(){
-        if(this.searchString == null || this.searchString.length() == 0){
+        if(this.searchString == null || this.searchString.length() < 3){
             return Filters.empty();
         }
+        String escapedPrefix = Pattern.quote(this.searchString);
+        String regexPattern = ".*" + escapedPrefix + ".*";
         Bson filter = Filters.or(
-            Filters.regex(TestingRun.NAME, this.searchString, "i")
+            Filters.regex(TestingRun.NAME, regexPattern, "i")
         );
         return filter;
     }
@@ -388,6 +387,14 @@ public class StartTestAction extends UserAction {
         testingRunFilters.addAll(prepareFilters(startTimestamp, endTimestamp));
         testingRunFilters.add(getSearchFilters());
         testingRunFilters.addAll(getTableFilters());
+
+        if(skip < 0){
+            skip *= -1;
+        }
+
+        if(limit < 0){
+            limit *= -1;
+        }
 
         int pageLimit = Math.min(limit == 0 ? 50 : limit, 10_000);
 
@@ -829,10 +836,10 @@ public class StartTestAction extends UserAction {
             int totalInitiatedTests = 0;
             List<StatusForIndividualTest> currentTestsRunningList = new ArrayList<>();
             for(TestingRunResultSummary summary: runningTrrs){
-                int countInitiatedTestsForSummary = TestingRunConfigDao.instance.countTotalTestsInitialised(summary);
+                int countInitiatedTestsForSummary = (summary.getTestInitiatedCount() * summary.getTotalApis()) ;
                 totalInitiatedTests += countInitiatedTestsForSummary;
 
-                int currentTestsStoredForSummary = (int) TestingRunResultDao.instance.count(Filters.in(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summary.getId()));
+                int currentTestsStoredForSummary = summary.getTestResultsCount();
                 totalRunningTests += currentTestsStoredForSummary;
                 currentTestsRunningList.add(new StatusForIndividualTest(summary.getTestingRunId().toHexString(), totalInitiatedTests, totalRunningTests));
             }

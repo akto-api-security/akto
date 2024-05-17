@@ -263,14 +263,6 @@ public class TestExecutor {
     }
 
     public static void updateTestSummary(ObjectId summaryId){
-
-        long testingRunResultsCount = TestingRunResultDao.instance
-                .count(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId));
-
-        TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
-                Filters.eq(Constants.ID, summaryId),
-                Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResultsCount));
-
         loggerMaker.infoAndAddToDb("Finished updating results count", LogDb.TESTING);
 
         Map<String, Integer> totalCountIssues = new HashMap<>();
@@ -548,13 +540,21 @@ public class TestExecutor {
         }
     }
 
-    public void insertResultsAndMakeIssues(List<TestingRunResult> testingRunResults) {
+    public void insertResultsAndMakeIssues(List<TestingRunResult> testingRunResults, ObjectId testRunResultSummaryId) {
         int resultSize = testingRunResults.size();
         if (resultSize > 0) {
             loggerMaker.infoAndAddToDb("testingRunResults size: " + resultSize, LogDb.TESTING);
             trim(testingRunResults);
             TestingRunResultDao.instance.insertMany(testingRunResults);
             loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
+
+            TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                Filters.eq(Constants.ID, testRunResultSummaryId),
+                Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize)
+            );
+
+            loggerMaker.infoAndAddToDb("Updated count in summary", LogDb.TESTING);
+
             TestingIssuesHandler handler = new TestingIssuesHandler();
             boolean triggeredByTestEditor = false;
             handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
@@ -596,7 +596,7 @@ public class TestExecutor {
                 countSuccessfulTests++;
             }
 
-            insertResultsAndMakeIssues(testingRunResults);
+            insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
         }
         if(countSuccessfulTests > 0){
             ApiInfoDao.instance.updateLastTestedField(apiInfoKey);
