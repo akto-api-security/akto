@@ -1,15 +1,18 @@
 package com.akto.action;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
 
-import com.akto.action.observe.Utils;
 import com.akto.dao.*;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.ApiCollectionTestStatus;
 import com.akto.dto.testing.TestingEndpoints;
 import com.mongodb.client.MongoCursor;
@@ -40,6 +43,7 @@ import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UnwindOptions;
 import com.opensymphony.xwork2.Action;
 import org.apache.commons.lang3.tuple.Pair;
 import org.bson.Document;
@@ -74,11 +78,9 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     boolean redacted;
-
-    public String fetchAllCollections() {
-        this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+    
+    public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections) {
         this.apiCollectionTestStatus = new ArrayList<>();
-
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
         Map<Integer, Pair<String,Integer>> map = new HashMap<>();
         try (MongoCursor<BasicDBObject> cursor = TestingRunDao.instance.getMCollection().aggregate(
@@ -106,7 +108,7 @@ public class ApiCollectionsAction extends UserAction {
             if (count != null && (apiCollection.getHostName() != null)) {
                 apiCollection.setUrlsCount(count);
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
-                count = Utils.countEndpoints(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
+                count = SingleTypeInfoDao.instance.countEndpoints(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
                 apiCollection.setUrlsCount(count);
             } else {
                 apiCollection.setUrlsCount(fallbackCount);
@@ -120,6 +122,13 @@ public class ApiCollectionsAction extends UserAction {
 
             apiCollection.setUrls(new HashSet<>());
         }
+        return apiCollections;
+    }
+
+    public String fetchAllCollections() {
+
+        this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -230,6 +239,7 @@ public class ApiCollectionsAction extends UserAction {
             }
             ApiCollectionUsers.updateApiCollection(collection.getConditions(), collection.getId());
         }
+
         return SUCCESS.toUpperCase();
     }
 
@@ -342,7 +352,7 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
-
+        
         return SUCCESS.toUpperCase();
     }
 
@@ -417,7 +427,15 @@ public class ApiCollectionsAction extends UserAction {
     public String fetchRiskScoreInfo(){
         Map<Integer, Double> riskScoreMap = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
-        BasicDBObject groupId = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
+
+        /*
+         * Use Unwind to unwind the collectionIds field resulting in a document for each collectionId in the collectionIds array
+         */
+        UnwindOptions unwindOptions = new UnwindOptions();
+        unwindOptions.preserveNullAndEmptyArrays(false);  
+        pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+
+        BasicDBObject groupId = new BasicDBObject("apiCollectionId", "$collectionIds");
         pipeline.add(Aggregates.sort(
             Sorts.descending(ApiInfo.RISK_SCORE)
         ));
@@ -457,6 +475,58 @@ public class ApiCollectionsAction extends UserAction {
         return Action.ERROR.toUpperCase();
     }
 
+    private List<Integer> reduceApiCollectionToId(List<ApiCollection> apiCollections) {
+        if (apiCollections == null) {
+            return new ArrayList<>();
+        }
+        return apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
+    }
+
+    private List<ApiCollection> filterDeactivatedCollections(List<ApiCollection> apiCollections) {
+        if (apiCollections == null) {
+            return new ArrayList<>();
+        }
+        List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
+        /*
+         * The apiCollections from request contain only the IDs,
+         * thus we need to fetch the active status from the db.
+         */
+        return ApiCollectionsDao.instance.findAll(Filters.and(
+                Filters.in(Constants.ID, apiCollectionIds),
+                Filters.eq(ApiCollection._DEACTIVATED, true)));
+    }
+
+    public String deactivateCollections() {
+        List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
+        ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
+                Updates.set(ApiCollection._DEACTIVATED, true));
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String activateCollections() {
+        this.apiCollections = filterDeactivatedCollections(this.apiCollections);
+        if (this.apiCollections.isEmpty()) {
+            return Action.SUCCESS.toUpperCase();
+        }
+        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
+
+        int accountId = Context.accountId.get();
+        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.ACTIVE_ENDPOINTS);
+        int usageBefore = featureAccess.getUsage();
+        int count = this.apiCollections.stream().mapToInt(apiCollection -> apiCollection.getUrlsCount()).sum();
+        featureAccess.setUsage(usageBefore + count);
+
+        if (!featureAccess.checkInvalidAccess()) {
+            List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
+            ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
+                    Updates.unset(ApiCollection._DEACTIVATED));
+        } else {
+            String errorMessage = "API endpoints in collections exceeded usage limit. Unable to activate collections. Please upgrade your plan.";
+            addActionError(errorMessage);
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
     public String fetchCustomerEndpoints(){
         try {
             ApiCollection juiceShop = ApiCollectionsDao.instance.findByName("juice_shop_demo");

@@ -21,6 +21,7 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.UnwindOptions;
 
 public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
 
@@ -61,7 +62,11 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN")));
 
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$_id.apiInfoKey.apiCollectionId")
+        UnwindOptions unwindOptions = new UnwindOptions();
+        unwindOptions.preserveNullAndEmptyArrays(false);  
+        pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$collectionIds")
                                                 .append("severity", "$severity") ;
 
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));

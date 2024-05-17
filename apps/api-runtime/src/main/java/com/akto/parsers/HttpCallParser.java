@@ -15,6 +15,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
 import com.akto.runtime.URLAggregator;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.JSONUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.Constants;
@@ -469,6 +470,13 @@ public class HttpCallParser {
             }
 
         }
+
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        filteredResponseParams.removeIf((temp) -> {
+            int apiCollectionId = temp.getRequestParams().getApiCollectionId();
+            return deactivatedCollections.contains(apiCollectionId);
+        });
+
         int filteredSize = filteredResponseParams.size();
         loggerMaker.debugInfoAddToDb("Filtered " + (originalSize - filteredSize) + " responses", LogDb.RUNTIME);
         return filteredResponseParams;

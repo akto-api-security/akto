@@ -9,7 +9,7 @@ function EmptyScreensLayout({iconSrc,headingText,description, buttonText, redire
   return (
     <VerticalStack gap={5}>
         <Card padding={5}>
-            <Box paddingBlockStart={5}>
+            <Box paddingBlockStart={5} paddingBlockEnd={16}>
                 <HorizontalStack align="center">
                     <Box width='400px'>
                         <VerticalStack gap={8}>
@@ -22,13 +22,13 @@ function EmptyScreensLayout({iconSrc,headingText,description, buttonText, redire
                             </HorizontalStack>
                             <VerticalStack gap={4}>
                                 <HorizontalStack align='center'>
-                                    <Text variant="headingLg">{headingText}</Text>
+                                    <Text variant="headingLg" alignment={"center"}>{headingText}</Text>
                                 </HorizontalStack>
                                 
                                 <Text color="subdued" variant="bodyMd" alignment="center">{description}</Text>
                                 
                                 <HorizontalStack align='center'>
-                                    {redirectUrl ? <Box paddingBlockStart={2} paddingBlockEnd={16}>
+                                    {redirectUrl ? <Box paddingBlockStart={2}>
                                         <Button primary onClick={() => navigate(redirectUrl)}>{buttonText}</Button>
                                     </Box> : null}
                                     {bodyComponent}
@@ -40,12 +40,14 @@ function EmptyScreensLayout({iconSrc,headingText,description, buttonText, redire
                 </HorizontalStack>
             </Box>
         </Card>
+        { learnText ? 
         <HorizontalStack align="center">
             <HorizontalStack gap="1">
                 Learn more about
                 <Link url={docsUrl} target="_blank">{learnText}</Link>
             </HorizontalStack>
         </HorizontalStack>
+        : <></>}
         {infoItems ? <InfoComponent title={infoTitle} items={infoItems} /> : null}
     </VerticalStack>
   )
