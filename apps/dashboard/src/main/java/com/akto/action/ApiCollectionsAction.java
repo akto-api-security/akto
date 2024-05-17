@@ -48,6 +48,7 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UnwindOptions;
 import com.opensymphony.xwork2.Action;
 import org.apache.commons.lang3.tuple.Pair;
 import org.bson.Document;
@@ -440,7 +441,15 @@ public class ApiCollectionsAction extends UserAction {
     public String fetchRiskScoreInfo(){
         Map<Integer, Double> riskScoreMap = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
-        BasicDBObject groupId = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
+
+        /*
+         * Use Unwind to unwind the collectionIds field resulting in a document for each collectionId in the collectionIds array
+         */
+        UnwindOptions unwindOptions = new UnwindOptions();
+        unwindOptions.preserveNullAndEmptyArrays(false);  
+        pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+
+        BasicDBObject groupId = new BasicDBObject("apiCollectionId", "$collectionIds");
         pipeline.add(Aggregates.sort(
             Sorts.descending(ApiInfo.RISK_SCORE)
         ));

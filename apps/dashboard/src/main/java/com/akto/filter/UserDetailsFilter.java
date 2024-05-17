@@ -304,12 +304,10 @@ public class UserDetailsFilter implements Filter {
             int accountId = Context.accountId.get();
             Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
 
-            if (organization == null) {
-                httpServletResponse.sendError(403);
-                return;
-            }
-
-            if (organization.checkExpirationWithAktoSync()) {
+            /*
+             * In case org is not present, it is recreated on login.
+             */
+            if (organization != null && organization.checkExpirationWithAktoSync()) {
 
                 // attempt to sync with billing once more
                 organization = InitializerListener.fetchAndSaveFeatureWiseAllowed(organization);
