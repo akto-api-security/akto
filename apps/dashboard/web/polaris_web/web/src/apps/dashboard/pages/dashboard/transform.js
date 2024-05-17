@@ -98,7 +98,6 @@ const transform = {
     },
 
     getCountInfo: (collectionsArr, coverageObject) => {
-        console.log(collectionsArr)
         let urlsCount = 0 ;
         let coverageCount = 0 ;
         collectionsArr.forEach((x) =>{
