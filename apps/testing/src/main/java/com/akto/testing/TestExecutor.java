@@ -61,7 +61,7 @@ import java.util.concurrent.*;
 
 public class TestExecutor {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class, LogDb.TESTING);
     private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
 
     public static long acceptableSizeInBytes = 5_000_000;
@@ -502,8 +502,7 @@ public class TestExecutor {
         try {
             startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, maxRunTime, syncLimit);
         } catch (Exception e) {
-            e.printStackTrace();
-            loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
         }
 
         latch.countDown();
