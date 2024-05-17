@@ -98,6 +98,9 @@ public class AccountSettings {
     public static final String ALLOW_REDUNDANT_ENDPOINTS_LIST = "allowRedundantEndpointsList";
     private List<String> allowRedundantEndpointsList;
 
+    public static final String FALLBACK_TO_HTTP = "fallbackToHttp";
+    private boolean fallbackToHttp;
+
     public AccountSettings() {
     }
 
@@ -382,5 +385,13 @@ public class AccountSettings {
 
     public void setAllowRedundantEndpointsList(List<String> allowRedundantEndpointsList) {
         this.allowRedundantEndpointsList = allowRedundantEndpointsList;
+    }
+
+    public boolean isFallbackToHttp() {
+        return fallbackToHttp;
+    }
+
+    public void setFallbackToHttp(boolean fallbackToHttp) {
+        this.fallbackToHttp = fallbackToHttp;
     }
 }

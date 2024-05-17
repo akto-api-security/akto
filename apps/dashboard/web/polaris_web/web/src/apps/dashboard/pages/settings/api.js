@@ -367,6 +367,15 @@ const settingRequests = {
             }
         });
     },
+    updateFallbackToHttp(fallbackToHttp) {
+        return request({
+            url: '/api/updateFallbackToHttp',
+            method: 'post',
+            data: {
+                fallbackToHttp
+            }
+        });
+    },
     addFilterHeaderValueMap(filterHeaderValueMap){
         return request({
             url: '/api/addFilterHeaderValueMap',

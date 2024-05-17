@@ -1,6 +1,8 @@
 package com.akto.testing;
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.TestingRunConfig;
@@ -29,6 +31,23 @@ public class ApiExecutor {
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
+
+    static int settingsLastFetched = 0;
+    static boolean tryRequestWithHttp = false;
+    static final int TIME_PERIOD = 5*60;
+
+    private static boolean checkTryWithHttp() {
+        int now = Context.now();
+        if (settingsLastFetched + TIME_PERIOD < now) {
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            if (accountSettings != null) {
+                tryRequestWithHttp = accountSettings.isFallbackToHttp();
+            }
+            settingsLastFetched = now;
+        }
+        return tryRequestWithHttp;
+    }
+
     
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
 
@@ -66,6 +85,14 @@ public class ApiExecutor {
 
         Call call = client.newCall(request);
         Response response = null;
+        boolean isHttps = request.isHttps();
+        String ogUrl = request.url().toString();
+        String httpUrl = ogUrl;
+        if (isHttps) {
+            httpUrl = "http://" + ogUrl.substring(7);
+        }
+        Request httpRequest = request.newBuilder().url(httpUrl).build();
+        boolean tryWithHttp = checkTryWithHttp();
         String body;
         try {
             response = call.execute();
@@ -81,7 +108,11 @@ public class ApiExecutor {
             }
         } catch (IOException e) {
             loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
-            throw new Exception("Api Call failed");
+            if(tryWithHttp && isHttps){
+                return common(httpRequest, followRedirects, debug, testLogs, skipSSRFCheck);
+            } else {
+                throw new Exception("Api Call failed");
+            }
         } finally {
             if (response != null) {
                 response.close();

@@ -109,6 +109,29 @@ public class AdminSettingsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    boolean fallbackToHttp;
+
+    public boolean isFallbackToHttp() {
+        return fallbackToHttp;
+    }
+
+    public void setFallbackToHttp(boolean fallbackToHttp) {
+        this.fallbackToHttp = fallbackToHttp;
+    }
+
+    public String updateFallbackToHttp() {
+        User user = getSUser();
+        if (user == null)
+            return ERROR.toUpperCase();
+
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.FALLBACK_TO_HTTP, this.fallbackToHttp),
+                new UpdateOptions().upsert(true));
+
+        return SUCCESS.toUpperCase();
+    }
+
     private int trafficAlertThresholdSeconds;
     public String updateTrafficAlertThresholdSeconds() {
         User user = getSUser();

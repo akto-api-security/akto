@@ -35,6 +35,7 @@ function About() {
     const [replaceHeaderValueRegex, setReplaceHeaderValueRegex] = useState('');
     const [replaceNewCollectionName, setReplaceNewCollectionName] = useState('');
     const [enableTelemetry, setEnableTelemetry] = useState(false)
+    const [fallbackToHttp, setFallbackToHttp] = useState(false)
     const [privateCidrList, setPrivateCidrList] = useState([])
     const [partnerIpsList, setPartnerIpsList] = useState([])
 
@@ -51,6 +52,7 @@ function About() {
         setRedactPayload(resp.redactPayload)
         setNewMerging(resp.urlRegexMatchingEnabled)
         setTrafficThreshold(resp.trafficAlertThresholdSeconds)
+        setFallbackToHttp(resp.fallbackToHttp)
         setObjectArr(arr)
         setEnableTelemetry(resp.telemetrySettings.customerEnabled)
         if (resp.filterHeaderValueMap)
@@ -110,6 +112,11 @@ function About() {
     const toggleTelemetry = async(val) => {
         setEnableTelemetry(val);
         await settingRequests.toggleTelemetry(val);
+    }
+
+    const toggleFallbackToHttp = async(val) => {
+        setFallbackToHttp(val);
+        await settingRequests.updateFallbackToHttp(val);
     }
 
     const handleSelectTraffic = async(val) => {
@@ -351,6 +358,7 @@ function About() {
                                   <ToggleComponent text={"Redact sample data"} initial={redactPayload} onToggle={handleRedactPayload} />
                                   <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
                                   <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
+                                  <ToggleComponent text={"Fallback to HTTP if HTTPS test requests fail"} initial={fallbackToHttp} onToggle={toggleFallbackToHttp} />
                                   {redundantUrlComp}
                                   <VerticalStack gap={1}>
                                       <Text color="subdued">Traffic alert threshold</Text>
