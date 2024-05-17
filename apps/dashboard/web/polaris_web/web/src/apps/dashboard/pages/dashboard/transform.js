@@ -98,9 +98,14 @@ const transform = {
     },
 
     getCountInfo: (collectionsArr, coverageObject) => {
+        console.log(collectionsArr)
         let urlsCount = 0 ;
         let coverageCount = 0 ;
         collectionsArr.forEach((x) =>{
+            if (x.hasOwnProperty('type') && x.type === 'API_GROUP') {
+                return
+            }
+
             urlsCount += x.urlsCount;
             coverageCount += coverageObject[x.id] || 0 ;
         })
