@@ -37,7 +37,7 @@ public class GithubSync {
         GithubFile githubFile = null;
 
         Request fileRequest = new Request.Builder()
-                            .url(String.format("https://raw.githubusercontent.com/%s/master/%s", repo, filePath))
+                            .url(String.format("https://raw.githubusercontent.com/%s/feature/api-groups-csv/%s", repo, filePath))
                             .build();
                             
         try {
