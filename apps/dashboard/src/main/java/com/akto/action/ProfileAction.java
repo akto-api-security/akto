@@ -163,8 +163,9 @@ public class ProfileAction extends UserAction {
 
                 organization = InitializerListener.fetchAndSaveFeatureWiseAllowed(organization);
                 gracePeriod = organization.getGracePeriod();
-                if (organization.getFeatureWiseAllowed() != null) {
-                    featureWiseAllowed = organization.getFeatureWiseAllowed();
+                featureWiseAllowed = organization.getFeatureWiseAllowed();
+                if (featureWiseAllowed == null) {
+                    featureWiseAllowed = new HashMap<>();
                 }
 
                 isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
@@ -176,10 +177,15 @@ public class ProfileAction extends UserAction {
             userDetails.append("organizationName", organization.getName());
             userDetails.append("stiggIsOverage", isOverage);
             BasicDBObject stiggFeatureWiseAllowed = new BasicDBObject();
-            for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
-                stiggFeatureWiseAllowed.append(entry.getKey(), new BasicDBObject()
-                        .append(FeatureAccess.IS_GRANTED, entry.getValue().getIsGranted())
-                        .append(FeatureAccess.IS_OVERAGE_AFTER_GRACE, entry.getValue().checkOverageAfterGrace(gracePeriod)));
+            for (String key : featureWiseAllowed.keySet()) {
+                FeatureAccess featureAccess = featureWiseAllowed.get(key);
+                featureAccess.setGracePeriod(gracePeriod);
+                stiggFeatureWiseAllowed.append(key, new BasicDBObject()
+                        .append(FeatureAccess.IS_GRANTED, featureAccess.getIsGranted())
+                        .append(FeatureAccess.USAGE_LIMIT, featureAccess.getUsageLimit())
+                        .append(FeatureAccess.USAGE, featureAccess.getUsage())
+                        .append(FeatureAccess.OVERAGE_FIRST_DETECTED, featureAccess.getOverageFirstDetected())
+                        .append(FeatureAccess.IS_OVERAGE_AFTER_GRACE, featureAccess.checkInvalidAccess()));
             }
 
             boolean dataIngestionPaused = UsageMetricUtils.checkActiveEndpointOverage(sessionAccId);
@@ -193,6 +199,7 @@ public class ProfileAction extends UserAction {
             userDetails.append("stiggCustomerId", organizationId);
             userDetails.append("stiggCustomerToken", OrganizationUtils.fetchSignature(organizationId, organization.getAdminEmail()));
             userDetails.append("stiggClientKey", OrganizationUtils.fetchClientKey(organizationId, organization.getAdminEmail()));
+            userDetails.append("expired", organization.checkExpirationWithAktoSync());
             userDetails.append("hotjarSiteId", organization.getHotjarSiteId());
         }
 

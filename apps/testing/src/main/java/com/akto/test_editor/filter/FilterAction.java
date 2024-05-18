@@ -66,6 +66,7 @@ public final class FilterAction {
         put("cookie_expire_filter", new CookieExpireFilter());
         put("datatype", new DatatypeFilter());
         put("ssrf_url_hit", new SsrfUrlHitFilter());
+        put("belongs_to_collections", new ApiCollectionFilter());
     }};
 
     public FilterAction() { }

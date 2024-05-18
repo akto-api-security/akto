@@ -323,7 +323,12 @@ const router = createBrowserRouter([
   {
     path: "/business-email",
     element: <PageBusinessEmail />
-  }
+  },
+  // catches all undefined paths and redirects to homepage.
+  {
+    path: "*",
+    element: <Navigate to="/dashboard/home" />,
+  },
 ])
 
 function App() {
