@@ -163,31 +163,84 @@ public class Executor {
             error_messages.add(singleReq.getErrMsg());
         }
 
-        boolean vulnerable = false;
-        for (RawApi testReq: testRawApis) {
-            if (executorNodes.size() > 0 && testReq.equals(origRawApi)) {
-                continue;
-            }
-            if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
-                break;
-            }
-            try {
-                // follow redirects = true for now
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
-                requestSent = true;
-                ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
-                TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
-                if (res != null) {
-                    result.add(res);
+        List<ExecutorNode> forOneExecutorNodes = modifyExecutionOrderResp.getForOneExecutorNodes();
+        if (forOneExecutorNodes != null && !forOneExecutorNodes.isEmpty()) {
+            for (ExecutorNode executorNode: forOneExecutorNodes) {
+
+                List<RawApi> newTestRawApis = new ArrayList<>();
+                if (testRawApis.size() == 0) {
+                    continue;
                 }
-                vulnerable = res.getVulnerable();
-            } catch(Exception e) {
-                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
-                error_messages.add("Error executing test request: " + e.getMessage());
-                loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
+                for (RawApi rawApi1: testRawApis) {
+                    newTestRawApis.add(rawApi1.copy());
+                }
+                ExecutorAlgorithm newExecutorAlgorithm = new ExecutorAlgorithm(newTestRawApis.get(0), varMap, authMechanism, customAuthTypes);
+                Map<Integer, ExecuteAlgoObj> newAlgoMap = new HashMap<>();
+
+                List<ExecutorNode> newExecutorNodeList = new ArrayList<>();
+                newExecutorNodeList.add(executorNode);
+
+                singleReq = newExecutorAlgorithm.execute(newExecutorNodeList, 0, newAlgoMap, newTestRawApis, false, 0, apiInfoKey);
+
+                if (!singleReq.getSuccess()) {
+                    testRawApis = new ArrayList<>();
+                    error_messages.add(singleReq.getErrMsg());
+                }
+
+                boolean vulnerable = false;
+                for (RawApi testReq: newTestRawApis) {
+                    if (executorNodes.size() > 0 && testReq.equals(origRawApi)) {
+                        continue;
+                    }
+//                    if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
+//                        break;
+//                    }
+                    try {
+                        // follow redirects = true for now
+                        testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                        requestSent = true;
+                        ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
+                        TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                        if (res != null) {
+                            result.add(res);
+                        }
+                        vulnerable = res.getVulnerable();
+                    } catch(Exception e) {
+                        testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
+                        error_messages.add("Error executing test request: " + e.getMessage());
+                        loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
+                    }
+                }
+            }
+
+        } else {
+            boolean vulnerable = false;
+            for (RawApi testReq: testRawApis) {
+                if (executorNodes.size() > 0 && testReq.equals(origRawApi)) {
+                    continue;
+                }
+//                if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
+//                    break;
+//                }
+                try {
+                    // follow redirects = true for now
+                    testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                    requestSent = true;
+                    ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
+                    TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                    if (res != null) {
+                        result.add(res);
+                    }
+                    vulnerable = res.getVulnerable();
+                } catch(Exception e) {
+                    testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
+                    error_messages.add("Error executing test request: " + e.getMessage());
+                    loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
+                }
             }
         }
-        
+
+
         if(result.isEmpty()){
             if(requestSent){
                 error_messages.add(TestError.API_REQUEST_FAILED.getMessage());

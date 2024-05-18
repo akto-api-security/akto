@@ -358,7 +358,7 @@ public class Utils {
                 while(fieldNames.hasNext()) {
                     String fieldName = fieldNames.next();
                     JsonNode jsonNode = node.get(fieldName);
-                    if (jsonNode.isValueNode()) {
+                    if (jsonNode.isTextual()) {
                         values.add(fieldName);
                     }
                 }

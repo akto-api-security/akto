@@ -128,7 +128,7 @@ public class RawApi {
         if (!isPayloadEqual(payload, compareWithPayload)) {
             return false;
         }
-        
+
         // System.out.println(m1);
         // System.out.println(m2);
         // System.out.println(m1.equals(m2));
@@ -166,7 +166,7 @@ public class RawApi {
         return true;
     }
 
-    public boolean isPayloadEqual(String payload, String compareWithPayload) {
+    public static boolean isPayloadEqual(String payload, String compareWithPayload) {
 
         if (payload == null) {
             return compareWithPayload == null;

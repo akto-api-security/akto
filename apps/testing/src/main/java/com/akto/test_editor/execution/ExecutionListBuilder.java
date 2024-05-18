@@ -76,6 +76,7 @@ public class ExecutionListBuilder {
 
     public ModifyExecutionOrderResp modifyExecutionFlow(List<ExecutorNode> executorNodes, Map<String, Object> varMap) {
         List<ExecutorNode> updatedExecutionFlow = new ArrayList<>();
+        List<ExecutorNode> forOneExecutionFlow = new ArrayList<>();;
         for (ExecutorNode executorNode: executorNodes) {
             if (executorNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Dynamic.toString())) {
                 List<Object> values = VariableResolver.resolveExpression(varMap, executorNode.getOperationType());
@@ -91,8 +92,9 @@ public class ExecutionListBuilder {
                 ExecutorNode loopNode = executorNode.getChildNodes().get(0);
                 int startIndex = 0;
                 int endIndex = values.size();
+                boolean isForOne = false;
                 if (loopNode.getOperationType().equalsIgnoreCase(TestEditorEnums.LoopExecutorOperands.FOR_ONE.toString())) {
-                    endIndex = 1;
+                    isForOne = true;
                 }
                 List<ExecutorNode> childNodes = loopNode.getChildNodes();
 
@@ -105,7 +107,7 @@ public class ExecutionListBuilder {
                             opType = opType.replace("${iteratorKey}", values.get(i).toString());
 
                             Object dataValues = dataNode.getValues();
-                            if (dataValues != null && dataValues instanceof String) {
+                            if (dataValues instanceof String) {
                                 dataValues = dataValues.toString().replace("${iteratorKey}", values.get(i).toString());
                                 if (!dataValues.toString().startsWith("${")) {
                                     dataValues = "${" + dataValues.toString() + "}";
@@ -114,13 +116,21 @@ public class ExecutionListBuilder {
                             List<ExecutorNode> newChildNodes = new ArrayList<>();
                             ExecutorNode newDataNode = new ExecutorNode(dataNode.getNodeType(), dataNode.getChildNodes(), dataValues, opType);
                             newChildNodes.add(newDataNode);
-                            updatedExecutionFlow.add(new ExecutorNode(childNode.getNodeType(), newChildNodes, childNode.getValues(), childNode.getOperationType()));
+                            if (isForOne) {
+                                forOneExecutionFlow.add(new ExecutorNode(childNode.getNodeType(), newChildNodes, childNode.getValues(), childNode.getOperationType()));
+                            } else {
+                                updatedExecutionFlow.add(new ExecutorNode(childNode.getNodeType(), newChildNodes, childNode.getValues(), childNode.getOperationType()));
+                            }
                         } else {
                             Object dataValues = childNode.getValues();
-                            if (dataValues != null && dataValues instanceof String) {
+                            if (dataValues instanceof String) {
                                 dataValues = dataValues.toString().replace("${iteratorKey}", values.get(i).toString());
                             }
-                            updatedExecutionFlow.add(new ExecutorNode(childNode.getNodeType(), childNode.getChildNodes(), dataValues, childNode.getOperationType()));
+                            if (isForOne) {
+                                forOneExecutionFlow.add(new ExecutorNode(childNode.getNodeType(), childNode.getChildNodes(), dataValues, childNode.getOperationType()));
+                            }else {
+                                updatedExecutionFlow.add(new ExecutorNode(childNode.getNodeType(), childNode.getChildNodes(), dataValues, childNode.getOperationType()));
+                            }
                         }
                     }
                 }
@@ -128,7 +138,7 @@ public class ExecutionListBuilder {
                 updatedExecutionFlow.add(executorNode);
             }
         }
-        return new ModifyExecutionOrderResp(updatedExecutionFlow, null);
+        return new ModifyExecutionOrderResp(updatedExecutionFlow, forOneExecutionFlow,null);
     }
 
 }

@@ -5,6 +5,7 @@ import java.util.List;
 public class ModifyExecutionOrderResp {
     
     List<ExecutorNode> executorNodes;
+    List<ExecutorNode> forOneExecutorNodes;
     String error;
 
     public ModifyExecutionOrderResp() {
@@ -13,6 +14,13 @@ public class ModifyExecutionOrderResp {
     public ModifyExecutionOrderResp(List<ExecutorNode> executorNodes, String error) {
         this.executorNodes = executorNodes;
         this.error = error;
+        this.forOneExecutorNodes = null;
+    }
+
+    public ModifyExecutionOrderResp(List<ExecutorNode> executorNodes,List<ExecutorNode> forOneExecutorNodes, String error) {
+        this.executorNodes = executorNodes;
+        this.error = error;
+        this.forOneExecutorNodes = forOneExecutorNodes;
     }
 
     public List<ExecutorNode> getExecutorNodes() {
@@ -31,4 +39,9 @@ public class ModifyExecutionOrderResp {
         this.error = error;
     }
 
+    public List<ExecutorNode> getForOneExecutorNodes() {return forOneExecutorNodes;}
+
+    public void setForOneExecutorNodes(List<ExecutorNode> forOneExecutorNodes) {
+        this.forOneExecutorNodes = forOneExecutorNodes;
+    }
 }
