@@ -232,10 +232,10 @@ public class IssuesAction extends UserAction {
         boolean includeYamlContent = false;
 
         switch (mode) {
-            case "RunTests":
+            case "runTests":
                 categories = GlobalEnums.TestCategory.values();
                 break;
-            case "TestEditor":
+            case "testEditor":
                 includeYamlContent = true;
                 vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
                 break;
