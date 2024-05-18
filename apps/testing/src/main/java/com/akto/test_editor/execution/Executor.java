@@ -740,9 +740,12 @@ public class Executor {
                     if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().size() == 0) {
                         return new ExecutorSingleOperationResp(false, "auth headers missing");
                     }
-                    authVal = authMechanism.getAuthParams().get(0).getValue();
-                    ExecutorSingleOperationResp result = Operations.modifyHeader(rawApi, authHeader, authVal);
-                    modifiedAtLeastOne = modifiedAtLeastOne || result.getSuccess();
+
+                    for (AuthParam authParam: authMechanism.getAuthParams()) {
+                        authVal = authParam.getValue();
+                        ExecutorSingleOperationResp result = Operations.modifyHeader(rawApi, authParam.getKey(), authVal);
+                        modifiedAtLeastOne = modifiedAtLeastOne || result.getSuccess();
+                    }
                 }
 
                 // once all the replacement has been done.. .remove all the auth keys that were not impacted by the change by comparing it with initial request

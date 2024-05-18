@@ -14,7 +14,6 @@ import org.json.JSONObject;
 
 import com.akto.action.ApiCollectionsAction;
 import com.akto.billing.UsageMetricUtils;
-import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.context.Context;
@@ -30,7 +29,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
-import com.akto.util.Constants;
 import com.akto.util.tasks.OrganizationTask;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -44,16 +42,6 @@ public class DeactivateCollections {
 
     public static void deactivateCollectionsJob() {
 
-        BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
-        // we do not need to run this job for new user.
-        if (backwardCompatibility == null) {
-            return;
-        }
-        // we need to run this job only once.
-        if (backwardCompatibility.getDeactivateCollections() != 0) {
-            return;
-        }
-
         executorService.schedule(new Runnable() {
             public void run() {
                 OrganizationTask.instance.executeTask(new Consumer<Organization>() {
@@ -65,14 +53,6 @@ public class DeactivateCollections {
             }
         }, 0, TimeUnit.SECONDS);
 
-        /*
-         * This will update the backward compatibility doc in db,
-         * before the job is completed. 
-         * In case the job fails, we will not run it again.
-         */
-        BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.DEACTIVATE_COLLECTIONS, Context.now()));
     }
 
     private static void raiseMixpanelEvent(Organization organization, int accountId, int overage) {
@@ -109,6 +89,18 @@ public class DeactivateCollections {
 
             for (int accountId : organization.getAccounts()) {
                 Context.accountId.set(accountId);
+
+                BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance
+                        .findOne(new BasicDBObject());
+                if (backwardCompatibility == null) {
+                    continue;
+                }
+                // we need to run this job only once.
+                if (backwardCompatibility.getDeactivateCollections() != 0) {
+                    loggerMaker.infoAndAddToDb("This account's collections have been deactivated previously");
+                    continue;
+                }
+
                 UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOne(
                         UsageMetricsDao.generateFilter(organizationId, accountId, MetricTypes.ACTIVE_ENDPOINTS));
                 int measureEpoch = Context.now();
@@ -118,6 +110,9 @@ public class DeactivateCollections {
                 raiseMixpanelEvent(organization, accountId, overage);
                 sendToSlack(organization, accountId, overage, featureAccess.getUsageLimit());
                 overage = deactivateCollectionsForAccount(overage, measureEpoch);
+                BackwardCompatibilityDao.instance.updateOne(
+                        Filters.eq("_id", backwardCompatibility.getId()),
+                        Updates.set(BackwardCompatibility.DEACTIVATE_COLLECTIONS, Context.now()));
             }
         } catch (Exception e) {
             String errorMessage = String.format("Unable to deactivate collections for %s ", organization.getId());

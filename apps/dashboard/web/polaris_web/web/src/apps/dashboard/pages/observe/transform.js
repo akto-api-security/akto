@@ -421,6 +421,10 @@ const transform = {
         let totalTested = 0 ;
 
         collectionsData?.forEach((c) =>{
+            if (c.hasOwnProperty('type') && c.type === 'API_GROUP') {
+                return
+            }
+
             totalUrl += c.endpoints ;
             totalTested += c.testedEndpoints;
         })

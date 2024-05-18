@@ -51,12 +51,15 @@ const transform = {
         }
     },
 
-    getRiskScoreTrendOptions: (data)=>{
+    getRiskScoreTrendOptions: (data, riskScoreRanges)=>{
         let dataArr = [] ;
-        for(let c = 2 ; c < 6 ; c++){
+        for(let c = 3 ; c < 6 ; c++){
             const val = data[c] ? data[c] : 0;
             dataArr.push(val)
         }
+
+        const riskScoreRangesRev = [...riskScoreRanges].reverse();
+
         const riskScoreChartOptions = {
             chart: {
                 type: 'column',
@@ -72,7 +75,7 @@ const transform = {
                 margin: 20
             },
             xAxis: {
-                categories: ['0-2', '2-3', '3-4', '4-5'],
+                categories: ['0-3', '3-4', '4-5'],
                 crosshair: true,
                 accessibility: {
                     description: 'Risk score values'
@@ -86,6 +89,19 @@ const transform = {
             },
             legend: {
                 enabled: false
+            },
+            plotOptions: {
+                column: {
+                    point: {
+                        events: {
+                            click: function () {
+                                const columnIndex = this.index;
+                                const apiCollectionId = riskScoreRangesRev[columnIndex].apiCollectionId;
+                                window.location.href = `/dashboard/observe/inventory/${apiCollectionId}`;
+                            }
+                        }
+                    }
+                }
             },
             series: {
                 minPointLength: 0,
@@ -101,6 +117,10 @@ const transform = {
         let urlsCount = 0 ;
         let coverageCount = 0 ;
         collectionsArr.forEach((x) =>{
+            if (x.hasOwnProperty('type') && x.type === 'API_GROUP') {
+                return
+            }
+
             urlsCount += x.urlsCount;
             coverageCount += coverageObject[x.id] || 0 ;
         })

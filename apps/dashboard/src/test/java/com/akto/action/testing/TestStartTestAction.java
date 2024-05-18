@@ -5,6 +5,7 @@ import com.akto.action.ApiTokenAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiTokensDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
@@ -14,6 +15,7 @@ import com.akto.dto.ApiToken;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
 import com.akto.dto.ApiToken.Utility;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.URLMethods;
@@ -175,6 +177,10 @@ public class TestStartTestAction extends MongoBasedTest {
         acc.setDashboardVersion("test - test - test");
         acc.setId(ACCOUNT_ID);
         AccountSettingsDao.instance.insertOne(acc);
+
+        Organization org = new Organization(UUID.randomUUID().toString(), user.getLogin(), user.getLogin(),
+                new HashSet<>(Arrays.asList(ACCOUNT_ID)), true);
+        OrganizationsDao.instance.insertOne(org);
         
         Map<String,Object> userSession = new HashMap<>();
         userSession.put("user",user);

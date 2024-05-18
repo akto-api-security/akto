@@ -118,6 +118,9 @@ public class HAR {
 
         for (HarHeader harHeader: headers) {
             if (harHeader != null) {
+                if (harHeader.getName().contains(" ")) {
+                    continue;
+                }
                 headerMap.put(harHeader.getName(), harHeader.getValue());
             }
         }
