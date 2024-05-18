@@ -1748,6 +1748,7 @@ public class InitializerListener implements ServletContextListener {
 
                 setUpUpdateCustomCollections();
                 setUpFillCollectionIdArrayJob();
+                setupAutomatedApiGroupsScheduler();
             }
         }, 0, TimeUnit.SECONDS);
 
@@ -2473,5 +2474,23 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public void setupAutomatedApiGroupsScheduler(){
+
+        AutomatedApiGroupsUtils.fetchGroups();
+
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            System.out.println("account id" + t.getId());
+                        } catch (Exception e) {
+                        }
+                    }
+                }, "automated-api-groups-scheduler");
+            }
+        }, 0, 4, TimeUnit.HOURS);
+    }
 }
 
