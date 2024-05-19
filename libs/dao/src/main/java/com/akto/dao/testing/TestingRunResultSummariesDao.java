@@ -131,7 +131,7 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
                 Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
                 Filters.gte(TestingRunResultSummary.START_TIMESTAMP, filterTime)
             ),
-            Projections.include(TestingRunResultSummary.TESTING_RUN_ID, TestingRunResultSummary.TOTAL_APIS)
+            Projections.include(TestingRunResultSummary.TESTING_RUN_ID, TestingRunResultSummary.TOTAL_APIS, TestingRunResultSummary.TESTS_INITIATED_COUNT, TestingRunResultSummary.TEST_RESULTS_COUNT)
         );
         return trrs;
     }

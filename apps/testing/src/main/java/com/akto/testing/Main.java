@@ -63,6 +63,10 @@ public class Main {
 
     private static TestingRunResultSummary createTRRSummaryIfAbsent(TestingRun testingRun, int start){
         ObjectId testingRunId = new ObjectId(testingRun.getHexId());
+        int testsInitiatedCount = 0;
+        if(testingRun.getTestingRunConfig() != null){
+            testsInitiatedCount = testingRun.getTestingRunConfig().getTestSubCategoryList().size();
+        }
 
         return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.and(
@@ -71,7 +75,8 @@ public class Main {
                 ),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
-                        Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start)
+                        Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start),
+                        Updates.set(TestingRunResultSummary.TESTS_INITIATED_COUNT, testsInitiatedCount)
                 ),
                 new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER)
         );
@@ -181,6 +186,14 @@ public class Main {
         }
 
         logger.info(testingRun.getTestingRunConfig().toString());
+    }
+
+    private static void setTestsInitiatedCountInSummary(TestingRun testingRun, TestingRunResultSummary trrs){
+        if(testingRun.getTestingRunConfig() == null){
+            return ;
+        }else{
+            trrs.setTestInitiatedCount(testingRun.getTestingRunConfig().getTestSubCategoryList().size());
+        }
     }
 
     public static void main(String[] args) throws InterruptedException {
@@ -301,6 +314,8 @@ public class Main {
                             testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
                         }
 
+                        setTestsInitiatedCountInSummary(testingRun, testingRunResultSummary);
+
                         if (testingRunResultSummary != null) {
                             List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), 1);
                             if (testingRunResults != null && !testingRunResults.isEmpty()) {
@@ -348,6 +363,7 @@ public class Main {
                                 trrs.setStartTimestamp(start);
                                 trrs.setState(State.RUNNING);
                                 TestingRunResultSummariesDao.instance.insertOne(trrs);
+                                setTestsInitiatedCountInSummary(testingRun, trrs);
                                 summaryId = trrs.getId();
                             } else {
                                 trrs = createTRRSummaryIfAbsent(testingRun, start);
