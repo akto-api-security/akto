@@ -40,7 +40,7 @@ export default function LeftNav(){
                 key: '1',
               },
               {
-                label: 'Dashboard',
+                label: 'API Security Posture',
                 icon: OrdersFilledMinor,
                 onClick: ()=>{
                   handleSelect("dashboard_home")
@@ -52,7 +52,7 @@ export default function LeftNav(){
               },
               {   
                 url: '#',
-                label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("observe") ? (active === 'active' ? "subdued" : ""): ""}>API Inventory</Text>,
+                label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("observe") ? (active === 'active' ? "subdued" : ""): ""}>API Discovery</Text>,
                 icon: InventoryFilledMajor,
                 onClick: ()=>{
                   handleSelect("_observe")
@@ -79,7 +79,7 @@ export default function LeftNav(){
                       selected: leftNavSelected === "dashboard_observe_changes"
                     },
                     {
-                      label: 'Sensitive data',
+                      label: 'Sensitive Data',
                       onClick: ()=>{
                         navigate('/dashboard/observe/sensitive')
                         handleSelect("dashboard_observe_sensitive")
@@ -110,7 +110,7 @@ export default function LeftNav(){
                     selected: leftNavSelected === 'dashboard_testing'
                   },
                   {
-                    label: 'Test roles',
+                    label: 'Test Roles',
                     onClick: ()=>{
                       navigate('/dashboard/testing/roles')
                       handleSelect('dashboard_testing_roles')
@@ -119,7 +119,7 @@ export default function LeftNav(){
                     selected: leftNavSelected === 'dashboard_testing_roles'
                   },
                   {
-                    label: 'User config',
+                    label: 'User Config',
                     onClick: ()=>{
                       navigate('/dashboard/testing/user-config')
                       handleSelect('dashboard_testing_user_config')
