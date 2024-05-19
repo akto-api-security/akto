@@ -184,8 +184,11 @@ public class Main {
             configFromTrrs.rebaseOn(baseConfig);
             testingRun.setTestingRunConfig(configFromTrrs);
         }
-
-        logger.info(testingRun.getTestingRunConfig().toString());
+        if(testingRun.getTestingRunConfig() != null){
+            logger.info(testingRun.getTestingRunConfig().toString());
+        }else{
+            logger.info("Testing run config is null.");
+        }
     }
 
     private static void setTestsInitiatedCountInSummary(TestingRun testingRun, TestingRunResultSummary trrs){
