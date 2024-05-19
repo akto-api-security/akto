@@ -112,6 +112,7 @@ function SingleTestRunPage() {
   const [workflowTest, setWorkflowTest ] = useState(false);
   const [secondaryPopover, setSecondaryPopover] = useState(false)
   const currentTestingRuns = TestingStore((state) => state.currentTestingRuns)
+  const  setErrorsObject = TestingStore((state) => state.setErrorsObject)
   const [currentTestRunObj, setCurrentTestObj] = useState({
     testsInitiated: 0,
     testsInsertedInDb: 0,
@@ -172,8 +173,10 @@ function SingleTestRunPage() {
     fillTempData(testRunResults, 'vulnerable')
     fillData(transform.getPrettifiedTestRunResults(testRunResults), 'vulnerable')
 
-    await api.fetchTestingRunResults(summaryHexId, "SKIPPED_EXEC").then(({ testingRunResults }) => {
+    await api.fetchTestingRunResults(summaryHexId, "SKIPPED_EXEC").then(({ testingRunResults, errorEnums }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+      errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
+      setErrorsObject(errorEnums)
     })
     fillTempData(testRunResults, 'skipped')
     fillData(transform.getPrettifiedTestRunResults(testRunResults), 'skipped')

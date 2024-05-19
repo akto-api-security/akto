@@ -15,6 +15,7 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.Confidence;
+import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRun.TestingRunType;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
@@ -494,6 +495,8 @@ public class StartTestAction extends UserAction {
     }
     private QueryMode queryMode;
 
+    private Map<TestError, String> errorEnums = new HashMap<>();
+
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
         try {
@@ -524,6 +527,13 @@ public class StartTestAction extends UserAction {
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
                     testingRunResultFilters.add(Filters.nin(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
                     break;
+            }
+        }
+
+        if(queryMode == QueryMode.SKIPPED_EXEC){
+            TestError[] testErrors = TestResult.TestError.values();
+            for(TestError testError: testErrors){
+                this.errorEnums.put(testError, testError.getMessage());
             }
         }
 
@@ -1181,5 +1191,9 @@ public class StartTestAction extends UserAction {
 
     public CurrentTestsStatus getCurrentTestsStatus() {
         return currentTestsStatus;
+    }
+
+    public Map<TestError, String> getErrorEnums() {
+        return errorEnums;
     }
 }
