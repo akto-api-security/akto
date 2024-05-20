@@ -2,8 +2,6 @@ package com.akto.dao.testing;
 
 import com.akto.dao.AccountsContextDao;
 import com.akto.dto.testing.TestingRunConfig;
-import com.akto.util.Constants;
-import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.MongoDBEnums;
 
 public class TestingRunConfigDao extends AccountsContextDao<TestingRunConfig> {
@@ -15,7 +13,7 @@ public class TestingRunConfigDao extends AccountsContextDao<TestingRunConfig> {
     public static final TestingRunConfigDao instance = new TestingRunConfigDao();
 
     private TestingRunConfigDao() {}
-
+    
     @Override
     public Class<TestingRunConfig> getClassT() {
         return TestingRunConfig.class;

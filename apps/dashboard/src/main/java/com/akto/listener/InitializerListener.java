@@ -101,6 +101,7 @@ import com.mongodb.ReadPreference;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.DeleteResult;
 import com.slack.api.Slack;
 import com.slack.api.util.http.SlackHttpClient;
 import com.slack.api.webhook.WebhookResponse;
@@ -1381,6 +1382,36 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void disableAwsSecretPiiType(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDisableAwsSecretPii() != 0) {
+            return;
+        }
+
+        String piiType = "AWS SECRET ACCESS KEY";
+
+        Bson filters = Filters.eq("subType", piiType);
+        Bson update = Updates.set("subType", SingleTypeInfo.GENERIC.toString());
+
+        try {
+            SingleTypeInfoDao.instance.updateMany(filters, update);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in disableAwsSecretPiiType " + e.getMessage(), LogDb.DASHBOARD);
+        }
+
+        try {
+            Bson delFilter = Filters.eq("name", piiType);
+            DeleteResult res = CustomDataTypeDao.instance.deleteAll(delFilter);
+            loggerMaker.infoAndAddToDb("auth type : " + res.toString());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error deleting pii type " + piiType + " " + e.getMessage(), LogDb.DASHBOARD);
+        }
+
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DISABLE_AWS_SECRET_PII, Context.now())
+        );
+    }
+
     public static void setAktoDefaultNewUI(BackwardCompatibility backwardCompatibility){
         if(backwardCompatibility.getAktoDefaultNewUI() == 0){
 
@@ -2086,6 +2117,7 @@ public class InitializerListener implements ServletContextListener {
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
         setDefaultTelemetrySettings(backwardCompatibility);
+        disableAwsSecretPiiType(backwardCompatibility);
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
         }
