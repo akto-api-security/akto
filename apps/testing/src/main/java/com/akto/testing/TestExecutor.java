@@ -132,6 +132,12 @@ public class TestExecutor {
         int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? Math.min( testingRun.getMaxConcurrentRequests(), 100) : 10;
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
+        if (testingRun.getTestingRunConfig() != null) {
+            TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(Filters.eq(Constants.ID, summaryId),
+                    Updates.set(TestingRunResultSummary.TESTS_INITIATED_COUNT,
+                            testingRun.getTestingRunConfig().getTestSubCategoryList().size()));
+        }
+
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
         sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(testingRun.getTestingEndpoints().returnApis()));
         AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
