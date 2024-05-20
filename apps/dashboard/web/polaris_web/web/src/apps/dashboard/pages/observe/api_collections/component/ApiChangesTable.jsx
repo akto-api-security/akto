@@ -104,7 +104,7 @@ function ApiChangesTable(props) {
       setLoading(true);
         let ret = [];
         let total = 0;
-        await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimeStamp, endTimeStamp, false, false).then((res) => {
+        await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimeStamp, endTimeStamp, false, false, queryValue).then((res) => {
             ret = res.endpoints.map((x,index) => transform.prepareEndpointForTable(x,index));
             total = res.total;
             setLoading(false);
@@ -133,7 +133,6 @@ function ApiChangesTable(props) {
       onRowClick={(data) => handleRow(data)}
       fetchData={fetchTableData}
       filters={selectedTab === 'param' ? paramFilters : filters}
-      hideQueryField={selectedTab === 'param' ? true : false}
       selected={selected}
       onSelect={handleSelectedTab}
       mode={IndexFiltersMode.Default}

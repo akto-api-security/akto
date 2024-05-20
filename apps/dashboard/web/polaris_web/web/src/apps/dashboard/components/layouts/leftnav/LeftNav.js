@@ -1,5 +1,5 @@
 import {Navigation, Text} from "@shopify/polaris"
-import {SettingsFilledMinor,AppsFilledMajor, InventoryFilledMajor, MarketingFilledMinor, FileFilledMinor, AnalyticsFilledMinor, OrdersFilledMinor} from "@shopify/polaris-icons"
+import {SettingsFilledMinor,AppsFilledMajor, InventoryFilledMajor, MarketingFilledMinor, FileFilledMinor, AnalyticsFilledMinor, ReportFilledMinor} from "@shopify/polaris-icons"
 import {useLocation, useNavigate} from "react-router-dom"
 
 import './LeftNav.css'
@@ -40,8 +40,8 @@ export default function LeftNav(){
                 key: '1',
               },
               {
-                label: 'Dashboard',
-                icon: OrdersFilledMinor,
+                label: 'API Security Posture',
+                icon: ReportFilledMinor,
                 onClick: ()=>{
                   handleSelect("dashboard_home")
                   navigate("/dashboard/home")
@@ -52,10 +52,11 @@ export default function LeftNav(){
               },
               {   
                 url: '#',
-                label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("observe") ? (active === 'active' ? "subdued" : ""): ""}>API Inventory</Text>,
+                label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("observe") ? (active === 'active' ? "subdued" : ""): ""}>API Discovery</Text>,
                 icon: InventoryFilledMajor,
                 onClick: ()=>{
-                  handleSelect("_observe")
+                  handleSelect("dashboard_observe_inventory")
+                  navigate('/dashboard/observe/inventory')
                   setActive("normal")
                 },
                 selected: leftNavSelected.includes('_observe'),
@@ -79,7 +80,7 @@ export default function LeftNav(){
                       selected: leftNavSelected === "dashboard_observe_changes"
                     },
                     {
-                      label: 'Sensitive data',
+                      label: 'Sensitive Data',
                       onClick: ()=>{
                         navigate('/dashboard/observe/sensitive')
                         handleSelect("dashboard_observe_sensitive")
@@ -95,8 +96,9 @@ export default function LeftNav(){
                 label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("testing") ? (active === 'active' ? "subdued" : ""): ""}>Testing</Text>,
                 icon: MarketingFilledMinor,
                 onClick: ()=>{
-                    handleSelect('_testing')
-                    setActive("normal")
+                  navigate('/dashboard/testing')
+                  handleSelect('dashboard_testing')
+                  setActive("normal")
                 },
                 selected: leftNavSelected.includes('_testing'),
                 subNavigationItems:[
@@ -110,7 +112,7 @@ export default function LeftNav(){
                     selected: leftNavSelected === 'dashboard_testing'
                   },
                   {
-                    label: 'Test roles',
+                    label: 'Test Roles',
                     onClick: ()=>{
                       navigate('/dashboard/testing/roles')
                       handleSelect('dashboard_testing_roles')
@@ -119,7 +121,7 @@ export default function LeftNav(){
                     selected: leftNavSelected === 'dashboard_testing_roles'
                   },
                   {
-                    label: 'User config',
+                    label: 'User Config',
                     onClick: ()=>{
                       navigate('/dashboard/testing/user-config')
                       handleSelect('dashboard_testing_user_config')

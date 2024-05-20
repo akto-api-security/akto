@@ -70,6 +70,8 @@ public class BackwardCompatibility {
     private int riskScoreGroups;
     public static final String DEACTIVATE_COLLECTIONS = "deactivateCollections";
     private int deactivateCollections;
+    public static final String DISABLE_AWS_SECRET_PII = "disableAwsSecretPii";
+    private int disableAwsSecretPii;
 
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
@@ -78,7 +80,7 @@ public class BackwardCompatibility {
                                  int aktoDefaultNewUI, int initializeOrganizationAccountBelongsTo, int orgsInBilling,
                                  int computeIntegratedConnections, int deleteLastCronRunInfo, int moveAuthMechanismToRole,
                                  int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
-                                 int deactivateCollections) {
+                                 int deactivateCollections, int disableAwsSecretPii) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -102,6 +104,7 @@ public class BackwardCompatibility {
         this.vulnerableApiUpdationVersionV1 = vulnerableApiUpdationVersionV1;
         this.riskScoreGroups = riskScoreGroups;
         this.deactivateCollections = deactivateCollections;
+        this.disableAwsSecretPii = disableAwsSecretPii;
     }
 
     public BackwardCompatibility() {
@@ -305,6 +308,14 @@ public class BackwardCompatibility {
 
     public void setDeactivateCollections(int deactivateCollections) {
         this.deactivateCollections = deactivateCollections;
+    }
+
+    public int getDisableAwsSecretPii() {
+        return disableAwsSecretPii;
+    }
+
+    public void setDisableAwsSecretPii(int disableAwsSecretPii) {
+        this.disableAwsSecretPii = disableAwsSecretPii;
     }
 
 }
