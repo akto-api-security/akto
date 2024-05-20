@@ -34,7 +34,6 @@ public class InfraMetricsFilter implements Filter {
         filterChain.doFilter(request, response);
         long end = System.currentTimeMillis();
         long duration = end - start;
-        System.out.println("DURATION: " + duration);
 
         try {
             HttpServletResponse httpServletResponse = (HttpServletResponse) response;
