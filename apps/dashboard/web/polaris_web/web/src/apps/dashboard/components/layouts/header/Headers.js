@@ -43,10 +43,10 @@ export default function Header() {
             testingApi.fetchTestingRunStatus().then((resp) => {
                 setCurrentTestingRuns(resp.currentRunningTestsStatus)
                 setCurrentTestsObj({
-                    totalTestsInitiated: resp.testRunsScheduled,
-                    totalTestsCompleted: resp.totalTestsCompleted,
-                    totalTestsQueued: resp.testRunsQueued,
-                    testRunsArr: resp.currentRunningTestsStatus
+                    totalTestsInitiated: resp?.testRunsScheduled || 0,
+                    totalTestsCompleted: resp?.totalTestsCompleted || 0,
+                    totalTestsQueued: resp?.testRunsQueued || 0,
+                    testRunsArr: resp?.currentRunningTestsStatus || []
                 })
             })
         },2000)
@@ -187,7 +187,7 @@ export default function Header() {
 
     const secondaryMenuMarkup = (
         <HorizontalStack gap={"4"}>
-            {currentTestsObj.testRunsArr.length !== 0 ? 
+            {(Object.keys(currentTestsObj).length > 0 && currentTestsObj?.testRunsArr?.length !== 0) ? 
             <HorizontalStack gap={"2"}>
                 <Button plain monochrome onClick={() => {handleTestingNavigate()}}>
                  <SemiCircleProgress key={"progress"} progress={progress} size={60} height={55} width={75}/>
