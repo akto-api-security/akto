@@ -781,7 +781,7 @@ public class InitializerListener implements ServletContextListener {
                     ex.printStackTrace(); // or loggger would be better
                 }
             }
-        }, 0, 5, TimeUnit.MINUTES);
+        }, 0, 4, TimeUnit.HOURS);
 
     }
 
@@ -895,7 +895,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "webhook-sener");
             }
-        }, 0, 15, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.HOURS);
     }
 
     static class ChangesInfo {
@@ -2479,6 +2479,12 @@ public class InitializerListener implements ServletContextListener {
     public void setupUsageScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                Context.accountId.set(1000_000);
+                boolean dibs = callDibs("usage-scheduler", 60*60, 60);
+                if (!dibs) {
+                    loggerMaker.infoAndAddToDb("Usage cron dibs not acquired, skipping usage cron", LoggerMaker.LogDb.DASHBOARD);
+                    return;
+                }
                 calcUsage();
             }
         }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
