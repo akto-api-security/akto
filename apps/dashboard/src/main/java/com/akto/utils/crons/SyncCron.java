@@ -34,14 +34,16 @@ public class SyncCron {
     public void setUpUpdateCronScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+
+                Context.accountId.set(1000_000);
+                boolean dibs = callDibs(Cluster.SYNC_CRON_INFO, 300, 60);
+                if(!dibs){
+                    loggerMaker.infoAndAddToDb("Cron for updating new parameters, new endpoints and severity score dibs not acquired, thus skipping cron", LogDb.DASHBOARD);
+                    return;
+                }
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        boolean dibs = callDibs(Cluster.SYNC_CRON_INFO, 300, 60);
-                        if(!dibs){
-                            loggerMaker.infoAndAddToDb("Cron for updating new parameters, new endpoints and severity score dibs not acquired, thus skipping cron", LogDb.DASHBOARD);
-                            return;
-                        }
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                         LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
                         loggerMaker.infoAndAddToDb("Cron for updating new parameters, new endpoints and severity score picked up " + accountSettings.getId(), LogDb.DASHBOARD);
