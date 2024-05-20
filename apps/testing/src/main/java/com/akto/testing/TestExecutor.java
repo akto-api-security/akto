@@ -1,3 +1,4 @@
+
 package com.akto.testing;
 
 import com.akto.dao.ActivitiesDao;
@@ -17,10 +18,7 @@ import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Graph;
-import com.akto.dto.test_editor.Auth;
-import com.akto.dto.test_editor.ExecutorNode;
-import com.akto.dto.test_editor.FilterNode;
-import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
@@ -34,9 +32,11 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -46,11 +46,6 @@ import com.google.gson.Gson;
 import com.mongodb.MongoInterruptedException;
 import org.apache.commons.lang3.StringUtils;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.*;
 
 import org.bson.conversions.Bson;
@@ -110,7 +105,7 @@ public class TestExecutor {
             Graph graph = new Graph();
             graph.buildGraph(workflowTest);
             GraphExecutorRequest graphExecutorRequest = new GraphExecutorRequest(graph, workflowTest, testingRun.getId(), summaryId, valuesMap, false, "linear");
-            GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest, debug, testLogs);
+            GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest, debug, testLogs, null);
             WorkflowTestResultsDao.instance.insertOne(graphExecutorResult.getWorkflowTestResult());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while executing workflow test " + e, LogDb.TESTING);
@@ -136,6 +131,12 @@ public class TestExecutor {
         int now = Context.now();
         int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? Math.min( testingRun.getMaxConcurrentRequests(), 100) : 10;
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
+
+        if (testingRun.getTestingRunConfig() != null) {
+            TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, summaryId),
+                    Updates.set(TestingRunResultSummary.TESTS_INITIATED_COUNT,
+                            testingRun.getTestingRunConfig().getTestSubCategoryList().size()));
+        }
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
         sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(testingRun.getTestingEndpoints().returnApis()));
@@ -222,7 +223,7 @@ public class TestExecutor {
             }
         }
 
-        final int maxRunTime = testingRun.getTestRunTime() < 0 ? 30*60 : testingRun.getTestRunTime(); // if nothing specified wait for 30 minutes
+        final int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); // if nothing specified wait for 30 minutes
 
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
@@ -268,14 +269,6 @@ public class TestExecutor {
     }
 
     public static void updateTestSummary(ObjectId summaryId){
-
-        long testingRunResultsCount = TestingRunResultDao.instance
-                .count(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId));
-
-        TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
-                Filters.eq(Constants.ID, summaryId),
-                Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResultsCount));
-
         loggerMaker.infoAndAddToDb("Finished updating results count", LogDb.TESTING);
 
         Map<String, Integer> totalCountIssues = new HashMap<>();
@@ -553,13 +546,21 @@ public class TestExecutor {
         }
     }
 
-    public void insertResultsAndMakeIssues(List<TestingRunResult> testingRunResults) {
+    public void insertResultsAndMakeIssues(List<TestingRunResult> testingRunResults, ObjectId testRunResultSummaryId) {
         int resultSize = testingRunResults.size();
         if (resultSize > 0) {
             loggerMaker.infoAndAddToDb("testingRunResults size: " + resultSize, LogDb.TESTING);
             trim(testingRunResults);
             TestingRunResultDao.instance.insertMany(testingRunResults);
             loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
+
+            TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                Filters.eq(Constants.ID, testRunResultSummaryId),
+                Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize)
+            );
+
+            loggerMaker.infoAndAddToDb("Updated count in summary", LogDb.TESTING);
+
             TestingIssuesHandler handler = new TestingIssuesHandler();
             boolean triggeredByTestEditor = false;
             handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
@@ -601,7 +602,7 @@ public class TestExecutor {
                 countSuccessfulTests++;
             }
 
-            insertResultsAndMakeIssues(testingRunResults);
+            insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
         }
         if(countSuccessfulTests > 0){
             ApiInfoDao.instance.updateLastTestedField(apiInfoKey);
@@ -624,11 +625,23 @@ public class TestExecutor {
         return true;
     }
 
+    Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
                                        ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
+
+        if (deactivatedCollections.contains(apiInfoKey.getApiCollectionId())) {
+            List<GenericTestResult> testResults = new ArrayList<>();
+            testResults.add(new TestResult(null, null, Collections.singletonList(TestError.DEACTIVATED_ENDPOINT.getMessage()),0, false, Confidence.HIGH, null));
+            return new TestingRunResult(
+                testRunId, apiInfoKey, testSuperType, testSubType ,testResults,
+                false,new ArrayList<>(),100,Context.now(),
+                Context.now(), testRunResultSummaryId, null, Collections.singletonList(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Deactivated endpoint"))
+            );
+        }
 
         List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
         if (messages == null || messages.isEmpty()){
@@ -678,6 +691,8 @@ public class TestExecutor {
         List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
         // TestingUtil -> authMechanism
         // TestingConfig -> auth
+        com.akto.test_editor.execution.Executor executor = new Executor();
+        executor.overrideTestUrl(rawApi, testingRunConfig);
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
                 rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
         YamlTestResult testResults = yamlTestTemplate.run(debug, testLogs);

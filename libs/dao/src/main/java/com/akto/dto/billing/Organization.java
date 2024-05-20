@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.Set;
 import org.bson.codecs.pojo.annotations.BsonId;
 
+import com.akto.dao.context.Context;
+
 public class Organization {
     
     // Change this to use a UUID
@@ -32,7 +34,15 @@ public class Organization {
     public static final String HOTJAR_SITE_ID = "hotjarSiteId";
 
     public String hotjarSiteId = "hotjarSiteId";
+
+    public static final String TEST_TELEMETRY_ENABLED = "testTelemetryEnabled";
+    private boolean testTelemetryEnabled;
     private int gracePeriod;
+
+    public static final String _EXPIRED = "expired";
+    private boolean expired;
+
+    public static final int NO_SYNC_PERIOD = 60 * 60 * 24 * 3; // 3 days.
 
     public Organization() { }
 
@@ -123,5 +133,36 @@ public class Organization {
 
     public void setLastFeatureMapUpdate(int lastFeatureMapUpdate) {
         this.lastFeatureMapUpdate = lastFeatureMapUpdate;
+    }
+
+    public boolean isExpired() {
+        return expired;
+    }
+
+    public void setExpired(boolean expired) {
+        this.expired = expired;
+    }
+
+    public boolean checkExpirationWithAktoSync() {
+
+        boolean noConnectivity = (((lastFeatureMapUpdate > 0) &&
+                (lastFeatureMapUpdate + Organization.NO_SYNC_PERIOD < Context.now())) &&
+                (featureWiseAllowed == null || featureWiseAllowed.isEmpty()));
+
+        /*
+         * TODO: no connectivity check to be added later.
+         */
+        if (expired) {
+            return true;
+        }
+
+        return false;
+    }
+    public boolean getTestTelemetryEnabled() {
+        return testTelemetryEnabled;
+    }
+
+    public void setTestTelemetryEnabled(boolean testTelemetryEnabled) {
+        this.testTelemetryEnabled = testTelemetryEnabled;
     }
 }

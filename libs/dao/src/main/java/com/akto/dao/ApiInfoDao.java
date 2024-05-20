@@ -2,6 +2,7 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
@@ -12,6 +13,7 @@ import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UnwindOptions;
 import com.mongodb.client.model.Updates;
 
 import org.bson.Document;
@@ -60,11 +62,20 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         fieldNames = new String[]{ApiInfo.LAST_TESTED};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
+        fieldNames = new String[]{ApiInfo.LAST_CALCULATED_TIME};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL }, true);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] {ApiInfo.SEVERITY_SCORE }, false);
+                
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] {ApiInfo.RISK_SCORE }, false);
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { ApiInfo.RISK_SCORE, ApiInfo.ID_API_COLLECTION_ID }, false);
     }
     
 
@@ -81,7 +92,11 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         int oneMonthAgo = Context.now() - Constants.ONE_MONTH_TIMESTAMP ;
         pipeline.add(Aggregates.match(Filters.gte("lastTested", oneMonthAgo)));
 
-        BasicDBObject groupedId2 = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
+        UnwindOptions unwindOptions = new UnwindOptions();
+        unwindOptions.preserveNullAndEmptyArrays(false);  
+        pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+
+        BasicDBObject groupedId2 = new BasicDBObject("apiCollectionId", "$collectionIds");
         pipeline.add(Aggregates.group(groupedId2, Accumulators.sum("count",1)));
         pipeline.add(Aggregates.project(
             Projections.fields(
@@ -105,7 +120,12 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
     public Map<Integer,Integer> getLastTrafficSeen(){
         Map<Integer,Integer> result = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$_id.apiCollectionId");
+
+        UnwindOptions unwindOptions = new UnwindOptions();
+        unwindOptions.preserveNullAndEmptyArrays(false);  
+        pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$collectionIds");
         pipeline.add(Aggregates.sort(Sorts.orderBy(Sorts.descending(ApiInfo.ID_API_COLLECTION_ID), Sorts.descending(ApiInfo.LAST_SEEN))));
         pipeline.add(Aggregates.group(groupedId, Accumulators.first(ApiInfo.LAST_SEEN, "$lastSeen")));
         
@@ -121,37 +141,22 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         return result;
     }
 
-    public List<Bson> buildRiskScorePipeline(){
-        int oneMonthBefore = Context.now() - Constants.ONE_MONTH_TIMESTAMP;
-        String computedSeverityScore = "{'$cond':[{'$gte':['$severityScore',100]},2,{'$cond':[{'$gte':['$severityScore',10]},1,{'$cond':[{'$gt':['$severityScore',0]},0.5,0]}]}]}";
-        String computedAccessTypeScore = "{ '$cond': { 'if': { '$and': [ { '$gt': [ { '$size': '$apiAccessTypes' }, 0 ] }, { '$in': ['PUBLIC', '$apiAccessTypes'] } ] }, 'then': 1, 'else': 0 } }";
-        String computedLastSeenScore = "{ '$cond': [ { '$gte': ['$lastSeen', " +  oneMonthBefore + " ] }, 1, 0 ] }";
-        String computedIsSensitiveScore = "{ '$cond': [ { '$eq': ['$isSensitive', true] }, 1, 0 ] }";
-
-        List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.project(
-            Projections.fields(
-                Projections.include("_id"),
-                Projections.computed("sensitiveScore",Document.parse(computedIsSensitiveScore)),
-                Projections.computed("isNewScore",Document.parse(computedLastSeenScore)),
-                Projections.computed("accessTypeScore",Document.parse(computedAccessTypeScore)),
-                Projections.computed("severityScore",Document.parse(computedSeverityScore))
-            )
-        ));
-
-        String computedRiskScore = "{ '$add': ['$sensitiveScore', '$isNewScore', '$accessTypeScore', '$severityScore']}";
-
-        pipeline.add(
-            Aggregates.project(
-                Projections.fields(
-                    Projections.include("_id"),
-                    Projections.computed("riskScore", Document.parse(computedRiskScore))
-                )
-            )
-        );
-        return pipeline;
+    public static Float getRiskScore(ApiInfo apiInfo, boolean isSensitive, float riskScoreFromSeverityScore){
+        float riskScore = 0;
+        if(apiInfo != null){
+            if(Context.now() - apiInfo.getLastSeen() <= Constants.ONE_MONTH_TIMESTAMP){
+                riskScore += 1;
+            }
+            if(apiInfo.getApiAccessTypes().contains(ApiAccessType.PUBLIC)){
+                riskScore += 1;
+            }
+        }
+        if(isSensitive){
+            riskScore += 1;
+        }
+        riskScore += riskScoreFromSeverityScore;
+        return riskScore;
     }
-
     @Override
     public String getCollName() {
         return "api_info";

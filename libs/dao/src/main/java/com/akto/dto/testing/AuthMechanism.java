@@ -18,15 +18,16 @@ public class AuthMechanism {
     private ArrayList<RequestData> requestData;
 
     private String uuid;
-
+    private List<Integer> apiCollectionIds;
     public AuthMechanism() {
     }
 
-    public AuthMechanism(List<AuthParam> authParams, ArrayList<RequestData> requestData, String type) {
+    public AuthMechanism(List<AuthParam> authParams, ArrayList<RequestData> requestData, String type, List<Integer> apiCollectionIds) {
         this.authParams = authParams;
         this.requestData = requestData;
         this.type = type;
         this.uuid = UUID.randomUUID().toString();
+        this.apiCollectionIds = apiCollectionIds;
     }
 
     public boolean addAuthToRequest(OriginalHttpRequest request) {
@@ -99,4 +100,11 @@ public class AuthMechanism {
         this.uuid = uuid;
     }
 
+    public List<Integer> getApiCollectionIds() {
+        return apiCollectionIds;
+    }
+
+    public void setApiCollectionIds(List<Integer> apiCollectionIds) {
+        this.apiCollectionIds = apiCollectionIds;
+    }
 }

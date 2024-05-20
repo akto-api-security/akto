@@ -110,7 +110,18 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return Filters.and(filters);
     }
 
-
+    public static Map<String, Object> createFiltersMap(SingleTypeInfo info) {
+        Map<String, Object> filterMap = new HashMap<>();
+        filterMap.put("url", info.getUrl());
+        filterMap.put("method", info.getMethod());
+        filterMap.put("responseCode", info.getResponseCode());
+        filterMap.put("isHeader", info.getIsHeader());
+        filterMap.put("param", info.getParam());
+        filterMap.put("apiCollectionId", info.getApiCollectionId());
+        filterMap.put("subType", info.getSubType().getName());
+        filterMap.put("isUrlParam", info.getIsUrlParam());
+        return filterMap;
+    }
 
     public static List<Bson> createFiltersBasic(SingleTypeInfo info) {
         List<Bson> filters = new ArrayList<>();
@@ -471,6 +482,36 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             return 0;
         }
 
+    }
+
+    public static final int LARGE_LIMIT = 10_000;
+
+    public int countEndpoints(Bson filters) {
+        int ret = 0;
+
+        List<Bson> pipeline = new ArrayList<>();
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                .append("url", "$url")
+                .append("method", "$method");
+
+        Bson projections = Projections.fields(
+                Projections.include("timestamp", "lastSeen", "apiCollectionId", "url", "method", SingleTypeInfo._COLLECTION_IDS));
+
+        pipeline.add(Aggregates.project(projections));
+        pipeline.add(Aggregates.match(filters));
+        pipeline.add(Aggregates.group(groupedId));
+        pipeline.add(Aggregates.limit(LARGE_LIMIT));
+        pipeline.add(Aggregates.count());
+
+        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor();
+
+        while (endpointsCursor.hasNext()) {
+            ret = endpointsCursor.next().getInt("count");
+            break;
+        }
+
+        return ret;
     }
 
     public Map<ApiInfo.ApiInfoKey, List<String>> fetchRequestParameters(List<ApiInfo.ApiInfoKey> apiInfoKeys) {

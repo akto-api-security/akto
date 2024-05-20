@@ -49,7 +49,8 @@ function CreateNewCollectionModal(props) {
         }
         fetchData()
         setActive(false)
-        func.setToast(true, false, "API collection created successfully")
+        func.setToast(true, false, <div data-testid="collection_creation_message">{"API collection created successfully"}</div>)
+
     }
 
     const handleNewCollectionNameChange =

@@ -19,6 +19,7 @@ import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.har.HAR;
 import com.akto.log.LoggerMaker;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.util.DashboardMode;
 import com.akto.utils.GzipUtils;
@@ -37,6 +38,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public class HarAction extends UserAction {
@@ -63,6 +65,14 @@ public class HarAction extends UserAction {
         }
 
         ApiCollection apiCollection = null;
+        
+        /*
+         * We need to allow the first time creation for demo collections 
+         * thus calculating them before creation.
+         */
+        Set<Integer> demoCollections = UsageMetricCalculator.getDemos();
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
         loggerMaker.infoAndAddToDb("HarAction.execute() started", LoggerMaker.LogDb.DASHBOARD);
         if (apiCollectionName != null) {
             apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
@@ -80,7 +90,7 @@ public class HarAction extends UserAction {
                         return ERROR.toUpperCase();
                     }
                 } else {
-                    Collection<String> actionErrors = apiCollectionsAction.getActionErrors(); 
+                    Collection<String> actionErrors = apiCollectionsAction.getActionErrors();
                     if (actionErrors != null && actionErrors.size() > 0) {
                         for (String actionError: actionErrors) {
                             addActionError(actionError);
@@ -105,6 +115,17 @@ public class HarAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        String commonErrorMessage = "collection can't be used, please create a new collection.";
+
+        if(demoCollections.contains(apiCollectionId)) {
+            addActionError("Demo " + commonErrorMessage);
+            return ERROR.toUpperCase();
+        }
+
+        if(deactivatedCollections.contains(apiCollectionId)) {
+            addActionError("Deactivated " + commonErrorMessage);
+            return ERROR.toUpperCase();
+        }
         if (!skipKafka && KafkaListener.kafka == null) {
             addActionError("Dashboard kafka not running");
             return ERROR.toUpperCase();
@@ -178,7 +199,7 @@ public class HarAction extends UserAction {
     Awesome awesome = null;
 
     public String uploadTcp() {
-        
+
         File tmpDir = FileUtils.getTempDirectory();
         String filename = UUID.randomUUID().toString() + ".pcap";
         File tcpDump = new File(tmpDir, filename);
@@ -188,23 +209,23 @@ public class HarAction extends UserAction {
             Awesome.GoString.ByValue str = new Awesome.GoString.ByValue();
             str.p = tcpDump.getAbsolutePath();
             str.n = str.p.length();
-    
+
             Awesome.GoString.ByValue str2 = new Awesome.GoString.ByValue();
             str2.p = System.getenv("AKTO_KAFKA_BROKER_URL");
             str2.n = str2.p.length();
-    
+
             awesome.readTcpDumpFile(str, str2 , apiCollectionId);
-    
-            return Action.SUCCESS.toUpperCase();            
+
+            return Action.SUCCESS.toUpperCase();
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
-            return Action.ERROR.toUpperCase();        
+            return Action.ERROR.toUpperCase();
         }
 
     }
 
-    interface Awesome extends Library {          
+    interface Awesome extends Library {
         public static class GoString extends Structure {
             /** C type : const char* */
             public String p;
@@ -224,8 +245,8 @@ public class HarAction extends UserAction {
             public static class ByReference extends GoString implements Structure.ByReference {}
             public static class ByValue extends GoString implements Structure.ByValue {}
         }
-        
+
         public void readTcpDumpFile(GoString.ByValue filepath, GoString.ByValue kafkaURL, long apiCollectionId);
-        
+
     }
 }

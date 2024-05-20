@@ -114,7 +114,6 @@ public class IssuesAction extends UserAction {
         issues = TestingRunIssuesDao.instance.findAll(filters, skip,limit, sort);
 
         for (TestingRunIssues runIssue : issues) {
-            // string comparison (nuclei test)
             if (runIssue.getId().getTestSubCategory().startsWith("http")) {//TestSourceConfig case
                 TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runIssue.getId().getTestCategoryFromSourceConfig());
                 runIssue.getId().setTestSourceConfig(config);
@@ -172,7 +171,6 @@ public class IssuesAction extends UserAction {
         String testSubType = null;
         // ?? enum stored in db
         String subCategory = issue.getId().getTestSubCategory();
-        // string comparison (nuclei test)
         if (subCategory.startsWith("http")) {
             testSubType = issue.getId().getTestCategoryFromSourceConfig();
         } else {
@@ -227,10 +225,29 @@ public class IssuesAction extends UserAction {
     }
 
     private boolean fetchOnlyActive;
+    private String mode;
 
     public String fetchAllSubCategories() {
 
-        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap(true, fetchOnlyActive);
+        boolean includeYamlContent = false;
+
+        switch (mode) {
+            case "runTests":
+                categories = GlobalEnums.TestCategory.values();
+                break;
+            case "testEditor":
+                includeYamlContent = true;
+                vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
+                break;
+            default:
+                includeYamlContent = true;
+                categories = GlobalEnums.TestCategory.values();
+                vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
+                testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
+        }
+
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(includeYamlContent,
+                fetchOnlyActive);
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             try {
@@ -240,13 +257,10 @@ public class IssuesAction extends UserAction {
                 }
             } catch (Exception e) {
                 String err = "Error while fetching subcategories for " + entry.getKey();
-                loggerMaker.errorAndAddToDb(e,err, LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, err, LogDb.DASHBOARD);
             }
         }
 
-        this.categories = GlobalEnums.TestCategory.values();
-        this.testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
-        this.vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
         return SUCCESS.toUpperCase();
     }
 
@@ -462,5 +476,9 @@ public class IssuesAction extends UserAction {
 
     public void setSampleDataVsCurlMap(Map<String, String> sampleDataVsCurlMap) {
         this.sampleDataVsCurlMap = sampleDataVsCurlMap;
+    }
+
+    public void setMode(String mode) {
+        this.mode = mode;
     }
 }

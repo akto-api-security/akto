@@ -4,12 +4,13 @@ import Dropdown from './layouts/Dropdown';
 import {DeleteMinor} from "@shopify/polaris-icons"
 import func from "@/util/func"
 import ConditionComponent from './ConditionComponent';
+import TitleWithInfo from './shared/TitleWithInfo';
 
 function ConditionsPicker(props) {
 
     const id = props.id ? props.id : "condition"
 
-    const {title, param, selectOptions, conditions, operator, dispatch} = props
+    const {title, param, selectOptions, conditions, operator, dispatch, tooltipContent} = props
 
     const handleDelete = (index) => {
         dispatch({type:"delete", key: "condition", index: index})
@@ -59,9 +60,7 @@ function ConditionsPicker(props) {
 
     return (
         <LegacyCard.Section title={
-            <Text color='subdued' variant='headingSm'>
-                {title}
-            </Text>
+            <TitleWithInfo titleText={title} tooltipContent={tooltipContent} textProps={{variant: 'headingSm', color: 'subdued'}} />
         } >
             {fieldsComponent}
             <br/>
