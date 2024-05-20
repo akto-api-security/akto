@@ -51,7 +51,7 @@ const transform = {
         }
     },
 
-    getRiskScoreTrendOptions: (data, riskScoreRanges)=>{
+    getRiskScoreTrendOptions: (data, riskScoreRanges, navigate)=>{
         let dataArr = [] ;
         for(let c = 3 ; c < 6 ; c++){
             const val = data[c] ? data[c] : 0;
@@ -97,7 +97,7 @@ const transform = {
                             click: function () {
                                 const columnIndex = this.index;
                                 const apiCollectionId = riskScoreRangesRev[columnIndex].apiCollectionId;
-                                window.location.href = `/dashboard/observe/inventory/${apiCollectionId}`;
+                                navigate(`/dashboard/observe/inventory/${apiCollectionId}`)
                             }
                         }
                     }
