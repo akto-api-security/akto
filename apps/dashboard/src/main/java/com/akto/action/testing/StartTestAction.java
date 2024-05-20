@@ -397,7 +397,7 @@ public class StartTestAction extends UserAction {
             limit *= -1;
         }
 
-        int pageLimit = Math.min(limit == 0 ? 50 : limit, 10_000);
+        int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
 
         testingRuns = TestingRunDao.instance.findAll(
                 Filters.and(testingRunFilters), skip, pageLimit,

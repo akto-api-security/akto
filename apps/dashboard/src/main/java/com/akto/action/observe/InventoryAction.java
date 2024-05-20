@@ -663,7 +663,7 @@ public class InventoryAction extends UserAction {
             limit *= -1;
         }
 
-        int pageLimit = Math.min(limit == 0 ? 50 : limit, 10_000);
+        int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
 
         List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.and(prepareFilters(), getSearchFilters()), skip,pageLimit, sort);
         return list;        
