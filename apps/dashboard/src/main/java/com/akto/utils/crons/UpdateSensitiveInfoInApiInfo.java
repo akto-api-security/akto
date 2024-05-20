@@ -31,7 +31,7 @@ public class UpdateSensitiveInfoInApiInfo {
                 Context.accountId.set(1000_000);
                 boolean dibs = callDibs(Cluster.MAP_SENSITIVE_IN_INFO, 900, 60);
                 if(!dibs){
-                    loggerMaker.infoAndAddToDb("Cron for updating new parameters, new endpoints and severity score dibs not acquired, thus skipping cron", LogDb.DASHBOARD);
+                    loggerMaker.infoAndAddToDb("Cron for mapping sensitive info not picked up as dibs is acquired.", LogDb.DASHBOARD);
                     return;
                 }
                 AccountTask.instance.executeTask(new Consumer<Account>() {
