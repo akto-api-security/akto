@@ -12,6 +12,8 @@ public class Info {
 
     private String impact;
 
+    private String remediation;
+
     private Category category;
 
     private String subCategory;
@@ -26,12 +28,13 @@ public class Info {
 
     private List<String> cve;
 
-    public Info(String name, String description, String details, String impact, Category category, String subCategory,
+    public Info(String name, String description, String details, String impact, String remediation, Category category, String subCategory,
             String severity, List<String> tags, List<String> references, List<String> cwe, List<String> cve) {
         this.name = name;
         this.description = description;
         this.details = details;
         this.impact = impact;
+        this.remediation = remediation;
         this.category = category;
         this.subCategory = subCategory;
         this.severity = severity;
@@ -74,6 +77,15 @@ public class Info {
     public void setImpact(String impact) {
         this.impact = impact;
     }
+
+    public String getRemediation() {
+        return remediation;
+    }
+
+    public void setRemediation(String remediation) {
+        this.remediation  = remediation;
+    }
+
 
     public Category getCategory() {
         return category;
