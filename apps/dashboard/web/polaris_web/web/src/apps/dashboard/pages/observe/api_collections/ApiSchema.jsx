@@ -3,8 +3,9 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
 import func from "@/util/func"
 import transform from "../transform";
+import { useNavigate } from "react-router-dom";
 
-function prepareTableData (data) {
+function prepareTableData (data, handleBadgeClick) {
     let sensitivePayload = []
     let normalPayload = []
     let standardHeader = []
@@ -23,9 +24,11 @@ function prepareTableData (data) {
             </Text>
             {
                 isSensitive ?
-                    <Badge status="warning">
-                        {element.subType.name}
-                    </Badge> : null
+                    <Button plain monochrome onClick={() => {handleBadgeClick(element.subType.name, "")}}>
+                        <Badge status="warning">
+                            {element.subType.name}
+                        </Badge>
+                    </Button> : null
             }
             </HorizontalStack>), <Text variant="bodySm" fontWeight="regular" color="subdued">{func.prepareValuesTooltip(element)}</Text>
         ]
@@ -72,7 +75,7 @@ function ApiSingleSchema(props) {
         tabSensitive: ''
     });
     useEffect(()=>{
-        setDataObj(prepareTableData(data));
+        setDataObj(prepareTableData(data, props.handleBadgeClick));
     },[])
     const headerCount = dataObj?.headerData?.length
     const payloadCount = dataObj?.payloadData?.length
@@ -142,15 +145,21 @@ function ApiSingleSchema(props) {
 function ApiSchema(props) {
 
     const { data, badgeActive, setBadgeActive } = props
+    const navigate = useNavigate()
 
     let reqData = data.filter((item) => item.responseCode === -1)
     let resData = data.filter((item) => item.responseCode !== -1)
+
+    const handleBadgeClick = (datatype, position) => {
+        const navUrl = "/dashboard/observe/sensitive/" + datatype.toUpperCase()
+        navigate(navUrl)
+    }
 
     return (
         <VerticalStack gap="2">
             {
                 ['Request', 'Response'].map((type, index) => {
-                    return <ApiSingleSchema title={type} key={type} data={index == 0 ? reqData : resData} badgeActive={badgeActive} setBadgeActive={setBadgeActive}/>
+                    return <ApiSingleSchema handleBadgeClick={handleBadgeClick} title={type} key={type} data={index == 0 ? reqData : resData} badgeActive={badgeActive} setBadgeActive={setBadgeActive}/>
                 })
             }
 

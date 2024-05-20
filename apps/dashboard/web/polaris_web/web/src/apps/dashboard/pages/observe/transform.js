@@ -48,6 +48,7 @@ const apiDetailsHeaders = [
         value: 'apiCollectionName',
         itemOrder: 3,
         icon: DynamicSourceMinor,
+        iconTooltip: "Api collection name"
     },
     {
         text: 'Tags',
@@ -66,39 +67,44 @@ const apiDetailsHeaders = [
         itemOrder: 3,
         value: 'hostName',
         icon: GlobeMinor,
+        iconTooltip: "Hostname of the api collection"
     },
     {
         text: 'Last Seen',
         value: 'last_seen',
         icon: SearchMinor,
-        itemOrder: 3
+        itemOrder: 3,
+        iconTooltip: "Last seen traffic"
     },
     {
         text: 'Access Type',
         value: 'access_type',
         icon: InfoMinor,
         itemOrder: 3,
-        showFilter: true
+        showFilter: true, 
+        iconTooltip: "Access type of the API"
     },
     {
         text: 'Auth Type',
         value: 'auth_type',
         icon: LockMinor,
         itemOrder: 3,
-        showFilter: true
+        showFilter: true,
+        iconTooltip: "Auth type of the API"
     },
     {
         text: "Discovered",
         value: 'added',
         icon: ClockMinor,
-        itemOrder: 3
+        itemOrder: 3,
+        iconTooltip: "Discovered time of API"
     },
     {
         text: 'Changes',
         value: 'changes',
         icon: InfoMinor,
-        itemOrder: 3
-
+        itemOrder: 3,
+        iconTooltip: "Changes in API"
     }
 ]
 
@@ -393,7 +399,7 @@ const transform = {
                 displayName: c.displayName,
                 displayNameComp: c.displayNameComp,
                 endpoints: c.endpoints,
-                riskScoreComp: <Badge status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
+                riskScoreComp: <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
                 coverage: calcCoverage,
                 issuesArr: this.getIssuesList(c.severityInfo),
                 sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes, c.deactivated),

@@ -2,7 +2,7 @@ import request from "../../../../util/request"
 
 
 export default {
-    async fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, sensitive, isRequest) {
+    async fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, sensitive, isRequest, queryValue) {
         const resp = await request({
             url: '/api/fetchChanges',
             method: 'post',
@@ -19,7 +19,8 @@ export default {
                 startTimestamp,
                 endTimestamp,
                 sensitive: sensitive,
-                request: isRequest
+                request: isRequest,
+                searchString:queryValue
             }
         })
         return resp.response.data

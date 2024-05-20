@@ -176,6 +176,7 @@ function TestCollectionConfiguration() {
                 condensedHeight={true}
                 hideQueryField={true}
                 headings={headers}
+                hidePagination={true}
             />
         </div>
 

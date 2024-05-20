@@ -40,7 +40,7 @@ function GithubCell(props){
         })
     }
     <VerticalStack gap="2" inlineAlign='baseline'>
-        <HorizontalStack gap="2" align='start'>
+        <HorizontalStack wrap={false} gap="2" align='start'>
             {
                 headers?.filter((header) => {
                     return header.itemOrder == 1
@@ -102,9 +102,11 @@ function GithubCell(props){
                     return data[header.value]!=undefined && data[header.value]!="";
                 }).map((header) => {
                     return (
-                        <HorizontalStack key={header.value} gap="1">
+                        <HorizontalStack wrap={false} key={header.value} gap="1">
                             <div style={{ maxWidth: "1rem", maxHeight: "1rem" }}>
-                                <Icon source={header.icon} color="subdued" />
+                                <Tooltip content={header.iconTooltip} dismissOnMouseOut>
+                                    <Icon source={header.icon} color="subdued" />
+                                </Tooltip>
                             </div>
                             <TooltipText
                                 tooltip={data[header.value]}

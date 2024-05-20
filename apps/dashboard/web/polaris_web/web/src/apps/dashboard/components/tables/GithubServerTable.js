@@ -337,7 +337,7 @@ function GithubServerTable(props) {
               </IndexTable>
             </div>
             </LegacyCard.Section>
-            {(total > pageLimit) && <LegacyCard.Section>
+            {(total !== 0 && !props?.hidePagination) && <LegacyCard.Section>
               <HorizontalStack
                 align="center">
                 <Pagination
