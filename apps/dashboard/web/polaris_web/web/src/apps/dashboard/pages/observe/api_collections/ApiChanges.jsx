@@ -136,6 +136,11 @@ function ApiChanges() {
         />
     )
 
+    const graphPointClick = ({ point }) => {
+        const dateObj = { alias: "custom", title : (new Date((point.x +  (5 * 60 * 1000) ))).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' }).replace(/,/g, '') ,  period : {since: new Date((point.x - ( 24 * 60 * 60 * 1000) )), until: new Date((point.x + (24 * 60 * 60 * 1000) ))} }
+        dispatchCurrDateRange({ type: "update", period:{period: dateObj.period, title: dateObj.title, alias: dateObj.alias }})
+    }
+
     const processChartData = () => {
         return [
             {
@@ -189,6 +194,7 @@ function ApiChanges() {
                         yAxisTitle="Count"
                         width={20}
                         noGap={true}
+                        graphPointClick={graphPointClick}
                     />
                 </VerticalStack>
             </VerticalStack>

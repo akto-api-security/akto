@@ -131,6 +131,8 @@ public class Main {
     }
 
     private static TestingRunResultSummary findPendingTestingRunResultSummary() {
+
+        // if you change this delta, update this delta in method getCurrentRunningTestsSummaries
         int now = Context.now();
         int delta = now - 20*60;
 

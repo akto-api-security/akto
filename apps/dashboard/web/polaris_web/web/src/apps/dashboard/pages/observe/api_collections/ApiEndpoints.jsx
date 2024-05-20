@@ -157,6 +157,7 @@ function ApiEndpoints() {
     const [isGptActive, setIsGptActive] = useState(false)
     const [redacted, setIsRedacted] = useState(false)
     const [showRedactModal, setShowRedactModal] = useState(false)
+    const [tableLoading, setTableLoading] = useState(false)
 
     const queryParams = new URLSearchParams(location.search);
     const selectedUrl = queryParams.get('selected_url')
@@ -196,7 +197,7 @@ function ApiEndpoints() {
         })
 
         let data = {}
-        let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, null)
+        let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap)
 
         // handle code analysis endpoints
         const codeAnalysisCollectionInfo = apiCollectionData.codeAnalysisCollectionInfo
@@ -570,10 +571,10 @@ function ApiEndpoints() {
     )
 
     const handleSelectedTab = (selectedIndex) => {
-        setLoading(true)
+        setTableLoading(true)
         setSelected(selectedIndex)
         setTimeout(()=>{
-            setLoading(false)
+            setTableLoading(false)
         },200)
     }
 
@@ -673,6 +674,7 @@ function ApiEndpoints() {
                           tableTabs={tableTabs}
                           selectable={true}
                           promotedBulkActions={promotedBulkActions}
+                          loading={tableLoading || loading}
                       />
                       <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                           <Modal.Section flush>

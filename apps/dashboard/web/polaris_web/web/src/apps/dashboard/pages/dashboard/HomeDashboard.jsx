@@ -148,17 +148,20 @@ function HomeDashboard() {
         {
             text: "High risk",
             range: '4-5',
-            status: "critical"
+            status: "critical",
+            apiCollectionId: 111_111_150
         },
         {
             text: 'Medium risk',
             range: '3-4',
             status: 'warning',
+            apiCollectionId: 111_111_149
         },
         {
             text: "Low risk",
             range: '0-3',
             status: 'new',
+            apiCollectionId: 111_111_148
         }
     ]
     const riskScoreTrendComp = (
