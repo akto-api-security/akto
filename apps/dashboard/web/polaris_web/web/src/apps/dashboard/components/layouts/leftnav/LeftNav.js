@@ -1,5 +1,5 @@
 import {Navigation, Text} from "@shopify/polaris"
-import {SettingsFilledMinor,AppsFilledMajor, InventoryFilledMajor, MarketingFilledMinor, FileFilledMinor, AnalyticsFilledMinor, OrdersFilledMinor} from "@shopify/polaris-icons"
+import {SettingsFilledMinor,AppsFilledMajor, InventoryFilledMajor, MarketingFilledMinor, FileFilledMinor, AnalyticsFilledMinor, ReportFilledMinor} from "@shopify/polaris-icons"
 import {useLocation, useNavigate} from "react-router-dom"
 
 import './LeftNav.css'
@@ -41,7 +41,7 @@ export default function LeftNav(){
               },
               {
                 label: 'API Security Posture',
-                icon: OrdersFilledMinor,
+                icon: ReportFilledMinor,
                 onClick: ()=>{
                   handleSelect("dashboard_home")
                   navigate("/dashboard/home")
