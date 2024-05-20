@@ -1130,6 +1130,7 @@ public class InitializerListener implements ServletContextListener {
         loginConditions.add(new RegexTestingEndpoints(TestingEndpoints.Operator.OR, regex));
         loginGroup.setConditions(loginConditions);
         ApiCollectionUsers.removeFromCollectionsForCollectionId(loginGroup.getConditions(), id);
+        loginGroup.setAutomated(true);
 
         ApiCollectionsDao.instance.insertOne(loginGroup);
         ApiCollectionUsers.addToCollectionsForCollectionId(loginGroup.getConditions(), loginGroup.getId());
@@ -1161,6 +1162,7 @@ public class InitializerListener implements ServletContextListener {
 
         riskScoreGroup.setConditions(riskScoreConditions);
         riskScoreGroup.setType(ApiCollection.Type.API_GROUP);
+        riskScoreGroup.setAutomated(true);
 
         ApiCollectionsDao.instance.insertOne(riskScoreGroup); 
     }
@@ -1174,6 +1176,46 @@ public class InitializerListener implements ServletContextListener {
             BackwardCompatibilityDao.instance.updateOne(
                     Filters.eq("_id", backwardCompatibility.getId()),
                     Updates.set(BackwardCompatibility.RISK_SCORE_GROUPS, Context.now())
+            );
+        }
+    }
+
+    public static void setApiCollectionAutomatedField(BackwardCompatibility backwardCompatibility) {
+        // Set automated field of existing automated API collections
+        if (backwardCompatibility.getApiCollectionAutomatedField() == 0) {
+            int[] apiCollectionIds = {111_111_128, 111_111_129, 111_111_130, 111_111_148, 111_111_149, 111_111_150};
+
+            for (int apiCollectionId : apiCollectionIds) {
+                ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id", apiCollectionId));
+
+                if (apiCollection != null) {
+                    if (!apiCollection.getAutomated()) {
+                        apiCollection.setAutomated(true);
+                        ApiCollectionsDao.instance.updateOne(
+                            Filters.eq("_id", apiCollectionId), 
+                            Updates.set(ApiCollection.AUTOMATED, true));
+                    }
+                }
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.API_COLLECTION_AUTOMATED_FIELD, Context.now())
+            );
+        }
+    }
+
+    public static void createAutomatedAPIGroups(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getAutomatedApiGroups() == 0) {
+            String groupsCsv = AutomatedApiGroupsUtils.fetchGroups(false);
+
+            if (groupsCsv != null) {
+                AutomatedApiGroupsUtils.processAutomatedGroups(groupsCsv);
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.AUTOMATED_API_GROUPS, Context.now())
             );
         }
     }
@@ -2038,6 +2080,8 @@ public class InitializerListener implements ServletContextListener {
         moveAuthMechanismDataToRole(backwardCompatibility);
         createLoginSignupGroups(backwardCompatibility);
         createRiskScoreGroups(backwardCompatibility);
+        setApiCollectionAutomatedField(backwardCompatibility);
+        createAutomatedAPIGroups(backwardCompatibility);
         deleteAccessListFromApiToken(backwardCompatibility);
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
@@ -2474,18 +2518,22 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    public void setupAutomatedApiGroupsScheduler(){
-
-        AutomatedApiGroupsUtils.fetchGroups();
-
+    public void setupAutomatedApiGroupsScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                String groupsCsv = AutomatedApiGroupsUtils.fetchGroups(true);
+
+                if (groupsCsv == null) {
+                    return;
+                }
+
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
                         try {
-                            System.out.println("account id" + t.getId());
+                            AutomatedApiGroupsUtils.processAutomatedGroups(groupsCsv);
                         } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb("Error while processing automated api groups: " + e.getMessage(), LogDb.DASHBOARD);
                         }
                     }
                 }, "automated-api-groups-scheduler");
