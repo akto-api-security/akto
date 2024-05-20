@@ -4,14 +4,59 @@ import {ResourcesMajor,
   CollectionsMajor,
   CreditCardSecureMajor,
   MarketingMajor,
-  FraudProtectMajor, RiskMajor} from '@shopify/polaris-icons';
+  FraudProtectMajor, RiskMajor,
+  CircleCancelMajor,
+  CalendarMinor,
+  ReplayMinor,
+  PlayMinor,
+} from '@shopify/polaris-icons';
 import React, {  } from 'react'
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon, VerticalStack, Avatar, Tag} from '@shopify/polaris';
+import { Text,HorizontalStack, Badge, Link, List, Box, Icon, Avatar, Tag, Tooltip} from '@shopify/polaris';
 import { history } from "@/util/history";
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
-import { circle_cancel, circle_tick_minor } from "../../components/icons";
+import TestingStore from "./testingStore";
+
+import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
+
+let headers = [
+    {
+      value: "nameComp",
+      title: 'Issue name',
+      tooltipContent: 'Name of the test as in our test editor'
+    },
+    {
+      title: 'Severity',
+      value: 'severityComp',
+      sortActive: true
+    },
+    {
+      value: 'testCategory',
+      title: 'Category',
+      type: CellType.TEXT,
+      tooltipContent: 'Name of the subcategory of the test'
+    },
+    {
+      title: 'CWE tags',
+      value: 'cweDisplayComp',
+      tooltipContent: "CWE tags associated with the test from akto's test library"
+    },
+    {
+      title: 'Number of urls',
+      value: 'totalUrls',
+      type: CellType.TEXT
+    },
+    {
+      value: "scanned_time_comp",
+      title: 'Scanned',
+      sortActive: true
+    },
+    {
+      title: '',
+      type: CellType.COLLAPSIBLE
+    }
+]
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
@@ -61,17 +106,19 @@ function getTotalSeverityTestRunResult(severity) {
 function getRuntime(scheduleTimestamp, endTimestamp, state) {
   let status = getStatus(state);
   if (status === 'RUNNING') {
-    return "Currently running";
+    return <div data-testid="test_run_status">Currently running</div>;
   }
   const currTime = Date.now();
   if (endTimestamp <= 0) {
     if (currTime > scheduleTimestamp) {
-      return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
+      return <div data-testid="test_run_status">Was scheduled for {func.prettifyEpoch(scheduleTimestamp)}</div>;
+
     } else {
-      return "Next run in " + func.prettifyEpoch(scheduleTimestamp)
+      return <div data-testid="test_run_status">Next run in {func.prettifyEpoch(scheduleTimestamp)}</div>;
     }
   }
-  return 'Last run ' + func.prettifyEpoch(endTimestamp);
+  return <div data-testid="test_run_status">Last run {func.prettifyEpoch(endTimestamp)}</div>;
+
 }
 
 function getAlternateTestsInfo(state) {
@@ -152,9 +199,10 @@ const transform = {
       if(checkTestFailure(state, testRunState)){
         state = 'FAIL'
       }
+      const iconObj = func.getTestingRunIconObj(state)
       obj['orderPriority'] = getOrderPriority(state)
-      obj['icon'] = func.getTestingRunIcon(state);
-      obj['iconColor'] = func.getTestingRunIconColor(state)
+      obj['icon'] = iconObj.icon;
+      obj['iconColor'] = iconObj?.iconColor || ''
       obj['summaryState'] = getStatus(state)
       obj['startTimestamp'] = data?.startTimestamp
       obj['endTimestamp'] = data?.endTimestamp
@@ -171,22 +219,12 @@ const transform = {
       };
       return obj;
     },
-    prettifyTestName: (testName, icon, iconColor, state)=>{
-      let iconComp
-      switch(state){
-        case "COMPLETED":
-          iconComp = (<Box><Icon source={circle_tick_minor} /></Box>)
-          break;
-        case "STOPPED":
-          iconComp = (<Box><Icon source={circle_cancel} /></Box>)
-          break;
-        default:
-          iconComp = (<Box><Icon source={icon} color={iconColor}/></Box>)
-          break;
-      }
+    prettifyTestName: (testName, icon, iconColor, iconToolTipContent)=>{
       return(
         <HorizontalStack gap={4}>
-          {iconComp}
+          <Tooltip content={iconToolTipContent} hoverDelay={"300"} dismissOnMouseOut>
+            <Box><Icon source={icon} color={iconColor}/></Box>
+          </Tooltip>
           <Box maxWidth="350px">
             <TooltipText text={testName} tooltip={testName} textProps={{fontWeight: 'medium'}} />
           </Box>
@@ -219,11 +257,17 @@ const transform = {
       state = 'FAIL'
     }
 
+    let apiCollectionId = -1
+    if(Object.keys(data).length > 0){
+      apiCollectionId = data?.testingEndpoints?.apiCollectionId ||  data?.testingEndpoints?.workflowTest?.apiCollectionId || data?.testingEndpoints?.apisList[0]?.apiCollectionId
+    }
+    const iconObj = func.getTestingRunIconObj(state)
+
       obj['id'] = data.hexId;
       obj['testingRunResultSummaryHexId'] = testingRunResultSummary?.hexId;
       obj['orderPriority'] = getOrderPriority(state)
-      obj['icon'] = func.getTestingRunIcon(state);
-      obj['iconColor'] = func.getTestingRunIconColor(state)
+      obj['icon'] = iconObj.icon;
+      obj['iconColor'] = iconObj.color
       obj['name'] = data.name || "Test"
       obj['number_of_tests'] = data.testIdConfig == 1 ? "-" : getTestsInfo(testingRunResultSummary?.testResultsCount, state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
@@ -241,10 +285,12 @@ const transform = {
       obj['startTimestamp'] = testingRunResultSummary?.startTimestamp
       obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
+      obj['apiCollectionId'] = apiCollectionId
       if(prettified){
+        
         const prettifiedTest={
           ...obj,
-          testName: transform.prettifyTestName(data.name || "Test", func.getTestingRunIcon(state),func.getTestingRunIconColor(state), state),
+          testName: transform.prettifyTestName(data.name || "Test", iconObj.icon,iconObj.color, iconObj.tooltipContent),
           severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues))
         }
         return prettifiedTest
@@ -284,6 +330,7 @@ const transform = {
       obj['cweDisplay'] = minimizeTagList(obj['cwe'])
       obj['cve'] = subCategoryMap[data.testSubType]?.cve ? subCategoryMap[data.testSubType]?.cve : []
       obj['cveDisplay'] = minimizeTagList(obj['cve'])
+      obj['errorsList'] = data.errorsList || []
       return obj;
     },
     prepareTestRunResults : (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap) => {
@@ -360,9 +407,7 @@ const transform = {
     //<Box width="300px"><Button onClick={createJiraTicket} plain disabled={window.JIRA_INTEGRATED != "true"}>Click here to create a new ticket</Button></Box>
     let filledSection = []
     moreInfoSections.forEach((section) => {
-      let sectionLocal = {}
-      sectionLocal.icon = section.icon
-      sectionLocal.title = section.title
+      let sectionLocal = {...section}
       switch (section.title) {
         case "Description":
         if(category?.issueDetails == null || category?.issueDetails == undefined){
@@ -538,19 +583,18 @@ const transform = {
     }
     return conditions;
   },
-  setTestMetadata() {
-    api.fetchAllSubCategories().then((resp) => {
-      let subCategoryMap = {}
-      resp.subCategories.forEach((x) => {
-        subCategoryMap[x.name] = x
-      })
-      let subCategoryFromSourceConfigMap = {}
-      resp.testSourceConfigs.forEach((x) => {
-        subCategoryFromSourceConfigMap[x.id] = x
-      })
-      PersistStore.getState().setSubCategoryMap(subCategoryMap)
-      PersistStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap)
-    })
+  async setTestMetadata() {
+    const resp = await api.fetchAllSubCategories(true, "Dashboard");
+    let subCategoryMap = {};
+    resp.subCategories.forEach((x) => {
+      subCategoryMap[x.name] = x;
+    });
+    let subCategoryFromSourceConfigMap = {};
+    resp.testSourceConfigs.forEach((x_1) => {
+      subCategoryFromSourceConfigMap[x_1.id] = x_1;
+    });
+    PersistStore.getState().setSubCategoryMap(subCategoryMap);
+    PersistStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap);
   },
   prettifySummaryTable(summaries) {
     summaries = summaries.map((obj) => {
@@ -570,37 +614,44 @@ getInfoSectionsHeaders(){
     {
       icon: RiskMajor,
       title: "Impact",
-      content: ""
+      content: "",
+      tooltipContent: 'The impact of the test on apis in general scenario.'
     },
     {
       icon: CollectionsMajor,
       title: "Tags",
-      content: ""
+      content: "",
+      tooltipContent: 'Category info about the test.'
     },
     {
       icon: CreditCardSecureMajor,
       title: "CWE",
-      content: ""
+      content: "",
+      tooltipContent: "CWE tags associated with the test from akto's test library"
     },
     {
       icon: FraudProtectMajor,
       title: "CVE",
-      content: ""
+      content: "",
+      tooltipContent: "CVE tags associated with the test from akto's test library"
     },
     {
       icon: MarketingMajor,
       title: "API endpoints affected",
-      content: ""
+      content: "",
+      tooltipContent: "Affecting endpoints in your inventory for the same test"
     },
     {
       icon: ResourcesMajor,
       title: "References",
-      content: ""
+      content: "",
+      tooltipContent: "References for the above test."
     },
     {
       icon: ResourcesMajor,
       title: "Jira",
-      content: ""
+      content: "",
+      tooltipContent: "Jira ticket number attached to the testing run issue"
     }
   ]
   return moreInfoSections
@@ -615,6 +666,7 @@ convertSubIntoSubcategory(resp){
   const subCategoryMap = PersistStore.getState().subCategoryMap
   Object.keys(resp).forEach((key)=>{
     const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.shortName : key;
+    const objectKeyName = subCategoryMap[key] ? subCategoryMap[key].superCategory.name : key;
     if(obj.hasOwnProperty(objectKey)){
       let tempObj =  JSON.parse(JSON.stringify(obj[objectKey]));
       let newObj = {
@@ -627,13 +679,15 @@ convertSubIntoSubcategory(resp){
     else if(!subCategoryMap[key]){
       obj[objectKey] = {
         text: resp[key],
-        color: func.getColorForCharts(key)
+        color: func.getColorForCharts(key),
+        filterkey: objectKeyName
       }
       countObj.HIGH+=resp[key]
     }else{
       obj[objectKey] = {
         text: resp[key],
-        color: func.getColorForCharts(subCategoryMap[key].superCategory.name)
+        color: func.getColorForCharts(subCategoryMap[key].superCategory.name),
+        filterkey: objectKeyName
       }
       countObj[subCategoryMap[key].superCategory.severity._name]+=resp[key]
     }
@@ -645,7 +699,7 @@ convertSubIntoSubcategory(resp){
     const prop2 = val2['text'];
     return prop2 - prop1 ;
   });
-
+  
   return {
     subCategoryMap: Object.fromEntries(sortedEntries),
     countMap: countObj
@@ -661,38 +715,58 @@ getUrlComp(url){
     <HorizontalStack gap={1}>
       <Box width="54px">
         <HorizontalStack align="end">
-          <Text variant="bodyMd" color="subdued">{method}</Text>
+          <Text variant="bodyMd" fontWeight="medium" color="subdued">{method}</Text>
         </HorizontalStack>
       </Box>
-      <Text variant="bodyMd">{endpoint}</Text>
+      <div style={{fontSize: '14px', lineHeight: '20px', color: '#202223'}} data-testid="affected_endpoints">{endpoint}</div>
     </HorizontalStack>
   )
 },
 
-getCollapsibleRow(urls){
+getCollapsibleRow(urls, severity){
+  const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
   return(
-    <tr style={{background: "#EDEEEF"}}>
-      <td colSpan={7}>
-        <Box paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
-          <VerticalStack gap={2}>
-            {urls.map((ele,index)=>{
-              return(
-                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline key={index}>
+    <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+      <td colSpan={7} style={{padding: '0px !important'}}>
+          {urls.map((ele,index)=>{
+            const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
+            return( 
+              <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"4"} key={index}
+                  borderColor="border-subdued" {...borderStyle}
+              >
+                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
                   {this.getUrlComp(ele.url)}
                 </Link>
-              )
-            })}
-          </VerticalStack>
-        </Box>
+              </Box>
+            )
+          })}
       </td>
     </tr>
   )
 },
 
+getTestErrorType(message){
+  const errorsObject = TestingStore.getState().errorsObject
+  for(var key in errorsObject){
+    if(errorsObject[key] === message){
+      return key
+    }
+  }
+  return "UNKNOWN_ERROR_OCCURRED"
+},
+
 getPrettifiedTestRunResults(testRunResults){
+  const errorsObject = TestingStore.getState().errorsObject
   let testRunResultsObj = {}
   testRunResults.forEach((test)=>{
-    const key = test.name + ': ' + test.vulnerable
+    let key = test.name + ': ' + test.vulnerable
+    let error_message = ""
+    if(test?.errorsList.length > 0){
+      const errorType = this.getTestErrorType(test.errorsList[0])
+      key = key + ': ' + errorType
+      error_message = errorsObject[errorType]
+    }
+
     if(testRunResultsObj.hasOwnProperty(key)){
       let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
       let urls = testRunResultsObj[key].urls
@@ -700,19 +774,23 @@ getPrettifiedTestRunResults(testRunResults){
       let obj = {
         ...test,
         urls: urls,
-        endTimestamp: endTimestamp
+        endTimestamp: endTimestamp,
+        errorMessage: error_message
       }
       delete obj["nextUrl"]
       delete obj["url"]
+      delete obj["errorsList"]
       testRunResultsObj[key] = obj
     }else{
       let urls = [{url: test.url, nextUrl: test.nextUrl}]
       let obj={
         ...test,
         urls:urls,
+        errorMessage: error_message
       }
       delete obj["nextUrl"]
       delete obj["url"]
+      delete obj["errorsList"]
       testRunResultsObj[key] = obj
     }
   })
@@ -721,7 +799,7 @@ getPrettifiedTestRunResults(testRunResults){
     let obj = testRunResultsObj[key]
     let prettifiedObj = {
       ...obj,
-      nameComp: <Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box>,
+      nameComp: <div data-testid={obj.name}><Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box></div>,
       severityComp: obj?.vulnerable === true ? <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge> : <Text>-</Text>,
       cweDisplayComp: obj?.cweDisplay?.length > 0 ? <HorizontalStack gap={1}>
         {obj.cweDisplay.map((ele,index)=>{
@@ -732,7 +810,7 @@ getPrettifiedTestRunResults(testRunResults){
       </HorizontalStack> : <Text>-</Text>,
       totalUrls: obj.urls.length,
       scanned_time_comp: <Text variant="bodyMd">{func.prettifyEpoch(obj?.endTimestamp)}</Text>,
-      collapsibleRow: this.getCollapsibleRow(obj.urls),
+      collapsibleRow: this.getCollapsibleRow(obj.urls, obj?.severity[0]),
       urlFilters: obj.urls.map((ele) => ele.url)
     }
     prettifiedResults.push(prettifiedObj)
@@ -781,7 +859,8 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
   const rowItems = [
     {
       title: 'Severity',
-      value: <Text fontWeight="semibold" color={observeFunc.getColor(severity)}>{severity}</Text>
+      value: <Text fontWeight="semibold" color={observeFunc.getColor(severity)}>{severity}</Text>,
+      tooltipContent: "Severity of the test run result"
     },
     {
       title: "API",
@@ -790,34 +869,130 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
           <Text color="subdued" fontWeight="semibold">{apiInfo.id.method}</Text>
           <TextComp value={observeFunc.getTruncatedUrl(apiInfo.id.url)} />
         </HorizontalStack>
-      )
+      ),
+      tooltipContent: "Name of the api on which test is run"
     },
     {
       title: 'Hostname',
-      value: <TextComp value={observeFunc.getHostName(apiInfo.id.url)} />
+      value: <TextComp value={observeFunc.getHostName(apiInfo.id.url)} />,
+      tooltipContent: "Hostname of the api on which test is run"
     },
     {
       title: "Auth type",
-      value:<TextComp value={(auth_type || "").toLowerCase()} />
+      value:<TextComp value={(auth_type || "").toLowerCase()} />,
+      tooltipContent: "Authentication type of the api on which test is run"
     },
     {
       title: "Access type",
-      value: <TextComp value={access_type} />
+      value: <TextComp value={access_type} />,
+      tooltipContent: "Access type of the api on which test is run"
     },
     {
       title: "Sensitive Data",
-      value: <TextComp value={sensitiveData} />
+      value: <TextComp value={sensitiveData} />,
+      tooltipContent: "Sensitive parameters detected in API data"
     },
     {
       title: "Detected",
-      value: <TextComp value={func.prettifyEpoch(apiInfo.lastSeen)} />
+      value: <TextComp value={func.prettifyEpoch(apiInfo.lastSeen)} />,
+      tooltipContent: "Discovered time of the API"
     },
     {
       title: "Jira",
-      value: jiraComponent
+      value: jiraComponent,
+      tooltipContent:"Jira ticket number attached to the testing run issue"
     }
   ]
   return rowItems
+},
+
+stopTest(hexId){
+  api.stopTest(hexId).then((resp) => {
+    func.setToast(true, false, "Test run stopped")
+  }).catch((resp) => {
+    func.setToast(true, true, "Unable to stop test run")
+  });
+},
+
+rerunTest(hexId, refreshSummaries){
+  api.rerunTest(hexId).then((resp) => {
+    func.setToast(true, false, "Test re-run initiated")
+    setTimeout(() => {
+      refreshSummaries();
+    }, 2000)
+  }).catch((resp) => {
+    func.setToast(true, true, "Unable to re-run test")
+  });
+},
+getActionsList(hexId){
+  return [
+  {
+      content: 'Schedule test',
+      icon: CalendarMinor,
+      onAction: () => {console.log("schedule test function")},
+  },
+  {
+      content: 'Re-run',
+      icon: ReplayMinor,
+      onAction: () => TestingStore.getState().setRerunModal(true),
+  },
+  {
+      content: 'Add to CI/CD pipeline',
+      icon: PlayMinor,
+      onAction: () => {window.open('https://docs.akto.io/testing/run-tests-in-cicd', '_blank');},
+  },
+  {
+      content: 'Stop',
+      icon: CircleCancelMajor,
+      destructive:true,
+      onAction: () => {this.stopTest(hexId || "")},
+      disabled: true,
+  }
+]},
+getActions(item){
+  let arr = []
+  let section1 = {title: 'Actions', items:[]}
+  let actionsList = this.getActionsList(item.id);
+  if(item['run_type'] === 'One-time'){
+    section1.items.push(actionsList[1])
+  }
+  if(item['run_type'] !== 'CI/CD'){
+    section1.items.push(actionsList[2])
+  }
+  
+  if(item['orderPriority'] === 1 || item['orderPriority'] === 2){
+      actionsList[3].disabled = false
+  }else{
+      actionsList[3].disabled = true
+  }
+  section1.items.push(actionsList[3]);
+  arr.push(section1)
+  return arr
+},
+getHeaders: (tab)=> {
+  switch(tab){
+
+      case "vulnerable":
+          return headers;
+      
+      case "no_vulnerability_found":
+          return headers.filter((header) => header.title !== "Severity")
+
+      case "skipped":
+          return headers.filter((header) => header.title !== "CWE tags").map((header) => {
+              if (header.title === "Severity") {
+                  // Modify the object as needed
+                  return { type: CellType.TEXT, title: "Error message", value: 'errorMessage' };
+              }
+              return header;
+          })
+
+      default:
+          return headers
+  }
+},
+convertErrorEnumsToErrorObjects(errorEnums){
+  console.log(errorEnums)
 }
 }
 

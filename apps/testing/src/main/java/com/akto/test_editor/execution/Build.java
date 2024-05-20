@@ -1,30 +1,26 @@
-package com.akto.utils;
+package com.akto.test_editor.execution;
 
-import com.akto.DaoInit;
 import com.akto.dao.DependencyFlowNodesDao;
-import com.akto.dao.ModifyHostDetailsDao;
-import com.akto.dao.ReplaceDetailsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.*;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.RawApi;
 import com.akto.dto.dependency_flow.*;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
-import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.policies.AuthPolicy;
-import com.akto.test_editor.execution.Operations;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
-
 import com.akto.util.modifier.SetValueModifier;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import joptsimple.internal.Strings;
 import org.bson.conversions.Bson;
@@ -37,12 +33,11 @@ import static com.akto.util.HttpRequestResponseUtils.extractValuesFromPayload;
 
 public class Build {
 
-    private Map<Integer, ReverseNode>  parentToChildMap = new HashMap<>();
+    private Map<Integer, ReverseNode> parentToChildMap = new HashMap<>();
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Build.class);
 
-    private void buildParentToChildMap(List<Node> nodes) {
-        parentToChildMap = new HashMap<>();
+    public static void buildParentToChildMap(Collection<Node> nodes, Map<Integer, ReverseNode> parentToChildMap) {
         for (Node node: nodes) {
             if (node.getConnections() == null) continue;
             for (Connection connection: node.getConnections().values()) {
@@ -69,7 +64,7 @@ public class Build {
 
     }
 
-    private Map<Integer, List<SampleData>> buildLevelsToSampleDataMap(List<Node> nodes) {
+    public static Map<Integer, List<SampleData>> buildLevelsToSampleDataMap(List<Node> nodes) {
 
         // divide them into levels
         Map<Integer,List<SampleData>> levelsToSampleDataMap = new HashMap<>();
@@ -158,11 +153,11 @@ public class Build {
             this.success = success;
         }
 
-        
+
     }
 
     Set<ApiInfo.ApiInfoKey> apisReplayedSet = new HashSet<>();
-    public List<RunResult> runPerLevel(List<SampleData> sdList, Map<String, ModifyHostDetail> modifyHostDetailMap, Map<Integer, ReplaceDetail> replaceDetailsMap) {
+    public static List<RunResult> runPerLevel(List<SampleData> sdList, Map<String, ModifyHostDetail> modifyHostDetailMap, Map<Integer, ReplaceDetail> replaceDetailsMap, Map<Integer, ReverseNode> parentToChildMap, Set<ApiInfo.ApiInfoKey> apisReplayedSet) {
         List<RunResult> runResults = new ArrayList<>();
         for (SampleData sampleData: sdList) {
             Key id = sampleData.getId();
@@ -249,7 +244,7 @@ public class Build {
 
 
         List<Node> nodes = DependencyFlowNodesDao.instance.findNodesForCollectionIds(apiCollectionsIds,false,0, 10_000);
-        buildParentToChildMap(nodes);
+        buildParentToChildMap(nodes, parentToChildMap);
         Map<Integer, List<SampleData>> levelsToSampleDataMap = buildLevelsToSampleDataMap(nodes);
 
         List<RunResult> runResults = new ArrayList<>();
@@ -261,7 +256,7 @@ public class Build {
 
             loggerMaker.infoAndAddToDb("Running level: " + level, LoggerMaker.LogDb.DASHBOARD);
             try {
-                List<RunResult> runResultsPerLevel = runPerLevel(sdList, modifyHostDetailMap, replaceDetailsMap);
+                List<RunResult> runResultsPerLevel = runPerLevel(sdList, modifyHostDetailMap, replaceDetailsMap, parentToChildMap, apisReplayedSet);
                 runResults.addAll(runResultsPerLevel);
                 loggerMaker.infoAndAddToDb("Finished running level " + level, LoggerMaker.LogDb.DASHBOARD);
             } catch (Exception e) {
@@ -282,7 +277,7 @@ public class Build {
                 if (apisReplayedSet.contains(new ApiInfo.ApiInfoKey(key.getApiCollectionId(), key.getUrl(), key.getMethod()))) continue;
                 filtered.add(sampleData);
             }
-            List<RunResult> runResultsAll = runPerLevel(filtered, modifyHostDetailMap, replaceDetailsMap);
+            List<RunResult> runResultsAll = runPerLevel(filtered, modifyHostDetailMap, replaceDetailsMap, parentToChildMap, apisReplayedSet);
             runResults.addAll(runResultsAll);
             skip += limit;
             if (all.size() < limit) break;
@@ -340,7 +335,7 @@ public class Build {
 
     }
 
-    public List<SampleData> fillSdList(List<SampleData> sdList) {
+    public static List<SampleData> fillSdList(List<SampleData> sdList) {
         if (sdList == null || sdList.isEmpty()) return new ArrayList<>();
 
         List<Bson> filters = new ArrayList<>();
@@ -359,30 +354,12 @@ public class Build {
 
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
-    public void fillReplaceDetailsMap(ReverseNode reverseNode, OriginalHttpResponse response, Map<Integer, ReplaceDetail> replaceDetailsMap) {
+    public static void fillReplaceDetailsMap(ReverseNode reverseNode, OriginalHttpResponse response, Map<Integer, ReplaceDetail> replaceDetailsMap) {
         if (reverseNode == null) return;
 
         Map<Integer, ReplaceDetail> deltaReplaceDetailsMap = new HashMap<>();
 
-        String respPayload = response.getBody();
-        Map<String, Set<Object>> valuesMap = extractValuesFromPayload(respPayload);
-
-        Map<String, List<String>> responseHeaders = response.getHeaders();
-        for (String headerKey: responseHeaders.keySet()) {
-            List<String> values = responseHeaders.get(headerKey);
-            if (values == null) continue;
-
-            if (headerKey.equalsIgnoreCase("set-cookie")) {
-                Map<String, String> cookieMap = AuthPolicy.parseCookie(values);
-                for (String cookieKey : cookieMap.keySet()) {
-                    String cookieVal = cookieMap.get(cookieKey);
-                    valuesMap.put(cookieKey, new HashSet<>(Collections.singletonList(cookieVal)));
-                }
-            } else {
-                valuesMap.put(headerKey, new HashSet<>(values));
-            }
-
-        }
+        Map<String, Set<Object>> valuesMap = getValuesMap(response);
 
         Map<String,ReverseConnection> connections = reverseNode.getReverseConnections();
         for (ReverseConnection reverseConnection: connections.values()) {
@@ -421,4 +398,27 @@ public class Build {
 
     }
 
+    public static Map<String, Set<Object>> getValuesMap(OriginalHttpResponse response) {
+        String respPayload = response.getBody();
+        Map<String, Set<Object>> valuesMap = extractValuesFromPayload(respPayload);
+
+        Map<String, List<String>> responseHeaders = response.getHeaders();
+        for (String headerKey: responseHeaders.keySet()) {
+            List<String> values = responseHeaders.get(headerKey);
+            if (values == null) continue;
+
+            if (headerKey.equalsIgnoreCase("set-cookie")) {
+                Map<String, String> cookieMap = AuthPolicy.parseCookie(values);
+                for (String cookieKey : cookieMap.keySet()) {
+                    String cookieVal = cookieMap.get(cookieKey);
+                    valuesMap.put(cookieKey, new HashSet<>(Collections.singletonList(cookieVal)));
+                }
+            } else {
+                valuesMap.put(headerKey, new HashSet<>(values));
+            }
+
+        }
+
+        return valuesMap;
+    }
 }

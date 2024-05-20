@@ -29,8 +29,8 @@ import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.testing.info.BFLATestInfo;
-import com.akto.dto.testing.info.NucleiTestInfo;
 import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.third_party_access.Credential;
@@ -156,6 +156,8 @@ public class DaoInit {
                 .enableDiscriminator(true).build();
         ClassModel<CustomTestingEndpoints> customTestingEndpointsClassModel = ClassModel
                 .builder(CustomTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<AllTestingEndpoints> allTestingEndpointsClassModel = ClassModel
+                .builder(AllTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<CollectionWiseTestingEndpoints> collectionWiseTestingEndpointsClassModel = ClassModel
                 .builder(CollectionWiseTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<WorkflowTestingEndpoints> workflowTestingEndpointsClassModel = ClassModel
@@ -204,7 +206,6 @@ public class DaoInit {
         ClassModel<AktoDataType> AktoDataTypeClassModel = ClassModel.builder(AktoDataType.class).enableDiscriminator(true).build();
         ClassModel<TestInfo> testInfoClassModel = ClassModel.builder(TestInfo.class).enableDiscriminator(true).build();
         ClassModel<BFLATestInfo> bflaTestInfoClassModel = ClassModel.builder(BFLATestInfo.class).enableDiscriminator(true).build();
-        ClassModel<NucleiTestInfo> nucleiTestInfoClassModel = ClassModel.builder(NucleiTestInfo.class).enableDiscriminator(true).build();
         ClassModel<AccessMatrixUrlToRole> accessMatrixUrlToRoleClassModel = ClassModel.builder(AccessMatrixUrlToRole.class).enableDiscriminator(true).build();
         ClassModel<AccessMatrixTaskInfo> accessMatrixTaskInfoClassModel = ClassModel.builder(AccessMatrixTaskInfo.class).enableDiscriminator(true).build();
         ClassModel<Loader> loaderClassModel = ClassModel.builder(Loader.class).enableDiscriminator(true).build();
@@ -218,6 +219,7 @@ public class DaoInit {
         ClassModel<TrafficMetricsAlert> trafficMetricsAlertClassModel = ClassModel.builder(TrafficMetricsAlert.class).enableDiscriminator(true).build();
         ClassModel<JiraIntegration> jiraintegrationClassModel = ClassModel.builder(JiraIntegration.class).enableDiscriminator(true).build();
         ClassModel<MethodCondition> methodConditionClassModel = ClassModel.builder(MethodCondition.class).enableDiscriminator(true).build();
+        ClassModel<RegexTestingEndpoints> regexTestingEndpointsClassModel = ClassModel.builder(RegexTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<DependencyNode> dependencyNodeClassModel = ClassModel.builder(DependencyNode.class).enableDiscriminator(true).build();
         ClassModel<ParamInfo> paramInfoClassModel = ClassModel.builder(ParamInfo.class).enableDiscriminator(true).build();
         ClassModel<Node> nodeClassModel = ClassModel.builder(Node.class).enableDiscriminator(true).build();
@@ -237,6 +239,11 @@ public class DaoInit {
         ClassModel<ModifyHostDetail> modifyHostDetailClassModel = ClassModel.builder(ModifyHostDetail.class).enableDiscriminator(true).build();
         ClassModel<FileUpload> fileUploadClassModel = ClassModel.builder(FileUpload.class).enableDiscriminator(true).build();
         ClassModel<FileUploadLog> fileUploadLogClassModel = ClassModel.builder(FileUploadLog.class).enableDiscriminator(true).build();
+        ClassModel<CodeAnalysisCollection> codeAnalysisCollectionClassModel = ClassModel.builder(CodeAnalysisCollection.class).enableDiscriminator(true).build();
+        ClassModel<CodeAnalysisApiLocation> codeAnalysisApiLocationClassModel = ClassModel.builder(CodeAnalysisApiLocation.class).enableDiscriminator(true).build();
+        ClassModel<CodeAnalysisApiInfo> codeAnalysisApiInfoClassModel = ClassModel.builder(CodeAnalysisApiInfo.class).enableDiscriminator(true).build();
+        ClassModel<CodeAnalysisApiInfo.CodeAnalysisApiInfoKey> codeAnalysisApiInfoKeyClassModel = ClassModel.builder(CodeAnalysisApiInfo.CodeAnalysisApiInfoKey.class).enableDiscriminator(true).build();
+        ClassModel<RiskScoreTestingEndpoints> riskScoreTestingEndpointsClassModel = ClassModel.builder(RiskScoreTestingEndpoints.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -255,17 +262,18 @@ public class DaoInit {
                 cappedSetClassModel, CustomWebhookClassModel, WorkflowNodeDetailsClassModel, CustomWebhookResultClassModel,
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
                 testingIssuesIdClassModel, testSourceConfigClassModel, endpointLogicalGroupClassModel, testRolesClassModel,
-                logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
+                logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, customAuthTypeModel,
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
                 accessMatrixUrlToRoleClassModel, accessMatrixTaskInfoClassModel,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
                 vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel,jiraintegrationClassModel, setupClassModel,
                 cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
-                methodConditionClassModel,
+                methodConditionClassModel, regexTestingEndpointsClassModel, allTestingEndpointsClassModel,
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel,
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
-                ,fileUploadLogClassModel).automatic(true).build());
+                ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
+                riskScoreTestingEndpointsClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -306,7 +314,9 @@ public class DaoInit {
                 new EnumCodec<>(ApiCollection.ENV_TYPE.class),
                 new EnumCodec<>(FileUpload.UploadType.class),
                 new EnumCodec<>(FileUpload.UploadStatus.class),
-                new EnumCodec<>(FileUploadLog.UploadLogStatus.class)
+                new EnumCodec<>(FileUploadLog.UploadLogStatus.class),
+                new EnumCodec<>(TestCollectionProperty.Id.class),
+                new EnumCodec<>(CustomAuthType.TypeOfToken.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
@@ -360,6 +370,8 @@ public class DaoInit {
         ActivitiesDao.instance.createIndicesIfAbsent();
         DependencyNodeDao.instance.createIndicesIfAbsent();
         DependencyFlowNodesDao.instance.createIndicesIfAbsent();
+        CodeAnalysisCollectionDao.instance.createIndicesIfAbsent();
+        CodeAnalysisApiInfoDao.instance.createIndicesIfAbsent();
     }
 
 }

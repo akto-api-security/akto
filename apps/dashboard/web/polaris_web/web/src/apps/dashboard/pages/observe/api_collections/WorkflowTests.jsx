@@ -49,6 +49,7 @@ function WorkflowTests({ apiCollectionId, endpointsList }) {
             value: "author",
             showFilter: true,
             itemCell: 2,
+            sortActive: true,
         },
         {
             text: "Created",
@@ -65,8 +66,8 @@ function WorkflowTests({ apiCollectionId, endpointsList }) {
     ]
 
     const sortOptions = [
-        { label: 'Author', value: 'author asc', directionLabel: 'A-Z', sortKey: 'author' },
-        { label: 'Author', value: 'author desc', directionLabel: 'Z-A', sortKey: 'author' },
+        { label: 'Author', value: 'author asc', directionLabel: 'A-Z', sortKey: 'author', columnIndex: 2 },
+        { label: 'Author', value: 'author desc', directionLabel: 'Z-A', sortKey: 'author', columnIndex: 2 },
     ];
 
 

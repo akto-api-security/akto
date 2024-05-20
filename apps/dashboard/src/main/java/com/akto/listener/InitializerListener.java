@@ -44,6 +44,8 @@ import com.akto.dto.pii.PIIType;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.testing.*;
+import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -64,6 +66,7 @@ import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
+import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.util.AccountTask;
 import com.akto.util.ConnectionInfo;
@@ -75,6 +78,7 @@ import com.akto.util.Pair;
 import com.akto.util.UsageUtils;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.*;
 import com.akto.util.DashboardMode;
@@ -84,10 +88,10 @@ import com.akto.utils.scripts.FixMultiSTIs;
 import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
+import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
 import com.akto.utils.notifications.TrafficUpdates;
-import com.akto.utils.usage.UsageMetricCalculator;
 import com.akto.billing.UsageMetricUtils;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
@@ -97,11 +101,17 @@ import com.mongodb.ReadPreference;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.DeleteResult;
 import com.slack.api.Slack;
+import com.slack.api.util.http.SlackHttpClient;
 import com.slack.api.webhook.WebhookResponse;
+
+import okhttp3.OkHttpClient;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -710,7 +720,9 @@ public class InitializerListener implements ServletContextListener {
                                 return;
                             }
 
-                    Slack slack = Slack.getInstance();
+                    OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
+                    SlackHttpClient slackHttpClient = new SlackHttpClient(httpClient);
+                    Slack slack = Slack.getInstance(slackHttpClient);
 
                     for (SlackWebhook slackWebhook : listWebhooks) {
                         int now = Context.now();
@@ -1085,6 +1097,88 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public static TestRoles createAndSaveAttackerRole(AuthMechanism authMechanism) {
+        int createdTs = authMechanism.getId().getTimestamp();
+        EndpointLogicalGroup endpointLogicalGroup = new EndpointLogicalGroup(new ObjectId(), createdTs, createdTs, "System", "All", new AllTestingEndpoints());
+        EndpointLogicalGroupDao.instance.insertOne(endpointLogicalGroup);
+        AuthWithCond authWithCond = new AuthWithCond(authMechanism, new HashMap<>(), null);
+        List<AuthWithCond> authWithCondList = Collections.singletonList(authWithCond);
+        TestRoles testRoles = new TestRoles(new ObjectId(), "ATTACKER_TOKEN_ALL", endpointLogicalGroup.getId(), authWithCondList, "System", createdTs, createdTs, null);
+        TestRolesDao.instance.insertOne(testRoles);
+        return testRoles;
+    }
+
+    public static void moveAuthMechanismDataToRole(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getMoveAuthMechanismToRole() == 0) {
+
+            AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+            if (authMechanism != null) {
+                createAndSaveAttackerRole(authMechanism);
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.MOVE_AUTH_MECHANISM_TO_ROLE, Context.now())
+            );
+
+        }
+    }
+
+    public static void createApiGroup(int id, String name, String regex) {
+        ApiCollection loginGroup = new ApiCollection(id, name, Context.now(), new HashSet<>(), null, 0, false, false);
+        loginGroup.setType(ApiCollection.Type.API_GROUP);
+        ArrayList<TestingEndpoints> loginConditions = new ArrayList<>();
+        loginConditions.add(new RegexTestingEndpoints(TestingEndpoints.Operator.OR, regex));
+        loginGroup.setConditions(loginConditions);
+        ApiCollectionUsers.removeFromCollectionsForCollectionId(loginGroup.getConditions(), id);
+
+        ApiCollectionsDao.instance.insertOne(loginGroup);
+        ApiCollectionUsers.addToCollectionsForCollectionId(loginGroup.getConditions(), loginGroup.getId());
+    }
+
+    public static void createLoginSignupGroups(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getLoginSignupGroups() == 0) {
+
+            createApiGroup(111_111_128, "Login APIs", "^((https?):\\/\\/)?(www\\.)?.*?(login|signin|sign-in|authenticate|session)(.*?)(\\?.*|\\/?|#.*?)?$");
+            createApiGroup(111_111_129, "Signup APIs", "^((https?):\\/\\/)?(www\\.)?.*?(register|signup|sign-up|users\\/create|account\\/create|account_create|create_account)(.*?)(\\?.*|\\/?|#.*?)?$");
+            createApiGroup(111_111_130, "Password Reset APIs", "^((https?):\\/\\/)?(www\\.)?.*?(password-reset|reset-password|forgot-password|user\\/reset|account\\/recover|api\\/password_reset|password\\/reset|account\\/reset-password-request|password_reset_request|account_recovery)(.*?)(\\?.*|\\/?|#.*?)?$");
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.LOGIN_SIGNUP_GROUPS, Context.now())
+            );
+
+        }
+    }
+
+    public static void createRiskScoreApiGroup(int id, String name, RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType) {
+        loggerMaker.infoAndAddToDb("Creating risk score group: " + name, LogDb.DASHBOARD);
+        
+        ApiCollection riskScoreGroup = new ApiCollection(id, name, Context.now(), new HashSet<>(), null, 0, false, false);
+            
+        List<TestingEndpoints> riskScoreConditions = new ArrayList<>();
+        RiskScoreTestingEndpoints riskScoreTestingEndpoints = new RiskScoreTestingEndpoints(riskScoreGroupType);
+        riskScoreConditions.add(riskScoreTestingEndpoints);
+
+        riskScoreGroup.setConditions(riskScoreConditions);
+        riskScoreGroup.setType(ApiCollection.Type.API_GROUP);
+
+        ApiCollectionsDao.instance.insertOne(riskScoreGroup); 
+    }
+
+    public static void createRiskScoreGroups(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getRiskScoreGroups() == 0) {
+            createRiskScoreApiGroup(111_111_148, "Low Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.LOW);
+            createRiskScoreApiGroup(111_111_149, "Medium Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.MEDIUM);
+            createRiskScoreApiGroup(111_111_150, "High Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.HIGH);
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.RISK_SCORE_GROUPS, Context.now())
+            );
+        }
+    }
+
     public static void dropWorkflowTestResultCollection(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDropWorkflowTestResult() == 0) {
             WorkflowTestResultsDao.instance.getMCollection().drop();
@@ -1244,6 +1338,36 @@ public class InitializerListener implements ServletContextListener {
             );
             loggerMaker.infoAndAddToDb("Default telemetry settings set successfully", LogDb.DASHBOARD);
         }
+    }
+
+    public static void disableAwsSecretPiiType(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDisableAwsSecretPii() != 0) {
+            return;
+        }
+
+        String piiType = "AWS SECRET ACCESS KEY";
+
+        Bson filters = Filters.eq("subType", piiType);
+        Bson update = Updates.set("subType", SingleTypeInfo.GENERIC.toString());
+
+        try {
+            SingleTypeInfoDao.instance.updateMany(filters, update);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in disableAwsSecretPiiType " + e.getMessage(), LogDb.DASHBOARD);
+        }
+
+        try {
+            Bson delFilter = Filters.eq("name", piiType);
+            DeleteResult res = CustomDataTypeDao.instance.deleteAll(delFilter);
+            loggerMaker.infoAndAddToDb("auth type : " + res.toString());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error deleting pii type " + piiType + " " + e.getMessage(), LogDb.DASHBOARD);
+        }
+
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DISABLE_AWS_SECRET_PII, Context.now())
+        );
     }
 
     public static void setAktoDefaultNewUI(BackwardCompatibility backwardCompatibility){
@@ -1473,7 +1597,22 @@ public class InitializerListener implements ServletContextListener {
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         for (ApiCollection apiCollection : apiCollections) {
             if (ApiCollection.Type.API_GROUP.equals(apiCollection.getType())) {
-                ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+                List<TestingEndpoints> conditions = apiCollection.getConditions();
+
+                // Don't update API groups that are delta update based
+                boolean isDeltaUpdateBasedApiGroup = false;
+                for (TestingEndpoints testingEndpoints : conditions) {
+                    if (TestingEndpoints.checkDeltaUpdateBased(testingEndpoints.getType())) {
+                        isDeltaUpdateBasedApiGroup = true;
+                        break;
+                    }
+                }
+
+                if (isDeltaUpdateBasedApiGroup) {
+                    continue;
+                }
+
+                ApiCollectionUsers.computeCollectionsForCollectionId(conditions, apiCollection.getId());
             }
         }
     }
@@ -1793,8 +1932,11 @@ public class InitializerListener implements ServletContextListener {
             BasicDBObject metaData = OrganizationUtils.fetchOrgMetaData(organizationId, organization.getAdminEmail());
             gracePeriod = OrganizationUtils.fetchOrgGracePeriodFromMetaData(metaData);
             hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
+            boolean expired = OrganizationUtils.fetchExpired(metaData);
             boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
             setTelemetrySettings(organization, telemetryEnabled);
+            boolean testTelemetryEnabled = OrganizationUtils.fetchTestTelemetryEnabled(metaData);
+            organization.setTestTelemetryEnabled(testTelemetryEnabled);
 
             loggerMaker.infoAndAddToDb("Processed org metadata",LogDb.DASHBOARD);
 
@@ -1802,8 +1944,16 @@ public class InitializerListener implements ServletContextListener {
 
             organization.setGracePeriod(gracePeriod);
             organization.setFeatureWiseAllowed(featureWiseAllowed);
+            organization.setExpired(expired);
 
-            lastFeatureMapUpdate = Context.now();
+            /*
+             * only update this field if we were able to update
+             * i.e. if we were able to reach akto
+             * or this is the first time being updated.
+             */
+            if (lastFeatureMapUpdate == 0 || (featureWiseAllowed != null && !featureWiseAllowed.isEmpty())) {
+                lastFeatureMapUpdate = Context.now();
+            }
             organization.setLastFeatureMapUpdate(lastFeatureMapUpdate);
 
             OrganizationsDao.instance.updateOne(
@@ -1811,7 +1961,9 @@ public class InitializerListener implements ServletContextListener {
                     Updates.combine(
                             Updates.set(Organization.FEATURE_WISE_ALLOWED, featureWiseAllowed),
                             Updates.set(Organization.GRACE_PERIOD, gracePeriod),
+                            Updates.set(Organization._EXPIRED, expired),
                             Updates.set(Organization.HOTJAR_SITE_ID, hotjarSiteId),
+                            Updates.set(Organization.TEST_TELEMETRY_ENABLED, testTelemetryEnabled),
                             Updates.set(Organization.LAST_FEATURE_MAP_UPDATE, lastFeatureMapUpdate)));
 
             loggerMaker.infoAndAddToDb("Updated org",LogDb.DASHBOARD);
@@ -1913,10 +2065,14 @@ public class InitializerListener implements ServletContextListener {
         addAktoDataTypes(backwardCompatibility);
         updateDeploymentStatus(backwardCompatibility);
         dropAuthMechanismData(backwardCompatibility);
+        moveAuthMechanismDataToRole(backwardCompatibility);
+        createLoginSignupGroups(backwardCompatibility);
+        createRiskScoreGroups(backwardCompatibility);
         deleteAccessListFromApiToken(backwardCompatibility);
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
         setDefaultTelemetrySettings(backwardCompatibility);
+        disableAwsSecretPiiType(backwardCompatibility);
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
         }
@@ -2281,82 +2437,14 @@ public class InitializerListener implements ServletContextListener {
             @Override
             public void accept(Account a) {
                 int accountId = a.getId();
-
-                try {
-                    // Get organization to which account belongs to
-                    Organization organization = OrganizationsDao.instance.findOne(
-                            Filters.in(Organization.ACCOUNTS, accountId)
-                    );
-
-                    if (organization == null) {
-                        loggerMaker.errorAndAddToDb("Organization not found for account: " + accountId, LogDb.DASHBOARD);
-                        return;
-                    }
-
-                    loggerMaker.infoAndAddToDb(String.format("Measuring usage for %s / %d ", organization.getName(), accountId), LogDb.DASHBOARD);
-
-                    String organizationId = organization.getId();
-
-                    for (MetricTypes metricType : MetricTypes.values()) {
-                        UsageMetricInfo usageMetricInfo = UsageMetricInfoDao.instance.findOne(
-                                UsageMetricsDao.generateFilter(organizationId, accountId, metricType)
-                        );
-
-                        if (usageMetricInfo == null) {
-                            usageMetricInfo = new UsageMetricInfo(organizationId, accountId, metricType);
-                            UsageMetricInfoDao.instance.insertOne(usageMetricInfo);
-                        }
-
-                        int syncEpoch = usageMetricInfo.getSyncEpoch();
-                        int measureEpoch = usageMetricInfo.getMeasureEpoch();
-
-                        // Reset measureEpoch every month
-                        if (Context.now() - measureEpoch > 2629746) {
-                            if (syncEpoch > Context.now() - 86400) {
-                                measureEpoch = Context.now();
-
-                                UsageMetricInfoDao.instance.updateOne(
-                                        UsageMetricsDao.generateFilter(organizationId, accountId, metricType),
-                                        Updates.set(UsageMetricInfo.MEASURE_EPOCH, measureEpoch)
-                                );
-                            }
-
-                        }
-
-                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
-                                AccountSettingsDao.generateFilter()
-                        );
-                        String dashboardMode = DashboardMode.getDashboardMode().toString();
-                        String dashboardVersion = accountSettings.getDashboardVersion();
-
-                        UsageMetric usageMetric = new UsageMetric(
-                                organizationId, accountId, metricType, syncEpoch, measureEpoch,
-                                dashboardMode, dashboardVersion
-                        );
-
-                        //calculate usage for metric
-                        UsageMetricCalculator.calculateUsageMetric(usageMetric);
-
-                        UsageMetricsDao.instance.insertOne(usageMetric);
-                        loggerMaker.infoAndAddToDb("Usage metric inserted: " + usageMetric.getId(), LogDb.DASHBOARD);
-
-                        UsageMetricUtils.syncUsageMetricWithAkto(usageMetric);
-
-                        UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
-                        loggerMaker.infoAndAddToDb(String.format("Synced usage metric %s  %s/%d %s",
-                                        usageMetric.getId().toString(), usageMetric.getOrganizationId(), usageMetric.getAccountId(), usageMetric.getMetricType().toString()),
-                                LogDb.DASHBOARD
-                        );
-                    }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, String.format("Error while measuring usage for account %d. Error: %s", accountId, e.getMessage()), LogDb.DASHBOARD);
-                }
+                UsageMetricHandler.calcAndSyncAccountUsage(accountId);
             }
         }, "usage-scheduler");
 
+        DeactivateCollections.deactivateCollectionsJob();
+
         isCalcUsageRunning = false;
     }
-
 
     static boolean isSyncWithAktoRunning = false;
     public static void syncWithAkto() {

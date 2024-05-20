@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { Button, LegacyCard, HorizontalGrid, TextField, VerticalStack, Text, Banner } from '@shopify/polaris'
+import { LegacyCard, HorizontalGrid, TextField, VerticalStack, Text } from '@shopify/polaris'
 import Dropdown from '../../../components/layouts/Dropdown'
 import "./DataTypes.css"
 import ConditionsPicker from '../../../components/ConditionsPicker'
@@ -10,6 +10,7 @@ import api from '../api'
 import {produce} from "immer"
 import DetailsPage from '../../../components/DetailsPage'
 import InformationBannerComponent from '../../quick_start/components/shared/InformationBannerComponent'
+import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
 
 const statusItems = [
   {
@@ -234,6 +235,7 @@ function DataTypes() {
           selectOptions={selectOptions}
           operator={currState.keyConditions.operator}
           dispatch={(val) => { handleDispatch(val, "keyConditions") }}
+          tooltipContent="Conditions for matching 'key' in payload type"
         />
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div style={{ flexGrow: 1, borderBottom: '1px solid #ccc' }}></div>
@@ -249,6 +251,7 @@ function DataTypes() {
           selectOptions={selectOptions}
           operator={currState.valueConditions.operator}
           dispatch={(val) => { handleDispatch(val, "valueConditions") }}
+          tooltipContent="Conditions for matching 'value' in payload type"
         />
     </LegacyCard>
   )
@@ -259,7 +262,13 @@ function DataTypes() {
 
   const requestCard = (
     <VerticalStack gap="5" key="sensitive">
-      <LegacyCard title= "Sensitive" >
+      <LegacyCard title={
+          <TitleWithInfo 
+            textProps={{variant: 'headingMd'}} 
+            titleText={"Sensitive"} 
+            tooltipContent={"Positions to detect data-type in"}
+          />}
+      >
         <LegacyCard.Section>
           <p>Mark the location where you want the data type to be sensitive</p>
           <br/>
@@ -274,7 +283,14 @@ function DataTypes() {
 
   const redactCard = (
     <VerticalStack gap="5" key="redact">
-      <LegacyCard title= "Redact" >
+      <LegacyCard title={
+          <TitleWithInfo 
+            textProps={{variant: 'headingMd'}} 
+            titleText={"Redact"} 
+            tooltipContent={"Redact the current subtype"}
+            docsUrl={"https://docs.akto.io/api-inventory/how-to/redact-sensitive-data"}
+          />}
+      >
         <div className='card-items'>
           <InformationBannerComponent docsUrl={""} content="When enabled, existing sample payload values will be deleted, and this data type will be redacted in future payloads. Please note that your API Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.">
           </InformationBannerComponent>
@@ -295,12 +311,18 @@ function DataTypes() {
 
   return (
     <DetailsPage
-    pageTitle={pageTitle}
-    backUrl="/dashboard/observe/sensitive"
-    saveAction={saveAction}
-    discardAction={resetFunc}
-    isDisabled={compareFunc}
-    components={components}
+      pageTitle={
+          <TitleWithInfo 
+            tooltipContent={"Edit your custom data type"} 
+            titleText={pageTitle} 
+            docsUrl="https://docs.akto.io/api-inventory/how-to/create-a-custom-data-type"
+          />
+      }
+      backUrl="/dashboard/observe/sensitive"
+      saveAction={saveAction}
+      discardAction={resetFunc}
+      isDisabled={compareFunc}
+      components={components}
     />
   )
 }

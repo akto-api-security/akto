@@ -17,7 +17,9 @@ public class TestEditorEnums {
         PARAM,
         CONTAINS_JWT,
         COOKIE_EXPIRE_FILTER,
-        DATATYPE
+        DATATYPE,
+        BELONGS_TO_COLLECTIONS,
+        VALUETYPE
     }
 
     public enum CollectionOperands {
@@ -76,7 +78,8 @@ public class TestEditorEnums {
         PARAM_CONTEXT,
         ENDPOINT_IN_TRAFFIC_CONTEXT,
         INCLUDE_ROLES_ACCESS,
-        EXCLUDE_ROLES_ACCESS
+        EXCLUDE_ROLES_ACCESS,
+        API_ACCESS_TYPE
     }
 
 
@@ -197,6 +200,7 @@ public class TestEditorEnums {
     }
 
     public enum TerminalExecutorDataOperands {
+        API,
         DELETE_HEADER,
         DELETE_BODY_PARAM,
         DELETE_QUERY_PARAM,
@@ -220,6 +224,7 @@ public class TestEditorEnums {
         MODIFY_BODY_PARAM,
         MODIFY_QUERY_PARAM,
         ADD_GRAPHQL_FIELD,
+        ADD_UNIQUE_GRAPHQL_FIELD,
         MODIFY_GRAPHQL_FIELD
     }
 
