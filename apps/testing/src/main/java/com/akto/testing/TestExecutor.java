@@ -133,7 +133,7 @@ public class TestExecutor {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
         if (testingRun.getTestingRunConfig() != null) {
-            TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(Filters.eq(Constants.ID, summaryId),
+            TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, summaryId),
                     Updates.set(TestingRunResultSummary.TESTS_INITIATED_COUNT,
                             testingRun.getTestingRunConfig().getTestSubCategoryList().size()));
         }
