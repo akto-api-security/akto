@@ -1,5 +1,5 @@
 import {Navigation, Text} from "@shopify/polaris"
-import {SettingsFilledMinor,AppsFilledMajor, InventoryFilledMajor, MarketingFilledMinor, FileFilledMinor, AnalyticsFilledMinor, OrdersFilledMinor} from "@shopify/polaris-icons"
+import {SettingsFilledMinor,AppsFilledMajor, InventoryFilledMajor, MarketingFilledMinor, FileFilledMinor, AnalyticsFilledMinor, ReportFilledMinor} from "@shopify/polaris-icons"
 import {useLocation, useNavigate} from "react-router-dom"
 
 import './LeftNav.css'
@@ -41,7 +41,7 @@ export default function LeftNav(){
               },
               {
                 label: 'API Security Posture',
-                icon: OrdersFilledMinor,
+                icon: ReportFilledMinor,
                 onClick: ()=>{
                   handleSelect("dashboard_home")
                   navigate("/dashboard/home")
@@ -55,7 +55,8 @@ export default function LeftNav(){
                 label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("observe") ? (active === 'active' ? "subdued" : ""): ""}>API Discovery</Text>,
                 icon: InventoryFilledMajor,
                 onClick: ()=>{
-                  handleSelect("_observe")
+                  handleSelect("dashboard_observe_inventory")
+                  navigate('/dashboard/observe/inventory')
                   setActive("normal")
                 },
                 selected: leftNavSelected.includes('_observe'),
@@ -95,8 +96,9 @@ export default function LeftNav(){
                 label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("testing") ? (active === 'active' ? "subdued" : ""): ""}>Testing</Text>,
                 icon: MarketingFilledMinor,
                 onClick: ()=>{
-                    handleSelect('_testing')
-                    setActive("normal")
+                  navigate('/dashboard/testing')
+                  handleSelect('dashboard_testing')
+                  setActive("normal")
                 },
                 selected: leftNavSelected.includes('_testing'),
                 subNavigationItems:[

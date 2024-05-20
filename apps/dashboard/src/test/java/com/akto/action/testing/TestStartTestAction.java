@@ -96,7 +96,7 @@ public class TestStartTestAction extends MongoBasedTest {
         testingRun.setId(testingRunId);
         for (int startTimestamp=0; startTimestamp < 30; startTimestamp++) {
             TestingRunResultSummary testingRunResultSummary = new TestingRunResultSummary(
-                startTimestamp, startTimestamp+10, new HashMap<>(), 10, testingRunId, testingRunId.toHexString(), 10, 0
+                startTimestamp, startTimestamp+10, new HashMap<>(), 10, testingRunId, testingRunId.toHexString(), 10, 0, 10
             );
 
             testingRunResultSummaryList.add(testingRunResultSummary);
