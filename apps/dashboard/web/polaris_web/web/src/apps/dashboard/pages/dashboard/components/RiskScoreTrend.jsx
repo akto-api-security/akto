@@ -30,7 +30,7 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
                 <HorizontalGrid columns={2} gap={5}>
                 <HighchartsReact
                     highcharts={Highcharts}
-                    options={transform.getRiskScoreTrendOptions(riskScoreRangeMap, riskScoreRanges)}
+                    options={transform.getRiskScoreTrendOptions(riskScoreRangeMap, riskScoreRanges, navigate)}
                     ref={riskScoreTrendRef}
                 />
                 <Box paddingInlineEnd={4} paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
