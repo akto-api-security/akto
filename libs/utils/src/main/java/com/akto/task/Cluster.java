@@ -54,7 +54,7 @@ public class Cluster {
             // already present
             Bson findExpiredKeyQ = Filters.and(
                 Filters.eq("_id", prize),
-                Filters.lte("expiryTs", now - expiryPeriod)
+                Filters.lte("expiryTs", now)
             );
     
             try {
