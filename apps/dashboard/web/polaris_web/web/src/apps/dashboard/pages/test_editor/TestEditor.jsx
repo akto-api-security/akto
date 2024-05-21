@@ -26,6 +26,7 @@ const TestEditor = () => {
     const setVulnerableRequestMap = TestEditorStore(state => state.setVulnerableRequestMap)
     const setDefaultRequest = TestEditorStore(state => state.setDefaultRequest)
     const setActive = PersistStore(state => state.setActive)
+    const setSubCategoryMap = PersistStore(state => state.setSubCategoryMap)
 
     const [loading, setLoading] = useState(true)
 
@@ -41,6 +42,11 @@ const TestEditor = () => {
         const allSubCategoriesResponse = await testEditorRequests.fetchAllSubCategories("testEditor")
         if (allSubCategoriesResponse) {
             try {
+                let subCategoryMap = {};
+                allSubCategoriesResponse?.subCategories.forEach((x) => {
+                    subCategoryMap[x.name] = x;
+                });
+                setSubCategoryMap(subCategoryMap);
                 const obj = convertFunc.mapCategoryToSubcategory(allSubCategoriesResponse.subCategories)
                 setTestsObj(obj)
     
