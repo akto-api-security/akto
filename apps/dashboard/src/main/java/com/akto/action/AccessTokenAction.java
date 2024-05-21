@@ -43,7 +43,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE_NAME, null);
         cookie.setMaxAge(0);
         cookie.setHttpOnly(true);
-        cookie.setPath("/dashboard");
+        cookie.setPath("/");
         String https = System.getenv("AKTO_HTTPS_FLAG");
         if (Objects.equals(https, "true")) {
             cookie.setSecure(true);
