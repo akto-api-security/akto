@@ -1130,8 +1130,8 @@ public class InitializerListener implements ServletContextListener {
         ArrayList<TestingEndpoints> loginConditions = new ArrayList<>();
         loginConditions.add(new RegexTestingEndpoints(TestingEndpoints.Operator.OR, regex));
         loginGroup.setConditions(loginConditions);
-        ApiCollectionUsers.removeFromCollectionsForCollectionId(loginGroup.getConditions(), id);
         loginGroup.setAutomated(true);
+        ApiCollectionUsers.removeFromCollectionsForCollectionId(loginGroup.getConditions(), id);
 
         ApiCollectionsDao.instance.insertOne(loginGroup);
         ApiCollectionUsers.addToCollectionsForCollectionId(loginGroup.getConditions(), loginGroup.getId());
@@ -2562,6 +2562,14 @@ public class InitializerListener implements ServletContextListener {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
+                        boolean dibs = callDibs(Cluster.AUTOMATED_API_GROUPS_CRON, 4*60*60, 60);
+                        if(!dibs){
+                            loggerMaker.infoAndAddToDb("Cron for updating automated API groups not acquired, thus skipping cron", LogDb.DASHBOARD);
+                            return;
+                        }
+
+                        loggerMaker.infoAndAddToDb("Cron for updating automated API groups picked up " + Context.getId(), LogDb.DASHBOARD);
+
                         try {
                             AutomatedApiGroupsUtils.processAutomatedGroups(groupsCsv);
                         } catch (Exception e) {
