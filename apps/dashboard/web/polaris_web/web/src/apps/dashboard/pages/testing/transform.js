@@ -148,7 +148,7 @@ function minimizeTagList(items){
 }
 
 function checkTestFailure(summaryState, testRunState) {
-  if (testRunState == 'COMPLETED' && summaryState != 'COMPLETED') {
+  if (testRunState === 'COMPLETED' && summaryState !== 'COMPLETED' && summaryState !== "STOPPED") {
     return true;
   }
   return false;
@@ -280,8 +280,8 @@ const transform = {
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
       obj['runTypeStatus'] = [obj['run_type']]
       obj['nextUrl'] = "/dashboard/testing/"+data.hexId
-      obj['testRunState'] = data.state
-      obj['summaryState'] = state
+      obj['testRunState'] = state
+      obj['summaryState'] = testingRunResultSummary.state
       obj['startTimestamp'] = testingRunResultSummary?.startTimestamp
       obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
@@ -959,11 +959,8 @@ getActions(item){
   if(item['run_type'] !== 'CI/CD'){
     section1.items.push(actionsList[2])
   }
-  
-  if(item['orderPriority'] === 1 || item['orderPriority'] === 2){
-      actionsList[3].disabled = false
-  }else{
-      actionsList[3].disabled = true
+  if(item.orderPriority < 3){
+    actionsList[3].disabled = false
   }
   section1.items.push(actionsList[3]);
   arr.push(section1)
