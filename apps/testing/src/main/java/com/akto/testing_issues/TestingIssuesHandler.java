@@ -1,11 +1,14 @@
 package com.akto.testing_issues;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -15,12 +18,15 @@ import com.akto.util.enums.GlobalEnums;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.akto.util.Constants.ID;
 import static com.akto.util.enums.GlobalEnums.*;
@@ -101,15 +107,34 @@ public class TestingIssuesHandler {
                                                            Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap,
                                                            List<TestingRunIssues> testingRunIssuesList) {
         int lastSeen = Context.now();
+        AtomicReference<ObjectId> summaryIdRef = new AtomicReference<>(null);
+
+        Map<String, Integer> countIssuesMap = new HashMap<>();
+        countIssuesMap.put(Severity.HIGH.toString(), 0);
+        countIssuesMap.put(Severity.MEDIUM.toString(), 0);
+        countIssuesMap.put(Severity.LOW.toString(), 0);
+
         testingIssuesIdsMap.forEach((testingIssuesId, runResult) -> {
             boolean doesExists = false;
+            if (summaryIdRef.get() == null) {
+                summaryIdRef.set(runResult.getTestRunResultSummaryId());
+            }
+
+            if(!runResult.isVulnerable()){
+                return;
+            }
+
+            Severity severity = TestExecutor.getSeverityFromTestingRunResult(runResult);
+            int count = countIssuesMap.getOrDefault(severity.toString(), 0);
+            countIssuesMap.put(severity.toString(), count + 1);
+
             for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
                 if (testingRunIssues.getId().equals(testingIssuesId)) {
                     doesExists = true;
                     break;
                 }
             }
-            if (!doesExists && runResult.isVulnerable()) {
+            if (!doesExists) {
                 // name = category
                 String subCategory = runResult.getTestSubType();
                 if (subCategory.startsWith("http")) {
@@ -118,7 +143,7 @@ public class TestingIssuesHandler {
                             config.getSeverity(),
                             TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId(), null, lastSeen)));
                 }else {
-                    Severity severity = TestExecutor.getSeverityFromTestingRunResult(runResult);
+                    
                     writeModelList.add(new InsertOneModel<>(new TestingRunIssues(testingIssuesId,
                             severity,
                             TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId(),null, lastSeen))); // todo: take value from yaml
@@ -126,6 +151,19 @@ public class TestingIssuesHandler {
                 loggerMaker.infoAndAddToDb(String.format("Inserting the id %s , with summary Id as %s", testingIssuesId, runResult.getTestRunResultSummaryId()), LogDb.TESTING);
             }
         });
+
+        ObjectId summaryId = summaryIdRef.get();
+        if(summaryId != null){
+            TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                Filters.eq("_id", summaryId),
+                Updates.combine(
+                    Updates.inc("countIssues.HIGH", countIssuesMap.get("HIGH")),
+                    Updates.inc("countIssues.MEDIUM", countIssuesMap.get("MEDIUM")),
+                    Updates.inc("countIssues.LOW", countIssuesMap.get("LOW"))
+                )
+            );
+        }
+
     }
 
     public void handleIssuesCreationFromTestingRunResults(List<TestingRunResult> testingRunResultList, boolean triggeredByTestEditor) {
