@@ -16,7 +16,7 @@ function GithubCell(props){
 
     const {data, headers, getStatus, width, nameWidth, isBadgeClickable, badgeClicked} = props
     return (
-    <HorizontalStack gap="1">
+    <HorizontalStack gap="1" wrap={false}>
     {
         headers?.filter((header) => {
             return header.itemOrder==0
@@ -94,7 +94,7 @@ function GithubCell(props){
             }
         </HorizontalStack>
         <Box maxWidth={width}>
-        <HorizontalStack gap='2' align="start">
+        <HorizontalStack gap='2' align="start" wrap={false}>
             {
                 headers?.filter((header) => {
                     return header.itemOrder==3

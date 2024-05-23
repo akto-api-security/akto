@@ -1,4 +1,4 @@
-import { Button, LegacyCard, VerticalStack, Box, HorizontalStack } from '@shopify/polaris'
+import { Button, LegacyCard, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import ConditionComponent from './ConditionComponent';
 import Dropdown from './layouts/Dropdown';
