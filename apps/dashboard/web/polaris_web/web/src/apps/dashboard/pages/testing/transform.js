@@ -914,12 +914,15 @@ stopTest(hexId){
   });
 },
 
-rerunTest(hexId, refreshSummaries){
+rerunTest(hexId, refreshSummaries, shouldRefresh){
   api.rerunTest(hexId).then((resp) => {
+    window.location.reload()
     func.setToast(true, false, "Test re-run initiated")
-    setTimeout(() => {
-      refreshSummaries();
-    }, 2000)
+    if(shouldRefresh){
+      setTimeout(() => {
+        refreshSummaries();
+      }, 2000)
+    }
   }).catch((resp) => {
     func.setToast(true, true, "Unable to re-run test")
   });
@@ -945,7 +948,7 @@ getActionsList(hexId){
       content: 'Stop',
       icon: CircleCancelMajor,
       destructive:true,
-      onAction: () => {this.stopTest(hexId || "")},
+      onAction: () => {this.stopTest(hexId || ""); window.location.reload();},
       disabled: true,
   }
 ]},
@@ -953,6 +956,9 @@ getActions(item){
   let arr = []
   let section1 = {title: 'Actions', items:[]}
   let actionsList = this.getActionsList(item.id);
+  if(item.orderPriority === 1){
+    actionsList[1].disabled = true
+  }
   if(item['run_type'] === 'One-time'){
     section1.items.push(actionsList[1])
   }

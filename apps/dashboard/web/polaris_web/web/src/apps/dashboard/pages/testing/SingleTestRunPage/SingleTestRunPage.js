@@ -13,14 +13,16 @@ import {
   Popover,
   ActionList,
   Card,
-  ProgressBar
+  ProgressBar,
+  Tooltip
 } from '@shopify/polaris';
 
 import {
   CircleInformationMajor,
   ArchiveMinor,
   PriceLookupMinor,
-  ReportMinor
+  ReportMinor,
+  RefreshMajor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import func from '@/util/func';
@@ -199,22 +201,11 @@ function SingleTestRunPage() {
       }
       let cicd = testingRunType === "CI_CD";
       localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0], cicd, false);
-      if(localSelectedTestRun.orderPriority === 1){
-        if(setData){
-          setTimeout(() => {
-            refreshSummaries();
-          }, 2000)
-        }
-        setTempLoading((prev) => {
-            prev.running = true;
-            return {...prev};
-        });
-      }
 
       if(setData){
         setSelectedTestRun(localSelectedTestRun);
       }
-      if((localSelectedTestRun.testingRunResultSummaryHexId && testRunResults[selectedTab].length === 0) || !setData) {
+      if((localSelectedTestRun.testingRunResultSummaryHexId && testRunResults[selectedTab].length === 0) || setData) {
         await fetchTestingRunResultsData(localSelectedTestRun.testingRunResultSummaryHexId);
         }
       }) 
@@ -222,31 +213,6 @@ function SingleTestRunPage() {
     return localSelectedTestRun;
 }
 
-  const refreshSummaries = () => {
-    let intervalId = setInterval(async() => {
-      let localSelectedTestRun = await fetchData(false);
-      if(localSelectedTestRun.id){
-        if(localSelectedTestRun.orderPriority !== 1){
-          setSelectedTestRun(localSelectedTestRun);
-          setTempLoading((prev) => {
-            prev.running = false;
-            return prev;
-          });
-          clearInterval(intervalId)
-        } else {
-          setSelectedTestRun((prev) => {
-            if(func.deepComparison(prev, localSelectedTestRun)){
-              return prev;
-            }
-            return localSelectedTestRun;
-          });
-        }
-      } else {
-        clearInterval(intervalId)
-      }
-      refreshId.current = intervalId;
-    },5000)
-  }
 
   useEffect(()=>{
     async function loadData(){
@@ -468,6 +434,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
               </Text>
             </Badge>
             )}
+            <Button plain monochrome onClick={() => fetchData(true)}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
         </HorizontalStack>
         <HorizontalStack gap={"2"}>
           <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
@@ -520,7 +487,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
         secondaryActions={!workflowTest ? moreActionsComp: undefined}
         components={useComponents}
       />
-      <ReRunModal selectedTestRun={selectedTestRun} refreshSummaries={refreshSummaries}/>
+      <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false}/>
     </>
   );
 }
