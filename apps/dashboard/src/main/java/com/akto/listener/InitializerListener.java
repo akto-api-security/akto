@@ -6,6 +6,7 @@ import com.akto.action.ApiCollectionsAction;
 import com.akto.action.CustomDataTypeAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.action.testing.StartTestAction;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
@@ -21,14 +22,13 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.upload.FileUploadLogsDao;
 import com.akto.dao.upload.FileUploadsDao;
-import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.*;
-import com.akto.dto.billing.FeatureAccess;
-import com.akto.dto.billing.Organization;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.User.AktoUIMode;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
@@ -44,55 +44,43 @@ import com.akto.dto.pii.PIIType;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.upload.FileUpload;
 import com.akto.dto.type.URLMethods;
-import com.akto.dto.usage.MetricTypes;
+import com.akto.dto.upload.FileUpload;
 import com.akto.dto.usage.UsageMetric;
-import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
-import com.akto.notifications.slack.DailyUpdate;
-import com.akto.notifications.slack.TestSummaryGenerator;
+import com.akto.notifications.slack.*;
 import com.akto.parsers.HttpCallParser;
 import com.akto.task.Cluster;
 import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
-import com.akto.testing.HostDNSLookup;
-import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
-import com.akto.util.AccountTask;
-import com.akto.util.ConnectionInfo;
-import com.akto.util.EmailAccountName;
-import com.akto.util.Constants;
-import com.akto.util.DbMode;
-import com.akto.util.JSONUtils;
-import com.akto.util.Pair;
-import com.akto.util.UsageUtils;
+import com.akto.usage.UsageMetricHandler;
+import com.akto.util.*;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.tasks.OrganizationTask;
-import com.akto.utils.*;
-import com.akto.util.DashboardMode;
-import com.akto.utils.GithubSync;
+import com.akto.utils.Auth0;
 import com.akto.utils.RedactSampleData;
-import com.akto.utils.scripts.FixMultiSTIs;
+import com.akto.utils.TestTemplateUtils;
+import com.akto.utils.billing.OrganizationUtils;
+import com.akto.utils.crons.Crons;
 import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
 import com.akto.utils.jobs.DeactivateCollections;
-import com.akto.utils.billing.OrganizationUtils;
-import com.akto.utils.crons.Crons;
 import com.akto.utils.notifications.TrafficUpdates;
-import com.akto.billing.UsageMetricUtils;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -104,10 +92,7 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.DeleteResult;
 import com.slack.api.Slack;
 import com.slack.api.util.http.SlackHttpClient;
-import com.slack.api.webhook.WebhookResponse;
-
 import okhttp3.OkHttpClient;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
@@ -118,7 +103,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletContextListener;
 import java.io.*;
-import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -739,41 +723,22 @@ public class InitializerListener implements ServletContextListener {
                                 }
 
                                 loggerMaker.infoAndAddToDb(slackWebhook.toString(), LogDb.DASHBOARD);
-                                TestSummaryGenerator testSummaryGenerator = new TestSummaryGenerator(Context.accountId.get());
-                                String testSummaryPayload = testSummaryGenerator.toJson(slackWebhook.getDashboardUrl());
+                                SlackAlerts dailyTestSummaryAlert = createDailyTestSummaryAlert(slackWebhook.getDashboardUrl());
+                                SlackSender.sendAlert(Context.accountId.get(), dailyTestSummaryAlert);
 
                                 ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp(), null, null, false);
-                                DailyUpdate dailyUpdate = new DailyUpdate(
-                                0, 0,
-                                ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(),
-                                ci.recentSentiiveParams, ci.newParamsInExistingEndpoints,
-                                slackWebhook.getLastSentTimestamp(), now,
-                                ci.newSensitiveParams, slackWebhook.getDashboardUrl());
+
+                                SlackAlerts dailyInventorySummaryAlert = new DailyInventorySummaryAlert(
+                                        ci.newEndpointsLast7Days.size(),
+                                        ci.newSensitiveParams.size(),
+                                        ci.recentSentiiveParams,
+                                        ci.newParamsInExistingEndpoints,
+                                        slackWebhook.getDashboardUrl()
+                                );
+                                SlackSender.sendAlert(Context.accountId.get(), dailyInventorySummaryAlert);
 
                                 slackWebhook.setLastSentTimestamp(now);
                                 SlackWebhooksDao.instance.updateOne(eq("webhook", slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now));
-
-                                String webhookUrl = slackWebhook.getWebhook();
-                                String payload = dailyUpdate.toJSON();
-                                loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
-                                try {
-                                    URI uri = URI.create(webhookUrl);
-                                    if (!HostDNSLookup.isRequestValid(uri.getHost())) {
-                                        throw new IllegalArgumentException("SSRF attack attempt");
-                                    }
-                                    loggerMaker.infoAndAddToDb("Payload for changes:" + payload, LogDb.DASHBOARD);
-                                    WebhookResponse response = slack.send(webhookUrl, payload);
-                                    loggerMaker.infoAndAddToDb("Changes webhook response: " + response.getBody(), LogDb.DASHBOARD);
-
-                                    // slack testing notification
-                                    loggerMaker.infoAndAddToDb("Payload for test summary:" + testSummaryPayload, LogDb.DASHBOARD);
-                                    response = slack.send(webhookUrl, testSummaryPayload);
-                                    loggerMaker.infoAndAddToDb("Test summary webhook response: " + response.getBody(), LogDb.DASHBOARD);
-
-                                } catch (Exception e) {
-                                    e.printStackTrace();
-                                    loggerMaker.errorAndAddToDb(e, "Error while sending slack alert: " + e.getMessage(), LogDb.DASHBOARD);
-                                }
                             }
                         }
                     }, "setUpDailyScheduler");
@@ -783,6 +748,133 @@ public class InitializerListener implements ServletContextListener {
             }
         }, 0, 4, TimeUnit.HOURS);
 
+    }
+
+    private DailyTestSummaryAlert createDailyTestSummaryAlert(String dashboardUrl) {
+        int now = Context.now();
+        long twentyFourHoursAgo = now - (24 * 60 * 60);
+
+        Bson trrFilter = Filters.and(
+                Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.COMPLETED),
+                Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now),
+                Filters.gt(TestingRunResultSummary.START_TIMESTAMP, twentyFourHoursAgo)
+        );
+        List<TestingRunResultSummary> testingRunResultSummaryList = TestingRunResultSummariesDao.instance.findAll(trrFilter);
+
+        Bson triFilter1 = Filters.and(
+                Filters.gte(TestingRunIssues.CREATION_TIME, twentyFourHoursAgo)
+        );
+        Bson triFilter2 = Filters.and(
+                Filters.gte(TestingRunIssues.LAST_UPDATED, twentyFourHoursAgo)
+        );
+
+        List<TestingRunIssues> testingRunIssuesCreationTimeList = TestingRunIssuesDao.instance.findAll(triFilter1);
+        List<TestingRunIssues> testingRunIssuesLastUpdatedList = TestingRunIssuesDao.instance.findAll(triFilter2);
+
+        long totalScanTimeInSeconds = 0;
+        for(TestingRunResultSummary testingRunResultSummary : testingRunResultSummaryList) {
+            totalScanTimeInSeconds += Math.abs(testingRunResultSummary.getEndTimestamp() - testingRunResultSummary.getStartTimestamp());
+        }
+
+        Map<String, Integer> apisAffectedCount = new HashMap<>();
+        Map<String, Integer> severityCount = new HashMap<>();
+        for(TestingRunIssues testingRunIssues: testingRunIssuesLastUpdatedList) {
+            String key = testingRunIssues.getSeverity().toString();
+            if(!severityCount.containsKey(key)) {
+                severityCount.put(key, 0);
+            }
+
+            int issuesSeverityCount = severityCount.get(key);
+            severityCount.put(key, issuesSeverityCount+1);
+
+            String testSubCategory = testingRunIssues.getId().getTestSubCategory();
+            int totalApisAffected = apisAffectedCount.getOrDefault(testSubCategory, 0)+1;
+            apisAffectedCount.put(
+                    testSubCategory,
+                    totalApisAffected
+            );
+        }
+
+        List<NewIssuesModel> newIssuesModelList = new ArrayList<>();
+        Map<String, Integer> categoryFrequencyMap = new HashMap<>();
+        for(TestingRunIssues testingRunIssues : testingRunIssuesCreationTimeList) {
+            String testRunResultId;
+            Bson filterForRunResult = Filters.and(
+                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunIssues.getLatestTestingRunSummaryId()),
+                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, testingRunIssues.getId().getTestSubCategory()),
+                    Filters.eq(TestingRunResult.API_INFO_KEY, testingRunIssues.getId().getApiInfoKey())
+            );
+
+            if(newIssuesModelList.size() <= 5) {
+                TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(filterForRunResult, Projections.include("_id"));
+                testRunResultId = testingRunResult.getHexId();
+            } else testRunResultId = "";
+
+            if(categoryFrequencyMap.size() <= 3) {
+                TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(filterForRunResult);
+                String testCategory = testingRunResult.getTestSuperType();
+                categoryFrequencyMap.put(testCategory, categoryFrequencyMap.getOrDefault(testCategory, 0) + 1);
+            }
+
+            String issueCategory = testingRunIssues.getId().getTestSubCategory();
+            newIssuesModelList.add(new NewIssuesModel(
+                    issueCategory,
+                    testRunResultId,
+                    apisAffectedCount.get(issueCategory),
+                    testingRunIssues.getCreationTime()
+            ));
+        }
+
+        String testTopThreeCategories = printTopFrequencies(categoryFrequencyMap);
+
+        Bson apiInfoFilter = Filters.and(
+                Filters.gte(ApiInfo.LAST_TESTED, twentyFourHoursAgo)
+        );
+
+        int apiInfoListCount = (int) ApiInfoDao.instance.getMCollection().countDocuments(apiInfoFilter);
+        int totalApis = (int) ApiInfoDao.instance.getMCollection().estimatedDocumentCount();
+        int testCoverage = (int) Math.ceil(100.0 * ((double) apiInfoListCount / totalApis));
+
+        return new DailyTestSummaryAlert(
+                testingRunResultSummaryList.size(),
+                apiInfoListCount,
+                testingRunIssuesLastUpdatedList.size(),
+                testingRunIssuesCreationTimeList.size(),
+                severityCount.getOrDefault(GlobalEnums.Severity.HIGH.name(), 0),
+                severityCount.getOrDefault(GlobalEnums.Severity.MEDIUM.name(), 0),
+                severityCount.getOrDefault(GlobalEnums.Severity.LOW.name(), 0),
+                testTopThreeCategories,
+                totalScanTimeInSeconds,
+                testCoverage,
+                newIssuesModelList,
+                dashboardUrl,
+                "/dashboard/testing#one_time",
+                "/dashboard/issues"
+        );
+    }
+
+    private String printTopFrequencies(Map<String, Integer> map) {
+        if(map.isEmpty()) return "";
+
+        List<Map.Entry<String, Integer>> entryList = new ArrayList<>(map.entrySet());
+
+        entryList.sort((e1, e2) -> e2.getValue().compareTo(e1.getValue()));
+
+        List<String> topKeys = new ArrayList<>();
+        for (int i = 0; i < Math.min(3, entryList.size()); i++) {
+            topKeys.add(entryList.get(i).getKey());
+        }
+
+        String result;
+        if (topKeys.size() == 1) {
+            result = topKeys.get(0);
+        } else if (topKeys.size() == 2) {
+            result = topKeys.get(0) + " And " + topKeys.get(1);
+        } else {
+            result = topKeys.get(0) + ", " + topKeys.get(1) + ", And " + topKeys.get(2);
+        }
+
+        return result;
     }
 
     public static void webhookSenderUtil(CustomWebhook webhook) {

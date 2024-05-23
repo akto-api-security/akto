@@ -231,7 +231,7 @@ public class Main {
         loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
-        
+
         Map<Integer, Integer> logSentMap = new HashMap<>();
 
         while (true) {
@@ -375,7 +375,7 @@ public class Main {
                         }
                     }
                     testExecutor.init(testingRun, summaryId);
-                    raiseMixpanelEvent(summaryId, testingRun, accountId);
+                    raiseMixpanelEvent(summaryId, testingRun, Context.accountId.get());
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error in init " + e);
                 }
