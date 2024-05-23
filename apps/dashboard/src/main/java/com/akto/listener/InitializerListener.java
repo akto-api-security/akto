@@ -1821,7 +1821,7 @@ public class InitializerListener implements ServletContextListener {
 
                 setUpUpdateCustomCollections();
                 setUpFillCollectionIdArrayJob();
-                setupAutomatedApiGroupsScheduler();
+                //setupAutomatedApiGroupsScheduler();
             }
         }, 0, TimeUnit.SECONDS);
 
