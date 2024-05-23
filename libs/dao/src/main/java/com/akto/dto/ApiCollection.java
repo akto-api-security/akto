@@ -17,6 +17,7 @@ public class ApiCollection {
 
     @BsonId
     int id;
+    public static final String ID = "_id";
     public static final String NAME = "name";
     String name;
     int startTs;
@@ -42,6 +43,9 @@ public class ApiCollection {
 
     public static final String _DEACTIVATED = "deactivated";
     boolean deactivated;
+
+    public static final String AUTOMATED = "automated";
+    boolean automated;
 
     public enum Type {
         API_GROUP
@@ -272,5 +276,13 @@ public class ApiCollection {
 	public void setUserSetEnvType(ENV_TYPE userSetEnvType) {
 		this.userSetEnvType = userSetEnvType;
 	}
+
+    public boolean getAutomated() {
+        return automated;
+    }
+
+    public void setAutomated(boolean automated) {
+        this.automated = automated;
+    }
     
 }
