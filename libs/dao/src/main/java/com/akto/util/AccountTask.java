@@ -19,7 +19,7 @@ public class AccountTask {
     private static final Logger logger = LoggerFactory.getLogger(AccountTask.class);
     public static final AccountTask instance = new AccountTask();
 
-    public static final List<Integer> inactiveAccountsList = Arrays.asList(
+    public static final Set<Integer> inactiveAccountsSet = new HashSet(Arrays.asList(
             1698166879, 1701109976, 1690222721, 1700421987, 1692653749, 1698114809, 1692928130, 1690570731, 1695581777,1692193671,
             1700455610, 1689888960, 1696391279, 1693288165, 1698331284, 1698116613, 1695160251, 1699511169, 1698201149, 1691024024,
             1697579719, 1690780188, 1699345772, 1691467974, 1692221066, 1697099439, 1690004941, 1698928692, 1699938165,
@@ -111,10 +111,11 @@ public class AccountTask {
             1694404381, 1691110878, 1694742924, 1692047956, 1697247018, 1698197541, 1699482960, 1696888352, 1698016044,
             1699241134, 1692888253, 1693594787, 1698264867, 1699158086, 1697147431, 1694835484, 1694759602, 1694808742,
             1692194630, 1695253515, 1699148653, 1690892023, 1700591679, 1696321249, 1699994696, 1697672499, 1697590453,
-            1700247456, 1691692570, 1693241353, 1691435648, 1700863458);
+            1700247456, 1691692570, 1693241353, 1691435648, 1700863458));
+
+
 
     public void executeTask(Consumer<Account> consumeAccount, String taskName) {
-        Set<Integer> inactiveAccountsSet = new HashSet<>(inactiveAccountsList);
 
         Bson activeFilter = Filters.or(
                 Filters.exists(Account.INACTIVE_STR, false),
@@ -124,11 +125,9 @@ public class AccountTask {
         List<Account> activeAccounts = AccountsDao.instance.findAll(activeFilter);
         for(Account account: activeAccounts) {
             if (inactiveAccountsSet.contains(account.getId())) {
-                System.out.println("skipppping");
                 continue;
             }
             try {
-                System.out.println("not skipping");
                 Context.accountId.set(account.getId());
                 consumeAccount.accept(account);
             } catch (Exception e) {
