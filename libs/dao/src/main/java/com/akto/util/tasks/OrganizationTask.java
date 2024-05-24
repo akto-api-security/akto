@@ -1,10 +1,14 @@
 package com.akto.util.tasks;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.billing.Organization;
+import com.akto.util.AccountTask;
 import com.mongodb.BasicDBObject;
 
 import org.slf4j.Logger;
@@ -18,6 +22,14 @@ public class OrganizationTask {
 
         List<Organization> organizations = OrganizationsDao.instance.findAll(new BasicDBObject());
         for(Organization organization: organizations) {
+            Set<Integer> activeAccounts = new HashSet<>();
+            for (int accountId: organization.getAccounts()) {
+                if (!AccountTask.inactiveAccountsList.contains(accountId)) {
+                    activeAccounts.add(accountId);
+                }
+            }
+            System.out.println("org: activeAccounts: " + activeAccounts.size());
+            organization.setAccounts(activeAccounts);
             try {
                 logger.info("executing " + taskName + " for org: " + organization.getName() + ": " + organization.getId());
                 consumeOrganization.accept(organization);
