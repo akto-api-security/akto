@@ -250,7 +250,7 @@ const SampleApi = () => {
             </div>
 
             <Divider />
-            <SampleData data={editorData} minHeight="80.3vh"  editorLanguage="custom_http" />
+            <SampleData data={editorData} minHeight="80.4vh"  editorLanguage="custom_http" />
             {resultComponent}
             <Modal
                 open={showTestResult}
