@@ -331,6 +331,7 @@ const transform = {
       obj['cve'] = subCategoryMap[data.testSubType]?.cve ? subCategoryMap[data.testSubType]?.cve : []
       obj['cveDisplay'] = minimizeTagList(obj['cve'])
       obj['errorsList'] = data.errorsList || []
+      obj['testCategoryId'] = data.testSubType
       return obj;
     },
     prepareTestRunResults : (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap) => {

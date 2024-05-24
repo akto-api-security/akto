@@ -202,7 +202,8 @@ function SampleData(props) {
             lightbulb: { enabled: false },
             scrollbar:{
               alwaysConsumeMouseWheel: false
-            }
+            },
+            fixedOverflowWidgets: true 
         }
         let instance = "";
         if(editorLanguage.includes("custom")){

@@ -94,7 +94,7 @@ function GithubCell(props){
             }
         </HorizontalStack>
         <Box maxWidth={width}>
-        <HorizontalStack gap='2' align="start" wrap={false}>
+        <HorizontalStack gap='2' align="start">
             {
                 headers?.filter((header) => {
                     return header.itemOrder==3
@@ -138,7 +138,7 @@ function GithubCell(props){
                     </div>
                     
                 : <Badge key={item} status={getStatus(item)}>
-                    <Text {...header.dataProps}>
+                    <Text {...header.dataProps} breakWord>
                         {item}
                     </Text>
                 </Badge>
