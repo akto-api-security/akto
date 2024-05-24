@@ -108,6 +108,7 @@ import com.slack.api.webhook.WebhookResponse;
 
 import okhttp3.OkHttpClient;
 
+import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
@@ -1208,10 +1209,11 @@ public class InitializerListener implements ServletContextListener {
 
     public static void createAutomatedAPIGroups(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getAutomatedApiGroups() == 0) {
-            String groupsCsv = AutomatedApiGroupsUtils.fetchGroups(false);
+            // Fetch automated API groups csv records
+            List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups(true);
 
-            if (groupsCsv != null) {
-                AutomatedApiGroupsUtils.processAutomatedGroups(groupsCsv);
+            if (apiGroupRecords != null) {
+                AutomatedApiGroupsUtils.processAutomatedGroups(apiGroupRecords);
             }
 
             BackwardCompatibilityDao.instance.updateOne(
@@ -1821,7 +1823,7 @@ public class InitializerListener implements ServletContextListener {
 
                 setUpUpdateCustomCollections();
                 setUpFillCollectionIdArrayJob();
-                //setupAutomatedApiGroupsScheduler();
+                setupAutomatedApiGroupsScheduler();
             }
         }, 0, TimeUnit.SECONDS);
 
@@ -2559,25 +2561,29 @@ public class InitializerListener implements ServletContextListener {
     public void setupAutomatedApiGroupsScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                String groupsCsv = AutomatedApiGroupsUtils.fetchGroups(true);
 
-                if (groupsCsv == null) {
+                // Acquire dibs for updating automated API groups
+                Context.accountId.set(1000_000);
+                boolean dibs = callDibs(Cluster.AUTOMATED_API_GROUPS_CRON,  4*60*60, 60);
+                if(!dibs){
+                    loggerMaker.infoAndAddToDb("Cron for updating automated API groups not acquired, thus skipping cron", LogDb.DASHBOARD);
+                    return;
+                }
+
+                loggerMaker.infoAndAddToDb("Cron for updating automated API groups picked up.", LogDb.DASHBOARD);
+
+                // Fetch automated API groups csv records
+                List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups(true);
+
+                if (apiGroupRecords == null) {
                     return;
                 }
 
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        boolean dibs = callDibs(Cluster.AUTOMATED_API_GROUPS_CRON, 4*60*60, 60);
-                        if(!dibs){
-                            loggerMaker.infoAndAddToDb("Cron for updating automated API groups not acquired, thus skipping cron", LogDb.DASHBOARD);
-                            return;
-                        }
-
-                        loggerMaker.infoAndAddToDb("Cron for updating automated API groups picked up " + Context.getId(), LogDb.DASHBOARD);
-
                         try {
-                            AutomatedApiGroupsUtils.processAutomatedGroups(groupsCsv);
+                            AutomatedApiGroupsUtils.processAutomatedGroups(apiGroupRecords);
                         } catch (Exception e) {
                             loggerMaker.errorAndAddToDb("Error while processing automated api groups: " + e.getMessage(), LogDb.DASHBOARD);
                         }
