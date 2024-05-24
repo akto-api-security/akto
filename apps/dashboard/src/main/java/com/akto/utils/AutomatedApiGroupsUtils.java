@@ -31,8 +31,12 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.google.protobuf.Api;
 import com.mongodb.BasicDBObject;
+import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.InsertOneModel;
+import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
 
 public class AutomatedApiGroupsUtils {
 
@@ -40,9 +44,10 @@ public class AutomatedApiGroupsUtils {
 
     private static final ExecutorService executorService = Executors.newFixedThreadPool(1);
 
-    public static String fetchGroups(Boolean updateGroups) {
+    public static List<CSVRecord> fetchGroups(Boolean updateGroups) {
         GithubSync githubSync = new GithubSync();
         GithubFile githubFile = githubSync.syncFile("akto-api-security/akto","automated-api-groups/automated-api-groups.csv", null, null);
+        String groupsCsvContent = null;
 
         if (githubFile == null) {
             if (!updateGroups) {
@@ -51,16 +56,32 @@ public class AutomatedApiGroupsUtils {
                     String resourceName = "automated-api-groups/automated-api-groups.csv";
                     byte[] fileBytes = Files.readAllBytes(Paths.get(resourceName));
                     String fileContent = new String(fileBytes, StandardCharsets.UTF_8);
-                    return fileContent;
+                    groupsCsvContent = fileContent;
                 } catch (Exception ex) {
                     loggerMaker.errorAndAddToDb(ex, String.format("Error while loading automated groups csv file. Error: %s", ex.getMessage()), LogDb.DASHBOARD);
                 }
             }
+        } else {
+            groupsCsvContent = githubFile.getContent();
+        }
 
+        if (groupsCsvContent == null) {
             return null;
         }
 
-        return githubFile.getContent();
+        List<CSVRecord> apiGroupRecords = null;
+        try (CSVParser csvParser = CSVFormat.DEFAULT
+                .builder()
+                .setHeader()
+                .setSkipHeaderRecord(true)
+                .build()
+                .parse(new StringReader(groupsCsvContent))) {
+            apiGroupRecords = csvParser.getRecords();
+        } catch (IOException e) {
+            loggerMaker.errorAndAddToDb("Error while processing automated API groups CSV - " + e.getMessage(), LogDb.DASHBOARD);
+        } 
+
+        return apiGroupRecords;
     }
 
     public static void deleteAutomatedAPIGroup(List<ApiCollection> apiCollectionsDelete) {
@@ -76,17 +97,13 @@ public class AutomatedApiGroupsUtils {
         
     }
 
-    public static void processAutomatedGroups(String groupCsv) {
+    public static void processAutomatedGroups(List<CSVRecord> apiGroupRecords) {
         loggerMaker.infoAndAddToDb("Syncing automated API groups", LogDb.DASHBOARD);
 
-        try (CSVParser csvParser = CSVFormat.DEFAULT
-                .builder()
-                .setHeader()
-                .setSkipHeaderRecord(true)
-                .build()
-                .parse(new StringReader(groupCsv))) {
-            
+        try {
             Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>(); 
+            List<WriteModel<ApiCollection>> bulkUpdatesForApiCollections = new ArrayList<>();
+
             List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
             List<ApiCollection> apiCollectionsDelete = new ArrayList<>();
             
@@ -94,7 +111,7 @@ public class AutomatedApiGroupsUtils {
                 apiCollectionsMap.put(apiCollection.getId(), apiCollection);
             }
 
-            for (CSVRecord csvRecord : csvParser) {
+            for (CSVRecord csvRecord : apiGroupRecords) {
                 String apiCollectionIdStr = csvRecord.get("apiCollectionId");
                 apiCollectionIdStr = apiCollectionIdStr.replaceAll("_", "");
                 int apiCollectionId = Integer.parseInt(apiCollectionIdStr);
@@ -113,7 +130,9 @@ public class AutomatedApiGroupsUtils {
                         automatedGroupConditions.add(new RegexTestingEndpoints(TestingEndpoints.Operator.OR, regex));
                         automatedGroup.setConditions(automatedGroupConditions);
 
-                        ApiCollectionsDao.instance.insertOne(automatedGroup);
+                        bulkUpdatesForApiCollections.add(
+                            new InsertOneModel<>(automatedGroup)
+                        );
                         apiCollectionsMap.put(apiCollectionId, automatedGroup);
                     } else {
                         ApiCollection automatedGroup = apiCollectionsMap.get(apiCollectionId);
@@ -123,10 +142,12 @@ public class AutomatedApiGroupsUtils {
                         // Update api group if regex has changed
                         if (!regexTestingEndpoint.getRegex().equals(regex)) {
                             regexTestingEndpoint.setRegex(regex);
-
-                            ApiCollectionsDao.instance.updateOne(
-                                Filters.eq(ApiCollection.ID, apiCollectionId),
-                                Updates.set("conditions", automatedGroupConditions)
+                            
+                            bulkUpdatesForApiCollections.add(
+                                new UpdateOneModel<> (
+                                    Filters.eq(ApiCollection.ID, apiCollectionId),
+                                    Updates.set("conditions", automatedGroupConditions)
+                                )
                             );
                         }
                     }
@@ -138,6 +159,14 @@ public class AutomatedApiGroupsUtils {
                         apiCollectionsDelete.add(apiCollection);
                         apiCollectionsMap.remove(apiCollectionId);
                     }
+                }
+            }
+
+            if (bulkUpdatesForApiCollections.size() > 0) {
+                try {
+                    ApiCollectionsDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiCollections);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error while processing automated API groups - " + e.getMessage(), LogDb.DASHBOARD);
                 }
             }
 
@@ -153,7 +182,7 @@ public class AutomatedApiGroupsUtils {
                     loggerMaker.errorAndAddToDb("Error while deleting automated API group - " + e.getMessage(), LogDb.DASHBOARD);
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while processing automated API groups - " + e.getMessage(), LogDb.DASHBOARD);
         }
     }
