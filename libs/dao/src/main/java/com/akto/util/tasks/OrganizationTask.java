@@ -24,11 +24,10 @@ public class OrganizationTask {
         for(Organization organization: organizations) {
             Set<Integer> activeAccounts = new HashSet<>();
             for (int accountId: organization.getAccounts()) {
-                if (!AccountTask.inactiveAccountsList.contains(accountId)) {
+                if (!AccountTask.inactiveAccountsSet.contains(accountId)) {
                     activeAccounts.add(accountId);
                 }
             }
-            System.out.println("org: activeAccounts: " + activeAccounts.size());
             organization.setAccounts(activeAccounts);
             try {
                 logger.info("executing " + taskName + " for org: " + organization.getName() + ": " + organization.getId());
