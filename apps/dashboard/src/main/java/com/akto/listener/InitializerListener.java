@@ -1210,7 +1210,7 @@ public class InitializerListener implements ServletContextListener {
     public static void createAutomatedAPIGroups(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getAutomatedApiGroups() == 0) {
             // Fetch automated API groups csv records
-            List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups(true);
+            List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups(false);
 
             if (apiGroupRecords != null) {
                 AutomatedApiGroupsUtils.processAutomatedGroups(apiGroupRecords);
