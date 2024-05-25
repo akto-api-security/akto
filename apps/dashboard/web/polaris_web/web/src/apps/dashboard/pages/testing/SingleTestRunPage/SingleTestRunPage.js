@@ -324,7 +324,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
         selected={selected}
         tableTabs={tableTabs}
         onSelect={handleSelectedTab}
-        filterStateUrl={"dashboard/testing/" + selectedTestRun?.id + "/" + selectedTab}
+        filterStateUrl={"/dashboard/testing/" + selectedTestRun?.id + "/#" + selectedTab}
       />
   )
 
