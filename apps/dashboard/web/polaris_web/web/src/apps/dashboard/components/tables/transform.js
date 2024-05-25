@@ -1,4 +1,5 @@
 import func from "@/util/func";
+import PersistStore from "../../../main/PersistStore";
 
 const tableFunc = {
     fetchDataSync: function (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props){
@@ -136,6 +137,49 @@ const tableFunc = {
       return [sortOptions[0].value]
     }
     return filtersMap.sort
+  },
+  getPrettifiedFilter(filters){
+    let filterStr = "";
+    filters.forEach((filter) => {
+      if(filterStr.length !== 0){filterStr += "&"}
+      filterStr += filter.key + "__" + filter.value
+    })
+    return filterStr
+  },
+
+  getFiltersMapFromUrl(searchString, labelFunc, handleRemoveAppliedFilter, pageKey){
+    const result = [];
+    if(searchString.length === 0){
+      return []
+    }
+    const pairs = searchString.split('&');
+  
+    pairs.forEach(pair => {
+      const [key, values] = pair.split('__');
+      const valueArray = values.split(',');
+      result.push({
+        key,
+        value: valueArray,
+        label: labelFunc(key,valueArray),
+        onRemove: handleRemoveAppliedFilter
+      });
+    });
+
+    const currentFilters = PersistStore.getState().filtersMap
+    const setPageFilters = PersistStore.getState().setFiltersMap
+    const pageFilters = currentFilters?.pageKey?.filters || {}
+    if(!func.deepComparison(pageFilters, result)){
+      setPageFilters({
+        ...pageFilters,
+        [pageKey]: {
+          sort: pageFilters[pageKey]?.sort || [],
+          'filters':result
+        }
+      
+      })
+      return result
+    }
+    return []
   }
 }
 
