@@ -1436,12 +1436,12 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
   getTabsCount(tableTabs, data, initialCountArr = []){
     const currentState = PersistStore(state => state.tableInitialState)
-    const baseUrl = window.location.href.split('#')[0]
+    const baseUrl = window.location.pathname + "/#"
 
     let finalCountObj = {}
     tableTabs.forEach((tab,ind) => {
       const tabId = this.getKeyFromName(tab)
-      const tabKey = baseUrl + '#' + tabId
+      const tabKey = baseUrl + tabId
       const count = currentState[tabKey] || data[tabId]?.length || initialCountArr[ind] || 0
       finalCountObj[tabId] = count
     })
