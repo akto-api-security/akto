@@ -107,8 +107,13 @@ public class IssuesAction extends UserAction {
     }
 
     public String fetchAllIssues() {
-        Bson sort = Sorts.orderBy(Sorts.descending(TestingRunIssues.TEST_RUN_ISSUES_STATUS),
-                Sorts.descending(TestingRunIssues.CREATION_TIME));
+
+        Bson sort = Sorts.descending(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.UNREAD, TestingRunIssues.CREATION_TIME);
+
+//                Sorts.orderBy(Sorts.descending(TestingRunIssues.UNREAD),
+//                Sorts.descending(TestingRunIssues.TEST_RUN_ISSUES_STATUS),
+//                Sorts.descending(TestingRunIssues.CREATION_TIME)
+//                );
         Bson filters = createFilters();
         totalIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(filters);
         issues = TestingRunIssuesDao.instance.findAll(filters, skip,limit, sort);
@@ -182,6 +187,13 @@ public class IssuesAction extends UserAction {
                 Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey())
         );
         testingRunResult = TestingRunResultDao.instance.findOne(filterForRunResult);
+        if (issue.isUnread()) {
+            logger.info("Issue id from db to be marked as read " + issueId);
+            Bson update = Updates.combine(Updates.set(TestingRunIssues.UNREAD, false),
+                    Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
+            TestingRunIssues updatedIssue = TestingRunIssuesDao.instance.updateOneNoUpsert(Filters.eq(ID, issueId), update);
+            issueId = updatedIssue.getId();
+        }
         return SUCCESS.toUpperCase();
     }
 

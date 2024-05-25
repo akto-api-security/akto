@@ -25,11 +25,17 @@ public class TestingRunIssues {
     private String jiraIssueUrl;
     public static final String LAST_UPDATED = "lastUpdated";
     private int lastUpdated;
-
+    public static final String UNREAD = "unread";
+    private boolean unread;
     private List<Integer> collectionIds;
 
     public TestingRunIssues(TestingIssuesId id, GlobalEnums.Severity severity, GlobalEnums.TestRunIssueStatus status,
                             int creationTime, int lastSeen, ObjectId latestTestingRunSummaryId, String jiraIssueUrl, int lastUpdated) {
+        this(id, severity, status, creationTime, lastSeen, latestTestingRunSummaryId, jiraIssueUrl, lastUpdated, false);
+    }
+
+    public TestingRunIssues(TestingIssuesId id, GlobalEnums.Severity severity, GlobalEnums.TestRunIssueStatus status,
+                            int creationTime, int lastSeen, ObjectId latestTestingRunSummaryId, String jiraIssueUrl, int lastUpdated, boolean unread) {
         this.creationTime = creationTime;
         this.lastSeen = lastSeen;
         this.id = id;
@@ -41,6 +47,7 @@ public class TestingRunIssues {
         this.latestTestingRunSummaryId = latestTestingRunSummaryId;
         this.jiraIssueUrl = jiraIssueUrl;
         this.lastUpdated = lastUpdated;
+        this.unread = unread;
     }
 
     public TestingRunIssues() {
@@ -143,5 +150,13 @@ public class TestingRunIssues {
                 ", lastUpdated=" + lastUpdated +
                 ", collectionIds=" + collectionIds +
                 '}';
+    }
+
+    public boolean isUnread() {
+        return unread;
+    }
+
+    public void setUnread(boolean unread) {
+        this.unread = unread;
     }
 }

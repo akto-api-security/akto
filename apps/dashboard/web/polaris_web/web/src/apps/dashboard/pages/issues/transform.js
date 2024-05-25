@@ -66,6 +66,9 @@ const transform = {
             temp.categoryDescription=getCategoryDescription(issue.id)
             temp.testType=getTestType(issue.id.testErrorSource)
             temp.issueId=issue.id
+            if (issue.unread) {
+                temp.unread = ['Unread']
+            }
             temp.issueStatus=issue.testRunIssueStatus
             if(temp.issueStatus=="IGNORED"){
                 temp.ignoreReason=issue.ignoreReason
