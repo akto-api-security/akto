@@ -258,7 +258,8 @@ prettifyEpoch(epoch) {
     if(localItem.includes("HIGH")) return 'critical';
     if(localItem.includes("MEDIUM")) return 'warning';
     if(localItem.includes("LOW")) return 'neutral';
-    if(localItem.includes("CWE") || localItem.startsWith("+")) return 'info';
+    if(localItem.includes("CWE") || localItem.startsWith("+")) return 'info'
+    if(localItem.includes("UNREAD") || localItem.startsWith("+")) return 'attention';
     return "";
   },
   getRunResultSubCategory(runResult, subCategoryFromSourceConfigMap, subCategoryMap, fieldName) {

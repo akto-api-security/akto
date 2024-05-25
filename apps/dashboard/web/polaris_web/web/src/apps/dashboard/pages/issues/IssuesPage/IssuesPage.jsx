@@ -64,7 +64,12 @@ const headers = [
     },
     {
         value: 'collectionIds'
-    }
+    },
+    {
+        text:"unread",
+        value:"unread",
+        itemOrder:2
+    },
 ]
 
 const sortOptions = [
@@ -284,6 +289,12 @@ function IssuesPage(){
             setLoading(false);
         })
         ret = func.sortFunc(ret, sortKey, sortOrder)
+        ret = ret.sort((a,b) => {
+            if (a.unread) {
+                return -1;
+            }
+        })
+        console.log("ret", ret)
         
         return {value:ret , total:total};
     }
