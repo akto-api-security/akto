@@ -44,6 +44,9 @@ public class AutomatedApiGroupsUtils {
 
     private static final ExecutorService executorService = Executors.newFixedThreadPool(1);
 
+    public static final int UPDATE_BATCH_SIZE = 100;
+    public static final int DELETE_BATCH_SIZE = 100;
+
     public static List<CSVRecord> fetchGroups(Boolean updateGroups) {
         GithubSync githubSync = new GithubSync();
         GithubFile githubFile = githubSync.syncFile("akto-api-security/akto","automated-api-groups/automated-api-groups.csv", null, null);
@@ -85,12 +88,18 @@ public class AutomatedApiGroupsUtils {
     }
 
     public static void deleteAutomatedAPIGroup(List<ApiCollection> apiCollectionsDelete) {
-        loggerMaker.infoAndAddToDb("Deleting automated API groups - " + apiCollectionsDelete, LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("Deleting automated API groups - count: " + apiCollectionsDelete.size(), LogDb.DASHBOARD);
         
         try {
             ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
-            apiCollectionsAction.setApiCollections(apiCollectionsDelete);
-            apiCollectionsAction.deleteMultipleCollections();
+
+            for (int start = 0; start < apiCollectionsDelete.size(); start += AutomatedApiGroupsUtils.DELETE_BATCH_SIZE) {
+                int end = Math.min(start + AutomatedApiGroupsUtils.DELETE_BATCH_SIZE, apiCollectionsDelete.size());
+                List<ApiCollection> batch = apiCollectionsDelete.subList(start, end);
+                apiCollectionsAction.setApiCollections(batch);
+                apiCollectionsAction.deleteMultipleCollections();
+            }
+
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while deleting automated API group - " + e.getMessage(),  LogDb.DASHBOARD);
         }
@@ -164,9 +173,14 @@ public class AutomatedApiGroupsUtils {
 
             if (bulkUpdatesForApiCollections.size() > 0) {
                 try {
-                    ApiCollectionsDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiCollections);
+                    loggerMaker.infoAndAddToDb("Performing automated API group bulk writes, count: " + bulkUpdatesForApiCollections.size(), LogDb.DASHBOARD);
+                    for (int start = 0; start < bulkUpdatesForApiCollections.size(); start += AutomatedApiGroupsUtils.UPDATE_BATCH_SIZE) {
+                        int end = Math.min(start + AutomatedApiGroupsUtils.UPDATE_BATCH_SIZE, bulkUpdatesForApiCollections.size());
+                        List<WriteModel<ApiCollection>> batch = bulkUpdatesForApiCollections.subList(start, end);
+                        ApiCollectionsDao.instance.getMCollection().bulkWrite(batch);
+                    }
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error while processing automated API groups - " + e.getMessage(), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb("Error while performing automated API group bulk writes- " + e.getMessage(), LogDb.DASHBOARD);
                 }
             }
 
@@ -177,6 +191,12 @@ public class AutomatedApiGroupsUtils {
                     executorService.submit(() -> {
                         Context.accountId.set(accountId);
                         deleteAutomatedAPIGroup(apiCollectionsDelete);
+                        
+                        // Wait for 500ms before deleting groups for next account
+                        try {
+                            Thread.sleep(500);
+                        } catch (InterruptedException e) {
+                        }
                     });
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Error while deleting automated API group - " + e.getMessage(), LogDb.DASHBOARD);
