@@ -108,6 +108,10 @@ function GithubServerTable(props) {
     setSortableColumns(tableFunc.getSortableChoices(props?.headers))
   },[props?.headers])
 
+  useEffect(() => {
+    fetchData(queryValue)
+  },[props?.callFromOutside])
+
   const handleSort = (col, dir) => {
     let tempSortSelected = props?.sortOptions.filter(x => x.columnIndex === (col + 1))
     let sortVal = [tempSortSelected[0].value]

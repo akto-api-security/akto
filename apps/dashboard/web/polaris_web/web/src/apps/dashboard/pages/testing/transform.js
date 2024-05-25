@@ -148,7 +148,7 @@ function minimizeTagList(items){
 }
 
 function checkTestFailure(summaryState, testRunState) {
-  if (testRunState == 'COMPLETED' && summaryState != 'COMPLETED') {
+  if (testRunState === 'COMPLETED' && summaryState !== 'COMPLETED' && summaryState !== "STOPPED") {
     return true;
   }
   return false;
@@ -280,8 +280,8 @@ const transform = {
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
       obj['runTypeStatus'] = [obj['run_type']]
       obj['nextUrl'] = "/dashboard/testing/"+data.hexId
-      obj['testRunState'] = data.state
-      obj['summaryState'] = state
+      obj['testRunState'] = state
+      obj['summaryState'] = testingRunResultSummary.state
       obj['startTimestamp'] = testingRunResultSummary?.startTimestamp
       obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
@@ -914,12 +914,15 @@ stopTest(hexId){
   });
 },
 
-rerunTest(hexId, refreshSummaries){
+rerunTest(hexId, refreshSummaries, shouldRefresh){
   api.rerunTest(hexId).then((resp) => {
+    window.location.reload()
     func.setToast(true, false, "Test re-run initiated")
-    setTimeout(() => {
-      refreshSummaries();
-    }, 2000)
+    if(shouldRefresh){
+      setTimeout(() => {
+        refreshSummaries();
+      }, 2000)
+    }
   }).catch((resp) => {
     func.setToast(true, true, "Unable to re-run test")
   });
@@ -945,7 +948,7 @@ getActionsList(hexId){
       content: 'Stop',
       icon: CircleCancelMajor,
       destructive:true,
-      onAction: () => {this.stopTest(hexId || "")},
+      onAction: () => {this.stopTest(hexId || ""); window.location.reload();},
       disabled: true,
   }
 ]},
@@ -953,17 +956,17 @@ getActions(item){
   let arr = []
   let section1 = {title: 'Actions', items:[]}
   let actionsList = this.getActionsList(item.id);
+  if(item.orderPriority === 1){
+    actionsList[1].disabled = true
+  }
   if(item['run_type'] === 'One-time'){
     section1.items.push(actionsList[1])
   }
   if(item['run_type'] !== 'CI/CD'){
     section1.items.push(actionsList[2])
   }
-  
-  if(item['orderPriority'] === 1 || item['orderPriority'] === 2){
-      actionsList[3].disabled = false
-  }else{
-      actionsList[3].disabled = true
+  if(item.orderPriority < 3){
+    actionsList[3].disabled = false
   }
   section1.items.push(actionsList[3]);
   arr.push(section1)
