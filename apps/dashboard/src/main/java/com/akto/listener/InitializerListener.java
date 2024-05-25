@@ -2589,6 +2589,12 @@ public class InitializerListener implements ServletContextListener {
                         }
                     }
                 }, "automated-api-groups-scheduler");
+
+                 // Wait for 500ms before processing groups for next account
+                 try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                }
             }
         }, 0, 4, TimeUnit.HOURS);
     }
