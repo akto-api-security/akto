@@ -34,14 +34,18 @@ const func = {
     }
     return res
   },
-  validateName(name) {
-    const regex = /^[a-z0-9_]+$/i;
-    if (name.length == 0) {
-       return "Name cannot be blank";
-    } else if (!name.match(regex)) {
-      return "Only alphanumeric and underscore characters allowed in name" ;
+  nameValidationFunc(nameVal, initialCond){
+    let error = ""
+    if(nameVal.length === 0 || initialCond){
+      return error
     }
-    return true;
+    const regex = /^[A-Z_0-9 ]+$/;
+    if (!nameVal.toUpperCase().match(regex)){
+      error = "Name can only contain alphabets, spaces, numbers and underscores"
+    } else if(nameVal.length > 25){
+      error = "Name too long. Maximum limit allowed is 25"
+    }
+    return error;
   },
   toDateStr(date, needYear) {
     let strArray = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
