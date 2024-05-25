@@ -3,7 +3,7 @@ import transform from '../transform';
 import React, { useEffect, useState }  from 'react'
 import TestingStore from '../testingStore';
 
-function ReRunModal({refreshSummaries, selectedTestRun}) {
+function ReRunModal({refreshSummaries, selectedTestRun, shouldRefresh}) {
     const [localModal, setLocalModal] = useState(false)
     const rerunModal = TestingStore(state => state.rerunModal)
     const setRerunModal = TestingStore(state => state.setRerunModal)
@@ -24,7 +24,7 @@ function ReRunModal({refreshSummaries, selectedTestRun}) {
             title={"Re-run test"}
             primaryAction={{
                 content: "Re-run test",
-                onAction: () => {transform.rerunTest(selectedTestRun.id, refreshSummaries) ; handleClose()}
+                onAction: () => {transform.rerunTest(selectedTestRun.id, refreshSummaries, shouldRefresh) ; handleClose()}
             }}
             secondaryActions={[
                 {
