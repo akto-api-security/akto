@@ -1,4 +1,4 @@
-import { Button, LegacyCard, VerticalStack, Text } from '@shopify/polaris'
+import { Button, LegacyCard, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import Dropdown from './layouts/Dropdown';
 import {DeleteMinor} from "@shopify/polaris-icons"
