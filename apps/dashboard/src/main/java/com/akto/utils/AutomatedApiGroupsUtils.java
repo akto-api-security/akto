@@ -44,6 +44,8 @@ public class AutomatedApiGroupsUtils {
 
     private static final ExecutorService executorService = Executors.newFixedThreadPool(1);
 
+    public static int delete_account_ctr = 0;
+
     public static final int UPDATE_BATCH_SIZE = 100;
     public static final int DELETE_BATCH_SIZE = 100;
 
@@ -191,12 +193,16 @@ public class AutomatedApiGroupsUtils {
                     executorService.submit(() -> {
                         Context.accountId.set(accountId);
                         deleteAutomatedAPIGroup(apiCollectionsDelete);
+
+                        AutomatedApiGroupsUtils.delete_account_ctr += 1;
                         
-                        // Wait for 500ms before deleting groups for next account
-                        try {
-                            Thread.sleep(500);
-                        } catch (InterruptedException e) {
-                        }
+                        // Sleep for 1.5 seconds after every 50 accounts
+                        if (AutomatedApiGroupsUtils.delete_account_ctr % 50 == 0) {
+                            try {
+                                Thread.sleep(1500);
+                            } catch (InterruptedException e) {
+                            }
+                        } 
                     });
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Error while deleting automated API group - " + e.getMessage(), LogDb.DASHBOARD);
