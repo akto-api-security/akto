@@ -107,13 +107,8 @@ public class IssuesAction extends UserAction {
     }
 
     public String fetchAllIssues() {
-
-        Bson sort = Sorts.descending(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.UNREAD, TestingRunIssues.CREATION_TIME);
-
-//                Sorts.orderBy(Sorts.descending(TestingRunIssues.UNREAD),
-//                Sorts.descending(TestingRunIssues.TEST_RUN_ISSUES_STATUS),
-//                Sorts.descending(TestingRunIssues.CREATION_TIME)
-//                );
+        Bson sort = Sorts.orderBy(Sorts.descending(TestingRunIssues.TEST_RUN_ISSUES_STATUS),
+                Sorts.descending(TestingRunIssues.CREATION_TIME));
         Bson filters = createFilters();
         totalIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(filters);
         issues = TestingRunIssuesDao.instance.findAll(filters, skip,limit, sort);
