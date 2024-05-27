@@ -448,11 +448,20 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         params.put("client_secret", githubConfig.getClientSecret());
         params.put("code", this.code);
         try {
-            Map<String,Object> tokenData = CustomHttpRequest.postRequest("https://github.com/login/oauth/access_token", params);
+            String githubUrl = githubConfig.getGithubUrl();
+            if (StringUtils.isEmpty(githubUrl)) githubUrl = "https://github.com";
+
+            String githubApiUrl = githubConfig.getGithubApiUrl();
+            if (StringUtils.isEmpty(githubApiUrl)) githubApiUrl = "https://api.github.com";
+
+            if (githubApiUrl.endsWith("/")) githubApiUrl = githubApiUrl.substring(0, githubApiUrl.length() - 1);
+            if (githubUrl.endsWith("/")) githubUrl = githubUrl.substring(0, githubUrl.length() - 1);
+
+            Map<String,Object> tokenData = CustomHttpRequest.postRequest(githubUrl + "/login/oauth/access_token", params);
             String accessToken = tokenData.get("access_token").toString();
             String refreshToken = tokenData.getOrDefault("refresh_token", "").toString();
             int refreshTokenExpiry = Integer.parseInt(tokenData.getOrDefault("refresh_token_expires_in", "0").toString());
-            Map<String,Object> userData = CustomHttpRequest.getRequest("https://api.github.com/user", "Bearer " + accessToken);
+            Map<String,Object> userData = CustomHttpRequest.getRequest(githubApiUrl + "/user", "Bearer " + accessToken);
             String company = "sso";
             String username = userData.get("login").toString() + "@" + company;
             SignupInfo.GithubSignupInfo ghSignupInfo = new SignupInfo.GithubSignupInfo(accessToken, refreshToken, refreshTokenExpiry, username);

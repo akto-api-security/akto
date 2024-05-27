@@ -14,6 +14,8 @@ function GithubSso() {
     const [githubPresent, setGithubPresent] = useState("")
     const [componentType, setComponentType] = useState(0) ;
     const [nextButtonActive,setNextButtonActive] = useState(window.DASHBOARD_MODE === "ON_PREM");
+    const [githubUrl, setGithubUrl] = useState("https://github.com")
+    const [githubApiUrl, setGithubApiUrl] = useState("https://api.github.com")
 
     const location = window.location ;
     const hostname = location.origin;
@@ -51,12 +53,14 @@ function GithubSso() {
 
     async function fetchGithubSso() {
         try {
-            let {githubClientId} = await settingRequests.fetchGithubSso()
+            let {githubClientId, githubApiUrl, githubUrl} = await settingRequests.fetchGithubSso()
             if(githubClientId){
                 setComponentType(1);
             }
             setGithubPresent(!!githubClientId)
             setGithubClientId(githubClientId)
+            if (githubApiUrl) setGithubUrl(githubUrl)
+            if (githubApiUrl) setGithubApiUrl(githubApiUrl)
         } catch (error) {
             setNextButtonActive(false)
         }
@@ -67,7 +71,7 @@ function GithubSso() {
     }, [])
 
     const handleAddGithubSso = async () => {
-        const response = await settingRequests.addGithubSso(githubClientId, githubClientSecret)
+        const response = await settingRequests.addGithubSso(githubClientId, githubClientSecret, githubUrl, githubApiUrl)
         if (response) {
             if (response.error) {
                 func.setToast(true, true, response.error)
@@ -95,6 +99,18 @@ function GithubSso() {
                 label="Github Client Secret"
                 value={githubPresent ? "********************************": githubClientSecret}
                 onChange={(githubClientSecret) => setGithubClientSecret(githubClientSecret)}
+            />
+
+            <TextField
+                label="Github URL"
+                value={githubUrl}
+                onChange={githubPresent ? () => {} : (githubUrl) => setGithubUrl(githubUrl)}
+            />
+
+            <TextField
+                label="Github API URL"
+                value={githubApiUrl}
+                onChange={githubPresent ? () => {} : (githubApiUrl) => setGithubApiUrl(githubApiUrl)}
             />
         </LegacyCard.Section>
 

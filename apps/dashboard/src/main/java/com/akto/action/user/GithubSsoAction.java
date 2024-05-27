@@ -22,6 +22,7 @@ import com.mongodb.client.result.DeleteResult;
 
 import okhttp3.OkHttpClient;
 
+import org.apache.commons.lang3.StringUtils;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
 import org.kohsuke.github.connector.GitHubConnector;
@@ -123,6 +124,8 @@ public class GithubSsoAction extends UserAction {
     private String githubAppSecretKey;
     private String githubAppId;
     private String testingRunSummaryHexId;
+    private String githubUrl;
+    private String githubApiUrl;
     public String addGithubSso() {
 
         if(!DashboardMode.isOnPremDeployment()){
@@ -146,6 +149,8 @@ public class GithubSsoAction extends UserAction {
         Config.GithubConfig ghConfig = new Config.GithubConfig();
         ghConfig.setClientId(githubClientId);
         ghConfig.setClientSecret(githubClientSecret);
+        if (!StringUtils.isEmpty(githubUrl)) ghConfig.setGithubUrl(githubUrl);   
+        if (!StringUtils.isEmpty(githubApiUrl)) ghConfig.setGithubApiUrl(githubApiUrl);   
 
         ConfigsDao.instance.insertOne(ghConfig);
 
@@ -168,6 +173,8 @@ public class GithubSsoAction extends UserAction {
 
         if (githubConfig != null) {
             this.githubClientId = githubConfig.getClientId();
+            this.githubApiUrl = githubConfig.getGithubApiUrl();
+            this.githubUrl = githubConfig.getGithubUrl();
         }
 
         return SUCCESS.toUpperCase();
@@ -207,5 +214,21 @@ public class GithubSsoAction extends UserAction {
 
     public void setGithubAppId(String githubAppId) {
         this.githubAppId = githubAppId;
+    }
+
+    public void setGithubUrl(String githubUrl) {
+        this.githubUrl = githubUrl;
+    }
+
+    public void setGithubApiUrl(String githubApiUrl) {
+        this.githubApiUrl = githubApiUrl;
+    }
+
+    public String getGithubUrl() {
+        return githubUrl;
+    }
+
+    public String getGithubApiUrl() {
+        return githubApiUrl;
     }
 }
