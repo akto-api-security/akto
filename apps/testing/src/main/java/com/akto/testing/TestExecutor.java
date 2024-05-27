@@ -769,20 +769,19 @@ public class TestExecutor {
             }
             int index = 0;
 
-            List<Object> updatedObjList = new ArrayList<>();
+            Object reqObj = null;
             for (int i = 0; i < objList.size(); i++) {
                 Map<String,Object> mapValues = m.convertValue(objList.get(i), Map.class);
                 if (mapValues.get("operationName").toString().equalsIgnoreCase(queryName)) {
-                    updatedObjList.add(objList.get(i));
+                    reqObj = objList.get(i);
                     index = i;
                     break;
                 }
             }
-            updatedBody = gson.toJson(updatedObjList);
+            updatedBody = gson.toJson(reqObj);
 
-            List<Object> updatedRespObjList = new ArrayList<>();
-            updatedRespObjList.add(respObjList.get(index));
-            updatedRespBody = gson.toJson(updatedRespObjList);
+            Object respObject = respObjList.get(index);
+            updatedRespBody = gson.toJson(respObject);
 
             Map<String, Object> json = gson.fromJson(rawApi.getOriginalMessage(), Map.class);
             json.put("requestPayload", updatedBody);
