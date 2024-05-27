@@ -104,13 +104,13 @@ function GithubSso() {
             <TextField
                 label="Github URL"
                 value={githubUrl}
-                onChange={githubPresent ? () => {} : (githubUrl) => setGithubUrl(githubUrl)}
+                onChange={ (githubUrl) => setGithubUrl(githubUrl)}
             />
 
             <TextField
                 label="Github API URL"
                 value={githubApiUrl}
-                onChange={githubPresent ? () => {} : (githubApiUrl) => setGithubApiUrl(githubApiUrl)}
+                onChange={(githubApiUrl) => setGithubApiUrl(githubApiUrl)}
             />
         </LegacyCard.Section>
 
