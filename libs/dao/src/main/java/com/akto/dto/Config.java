@@ -302,6 +302,8 @@ public abstract class Config {
         private String clientId;
 
         private String clientSecret;
+        private String githubUrl;
+        private String githubApiUrl;
         public static final String CONFIG_ID = ConfigType.GITHUB.name() + CONFIG_SALT;
 
         public GithubConfig() {
@@ -323,6 +325,22 @@ public abstract class Config {
 
         public void setClientSecret(String clientSecret) {
             this.clientSecret = clientSecret;
+        }
+
+        public String getGithubUrl() {
+            return githubUrl;
+        }
+
+        public void setGithubUrl(String githubUrl) {
+            this.githubUrl = githubUrl;
+        }
+
+        public String getGithubApiUrl() {
+            return githubApiUrl;
+        }
+
+        public void setGithubApiUrl(String githubApiUrl) {
+            this.githubApiUrl = githubApiUrl;
         }
     }
 
