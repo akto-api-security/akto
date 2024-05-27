@@ -59,7 +59,7 @@ function GithubSso() {
             }
             setGithubPresent(!!githubClientId)
             setGithubClientId(githubClientId)
-            if (githubApiUrl) setGithubUrl(githubUrl)
+            if (githubUrl) setGithubUrl(githubUrl)
             if (githubApiUrl) setGithubApiUrl(githubApiUrl)
         } catch (error) {
             setNextButtonActive(false)
