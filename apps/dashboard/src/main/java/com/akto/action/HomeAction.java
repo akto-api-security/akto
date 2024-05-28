@@ -51,6 +51,9 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
         if (GithubLogin.getClientId() != null) {
             servletRequest.setAttribute("githubClientId", new String(Base64.getEncoder().encode(GithubLogin.getClientId().getBytes())));
         }
+        if (GithubLogin.getGithubUrl() != null) {
+            servletRequest.setAttribute("githubUrl", GithubLogin.getGithubUrl());
+        }
         if(OktaLogin.getAuthorisationUrl() != null){
             servletRequest.setAttribute("oktaAuthUrl", new String(Base64.getEncoder().encode(OktaLogin.getAuthorisationUrl().getBytes())));
         }
