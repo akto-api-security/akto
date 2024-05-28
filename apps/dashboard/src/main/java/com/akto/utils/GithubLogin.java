@@ -47,6 +47,7 @@ public class GithubLogin {
         if (ghConfig == null) return null;
 
         String githubUrl = ghConfig.getGithubUrl();
+        if (githubUrl == null) return null;
         if (githubUrl.endsWith("/")) githubUrl = githubUrl.substring(0, githubUrl.length() - 1);
         return githubUrl;
     }
