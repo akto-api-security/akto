@@ -28,7 +28,7 @@ function ExportHtml() {
         let low = 0
         testingRunResults?.length > 0 && testingRunResults.forEach((testingRun) => {
             let subtype = testingRun?.testSubType
-            let subCategory = subCategoryMap?.[subtype]
+            let subCategory = subCategoryMap?.[subtype]        
             if (!subCategory) {
                 return
             }
@@ -282,7 +282,7 @@ function VulnerableMultiStepTestDetails(props) {
                 {Object.keys(props.testingRun.workflowTest.mapNodeIdToWorkflowNodeDetails).map((stepId, index) => {
                     let step = props.testingRun.workflowTest.mapNodeIdToWorkflowNodeDetails[stepId]
                     let nodeResultMap = props.testingRun.testResults[0].nodeResultMap[stepId]
-                    if (nodeResultMap.message !== '[]') {
+                    if (nodeResultMap &&  nodeResultMap.message !== '[]') {
                         let attempt = nodeResultMap.message
                         return (
                             <div key={index}>
