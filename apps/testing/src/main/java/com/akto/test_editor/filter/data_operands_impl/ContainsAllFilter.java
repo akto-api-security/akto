@@ -13,6 +13,7 @@ public class ContainsAllFilter extends DataOperandsImpl {
         Boolean result = true;
         Boolean res;
         List<String> querySet = new ArrayList<>();
+        List<String> notMatchedQuerySet = new ArrayList<>();
         String data;
         try {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
@@ -25,11 +26,17 @@ public class ContainsAllFilter extends DataOperandsImpl {
                 res = evaluateOnStringQuerySet(data.trim(), queryString.trim());
             } catch (Exception e) {
                 res = false;
-
+                notMatchedQuerySet.add(queryString.trim());
+            }
+            if (!res) {
+                notMatchedQuerySet.add(queryString.trim());
             }
             result = result && res;
         }
-        return result;
+        if (result) {
+            return new ValidationResult(result, "");
+        }
+        return new ValidationResult(result, "ContainsAllFilter skipped due to following :" + notMatchedQuerySet);
     }
 
     public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {
