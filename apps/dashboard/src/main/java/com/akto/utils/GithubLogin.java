@@ -40,6 +40,17 @@ public class GithubLogin {
         return ghConfig.getClientId();
     }
 
+    public static String getGithubUrl() {
+        if (getInstance() == null) return null;
+
+        GithubConfig ghConfig = getInstance().getGithubConfig();
+        if (ghConfig == null) return null;
+
+        String githubUrl = ghConfig.getGithubUrl();
+        if (githubUrl.endsWith("/")) githubUrl = githubUrl.substring(0, githubUrl.length() - 1);
+        return githubUrl;
+    }
+
     private GithubLogin() {
     }
 
