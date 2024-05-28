@@ -62,6 +62,7 @@
                     window.RELEASE_VERSION_GLOBAL = '${requestScope.AktoVersionGlobal}';
                     window.AKTO_UI_MODE = '${requestScope.aktoUIMode}'
                     window.GITHUB_CLIENT_ID=atob('${requestScope.githubClientId}')
+                    window.GITHUB_URL='${requestScope.githubUrl}'
                     window.STIGG_CUSTOMER_ID='${requestScope.stiggCustomerId}'
                     window.STIGG_CUSTOMER_TOKEN='${requestScope.stiggCustomerToken}'
                     window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
