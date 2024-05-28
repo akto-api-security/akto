@@ -15,7 +15,7 @@ import com.akto.runtime.policies.AuthPolicy;
 public class CookieExpireFilter extends DataOperandsImpl {
     
     @Override
-    public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
+    public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
         List<Boolean> querySet = new ArrayList<>();
         Boolean queryVal;
@@ -26,7 +26,7 @@ public class CookieExpireFilter extends DataOperandsImpl {
             queryVal = (Boolean) querySet.get(0);
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return false;
+            return new ValidationResult(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
 
         if (data == null || queryVal == null) {

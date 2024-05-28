@@ -743,11 +743,11 @@ public final class FilterAction {
         }
     }
 
-    public Boolean invokeFilter(DataOperandFilterRequest dataOperandFilterRequest) {
+    public ValidationResult invokeFilter(DataOperandFilterRequest dataOperandFilterRequest) {
 
         DataOperandsImpl handler = this.filters.get(dataOperandFilterRequest.getOperand().toLowerCase());
         if (handler == null) {
-          return false;
+          return new ValidationResult(false, "operand:" + dataOperandFilterRequest.getOperand().toLowerCase()+ " not found in filters");
         }
 
         return handler.isValid(dataOperandFilterRequest);

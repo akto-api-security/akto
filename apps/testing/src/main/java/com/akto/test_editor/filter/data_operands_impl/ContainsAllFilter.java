@@ -8,7 +8,7 @@ import com.akto.dto.test_editor.DataOperandFilterRequest;
 public class ContainsAllFilter extends DataOperandsImpl {
     
     @Override
-    public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
+    public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
         Boolean result = true;
         Boolean res;
@@ -18,13 +18,14 @@ public class ContainsAllFilter extends DataOperandsImpl {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return result;
+            return new ValidationResult(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
         for (String queryString: querySet) {
             try {
                 res = evaluateOnStringQuerySet(data.trim(), queryString.trim());
             } catch (Exception e) {
                 res = false;
+
             }
             result = result && res;
         }

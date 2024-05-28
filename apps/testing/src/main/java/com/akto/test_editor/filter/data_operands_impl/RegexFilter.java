@@ -9,7 +9,7 @@ import com.akto.test_editor.Utils;
 public class RegexFilter extends DataOperandsImpl {
     
     @Override
-    public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
+    public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
         
         Boolean result = false;
         Boolean res;
@@ -19,7 +19,7 @@ public class RegexFilter extends DataOperandsImpl {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return result;
+            return new ValidationResult(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
         for (String queryString: querySet) {
             try {

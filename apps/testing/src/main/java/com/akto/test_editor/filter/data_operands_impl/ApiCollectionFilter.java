@@ -11,13 +11,12 @@ import org.bson.conversions.Bson;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public class ApiCollectionFilter extends DataOperandsImpl {
 
     @Override
-    public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
+    public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
         Boolean result = false;
         Boolean res;
@@ -27,7 +26,7 @@ public class ApiCollectionFilter extends DataOperandsImpl {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return result;
+            return new ValidationResult(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
 
         Bson fQuery = Filters.in(ApiCollection.NAME, querySet);
@@ -54,7 +53,9 @@ public class ApiCollectionFilter extends DataOperandsImpl {
 
 
         result = ApiInfoDao.instance.findOne(urlInCollectionQuery) != null;
-
-        return result;
+        if (result) {
+            return new ValidationResult(result, "");
+        }
+        return new ValidationResult(result, "Could not find given urls: "+ data +", in list of API collections");
     }
 }
