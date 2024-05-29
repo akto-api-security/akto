@@ -1,13 +1,12 @@
 
 package com.akto.testing;
 
+import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.ActivitiesDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
-import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
@@ -36,6 +35,7 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
+import com.akto.testing_utils.TestingUtils;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
@@ -271,51 +271,20 @@ public class TestExecutor {
     public static void updateTestSummary(ObjectId summaryId){
         loggerMaker.infoAndAddToDb("Finished updating results count", LogDb.TESTING);
 
-        Map<String, Integer> totalCountIssues = new HashMap<>();
-        totalCountIssues.put(Severity.HIGH.toString(), 0);
-        totalCountIssues.put(Severity.MEDIUM.toString(), 0);
-        totalCountIssues.put(Severity.LOW.toString(), 0);
-
-        int skip = 0;
-        int limit = 1000;
-        boolean fetchMore = false;
-        do {
-            fetchMore = false;
-            List<TestingRunResult> testingRunResults = TestingRunResultDao.instance
-                    .fetchLatestTestingRunResult(
-                            Filters.and(
-                                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId),
-                                    Filters.eq(TestingRunResult.VULNERABLE, true)),
-                            limit,
-                            skip,
-                            Projections.exclude("testResults.originalMessage", "testResults.nodeResultMap"));
-
-            loggerMaker.infoAndAddToDb("Reading " + testingRunResults.size() + " vulnerable testingRunResults",
-                    LogDb.TESTING);
-
-            for (TestingRunResult testingRunResult : testingRunResults) {
-                String severity = getSeverityFromTestingRunResult(testingRunResult).toString();
-                int initialCount = totalCountIssues.get(severity);
-                totalCountIssues.put(severity, initialCount + 1);
-            }
-
-            if (testingRunResults.size() == limit) {
-                skip += limit;
-                fetchMore = true;
-            }
-
-        } while (fetchMore);
-
         FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
         options.returnDocument(ReturnDocument.AFTER);
+
+        State updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
+
         TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(Constants.ID, summaryId),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
-                        Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
-                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)),
+                        Updates.set(TestingRunResultSummary.STATE, updatedState)),
                 options);
         GithubUtils.publishGithubComments(testingRunResultSummary);
+
+        Map<String , Integer> totalCountIssues = testingRunResultSummary.getCountIssues();
 
         loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
         if(totalCountIssues.get(Severity.HIGH.toString()) > 0){
@@ -578,31 +547,36 @@ public class TestExecutor {
 
         int countSuccessfulTests = 0;
         for (String testSubCategory: testSubCategories) {
-            if (Context.now() - startTime > timeToKill) {
-                loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
+            if(GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId)){
+                if (Context.now() - startTime > timeToKill) {
+                    loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
+                    return;
+                }
+                List<TestingRunResult> testingRunResults = new ArrayList<>();
+
+                TestConfig testConfig = testConfigMap.get(testSubCategory);
+                
+                if (testConfig == null) continue;
+                TestingRunResult testingRunResult = null;
+                if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
+                    continue;
+                }
+                try {
+                    testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
+                    e.printStackTrace();
+                }
+                if (testingRunResult != null) {
+                    testingRunResults.add(testingRunResult);
+                    countSuccessfulTests++;
+                }
+
+                insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
+            }else{
+                logger.info("Test stopped for id: " + testRunId.toString());
                 return;
             }
-            List<TestingRunResult> testingRunResults = new ArrayList<>();
-
-            TestConfig testConfig = testConfigMap.get(testSubCategory);
-            
-            if (testConfig == null) continue;
-            TestingRunResult testingRunResult = null;
-            if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
-                continue;
-            }
-            try {
-                testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
-                e.printStackTrace();
-            }
-            if (testingRunResult != null) {
-                testingRunResults.add(testingRunResult);
-                countSuccessfulTests++;
-            }
-
-            insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
         }
         if(countSuccessfulTests > 0){
             ApiInfoDao.instance.updateLastTestedField(apiInfoKey);
@@ -769,20 +743,19 @@ public class TestExecutor {
             }
             int index = 0;
 
-            List<Object> updatedObjList = new ArrayList<>();
+            Object reqObj = null;
             for (int i = 0; i < objList.size(); i++) {
                 Map<String,Object> mapValues = m.convertValue(objList.get(i), Map.class);
                 if (mapValues.get("operationName").toString().equalsIgnoreCase(queryName)) {
-                    updatedObjList.add(objList.get(i));
+                    reqObj = objList.get(i);
                     index = i;
                     break;
                 }
             }
-            updatedBody = gson.toJson(updatedObjList);
+            updatedBody = gson.toJson(reqObj);
 
-            List<Object> updatedRespObjList = new ArrayList<>();
-            updatedRespObjList.add(respObjList.get(index));
-            updatedRespBody = gson.toJson(updatedRespObjList);
+            Object respObject = respObjList.get(index);
+            updatedRespBody = gson.toJson(respObject);
 
             Map<String, Object> json = gson.fromJson(rawApi.getOriginalMessage(), Map.class);
             json.put("requestPayload", updatedBody);

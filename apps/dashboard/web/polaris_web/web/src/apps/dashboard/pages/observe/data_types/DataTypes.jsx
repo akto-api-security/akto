@@ -192,8 +192,9 @@ function DataTypes() {
 
   const handleChange = (obj) => {
     dispatchCurrState({type:"update", obj:obj})
-}
+  }
 
+  const errorMessage = func.nameValidationFunc(currState.name)
   const descriptionCard = (
     <LegacyCard title="Details" key="desc">
       <LegacyCard.Section>
@@ -201,6 +202,8 @@ function DataTypes() {
           <TextField id={"name-field"} label="Name" helpText="Name the data type"
             value={currState.name} placeholder='NEW_CUSTOM_DATA_TYPE'
             {...pageTitle === "Add data type" ? {onChange: (val) => handleChange({name: val})} : {}}
+            requiredIndicator={true}
+            {...errorMessage.length > 0 ? {error: errorMessage} : {}}
             />
           {currState.dataType === 'Custom' ?
             <Dropdown id={"active-dropdown"} menuItems={statusItems}

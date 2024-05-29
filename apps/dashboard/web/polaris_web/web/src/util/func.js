@@ -34,14 +34,18 @@ const func = {
     }
     return res
   },
-  validateName(name) {
-    const regex = /^[a-z0-9_]+$/i;
-    if (name.length == 0) {
-       return "Name cannot be blank";
-    } else if (!name.match(regex)) {
-      return "Only alphanumeric and underscore characters allowed in name" ;
+  nameValidationFunc(nameVal, initialCond){
+    let error = ""
+    if(nameVal.length === 0 || initialCond){
+      return error
     }
-    return true;
+    const regex = /^[A-Z_0-9 ]+$/;
+    if (!nameVal.toUpperCase().match(regex)){
+      error = "Name can only contain alphabets, spaces, numbers and underscores"
+    } else if(nameVal.length > 25){
+      error = "Name too long. Maximum limit allowed is 25"
+    }
+    return error;
   },
   toDateStr(date, needYear) {
     let strArray = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -258,7 +262,8 @@ prettifyEpoch(epoch) {
     if(localItem.includes("HIGH")) return 'critical';
     if(localItem.includes("MEDIUM")) return 'warning';
     if(localItem.includes("LOW")) return 'neutral';
-    if(localItem.includes("CWE") || localItem.startsWith("+")) return 'info';
+    if(localItem.includes("CWE") || localItem.startsWith("+")) return 'info'
+    if(localItem.includes("UNREAD") || localItem.startsWith("+")) return 'attention';
     return "";
   },
   getRunResultSubCategory(runResult, subCategoryFromSourceConfigMap, subCategoryMap, fieldName) {
@@ -1436,12 +1441,11 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
   getTabsCount(tableTabs, data, initialCountArr = []){
     const currentState = PersistStore(state => state.tableInitialState)
-    const baseUrl = window.location.href.split('#')[0]
-
+    const baseUrl = window.location.pathname + "/#"
     let finalCountObj = {}
     tableTabs.forEach((tab,ind) => {
       const tabId = this.getKeyFromName(tab)
-      const tabKey = baseUrl + '#' + tabId
+      const tabKey = baseUrl + tabId
       const count = currentState[tabKey] || data[tabId]?.length || initialCountArr[ind] || 0
       finalCountObj[tabId] = count
     })

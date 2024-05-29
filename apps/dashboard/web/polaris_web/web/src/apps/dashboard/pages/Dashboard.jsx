@@ -15,8 +15,6 @@ function Dashboard() {
     const location = useLocation();
     history.location = location
     history.navigate = useNavigate();
-    const navigate = useNavigate()
-
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
@@ -45,16 +43,6 @@ function Dashboard() {
         }
         if (!subCategoryMap || (Object.keys(subCategoryMap).length === 0)) {
             fetchMetadata();
-        }
-        if(location.hash?.length > 0){
-            let newPath = location.pathname
-            if(location.hash.includes("Data")){
-                newPath = '/dashboard/observe/sensitive'
-            }
-            else if(newPath.includes("settings")){
-                newPath = newPath + "/" + location.hash.split("#")[1]
-            }
-            navigate(newPath)
         }
         if(window.Beamer){
             window.Beamer.init();

@@ -15,7 +15,6 @@ import {TestrunsBannerComponent} from "./TestrunsBannerComponent";
 import useTable from "../../../components/tables/TableContext";
 import PersistStore from "../../../../main/PersistStore";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
-
 /*
   {
     text:"", // req. -> The text to be shown wherever the header is being shown
@@ -141,26 +140,18 @@ const [subCategoryInfo, setSubCategoryInfo] = useState({})
 const [collapsible, setCollapsible] = useState(true)
 const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 
-const checkIsTestRunning = (testingRuns) => {
-  let val = false
-  testingRuns.forEach(element => {
-    if(element.orderPriority == 1){
-      val = true
-    }
-  });
-  return val ;
-}
 
 const refreshSummaries = () =>{
   setTimeout(() => {
-    setUpdateTable(!updateTable);
+    setUpdateTable(!updateTable)
   }, 5000)
 }
 
 function processData(testingRuns, latestTestingRunResultSummaries, cicd){
   let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries, cicd, true);
-  if(checkIsTestRunning(testRuns)){
-    refreshSummaries();
+  const updatedRuns = testRuns.filter((test) => test.orderPriority !== 1)
+  if(updatedRuns.length !== testRuns.length){
+    refreshSummaries()
   }
   return testRuns;
 }
@@ -309,7 +300,7 @@ const SummaryCardComponent = () =>{
     },
   ]};
 
-  const key = currentTab + startTimestamp + endTimestamp + updateTable;
+  const key = currentTab + startTimestamp + endTimestamp;
 const coreTable = (
 <GithubServerTable
     key={key}
@@ -333,6 +324,7 @@ const coreTable = (
     condensedHeight={true}
     promotedBulkActions={promotedBulkActions}
     selectable= {true}
+    callFromOutside={updateTable}
   />   
 )
 
