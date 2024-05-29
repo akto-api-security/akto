@@ -10,7 +10,6 @@ public class TestResult extends GenericTestResult {
     private String message;
     public static final String _ERRORS = "errors";
     private List<String> errors;
-    
     public static final String TEST_RESULTS_ERRORS = TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS;
 
     public static final String ERRORS = "errors";
@@ -38,7 +37,8 @@ public class TestResult extends GenericTestResult {
         NO_API_REQUEST("No test requests created", false),
         SKIPPING_EXECUTION_BECAUSE_AUTH("Request API failed authentication check, skipping execution", true),
         SKIPPING_EXECUTION_BECAUSE_FILTERS("Request API failed to satisfy api_selection_filters block, skipping execution", true),
-        DEACTIVATED_ENDPOINT("This is a deactivated endpoint", true);
+        DEACTIVATED_ENDPOINT("This is a deactivated endpoint", true),
+        USAGE_EXCEEDED("You have exceeded the limit of this feature, skipping execution", true);
         private final String message;
         private final boolean skipTest;
 
