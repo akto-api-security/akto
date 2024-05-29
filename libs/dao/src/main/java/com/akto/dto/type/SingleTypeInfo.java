@@ -942,6 +942,16 @@ public String composeKeyWithCustomSubType(SubType s) {
         this.publicCount = publicCount;
     }
 
+    public String composeApiInfoKey() {
+        if (this.getMethod() == null) {
+            return null;
+        }
+        if (this.getUrl() == null) {
+            return null;
+        }
+        return this.getApiCollectionId() + " " + this.getUrl() + " " + this.getMethod();
+    }
+
     public ObjectId getId() {
         return id;
     }
