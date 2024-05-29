@@ -237,6 +237,11 @@
             <artifactId>httpmime</artifactId>
             <version>4.5.13</version> <!-- Use the latest version -->
         </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>1.9.0</version>
+        </dependency>
     </dependencies>
     <build>
         <sourceDirectory>src/main/java</sourceDirectory>

@@ -182,6 +182,13 @@ public class IssuesAction extends UserAction {
                 Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey())
         );
         testingRunResult = TestingRunResultDao.instance.findOne(filterForRunResult);
+        if (issue.isUnread()) {
+            logger.info("Issue id from db to be marked as read " + issueId);
+            Bson update = Updates.combine(Updates.set(TestingRunIssues.UNREAD, false),
+                    Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
+            TestingRunIssues updatedIssue = TestingRunIssuesDao.instance.updateOneNoUpsert(Filters.eq(ID, issueId), update);
+            issueId = updatedIssue.getId();
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -225,10 +232,29 @@ public class IssuesAction extends UserAction {
     }
 
     private boolean fetchOnlyActive;
+    private String mode;
 
     public String fetchAllSubCategories() {
 
-        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap(true, fetchOnlyActive);
+        boolean includeYamlContent = false;
+
+        switch (mode) {
+            case "runTests":
+                categories = GlobalEnums.TestCategory.values();
+                break;
+            case "testEditor":
+                includeYamlContent = true;
+                vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
+                break;
+            default:
+                includeYamlContent = true;
+                categories = GlobalEnums.TestCategory.values();
+                vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
+                testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
+        }
+
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(includeYamlContent,
+                fetchOnlyActive);
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             try {
@@ -238,13 +264,10 @@ public class IssuesAction extends UserAction {
                 }
             } catch (Exception e) {
                 String err = "Error while fetching subcategories for " + entry.getKey();
-                loggerMaker.errorAndAddToDb(e,err, LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, err, LogDb.DASHBOARD);
             }
         }
 
-        this.categories = GlobalEnums.TestCategory.values();
-        this.testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
-        this.vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
         return SUCCESS.toUpperCase();
     }
 
@@ -460,5 +483,9 @@ public class IssuesAction extends UserAction {
 
     public void setSampleDataVsCurlMap(Map<String, String> sampleDataVsCurlMap) {
         this.sampleDataVsCurlMap = sampleDataVsCurlMap;
+    }
+
+    public void setMode(String mode) {
+        this.mode = mode;
     }
 }

@@ -1,12 +1,15 @@
-import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar } from '@shopify/polaris';
-import { NotificationMajor, CustomerPlusMajor, LogOutMinor, ReplaceMajor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor } from '@shopify/polaris-icons';
-import { useState, useCallback } from 'react';
+import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button } from '@shopify/polaris';
+import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor } from '@shopify/polaris-icons';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
 import PersistStore from '../../../../main/PersistStore';
 import './Headers.css'
 import api from '../../../../signup/api';
 import func from '@/util/func';
+import SemiCircleProgress from '../../shared/SemiCircleProgress';
+import testingApi from "../../../pages/testing/api"
+import TestingStore from '../../../pages/testing/testingStore';
 
 export default function Header() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -14,6 +17,12 @@ export default function Header() {
     const [searchValue, setSearchValue] = useState('');
     const [newAccount, setNewAccount] = useState('')
     const [showCreateAccount, setShowCreateAccount] = useState(false)
+    const [currentTestsObj, setCurrentTestsObj] = useState({
+        totalTestsCompleted:0,
+        totalTestsInitiated:0,
+        totalTestsQueued: 0,
+        testRunsArr: [],
+    })
 
     const navigate = useNavigate()
 
@@ -27,7 +36,21 @@ export default function Header() {
     const allCollections = PersistStore((state) => state.allCollections)
     const searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections)
 
+    const setCurrentTestingRuns = TestingStore(state => state.setCurrentTestingRuns)
     
+    const fetchTestingStatus = () => {
+        setInterval(()=> {
+            testingApi.fetchTestingRunStatus().then((resp) => {
+                setCurrentTestingRuns(resp.currentRunningTestsStatus)
+                setCurrentTestsObj({
+                    totalTestsInitiated: resp?.testRunsScheduled || 0,
+                    totalTestsCompleted: resp?.totalTestsCompleted || 0,
+                    totalTestsQueued: resp?.testRunsQueued || 0,
+                    testRunsArr: resp?.currentRunningTestsStatus || []
+                })
+            })
+        },2000)
+    }
 
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
@@ -46,38 +69,6 @@ export default function Header() {
         }).catch(err => {
             navigate("/");
         })
-    }
-
-    const handleSwitchUI = async () => {
-        resetAll();
-        let currPath = window.location.pathname
-        await api.updateAktoUIMode({ aktoUIMode: "VERSION_1" })
-        if(currPath.includes("sensitive")){
-            let arr = currPath.split("/") ;
-            let last = arr.pop()
-            if(last !== 'sensitive'){
-                let path = arr.toString().replace(/,/g, '/')
-                let id = arr.pop()
-                if(id !== 'sensitive'){
-                    path="/dashboard/observe/inventory/" + id + '/' + last
-                }
-                window.location.pathname=path
-            }else{
-                window.location.reload()
-            }
-        }else if(currPath.includes('testing')){
-            let child = currPath.split("testing")[1].split("/")
-            let lastStr = child.length > 1 ? child[1] : '' ;
-            if(lastStr === 'issues'){
-                window.location.pathname = "/dashboard/issues"
-            }
-            else if(lastStr === 'roles' || lastStr.includes('user')){
-                lastStr = ''
-            }
-            window.location.pathname = "/dashboard/testing/" + lastStr
-        }else{
-            window.location.reload()
-        }
     }
 
     
@@ -131,7 +122,6 @@ export default function Header() {
                 },
                 {
                     items: [
-                        // { id: "switch-ui", content: <ContentWithIcon text={"Switch to legacy"} icon={ReplaceMajor} />, onAction: handleSwitchUI },
                         { content: <ContentWithIcon text={"Documentation"} icon={NoteMinor} />, onAction: () => { window.open("https://docs.akto.io/readme") } },
                         { content: <ContentWithIcon text={"Tutorials"} icon={ResourcesMajor}/>, onAction: () => { window.open("https://www.youtube.com/@aktodotio") } },
                         { content: <ContentWithIcon icon={UpdateInventoryMajor} text={"Changelog"} />, onAction: () => { window.open("https://app.getbeamer.com/akto/en") } },
@@ -185,15 +175,38 @@ export default function Header() {
         />
     );
 
+    const handleTestingNavigate = () => {
+        let navUrl = "/dashboard/testing"
+        if(currentTestsObj.testRunsArr.length === 1){
+            navUrl = navUrl + "/" + currentTestsObj.testRunsArr[0].testingRunId
+        }
+        navigate(navUrl)
+    }
+
+    const progress = currentTestsObj.totalTestsInitiated === 0 ? 0 : Math.floor((currentTestsObj.totalTestsCompleted * 100)/ currentTestsObj.totalTestsInitiated)
+
     const secondaryMenuMarkup = (
-        <TopBar.Menu
-            activatorContent={
-                <span id="beamer-btn">
-                    <Icon source={NotificationMajor} />
-                </span>
-            }
-            actions={[]}
-        />
+        <HorizontalStack gap={"4"}>
+            {(Object.keys(currentTestsObj).length > 0 && currentTestsObj?.testRunsArr?.length !== 0) ? 
+            <HorizontalStack gap={"2"}>
+                <Button plain monochrome onClick={() => {handleTestingNavigate()}}>
+                 <SemiCircleProgress key={"progress"} progress={progress} size={60} height={55} width={75}/>
+                </Button>
+                <VerticalStack gap={"0"}>
+                    <Text fontWeight="medium">Test run status</Text>
+                    <Text color="subdued" variant="bodySm">{`${currentTestsObj.totalTestsQueued} tests queued`}</Text>
+                </VerticalStack>
+            </HorizontalStack> : null}
+             <TopBar.Menu
+                activatorContent={
+                    <span id="beamer-btn">
+                        <Icon source={NotificationMajor} />
+                    </span>
+                }
+                actions={[]}
+            />
+        </HorizontalStack>
+        
     );
 
     const topBarMarkup = (
@@ -235,6 +248,10 @@ export default function Header() {
             </Modal>
         </div>
     );
+
+    useEffect(() => {
+        fetchTestingStatus()
+    },[])
 
     return (
         topBarMarkup

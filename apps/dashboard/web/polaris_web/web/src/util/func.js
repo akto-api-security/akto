@@ -127,6 +127,9 @@ prettifyEpoch(epoch) {
   },
   downloadAsCSV(data, selectedTestRun) {
     // use correct function, this does not expand objects.
+    if(Object.keys(data).length === 0){
+      return;
+    }
     let headerTextToValueMap = Object.keys(data[0])
 
     let csv = headerTextToValueMap.join(",") + "\r\n"
@@ -229,13 +232,11 @@ prettifyEpoch(epoch) {
 
       case "STOPPED":
         return{
-          color: "critical",
           tooltipContent: "Error occurred while running the test.",
           icon: circle_cancel,
         }
       case "COMPLETED": 
         return {
-          color: "success",
           tooltipContent: "Test has been completed.",
           icon: circle_tick_minor
         }
@@ -257,7 +258,8 @@ prettifyEpoch(epoch) {
     if(localItem.includes("HIGH")) return 'critical';
     if(localItem.includes("MEDIUM")) return 'warning';
     if(localItem.includes("LOW")) return 'neutral';
-    if(localItem.includes("CWE") || localItem.startsWith("+")) return 'info';
+    if(localItem.includes("CWE") || localItem.startsWith("+")) return 'info'
+    if(localItem.includes("UNREAD") || localItem.startsWith("+")) return 'attention';
     return "";
   },
   getRunResultSubCategory(runResult, subCategoryFromSourceConfigMap, subCategoryMap, fieldName) {
@@ -773,7 +775,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               endpoint: x.url,
               parameterisedEndpoint: x.method + " " + this.parameterizeUrl(x.url),
               open: apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].indexOf("UNAUTHENTICATED") !== -1 : false,
-              access_type: access_type || "None",
+              access_type: access_type || "No access type",
               method: x.method,
               color: x.sensitive && x.sensitive.size > 0 ? "#f44336" : "#00bfa5",
               apiCollectionId: x.apiCollectionId,
@@ -781,13 +783,13 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               lastSeenTs: apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs,
               detectedTs: x.startTs,
               changesCount: x.changesCount,
-              changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : '-',
+              changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : 'No new changes',
               added: "Discovered " + this.prettifyEpoch(x.startTs),
               violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
-              auth_type: (authType || "").toLowerCase(),
+              auth_type: (authType || "no auth type found").toLowerCase(),
               sensitiveTags: [...this.convertSensitiveTags(x.sensitive)],
-              authTypeTag: (authTypeTag || "").toLowerCase(),
+              authTypeTag: (authTypeTag || "no auth").toLowerCase(),
               collectionIds: apiInfoMap[key] ? apiInfoMap[key]?.collectionIds.filter(x => {
                 return Object.keys(apiGroupsMap).includes(x) || Object.keys(apiGroupsMap).includes(x.toString())
               }).map( x => {
@@ -1054,6 +1056,7 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
  },
 
  dateRangeReducer(draft, action){
+
   try {
     switch(action.type){
       case "update": {
@@ -1147,6 +1150,19 @@ mapCollectionIdToHostName(apiCollections){
         duration += seconds + ` second${seconds==1 ? '' : 's'}`;
     }
     return duration.trim();
+  },
+  getHexColorForSeverity(key){
+    switch(key){
+      case "HIGH":
+        return "#D72C0D"
+      case "MEDIUM":
+        return "#FFD79D"
+      case "LOW":
+        return "#2C6ECB"
+      default:
+        return "#2C6ECB"
+    }
+
   },
 
   getColorForCharts(key){

@@ -1,4 +1,4 @@
-import request from "../../../../util/request"
+import request from "@/util/request"
 
 export default {
     async fetchTestingDetails(startTimestamp, endTimestamp,  sortKey, sortOrder, skip, limit, filters, testingRunType, searchString) {
@@ -34,11 +34,11 @@ export default {
         })
         return resp        
     },
-    async fetchAllSubCategories (fetchOnlyActive) {
+    async fetchAllSubCategories(fetchOnlyActive, mode) {
         const resp = await request({
             url: 'api/fetchAllSubCategories',
             method: 'post',
-            data: {fetchOnlyActive}
+            data: { fetchOnlyActive, mode }
         })
         return resp
     },
@@ -368,6 +368,14 @@ export default {
             url: '/api/deleteAccessMatrix',
             method: 'post',
             data: {roleName}
+        })
+    },
+
+    fetchTestingRunStatus(){
+        return request({
+            url: '/api/fetchActiveTestRunsStatus',
+            method: 'post',
+            data: {}
         })
     },
     fetchTestCollectionConfiguration(apiCollectionId) {

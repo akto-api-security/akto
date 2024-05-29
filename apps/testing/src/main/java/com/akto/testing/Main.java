@@ -136,6 +136,8 @@ public class Main {
     }
 
     private static TestingRunResultSummary findPendingTestingRunResultSummary() {
+
+        // if you change this delta, update this delta in method getCurrentRunningTestsSummaries
         int now = Context.now();
         int delta = now - 20*60;
 
@@ -182,8 +184,11 @@ public class Main {
             configFromTrrs.rebaseOn(baseConfig);
             testingRun.setTestingRunConfig(configFromTrrs);
         }
-
-        logger.info(testingRun.getTestingRunConfig().toString());
+        if(testingRun.getTestingRunConfig() != null){
+            logger.info(testingRun.getTestingRunConfig().toString());
+        }else{
+            logger.info("Testing run config is null.");
+        }
     }
 
     public static void main(String[] args) throws InterruptedException {

@@ -28,6 +28,7 @@ public class InviteUserAction extends UserAction{
 
     public static final String INVALID_EMAIL_ERROR = "Invalid email";
     public static final String DIFFERENT_ORG_EMAIL_ERROR = "Email must belong to same organisation";
+    public static final String AKTO_DOMAIN = "akto.io";
 
     public static String validateEmail(String email, String adminLogin) {
         if (email == null) return INVALID_EMAIL_ERROR;
@@ -43,7 +44,7 @@ public class InviteUserAction extends UserAction{
         String domain = loginArr[1];
         String inviteeEmailDomain = inviteeEmailArr[1];
 
-        if (!domain.equals(inviteeEmailDomain)) {
+        if (!domain.equals(inviteeEmailDomain) && !domain.equals(AKTO_DOMAIN))  {
             return DIFFERENT_ORG_EMAIL_ERROR;
         }
 
