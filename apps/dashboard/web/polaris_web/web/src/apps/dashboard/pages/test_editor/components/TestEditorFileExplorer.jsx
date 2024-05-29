@@ -156,7 +156,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
         return arr
     }
     return (
-        <div className="editor-navbar" style={{'overflowY' : 'scroll'}}>
+        <div className="editor-navbar" style={{'overflowY' : 'scroll', overflowX: 'hidden', width: '18rem'}}>
             <Navigation location="/">
                 <VerticalStack gap="4">
                     <TextField  

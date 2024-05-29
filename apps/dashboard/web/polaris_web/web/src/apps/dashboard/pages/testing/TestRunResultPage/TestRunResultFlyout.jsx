@@ -81,6 +81,11 @@ function TestRunResultFlyout(props) {
         const navigateUrl = isIssuePage ? "/dashboard/issues" : window.location.pathname.split("result")[0]
         navigate(navigateUrl) 
     }
+
+    const openTest = () => {
+        const navUrl = window.location.origin + "/dashboard/test-editor/" + selectedTestRunResult.testCategoryId
+        window.open(navUrl, "_blank")
+    }
     
     function ActionsComp (){
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
@@ -128,7 +133,9 @@ function TestRunResultFlyout(props) {
                 <VerticalStack gap={"2"}>
                     <Box width="100%">
                         <div style={{display: 'flex', gap: '4px'}} className='test-title'>
-                            <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
+                            <Button removeUnderline plain monochrome onClick={() => openTest()}>
+                                <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
+                            </Button>
                             {severity.length > 0 ? <Box><Badge size="small" status={func.getTestResultStatus(severity)}>{severity}</Badge></Box> : null}
                         </div>
                     </Box>

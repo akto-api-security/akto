@@ -83,6 +83,8 @@ function TagDetails() {
         dispatchCurrState({type:"update", obj:obj})
     }
 
+    const errorMessage = func.nameValidationFunc(currState.name || "", !isNew)
+
     const descriptionCard = (
         <LegacyCard title="Details" key="desc">
             <LegacyCard.Section>
@@ -90,7 +92,10 @@ function TagDetails() {
                     <TextField
                         id={"name-field"} 
                         label="Name" value={currState.name}
-                        placeholder='New tag name' onChange={(val) => { isNew ? handleChange({ name: val }) : {} }}
+                        placeholder='New tag name' 
+                        {...isNew  ? {onChange: (val) => handleChange({name: val})} : {}}
+                        requiredIndicator={true}
+                        {...errorMessage.length > 0 ? {error: errorMessage} : {}}
                     />
                     {isNew ? null :
                         <Dropdown menuItems={activeItems} placeHolder={"Tag active status"}
@@ -127,12 +132,11 @@ function TagDetails() {
 
     const saveAction = async () => {
         let name = currState.name;
-        let isValidOrError = func.validateName(name);
         let keyConditionFromUsers = transform.preparePredicatesForApi(currState.keyConditions);
         if ((!keyConditionFromUsers || keyConditionFromUsers.length == 0)) {
             func.setToast(true, true, "Invalid url conditions");
-        } else if (isValidOrError!==true){
-            func.setToast(true, true, isValidOrError);
+        } else if (errorMessage.length ===0){
+            func.setToast(true, true, errorMessage);
         } else {
             if (isNew) {
                 tagsApi.saveTagConfig(name, currState.operator, keyConditionFromUsers, true, currState.active).then((res) => {
