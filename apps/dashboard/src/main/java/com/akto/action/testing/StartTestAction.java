@@ -691,7 +691,6 @@ public class StartTestAction extends UserAction {
     }
 
     public String stopTest() {
-        // stop only scheduled and running tests
         Bson filter = Filters.or(
                 Filters.eq(TestingRun.STATE, State.SCHEDULED),
                 Filters.eq(TestingRun.STATE, State.RUNNING));
@@ -701,6 +700,11 @@ public class StartTestAction extends UserAction {
                 TestingRunDao.instance.updateOne(
                         Filters.and(filter, Filters.eq(Constants.ID, testingId)),
                         Updates.set(TestingRun.STATE, State.STOPPED));
+                Bson testingSummaryFilter = Filters.and(
+                    Filters.eq(TestingRunResultSummary.TESTING_RUN_ID,testingId),
+                    filter
+                );
+                TestingRunResultSummariesDao.instance.updateManyNoUpsert(testingSummaryFilter, Updates.set(TestingRunResultSummary.STATE, State.STOPPED));
                 return SUCCESS.toUpperCase();
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "ERROR: Stop test failed - " + e.toString(), LogDb.DASHBOARD);

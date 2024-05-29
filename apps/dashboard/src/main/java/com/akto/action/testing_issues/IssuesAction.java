@@ -182,6 +182,13 @@ public class IssuesAction extends UserAction {
                 Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey())
         );
         testingRunResult = TestingRunResultDao.instance.findOne(filterForRunResult);
+        if (issue.isUnread()) {
+            logger.info("Issue id from db to be marked as read " + issueId);
+            Bson update = Updates.combine(Updates.set(TestingRunIssues.UNREAD, false),
+                    Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
+            TestingRunIssues updatedIssue = TestingRunIssuesDao.instance.updateOneNoUpsert(Filters.eq(ID, issueId), update);
+            issueId = updatedIssue.getId();
+        }
         return SUCCESS.toUpperCase();
     }
 
