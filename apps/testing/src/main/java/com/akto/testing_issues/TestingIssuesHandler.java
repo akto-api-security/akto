@@ -15,6 +15,8 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.TestExecutor;
 import com.akto.testing_utils.TestingUtils;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -107,17 +109,18 @@ public class TestingIssuesHandler {
                                                            Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap,
                                                            List<TestingRunIssues> testingRunIssuesList) {
         int lastSeen = Context.now();
-        AtomicReference<ObjectId> summaryIdRef = new AtomicReference<>(null);
+        ObjectId summaryId = null;
 
         Map<String, Integer> countIssuesMap = new HashMap<>();
         countIssuesMap.put(Severity.HIGH.toString(), 0);
         countIssuesMap.put(Severity.MEDIUM.toString(), 0);
         countIssuesMap.put(Severity.LOW.toString(), 0);
 
-        testingIssuesIdsMap.forEach((testingIssuesId, runResult) -> {
+        for(TestingIssuesId testingIssuesId : testingIssuesIdsMap.keySet()) {
+            TestingRunResult runResult = testingIssuesIdsMap.get(testingIssuesId);
             boolean doesExists = false;
-            if (summaryIdRef.get() == null) {
-                summaryIdRef.set(runResult.getTestRunResultSummaryId());
+            if (summaryId == null) {
+                summaryId = runResult.getTestRunResultSummaryId();
             }
 
             if(!runResult.isVulnerable()){
@@ -150,9 +153,8 @@ public class TestingIssuesHandler {
                 }
                 loggerMaker.infoAndAddToDb(String.format("Inserting the id %s , with summary Id as %s", testingIssuesId, runResult.getTestRunResultSummaryId()), LogDb.TESTING);
             }
-        });
+        };
 
-        ObjectId summaryId = summaryIdRef.get();
         if(summaryId != null){
             TestingRunResultSummariesDao.instance.updateOneNoUpsert(
                 Filters.eq("_id", summaryId),

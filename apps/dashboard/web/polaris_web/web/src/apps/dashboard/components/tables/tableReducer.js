@@ -1,6 +1,5 @@
 import PersistStore from "../../../main/PersistStore";
-const tableInitialState = PersistStore.getState().tableInitialState[window.location.pathname + window.location.hash] || 0
-
+const tableInitialState = PersistStore.getState().tableInitialState[window.location.pathname + "/" + window.location.hash] || 0
 export const initialState = {
     tabsInfo : tableInitialState
 }

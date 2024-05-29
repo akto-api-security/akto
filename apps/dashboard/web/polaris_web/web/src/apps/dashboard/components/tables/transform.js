@@ -147,6 +147,12 @@ const tableFunc = {
     return filterStr
   },
 
+  convertValue(value) {
+    const intValue = parseInt(value, 10);
+    if (!isNaN(intValue)) return intValue;
+    return value;
+  },
+
   getFiltersMapFromUrl(searchString, labelFunc, handleRemoveAppliedFilter, pageKey){
     const result = [];
     if(searchString.length === 0){
@@ -156,7 +162,7 @@ const tableFunc = {
   
     pairs.forEach(pair => {
       const [key, values] = pair.split('__');
-      const valueArray = values.split(',');
+      const valueArray = values.split(',').map(this.convertValue);
       result.push({
         key,
         value: valueArray,
@@ -167,12 +173,12 @@ const tableFunc = {
 
     const currentFilters = PersistStore.getState().filtersMap
     const setPageFilters = PersistStore.getState().setFiltersMap
-    const pageFilters = currentFilters?.pageKey?.filters || {}
-    if(!func.deepComparison(pageFilters, result)){
+    const currentPageFilters = currentFilters?.[pageKey]?.filters || []
+    if(!func.deepComparison(currentPageFilters, result)){
       setPageFilters({
-        ...pageFilters,
+        ...currentFilters,
         [pageKey]: {
-          sort: pageFilters[pageKey]?.sort || [],
+          sort: currentFilters?.[pageKey]?.sort || [],
           'filters':result
         }
       
