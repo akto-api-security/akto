@@ -1441,7 +1441,6 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   getTabsCount(tableTabs, data, initialCountArr = []){
     const currentState = PersistStore(state => state.tableInitialState)
     const baseUrl = window.location.pathname + "/#"
-
     let finalCountObj = {}
     tableTabs.forEach((tab,ind) => {
       const tabId = this.getKeyFromName(tab)

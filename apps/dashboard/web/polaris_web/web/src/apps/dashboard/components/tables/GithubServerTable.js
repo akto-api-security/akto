@@ -87,7 +87,12 @@ function GithubServerTable(props) {
   }
 
   useEffect(()=> {
-    const queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey)
+    let queryFilters 
+    if (performance.getEntriesByType('navigation')[0].type === 'reload') {
+      queryFilters = []
+    }else{
+      queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey)
+    }
     const currentFilters = tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)
     setAppliedFilters(currentFilters)
     setSortSelected(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
@@ -107,11 +112,12 @@ function GithubServerTable(props) {
     tempData ? setData([...tempData.value]) : setData([])
     tempData ? setTotal(tempData.total) : setTotal(0)
     applyFilter(tempData.total)
-    
-    setTableInitialState({
-      ...tableInitialState,
-      [currentPageKey]: tempData.total
-    })
+    if(!performance.getEntriesByType('navigation')[0].type === 'reload'){
+      setTableInitialState({
+        ...tableInitialState,
+        [currentPageKey]: tempData.total
+      })
+    }
   }
 
   useEffect(() => {
