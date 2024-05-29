@@ -15,6 +15,7 @@ import com.akto.dao.testing.DeleteTestRunsDao;
 import com.akto.dto.Account;
 import com.akto.dto.testing.DeleteTestRuns;
 import com.akto.util.AccountTask;
+import com.akto.utils.DeleteTestRunUtils;
 import com.mongodb.client.model.Filters;
 
 public class Crons {
@@ -33,10 +34,10 @@ public class Crons {
                             if(deleteTestRunsList != null){
                                 for(DeleteTestRuns deleteTestRun : deleteTestRunsList){
                                     List<ObjectId> latestSummaryIds = deleteTestRun.getLatestTestingSummaryIds();
-                                    if(DeleteTestRunsDao.instance.isTestRunDeleted(deleteTestRun)){
+                                    if(DeleteTestRunUtils.isTestRunDeleted(deleteTestRun)){
                                         DeleteTestRunsDao.instance.getMCollection().deleteOne(Filters.in(DeleteTestRuns.LATEST_TESTING_SUMMARY_IDS, latestSummaryIds));
                                     }else{
-                                        DeleteTestRunsDao.instance.deleteTestRunsFromDb(deleteTestRun);
+                                        DeleteTestRunUtils.deleteTestRunsFromDb(deleteTestRun);
                                     }
                                 }
                             }

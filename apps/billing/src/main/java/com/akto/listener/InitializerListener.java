@@ -143,5 +143,4 @@ public class InitializerListener implements ServletContextListener {
         UsageCalculator.instance.aggregateUsageForOrg(organization, usageLowerBound, usageUpperBound);
         UsageCalculator.instance.sendOrgUsageDataToAllSinks(organization);
     }
-
 }
