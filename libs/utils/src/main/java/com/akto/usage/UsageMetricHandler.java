@@ -70,7 +70,7 @@ public class UsageMetricHandler {
                     featureAccess.setOverageFirstDetected(now);
                     raiseMixpanelEvent(organization, accountId,
                             featureAccess.getUsage() - featureAccess.getUsageLimit(), featureAccess.getUsageLimit());
-                    sendToSlack(organization, accountId, featureAccess.getUsage() - featureAccess.getUsageLimit(),
+                    sendToSlack(organization, accountId, featureAccess.getUsage(),
                             featureAccess.getUsageLimit(), metricType.toString());
                 }
             } else {
@@ -230,13 +230,13 @@ public class UsageMetricHandler {
         }
     }
 
-    private static void sendToSlack(Organization organization, int accountId, int overage, int usageLimit,
+    private static void sendToSlack(Organization organization, int accountId, int usage, int usageLimit,
             String feature) {
         if (organization == null) {
             return;
         }
-        String txt = String.format("Overage found for feature: %s, Org: %s %s acc: %s limit: %s overage: %s.",
-                feature, organization.getId(), organization.getAdminEmail(), accountId, usageLimit, overage);
+        String txt = String.format("Overage found for feature: %s, Org: %s %s acc: %s limit: %s usage: %s.",
+                feature, organization.getId(), organization.getAdminEmail(), accountId, usageLimit, usage);
         UsageMetricUtils.sendToUsageSlack(txt);
     }
 }
