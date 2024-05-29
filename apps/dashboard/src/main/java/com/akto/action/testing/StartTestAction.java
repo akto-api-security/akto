@@ -2,7 +2,6 @@ package com.akto.action.testing;
 
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
-import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
@@ -17,6 +16,13 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRun.TestingRunType;
+import com.akto.dto.testing.TestResult.Confidence;
+import com.akto.dto.testing.TestResult.TestError;
+import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.TestingRun.TestingRunType;
+import com.akto.dto.testing.WorkflowTestResult.NodeResult;
+import com.akto.dto.testing.info.CurrentTestsStatus;
+import com.akto.dto.testing.info.CurrentTestsStatus.StatusForIndividualTest;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -26,8 +32,6 @@ import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
-import com.mongodb.BasicDBList;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -42,6 +46,7 @@ import org.bson.types.ObjectId;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class StartTestAction extends UserAction {
@@ -216,8 +221,9 @@ public class StartTestAction extends UserAction {
 
         if (utility != null
                 && (Utility.CICD.toString().equals(utility) || Utility.EXTERNAL_API.toString().equals(utility))) {
+            int testsCounts = this.selectedTests != null ? this.selectedTests.size() : 0;
             TestingRunResultSummary summary = new TestingRunResultSummary(scheduleTimestamp, 0, new HashMap<>(),
-                    0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0, this.testIdConfig);
+                    0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0, this.testIdConfig,testsCounts );
             summary.setState(TestingRun.State.SCHEDULED);
             if (metadata != null) {
                 loggerMaker.infoAndAddToDb("CICD test triggered at " + Context.now(), LogDb.DASHBOARD);
@@ -345,11 +351,13 @@ public class StartTestAction extends UserAction {
     }
 
     private Bson getSearchFilters(){
-        if(this.searchString == null || this.searchString.length() == 0){
+        if(this.searchString == null || this.searchString.length() < 3){
             return Filters.empty();
         }
+        String escapedPrefix = Pattern.quote(this.searchString);
+        String regexPattern = ".*" + escapedPrefix + ".*";
         Bson filter = Filters.or(
-            Filters.regex(TestingRun.NAME, this.searchString, "i")
+            Filters.regex(TestingRun.NAME, regexPattern, "i")
         );
         return filter;
     }
@@ -383,7 +391,15 @@ public class StartTestAction extends UserAction {
         testingRunFilters.add(getSearchFilters());
         testingRunFilters.addAll(getTableFilters());
 
-        int pageLimit = Math.min(limit == 0 ? 50 : limit, 10_000);
+        if(skip < 0){
+            skip *= -1;
+        }
+
+        if(limit < 0){
+            limit *= -1;
+        }
+
+        int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
 
         testingRuns = TestingRunDao.instance.findAll(
                 Filters.and(testingRunFilters), skip, pageLimit,
@@ -481,6 +497,8 @@ public class StartTestAction extends UserAction {
     }
     private QueryMode queryMode;
 
+    private Map<TestError, String> errorEnums = new HashMap<>();
+
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
         try {
@@ -511,6 +529,13 @@ public class StartTestAction extends UserAction {
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
                     testingRunResultFilters.add(Filters.nin(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
                     break;
+            }
+        }
+
+        if(queryMode == QueryMode.SKIPPED_EXEC){
+            TestError[] testErrors = TestResult.TestError.values();
+            for(TestError testError: testErrors){
+                this.errorEnums.put(testError, testError.getMessage());
             }
         }
 
@@ -811,6 +836,36 @@ public class StartTestAction extends UserAction {
             e.printStackTrace();
         }
         return Action.ERROR.toUpperCase();
+    }
+
+    private CurrentTestsStatus currentTestsStatus;
+
+    public String getCurrentTestStateStatus(){
+        // polling api 
+        try {
+            List<TestingRunResultSummary> runningTrrs = TestingRunResultSummariesDao.instance.getCurrentRunningTestsSummaries();
+            int totalRunningTests = 0;
+            int totalInitiatedTests = 0;
+            List<StatusForIndividualTest> currentTestsRunningList = new ArrayList<>();
+            for(TestingRunResultSummary summary: runningTrrs){
+                int countInitiatedTestsForSummary = (summary.getTestInitiatedCount() * summary.getTotalApis()) ;
+                totalInitiatedTests += countInitiatedTestsForSummary;
+
+                int currentTestsStoredForSummary = summary.getTestResultsCount();
+                totalRunningTests += currentTestsStoredForSummary;
+                currentTestsRunningList.add(new StatusForIndividualTest(summary.getTestingRunId().toHexString(), totalInitiatedTests, totalRunningTests));
+            }
+            int totalTestsQueued = (int) TestingRunDao.instance.count(
+                Filters.eq(TestingRun.STATE, State.SCHEDULED)
+            );
+
+            this.currentTestsStatus = new CurrentTestsStatus(totalTestsQueued, totalRunningTests, totalInitiatedTests, currentTestsRunningList);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in getting status for tests", LogDb.DASHBOARD);
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
     }
 
 
@@ -1134,5 +1189,13 @@ public class StartTestAction extends UserAction {
 
     public void setTestRoleId(String testRoleId) {
         this.testRoleId = testRoleId;
+    }
+
+    public CurrentTestsStatus getCurrentTestsStatus() {
+        return currentTestsStatus;
+    }
+
+    public Map<TestError, String> getErrorEnums() {
+        return errorEnums;
     }
 }

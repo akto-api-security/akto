@@ -185,6 +185,13 @@ public class UserDetailsFilter implements Filter {
         // only for access-token based auth we check if session is valid or not
         if (!apiKeyFlag) {
             Object usernameObj = session.getAttribute("username");
+            if (usernameObj == null) {// dashboard restart case
+                //token checks already processed above (if not valid user, will be redirected to login page)
+                session.setAttribute("username", username);
+                session.setAttribute("login", Context.now());
+                session.setAttribute("signedUp", signedUp);
+                usernameObj = username;
+            }
             if (!Objects.equals(usernameObj, username)) {
                 redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
                 return ;

@@ -102,12 +102,14 @@ import com.mongodb.ReadPreference;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.DeleteResult;
 import com.slack.api.Slack;
 import com.slack.api.util.http.SlackHttpClient;
 import com.slack.api.webhook.WebhookResponse;
 
 import okhttp3.OkHttpClient;
 
+import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
@@ -782,7 +784,7 @@ public class InitializerListener implements ServletContextListener {
                     ex.printStackTrace(); // or loggger would be better
                 }
             }
-        }, 0, 5, TimeUnit.MINUTES);
+        }, 0, 4, TimeUnit.HOURS);
 
     }
 
@@ -896,7 +898,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "webhook-sener");
             }
-        }, 0, 15, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.HOURS);
     }
 
     static class ChangesInfo {
@@ -1131,6 +1133,7 @@ public class InitializerListener implements ServletContextListener {
         ArrayList<TestingEndpoints> loginConditions = new ArrayList<>();
         loginConditions.add(new RegexTestingEndpoints(TestingEndpoints.Operator.OR, regex));
         loginGroup.setConditions(loginConditions);
+        loginGroup.setAutomated(true);
         ApiCollectionUsers.removeFromCollectionsForCollectionId(loginGroup.getConditions(), id);
 
         ApiCollectionsDao.instance.insertOne(loginGroup);
@@ -1163,6 +1166,7 @@ public class InitializerListener implements ServletContextListener {
 
         riskScoreGroup.setConditions(riskScoreConditions);
         riskScoreGroup.setType(ApiCollection.Type.API_GROUP);
+        riskScoreGroup.setAutomated(true);
 
         ApiCollectionsDao.instance.insertOne(riskScoreGroup); 
     }
@@ -1176,6 +1180,47 @@ public class InitializerListener implements ServletContextListener {
             BackwardCompatibilityDao.instance.updateOne(
                     Filters.eq("_id", backwardCompatibility.getId()),
                     Updates.set(BackwardCompatibility.RISK_SCORE_GROUPS, Context.now())
+            );
+        }
+    }
+
+    public static void setApiCollectionAutomatedField(BackwardCompatibility backwardCompatibility) {
+        // Set automated field of existing automated API collections
+        if (backwardCompatibility.getApiCollectionAutomatedField() == 0) {
+            int[] apiCollectionIds = {111_111_128, 111_111_129, 111_111_130, 111_111_148, 111_111_149, 111_111_150};
+
+            for (int apiCollectionId : apiCollectionIds) {
+                ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id", apiCollectionId));
+
+                if (apiCollection != null) {
+                    if (!apiCollection.getAutomated()) {
+                        apiCollection.setAutomated(true);
+                        ApiCollectionsDao.instance.updateOne(
+                            Filters.eq("_id", apiCollectionId), 
+                            Updates.set(ApiCollection.AUTOMATED, true));
+                    }
+                }
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.API_COLLECTION_AUTOMATED_FIELD, Context.now())
+            );
+        }
+    }
+
+    public static void createAutomatedAPIGroups(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getAutomatedApiGroups() == 0) {
+            // Fetch automated API groups csv records
+            List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups(false);
+
+            if (apiGroupRecords != null) {
+                AutomatedApiGroupsUtils.processAutomatedGroups(apiGroupRecords);
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.AUTOMATED_API_GROUPS, Context.now())
             );
         }
     }
@@ -1339,6 +1384,36 @@ public class InitializerListener implements ServletContextListener {
             );
             loggerMaker.infoAndAddToDb("Default telemetry settings set successfully", LogDb.DASHBOARD);
         }
+    }
+
+    public static void disableAwsSecretPiiType(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDisableAwsSecretPii() != 0) {
+            return;
+        }
+
+        String piiType = "AWS SECRET ACCESS KEY";
+
+        Bson filters = Filters.eq("subType", piiType);
+        Bson update = Updates.set("subType", SingleTypeInfo.GENERIC.toString());
+
+        try {
+            SingleTypeInfoDao.instance.updateMany(filters, update);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in disableAwsSecretPiiType " + e.getMessage(), LogDb.DASHBOARD);
+        }
+
+        try {
+            Bson delFilter = Filters.eq("name", piiType);
+            DeleteResult res = CustomDataTypeDao.instance.deleteAll(delFilter);
+            loggerMaker.infoAndAddToDb("auth type : " + res.toString());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error deleting pii type " + piiType + " " + e.getMessage(), LogDb.DASHBOARD);
+        }
+
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DISABLE_AWS_SECRET_PII, Context.now())
+        );
     }
 
     public static void setAktoDefaultNewUI(BackwardCompatibility backwardCompatibility){
@@ -1750,6 +1825,7 @@ public class InitializerListener implements ServletContextListener {
 
                 setUpUpdateCustomCollections();
                 setUpFillCollectionIdArrayJob();
+                setupAutomatedApiGroupsScheduler();
             }
         }, 0, TimeUnit.SECONDS);
 
@@ -2042,10 +2118,13 @@ public class InitializerListener implements ServletContextListener {
         moveAuthMechanismDataToRole(backwardCompatibility);
         createLoginSignupGroups(backwardCompatibility);
         createRiskScoreGroups(backwardCompatibility);
+        setApiCollectionAutomatedField(backwardCompatibility);
+        createAutomatedAPIGroups(backwardCompatibility);
         deleteAccessListFromApiToken(backwardCompatibility);
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
         setDefaultTelemetrySettings(backwardCompatibility);
+        disableAwsSecretPiiType(backwardCompatibility);
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
         }
@@ -2452,6 +2531,12 @@ public class InitializerListener implements ServletContextListener {
     public void setupUsageScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                Context.accountId.set(1000_000);
+                boolean dibs = callDibs("usage-scheduler", 60*60, 60);
+                if (!dibs) {
+                    loggerMaker.infoAndAddToDb("Usage cron dibs not acquired, skipping usage cron", LoggerMaker.LogDb.DASHBOARD);
+                    return;
+                }
                 calcUsage();
             }
         }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
@@ -2478,5 +2563,40 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public void setupAutomatedApiGroupsScheduler() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+
+                // Acquire dibs for updating automated API groups
+                Context.accountId.set(1000_000);
+                boolean dibs = callDibs(Cluster.AUTOMATED_API_GROUPS_CRON,  4*60*60, 60);
+                if(!dibs){
+                    loggerMaker.infoAndAddToDb("Cron for updating automated API groups not acquired, thus skipping cron", LogDb.DASHBOARD);
+                    return;
+                }
+
+                loggerMaker.infoAndAddToDb("Cron for updating automated API groups picked up.", LogDb.DASHBOARD);
+
+                // Fetch automated API groups csv records
+                List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups(true);
+
+                if (apiGroupRecords == null) {
+                    return;
+                }
+
+                AutomatedApiGroupsUtils.delete_account_ctr = 0;
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            AutomatedApiGroupsUtils.processAutomatedGroups(apiGroupRecords);
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb("Error while processing automated api groups: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "automated-api-groups-scheduler");
+            }
+        }, 0, 4, TimeUnit.HOURS);
+    }
 }
 

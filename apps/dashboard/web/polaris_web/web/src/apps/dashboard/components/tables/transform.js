@@ -71,7 +71,7 @@ const tableFunc = {
           if(key === 'dateRange'){
             acc[key].value = this.mergeTimeRanges(acc[key].value, value)
           }else{
-            acc[key].value = [...new Set([...acc[key].value, ...value])];
+            acc[key].value = [...new Set([...value,...acc[key].value ])];
           }
         } else {
           if(key === 'dateRange'){

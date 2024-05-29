@@ -1,6 +1,5 @@
 package com.akto.dto.testing;
 
-import java.util.HashMap;
 import java.util.Map;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
@@ -17,6 +16,7 @@ public class TestingRunResultSummary {
     public static final String STATE = "state";    
     public static final String TEST_RESULTS_COUNT = "testResultsCount";
     public static final String METADATA_STRING = "metadata";
+    public static final String TESTS_INITIATED_COUNT = "testInitiatedCount";
 
     private ObjectId id;
     private int startTimestamp;
@@ -29,6 +29,7 @@ public class TestingRunResultSummary {
 
     private TestingRun.State state; 
     private int testResultsCount;
+    private int testInitiatedCount;
 
     private int testIdConfig;
 
@@ -41,7 +42,7 @@ public class TestingRunResultSummary {
     }
 
     public TestingRunResultSummary(int startTimestamp, int endTimestamp, Map<String,Integer> countIssues, int totalApis,
-                                   ObjectId testingRunId, String testingRunHexId, int testResultsCount, int testIdConfig) {
+                                   ObjectId testingRunId, String testingRunHexId, int testResultsCount, int testIdConfig, int testInitiatedCount) {
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
         this.countIssues = countIssues;
@@ -51,6 +52,7 @@ public class TestingRunResultSummary {
         this.state = TestingRun.State.RUNNING;
         this.testResultsCount = testResultsCount;
         this.testIdConfig = testIdConfig;
+        this.testInitiatedCount = testInitiatedCount;
     }
 
     public ObjectId getId() {
@@ -146,6 +148,14 @@ public class TestingRunResultSummary {
         this.testIdConfig = testIdConfig;
     }
 
+    public int getTestInitiatedCount() {
+        return testInitiatedCount;
+    }
+
+    public void setTestInitiatedCount(int testInitiatedCount) {
+        this.testInitiatedCount = testInitiatedCount;
+    }
+
     @Override
     public String toString() {
         return "{" +
@@ -158,6 +168,7 @@ public class TestingRunResultSummary {
             ", testingRunHexId='" + getTestingRunHexId() + "'" +
             ", state='" + getState() + "'" +
             ", metadata='" + getMetadata().toString() + "'" +
+            ", testInitiatedCount='" + getTestInitiatedCount() + "'" +
             "}";
     }
 }

@@ -115,7 +115,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 
     const newData = collectionsArr.map((c) => {
         if(c.deactivated){
-            c.rowStatus = 'critical',
+            c.rowStatus = 'critical'
             c.disableClick = true
         }
         return{

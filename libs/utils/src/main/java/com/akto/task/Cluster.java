@@ -22,6 +22,7 @@ public class Cluster {
     public static final String MAP_SENSITIVE_IN_INFO = "map-sensitiveInfo-in-ApiInfo";
     public static final String SYNC_CRON_INFO = "sync-cron-info";
     public static final String TOKEN_GENERATOR_CRON = "token-generator-cron";
+    public static final String AUTOMATED_API_GROUPS_CRON = "automated-api-groups-cron";
 
     public static final String winnerId = UUID.randomUUID().toString();
 
@@ -54,7 +55,7 @@ public class Cluster {
             // already present
             Bson findExpiredKeyQ = Filters.and(
                 Filters.eq("_id", prize),
-                Filters.lte("expiryTs", now - expiryPeriod)
+                Filters.lte("expiryTs", now)
             );
     
             try {

@@ -212,11 +212,11 @@ const settingRequests = {
         })
     },
 
-    addGithubSso(githubClientId, githubClientSecret) {
+    addGithubSso(githubClientId, githubClientSecret, githubUrl, githubApiUrl) {
         return request({
             url: '/api/addGithubSso',
             method: 'post',
-            data: {githubClientId, githubClientSecret}
+            data: {githubClientId, githubClientSecret, githubUrl, githubApiUrl}
         })
     },
 
