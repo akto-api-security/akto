@@ -71,20 +71,26 @@ public class UsageMetricCalculator {
         List<Integer> demos = new ArrayList<>(getDemos());
         List<Integer> deactivated = new ArrayList<>(getDeactivatedLatest());
         deactivated.addAll(demos);
-
         return Filters.nin(key, deactivated);
+    }
+
+    public static Set<Integer> getDemosAndDeactivated() {
+        Set<Integer> ret = new HashSet<>();
+        ret.addAll(getDeactivated());
+        ret.addAll(getDemos());
+        return ret;
     }
 
     public static List<String> getInvalidTestErrors() {
         List<String> invalidErrors = new ArrayList<String>() {{
             add(TestResult.TestError.DEACTIVATED_ENDPOINT.getMessage());
+            add(TestResult.TestError.USAGE_EXCEEDED.getMessage());
         }};
         return invalidErrors;
     }
 
     public static int calculateActiveEndpoints(UsageMetric usageMetric) {
         int measureEpoch = usageMetric.getMeasureEpoch();
-
         int activeEndpoints = SingleTypeInfoDao.instance.countEndpoints(
                 Filters.and(Filters.or(
                         Filters.gt(SingleTypeInfo.LAST_SEEN, measureEpoch),

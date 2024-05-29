@@ -84,10 +84,12 @@ public class FeatureAccess {
 
     public boolean checkInvalidAccess() {
 
+        // if not granted, then consider it as overage, i.e. cannot use the feature
         if (!getIsGranted()) {
             return true;
         }
 
+        // if usage limit is unlimited, then consider it as not overage
         if (checkBooleanOrUnlimited()) {
             return false;
         }
@@ -107,4 +109,13 @@ public class FeatureAccess {
         return this.getOverageFirstDetected() != -1 &&
                  !( this.getOverageFirstDetected() + gracePeriod > Context.now() );
     }
+
+    public SyncLimit fetchSyncLimit() {
+
+        int usageLeft = Math.max(this.getUsageLimit() - this.getUsage(), 0);
+        boolean checkLimit = !this.checkBooleanOrUnlimited();
+
+        return new SyncLimit(checkLimit, usageLeft);
+    }
+
 }
