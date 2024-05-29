@@ -2,6 +2,7 @@ package com.akto.testing;
 
 import com.akto.DaoInit;
 import com.akto.billing.UsageMetricUtils;
+import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
@@ -230,8 +231,7 @@ public class Main {
                 },"matrix-analyser-task");
             }
         }, 0, 1, TimeUnit.MINUTES);
-
-
+        GetRunningTestsStatus.getRunningTests().getStatusOfRunningTests();
 
         loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
@@ -394,10 +394,11 @@ public class Main {
                             Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds())
                     );
                 }
-
-                TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                        Filters.eq("_id", testingRun.getId()),  completedUpdate
-                );
+                if(GetRunningTestsStatus.getRunningTests().isTestRunning(testingRun.getId())){
+                    TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                            Filters.eq("_id", testingRun.getId()),  completedUpdate
+                    );
+                }
 
                 if(summaryId != null && testingRun.getTestIdConfig() != 1){
                     TestExecutor.updateTestSummary(summaryId);

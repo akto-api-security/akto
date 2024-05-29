@@ -16,7 +16,7 @@ function GithubCell(props){
 
     const {data, headers, getStatus, width, nameWidth, isBadgeClickable, badgeClicked} = props
     return (
-    <HorizontalStack gap="1">
+    <HorizontalStack gap="1" wrap={false}>
     {
         headers?.filter((header) => {
             return header.itemOrder==0
@@ -138,7 +138,7 @@ function GithubCell(props){
                     </div>
                     
                 : <Badge key={item} status={getStatus(item)}>
-                    <Text {...header.dataProps}>
+                    <Text {...header.dataProps} breakWord>
                         {item}
                     </Text>
                 </Badge>
