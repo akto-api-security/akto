@@ -6,7 +6,7 @@ import func from "@/util/func";
 import api from '../api';
 import transform from '../transform';
 import DetailsPage from '../../../components/DetailsPage';
-import {produce, current} from "immer"
+import {produce} from "immer"
 import HardCoded from '../user_config/HardCoded';
 import LoginStepBuilder from '../user_config/LoginStepBuilder';
 import { ChevronRightMinor, ChevronDownMinor, InfoMinor } from '@shopify/polaris-icons';
@@ -186,6 +186,7 @@ function TestRoleSettings() {
                     <TextField
                         label="Name" value={roleName} disabled={systemRole}
                         placeholder='New test role name' onChange={isNew ? handleTextChange : () => { }}
+                        requiredIndicator
                     />
                 </HorizontalGrid>
             </LegacyCard.Section>
