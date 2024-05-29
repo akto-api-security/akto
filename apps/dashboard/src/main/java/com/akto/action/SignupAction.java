@@ -434,19 +434,23 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     }
 
     public String registerViaGithub() {
+        logger.info("registerViaGithub");
         if (!DashboardMode.isOnPremDeployment()) return Action.ERROR.toUpperCase();
         GithubLogin ghLoginInstance = GithubLogin.getInstance();
         if (ghLoginInstance == null) {
             return ERROR.toUpperCase();
         }
+        logger.info("Found github instance");
         Config.GithubConfig githubConfig = GithubLogin.getInstance().getGithubConfig();
         if (githubConfig == null) {
             return ERROR.toUpperCase();
         }
+        logger.info("Found github configuration");
         BasicDBObject params = new BasicDBObject();
         params.put("client_id", githubConfig.getClientId());
         params.put("client_secret", githubConfig.getClientSecret());
         params.put("code", this.code);
+        logger.info("Github code length: {}", this.code.length());
         try {
             String githubUrl = githubConfig.getGithubUrl();
             if (StringUtils.isEmpty(githubUrl)) githubUrl = "https://github.com";
@@ -457,13 +461,32 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             if (githubApiUrl.endsWith("/")) githubApiUrl = githubApiUrl.substring(0, githubApiUrl.length() - 1);
             if (githubUrl.endsWith("/")) githubUrl = githubUrl.substring(0, githubUrl.length() - 1);
 
+            logger.info("Github URL: {}", githubUrl);
+            logger.info("Github API URL: {}", githubApiUrl);
+
             Map<String,Object> tokenData = CustomHttpRequest.postRequest(githubUrl + "/login/oauth/access_token", params);
+            logger.info("Post request to {} success", githubUrl);
+
             String accessToken = tokenData.get("access_token").toString();
+            if (StringUtils.isEmpty(accessToken)){
+                logger.info("Access token empty");
+            } else {
+                logger.info("Access token length: {}", accessToken.length());
+            }
+
             String refreshToken = tokenData.getOrDefault("refresh_token", "").toString();
+            if (StringUtils.isEmpty(refreshToken)){
+                logger.info("Refresh token empty");
+            } else {
+                logger.info("Refresh token length: {}", refreshToken.length());
+            }
+
             int refreshTokenExpiry = (int) Double.parseDouble(tokenData.getOrDefault("refresh_token_expires_in", "0").toString());
             Map<String,Object> userData = CustomHttpRequest.getRequest(githubApiUrl + "/user", "Bearer " + accessToken);
+            logger.info("Get request to {} success", githubApiUrl);
             String company = "sso";
             String username = userData.get("login").toString() + "@" + company;
+            logger.info("username {}", username);
             SignupInfo.GithubSignupInfo ghSignupInfo = new SignupInfo.GithubSignupInfo(accessToken, refreshToken, refreshTokenExpiry, username);
             shouldLogin = "true";
             createUserAndRedirect(username, username, ghSignupInfo, 1000000, Config.ConfigType.GITHUB.toString());
@@ -471,7 +494,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.info("Executed registerViaGithub");
 
         } catch (IOException e) {
+            e.printStackTrace();
+            logger.error(e.getMessage());
             return ERROR.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+            logger.error(e.getMessage());
         }
         return SUCCESS.toUpperCase();
     }
