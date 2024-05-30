@@ -12,6 +12,7 @@ import '../settings.css'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs';
 import { useNavigate} from 'react-router-dom'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards';
+import func from "@/util/func"
 
 function Integrations() {
 
@@ -87,82 +88,92 @@ function Integrations() {
         allItems = [...allItems, ...ssoItems]
     }
     let currObjs = allItems
-    const [currItems , setCurrentItems] = useState(currObjs)
+    const [currItems , setCurrentItems] = useState(getTabItems('all'))
     const tabs = [
         {
             id: 'all',
-            content: <span>All <Badge status='new'>12</Badge></span>,
+            content: <span>All <Badge status='new'>{getTabItems('all').length}</Badge></span>,
             component: <TabsList />
         },
         {
             id: 'traffic',
-            content: <span>Traffic Source <Badge status='new'>2</Badge></span>,
+            content: <span>Traffic Source <Badge status='new'>{getTabItems('traffic').length}</Badge></span>,
             component: <TabsList />
         },
         {
             id: 'reporting',
-            content: <span>Reporting<Badge status='new'>1</Badge></span>,
+            content: <span>Reporting<Badge status='new'>{getTabItems('reporting').length}</Badge></span>,
             component: <TabsList />
         },
         {
             id: 'ai',
-            content: <span>AI <Badge status='new'>1</Badge></span>,
+            content: <span>AI <Badge status='new'>{getTabItems('ai').length}</Badge></span>,
             component: <TabsList />
         },
         {
             id: 'alerts',
-            content: <span>Alerts <Badge status='new'>2</Badge></span>,
+            content: <span>Alerts <Badge status='new'>{getTabItems('alerts').length}</Badge></span>,
             component: <TabsList />
         },
         {
           id: 'sso',
-          content: <span>SSO <Badge status='new'>3</Badge></span>,
+          content: <span>SSO <Badge status='new'>{getTabItems('sso').length}</Badge></span>,
           component: <TabsList />
         },
         {
             id: 'automation',
-            content: <span>Automation <Badge status='new'>3</Badge></span>,
+            content: <span>Automation <Badge status='new'>{getTabItems('automation').length}</Badge></span>,
             component: <TabsList />
         }
     ]
 
+  function getTabItems(tabId) {
+    const emptyItem = [];
+    const trafficItems = [burpSuiteObj, postmanObj];
+    const reportingItems = [githubAppObj];
+    const aiItems = [aktoGptObj];
+    const ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj];
+    const alertsItems = [slackObj, webhooksObj];
+    const automationItems = [aktoApiObj, ciCdObj, jiraObj];
+    switch (tabId) {
+      case 'traffic':
+        return trafficItems;
+      case 'reporting':
+        if (func.checkLocal()) {
+          return emptyItem;
+        }
+        return reportingItems;
+      case 'ai':
+        return aiItems;
+      case 'sso':
+        if (func.checkLocal()) {
+          return emptyItem;
+        }
+        return ssoItems;
+      case 'alerts':
+        if (func.checkLocal()) {
+          return emptyItem;
+        }
+        return alertsItems;
+      case 'automation':
+        if (func.checkLocal()) {
+          return emptyItem;
+        }
+        return automationItems;
+      default:
+        let allItems = [...trafficItems, ...aiItems]
+        if (!func.checkLocal()){
+          allItems = [...allItems, ...alertsItems, ...automationItems]
+        }
+        if(func.checkOnPrem()){
+          allItems = [...allItems, ...ssoItems, ...reportingItems]
+        }
+        return allItems;
+    }
+  }
+
     const handleCurrTab = (tab) =>{
-        switch (tab.id) {
-            case 'traffic':
-              currObjs = [burpSuiteObj, postmanObj]
-              setCurrentItems(currObjs)
-              break;
-
-            case 'reporting':
-              currObjs= [githubAppObj]
-              setCurrentItems(currObjs)
-              break;
-
-              case 'ai':
-                currObjs= [aktoGptObj]
-                setCurrentItems(currObjs)
-                break;
-
-            case 'sso':
-                currObjs= [githubSsoObj, oktaSsoObj, azureAdSsoObj]
-                setCurrentItems(currObjs)
-                break;
-
-            case 'alerts':
-                currObjs= [slackObj,webhooksObj]
-                setCurrentItems(currObjs)
-                break;
-
-            case 'automation':
-                currObjs= [aktoApiObj,ciCdObj, jiraObj]
-                setCurrentItems(currObjs)
-                break;
-
-            default:
-                currObjs = allItems
-                setCurrentItems(currObjs)
-                break;
-          }
+      setCurrentItems(getTabItems(tab.id))
     }
     const handleTab = (tab)=>{
         navigate(tab)
