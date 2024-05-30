@@ -9,6 +9,7 @@ import FutureConnection from "./components/shared/FutureConnection"
 import BannerComponent from "./components/shared/BannerComponent"
 import OpenApiSource from "./components/OpenApiSource"
 import ApiInventoryFromSourceCode from "./components/ApiInventoryFromSourceCode"
+import func from "@/util/func"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -745,7 +746,7 @@ const yaml_kubernetes = [
 const quickStartFunc = {
     getConnectorsList: function () {
 
-        if(window.DASHBOARD_MODE==='LOCAL_DEPLOY' && window.IS_SAAS!=="true"){
+        if(func.checkLocal()){
             return [burpObj, postmanObj, openApiObj, harFileUploadObj]
         }
 

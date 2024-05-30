@@ -3,6 +3,7 @@ import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor
 import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor} from "@shopify/polaris-icons"
 import { VariantMajor, VocabularyMajor } from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
+import func from "@/util/func"
 
 const SettingsLeftNav = () => {
     const navigate = useNavigate()
@@ -37,7 +38,7 @@ const SettingsLeftNav = () => {
         onClick: () => navigate("/dashboard/settings/billing")
      }] : [];
 
-    const cicdArr = window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM' ? [{
+    const cicdArr = !func.checkLocal() ? [{
         label: 'CI/CD',
         icon: AutomationFilledMajor,
         selected: page === "ci-cd",
