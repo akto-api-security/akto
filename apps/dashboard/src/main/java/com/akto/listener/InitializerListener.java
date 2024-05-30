@@ -1080,6 +1080,21 @@ public class InitializerListener implements ServletContextListener {
         return ret;
     }
 
+    public static void dropApiDependencies(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDropApiDependencies() == 0) {
+            DependencyNodeDao.instance.getMCollection().drop();
+            DependencyFlowNodesDao.instance.getMCollection().drop();
+            DependencyNodeDao.instance.createIndicesIfAbsent();
+            DependencyFlowNodesDao.instance.createIndicesIfAbsent();
+        } else {
+            return;
+        }
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DROP_API_DEPENDENCIES, Context.now())
+        );
+    }
+
     public static void dropFilterSampleDataCollection(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDropFilterSampleData() == 0) {
             FilterSampleDataDao.instance.getMCollection().drop();
@@ -1800,7 +1815,6 @@ public class InitializerListener implements ServletContextListener {
                 }
                 trimCappedCollections();
                 setUpPiiAndTestSourcesScheduler();
-//                setUpDependencyFlowScheduler();
                 setUpTrafficAlertScheduler();
                 // setUpAktoMixpanelEndpointsScheduler();
                 SingleTypeInfo.init();
@@ -1808,6 +1822,7 @@ public class InitializerListener implements ServletContextListener {
                 setUpWebhookScheduler();
                 setUpDefaultPayloadRemover();
                 setUpTestEditorTemplatesScheduler();
+                setUpDependencyFlowScheduler();
                 tokenGeneratorCron.tokenGeneratorScheduler();
                 crons.deleteTestRunsScheduler();
                 updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
@@ -1834,6 +1849,7 @@ public class InitializerListener implements ServletContextListener {
 
 
     private void setUpDependencyFlowScheduler() {
+        int minutes = DashboardMode.isOnPremDeployment() ? 15 : 24*60;
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
@@ -1842,7 +1858,7 @@ public class InitializerListener implements ServletContextListener {
                         try {
                             DependencyFlow dependencyFlow = new DependencyFlow();
                             loggerMaker.infoAndAddToDb("Starting dependency flow");
-                            dependencyFlow.run();
+                            dependencyFlow.run(null);
                             dependencyFlow.syncWithDb();
                             loggerMaker.infoAndAddToDb("Finished running dependency flow");
                         } catch (Exception e) {
@@ -1853,7 +1869,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "dependency_flow");
             }
-        }, 0, 4, TimeUnit.HOURS);
+        }, 0, minutes, TimeUnit.MINUTES);
     }
 
     private void updateGlobalAktoVersion() {
@@ -2109,6 +2125,7 @@ public class InitializerListener implements ServletContextListener {
         dropLastCronRunInfoField(backwardCompatibility);
         fetchIntegratedConnections(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
+        dropApiDependencies(backwardCompatibility);
         resetSingleTypeInfoCount(backwardCompatibility);
         dropWorkflowTestResultCollection(backwardCompatibility);
         readyForNewTestingFramework(backwardCompatibility);
