@@ -744,6 +744,11 @@ const yaml_kubernetes = [
 
 const quickStartFunc = {
     getConnectorsList: function () {
+
+        if(window.DASHBOARD_MODE==='LOCAL_DEPLOY' && window.IS_SAAS!=="true"){
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj]
+        }
+
         const connectorsList = [gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
             openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
