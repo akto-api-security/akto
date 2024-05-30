@@ -37,6 +37,13 @@ const SettingsLeftNav = () => {
         onClick: () => navigate("/dashboard/settings/billing")
      }] : [];
 
+    const cicdArr = window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM' ? [{
+        label: 'CI/CD',
+        icon: AutomationFilledMajor,
+        selected: page === "ci-cd",
+        onClick: () => navigate("/dashboard/settings/integrations/ci-cd")
+    }] : [];
+
     return (
         <Navigation>
             <Navigation.Section
@@ -59,12 +66,7 @@ const SettingsLeftNav = () => {
                     //     selected: page === "alerts",
                     //     onClick: () => navigate("/dashboard/settings")
                     // },
-                    {
-                        label: 'CI/CD',
-                        icon: AutomationFilledMajor,
-                        selected: page === "ci-cd",
-                        onClick: () => navigate("/dashboard/settings/integrations/ci-cd")
-                    },
+                    ...cicdArr,
                     {
                         label: 'Integrations',
                         icon: AppsFilledMajor,

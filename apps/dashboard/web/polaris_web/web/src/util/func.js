@@ -1472,6 +1472,18 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return !errorInSkipList
     }
     return true;
+  },
+  checkLocal() {
+    if (window.DASHBOARD_MODE !== 'ON_PREM' && window.IS_SAAS !== "true") {
+      return true;
+    }
+    return false;
+  },
+  checkOnPrem() {
+    if (window.DASHBOARD_MODE === "ON_PREM") {
+      return true;
+    }
+    return false;
   }
 }
 
