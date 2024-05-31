@@ -9,6 +9,7 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.billing.SyncLimit;
+import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -1499,6 +1500,20 @@ public class APICatalogSync {
             Bson filterQ = Filters.and(filterForHostHeader, Filters.regex(SingleTypeInfo._URL, "STRING|INTEGER"));
             allParams = SingleTypeInfoDao.instance.findAll(filterQ, Projections.exclude(SingleTypeInfo._VALUES));
             allParams.addAll(SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES)));
+
+            int dependencyFlowLimit = 1_000;
+            if (mergingCalled && allParams.size() < dependencyFlowLimit) {
+                loggerMaker.infoAndAddToDb("ALl params less than " + dependencyFlowLimit +", running dependency flow", LogDb.RUNTIME);
+                try {
+                    DependencyFlow dependencyFlow = new DependencyFlow();
+                    dependencyFlow.run(null);
+                    dependencyFlow.syncWithDb();
+                    loggerMaker.infoAndAddToDb("Finished running dependency flow", LogDb.RUNTIME);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while running dependency flow in runtime: " + e.getMessage(), LogDb.RUNTIME);
+                }
+            }
+
         } else {
             List<Integer> apiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
             allParams = SingleTypeInfoDao.instance.fetchStiOfCollections(apiCollectionIds);
