@@ -82,6 +82,7 @@ public class DependencyAnalyser {
         url = realUrl(apiCollectionId, urlStatic).getUrl();
 
         String combinedUrl = apiCollectionId + "#" + url + "#" + method;
+        boolean isHar = url.startsWith("http");
 
         // different URL variables and corresponding examples. Use accordingly
         // urlWithParams : /api/books/2?user=User1
@@ -141,7 +142,7 @@ public class DependencyAnalyser {
         Map<String, Set<Object>> reqFlattened = JSONUtils.flatten(reqPayload);
 
         for (String requestParam: reqFlattened.keySet()) {
-            processRequestParam(requestParam, reqFlattened.get(requestParam), combinedUrl, false, false);
+            processRequestParam(requestParam, reqFlattened.get(requestParam), combinedUrl, false, false, isHar);
         }
 
         if (APICatalog.isTemplateUrl(url)) {
@@ -158,7 +159,7 @@ public class DependencyAnalyser {
                 }
                 Set<Object> val = new HashSet<>();
                 val.add(s);
-                processRequestParam(i+"", val, combinedUrl, true, false);
+                processRequestParam(i+"", val, combinedUrl, true, false, isHar);
             }
         }
 
@@ -171,7 +172,7 @@ public class DependencyAnalyser {
                 Map<String,String> cookieMap = AuthPolicy.parseCookie(values);
                 for (String cookieKey: cookieMap.keySet()) {
                     String cookieValue = cookieMap.get(cookieKey);
-                    processRequestParam(cookieKey, new HashSet<>(Collections.singletonList(cookieValue)), combinedUrl, false, true);
+                    processRequestParam(cookieKey, new HashSet<>(Collections.singletonList(cookieValue)), combinedUrl, false, true, isHar);
                 }
             } else {
                 Set<Object> valuesSet = new HashSet<>();
@@ -183,22 +184,32 @@ public class DependencyAnalyser {
                         valuesSet.add(v);
                     }
                 }
-                processRequestParam(param, valuesSet, combinedUrl, false, true);
+                processRequestParam(param, valuesSet, combinedUrl, false, true, isHar);
             }
 
         }
     }
 
-    private void processRequestParam(String requestParam, Set<Object> reqFlattenedValuesSet, String originalCombinedUrl, boolean isUrlParam, boolean isHeader) {
+    private void processRequestParam(String requestParam, Set<Object> reqFlattenedValuesSet, String originalCombinedUrl, boolean isUrlParam, boolean isHeader, boolean isHar) {
         for (Object val : reqFlattenedValuesSet) {
             if (filterValues(val) && valueSeen(val)) {
-                processValueForUrls(requestParam, val, originalCombinedUrl, isUrlParam, isHeader);
+                processValueForUrls(requestParam, val, originalCombinedUrl, isUrlParam, isHeader, isHar);
             }
         }
     }
 
-    private void processValueForUrls(String requestParam, Object val, String originalCombinedUrl, boolean isUrlParam, boolean isHeader) {
+    private void processValueForUrls(String requestParam, Object val, String originalCombinedUrl, boolean isUrlParam, boolean isHeader, boolean isHar) {
         for (String url : urlsToResponseParam.keySet()) {
+            if (isHar) {
+                // har files should be matched with the endpoints in their collection only
+                String apiCollectionId = url.split("#")[0];
+                String originalApiCollectionId = originalCombinedUrl.split("#")[0];
+                if (!apiCollectionId.equals(originalApiCollectionId)) continue;
+            } else {
+                // mirroring apis should be matched with the endpoints in mirroring collections only
+                String urlRespVal = url.split("#")[1];
+                if (urlRespVal.startsWith("http")) continue;
+            }
             if (!url.equals(originalCombinedUrl) && urlValSeen(url, val)) {
                 processUrlForParam(url, requestParam, val, originalCombinedUrl, isUrlParam, isHeader);
             }
