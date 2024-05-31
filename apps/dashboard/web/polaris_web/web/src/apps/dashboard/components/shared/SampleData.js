@@ -15,6 +15,7 @@ function highlightPaths(highlightPathMap, ref){
           matches = ref.getModel().findMatches(mainKey, false, false, false, null, true);
         } catch (error) {
           console.error(error)
+          console.log("mainKey: " + mainKey)
         }
         matches.forEach((match) => {
           ref.createDecorationsCollection([
@@ -65,6 +66,7 @@ function highlightHeaders(data, ref, getLineNumbers){
       matchRanges = ref.getModel().findMatches(header, false, false, true, null, true, 1)
     } catch (error) {
       console.error(error)
+      console.log("header: " + header)
     }
     changesArr = [ ...changesArr, ...matchRanges]
     matchRanges.forEach((obj) => {
