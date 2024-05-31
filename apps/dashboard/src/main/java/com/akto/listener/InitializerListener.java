@@ -1849,7 +1849,13 @@ public class InitializerListener implements ServletContextListener {
 
 
     private void setUpDependencyFlowScheduler() {
-        int minutes = DashboardMode.isOnPremDeployment() ? 15 : 24*60;
+        int minutes = DashboardMode.isOnPremDeployment() ? 60 : 24*60;
+        Context.accountId.set(1000_000);
+        boolean dibs = callDibs(Cluster.DEPENDENCY_FLOW_CRON,  minutes, 60);
+        if(!dibs){
+            loggerMaker.infoAndAddToDb("Cron for updating dependency flow not acquired, thus skipping cron", LogDb.DASHBOARD);
+            return;
+        }
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
