@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, Divider, LegacyCard, Page, Text, VerticalStack, HorizontalGrid, HorizontalStack, Icon, Scrollable, TextField, Tooltip, Tag, Form } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, HorizontalStack, Icon, Scrollable, TextField, Tooltip, Tag, Form } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
