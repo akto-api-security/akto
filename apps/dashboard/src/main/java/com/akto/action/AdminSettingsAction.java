@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.Set;
 
 import org.checkerframework.checker.units.qual.C;
 
@@ -26,6 +27,8 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class AdminSettingsAction extends UserAction {
 
@@ -34,6 +37,13 @@ public class AdminSettingsAction extends UserAction {
     private static final Logger logger = LoggerFactory.getLogger(AdminSettingsAction.class);
     private Organization organization;
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
+    private static final String IP_REGEX = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$";
+    private static final Pattern IP_PATTERN = Pattern.compile(IP_REGEX);
+
+    private static final String CIDR_REGEX = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/(3[0-2]|[12]?[0-9])$";
+    private static final Pattern CIDR_PATTERN = Pattern.compile(CIDR_REGEX);
+
     @Override
     public String execute() throws Exception {
         accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
@@ -43,11 +53,11 @@ public class AdminSettingsAction extends UserAction {
 
     public AccountSettings.SetupType setupType;
     public Boolean newMergingEnabled;
-    private List<String> privateCidrList;
+    private Set<String> privateCidrList;
 
     public Boolean enableTelemetry;
 
-	private List<String> partnerIpList;
+	private Set<String> partnerIpList;
     private List<String> allowRedundantEndpointsList;
 
     public String updateSetupType() {
@@ -235,6 +245,10 @@ public class AdminSettingsAction extends UserAction {
     }
     
     public String editPrivateCidrList(){
+        if (!validateCidrs(privateCidrList)) {
+            addActionError("Invalid CIDR detected");
+            return Action.ERROR.toUpperCase();
+        }
 
         try {
             AccountSettingsDao.instance.getMCollection().updateOne(
@@ -247,7 +261,36 @@ public class AdminSettingsAction extends UserAction {
 
     }
 
+    private static boolean validateCidrs(Set<String> cidrSet) {
+        for (String cidr : cidrSet) {
+            if (!validateCidr(cidr)) return false;
+        }
+        return true;
+    }
+
+    private static boolean validateIps(Set<String> ipSet) {
+        for (String ip : ipSet) {
+            if (!validateIp(ip)) return false;
+        }
+        return true;
+    }
+
+    private static boolean validateCidr(String cidr) {
+        if (cidr == null) return false;
+        return CIDR_PATTERN.matcher(cidr).matches();
+    }
+
+    private static boolean validateIp(String ip) {
+        if (ip == null) return false;
+        return IP_PATTERN.matcher(ip).matches();
+    }
+
     public String editPartnerIpList(){
+
+        if (!validateIps(partnerIpList)) {
+            addActionError("Invalid IP detected");
+            return Action.ERROR.toUpperCase();
+        }
 
         try {
             AccountSettingsDao.instance.getMCollection().updateOne(
@@ -350,19 +393,23 @@ public class AdminSettingsAction extends UserAction {
         return organization;
     }
 
-    public List<String> getPartnerIpList() {
+    public Set<String> getPartnerIpList() {
 		return partnerIpList;
 	}
 
-    public void setPartnerIpList(List<String> partnerIpList) {
-		this.partnerIpList = partnerIpList;
-	}
+    public void setPartnerIpList(Set<String> partnerIpList) {
+        this.partnerIpList = partnerIpList.stream()
+                                          .map(String::trim)
+                                          .collect(Collectors.toSet());
+    }
 
-	public void setPrivateCidrList(List<String> privateCidrList) {
-		this.privateCidrList = privateCidrList;
-	}
+    public void setPrivateCidrList(Set<String> privateCidrList) {
+        this.privateCidrList = privateCidrList.stream()
+                                              .map(String::trim)
+                                              .collect(Collectors.toSet());
+    }
 
-    public List<String> getPrivateCidrList() {
+    public Set<String> getPrivateCidrList() {
 		return privateCidrList;
 	}
     
