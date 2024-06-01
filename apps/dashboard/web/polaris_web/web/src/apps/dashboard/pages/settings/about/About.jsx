@@ -402,7 +402,6 @@ function About() {
             const values = localVal.split(",")
             let valid = true;
             for (let v of values) {
-                console.log(v);
                 if(v.length === 0){
                     return true
                 }
