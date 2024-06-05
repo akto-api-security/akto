@@ -14,6 +14,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Activity;
+import com.akto.dto.ApiInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.ConnectionInfo;
@@ -21,6 +22,7 @@ import com.akto.util.IssueTrendType;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
@@ -44,16 +46,13 @@ public class DashboardAction extends UserAction {
     
     // function for getting number of api in between multiple ranges to show trend on dashboard pagecalculateRiskValueForSeverity
     public String fetchRiskScoreCountMap(){
-        List<Bson> pipeline = ApiInfoDao.instance.buildRiskScorePipeline();
         Map<Integer, Integer> riskScoreCounts = new HashMap<>();
-        MongoCursor<BasicDBObject> apiCursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        MongoCursor<ApiInfo> apiCursor = ApiInfoDao.instance.getMCollection().find().projection(Projections.include("_id", ApiInfo.RISK_SCORE)).cursor();
         while(apiCursor.hasNext()){
             try {
-                BasicDBObject basicDBObject = apiCursor.next();
-                double riskScore = basicDBObject.getDouble("riskScore");
-                if (isBetween(0, 2, riskScore)) {
-                    riskScoreCounts.put(2, riskScoreCounts.getOrDefault(2,0) + 1);
-                } else if (isBetween(2, 3, riskScore)) {
+                ApiInfo apiInfo = apiCursor.next();
+                float riskScore = apiInfo.getRiskScore();
+                if (isBetween(0, 3, riskScore)) {
                     riskScoreCounts.put(3, riskScoreCounts.getOrDefault(3,0) + 1);
                 } else if (isBetween(3, 4, riskScore)) {
                     riskScoreCounts.put(4, riskScoreCounts.getOrDefault(4,0) + 1);

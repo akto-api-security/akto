@@ -2,6 +2,7 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
@@ -48,8 +49,9 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
             db.createCollection(getCollName());
         }
 
-        String[] fieldNames = {"startTs"};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiCollection.START_TS }, false);
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiCollection.NAME }, true);
     }
 
     public ApiCollection getMeta(int apiCollectionId) {
@@ -74,6 +76,10 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         }
 
         return apiCollectionMap;
+    }
+
+    public List<ApiCollection> fetchApiGroups() {
+        return ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
     }
 
     public ApiCollection findByName(String name) {

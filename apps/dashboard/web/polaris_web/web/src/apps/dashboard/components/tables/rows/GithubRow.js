@@ -15,7 +15,7 @@ import {
     HorizontalDotsMinor, ChevronDownMinor, ChevronUpMinor
 } from '@shopify/polaris-icons';
 import { useNavigate } from "react-router-dom";
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import './row.css'
 import GithubCell from '../cells/GithubCell';
 import func from "@/util/func"
@@ -29,20 +29,19 @@ const CellType = {
 
 function GithubRow(props) {
 
-    const {dataObj, getNextUrl, isRowClickable, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, headings, popoverActive, setPopoverActive } = props;
+    const {dataObj, getNextUrl, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, headings, popoverActive, setPopoverActive } = props;
     const navigate = useNavigate();
     const [data, setData] = useState(dataObj);
     const [collapsibleActive, setCollapsibleActive] = useState("none")
 
-    const togglePopoverActive = (index) => useCallback(
-        () => setPopoverActive((prev) => {
-            if (prev == index) {
-                return -1;
-            }
-            return index;
-        }),
-        [],
-    );
+    const togglePopoverActive = (e,index) => {
+        e.stopPropagation();
+        setPopoverActive((prev) => {
+            if(prev === index)
+                return -1
+            return index
+        })
+    }
     async function nextPage(data){
         if(data?.nextUrl || getNextUrl){
             navigate(data?.nextUrl) || (getNextUrl && navigate(await getNextUrl(data.id), {replace:true}));
@@ -50,6 +49,11 @@ function GithubRow(props) {
     }
 
     function handleRowClick(data){
+
+        if(data.deactivated){
+            return;
+        }
+
         if(data?.collapsibleRow){
             setCollapsibleActive((prev) => {
                 if(prev===data?.name){
@@ -64,8 +68,6 @@ function GithubRow(props) {
             nextPage(data);
         }
     }
-
-    const [rowClickable, setRowClickable] = useState(isRowClickable || false)
 
     useEffect(() => {
         setData((prev) => {
@@ -82,10 +84,9 @@ function GithubRow(props) {
             <IndexTable.Cell>
                 <div className='linkClass'>
                     <Link
-                        {...(rowClickable ? { dataPrimaryLink: rowClickable } : {})}
                         monochrome
                         removeUnderline
-                        onClick={() => (handleRowClick(data))}
+                        onClick={() => handleRowClick(data)}
                     >
                         <GithubCell
                             headers={headers}
@@ -123,10 +124,10 @@ function GithubRow(props) {
                     <HorizontalStack align='end'>
                         {
                             <Popover
-                                active={popoverActive == data.id}
-                                activator={<Button onClick={togglePopoverActive(data.id)} plain icon={HorizontalDotsMinor} />}
+                                active={popoverActive === data.id}
+                                activator={<Button onClick={(e) => togglePopoverActive(e,data.id)} plain icon={HorizontalDotsMinor} />}
                                 autofocusTarget="first-node"
-                                onClose={togglePopoverActive(popoverActive)}
+                                onClose={(e) => togglePopoverActive(e,popoverActive)}
                             >
                                 <ActionList
                                     actionRole="menuitem"
@@ -144,12 +145,11 @@ function GithubRow(props) {
     function LinkCell(cellData, header) {
         return (
             <IndexTable.Cell key={header.title}>
-                <div className='linkClass'>
+                <div className={`linkClass ${data.deactivated ? "text-subdued" : ""}`} >
                     <Link
                         dataPrimaryLink
                         monochrome
                         removeUnderline
-                        onClick={() => (handleRowClick(data))}
                     >
                         {cellData}
                     </Link>
@@ -172,10 +172,10 @@ function GithubRow(props) {
                 <HorizontalStack align='end'>
                     {
                         <Popover
-                            active={popoverActive == data.id}
-                            activator={<Button onClick={togglePopoverActive(data.id)} plain icon={HorizontalDotsMinor} />}
+                            active={popoverActive === data.id}
+                            activator={<Button onClick={(e) => togglePopoverActive(e,data.id)} plain icon={HorizontalDotsMinor} />}
                             autofocusTarget="first-node"
-                            onClose={togglePopoverActive(popoverActive)}
+                            onClose={(e) => togglePopoverActive(e,popoverActive)}
                         >
                             <ActionList
                                 actionRole="menuitem"
@@ -192,9 +192,7 @@ function GithubRow(props) {
         return (
             <IndexTable.Cell key={"collapsible"}>
                 <HorizontalStack align='end'>
-                    <div onClick={() => handleRowClick(data)} style={{cursor: 'pointer'}}>
-                        <Icon source={collapsibleActive === data?.name ? ChevronUpMinor : ChevronDownMinor} />
-                    </div>
+                    <Icon source={collapsibleActive === data?.name ? ChevronUpMinor : ChevronDownMinor} />
                 </HorizontalStack>
             </IndexTable.Cell>
         )
@@ -231,8 +229,9 @@ function GithubRow(props) {
                 id={data.id}
                 key={data.id}
                 position={index}
-                {...props.newRow ? {status: (index % 2) ? "subdued" : ''} : {}}
+                {...props.newRow ? {status: ((index % 2) ? "subdued" : '')} : {} }
                 {...props.notHighlightOnselected ? {} : {selected: selectedResources.includes(data?.id)}}
+                onClick={() => handleRowClick(data)}
             >
                 {props?.newRow ? <NewCell /> :<OldCell/>}   
             </IndexTable.Row>

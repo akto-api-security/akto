@@ -248,7 +248,7 @@ public class Parser {
                             responseObject.put(mKeys.statusCode, statusCode);
                             responseObjectList.add(responseObject);
                         } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e,"Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.getMessage(), LogDb.DASHBOARD);
+                            loggerMaker.infoAndAddToDb("Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.getMessage(), LogDb.DASHBOARD);
                             ApiResponses responses = operation.getResponses();
                             if (responses != null) {
                                 for (String responseCode : responses.keySet()) {

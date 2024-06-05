@@ -42,6 +42,10 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     public static final String TEST_RUN_RESULT_SUMMARY_ID = "testRunResultSummaryId";
     private ObjectId testRunResultSummaryId;
 
+    public static final String ERRORS_LIST = "errorsList";
+    private  List<String> errorsList;
+
+
     private WorkflowTest workflowTest;
 
     @BsonIgnore
@@ -312,5 +316,13 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setTestLogs(List<TestLog> testLogs) {
         this.testLogs = testLogs;
+    }
+
+    public List<String> getErrorsList() {
+        return errorsList;
+    }
+
+    public void setErrorsList(List<String> errorsList) {
+        this.errorsList = errorsList;
     }
 }

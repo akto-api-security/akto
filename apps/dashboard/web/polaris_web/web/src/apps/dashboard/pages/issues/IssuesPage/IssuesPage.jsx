@@ -11,6 +11,8 @@ import { Button } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
+import { useEffect } from "react";
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 
 const headers = [
     {
@@ -38,6 +40,7 @@ const headers = [
     {
         text: "Timestamp",
         value: "timestamp",
+        sortActive: true
     },
     {
         text: "Endpoint",
@@ -65,10 +68,10 @@ const headers = [
 ]
 
 const sortOptions = [
-    { label: 'Discovered time', value: 'timestamp asc', directionLabel: 'Newest', sortKey: 'timestamp' },
-    { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp' },
-    { label: 'Issue', value: 'categoryName asc', directionLabel: 'A-Z', sortKey: 'categoryName' },
-    { label: 'Issue', value: 'categoryName desc', directionLabel: 'Z-A', sortKey: 'categoryName' },    
+    { label: 'Discovered time', value: 'timestamp asc', directionLabel: 'Newest', sortKey: 'timestamp', columnIndex: 5 },
+    { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp', columnIndex: 5 },
+    { label: 'Issue', value: 'categoryName asc', directionLabel: 'A-Z', sortKey: 'categoryName', columnIndex: 1 },
+    { label: 'Issue', value: 'categoryName desc', directionLabel: 'Z-A', sortKey: 'categoryName', columnIndex: 1 },    
 ];
 
 let filtersOptions = [
@@ -152,8 +155,7 @@ function IssuesPage(){
     const [issuesFilters, setIssuesFilters] = useState({})
     const [key, setKey] = useState(false);
     const apiCollectionMap = PersistStore(state => state.collectionsMap);
-    const allCollections = PersistStore(state => state.allCollections);
-    const [showEmptyScreen, setShowEmptyScreen] = useState(false)
+    const [showEmptyScreen, setShowEmptyScreen] = useState(true)
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -252,7 +254,11 @@ function IssuesPage(){
 
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
         setLoading(true);
-
+        const res = await api.fetchIssues(skip, 1, null, null, null, null, 0)
+        if(res.totalIssuesCount === 0){
+            setShowEmptyScreen(true)
+            return {value:{} , total:0};
+        }
         let total =0;
         let ret = []
         let filterCollectionsId = filters.apiCollectionId.concat(filters.collectionIds);
@@ -278,9 +284,7 @@ function IssuesPage(){
             setLoading(false);
         })
         ret = func.sortFunc(ret, sortKey, sortOrder)
-        if(total === 0){
-            setShowEmptyScreen(true)
-        }
+        
         return {value:ret , total:total};
     }
 
@@ -306,10 +310,19 @@ function IssuesPage(){
             description: "Integrate Akto with GitHub to send all issues to your developers on GitHub."
         }
     ]
+
+  useEffect(() => {
+    if (subCategoryMap && Object.keys(subCategoryMap).length > 0 && apiCollectionMap && Object.keys(apiCollectionMap).length > 0) {
+        setShowEmptyScreen(false)
+    }
+  }, [subCategoryMap, apiCollectionMap])
     
     return (
         <PageWithMultipleCards
-            title="Issues"
+            title={<TitleWithInfo
+                    titleText={"Issues"}
+                    tooltipContent={"Issues are created when a test from test library has passed validation and thus a potential vulnerability is found."}
+                />}
             isFirstPage={true}
             components = {[
                 showEmptyScreen ? 
@@ -340,8 +353,8 @@ function IssuesPage(){
                     promotedBulkActions={promotedBulkActions}
                     hideQueryField={true}
                     getNextUrl={getNextUrl}
-                    rowClickable={true}
                     getStatus={func.getTestResultStatus}
+                    filterStateUrl={"/dashboard/issues"}
                 />
             ]}
             primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export vulnerability report</Button>}

@@ -6,19 +6,28 @@ import "./style.css"
 
 function FlyLayout(props) {
 
-    const { title, show, setShow, components,loading, showDivider, newComp} = props
+    const { title, titleComp,  show, setShow, components,loading, showDivider, newComp, handleClose, isHandleClose, width} = props
+    const handleExit = () => {
+        setShow(!show)
+        if(isHandleClose){
+            handleClose()
+        }
+    }
+    const divWidth = width || "50vw";
     return (
-        <div className={"flyLayout " + (show ? "show" : "")}>
+        <div className={"flyLayout " + (show ? "show" : "")} style={{width: divWidth}}>
             <div className="innerFlyLayout">
-                <Box borderColor="border-subdued" borderWidth="1" background="bg" width="50vw" minHeight="100%">
+                <Box borderColor="border-subdued" borderWidth="1" background="bg" width={divWidth} minHeight="100%">
                     { loading ? <div style={{position: "absolute", right: "25vw" , top: "50vh"}}><Spinner size="large" /></div>:
                     <VerticalStack gap={"5"}>
                         <Box padding={"4"} paddingBlockEnd={"0"} >
                             <HorizontalStack align="space-between">
-                                <Text variant="headingMd">
-                                    {title}
-                                </Text>
-                                <Button icon={CancelMajor} onClick={() => { setShow(!show) }} plain></Button>
+                                {titleComp ? titleComp : 
+                                    <Text variant="headingMd">
+                                        {title}
+                                    </Text>
+                                }
+                                <Button icon={CancelMajor} onClick={() => { handleExit()}} plain></Button>
                             </HorizontalStack>
                         </Box>
                         <Scrollable style={{ height: "92vh" }} shadow>

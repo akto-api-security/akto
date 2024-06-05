@@ -7,12 +7,14 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.CodeAnalysisApiInfo.CodeAnalysisApiInfoKey;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
-import com.akto.dto.type.APICatalog;
-import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.interceptor.CollectionInterceptor;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
@@ -70,9 +72,12 @@ public class InventoryAction extends UserAction {
     private int startTimestamp = 0; 
     private int endTimestamp = 0;
 
+    Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
     public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp) {
         List<BasicDBObject> endpoints = new ArrayList<>();
         List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
+        nonHostApiCollectionIds.addAll(deactivatedCollections);
 
         Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
         Bson filterQWithTs = Filters.and(
@@ -93,6 +98,7 @@ public class InventoryAction extends UserAction {
             endpoints.add(endpoint);
         }
         
+        nonHostApiCollectionIds.removeAll(deactivatedCollections);
 
         if (nonHostApiCollectionIds != null && nonHostApiCollectionIds.size() > 0){
             List<Bson> pipeline = new ArrayList<>();
@@ -115,11 +121,6 @@ public class InventoryAction extends UserAction {
         return endpoints;
     }
 
-
-
-
-
-
     private String hostName;
     private List<BasicDBObject> endpoints;
     public String fetchEndpointsBasedOnHostName() {
@@ -133,6 +134,11 @@ public class InventoryAction extends UserAction {
 
         if (apiCollection == null) {
             addActionError("Invalid host");
+            return ERROR.toUpperCase();
+        }
+
+        if (deactivatedCollections.contains(apiCollection.getId())) {
+            addActionError(CollectionInterceptor.errorMessage);
             return ERROR.toUpperCase();
         }
 
@@ -355,7 +361,41 @@ public class InventoryAction extends UserAction {
         if (unused == null) {
             unused = new HashSet<>();
         }
+        
         response.put("unusedEndpoints", unused);
+
+        // Attach code analysis collection
+        BasicDBObject codeAnalysisCollectionInfo = new BasicDBObject();
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        CodeAnalysisCollection codeAnalysisCollection = null;
+        if (apiCollection != null) {
+            codeAnalysisCollection = CodeAnalysisCollectionDao.instance.findOne(
+                Filters.eq("name", apiCollection.getName())
+            );
+        }
+        codeAnalysisCollectionInfo.put("codeAnalysisCollection", codeAnalysisCollection);
+
+        // Fetch code analysis endpoints
+        Map<String, CodeAnalysisApi> codeAnalysisApisMap = new HashMap<>();
+        if (codeAnalysisCollection != null) {
+            List<CodeAnalysisApiInfo> codeAnalysisApiInfoList = CodeAnalysisApiInfoDao.instance.findAll(
+                    Filters.eq("_id.codeAnalysisCollectionId", codeAnalysisCollection.getId()
+                )
+            );
+            
+            for(CodeAnalysisApiInfo codeAnalysisApiInfo: codeAnalysisApiInfoList) {
+                CodeAnalysisApiInfoKey codeAnalysisApiInfoKey = codeAnalysisApiInfo.getId();
+                CodeAnalysisApi codeAnalysisApi = new CodeAnalysisApi(
+                    codeAnalysisApiInfoKey.getMethod(),
+                    codeAnalysisApiInfoKey.getEndpoint(),
+                    codeAnalysisApiInfo.getLocation()
+                );
+                codeAnalysisApisMap.put(codeAnalysisApi.generateCodeAnalysisApisMapKey(), codeAnalysisApi);
+            }
+        }
+        codeAnalysisCollectionInfo.put("codeAnalysisApisMap", codeAnalysisApisMap);
+
+        response.put("codeAnalysisCollectionInfo", codeAnalysisCollectionInfo);
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -425,6 +465,7 @@ public class InventoryAction extends UserAction {
         pipeline.add(Aggregates.limit(100_000));
         pipeline.add(Aggregates.match(Filters.gte("timestamp", startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte("timestamp", endTimestamp)));
+        pipeline.add(Aggregates.match(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}))));
 
         Bson doyProj = Projections.computed("dayOfYear", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}));
@@ -572,6 +613,7 @@ public class InventoryAction extends UserAction {
             }
         }
 
+        filterList.add(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
         loggerMaker.infoAndAddToDb(filterList.toString(), LogDb.DASHBOARD);
         return Filters.and(filterList);
 
@@ -594,6 +636,17 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private Bson getSearchFilters(){
+        if(this.searchString == null || this.searchString.length() < 3){
+            return Filters.empty();
+        }
+        String escapedPrefix = Utils.escapeSpecialCharacters(this.searchString);
+        String regexPattern = "^" + escapedPrefix + ".*";
+        Bson filter = Filters.regex(SingleTypeInfo._PARAM, regexPattern, "i");
+        return filter;
+    }
+
+    private String searchString;
     private List<SingleTypeInfo> getMongoResults() {
 
         List<String> sortFields = new ArrayList<>();
@@ -602,12 +655,22 @@ public class InventoryAction extends UserAction {
         Bson sort = sortOrder == 1 ? Sorts.ascending(sortFields) : Sorts.descending(sortFields);
 
         loggerMaker.infoAndAddToDb(String.format("skip: %s, limit: %s, sort: %s", skip, limit, sort), LogDb.DASHBOARD);
-        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.and(prepareFilters()), skip, limit, sort);
+        if(skip < 0){
+            skip *= -1;
+        }
+
+        if(limit < 0){
+            limit *= -1;
+        }
+
+        int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
+
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.and(prepareFilters(), getSearchFilters()), skip,pageLimit, sort);
         return list;        
     }
 
     private long getTotalParams() {
-        return SingleTypeInfoDao.instance.getMCollection().countDocuments(prepareFilters());
+        return SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.and(prepareFilters(), getSearchFilters()));
     }
 
     public String fetchChanges() {
@@ -855,5 +918,9 @@ public class InventoryAction extends UserAction {
     
     public void setSubType(String subType) {
         this.subType = subType;
+    }
+
+    public void setSearchString(String searchString) {
+        this.searchString = searchString;
     }
 }

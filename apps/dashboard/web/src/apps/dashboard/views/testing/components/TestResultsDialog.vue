@@ -100,10 +100,7 @@
                     </template>
                     <template slot="Attempt" v-if="jsonAdvance && jsonAdvance['message']">
                         <div >
-                            <div v-if="getNucleiFileName(testingRunResult.testSubType)" style="margin-left: 24px" class="description-title mt-4" >
-                                <span> Nuclei template:</span> 
-                                <a target="_blank" :href="testingRunResult.testSubType"> <span style="color: var(--rgbaColor7)" >{{getNucleiFileName(testingRunResult.testSubType)}}</span> </a>
-                            </div>
+
                             <div v-if="jsonBasic['errors']" class="test-errors-class">
                                 {{ this.jsonBasic["errors"] }}
                             </div>
@@ -166,9 +163,6 @@ export default {
         }
     },
     methods: {
-        getNucleiFileName(path) {
-            return path.startsWith("http") ? path.substring(path.lastIndexOf('/')+1) : null
-        },
         getTabsContent() {
             if (this.messagesBasic.length > 1) {
                 return { 'Attempt': this.messagesBasic.length }

@@ -34,6 +34,7 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.json.JSONArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +47,8 @@ import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+
+import static com.akto.listener.InitializerListener.createAndSaveAttackerRole;
 
 public class RuntimeListener extends AfterMongoConnectListener {
 
@@ -79,7 +82,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
                 try {
                     initialiseDemoCollections();
-                    addSampleData();
+                    //addSampleData();
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,"Error while initialising demo collections: " + e, LoggerMaker.LogDb.DASHBOARD);
                 }
@@ -142,9 +145,11 @@ public class RuntimeListener extends AfterMongoConnectListener {
         List<AuthParam> authParamList = new ArrayList<>();
         authParamList.add(new HardcodedAuthParam(AuthParam.Location.HEADER, attackerKey, attackerToken, true));
         AuthMechanism authMechanism = new AuthMechanism(
-             authParamList, new ArrayList<>(), "HARDCODED"
+             authParamList, new ArrayList<>(), "HARDCODED", null
         );
-        AuthMechanismsDao.instance.insertOne(authMechanism);
+        ObjectId id = new ObjectId();
+        authMechanism.setId(id);
+        createAndSaveAttackerRole(authMechanism);
 
         //inserting first time during initialisation of demo collections
         insertVulnerableRequestsForDemo();
@@ -225,7 +230,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
             for (SingleTypeInfo singleTypeInfo: params) {
                 urlList.add(singleTypeInfo.getUrl());
             }
-            if (urlList.size() != 118) {
+            if (urlList.size() != 202) {
                 Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
             }
 

@@ -10,6 +10,12 @@ let testingStore = (set)=>({
     setSelectedTestRunResult: (selectedTestRunResult) => set({ selectedTestRunResult: selectedTestRunResult }),
     authMechanism: null,
     setAuthMechanism: (authMechanism) => set({authMechanism: authMechanism}),
+    rerunModal: null,
+    setRerunModal: (rerunModal) => set({rerunModal: rerunModal}),
+    errorsObject: {},
+    setErrorsObject: (errorsObject) => set({errorsObject: errorsObject}),
+    currentTestingRuns: [],
+    setCurrentTestingRuns: (currentTestingRuns) => set({currentTestingRuns: currentTestingRuns}),
 })
 
 testingStore = devtools(testingStore)

@@ -6,6 +6,8 @@ import com.akto.util.Util;
 
 public class SampleData {
     Key id;
+
+    public static final String SAMPLES = "samples";
     List<String> samples;
     List<Integer> collectionIds;
 
