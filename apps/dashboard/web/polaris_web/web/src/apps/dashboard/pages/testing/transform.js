@@ -766,10 +766,20 @@ getPrettifiedTestRunResults(testRunResults){
       const errorType = this.getTestErrorType(test.errorsList[0])
       key = key + ': ' + errorType
       if(errorType === "ROLE_NOT_FOUND"){
+        const baseUrl = window.location.origin+"/dashboard/testing/roles/details?system="
+        const missingConfigs = func.toSentenceCase(test.errorsList[0].split(errorsObject["ROLE_NOT_FOUND"])[0]).split(" ");
         error_message = (
-          <Link url={""} target="_blank" monochrome removeUnderline>
-            <span style={{ lineHeight: '16px', fontSize: '14px', color: "#B98900"}}> {func.toSentenceCase(test.errorsList[0].split(errorsObject["ROLE_NOT_FOUND"])[0])}</span>
-          </Link>
+          <HorizontalStack gap={"1"}>
+            {missingConfigs.map((config, index) => {
+              return(
+                config.length > 0 ?
+                  <div className="div-link" onClick={(e) => {e.stopPropagation();window.open(baseUrl + config.toUpperCase(), "_blank")}} key={index}>
+                    <span style={{ lineHeight: '16px', fontSize: '14px', color: "#B98900"}}>{func.toSentenceCase(config || "")}</span>
+                  </div>
+                : null
+              )
+            })}
+          </HorizontalStack>
         )
       }else{
         error_message = errorsObject[errorType]
@@ -1020,7 +1030,10 @@ getMissingConfigs(testResults){
   const configsSet = new Set();
   testResults.forEach((res) => {
     const config = res?.errorsList.length > 0 ? func.toSentenceCase(res.errorsList[0].split(errorsObject["ROLE_NOT_FOUND"])[0]) : ""
-    configsSet.add(config)
+    if(config.length > 0){
+      let allConfigs = config.split(" ")
+      allConfigs.filter(x => x.length > 1).forEach((x) => configsSet.add(func.toSentenceCase(x)))
+    }
   })
 
   return [...configsSet]

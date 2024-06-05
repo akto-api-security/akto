@@ -299,24 +299,28 @@ const promotedBulkActions = (selectedDataHexIds) => {
     }
   }
 
+  const baseUrl = window.location.origin+"/dashboard/testing/roles/details?system=";
+
   const bannerComp = (
     missingConfigs.length > 0 ? 
-    <Banner status="critical">
-      <HorizontalStack gap={3}>
-        <Box>
-          <Text fontWeight="semibold">
-            {`${missingConfigs.length} configurations missing: `}  
-          </Text>
-        </Box>
-        <HorizontalStack gap={2}>
-          {missingConfigs.map((config) => {
-            return(<Link url={""} key={config}>
-              {config}
-            </Link>) 
-          })}
+    <div className="banner-wrapper">
+      <Banner status="critical">
+        <HorizontalStack gap={3}>
+          <Box>
+            <Text fontWeight="semibold">
+              {`${missingConfigs.length} configuration${missingConfigs.length > 1 ? 's' : ''} missing: `}  
+            </Text>
+          </Box>
+          <HorizontalStack gap={2}>
+            {missingConfigs.map((config) => {
+              return(<Link url={baseUrl + config.toUpperCase()} key={config} target="_blank">
+                {config}
+              </Link>) 
+            })}
+          </HorizontalStack>
         </HorizontalStack>
-      </HorizontalStack>
-    </Banner> : null
+      </Banner>
+    </div> : null
   )
 
   const definedTableTabs = ['Vulnerable', 'Need configurations','Skipped', 'No vulnerability found']

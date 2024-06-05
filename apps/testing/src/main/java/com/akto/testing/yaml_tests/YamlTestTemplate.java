@@ -15,8 +15,11 @@ import com.akto.test_editor.auth.AuthValidator;
 import com.akto.test_editor.execution.Executor;
 import com.akto.testing.StatusCodeAnalyser;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class YamlTestTemplate extends SecurityTestTemplate {
 
@@ -31,9 +34,11 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     }
 
     @Override
-    public String requireConfig(){
+    public Set<String> requireConfig(){
+        Set<String> requiredConfigsList = new HashSet<>();
+
         if(this.authMechanism == null || this.authMechanism.getAuthParams() == null || this.authMechanism.getAuthParams().isEmpty()){
-            return "ATTACKER_TOKEN_ALL";
+            requiredConfigsList.add("ATTACKER_TOKEN_ALL");
         }
 
         Map<String,Boolean> currentRolesMap = RequiredConfigs.getCurrentConfigsMap();
@@ -47,7 +52,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
                         List<String> roles = (List<String>) node.getChildNodes().get(0).getValues();
                         String role = roles.get(0);
                         if(!currentRolesMap.containsKey(role)){
-                            return role;
+                            requiredConfigsList.add(role.toUpperCase());
                         }
                    }
                 }
@@ -58,7 +63,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
         if(childList != null && !childList.isEmpty() && childList.size() >= 2){
             ExecutorNode reqNodes = childList.get(1);
             if (reqNodes.getChildNodes() == null || reqNodes.getChildNodes().size() == 0) {
-                return null;
+                return requiredConfigsList;
             }
 
             ExecutorNode reqNode = reqNodes.getChildNodes().get(0);
@@ -72,7 +77,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
                             String roleName = keyStr.substring(0,keyStr.length()-1).trim();
 
                             if(!currentRolesMap.containsKey(roleName)){
-                                return roleName;
+                                requiredConfigsList.add(roleName.toUpperCase());
                             }
                         }
                     }
@@ -80,7 +85,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
             }
         }
 
-        return null;
+        return requiredConfigsList;
     }
 
     @Override
