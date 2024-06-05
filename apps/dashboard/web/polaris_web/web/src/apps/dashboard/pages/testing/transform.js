@@ -943,7 +943,13 @@ rerunTest(hexId, refreshSummaries, shouldRefresh){
       }, 2000)
     }
   }).catch((resp) => {
-    func.setToast(true, true, "Unable to re-run test")
+    let additionalMessage = "";
+    const { data } = resp?.response
+    const { actionErrors } = data
+    if (actionErrors !== null && actionErrors !== undefined && actionErrors.length > 0) {
+      additionalMessage = ", " + actionErrors[0]
+    }
+    func.setToast(true, true, "Unable to re-run test" + additionalMessage);
   });
 },
 getActionsList(hexId){

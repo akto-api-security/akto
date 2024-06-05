@@ -59,7 +59,8 @@ public class DependencyFlow {
     }
 
     static String ID = "_id";
-    public void run() {
+    // if apiCollectionId is null then don't apply any filter
+    public void run(String apiCollectionId) {
         resultNodes = new HashMap<>();
         queue = new LinkedList<>();
         done = new HashSet<>();
@@ -68,12 +69,18 @@ public class DependencyFlow {
         int limit = 100;
         Set<ApiInfo.ApiInfoKey> neverL0 = new HashSet<>();
         Set<ApiInfo.ApiInfoKey> maybeL0 = new HashSet<>();
-
+        
+        Bson apiCollectionIDFilter = apiCollectionId == null ? null :  Filters.and(
+                Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, apiCollectionId),
+                Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, apiCollectionId)
+        );
+        
         int maxIterations = 100;
         while (maxIterations > 0) {
             maxIterations -= 1;
             Bson filter = lastId == null ? new BasicDBObject() : Filters.gt(ID, lastId);
-            List<DependencyNode> dependencyNodeList = DependencyNodeDao.instance.findAll(filter, 0, limit, Sorts.ascending(ID));
+            Bson mainFilter = apiCollectionIDFilter != null ? Filters.and(filter, apiCollectionIDFilter) : filter;
+            List<DependencyNode> dependencyNodeList = DependencyNodeDao.instance.findAll(mainFilter, 0, limit, Sorts.ascending(ID));
             findL0Apis(neverL0, maybeL0, dependencyNodeList);
             for (DependencyNode dependencyNode: dependencyNodeList) {
                 lastId = dependencyNode.getId();
