@@ -60,7 +60,7 @@ public class HarAction extends UserAction {
 
     @Override
     public String execute() throws IOException {
-        if (InitializerListener.isKubernetes()) {
+        if (DashboardMode.isKubernetes()) {
             skipKafka = true;
         }
 
