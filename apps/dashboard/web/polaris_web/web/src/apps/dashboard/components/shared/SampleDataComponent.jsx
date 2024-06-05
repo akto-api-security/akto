@@ -91,9 +91,10 @@ function SampleDataComponent(props) {
             const completeDataWithoutResponse = { ...completeData };
             // Check and transform the required fields
             if (completeDataWithoutResponse["response"]) {
-                completeDataWithoutResponse["response "]= "{}";
+                completeDataWithoutResponse["response"]= {"body": "{}", "headers": "{}"};
             } else if (completeDataWithoutResponse["responsePayload"]) {
-                completeDataWithoutResponse["responsePayload "]= "{}";
+                completeDataWithoutResponse["responsePayload"]= "{}";
+                completeDataWithoutResponse["responseHeaders"]= "{}";
             }
             if (type === "CURL") { 
                 snackBarMessage = "Curl request copied to clipboard"
