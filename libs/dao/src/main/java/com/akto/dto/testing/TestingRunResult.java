@@ -45,6 +45,7 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     public static final String ERRORS_LIST = "errorsList";
     private  List<String> errorsList;
 
+    public static final String REQUIRES_CONFIG = TEST_RESULTS + ".0." + TestResult.REQUIRES_CONFIG;
 
     private WorkflowTest workflowTest;
 

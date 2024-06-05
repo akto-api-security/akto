@@ -49,9 +49,11 @@ public abstract class SecurityTestTemplate {
         this.strategy = strategy;
     }
 
-    private YamlTestResult getResultWithError(String errorMessage){
+    private YamlTestResult getResultWithError(String errorMessage, boolean requiresConfig){
         List<GenericTestResult> testResults = new ArrayList<>();
-        testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(errorMessage), 0, false, TestResult.Confidence.HIGH, null));
+        TestResult testResult = new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(errorMessage), 0, false, TestResult.Confidence.HIGH, null);
+        testResult.setRequiresConfig(requiresConfig);
+        testResults.add(testResult);
         return new YamlTestResult(testResults, null);
     }
 
@@ -73,16 +75,16 @@ public abstract class SecurityTestTemplate {
             for(String str: missingConfigList){
                 missingConfigs += (str + " ");
             }
-            return getResultWithError(missingConfigs + " " + ROLE_NOT_FOUND.getMessage());
+            return getResultWithError(missingConfigs + " " + ROLE_NOT_FOUND.getMessage(), true);
         }
         
         boolean valid = filter();
         if (!valid) {
-            return getResultWithError(SKIPPING_EXECUTION_BECAUSE_FILTERS.getMessage());
+            return getResultWithError(SKIPPING_EXECUTION_BECAUSE_FILTERS.getMessage(), false);
         }
         valid = checkAuthBeforeExecution(debug, testLogs);
         if (!valid) {
-            return getResultWithError(SKIPPING_EXECUTION_BECAUSE_AUTH.getMessage());
+            return getResultWithError(SKIPPING_EXECUTION_BECAUSE_AUTH.getMessage(), false);
         }
         YamlTestResult attempts = executor(debug, testLogs);
         if(attempts == null || attempts.getTestResults().isEmpty()){

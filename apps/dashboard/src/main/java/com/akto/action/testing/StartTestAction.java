@@ -530,11 +530,10 @@ public class StartTestAction extends UserAction {
                 case SECURED:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
                     testingRunResultFilters.add(Filters.nin(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
-                    testingRunResultFilters.add(Filters.regex(TestingRunResultDao.ERRORS_KEY,TestResult.TestError.ROLE_NOT_FOUND.toString()));
+                    testingRunResultFilters.add(Filters.eq(TestingRunResult.REQUIRES_CONFIG, false));
                     break;
                 case SKIPPED_EXEC_NEED_CONFIG:
-                    testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
-                    testingRunResultFilters.add(Filters.not(Filters.regex(TestingRunResultDao.ERRORS_KEY,TestResult.TestError.ROLE_NOT_FOUND.toString())));
+                    testingRunResultFilters.add(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
                     break;
             }
         }

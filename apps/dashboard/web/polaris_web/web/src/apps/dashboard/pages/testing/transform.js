@@ -1035,10 +1035,12 @@ getMissingConfigs(testResults){
   }
   const configsSet = new Set();
   testResults.forEach((res) => {
-    const config = res?.errorsList.length > 0 ? func.toSentenceCase(res.errorsList[0].split(errorsObject["ROLE_NOT_FOUND"])[0]) : ""
-    if(config.length > 0){
-      let allConfigs = config.split(" ")
-      allConfigs.filter(x => x.length > 1).forEach((x) => configsSet.add(func.toSentenceCase(x)))
+    if(res?.errorsList.length > 0 && res.errorsList[0].includes(errorsObject["ROLE_NOT_FOUND"])){
+      const config = func.toSentenceCase(res.errorsList[0].split(errorsObject["ROLE_NOT_FOUND"])[0])
+      if(config.length > 0){
+        let allConfigs = config.split(" ")
+        allConfigs.filter(x => x.length > 1).forEach((x) => configsSet.add(func.toSentenceCase(x)))
+      }
     }
   })
 

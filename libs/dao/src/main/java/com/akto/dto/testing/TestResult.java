@@ -17,6 +17,9 @@ public class TestResult extends GenericTestResult {
     private double percentageMatch;
     private TestInfo testInfo;
 
+    public static final String REQUIRES_CONFIG = "requiresConfig";
+    private boolean requiresConfig;
+
     public enum Confidence {
         HIGH, MEDIUM, LOW
     }
@@ -117,5 +120,13 @@ public class TestResult extends GenericTestResult {
 
     public void setTestInfo(TestInfo testInfo) {
         this.testInfo = testInfo;
+    }
+
+    public boolean isRequiresConfig() {
+        return requiresConfig;
+    }
+
+    public void setRequiresConfig(boolean requiresConfig) {
+        this.requiresConfig = requiresConfig;
     }
 }
