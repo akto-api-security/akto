@@ -1,5 +1,6 @@
 package com.akto.testing.yaml_tests;
 
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
@@ -7,7 +8,9 @@ import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.*;
 import com.akto.log.LoggerMaker;
+import com.akto.rules.RequiredConfigs;
 import com.akto.rules.TestPlugin;
+import com.akto.test_editor.Utils;
 import com.akto.test_editor.auth.AuthValidator;
 import com.akto.test_editor.execution.Executor;
 import com.akto.testing.StatusCodeAnalyser;
@@ -25,6 +28,59 @@ public class YamlTestTemplate extends SecurityTestTemplate {
                             List<CustomAuthType> customAuthTypes, Strategy strategy) {
         super(apiInfoKey, filterNode, validatorNode, executorNode ,rawApi, varMap, auth, authMechanism, logId, testingRunConfig, strategy);
         this.customAuthTypes = customAuthTypes;
+    }
+
+    @Override
+    public String requireConfig(){
+        if(this.authMechanism == null || this.authMechanism.getAuthParams() == null || this.authMechanism.getAuthParams().isEmpty()){
+            return "ATTACKER_TOKEN_ALL";
+        }
+
+        Map<String,Boolean> currentRolesMap = RequiredConfigs.getCurrentConfigsMap();
+
+        // traverse in filternodes.getValues(), looks for valid key, if key valid, check for that role
+        List<FilterNode> childNodes = filterNode.getChildNodes();
+        if(childNodes != null && !childNodes.isEmpty()){
+            for(FilterNode node: childNodes){
+                if(Utils.commandRequiresConfig(node.getOperand().toLowerCase())){
+                   if(!node.getChildNodes().isEmpty()){
+                        List<String> roles = (List<String>) node.getChildNodes().get(0).getValues();
+                        String role = roles.get(0);
+                        if(!currentRolesMap.containsKey(role)){
+                            return role;
+                        }
+                   }
+                }
+            }
+        }
+
+        List<ExecutorNode> childList = executorNode.getChildNodes();
+        if(childList != null && !childList.isEmpty() && childList.size() >= 2){
+            ExecutorNode reqNodes = childList.get(1);
+            if (reqNodes.getChildNodes() == null || reqNodes.getChildNodes().size() == 0) {
+                return null;
+            }
+
+            ExecutorNode reqNode = reqNodes.getChildNodes().get(0);
+            for(ExecutorNode node: reqNode.getChildNodes()){
+                if(node.getOperationType().equalsIgnoreCase(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_HEADER.toString())){
+                    for(ExecutorNode child: node.getChildNodes()){
+                        if(Utils.commandRequiresConfig(child.getOperationType().toString())){
+                            String ACCESS_ROLES_CONTEXT = "${roles_access_context.";
+                            String keyStr = child.getOperationType().toString();
+                            keyStr = keyStr.replace(ACCESS_ROLES_CONTEXT, "");
+                            String roleName = keyStr.substring(0,keyStr.length()-1).trim();
+
+                            if(!currentRolesMap.containsKey(roleName)){
+                                return roleName;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     @Override
