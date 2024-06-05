@@ -6,6 +6,11 @@ import org.apache.commons.lang3.StringUtils;
 public enum DashboardMode {
     LOCAL_DEPLOY, ON_PREM, STAIRWAY, SAAS;
 
+    public static boolean isKubernetes() {
+        String isKubernetes = System.getenv("IS_KUBERNETES");
+        return isKubernetes != null && isKubernetes.equalsIgnoreCase("true");
+    }
+
     public static DashboardMode getActualDashboardMode() {
         DashboardMode dashboardMode = getDashboardMode();
         if (isSaasDeployment()) {
