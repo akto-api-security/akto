@@ -14,6 +14,7 @@ import java.util.Collections;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.akto.dto.testing.TestResult.TestError.*;
 
@@ -56,7 +57,7 @@ public abstract class SecurityTestTemplate {
 
     public abstract boolean filter();
 
-    public abstract String requireConfig();
+    public abstract Set<String> requireConfig();
 
     public abstract boolean checkAuthBeforeExecution(boolean debug, List<TestingRunResult.TestLog> testLogs);
 
@@ -66,9 +67,13 @@ public abstract class SecurityTestTemplate {
 
     public YamlTestResult run(boolean debug, List<TestingRunResult.TestLog> testLogs) {
         
-        String missingConfig = requireConfig();
-        if(missingConfig != null){
-            return getResultWithError(missingConfig + " " + ROLE_NOT_FOUND.getMessage());
+        Set<String> missingConfigList = requireConfig();
+        if(!missingConfigList.isEmpty()){
+            String missingConfigs = "";
+            for(String str: missingConfigList){
+                missingConfigs += (str + " ");
+            }
+            return getResultWithError(missingConfigs + " " + ROLE_NOT_FOUND.getMessage());
         }
         
         boolean valid = filter();

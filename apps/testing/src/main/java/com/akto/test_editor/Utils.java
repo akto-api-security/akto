@@ -841,8 +841,8 @@ public class Utils {
     }
 
     public static Boolean commandRequiresConfig(String key){
-        String ACCESS_ROLES_CONTEXT = "roles_access_context";
-        if (key.contains(ACCESS_ROLES_CONTEXT) || key.equals("replace_auth_header")) {
+        String ACCESS_ROLES = "roles_access";
+        if (key.contains(ACCESS_ROLES) || key.equals("replace_auth_header")) {
             return true;
         }
         return false;
