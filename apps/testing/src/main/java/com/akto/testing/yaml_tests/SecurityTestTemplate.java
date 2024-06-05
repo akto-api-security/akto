@@ -48,7 +48,15 @@ public abstract class SecurityTestTemplate {
         this.strategy = strategy;
     }
 
+    private YamlTestResult getResultWithError(String errorMessage){
+        List<GenericTestResult> testResults = new ArrayList<>();
+        testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(errorMessage), 0, false, TestResult.Confidence.HIGH, null));
+        return new YamlTestResult(testResults, null);
+    }
+
     public abstract boolean filter();
+
+    public abstract String requireConfig();
 
     public abstract boolean checkAuthBeforeExecution(boolean debug, List<TestingRunResult.TestLog> testLogs);
 
@@ -57,18 +65,19 @@ public abstract class SecurityTestTemplate {
     public abstract void triggerMetaInstructions(Strategy strategy, YamlTestResult attempts);
 
     public YamlTestResult run(boolean debug, List<TestingRunResult.TestLog> testLogs) {
-
+        
+        String missingConfig = requireConfig();
+        if(missingConfig != null){
+            return getResultWithError(missingConfig + " " + ROLE_NOT_FOUND.getMessage());
+        }
+        
         boolean valid = filter();
         if (!valid) {
-            List<GenericTestResult> testResults = new ArrayList<>();
-            testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(SKIPPING_EXECUTION_BECAUSE_FILTERS.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
-            return new YamlTestResult(testResults, null);
+            return getResultWithError(SKIPPING_EXECUTION_BECAUSE_FILTERS.getMessage());
         }
         valid = checkAuthBeforeExecution(debug, testLogs);
         if (!valid) {
-            List<GenericTestResult> testResults = new ArrayList<>();
-            testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(SKIPPING_EXECUTION_BECAUSE_AUTH.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
-            return new YamlTestResult(testResults, null);
+            return getResultWithError(SKIPPING_EXECUTION_BECAUSE_AUTH.getMessage());
         }
         YamlTestResult attempts = executor(debug, testLogs);
         if(attempts == null || attempts.getTestResults().isEmpty()){

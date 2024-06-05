@@ -10,7 +10,7 @@ import {ResourcesMajor,
   ReplayMinor,
   PlayMinor,
 } from '@shopify/polaris-icons';
-import React, {  } from 'react'
+import React from 'react'
 import { Text,HorizontalStack, Badge, Link, List, Box, Icon, Avatar, Tag, Tooltip} from '@shopify/polaris';
 import { history } from "@/util/history";
 import PersistStore from "../../../main/PersistStore";
@@ -749,7 +749,7 @@ getCollapsibleRow(urls, severity){
 getTestErrorType(message){
   const errorsObject = TestingStore.getState().errorsObject
   for(var key in errorsObject){
-    if(errorsObject[key] === message){
+    if(errorsObject[key] === message || message.includes(errorsObject[key])){
       return key
     }
   }
@@ -765,7 +765,15 @@ getPrettifiedTestRunResults(testRunResults){
     if(test?.errorsList.length > 0){
       const errorType = this.getTestErrorType(test.errorsList[0])
       key = key + ': ' + errorType
-      error_message = errorsObject[errorType]
+      if(errorType === "ROLE_NOT_FOUND"){
+        error_message = (
+          <Link url={""} target="_blank" monochrome removeUnderline>
+            <span style={{ lineHeight: '16px', fontSize: '14px', color: "#B98900"}}> {func.toSentenceCase(test.errorsList[0].split(errorsObject["ROLE_NOT_FOUND"])[0])}</span>
+          </Link>
+        )
+      }else{
+        error_message = errorsObject[errorType]
+      }
     }
 
     if(testRunResultsObj.hasOwnProperty(key)){
@@ -991,12 +999,31 @@ getHeaders: (tab)=> {
               return header;
           })
 
+      case "need_configurations":
+        return headers.filter((header) => header.title !== "CWE tags").map((header) => {
+          if (header.title === "Severity") {
+              // Modify the object as needed
+              return { type: CellType.TEXT, title: "Configuration missing", value: 'errorMessage' };
+          }
+          return header;
+      })
+
       default:
           return headers
   }
 },
-convertErrorEnumsToErrorObjects(errorEnums){
-  console.log(errorEnums)
+getMissingConfigs(testResults){
+  const errorsObject = TestingStore.getState().errorsObject
+  if(Object.keys(errorsObject).length === 0){
+    return []
+  }
+  const configsSet = new Set();
+  testResults.forEach((res) => {
+    const config = res?.errorsList.length > 0 ? func.toSentenceCase(res.errorsList[0].split(errorsObject["ROLE_NOT_FOUND"])[0]) : ""
+    configsSet.add(config)
+  })
+
+  return [...configsSet]
 }
 }
 
