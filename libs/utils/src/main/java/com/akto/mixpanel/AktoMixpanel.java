@@ -12,6 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Map;
+import java.util.Map.Entry;
 
 public class AktoMixpanel {
     private static final Logger logger = LoggerFactory.getLogger(AktoMixpanel.class);
@@ -63,5 +65,25 @@ public class AktoMixpanel {
             logger.error("Failed to raise mixpanel event", e);
         }
 
+    }
+
+    public void sendBulkEvents(String distinctId, Map<String, JSONObject> eventMap) {
+        if (mixpanelConfig == null) {
+            loggerMaker.errorAndAddToDb("Mixpanel config is not initialized", LogDb.DASHBOARD);
+            return;
+        }
+        try {
+            String projectToken = mixpanelConfig.getProjectToken();
+            MessageBuilder messageBuilder = new MessageBuilder(projectToken);
+            ClientDelivery delivery = new ClientDelivery();
+
+            for (Entry<String,JSONObject> eventsEntry : eventMap.entrySet()) {
+                JSONObject event = messageBuilder.event(distinctId, eventsEntry.getKey(), eventsEntry.getValue());
+                delivery.addMessage(event);
+            }
+            mixpanel.deliver(delivery);
+        } catch (IOException e) {
+            logger.error("Failed to raise mixpanel event", e);
+        }
     }
 }

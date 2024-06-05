@@ -235,7 +235,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         List<String> keys = new ArrayList<>();
         keys.add("AT");
-        CustomAuthType customAuthType = new CustomAuthType("AT", keys,keys, true,0);
+        CustomAuthType customAuthType = new CustomAuthType("AT", keys,keys, true,0, null, null);
         CustomAuthTypeDao.instance.insertOne(customAuthType);
         List<CustomAuthType> authTypes = new ArrayList<>(Collections.singletonList(customAuthType));
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
@@ -262,7 +262,7 @@ public class AuthPolicyTest extends MongoBasedTest {
 
         List<String> keys = new ArrayList<>();
         keys.add("a3.AT");
-        CustomAuthType customAuthType = new CustomAuthType("AT", new ArrayList<>(),keys, true,0);
+        CustomAuthType customAuthType = new CustomAuthType("AT", new ArrayList<>(),keys, true,0, null, null);
 
         CustomAuthTypeDao.instance.insertOne(customAuthType);
         List<CustomAuthType> authTypes = new ArrayList<>(Collections.singletonList(customAuthType));

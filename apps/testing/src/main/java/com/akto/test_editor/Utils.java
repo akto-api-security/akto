@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -18,10 +19,12 @@ import org.bouncycastle.jce.provider.JDKDSASigner.stdDSA;
 
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.UrlModifierPayload;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -40,6 +43,12 @@ public class Utils {
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final JsonFactory factory = mapper.getFactory();
     private static final Gson gson = new Gson();
+
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
+        .writeTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
+        .callTimeout(5, TimeUnit.SECONDS)
+        .build();
 
     public static Boolean checkIfContainsMatch(String text, String keyword) {
         Pattern pattern = Pattern.compile(keyword);
@@ -312,6 +321,69 @@ public class Utils {
         }
     }
 
+    /*
+        key = users
+        payload = {data : {users : { __typename: "abc", email: "abc@abc.com", info : {id: "werasdf", token: "asdfa"} }}}
+
+        returns  __typename, email
+
+    */
+
+    public static List<String> findAllTerminalKeys(String payload, String key) {
+
+        JsonParser jp;
+        JsonNode node;
+        List<String> values = new ArrayList<>();
+        try {
+            jp = factory.createParser(payload);
+            node = mapper.readTree(jp);
+        } catch (IOException e) {
+            return values;
+        }
+
+        findAllKeys(node, key, values, false);
+        return values;
+    }
+
+    public static void findAllKeys(JsonNode node, String key, List<String> values, boolean found) {
+        if (found) {
+            if (node.isArray()) {
+                ArrayNode arrayNode = (ArrayNode) node;
+                for (int i = 0; i < arrayNode.size(); i++) {
+                    JsonNode arrayElement = arrayNode.get(i);
+                    findAllKeys(arrayElement, key, values, found);
+                }
+            } else {
+                Iterator<String> fieldNames = node.fieldNames();
+                while(fieldNames.hasNext()) {
+                    String fieldName = fieldNames.next();
+                    JsonNode jsonNode = node.get(fieldName);
+                    if (jsonNode.isValueNode()) {
+                        values.add(fieldName);
+                    }
+                }
+            }
+        }
+        if (node.isArray()) {
+            ArrayNode arrayNode = (ArrayNode) node;
+            for (int i = 0; i < arrayNode.size(); i++) {
+                JsonNode arrayElement = arrayNode.get(i);
+                findAllKeys(arrayElement, key, values, found);
+            }
+        } else {
+            Iterator<String> fieldNames = node.fieldNames();
+            while(fieldNames.hasNext()) {
+                String fieldName = fieldNames.next();
+                if (key.equalsIgnoreCase(fieldName)) {
+                    found = true;
+                }
+                JsonNode jsonNode = node.get(fieldName);
+                findAllKeys(jsonNode, key, values, found);
+                found = false;
+            }
+        }
+    }
+
     public static List<String> findAllValuesForKey(String payload, String key, boolean isRegex) {
         JsonParser jp = null;
         JsonNode node;
@@ -495,6 +567,13 @@ public class Utils {
             return urlModifierPayload;
         }
         return urlModifierPayload;
+    }
+
+    public static String jsonifyIfArray(String payload) {
+        if (payload != null && payload.startsWith("[")) {
+            payload = "{\"json\": "+payload+"}";
+        }
+        return payload;
     }
 
     public static String buildNewUrl(UrlModifierPayload urlModifierPayload, String oldUrl) {
@@ -697,8 +776,6 @@ public class Utils {
             .addHeader(Constants.AKTO_TOKEN_KEY, tokenVal)
             .post(emptyBody)
             .build();
-
-        OkHttpClient client = new OkHttpClient();
         Response okResponse = null;
     
         try {
@@ -709,6 +786,10 @@ public class Utils {
             return new ExecutorSingleOperationResp(true, "");
         }catch (Exception e){
             return new ExecutorSingleOperationResp(false, e.getMessage());
+        }finally {
+            if (okResponse != null) {
+                okResponse.close(); // Manually close the response body
+            }
         }
     }
 
@@ -726,8 +807,6 @@ public class Utils {
             .url(requestUrl)
             .get()
             .build();
-
-            OkHttpClient client = new OkHttpClient();
             Response okResponse = null;
         
         try {
@@ -741,6 +820,23 @@ public class Utils {
             }
         }catch (Exception e){
             return false;
+        } finally {
+            if (okResponse != null) {
+                okResponse.close(); // Manually close the response body
+            }
+        }
+    }
+
+    public static ApiAccessType getApiAccessTypeFromString(String apiAccessType){
+        switch (apiAccessType.toLowerCase()) {
+            case "private":
+                return ApiAccessType.PRIVATE;
+            case "public":
+                return ApiAccessType.PUBLIC;
+            case "partner":
+                return ApiAccessType.PARTNER;
+            default:
+                return null;
         }
     }
 

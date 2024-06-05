@@ -8,6 +8,7 @@ import "./dashboard.css"
 import func from "@/util/func"
 import transform from "./testing/transform";
 import PersistStore from "../../main/PersistStore";
+import ConfirmationModal from "../components/shared/ConfirmationModal";
 
 function Dashboard() {
 
@@ -23,6 +24,8 @@ function Dashboard() {
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
 
+    const subCategoryMap = PersistStore(state => state.subCategoryMap)
+
     const fetchAllCollections = async () => {
         let apiCollections = await homeFunctions.getAllCollections()
         const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
@@ -32,11 +35,17 @@ function Dashboard() {
         setAllCollections(apiCollections)
     }
 
+    const fetchMetadata = async () => {
+        await transform.setTestMetadata();
+    };
+
     useEffect(() => {
         if((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)){
             fetchAllCollections()
         }
-        transform.setTestMetadata();
+        if (!subCategoryMap || (Object.keys(subCategoryMap).length === 0)) {
+            fetchMetadata();
+        }
         if(location.hash?.length > 0){
             let newPath = location.pathname
             if(location.hash.includes("Data")){
@@ -47,7 +56,9 @@ function Dashboard() {
             }
             navigate(newPath)
         }
-        window.Beamer.init();
+        if(window.Beamer){
+            window.Beamer.init();
+        }
     }, [])
 
     const toastConfig = Store(state => state.toastConfig)
@@ -65,11 +76,20 @@ function Dashboard() {
         <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableToast} duration={2000} />
     ) : null;
 
+    const confirmationModalConfig = Store(state => state.confirmationModalConfig)
+
+    const ConfirmationModalMarkup = <ConfirmationModal
+        modalContent={confirmationModalConfig.modalContent}
+        primaryActionContent={confirmationModalConfig.primaryActionContent}
+        primaryAction={confirmationModalConfig.primaryAction}
+    />
+
     return (
         <div className="dashboard">
         <Frame>
             <Outlet />
             {toastMarkup}
+            {ConfirmationModalMarkup}
         </Frame>
         </div>
     )

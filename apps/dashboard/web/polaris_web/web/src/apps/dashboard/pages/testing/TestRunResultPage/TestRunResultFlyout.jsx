@@ -8,11 +8,13 @@ import { Avatar, Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Te
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import GridRows from '../../../components/shared/GridRows'
+import { useNavigate } from 'react-router-dom'
+import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
 
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage} = props
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
     const [popoverActive, setPopoverActive] = useState(false)
@@ -36,6 +38,8 @@ function TestRunResultFlyout(props) {
             setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam))
         }
     }
+
+    const navigate = useNavigate()
 
     useEffect(() => {
        if(issueDetails && Object.keys(issueDetails).length > 0){       
@@ -72,6 +76,11 @@ function TestRunResultFlyout(props) {
         content: 'Reopen',
         onAction: () => { reopenAction() }
     }]
+
+    const handleClose = () => {
+        const navigateUrl = isIssuePage ? "/dashboard/issues" : window.location.pathname.split("result")[0]
+        navigate(navigateUrl) 
+    }
     
     function ActionsComp (){
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
@@ -118,7 +127,7 @@ function TestRunResultFlyout(props) {
             <div style={{display: 'flex', justifyContent: "space-between", gap:"24px", padding: "16px", paddingTop: '0px'}}>
                 <VerticalStack gap={"2"}>
                     <Box width="100%">
-                        <div style={{display: 'flex', gap: '4px'}}>
+                        <div style={{display: 'flex', gap: '4px'}} className='test-title'>
                             <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
                             {severity.length > 0 ? <Box><Badge size="small" status={func.getTestResultStatus(severity)}>{severity}</Badge></Box> : null}
                         </div>
@@ -137,7 +146,7 @@ function TestRunResultFlyout(props) {
     const ValuesTab = {
         id: 'values',
         content: "Values",
-        component: (!(selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 && selectedTestRunResult.errors[0].endsWith("skipping execution"))) && selectedTestRunResult.testResults &&
+        component: (!(selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 && func.showTestSampleData(selectedTestRunResult))) && selectedTestRunResult.testResults &&
         <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
             key="Sample values"
             heading={"Attempt"}
@@ -161,7 +170,11 @@ function TestRunResultFlyout(props) {
                         <VerticalStack gap={"2"} >
                             <HorizontalStack gap="1_5-experimental">
                                 <Box><Icon source={item.icon} color='subdued'/></Box>
-                                <Text variant="bodyMd" fontWeight="semibold" color="subdued">{item.title}</Text>
+                                <TitleWithInfo
+                                    textProps={{variant:"bodyMd", fontWeight:"semibold", color:"subdued"}}
+                                    titleText={item.title}
+                                    tooltipContent={item.tooltipContent}
+                                />
                             </HorizontalStack>
                             {item?.content}
                         </VerticalStack>
@@ -174,11 +187,15 @@ function TestRunResultFlyout(props) {
     )
 
     function RowComp ({cardObj}){
-        const {title, value} = cardObj
+        const {title, value, tooltipContent} = cardObj
         return(
             value ? <Box width="224px">
                 <VerticalStack gap={"2"}>
-                    <Text variant="bodyMd" fontWeight="semibold" color="subdued">{title}</Text>
+                    <TitleWithInfo
+                        textProps={{variant:"bodyMd", fontWeight:"semibold"}}
+                        titleText={title}
+                        tooltipContent={tooltipContent}
+                    />
                     {value}
                 </VerticalStack>
             </Box>: null
@@ -193,9 +210,11 @@ function TestRunResultFlyout(props) {
         <Box padding={"4"}>
             <VerticalStack gap={"5"}>
                 <VerticalStack gap={"2"}>
-                    <Text variant="bodyMd" fontWeight="semibold" color="subdued">
-                        Description
-                    </Text>
+                    <TitleWithInfo
+                        textProps={{variant:"bodyMd", fontWeight:"semibold", color:"subdued"}}
+                        titleText={"Description"}
+                        tooltipContent={"A brief description about the test from test library"}
+                    />
                     <Box as="span">
                         {
                             getDescriptionText(fullDescription) 
@@ -244,15 +263,19 @@ function TestRunResultFlyout(props) {
         <TitleComponent/>, tabsComponent
     ]
 
+    const title = isIssuePage ? "Issue details" : "Test result"
+
     return (
         <FlyLayout
-            title={"Test result"}
+            title={title}
             show={showDetails}
             setShow={setShowDetails}
             components={currentComponents}
             loading={loading}
             showDivider={true}
             newComp={true}
+            handleClose={handleClose}
+            isHandleClose={true}
         />
     )
 }

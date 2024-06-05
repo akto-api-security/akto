@@ -48,6 +48,7 @@ const apiDetailsHeaders = [
         value: 'apiCollectionName',
         itemOrder: 3,
         icon: DynamicSourceMinor,
+        iconTooltip: "Api collection name"
     },
     {
         text: 'Tags',
@@ -66,39 +67,44 @@ const apiDetailsHeaders = [
         itemOrder: 3,
         value: 'hostName',
         icon: GlobeMinor,
+        iconTooltip: "Hostname of the api collection"
     },
     {
         text: 'Last Seen',
         value: 'last_seen',
         icon: SearchMinor,
-        itemOrder: 3
+        itemOrder: 3,
+        iconTooltip: "Last seen traffic"
     },
     {
         text: 'Access Type',
         value: 'access_type',
         icon: InfoMinor,
         itemOrder: 3,
-        showFilter: true
+        showFilter: true, 
+        iconTooltip: "Access type of the API"
     },
     {
         text: 'Auth Type',
         value: 'auth_type',
         icon: LockMinor,
         itemOrder: 3,
-        showFilter: true
+        showFilter: true,
+        iconTooltip: "Auth type of the API"
     },
     {
         text: "Discovered",
         value: 'added',
         icon: ClockMinor,
-        itemOrder: 3
+        itemOrder: 3,
+        iconTooltip: "Discovered time of API"
     },
     {
         text: 'Changes',
         value: 'changes',
         icon: InfoMinor,
-        itemOrder: 3
-
+        itemOrder: 3,
+        iconTooltip: "Changes in API"
     }
 ]
 
@@ -359,12 +365,16 @@ const transform = {
         )
     },
 
-    prettifySubtypes(sensitiveTags){
+    prettifySubtypes(sensitiveTags, deactivated){
         return(
             <Box maxWidth="200px">
                 <HorizontalStack gap={1}>
                     {sensitiveTags.map((item,index)=>{
-                        return(index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index}><Box><Icon color="subdued" source={func.getSensitiveIcons(item)} /></Box></Tooltip> : null)
+                        return (index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index}><Box>
+                            <div className={deactivated ? "icon-deactivated" : ""}>
+                                <Icon color={deactivated ? "" : "subdued"} source={func.getSensitiveIcons(item)} />
+                            </div>
+                        </Box></Tooltip> : null)
                     })}
                     {sensitiveTags.length > 4 ? <Badge size="small" status="warning" key={"more"}>{'+' + (sensitiveTags.length - 4).toString() + 'more'}</Badge> : null}
                 </HorizontalStack>
@@ -389,12 +399,14 @@ const transform = {
                 displayName: c.displayName,
                 displayNameComp: c.displayNameComp,
                 endpoints: c.endpoints,
-                riskScoreComp: <Badge status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
+                riskScoreComp: <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
                 coverage: calcCoverage,
                 issuesArr: this.getIssuesList(c.severityInfo),
-                sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes),
+                sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes, c.deactivated),
                 lastTraffic: c.detected,
                 riskScore: c.riskScore,
+                deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
+                activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 )),
                 envTypeComp: c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null
             }
         })
@@ -409,6 +421,10 @@ const transform = {
         let totalTested = 0 ;
 
         collectionsData?.forEach((c) =>{
+            if (c.hasOwnProperty('type') && c.type === 'API_GROUP') {
+                return
+            }
+
             totalUrl += c.endpoints ;
             totalTested += c.testedEndpoints;
         })
@@ -437,46 +453,14 @@ const transform = {
         }
     },
 
-    getRiskScoreValue(severity){
-        if(severity >= 100){
-            return 2
-        }else if(severity >= 10){
-            return 1
-        }else if(severity > 0){
-            return 0.5
-        }else{
-            return 0
-        }
-    },
-
     isNewEndpoint(lastSeen){
         let lastMonthEpoch = func.timeNow() - (30 * 24 * 60 * 60);
         return lastSeen > lastMonthEpoch
     },
 
-    getRiskScoreForEndpoint(url){
-        let riskScore = 0 
-        riskScore += this.getRiskScoreValue(url.severityScore);
-
-        if(url.access_type === "Public"){
-            riskScore += 1
-        }
-
-        if(url.isSensitive){
-            riskScore += 1
-        }
-
-        if(this.isNewEndpoint(url.lastSeenTs)){
-            riskScore += 1
-        }
-
-        return riskScore
-    },
-
     prettifyEndpointsData(inventoryData){
         const hostNameMap = PersistStore.getState().hostNameMap
         const prettifyData = inventoryData.map((url) => {
-            const score = this.getRiskScoreForEndpoint(url)
             return{
                 ...url,
                 last_seen: url.last_seen,
@@ -485,10 +469,10 @@ const transform = {
                 auth_type: url.auth_type,
                 endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} isNew={this.isNewEndpoint(url.lastSeenTs)} />,
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
-                riskScoreComp: <Badge status={this.getStatus(score)} size="small">{score.toString()}</Badge>,
-                riskScore: score,
+                riskScoreComp: <Badge status={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
                 isNew: this.isNewEndpoint(url.lastSeenTs),
                 sensitiveDataTags: url?.sensitiveTags.join(" "),
+                codeAnalysisEndpoint: false,
             }
         })
 

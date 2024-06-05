@@ -5,11 +5,13 @@ const endpointHeadings = [
         text: "Endpoint",
         value: "endpointComp",
         title: "Api endpoints",
+        sortActive: true
     },
     {
         text: "Risk score",
         title: "Risk score",
         value: "riskScoreComp",
+        tooltipContent: "Risk score is calculated based on the amount of sensitive information the API shares and its current status regarding security issues."
     },
     {
         text: "Hostname",
@@ -31,6 +33,7 @@ const endpointHeadings = [
         title: 'Access type',
         showFilter: true,
         type: CellType.TEXT,
+        sortActive: true
     },
     {
         text: 'Auth Type',
@@ -38,6 +41,7 @@ const endpointHeadings = [
         value: 'auth_type',
         showFilter: true,
         type: CellType.TEXT,
+        sortActive: true
     },
     {
         text: 'Sensitive Params',
@@ -50,6 +54,7 @@ const endpointHeadings = [
         title: 'Last seen',
         value: 'last_seen',
         type: CellType.TEXT,
+        sortActive: true
     },
 ]
 
@@ -65,6 +70,7 @@ const newParametersHeaders = [
         title: 'Parameter Type',
         type: CellType.TEXT,
         maxWidth: '100px',
+        tooltipContent: "Data type associated with the parameter"
     },
     {
         text: "Discovered",
@@ -73,7 +79,8 @@ const newParametersHeaders = [
         sortKey: 'timestamp',
         showFilterMenu: true,
         type: CellType.TEXT,
-        maxWidth: '120px'
+        maxWidth: '120px',
+        sortActive: true
     },
     {
         text: "Endpoint",
@@ -99,7 +106,8 @@ const newParametersHeaders = [
         sortKey: 'isHeader',
         showFilterMenu: true,
         type: CellType.TEXT,
-        maxWidth: '120px'
+        maxWidth: '120px',
+        tooltipContent: "Location (request/response) of where the parameter is detected."
     },
     {
         text: 'Values',
@@ -108,6 +116,7 @@ const newParametersHeaders = [
         maxWidth: '150px',
         showFilterMenu: true,
         type: CellType.TEXT,
+        tooltipContent: "Value of the parameter as detected in location"
     }
 ]
 
@@ -121,20 +130,31 @@ const endpointResourceName = {
     plural: 'API endpoints',
 };
 
+const methodObj = [{
+    text: 'Method',
+    value: 'method',
+    filterKey: 'method',
+    showFilter: true,
+    textValue: 'method',
+    sortActive: true
+}]
+
 const endpointSortOptions = [
-    { label: 'Method', value: 'method asc', directionLabel: 'A-Z', sortKey: 'method' },
-    { label: 'Method', value: 'method desc', directionLabel: 'Z-A', sortKey: 'method' },
-    { label: 'Endpoint', value: 'endpoint asc', directionLabel: 'A-Z', sortKey: 'url' },
-    { label: 'Endpoint', value: 'endpoint desc', directionLabel: 'Z-A', sortKey: 'url' },
-    { label: 'Auth Type', value: 'auth_type asc', directionLabel: 'A-Z', sortKey: 'auth_type' },
-    { label: 'Auth Type', value: 'auth_type desc', directionLabel: 'Z-A', sortKey: 'auth_type' },
-    { label: 'Access Type', value: 'access_type asc', directionLabel: 'A-Z', sortKey: 'access_type' },
-    { label: 'Access Type', value: 'access_type desc', directionLabel: 'Z-A', sortKey: 'access_type' },
+    { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Recent first', sortKey: 'lastSeenTs', columnIndex: 8 },
+    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest first', sortKey: 'lastSeenTs', columnIndex: 8 },
+    { label: 'Method', value: 'method asc', directionLabel: 'A-Z', sortKey: 'method', columnIndex: 9 },
+    { label: 'Method', value: 'method desc', directionLabel: 'Z-A', sortKey: 'method', columnIndex: 9 },
+    { label: 'Endpoint', value: 'endpoint asc', directionLabel: 'A-Z', sortKey: 'url', columnIndex: 1 },
+    { label: 'Endpoint', value: 'endpoint desc', directionLabel: 'Z-A', sortKey: 'url', columnIndex: 1 },
+    { label: 'Auth Type', value: 'auth_type asc', directionLabel: 'A-Z', sortKey: 'auth_type', columnIndex: 6 },
+    { label: 'Auth Type', value: 'auth_type desc', directionLabel: 'Z-A', sortKey: 'auth_type', columnIndex: 6 },
+    { label: 'Access Type', value: 'access_type asc', directionLabel: 'A-Z', sortKey: 'access_type', columnIndex: 5 },
+    { label: 'Access Type', value: 'access_type desc', directionLabel: 'Z-A', sortKey: 'access_type', columnIndex: 5 },
 ];
 
 const parameterSortOptions = [
-    { label: 'Discovered time', value: 'timestamp asc', directionLabel: 'Newest', sortKey: 'timestamp' },
-    { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp' },
+    { label: 'Discovered time', value: 'timestamp asc', directionLabel: 'Newest', sortKey: 'timestamp', columnIndex: 3},
+    { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp', columnIndex: 3 },
 ];
 
 let paramFilters = [
@@ -178,15 +198,17 @@ let paramFilters = [
 
 const apiChangesData = {
     getData(key){
-        if(key === 'param'){
+        if(key.includes('param')){
             const obj = {
-                headers: newParametersHeaders,
+                headers: [...newParametersHeaders, ...methodObj],
+                headings: newParametersHeaders,
                 resourceName: parameterResourceName,
                 sortOptions: parameterSortOptions,
             }
             return obj;
         }else{
             const obj = {
+                headings: endpointHeadings,
                 headers: endpointHeadings,
                 resourceName: endpointResourceName,
                 sortOptions: endpointSortOptions,

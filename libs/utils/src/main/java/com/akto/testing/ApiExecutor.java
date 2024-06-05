@@ -144,6 +144,52 @@ public class ApiExecutor {
         return url;
     }
 
+    public static String replacePathFromConfig(String url, TestingRunConfig testingRunConfig) {
+        if (testingRunConfig != null && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
+            URI typedUrl = null;
+            try {
+                typedUrl = new URI(url);
+
+            } catch (URISyntaxException e) {
+                loggerMaker.errorAndAddToDb(e, "error converting req url to uri " + url, LogDb.TESTING);
+                throw new RuntimeException(e);
+            }
+
+            String newUrl = testingRunConfig.getOverriddenTestAppUrl();
+
+            URI newUri = null;
+            try {
+                newUri = new URI(newUrl);
+
+            } catch (URISyntaxException e) {
+                loggerMaker.errorAndAddToDb(e, "error converting override url to uri " + url, LogDb.TESTING);
+                throw new RuntimeException(e);
+            }
+
+            String newPath = newUri.getPath();
+
+            if (newPath.equals("") || newPath.equals("/")) {
+                newPath = typedUrl.getPath();
+            }
+
+            String newHost = newUri.getHost();
+            if (newUri.getHost().equals("")) {
+                newHost = typedUrl.getHost();
+            }
+
+            try {
+                String newScheme = newUri.getScheme() == null ? typedUrl.getScheme() : newUri.getScheme();
+                int newPort = newUri.getPort() == -1 ? typedUrl.getPort() : newUri.getPort();
+
+                url = new URI(newScheme, null, newHost, newPort, newPath, typedUrl.getQuery(), typedUrl.getFragment()).toString();
+            } catch (URISyntaxException e) {
+                loggerMaker.errorAndAddToDb(e, "error building new url using override url", LogDb.TESTING);
+                throw new RuntimeException(e);
+            }
+        }
+        return url;
+    }
+
     public static String prepareUrl(OriginalHttpRequest request, TestingRunConfig testingRunConfig) throws Exception{
         String url = request.getUrl();
         url = url.trim();
@@ -172,6 +218,7 @@ public class ApiExecutor {
         headersMap.put(Constants.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
         for (String headerName: headersMap.keySet()) {
             if (forbiddenHeaders.contains(headerName)) continue;
+            if (headerName.contains(" ")) continue;
             List<String> headerValueList = headersMap.get(headerName);
             if (headerValueList == null || headerValueList.isEmpty()) continue;
             for (String headerValue: headerValueList) {

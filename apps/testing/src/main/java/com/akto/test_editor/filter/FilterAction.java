@@ -13,6 +13,7 @@ import com.akto.dto.testing.AccessMatrixUrlToRole;
 
 import org.bson.conversions.Bson;
 
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.test_editor.TestEditorEnums;
@@ -22,6 +23,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterActionRequest;
@@ -64,6 +66,7 @@ public final class FilterAction {
         put("cookie_expire_filter", new CookieExpireFilter());
         put("datatype", new DatatypeFilter());
         put("ssrf_url_hit", new SsrfUrlHitFilter());
+        put("belongs_to_collections", new ApiCollectionFilter());
     }};
 
     public FilterAction() { }
@@ -81,7 +84,9 @@ public final class FilterAction {
             case "include_roles_access":
                 return evaluateRolesAccessContext(filterActionRequest, true);
             case "exclude_roles_access":
-                return evaluateRolesAccessContext(filterActionRequest, false);                
+                return evaluateRolesAccessContext(filterActionRequest, false);
+            case "api_access_type":
+                return applyFilterOnAccessType(filterActionRequest);                
             default:
                 return new DataOperandsFilterResponse(false, null, null, null);
         }
@@ -281,6 +286,7 @@ public final class FilterAction {
 
         BasicDBObject payloadObj = new BasicDBObject();
         try {
+            payload = Utils.jsonifyIfArray(payload);
             payloadObj =  BasicDBObject.parse(payload);
         } catch(Exception e) {
             // add log
@@ -385,6 +391,7 @@ public final class FilterAction {
         String key = querySet.get(0);
         BasicDBObject reqObj = new BasicDBObject();
         try {
+            payload = Utils.jsonifyIfArray(payload);
             reqObj =  BasicDBObject.parse(payload);
         } catch(Exception e) {
             // add log
@@ -835,19 +842,28 @@ public final class FilterAction {
                 }
                 Object value = basicDBObject.get(key);
                 doAllSatisfy = getMatchingKeysForPayload(value, key, querySet, operand, matchingKeys, doAllSatisfy);
+                if (parentKey != null && TestEditorEnums.DataOperands.VALUETYPE.toString().equals(operand)) {
+                    matchingKeys.add(parentKey);
+                }
                 
             }
         } else if (obj instanceof BasicDBList) {
             for(Object elem: (BasicDBList) obj) {
                 doAllSatisfy = getMatchingKeysForPayload(elem, parentKey, querySet, operand, matchingKeys, doAllSatisfy);
             }
-        } else {
-            DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(parentKey, querySet, operand);
-            res = invokeFilter(dataOperandFilterRequest);
-            if (res) {
+            if (parentKey != null && TestEditorEnums.DataOperands.VALUETYPE.toString().equals(operand)) {
                 matchingKeys.add(parentKey);
             }
-            doAllSatisfy = Utils.evaluateResult("and", doAllSatisfy, res);
+
+        } else {
+            if (!TestEditorEnums.DataOperands.VALUETYPE.toString().equals(operand)) {
+                DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(parentKey, querySet, operand);
+                res = invokeFilter(dataOperandFilterRequest);
+                if (res) {
+                    matchingKeys.add(parentKey);
+                }
+                doAllSatisfy = Utils.evaluateResult("and", doAllSatisfy, res);
+            }
         }
         return doAllSatisfy;
     }
@@ -1185,6 +1201,23 @@ public final class FilterAction {
         return new DataOperandsFilterResponse(res, null, null, null);
     }
 
+    private DataOperandsFilterResponse applyFilterOnAccessType(FilterActionRequest filterActionRequest){
+        List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
+        ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(apiInfoKey));
+        Set<ApiAccessType> apiAccessTypes = apiInfo.getApiAccessTypes();
+        boolean res = false;
+        if(apiInfo != null && !querySet.isEmpty() && apiAccessTypes.size() > 0){
+            ApiAccessType apiAccessType = Utils.getApiAccessTypeFromString(querySet.get(0).toString());
+            if(apiAccessTypes.size() == 1){
+                res = apiAccessTypes.contains(apiAccessType);
+            }else{
+                res = apiAccessType == ApiAccessType.PUBLIC;
+            }
+        }
+        return new DataOperandsFilterResponse(res, null, null, null);
+    }
+
     public BasicDBObject getPrivateResourceCount(OriginalHttpRequest originalHttpRequest, ApiInfo.ApiInfoKey apiInfoKey) {
         String urlWithParams = originalHttpRequest.getFullUrlWithParams();
         String url = apiInfoKey.url;
@@ -1348,6 +1381,7 @@ public final class FilterAction {
         String payload = rawApi.getRequest().getJsonRequestBody();
         BasicDBObject reqObj = new BasicDBObject();
         try {
+            payload = Utils.jsonifyIfArray(payload);
             reqObj =  BasicDBObject.parse(payload);
         } catch(Exception e) {
             // add log
@@ -1371,6 +1405,7 @@ public final class FilterAction {
         String responsePayload = rawApi.getResponse().getJsonResponseBody();
         BasicDBObject respObj = new BasicDBObject();
         try {
+            responsePayload = Utils.jsonifyIfArray(responsePayload);
             respObj =  BasicDBObject.parse(responsePayload);
         } catch(Exception e) {
             // add log

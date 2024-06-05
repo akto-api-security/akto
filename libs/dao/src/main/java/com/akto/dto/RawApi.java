@@ -115,6 +115,13 @@ public class RawApi {
     }
 
     public boolean equals(RawApi compareWithRawApi) {
+        String method = this.getRequest().getMethod();
+        String compareWithMethod = compareWithRawApi.getRequest().getMethod();
+
+        if(method != compareWithMethod) {
+            return false;
+        }
+        
         String payload = this.getRequest().getBody().replaceAll("\\s+","");
         String compareWithPayload = compareWithRawApi.getRequest().getBody().replaceAll("\\s+","");
         

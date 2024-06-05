@@ -12,6 +12,7 @@ import {
 import { useNavigate } from "react-router-dom"
 import dashboardFunc from "../../transform"
 import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 
 const headers = [
     {
@@ -24,6 +25,7 @@ const headers = [
         value: "subType",
         showFilter:true,
         itemOrder: 1,
+        sortActive: true
     },
     {
         text: "Custom type",
@@ -43,15 +45,16 @@ const headers = [
     },
     {
         text:"Sensitive count",
-        value: "sensitiveCount"
+        value: "sensitiveCount",
+        sortActive: true
     }
 ] 
 
 const sortOptions = [
-    { label: 'Sensitive data', value: 'sensitiveCount asc', directionLabel: 'More exposure', sortKey: 'sensitiveCount' },
-    { label: 'Sensitive data', value: 'sensitiveCount desc', directionLabel: 'Less exposure', sortKey: 'sensitiveCount' },
-    { label: 'Data type', value: 'subType asc', directionLabel: 'A-Z', sortKey: 'subType' },
-    { label: 'Data type', value: 'subType desc', directionLabel: 'Z-A', sortKey: 'subType' },
+    { label: 'Sensitive data', value: 'sensitiveCount asc', directionLabel: 'More exposure', sortKey: 'sensitiveCount', columnIndex: 6 },
+    { label: 'Sensitive data', value: 'sensitiveCount desc', directionLabel: 'Less exposure', sortKey: 'sensitiveCount', columnIndex: 6 },
+    { label: 'Data type', value: 'subType asc', directionLabel: 'A-Z', sortKey: 'subType', columnIndex: 2 },
+    { label: 'Data type', value: 'subType desc', directionLabel: 'Z-A', sortKey: 'subType', columnIndex: 2 },
   ];
 
 const resourceName = {
@@ -160,12 +163,12 @@ function AllSensitiveData() {
     
     return (
         <PageWithMultipleCards
-        title={
-                <Text variant='headingLg' truncate>
-            {
-                "Sensitive data exposure"
-            }
-        </Text>
+            title={
+                <TitleWithInfo 
+                    titleText={"Sensitive data exposure"} 
+                    tooltipContent={"Akto allows you to identify which sensitive data an API contains in request or response."}
+                    docsUrl="https://docs.akto.io/api-inventory/concepts/sensitive-data" 
+                />
             }
             primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
             secondaryActions={<Button onClick={displayGPT}>Ask AktoGPT</Button>}

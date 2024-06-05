@@ -1,8 +1,6 @@
 import {
-  CircleCancelMajor,
   CalendarMinor,
   ClockMinor,
-  CircleTickMajor,
   CircleAlertMajor,
   DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor, InviteMinor, CreditCardMajor, IdentityCardMajor, LocationsMinor,
   PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, ReceiptMajor, MobileMajor, CalendarTimeMinor
@@ -16,6 +14,8 @@ import { current } from 'immer';
 import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
+
+import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
 
 const func = {
   setToast (isActive, isError, message) {
@@ -127,6 +127,9 @@ prettifyEpoch(epoch) {
   },
   downloadAsCSV(data, selectedTestRun) {
     // use correct function, this does not expand objects.
+    if(Object.keys(data).length === 0){
+      return;
+    }
     let headerTextToValueMap = Object.keys(data[0])
 
     let csv = headerTextToValueMap.join(",") + "\r\n"
@@ -140,6 +143,12 @@ prettifyEpoch(epoch) {
   },
   flattenObject(obj, prefix = '') {
     return obj && Object.keys(obj).reduce((acc, k) => {
+
+      // skip react objects
+      if(isValidElement(obj[k])){
+        return acc;
+      }
+
       const pre = prefix.length ? `${prefix}.` : '';
       if (
         typeof obj[k] === 'object' &&
@@ -196,27 +205,48 @@ prettifyEpoch(epoch) {
       return (countIssues[key] > 0)
     })
   },
-  getTestingRunIcon(state) {
-    switch (state?._name || state) {
-      case "RUNNING": return ClockMinor;
-      case "SCHEDULED": return CalendarMinor;
-      case "STOPPED": return CircleCancelMajor;
-      case "COMPLETED": return CircleTickMajor;
-      case "FAILED" :
-      case "FAIL": return CircleAlertMajor;
-      default: return ClockMinor;
-    }
-  },
-  getTestingRunIconColor(state) {
-    switch (state?._name || state) {
-      case "RUNNING": return "subdued";
-      case "SCHEDULED": return "warning";
+  getTestingRunIconObj(state) {
+    let testState = state?._name || state
+    switch(testState.toUpperCase()){
+      case "RUNNING": 
+        return {
+          color: "subdued",
+          icon: ClockMinor,
+          tooltipContent: "Test is currently running"
+        }
+
+      case "SCHEDULED": 
+        return {
+          color: "warning",
+          icon: CalendarMinor,
+          tooltipContent: "Test is scheduled and will run in future."
+        }
+
       case "FAILED":
       case "FAIL":
-      case "STOPPED": return "critical";
-      case "COMPLETED": return "success";
-      default: return "base";
-    }
+        return{
+          color: "critical",
+          icon: CircleAlertMajor,
+          tooltipContent: "Error occurred while running the test."
+        }
+
+      case "STOPPED":
+        return{
+          tooltipContent: "Error occurred while running the test.",
+          icon: circle_cancel,
+        }
+      case "COMPLETED": 
+        return {
+          tooltipContent: "Test has been completed.",
+          icon: circle_tick_minor
+        }
+      default: 
+        return{
+          color: "critical",
+          icon: CircleAlertMajor,
+          tooltipContent: "Unknown error occurred while running the test."
+        }
+      }
   },
   getSeverity(countIssues) {
     return func.getSeverityStatus(countIssues).map((key) => {
@@ -733,7 +763,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
 
           let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
           let authTypeTag = authType.replace(",", "");
-          let score = apiInfoMap[key] ? apiInfoMap[key]?.severityScore : 0
+          let riskScore = apiInfoMap[key] ? apiInfoMap[key]?.riskScore : 0
           let isSensitive = apiInfoMap[key] ? apiInfoMap[key]?.isSensitive : false
 
           ret[key] = {
@@ -744,7 +774,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               endpoint: x.url,
               parameterisedEndpoint: x.method + " " + this.parameterizeUrl(x.url),
               open: apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].indexOf("UNAUTHENTICATED") !== -1 : false,
-              access_type: access_type || "None",
+              access_type: access_type || "No access type",
               method: x.method,
               color: x.sensitive && x.sensitive.size > 0 ? "#f44336" : "#00bfa5",
               apiCollectionId: x.apiCollectionId,
@@ -752,20 +782,20 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               lastSeenTs: apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs,
               detectedTs: x.startTs,
               changesCount: x.changesCount,
-              changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : '-',
+              changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : 'No new changes',
               added: "Discovered " + this.prettifyEpoch(x.startTs),
               violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
-              auth_type: (authType || "").toLowerCase(),
+              auth_type: (authType || "no auth type found").toLowerCase(),
               sensitiveTags: [...this.convertSensitiveTags(x.sensitive)],
-              authTypeTag: (authTypeTag || "").toLowerCase(),
+              authTypeTag: (authTypeTag || "no auth").toLowerCase(),
               collectionIds: apiInfoMap[key] ? apiInfoMap[key]?.collectionIds.filter(x => {
                 return Object.keys(apiGroupsMap).includes(x) || Object.keys(apiGroupsMap).includes(x.toString())
               }).map( x => {
                 return apiGroupsMap[x]
               }) : [],
               isSensitive: isSensitive,
-              severityScore: score,
+              riskScore: riskScore
           }
 
       }
@@ -1025,6 +1055,7 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
  },
 
  dateRangeReducer(draft, action){
+
   try {
     switch(action.type){
       case "update": {
@@ -1071,6 +1102,9 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 },
 
 convertToDisambiguateLabelObj(value, convertObj, maxAllowed){
+  if(!value || value.length  === 0 || !Array.isArray(value)){
+    return ""
+  }
   if (value.length > maxAllowed) {
       return `${value.slice(0, maxAllowed)
                      .map(val => convertObj ? convertObj[val] : val)
@@ -1115,6 +1149,19 @@ mapCollectionIdToHostName(apiCollections){
         duration += seconds + ` second${seconds==1 ? '' : 's'}`;
     }
     return duration.trim();
+  },
+  getHexColorForSeverity(key){
+    switch(key){
+      case "HIGH":
+        return "#D72C0D"
+      case "MEDIUM":
+        return "#FFD79D"
+      case "LOW":
+        return "#2C6ECB"
+      default:
+        return "#2C6ECB"
+    }
+
   },
 
   getColorForCharts(key){
@@ -1356,7 +1403,15 @@ mapCollectionIdToHostName(apiCollections){
     transformedString = segments.join('/');
     transformedString = transformedString.replace(/[/|-]/g, '_');
     return transformedString;
-  },
+},
+showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
+  Store.getState().setConfirmationModalConfig({
+    modalContent: modalContent,
+    primaryActionContent: primaryActionContent,
+    primaryAction: primaryAction,
+    show: true
+  })
+},
   hashCode(str) {
     var hash = 0;
     for (var i = 0; i < str.length; i++) {
@@ -1366,6 +1421,54 @@ mapCollectionIdToHostName(apiCollections){
     }
     return hash;
   },
+  getTableTabsContent(tableTabs, countObj, setSelectedTab, selectedTab, currentCount){
+    const finalTabs = tableTabs.map((tab,ind) => {
+      const tabId = this.getKeyFromName(tab)
+      return {
+          content: tab,
+          badge: selectedTab === tabId ? currentCount.toString() : countObj[tabId].toString(),
+          onAction: () => { setSelectedTab(tabId) },
+          id: this.getKeyFromName(tabId),
+          index: ind 
+      }
+    })
+    return finalTabs
+  },
+  getTabsCount(tableTabs, data, initialCountArr = []){
+    const currentState = PersistStore(state => state.tableInitialState)
+    const baseUrl = window.location.href.split('#')[0]
+
+    let finalCountObj = {}
+    tableTabs.forEach((tab,ind) => {
+      const tabId = this.getKeyFromName(tab)
+      const tabKey = baseUrl + '#' + tabId
+      const count = currentState[tabKey] || data[tabId]?.length || initialCountArr[ind] || 0
+      finalCountObj[tabId] = count
+    })
+
+    return finalCountObj
+  },
+  getKeyFromName(key){
+    return key.replace(/[\s/]+/g, '_').toLowerCase();
+  },
+  showTestSampleData(selectedTestRunResult){
+
+    let skipList = [
+      "skipping execution",
+      "deactivated"
+    ]
+
+    let errors = selectedTestRunResult.errors;
+
+    if (errors && errors.length > 0) {
+      let errorInSkipList = errors.filter(x => {
+        return skipList.some(y => x.includes(y))
+      }).length > 0
+
+      return !errorInSkipList
+    }
+    return true;
+  }
 }
 
 export default func

@@ -8,6 +8,9 @@ import com.akto.listener.InitializerListener;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.notifications.slack.NewUserJoiningAlert;
+import com.akto.notifications.slack.SlackAlerts;
+import com.akto.notifications.slack.SlackSender;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
 import com.akto.utils.AzureLogin;
@@ -275,6 +278,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId());
                 }
                 createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), Config.ConfigType.AUTH0.toString());
+
                 return SUCCESS.toUpperCase();
             } else if(pendingInviteCode == null){
                 // invalid code
@@ -439,10 +443,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         if (githubConfig == null) {
             return ERROR.toUpperCase();
         }
-        List<NameValuePair> params = new ArrayList<>();
-        params.add(new BasicNameValuePair("client_id", githubConfig.getClientId()));
-        params.add(new BasicNameValuePair("client_secret", githubConfig.getClientSecret()));
-        params.add(new BasicNameValuePair("code", this.code));
+        BasicDBObject params = new BasicDBObject();
+        params.put("client_id", githubConfig.getClientId());
+        params.put("client_secret", githubConfig.getClientSecret());
+        params.put("code", this.code);
         try {
             Map<String,Object> tokenData = CustomHttpRequest.postRequest("https://github.com/login/oauth/access_token", params);
             String accessToken = tokenData.get("access_token").toString();
@@ -482,12 +486,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         String clientSecret = oktaConfig.getClientSecret();
         String redirectUri = oktaConfig.getRedirectUri();
 
-        List<NameValuePair> params = new ArrayList<>();
-        params.add(new BasicNameValuePair("grant_type", "authorization_code"));
-        params.add(new BasicNameValuePair("code", this.code));
-        params.add(new BasicNameValuePair("client_id", clientId));
-        params.add(new BasicNameValuePair("client_secret", clientSecret));
-        params.add(new BasicNameValuePair("redirect_uri", redirectUri));
+        BasicDBObject params = new BasicDBObject();
+        params.put("grant_type", "authorization_code");
+        params.put("code", this.code);
+        params.put("client_id", clientId);
+        params.put("client_secret", clientSecret);
+        params.put("redirect_uri", redirectUri);
 
         try {
             Map<String,Object> tokenData = CustomHttpRequest.postRequestEncodedType(domainUrl +"/token",params);
@@ -715,6 +719,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             props.put("Dashboard Mode", dashboardMode);
             props.put("Invited", invitationToAccount != 0);
             props.put("method", method);
+
+            SlackAlerts newUserJoiningAlert = new NewUserJoiningAlert(userEmail);
+            SlackSender.sendAlert(accountId, newUserJoiningAlert);
+
             AktoMixpanel aktoMixpanel = new AktoMixpanel();
             aktoMixpanel.sendEvent(distinct_id, "SIGNUP_SUCCEEDED", props);
         }

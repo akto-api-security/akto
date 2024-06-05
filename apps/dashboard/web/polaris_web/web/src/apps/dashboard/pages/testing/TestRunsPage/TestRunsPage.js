@@ -1,13 +1,6 @@
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider} from '@shopify/polaris';
-import {
-  CircleCancelMajor,
-  CalendarMinor,
-  ReplayMinor,
-  PlayMinor,
-  ChevronDownMinor,
-  ChevronUpMinor
-} from '@shopify/polaris-icons';
+import { ChevronDownMinor , ChevronUpMinor } from '@shopify/polaris-icons';
 import api from "../api";
 import { useEffect, useReducer, useState } from 'react';
 import transform from "../transform";
@@ -19,6 +12,9 @@ import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
 import {produce} from "immer"
 import values from "@/util/values";
 import {TestrunsBannerComponent} from "./TestrunsBannerComponent";
+import useTable from "../../../components/tables/TableContext";
+import PersistStore from "../../../../main/PersistStore";
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 
 /*
   {
@@ -51,6 +47,7 @@ let headers = [
     value: "number_of_tests",
     itemOrder: 3,
     type: CellType.TEXT,
+    tooltipContent: (<Text variant="bodySm">Count of attempted testing run results</Text>)
   },
   {
     text:"Severity",
@@ -58,6 +55,7 @@ let headers = [
     title: 'Issues',
     filterKey:"severityStatus",
     itemOrder:2,
+    tooltipContent: (<Text variant="bodySm">Severity and count of issues per test run</Text>)
   },
   {
     text: 'Run time',
@@ -65,6 +63,7 @@ let headers = [
     title: 'Status',
     itemOrder: 3,
     type: CellType.TEXT,
+    sortActive: true
   },
   {
     title: '',
@@ -73,8 +72,8 @@ let headers = [
 ]
 
 const sortOptions = [
-  { label: 'Run time', value: 'endTimestamp asc', directionLabel: 'Newest run', sortKey: 'endTimestamp' },
-  { label: 'Run time', value: 'endTimestamp desc', directionLabel: 'Oldest run', sortKey: 'endTimestamp' }
+  { label: 'Run time', value: 'scheduleTimestamp asc', directionLabel: 'Newest run', sortKey: 'scheduleTimestamp', columnIndex: 4 },
+  { label: 'Run time', value: 'scheduleTimestamp desc', directionLabel: 'Oldest run', sortKey: 'scheduleTimestamp', columnIndex: 4 }
 ];
 
 const resourceName = {
@@ -92,93 +91,31 @@ let filters = [
       { label: "Medium", value: "MEDIUM" },
       { label: "Low", value: "LOW" }
     ]
-  }
+  },
+  {
+    key: 'apiCollectionId',
+    label: 'Api collection name',
+    title: 'Api collection name',
+    choices: [],
+},
 ]
-
-function disambiguateLabel(key, value) {
-  switch (key) {
-    case 'severity':
-      return (value).map((val) => `${func.toSentenceCase(val)} severity`).join(', ');
-    default:
-      return value;
-  }
-}
 
 function TestRunsPage() {
 
-  const stopTest = (hexId) =>{
-    api.stopTest(hexId).then((resp) => {
-      func.setToast(true, false, "Test run stopped")
-    }).catch((resp) => {
-      func.setToast(true, true, "Unable to stop test run")
-    });
+  const apiCollectionMap = PersistStore(state => state.collectionsMap)
+
+  function disambiguateLabel(key, value) {
+    switch (key) {
+      case 'severity':
+        return (value).map((val) => `${func.toSentenceCase(val)} severity`).join(', ');
+      case "apiCollectionId": 
+        return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
+      default:
+        return value;
+    }
   }
 
-  const rerunTest = (hexId) =>{
-    api.rerunTest(hexId).then((resp) => {
-      func.setToast(true, false, "Test re-run")
-      setTimeout(() => {
-        refreshSummaries();
-      }, 2000)
-    }).catch((resp) => {
-      func.setToast(true, true, "Unable to re-run test")
-    });
-  }
-
-const getActionsList = (hexId) => {
-  return [
-  {
-      content: 'Schedule test',
-      icon: CalendarMinor,
-      onAction: () => {console.log("schedule test function")},
-  },
-  {
-      content: 'Re-run',
-      icon: ReplayMinor,
-      onAction: () => {rerunTest(hexId || "")},
-  },
-  {
-      content: 'Add to CI/CD pipeline',
-      icon: PlayMinor,
-      onAction: () => {window.open('https://docs.akto.io/testing/run-tests-in-cicd', '_blank');},
-  },
-  {
-      content: 'Stop',
-      icon: CircleCancelMajor,
-      destructive:true,
-      onAction: () => {stopTest(hexId || "")},
-      disabled: true,
-  }
-]}
-
-function getActions(item){
-  let arr = []
-  let section1 = {items:[]}
-  let actionsList = getActionsList(item.id);
-  if(item['run_type'] === 'One-time'){
-    // section1.items.push(actionsList[0])
-  }else{
-    section1.items.push(actionsList[1])
-  }
-
-  if(item['run_type'] === 'CI/CD'){
-    // section1.items.push(actionsList[0])
-  }else{
-    section1.items.push(actionsList[2])
-  }
-  
-  if(item['orderPriority'] === 1 || item['orderPriority'] === 2){
-      actionsList[3].disabled = false
-  }else{
-      actionsList[3].disabled = true
-  }
-
-  arr.push(section1)
-  let section2 = {items:[]}
-  section2.items.push(actionsList[3]);
-  arr.push(section2);
-  return arr
-}
+  filters = func.getCollectionFilters(filters)
 
 const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
 const getTimeEpoch = (key) => {
@@ -190,7 +127,7 @@ const endTimestamp = getTimeEpoch("until") + 86400
 
 
 const [loading, setLoading] = useState(true);
-const [currentTab, setCurrentTab] = useState("oneTime");
+const [currentTab, setCurrentTab] = useState("one_time");
 const [updateTable, setUpdateTable] = useState(false);
 const [countMap, setCountMap] = useState({});
 const [selected, setSelected] = useState(1);
@@ -236,9 +173,9 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
     switch (currentTab) {
 
-      case "cicd":
+      case "ci_cd":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CI_CD",
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CI_CD",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries, true);
           total = testingRunsCount;
@@ -246,15 +183,15 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       case "scheduled":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "RECURRING"
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "RECURRING",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
         });
         break;
-      case "oneTime":
+      case "one_time":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "ONE_TIME"
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "ONE_TIME",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -262,7 +199,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         break;
       default:
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, null
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, null,queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -304,36 +241,12 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     })
   }
 
-  const tableTabs = [
-    {
-        content: 'All',
-        index: 0,
-        badge: countMap['allTestRuns']?.toString(),
-        onAction: ()=> {setCurrentTab('All')},
-        id: 'All',
-    },
-    {
-      content: 'One time',
-      index: 0,
-      badge: countMap['oneTime']?.toString(),
-      onAction: ()=> {setCurrentTab('oneTime')},
-      id: 'oneTime',
-    },
-    {
-      content: 'Recurring',
-      index: 0,
-      badge: countMap['scheduled']?.toString(),
-      onAction: ()=> {setCurrentTab('scheduled')},
-      id: 'scheduled',
-    },
-    {
-      content: 'CI/CD',
-      index: 0,
-      badge: countMap['cicd']?.toString(),
-      onAction: ()=> {setCurrentTab('cicd')},
-      id: 'cicd',
-    },
-  ]
+  const definedTableTabs = ['All', 'One time', 'Scheduled', 'CI/CD']
+  const initialCount = [countMap['allTestRuns'], countMap['ontTime'], countMap['scheduled'], countMap['cicd']]
+
+  const { tabsInfo } = useTable()
+  const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
+  const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setCurrentTab, currentTab, tabsInfo)
 
   const fetchTotalCount = () =>{
     setLoading(true)
@@ -360,21 +273,21 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
 const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
 const SummaryCardComponent = () =>{
-  let totalVulnerabilites = severityCountMap?.HIGH?.text + severityCountMap?.MEDIUM?.text +  severityCountMap?.LOW?.text 
+  let totalVulnerabilities = severityCountMap?.HIGH?.text + severityCountMap?.MEDIUM?.text +  severityCountMap?.LOW?.text 
   return(
     <LegacyCard>
       <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
         <HorizontalStack align="space-between">
-          <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilites} vulnerabilities in total</Text>
+          <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
           <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
         </HorizontalStack>
-        {totalVulnerabilites > 0 ? 
+        {totalVulnerabilities > 0 ? 
         <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
           <LegacyCard.Subsection>
             <Box paddingBlockStart={3}><Divider/></Box>
             <HorizontalGrid columns={2} gap={6}>
-              <ChartypeComponent data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
-              <ChartypeComponent data={severityCountMap} reverse={true} title={"Severity"} charTitle={totalVulnerabilites} chartSubtitle={"Total Vulnerabilities"}/>
+              <ChartypeComponent navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
+              <ChartypeComponent data={severityCountMap} reverse={true} title={"Severity"} charTitle={totalVulnerabilities} chartSubtitle={"Total Vulnerabilities"}/>
             </HorizontalGrid>
 
           </LegacyCard.Subsection>
@@ -387,17 +300,16 @@ const SummaryCardComponent = () =>{
   const promotedBulkActions = (selectedTestRuns) => { 
     return [
     {
-      content: `Delete ${selectedTestRuns.length} test run${selectedTestRuns.length==1 ? '' : 's'}`,
+      content: <div data-testid="delete_result_button">{`Delete ${selectedTestRuns.length} test run${selectedTestRuns.length ===1 ? '' : 's'}`}</div>,
       onAction: async() => {
         await api.deleteTestRuns(selectedTestRuns);
-        func.setToast(true, false, `${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`)
+        func.setToast(true, false, <div data-testid="delete_success_message">{`${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`}</div>)
         window.location.reload();
       },
     },
   ]};
 
   const key = currentTab + startTimestamp + endTimestamp + updateTable;
-
 const coreTable = (
 <GithubServerTable
     key={key}
@@ -406,10 +318,9 @@ const coreTable = (
     sortOptions={sortOptions} 
     resourceName={resourceName} 
     filters={filters}
-    hideQueryField={true}
     disambiguateLabel={disambiguateLabel} 
     headers={headers}
-    getActions = {getActions}
+    getActions = {(item) => transform.getActions(item)}
     hasRowActions={true}
     loading={loading}
     getStatus={func.getTestResultStatus}
@@ -428,7 +339,12 @@ const coreTable = (
 const components = !hasUserInitiatedTestRuns ? [<SummaryCardComponent key={"summary"}/>,<TestrunsBannerComponent key={"banner-comp"}/>, coreTable] : [<SummaryCardComponent key={"summary"}/>, coreTable]
   return (
     <PageWithMultipleCards
-      title={<Text variant="headingLg" fontWeight="semibold">Test results</Text>}
+      title={
+        <TitleWithInfo
+          titleText={"Test results"}
+          tooltipContent={"See testing run results along with compact summary of issues."}
+        />
+      }
       isFirstPage={true}
       components={components}
       primaryAction={<DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>}
