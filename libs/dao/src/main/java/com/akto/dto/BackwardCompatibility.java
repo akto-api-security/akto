@@ -78,6 +78,9 @@ public class BackwardCompatibility {
     public static final String AUTOMATED_API_GROUPS = "automatedApiGroups";
     private int automatedApiGroups;
 
+    public static final String DROP_API_DEPENDENCIES = "dropApiDependencies";
+    private int dropApiDependencies;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -340,5 +343,13 @@ public class BackwardCompatibility {
 
     public void setAutomatedApiGroups(int automatedApiGroups) {
         this.automatedApiGroups = automatedApiGroups;
+    }
+
+    public int getDropApiDependencies() {
+        return dropApiDependencies;
+    }
+
+    public void setDropApiDependencies(int dropApiDependencies) {
+        this.dropApiDependencies = dropApiDependencies;
     }
 }

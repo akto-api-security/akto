@@ -287,7 +287,7 @@ public class TestExecutor {
         Map<String , Integer> totalCountIssues = testingRunResultSummary.getCountIssues();
 
         loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
-        if(totalCountIssues.getOrDefault(Severity.HIGH.toString(), 0) > 0){
+        if(totalCountIssues != null && totalCountIssues.getOrDefault(Severity.HIGH.toString(),0) > 0){
             ActivitiesDao.instance.insertActivity("High Vulnerability detected", totalCountIssues.get(Severity.HIGH.toString()) + " HIGH vulnerabilites detected");
         }
     }
