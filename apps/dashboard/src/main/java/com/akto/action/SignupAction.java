@@ -653,6 +653,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         if (user == null && "false".equalsIgnoreCase(shouldLogin)) {
             SignupUserInfo signupUserInfo = SignupDao.instance.insertSignUp(userEmail, username, signupInfo, invitationToAccount);
             LoginAction.loginUser(signupUserInfo.getUser(), servletResponse, false, servletRequest);
+            servletRequest.setAttribute("username", userEmail);
             servletResponse.sendRedirect("/dashboard/onboarding");
         } else {
 
@@ -702,6 +703,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);
             LoginAction.loginUser(user, servletResponse, true, servletRequest);
+            servletRequest.setAttribute("username", userEmail);
             servletResponse.sendRedirect("/dashboard/onboarding");
 
             String dashboardMode = DashboardMode.getActualDashboardMode().toString();
