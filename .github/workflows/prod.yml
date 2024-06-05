@@ -32,46 +32,21 @@ jobs:
 
       - name: mvn package command
         run: mvn package
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
-          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
-          aws-region: ap-south-1
-
-      - name: Configure AWS Credentials for ECR
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
-          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
-          aws-region: us-east-1
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-        with:
-          mask-password: 'true'
-          registry-type: public
-
-      - name: Build, tag, and push docker image to Amazon ECR
+      - name: DockerHub login
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
+          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+        run: |
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD 
+      - name: Build, tag, and push the image to DockerHub
+        id: build-image-dockerhub
+        env:
+          ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          REGISTRY_ALIAS: p7q3h0z2
           IMAGE_TAG: latest
-          IMAGE_TAG_2: testruntime
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
           cd apps/mini-runtime
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG_2 . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-runtime:$IMAGE_TAG"
-
-
-
-
-
-
-
-
-
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG . --push
+          echo "::set-output name=image::$ECR_REGISTRY/mini-runtime:$IMAGE_TAG"
