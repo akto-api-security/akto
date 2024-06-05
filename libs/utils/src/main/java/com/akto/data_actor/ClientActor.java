@@ -982,7 +982,7 @@ public class ClientActor extends DataActor {
                 return;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in insertRuntimeLog" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in insertRuntimeLog" + e.getStackTrace(), LoggerMaker.LogDb.RUNTIME);
             return;
         }
     }

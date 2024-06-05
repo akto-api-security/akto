@@ -173,7 +173,9 @@ public class Main {
 
         //DaoInit.init(new ConnectionString(mongoURI));
 
-        loggerMaker.infoAndAddToDb("Runtime starting at " + Context.now() + "....", LogDb.RUNTIME);
+        logger.info("Mini Runtime Starting..");
+
+        loggerMaker.infoAndAddToDb("Mini Runtime starting at " + Context.now() + "....", LogDb.RUNTIME);
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
