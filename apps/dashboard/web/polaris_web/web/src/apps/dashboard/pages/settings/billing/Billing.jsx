@@ -115,6 +115,10 @@ function Billing() {
                                   cancelUrl: window.location.href
                                 });
 
+                                if (window?.Intercom) {
+                                   window.Intercom("trackEvent", "clicked-upgrade", {"intention": intentionType, "installation": "saas"})
+                                }
+
                                 console.log("checkoutResult", checkoutResult);
                                 if (checkoutResult.data.provisionSubscription.status === 'PAYMENT_REQUIRED') {
                                   window.location.href = checkoutResult.data.provisionSubscription.checkoutUrl;
