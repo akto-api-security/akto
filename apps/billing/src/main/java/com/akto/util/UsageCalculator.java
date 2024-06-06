@@ -83,6 +83,7 @@ public class UsageCalculator {
             loggerMaker.infoAndAddToDb("marked "+updateResult.getModifiedCount()+" items as ignored", LoggerMaker.LogDb.BILLING);
         } finally {
             statusDataSinks = false;
+            currentCalcOrg = "";
         }
 
     }
