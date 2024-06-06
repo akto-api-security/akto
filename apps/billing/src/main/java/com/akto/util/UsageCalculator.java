@@ -180,9 +180,11 @@ public class UsageCalculator {
 
     }
 
-    static OrganizationFlags flags = OrganizationFlagsDao.instance.findOne(new BasicDBObject());
+    static boolean shouldProcessIncomplete(String orgId, OrganizationFlags flags) {
 
-    static boolean shouldProcessIncomplete(String orgId) {
+        if(orgId == null){
+            return false;
+        }
 
         if (flags == null) {
             return false;
@@ -193,7 +195,7 @@ public class UsageCalculator {
         return flags.getAggregateIncomplete().contains(orgId);
     }
 
-    public void aggregateUsageForOrg(Organization o, int usageLowerBound, int usageUpperBound) {
+    public void aggregateUsageForOrg(Organization o, int usageLowerBound, int usageUpperBound, OrganizationFlags flags) {
         if (statusAggregateUsage) {
             throw new IllegalStateException("Aggregation already going on");
         }
@@ -235,7 +237,7 @@ public class UsageCalculator {
                     } else {
                         String err = "Missing account id: " + account + " orgId: " + organizationId+ " metricType: " + metricTypeString + " hour: " + hour;
                         loggerMaker.errorAndAddToDb(err, LoggerMaker.LogDb.BILLING);
-                        if (!shouldProcessIncomplete(organizationId)) {
+                        if (!shouldProcessIncomplete(organizationId, flags)) {
                             throw new Exception(err);
                         }
                     }
