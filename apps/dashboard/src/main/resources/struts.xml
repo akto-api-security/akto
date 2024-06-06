@@ -15,6 +15,7 @@
         <interceptors>
             <!-- The feature labels for the usage interceptor are defined in stigg feature -> metadata. -->
             <interceptor name="usageInterceptor" class="com.akto.interceptor.UsageInterceptor" />
+            <interceptor name="roleAccessInterceptor" class="com.akto.interceptor.RoleAccessInterceptor" />
             <interceptor name="collectionInterceptor" class="com.akto.interceptor.CollectionInterceptor" />
         </interceptors>
 
@@ -217,6 +218,15 @@
         <action name="api/removeUser" class="com.akto.action.TeamAction" method="removeUser">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="rolesList">ADMIN</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
@@ -226,6 +236,15 @@
         <action name="api/makeAdmin" class="com.akto.action.TeamAction" method="makeAdmin">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="rolesList">ADMIN</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -295,6 +314,15 @@
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="rolesList">ADMIN</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -314,6 +342,15 @@
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="rolesList">ADMIN</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -344,6 +381,15 @@
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="rolesList">ADMIN</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -363,6 +409,15 @@
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="rolesList">ADMIN</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -393,6 +448,15 @@
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="rolesList">ADMIN</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -412,6 +476,15 @@
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="rolesList">ADMIN</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -450,6 +523,15 @@
         <action name="api/addGithubAppSecretKey" class="com.akto.action.user.GithubSsoAction" method="addGithubAppSecretKey">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="rolesList">ADMIN</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -461,6 +543,15 @@
         <action name="api/deleteGithubAppSecretKey" class="com.akto.action.user.GithubSsoAction" method="deleteGithubAppSecretKey">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="rolesList">ADMIN</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -1545,6 +1636,15 @@
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">API_DATA_REDACTION</param>
             </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="rolesList">ADMIN</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS"  type="json"/>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
@@ -1894,6 +1994,15 @@
         <action name="api/toggleTelemetry" class="com.akto.action.AdminSettingsAction" method="toggleTelemetry">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="rolesList">ADMIN</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
