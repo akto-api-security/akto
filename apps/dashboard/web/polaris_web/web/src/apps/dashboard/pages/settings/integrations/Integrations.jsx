@@ -102,7 +102,7 @@ function Integrations() {
         },
         {
             id: 'reporting',
-            content: <span>Reporting<Badge status='new'>{getTabItems('reporting').length}</Badge></span>,
+            content: <span>Reporting <Badge status='new'>{getTabItems('reporting').length}</Badge></span>,
             component: <TabsList />
         },
         {
