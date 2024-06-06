@@ -11,9 +11,11 @@ import com.akto.util.UsageUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.billing.OrganizationFlagsDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.billing.OrganizationFlags;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.metadata.ActiveAccounts;
@@ -21,6 +23,7 @@ import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
@@ -111,9 +114,10 @@ public class UsageAction extends ActionSupport implements ServletRequestAware {
             usageLowerBound = now - UsageUtils.USAGE_UPPER_BOUND_DL/2;
             usageUpperBound = now + UsageUtils.USAGE_UPPER_BOUND_DL/2;
             loggerMaker.infoAndAddToDb(String.format("Lower Bound: %d Upper bound: %d", usageLowerBound, usageUpperBound), LogDb.BILLING);
+            OrganizationFlags flags = OrganizationFlagsDao.instance.findOne(new BasicDBObject());
             executorService.schedule(new Runnable() {
                 public void run() {
-                    InitializerListener.aggregateAndSinkUsageData(organization, usageLowerBound, usageUpperBound);
+                    InitializerListener.aggregateAndSinkUsageData(organization, usageLowerBound, usageUpperBound, flags);
                     loggerMaker.infoAndAddToDb(String.format("Flushed usage data for organization %s", organizationId), LogDb.BILLING);
                 }
             }, 0, TimeUnit.SECONDS);
