@@ -123,6 +123,7 @@ function TestRunResultFull(props) {
                 data={selectedTestRunResult}
                 headers={headerDetails}
                 getStatus={func.getTestResultStatus}
+                divWrap={true}
                 />
             }
             divider= {true}
