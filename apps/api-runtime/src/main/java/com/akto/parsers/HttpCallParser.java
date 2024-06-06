@@ -322,7 +322,7 @@ public class HttpCallParser {
     }
 
     public static boolean useHostCondition(String hostName, HttpResponseParams.Source source) {
-        List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING);
+        List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING, HttpResponseParams.Source.OTHER, HttpResponseParams.Source.SDK);
         boolean hostNameCondition;
         if (hostName == null) {
             hostNameCondition = false;
