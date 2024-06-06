@@ -1,11 +1,13 @@
 package com.akto.util;
 
 import com.akto.billing.UsageMetricUtils;
+import com.akto.dao.billing.OrganizationFlagsDao;
 import com.akto.dao.billing.OrganizationUsageDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.Config;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.billing.OrganizationFlags;
 import com.akto.dto.billing.OrganizationUsage;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
@@ -178,6 +180,19 @@ public class UsageCalculator {
 
     }
 
+    static OrganizationFlags flags = OrganizationFlagsDao.instance.findOne(new BasicDBObject());
+
+    static boolean shouldProcessIncomplete(String orgId) {
+
+        if (flags == null) {
+            return false;
+        }
+        if (flags.getAggregateIncomplete() == null || flags.getAggregateIncomplete().isEmpty()) {
+            return false;
+        }
+        return flags.getAggregateIncomplete().contains(orgId);
+    }
+
     public void aggregateUsageForOrg(Organization o, int usageLowerBound, int usageUpperBound) {
         if (statusAggregateUsage) {
             throw new IllegalStateException("Aggregation already going on");
@@ -220,7 +235,9 @@ public class UsageCalculator {
                     } else {
                         String err = "Missing account id: " + account + " orgId: " + organizationId+ " metricType: " + metricTypeString + " hour: " + hour;
                         loggerMaker.errorAndAddToDb(err, LoggerMaker.LogDb.BILLING);
-                        throw new Exception(err);
+                        if (!shouldProcessIncomplete(organizationId)) {
+                            throw new Exception(err);
+                        }
                     }
 
                     int currentConsolidateUsage = consolidatedUsage.get(metricTypeString);
