@@ -1,7 +1,6 @@
 package com.akto.util;
 
 import com.akto.billing.UsageMetricUtils;
-import com.akto.dao.billing.OrganizationFlagsDao;
 import com.akto.dao.billing.OrganizationUsageDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricsDao;
@@ -35,14 +34,21 @@ public class UsageCalculator {
     private UsageCalculator() {}
 
     boolean statusDataSinks = false;
+    String currentCalcOrg = "";
 
     boolean statusAggregateUsage = false;
 
-    public void sendOrgUsageDataToAllSinks(Organization o) {
-        if (statusDataSinks) {
+    public void sendOrgUsageDataToAllSinks(Organization o, boolean justRun) {
+        boolean differentOrg = o != null && o.getId()!=null ? !currentCalcOrg.equals(o.getId()) : true;
+        justRun &= differentOrg;
+        if (statusDataSinks && !justRun) {
             throw new IllegalStateException("Data sinks already going on. Returning...");
         }
         try {
+            if(o == null){
+                return;
+            }
+            currentCalcOrg = o.getId();
             statusDataSinks = true;
             Bson filterQ =
                     Filters.and(
