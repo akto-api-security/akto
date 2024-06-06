@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, Divider, LegacyCard, Page, Text, VerticalStack, HorizontalGrid, HorizontalStack, Icon, Scrollable, TextField, Tooltip, Tag, Form } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, HorizontalStack, Icon, Scrollable, TextField, Tooltip, Tag, Form } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
@@ -117,24 +117,28 @@ function About() {
         await settingRequests.updateTrafficAlertThresholdSeconds(val);
     }
     const handleIpsChange = async(ip, isAdded, type) => {
+        let ipList = ip.split(",")
+        ipList = ipList.map((x) => x.replace(/\s+/g, '') )
         if(type === 'cidr'){
             let updatedIps = []
             if(isAdded){
-                updatedIps = [...privateCidrList, ip]
+                updatedIps = [...privateCidrList, ...ipList]
                 
             }else{
                 updatedIps = privateCidrList.filter(item => item !== ip);
             }
+            updatedIps = Array.from(new Set(updatedIps))
             setPrivateCidrList(updatedIps)
             await settingRequests.configPrivateCidr(updatedIps)
         }else{
             let updatedIps = []
             if(isAdded){
-                updatedIps = [...partnerIpsList, ip]
+                updatedIps = [...partnerIpsList, ...ipList]
                 
             }else{
                 updatedIps = partnerIpsList.filter(item => item !== ip);
             }
+            updatedIps = Array.from(new Set(updatedIps))
             setPartnerIpsList(updatedIps)
             await settingRequests.configPartnerIps(updatedIps)
         }
@@ -384,7 +388,7 @@ function About() {
     function UpdateIpsComponent({onSubmit, title, labelText, description, ipsList, onRemove, type}){
         const [value, setValue] = useState('')
         const onFormSubmit = (ip) => {
-            if(checkError(ip)){
+            if(checkError(ip, type)){
                 func.setToast(true, true, "Invalid ip address")
             }else{
                 setValue('')
@@ -392,18 +396,26 @@ function About() {
             }
         }
 
-        const checkError = () => {
-            if(value.length === 0){
-                return false
+        const checkError = (localVal, localType) => {
+            localVal = localVal.replace(/\s+/g, '')
+            if (localVal.length === 0) return false
+            const values = localVal.split(",")
+            let valid = true;
+            for (let v of values) {
+                if(v.length === 0){
+                    return true
+                }
+                if(localType=== "cidr"){
+                    valid = valid && (isCidr(v) !== 0)
+                }else{
+                    valid = valid && (isIP(v))
+                }
             }
-            if(type === "cidr"){
-                return isCidr(value) === 0
-            }else{
-                return !(isIP(value))
-            }
+
+            return !valid
         }
 
-        const isError = checkError(type)
+        const isError = checkError(value, type)
         return(
             <LegacyCard title={<TitleComponent title={title} description={description}/>}>
                 <Divider />

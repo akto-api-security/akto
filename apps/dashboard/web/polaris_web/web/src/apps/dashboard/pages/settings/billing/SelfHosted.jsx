@@ -82,6 +82,11 @@ const PlanDetails = ({customerId}) => {
                                       cancelUrl: window.location.href+"?orgId="+orgId
                                     });
 
+                                    if (window?.Intercom) {
+                                       window.Intercom("trackEvent", "clicked-upgrade", {"intention": intentionType, "installation": "self-hosted"})
+                                    }
+
+
                                     console.log("checkoutResult", checkoutResult);
                                     if (checkoutResult.data.provisionSubscription.status === 'PAYMENT_REQUIRED') {
                                       window.location.href = checkoutResult.data.provisionSubscription.checkoutUrl;

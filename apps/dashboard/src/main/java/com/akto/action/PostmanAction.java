@@ -264,7 +264,7 @@ public class PostmanAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private final boolean skipKafka = DashboardMode.isLocalDeployment();
+    private final boolean skipKafka = DashboardMode.isLocalDeployment() || DashboardMode.isKubernetes();
 
     private boolean allowReplay;
 

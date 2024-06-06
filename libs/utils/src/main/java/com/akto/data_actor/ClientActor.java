@@ -51,12 +51,22 @@ import com.google.gson.Gson;
 public class ClientActor extends DataActor {
 
     private static final int batchWriteLimit = 1000;
-    private static final String url = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL") + "/api";
+    private static final String url = buildDbAbstractorUrl();
     private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class);
     private static final int maxConcurrentBatchWrites = 2;
     private static final Gson gson = new Gson();
     
     ObjectMapper objectMapper = new ObjectMapper();
+
+    public static String buildDbAbstractorUrl() {
+        String dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        if (dbAbsHost.endsWith("/")) {
+            dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
+        }
+        return dbAbsHost + "/api";
+    }
+
+    
 
     public AccountSettings fetchAccountSettings() {
         Map<String, List<String>> headers = buildHeaders();
