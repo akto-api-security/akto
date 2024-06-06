@@ -131,7 +131,8 @@ public class InitializerListener implements ServletContextListener {
                     OrganizationTask.instance.executeTask(new Consumer<Organization>() {
                         @Override
                         public void accept(Organization o) {
-                            aggregateAndSinkUsageData(o, finalUsageLowerBound, finalUsageUpperBound, flags);                        }
+                            aggregateAndSinkUsageData(o, finalUsageLowerBound, finalUsageUpperBound, flags, false);
+                        }
                     }, "usage-reporting-scheduler");
 
                     UsageSyncDao.instance.updateOne(
@@ -145,8 +146,8 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
     }
 
-    public static void aggregateAndSinkUsageData(Organization organization, int usageLowerBound, int usageUpperBound, OrganizationFlags flags) {
+    public static void aggregateAndSinkUsageData(Organization organization, int usageLowerBound, int usageUpperBound, OrganizationFlags flags, boolean justRun) {
         UsageCalculator.instance.aggregateUsageForOrg(organization, usageLowerBound, usageUpperBound, flags);
-        UsageCalculator.instance.sendOrgUsageDataToAllSinks(organization);
+        UsageCalculator.instance.sendOrgUsageDataToAllSinks(organization, justRun);
     }
 }
