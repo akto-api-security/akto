@@ -228,7 +228,7 @@ public class ExportSampleDataAction extends UserAction {
                 originalHttpRequest.buildFromApiSampleMessage(sampleData);
 
                 HttpRequestParams httpRequestParams = new HttpRequestParams(
-                        originalHttpRequest.getMethod(), originalHttpRequest.getUrl(), originalHttpRequest.getType(),
+                        originalHttpRequest.getMethod(), originalHttpRequest.getFullUrlWithParams(), originalHttpRequest.getType(),
                         originalHttpRequest.getHeaders(), originalHttpRequest.getBody(), 0
                 );
 
