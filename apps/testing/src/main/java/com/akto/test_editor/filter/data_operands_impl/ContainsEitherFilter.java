@@ -13,6 +13,7 @@ public class ContainsEitherFilter extends DataOperandsImpl {
         Boolean result = false;
         Boolean res;
         List<String> querySet = new ArrayList<>();
+        List<String> notMatchedQuerySet = new ArrayList<>();
         String data;
         try {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
@@ -26,9 +27,15 @@ public class ContainsEitherFilter extends DataOperandsImpl {
             } catch (Exception e) {
                 res = false;
             }
+            if (!res) {
+                notMatchedQuerySet.add(queryString);
+            }
             result = result || res;
         }
-        return result;    
+        if (result) {
+            return new ValidationResult(result, "");
+        }
+        return new ValidationResult(result, "ContainsEitherFilter skipped due to following not matching with '"+data+"':" + notMatchedQuerySet);
     }
 
     public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {

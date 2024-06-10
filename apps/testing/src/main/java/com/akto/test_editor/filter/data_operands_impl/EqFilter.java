@@ -9,7 +9,7 @@ import com.akto.dto.test_editor.DataOperandFilterRequest;
 public class EqFilter extends DataOperandsImpl {
 
     @Override
-    public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
+    public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
         Boolean result = false;
         Object data = dataOperandFilterRequest.getData();
@@ -19,7 +19,7 @@ public class EqFilter extends DataOperandsImpl {
             if (data instanceof String) {
                 List<String> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
-                    return false;
+                    return new ValidationResult(false, "eq validation failed because of empty query");
                 }
                 result = data.toString().trim().toLowerCase().equals(queryList.get(0).trim().toLowerCase());
             }

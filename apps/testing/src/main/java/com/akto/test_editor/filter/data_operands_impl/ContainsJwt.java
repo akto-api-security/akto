@@ -27,16 +27,26 @@ public class ContainsJwt extends DataOperandsImpl {
         }
 
         if (data == null || queryVal == null) {
-            return false;
+            return new ValidationResult(result, "");
         }
 
         String[] splitValue = data.toString().split(" ");
+        String jwtKeyType = null;
         for (String x: splitValue) {
             if (KeyTypes.isJWT(x)) {
                 result = true;
+                jwtKeyType = x;
                 break;
             }
         }
-        return result && queryVal;
+        if (queryVal == result) {
+            return new ValidationResult(true,
+                    queryVal? "contains_jwt: true passed because key:"+ jwtKeyType+" is jwt type":
+                            "contains_jwt: false passed because no jwt type found");
+        }
+        if (queryVal) {
+            return new ValidationResult(false, "contains_jwt: true failed because no jwt type found");
+        }
+        return new ValidationResult(false, "contains_jwt: false failed because key:"+ jwtKeyType+" is jwt type");
     }
 }

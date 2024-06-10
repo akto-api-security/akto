@@ -30,7 +30,7 @@ public class CookieExpireFilter extends DataOperandsImpl {
         }
 
         if (data == null || queryVal == null) {
-            return false;
+            return new ValidationResult(false, queryVal == null ? "cookie_expire_filter is not set true": "no data to be matched for validation");
         }
 
         Map<String,String> cookieMap = AuthPolicy.parseCookie(Arrays.asList(data));
@@ -70,6 +70,13 @@ public class CookieExpireFilter extends DataOperandsImpl {
                 res = true;
             }
         }
-        return result == res;
+        if (result == res) {
+            return new ValidationResult(true, result? "cookie_expire_filter: true passed because cookie:"+ data+" expired":
+                    "cookie_expire_filter: false passed because cookie:"+ data+" not expired");
+        }
+        if (result) {
+            return new ValidationResult(false, "cookie_expire_filter: true failed cookie:"+ data+" not expired");
+        }
+        return new ValidationResult(false, "cookie_expire_filter: false failed because cookie:"+ data+" expired");
     }
 }

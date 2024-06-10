@@ -29,14 +29,14 @@ public class ContainsAllFilter extends DataOperandsImpl {
                 notMatchedQuerySet.add(queryString.trim());
             }
             if (!res) {
-                notMatchedQuerySet.add(queryString.trim());
+                notMatchedQuerySet.add(queryString);
             }
             result = result && res;
         }
         if (result) {
             return new ValidationResult(result, "");
         }
-        return new ValidationResult(result, "ContainsAllFilter skipped due to following :" + notMatchedQuerySet);
+        return new ValidationResult(result, "ContainsAllFilter skipped due to following not matching with '"+data+"':" + notMatchedQuerySet);
     }
 
     public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {
