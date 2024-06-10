@@ -67,6 +67,7 @@ import PageCheckInbox from "../signup/pages/PageCheckInbox"
 import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
 import TokenValidator from "./TokenValidator"
 import { TableContextProvider } from "@/apps/dashboard/components/tables/TableContext";
+import Authentication from "../dashboard/pages/authentication/Authentication";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -160,6 +161,10 @@ const router = createBrowserRouter([
           {
             path:"issues",
             element:<IssuesPage/>
+          },
+          {
+            path: "authentication",
+            element: <Authentication />
           },
           {
             path: "quick-start",

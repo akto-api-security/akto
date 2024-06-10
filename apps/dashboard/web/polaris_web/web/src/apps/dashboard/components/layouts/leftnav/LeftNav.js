@@ -1,5 +1,5 @@
 import {Navigation, Text} from "@shopify/polaris"
-import {SettingsFilledMinor,AppsFilledMajor, InventoryFilledMajor, MarketingFilledMinor, FileFilledMinor, AnalyticsFilledMinor, ReportFilledMinor} from "@shopify/polaris-icons"
+import {SettingsFilledMinor,AppsFilledMajor, InventoryFilledMajor, MarketingFilledMinor, FileFilledMinor, AnalyticsFilledMinor, ReportFilledMinor, FraudProtectPendingMinor} from "@shopify/polaris-icons"
 import {useLocation, useNavigate} from "react-router-dom"
 
 import './LeftNav.css'
@@ -154,6 +154,17 @@ export default function LeftNav(){
                   selected: leftNavSelected === 'dashboard_issues',
                   key: '6',
               },
+              {
+                label: <Text variant="bodyMd" fontWeight="medium">Authentication</Text>,
+                icon: FraudProtectPendingMinor,
+                onClick: ()=>{ 
+                    handleSelect("dashboard_authentication")
+                    navigate("/dashboard/authentication")
+                    setActive("normal")
+                  },
+                  selected: leftNavSelected === 'dashboard_authentication',
+                  key: '7',
+              }
             ]}
           />
           <Navigation.Section 
