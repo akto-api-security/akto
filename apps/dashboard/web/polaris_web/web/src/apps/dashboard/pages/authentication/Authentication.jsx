@@ -6,6 +6,8 @@ import PersistStore from "@/apps/main/PersistStore";
 import api from "@/apps/dashboard/pages/testing/api";
 import GridRows from "../../components/shared/GridRows";
 import FlyLayout from "../../components/layouts/FlyLayout";
+import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
+import { CellType } from "../../components/tables/rows/GithubRow";
 
 function CollectionCard({ cardObj }) {
 
@@ -42,9 +44,56 @@ function ApiSelector({ apiGroups }) {
         }
     })
 
-    const apisFlyLayoutComponents = [
-        <div>hello</div>
+    const headers = [
+        // {
+        //     text: "Endpoint",
+        //     value: "endpointComp",
+        //     title: "Api endpoints",
+        //     textValue: "endpoint",
+        //     sortActive: true
+        // },
+        {
+            title: "Endpoint",
+            value: "url", 
+            type: CellType.TEXT,
+        },
     ]
+
+    const resourceName = {
+        singular: 'API',
+        plural: 'APIs',
+    };
+
+    const promotedBulkActions = (selectedResources) => {
+
+        let ret = []
+        ret.push(
+            {
+                content: 'Confirm APIs selection',
+                //onAction: () => handleApiGroupAction(selectedResources, Operation.REMOVE)
+                onAction: () => {console.log(selectedResources)}
+            }
+        )
+       
+        return ret;
+    }
+
+    const apisFlyLayoutComponents = currentApiCollection ? [
+        <LegacyCard minHeight="100%">
+            <GithubSimpleTable
+                pageLimit={10}
+                data={currentApiCollection.apis}
+                resourceName={resourceName}
+                headers={headers}
+                headings={headers}
+                useNewRow={true}
+                selectable={true}
+                hideQueryField={true}
+                promotedBulkActions={promotedBulkActions}
+            />
+        </LegacyCard>
+        
+    ] : []
 
     const apiCollectionTitle = currentApiCollection ? 
         <HorizontalStack gap="2">
@@ -58,8 +107,6 @@ function ApiSelector({ apiGroups }) {
         setCurrentApiCollection (null)
     }
 
-
-    
     return (
         <Box minHeight="300px" padding={'4'}>
             
@@ -92,7 +139,13 @@ function AuthenticationSetup() {
         for (const authenticationApiGroup of authenticationApiGroupsCopy) {
             const collectionId = authenticationApiGroup.id
             const apiEndpointsResponse = await api.fetchCollectionWiseApiEndpoints(collectionId)
-            authenticationApiGroup.apis = apiEndpointsResponse?.listOfEndpointsInCollection
+
+            authenticationApiGroup.apis = apiEndpointsResponse?.listOfEndpointsInCollection.map(api => {
+                return {
+                    ...api,
+                    id: api.method + "###" + api.url + "###" + api.apiCollectionId + "###" + Math.random(),
+                }
+            })
         }
 
         setAuthenticationApiGroups(authenticationApiGroupsCopy)
