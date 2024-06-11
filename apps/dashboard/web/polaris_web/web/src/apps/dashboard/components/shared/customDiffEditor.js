@@ -98,6 +98,13 @@ const transform = {
             if (differences != undefined) {
                 for (let diff of differences) {
                     let kind = diff.kind;
+                    if(kind == undefined){
+                        continue;
+                    }
+                    let path = diff.path;
+                    if(path == undefined){
+                        continue;
+                    }
                     let key = diff.path.pop();
                     if(key==undefined){
                         continue;
