@@ -163,7 +163,7 @@ function AuthTypeDetails() {
         let name = currState.name
         if( (!headerKeys || headerKeys.length==0 ) && (!payloadKeys || payloadKeys.length==0 ) ){
             func.setToast(true, true, "Invalid header or payload keys");
-        } else if (errorMessage.length === 0){
+        } else if (errorMessage.length > 0){
             func.setToast(true, true, errorMessage);
         } else {
             if(isNew || isEditMode){
