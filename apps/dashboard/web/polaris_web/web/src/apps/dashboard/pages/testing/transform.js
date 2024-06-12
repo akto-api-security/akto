@@ -291,7 +291,7 @@ const transform = {
         const prettifiedTest={
           ...obj,
           testName: transform.prettifyTestName(data.name || "Test", iconObj.icon,iconObj.color, iconObj.tooltipContent),
-          severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues))
+          severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues || {"HIGH" : 0, "MEDIUM": 0, "LOW": 0}))
         }
         return prettifiedTest
       }else{
@@ -602,7 +602,7 @@ const transform = {
       const date = new Date(obj.startTimestamp * 1000)
       return{
         ...obj,
-        prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues),
+        prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues || {"HIGH" : 0, "MEDIUM": 0, "LOW": 0}),
         startTime: date.toLocaleTimeString() + " on " +  date.toLocaleDateString(),
         id: obj.hexId
       }
