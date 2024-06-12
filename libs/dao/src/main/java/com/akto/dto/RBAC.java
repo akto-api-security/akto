@@ -39,6 +39,9 @@ public class RBAC {
             this.featureReadWriteAccessMap = createFeatureMap(this);
         }
 
+        public Role[] getRoleHierarchy () {
+            return this.roleHierarchy;
+        }
         public ReadWriteAccess getReadWriteAccessForFeature(Feature feature) {
             return this.featureReadWriteAccessMap.get(feature);
         }
