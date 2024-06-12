@@ -23,13 +23,13 @@ public class RBAC {
         GUEST("GUEST");
 
         final String name;
-        final Role[] allowedAccess;//invitation
+        final Role[] roleHierarchy;//invitation
         final AccessGroups[] allowedAccessForRole;
 
 
         Role(String name) {
             this.name = name;
-            this.allowedAccess = Role.allowedAccess(this);
+            this.roleHierarchy = Role.roleHierarchy(this);
             this.allowedAccessForRole = Role.createAccessGroupsForRole(this);
         }
 
@@ -67,7 +67,7 @@ public class RBAC {
             return null;
         }
 
-        private static Role[] allowedAccess(Role role) {
+        private static Role[] roleHierarchy(Role role) {
             switch (role) {
                 case ADMIN:
                     return new Role[]{ADMIN, MEMBER, DEVELOPER, GUEST};
