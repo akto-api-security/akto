@@ -135,7 +135,7 @@ function TagDetails() {
         let keyConditionFromUsers = transform.preparePredicatesForApi(currState.keyConditions);
         if ((!keyConditionFromUsers || keyConditionFromUsers.length == 0)) {
             func.setToast(true, true, "Invalid url conditions");
-        } else if (errorMessage.length ===0){
+        } else if (errorMessage.length > 0){
             func.setToast(true, true, errorMessage);
         } else {
             if (isNew) {
