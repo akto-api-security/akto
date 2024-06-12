@@ -114,7 +114,6 @@ function SingleTestRunPage() {
   const [selected, setSelected] = useState(0)
   const [workflowTest, setWorkflowTest ] = useState(false);
   const [secondaryPopover, setSecondaryPopover] = useState(false)
-  const [updateKey, setUpdateKey] = useState(false)
   const currentTestingRuns = TestingStore((state) => state.currentTestingRuns)
   const  setErrorsObject = TestingStore((state) => state.setErrorsObject)
   const [currentTestRunObj, setCurrentTestObj] = useState({
@@ -161,9 +160,9 @@ function SingleTestRunPage() {
       return {...prev};
     });
 
-    await fetchTestingRunResultsData(summary.hexId, true);
+    await fetchTestingRunResultsData(summary.hexId);
   }
-  async function fetchTestingRunResultsData(summaryHexId, updateKey = false){
+  async function fetchTestingRunResultsData(summaryHexId){
     setLoading(false);
     setTempLoading((prev) => {
       prev.vulnerable = true;
@@ -201,7 +200,6 @@ function SingleTestRunPage() {
     })
     fillTempData(testRunResults, 'no_vulnerability_found')
     fillData(transform.getPrettifiedTestRunResults(testRunResults), 'no_vulnerability_found')
-    setUpdateKey(updateKey)
   }
   async function fetchData(setData) {
     let localSelectedTestRun = {}
@@ -339,9 +337,10 @@ const promotedBulkActions = (selectedDataHexIds) => {
           setLoading(false)
       },200)
   }
+
   const resultTable = (
     <GithubSimpleTable
-        key={"table" + updateKey}
+        key={"table"}
         data={testRunResults[selectedTab]}
         sortOptions={sortOptions}
         resourceName={resourceName}
