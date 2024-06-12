@@ -5,6 +5,8 @@ import org.bson.types.ObjectId;
 
 import java.util.*;
 
+import static com.akto.dto.RBAC.AccessGroups.*;
+
 public class RBAC {
 
     private ObjectId id;
@@ -24,49 +26,66 @@ public class RBAC {
 
         final String name;
         final Role[] roleHierarchy;//invitation
-        final AccessGroups[] allowedAccessForRole;
+        final Map<Feature, ReadWriteAccess> featureReadWriteAccessMap;
+        private static final Role[] roles = values();
 
+        public static Role[] getRoles() {
+            return roles;
+        }
 
         Role(String name) {
             this.name = name;
-            this.roleHierarchy = Role.roleHierarchy(this);
-            this.allowedAccessForRole = Role.createAccessGroupsForRole(this);
+            this.roleHierarchy = roleHierarchy(this);
+            this.featureReadWriteAccessMap = createFeatureMap(this);
         }
 
-        private static AccessGroups[] createAccessGroupsForRole(Role role) {
+        public ReadWriteAccess getReadWriteAccessForFeature(Feature feature) {
+            return this.featureReadWriteAccessMap.get(feature);
+        }
+
+        private Map<Feature, ReadWriteAccess> createFeatureMap (Role role) {
+            Map<Feature, ReadWriteAccess> featureReadWriteAccessMap = new HashMap<>();
             switch (role) {
                 case ADMIN:
-                    return new AccessGroups[]{
-                            AccessGroups.INVENTORY
-                                    .addFeature(Feature.API_COLLECTIONS.setWriteType(WriteType.READ_WRITE))
-                                    .addFeature(Feature.SENSITIVE_DATA.setWriteType(WriteType.READ_WRITE))
-                                    .addFeature(Feature.TRAFFIC_FILTERS.setWriteType(WriteType.READ_WRITE))
-                                    .addFeature(Feature.DEFAULT_PAYLOADS.setWriteType(WriteType.READ_WRITE))
-                                    .addFeature(Feature.TAGS.setWriteType(WriteType.READ_WRITE)),
-                            AccessGroups.TESTING
-                                    .addFeature(Feature.START_TEST_RUN.setWriteType(WriteType.READ_WRITE))
-                                    .addFeature(Feature.TEST_RESULTS.setWriteType(WriteType.READ_WRITE))
-                                    .addFeature(Feature.TEST_ROLES.setWriteType(WriteType.READ_WRITE))
-                                    .addFeature(Feature.USER_CONFIG.setWriteType(WriteType.READ_WRITE))
-                                    .addFeature(Feature.AUTH_TYPE.setWriteType(WriteType.READ_WRITE))
-                                    .addFeature(Feature.ISSUES.setWriteType(WriteType.READ_WRITE)),
-                            AccessGroups.TEST_LIBRARY
-                                    .addFeature(Feature.TEST_EDITOR.setWriteType(WriteType.READ_WRITE))
-                                    .addFeature(Feature.EXTERNAL_TEST_LIBRARY.setWriteType(WriteType.READ_WRITE)),
-                            AccessGroups.SETTINGS
-                                    .addFeature(Feature.INTEGRATIONS.setWriteType(WriteType.READ_WRITE))
-                                    .addFeature(Feature.METRICS.setWriteType(WriteType.READ_WRITE))
-                                    .addFeature(Feature.LOGS.setWriteType(WriteType.READ_WRITE))
-                                    .addFeature(Feature.BILLING.setWriteType(WriteType.READ_WRITE))
-
-                    };
+                    for (AccessGroups accessGroup: AccessGroups.getAccessGroups()) {
+                        for (Feature feature: Feature.getFeaturesForAccessGroup(accessGroup)) {
+                            featureReadWriteAccessMap.put(feature, ReadWriteAccess.READ_WRITE);
+                        }
+                    }
                 case MEMBER:
+                    for (AccessGroups accessGroup: AccessGroups.getAccessGroups()) {
+                        if (accessGroup.equals(SETTINGS)) {
+                            for (Feature feature: Feature.getFeaturesForAccessGroup(accessGroup)) {
+                                featureReadWriteAccessMap.put(feature, ReadWriteAccess.READ);
+                            }
+                        } else {
+                            for (Feature feature: Feature.getFeaturesForAccessGroup(accessGroup)) {
+                                featureReadWriteAccessMap.put(feature, ReadWriteAccess.READ_WRITE);
+                            }
+                        }
+                    }
                 case DEVELOPER:
+                    for (AccessGroups accessGroup: AccessGroups.getAccessGroups()) {
+                        if (accessGroup.equals(SETTINGS)) {
+                            for (Feature feature: Feature.getFeaturesForAccessGroup(accessGroup)) {
+                                featureReadWriteAccessMap.put(feature, ReadWriteAccess.READ_WRITE);
+                            }
+                        } else {
+                            for (Feature feature: Feature.getFeaturesForAccessGroup(accessGroup)) {
+                                featureReadWriteAccessMap.put(feature, ReadWriteAccess.READ);
+                            }
+                        }
+                    }
                 case GUEST:
+                    for (AccessGroups accessGroup: AccessGroups.getAccessGroups()) {
+                        for (Feature feature: Feature.getFeaturesForAccessGroup(accessGroup)) {
+                            featureReadWriteAccessMap.put(feature, ReadWriteAccess.READ);
+                        }
+                    }
+                    break;
             }
-            return null;
+            return featureReadWriteAccessMap;
         }
-
         private static Role[] roleHierarchy(Role role) {
             switch (role) {
                 case ADMIN:
@@ -80,67 +99,75 @@ public class RBAC {
             }
             return null;
         }
+
+
     }
+
     public enum AccessGroups {
         INVENTORY,
         TESTING,
         TEST_LIBRARY,
         SETTINGS;
 
-        final private Set<Feature> features;
-
-        AccessGroups() {
-            features = new HashSet<>();
-        }
-
-        public AccessGroups setFeatures(Feature[] features) {
-            this.features.addAll(Arrays.asList(features));
-            return this;
-        }
-
-        public AccessGroups addFeature(Feature feature) {
-            this.features.add(feature);
-            return this;
+        private static final AccessGroups[] accessGroups = values();
+        public static AccessGroups[] getAccessGroups() {
+            return accessGroups;
         }
     }
 
     public enum Feature {
         //Inventory Features
-        API_COLLECTIONS,
-        SENSITIVE_DATA,
-        TRAFFIC_FILTERS,
-        DEFAULT_PAYLOADS,
-        TAGS,
+        API_COLLECTIONS(INVENTORY),
+        SENSITIVE_DATA(INVENTORY),
+        TRAFFIC_FILTERS(INVENTORY),
+        DEFAULT_PAYLOADS(INVENTORY),
+        TAGS(INVENTORY),
 
         //Testrun features
-        START_TEST_RUN,
-        TEST_RESULTS,
-        TEST_ROLES,
-        USER_CONFIG,
-        AUTH_TYPE,
-        ISSUES,
+        START_TEST_RUN(TESTING),
+        TEST_RESULTS(TESTING),
+        TEST_ROLES(TESTING),
+        USER_CONFIG(TESTING),
+        AUTH_TYPE(TESTING),
+        ISSUES(TESTING),
 
         //Test Library features
-        TEST_EDITOR,
-        EXTERNAL_TEST_LIBRARY,
+        TEST_EDITOR(TEST_LIBRARY),
+        EXTERNAL_TEST_LIBRARY(TEST_LIBRARY),
 
         //Settings features
-        INTEGRATIONS,
-        METRICS,
-        LOGS,
+        INTEGRATIONS(SETTINGS),
+        METRICS(SETTINGS),
+        LOGS(SETTINGS),
 
         //Billing Features
-        BILLING;
+        BILLING(SETTINGS);
 
 
-        private WriteType writeType;
-        public Feature setWriteType(WriteType writeType) {
-            this.writeType = writeType;
-            return this;
+        private final AccessGroups accessGroups;
+
+        Feature(AccessGroups accessGroups) {
+            this.accessGroups = accessGroups;
+        }
+
+        private static final Feature[] features = values();
+
+        public static List<Feature> getFeaturesForAccessGroup(AccessGroups accessGroups) {
+            List<Feature> featureList = new ArrayList<>();
+            for (Feature feature : getFeatures()) {
+                if (feature.accessGroups.equals(accessGroups)) {
+                    featureList.add(feature);
+                }
+            }
+            return featureList;
+        }
+
+        public static Feature[] getFeatures() {
+            return features;
         }
     }
 
-    public enum WriteType {
+    public enum ReadWriteAccess {
         READ,
         READ_WRITE
     }
