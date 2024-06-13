@@ -124,7 +124,7 @@ public class TestingIssuesHandler {
             }
 
             if(!runResult.isVulnerable()){
-                return;
+                break;
             }
 
             Severity severity = TestExecutor.getSeverityFromTestingRunResult(runResult);
