@@ -285,15 +285,9 @@ public class TestExecutor {
         GithubUtils.publishGithubComments(testingRunResultSummary);
 
         Map<String , Integer> totalCountIssues = testingRunResultSummary.getCountIssues();
-        if(totalCountIssues == null){
-            totalCountIssues = new HashMap<>();
-            totalCountIssues.put("HIGH", 0);
-            totalCountIssues.put("MEDIUM", 0);
-            totalCountIssues.put("LOW", 0);
-        }
 
         loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
-        if(totalCountIssues.get(Severity.HIGH.toString()) > 0){
+        if(totalCountIssues.getOrDefault(Severity.HIGH.toString(), 0) > 0){
             ActivitiesDao.instance.insertActivity("High Vulnerability detected", totalCountIssues.get(Severity.HIGH.toString()) + " HIGH vulnerabilites detected");
         }
     }
