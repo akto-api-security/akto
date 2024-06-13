@@ -80,6 +80,10 @@ public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
         return (int) (System.currentTimeMillis() % 100000000l);
     }
 
+    public static Long epochInMillis() {
+        return (Long) (System.currentTimeMillis());
+    }
+
 
     public static long dateFromLotusNotation(BigDecimal serial_number, String sourceTz) {
         long numSecondsFromSheetEpoch = (long) (serial_number.doubleValue()*24*60*60);
