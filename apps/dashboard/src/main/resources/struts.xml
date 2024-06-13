@@ -949,6 +949,10 @@
         <action name="api/getAllCollections" class="com.akto.action.ApiCollectionsAction" method="fetchAllCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
             <result name="SUCCESS"  type="json">
             </result>
             <result name="ERROR" type="httpheader">
