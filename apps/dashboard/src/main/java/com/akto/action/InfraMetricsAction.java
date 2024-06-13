@@ -62,7 +62,7 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
             out.append("Dashboard version: ").append(accountSettings.getDashboardVersion()).append("\n");
         }
 
-        if (accountSettings != null && accountSettings.getDashboardVersion() != null) {
+        if (accountSettings != null && accountSettings.getApiRuntimeVersion() != null) {
             out.append("Runtime version: ").append(accountSettings.getApiRuntimeVersion()).append("\n");
         }
 
