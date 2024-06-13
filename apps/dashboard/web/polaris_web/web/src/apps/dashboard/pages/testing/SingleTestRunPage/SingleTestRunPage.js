@@ -14,7 +14,8 @@ import {
   ActionList,
   Card,
   ProgressBar,
-  Tooltip
+  Tooltip,
+  Banner
 } from '@shopify/polaris';
 
 import {
@@ -101,14 +102,14 @@ let filters = [
 
 function SingleTestRunPage() {
 
-  const [testRunResults, setTestRunResults] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [] })
-  const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [] })
+  const [testRunResults, setTestRunResults] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [] })
+  const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [] })
   const [ selectedTestRun, setSelectedTestRun ] = useState({});
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const subCategoryMap = PersistStore(state => state.subCategoryMap);
   const params= useParams()
   const [loading, setLoading] = useState(false);
-  const [tempLoading , setTempLoading] = useState({vulnerable: false, no_vulnerability_found: false, skipped: false, running: false})
+  const [tempLoading , setTempLoading] = useState({vulnerable: false, no_vulnerability_found: false, skipped: false, running: false,need_configurations:false})
   const [selectedTab, setSelectedTab] = useState("vulnerable")
   const [selected, setSelected] = useState(0)
   const [workflowTest, setWorkflowTest ] = useState(false);
@@ -120,6 +121,7 @@ function SingleTestRunPage() {
     testsInsertedInDb: 0,
     testingRunId: -1
   })
+  const [missingConfigs, setMissingConfigs] = useState([])
 
   const refreshId = useRef(null);
   const hexId = params.hexId;
@@ -166,6 +168,7 @@ function SingleTestRunPage() {
       prev.vulnerable = true;
       prev.no_vulnerability_found = true;
       prev.skipped = true;
+      prev.need_configurations = true
       return {...prev};
     });
     let testRunResults = [];
@@ -182,6 +185,15 @@ function SingleTestRunPage() {
     })
     fillTempData(testRunResults, 'skipped')
     fillData(transform.getPrettifiedTestRunResults(testRunResults), 'skipped')
+
+    await api.fetchTestingRunResults(summaryHexId, "SKIPPED_EXEC_NEED_CONFIG").then(({ testingRunResults }) => {
+      testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+    })
+    fillTempData(testRunResults, 'need_configurations')
+    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'need_configurations')
+    if(testRunResults.length > 0){
+      setMissingConfigs(transform.getMissingConfigs(testRunResults))
+    }
 
     await api.fetchTestingRunResults(summaryHexId, "SECURED").then(({ testingRunResults }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
@@ -287,7 +299,31 @@ const promotedBulkActions = (selectedDataHexIds) => {
     }
   }
 
-  const definedTableTabs = ['Vulnerable', 'Skipped', 'No vulnerability found']
+  const baseUrl = window.location.origin+"/dashboard/testing/roles/details?system=";
+
+  const bannerComp = (
+    missingConfigs.length > 0 ? 
+    <div className="banner-wrapper">
+      <Banner status="critical">
+        <HorizontalStack gap={3}>
+          <Box>
+            <Text fontWeight="semibold">
+              {`${missingConfigs.length} configuration${missingConfigs.length > 1 ? 's' : ''} missing: `}  
+            </Text>
+          </Box>
+          <HorizontalStack gap={2}>
+            {missingConfigs.map((config) => {
+              return(<Link url={baseUrl + config.toUpperCase()} key={config} target="_blank">
+                {config}
+              </Link>) 
+            })}
+          </HorizontalStack>
+        </HorizontalStack>
+      </Banner>
+    </div> : null
+  )
+
+  const definedTableTabs = ['Vulnerable', 'Need configurations','Skipped', 'No vulnerability found']
 
   const { tabsInfo } = useTable()
   const tableCountObj = func.getTabsCount(definedTableTabs, testRunResults)
@@ -301,6 +337,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
           setLoading(false)
       },200)
   }
+
   const resultTable = (
     <GithubSimpleTable
         key={"table"}
@@ -325,6 +362,11 @@ const promotedBulkActions = (selectedDataHexIds) => {
         tableTabs={tableTabs}
         onSelect={handleSelectedTab}
         filterStateUrl={"/dashboard/testing/" + selectedTestRun?.id + "/#" + selectedTab}
+        bannerComp={{
+          "comp": bannerComp,
+          "selected": 1
+          }
+        }
       />
   )
 
@@ -408,7 +450,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     )
   }
 
-  const allResultsLength = testRunResults.skipped.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length + progress
+  const allResultsLength = testRunResults.skipped.length + testRunResults.need_configurations.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length + progress
   const useComponents = (!workflowTest && allResultsLength === 0) ? [<EmptyData key="empty"/>] : components
   const headingComp = (
     <Box paddingBlockStart={1}>

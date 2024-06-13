@@ -840,4 +840,12 @@ public class Utils {
         }
     }
 
+    public static Boolean commandRequiresConfig(String key){
+        String ACCESS_ROLES = "roles_access";
+        if (key.contains(ACCESS_ROLES) || key.equals("replace_auth_header")) {
+            return true;
+        }
+        return false;
+    }
+
 }
