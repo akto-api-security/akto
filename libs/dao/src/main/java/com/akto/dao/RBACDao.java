@@ -1,11 +1,30 @@
 package com.akto.dao;
 
 
+import com.akto.dao.context.Context;
 import com.akto.dto.RBAC;
 import com.mongodb.client.model.Filters;
 
 public class RBACDao extends CommonContextDao<RBAC> {
     public static final RBACDao instance = new RBACDao();
+
+    public void createIndicesIfAbsent() {
+
+        boolean exists = false;
+        for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
+            if (getCollName().equalsIgnoreCase(col)){
+                exists = true;
+                break;
+            }
+        };
+
+        if (!exists) {
+            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
+        }
+
+        String[] fieldNames = {RBAC.USER_ID};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+    }
 
     public boolean isAdmin(int userId, int accountId) {
         RBAC rbac = RBACDao.instance.findOne(
