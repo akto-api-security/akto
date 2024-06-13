@@ -9,14 +9,15 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.SensitiveParamInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.akto.util.Util;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 
-import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
@@ -291,31 +292,37 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         );
     }
 
-
     // to get results irrespective of collections use negative value for apiCollectionId
     public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
         Bson filter = null;
         if (apiCollectionId != -1) {
             filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         }
-        return fetchEndpoints(filter, null);
+        List<Bson> pipeline = getPipelineForEndpoints(filter);
+        return processPipelineForEndpoint(pipeline);
     }
 
     public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Method method) {
         Bson filter = null;
-        if (method != null) {
-            // the filter obtained uses index.
-            filter = MethodCondition.createMethodFilter(method);
+        if (method == null) {
+            return new ArrayList<>();
         }
-        return fetchEndpoints(filter, null, 50);
+        // the filter obtained uses index.
+        filter = MethodCondition.createMethodFilter(method);
+        List<Bson> pipeline = getPipelineForEndpoints(filter);
+        pipeline.add(Aggregates.limit(50));
+        return processPipelineForEndpoint(pipeline);
     }
-
 
     public List<ApiInfo.ApiInfoKey> fetchEndpointsBySubType(SingleTypeInfo.SubType subType, int skip, int limit) {
-        return fetchEndpoints(Filters.eq("subType", subType.getName()), "timestamp", limit, skip);
+        Bson filter = Filters.eq("subType", subType.getName());
+        List<Bson> pipeline = getPipelineForEndpoints(filter);
+        pipeline.add(Aggregates.limit(limit));
+        pipeline.add(Aggregates.skip(skip));
+        return processPipelineForEndpoint(pipeline);
     }
 
-    private List<ApiInfo.ApiInfoKey> fetchEndpoints(Bson matchCriteria, String sortField, int... limitSkip) {
+    private List<Bson> getPipelineForEndpoints(Bson matchCriteria) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId =
                 new BasicDBObject("apiCollectionId", "$apiCollectionId")
@@ -327,22 +334,16 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         }
 
         Bson projections = Projections.fields(
-                Projections.include("timestamp", "apiCollectionId", "url", "method")
+                Projections.include("timestamp", "lastSeen", "apiCollectionId", "url", "method", SingleTypeInfo._COLLECTION_IDS)
         );
 
         pipeline.add(Aggregates.project(projections));
         pipeline.add(Aggregates.group(groupedId));
-        if(StringUtils.isNotEmpty(sortField)) {
-            pipeline.add(Aggregates.sort(Sorts.descending(sortField)));
-        }
+        pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
+        return pipeline;
+    }
 
-        if (limitSkip.length == 2) {
-            pipeline.add(Aggregates.limit(limitSkip[0]));
-            pipeline.add(Aggregates.skip(limitSkip[1]));
-        } else if(limitSkip.length == 1){
-            pipeline.add(Aggregates.limit(limitSkip[0]));
-        }
-
+    private List<ApiInfoKey> processPipelineForEndpoint(List<Bson> pipeline){
         MongoCursor<BasicDBObject> endpointsCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
         List<ApiInfo.ApiInfoKey> endpoints = new ArrayList<>();
@@ -485,21 +486,12 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     }
 
     public static final int LARGE_LIMIT = 10_000;
+    public static final String _COUNT = "count";
 
     public int countEndpoints(Bson filters) {
         int ret = 0;
 
-        List<Bson> pipeline = new ArrayList<>();
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId")
-                .append("url", "$url")
-                .append("method", "$method");
-
-        Bson projections = Projections.fields(
-                Projections.include("timestamp", "lastSeen", "apiCollectionId", "url", "method", SingleTypeInfo._COLLECTION_IDS));
-
-        pipeline.add(Aggregates.project(projections));
-        pipeline.add(Aggregates.match(filters));
-        pipeline.add(Aggregates.group(groupedId));
+        List<Bson> pipeline = getPipelineForEndpoints(filters);
         pipeline.add(Aggregates.limit(LARGE_LIMIT));
         pipeline.add(Aggregates.count());
 
@@ -507,7 +499,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 .aggregate(pipeline, BasicDBObject.class).cursor();
 
         while (endpointsCursor.hasNext()) {
-            ret = endpointsCursor.next().getInt("count");
+            ret = endpointsCursor.next().getInt(_COUNT);
             break;
         }
 

@@ -116,8 +116,33 @@ service.interceptors.response.use((response) => {
   return response.data
 }, err)
 
-const black_list_apis = ['dashboard/accesstoken', 'api/fetchBurpPluginInfo', 'api/fetchActiveLoaders', 'api/fetchAllSubCategories']
+const black_list_apis = ['dashboard/accessToken', 'api/fetchBurpPluginInfo', 'api/fetchActiveLoaders', 'api/fetchAllSubCategories']
 async function raiseMixpanelEvent(api) {
+  if (window?.Intercom) {
+    if (api?.startsWith("/api/ingestPostman")) {
+        window.Intercom("trackEvent", "created-api-collection", {"type": "Postman"})
+    }
+
+    if (api?.startsWith("/api/importSwaggerLogs")) {
+        window.Intercom("trackEvent", "created-api-collection", {"type": "Swagger"})
+    }
+
+    if (api?.startsWith("/api/uploadHar")) {
+        window.Intercom("trackEvent", "created-api-collection", {"type": "Har"})
+    }
+
+    if (api?.startsWith("/api/startTest")) {
+        window.Intercom("trackEvent", "started-test")
+    }
+
+    if (api?.startsWith("/api/runTestForGivenTemplate")) {
+        window.Intercom("trackEvent", "tested-editor")
+    }
+
+    if (api?.startsWith("/api/skipOnboarding") || api?.startsWith("/api/fetchTestSuites")) {
+        window.Intercom("trackEvent", "onboarding-started")
+    }
+  }
   if (api && !black_list_apis.some(black_list_api => api.includes(black_list_api))) {
     window.mixpanel.track(api)
   }

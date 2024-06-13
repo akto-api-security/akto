@@ -49,7 +49,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
 
         HttpCallParser httpCallParser = new HttpCallParser("", 0, 0, 0, false);
         httpCallParser.syncFunction(httpResponseParamsList, true,true, null);
-        APICatalogSync.mergeUrlsAndSave(1000, true, true);
+        APICatalogSync.mergeUrlsAndSave(1000, true, true, httpCallParser.apiCatalogSync.existingAPIsInDb);
 
         List<DependencyNode> nodes = DependencyNodeDao.instance.findAll(new BasicDBObject());
         assertEquals(expectedNodes, nodes.size());
@@ -87,8 +87,17 @@ public class TestDependencyAnalyser extends MongoBasedTest {
 
         process(messages, 7);
 
+        // this is to make sure incorrect apiCollectionId, then dependency flow shouldn't run
+        DependencyFlow dependencyFlowUseless = new DependencyFlow();
+        dependencyFlowUseless.run("1001");
+        dependencyFlowUseless.syncWithDb();
+        TreeHelper treeHelperUseless = new TreeHelper();
+        treeHelperUseless.buildTree("1000", "/api/m7", "POST");
+        Map<Integer, Node> resultUseless = treeHelperUseless.result;
+        assertTrue(resultUseless.isEmpty());
+
         DependencyFlow dependencyFlow = new DependencyFlow();
-        dependencyFlow.run();
+        dependencyFlow.run("1000");
         dependencyFlow.syncWithDb();
 
         TreeHelper treeHelper = new TreeHelper();
@@ -155,7 +164,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         process(messages, 7);
 
         DependencyFlow dependencyFlow = new DependencyFlow();
-        dependencyFlow.run();
+        dependencyFlow.run("1000");
         dependencyFlow.syncWithDb();
 
         TreeHelper treeHelper = new TreeHelper();
@@ -191,7 +200,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         process(messages, 1);
 
         DependencyFlow dependencyFlow = new DependencyFlow();
-        dependencyFlow.run();
+        dependencyFlow.run("1000");
         dependencyFlow.syncWithDb();
 
         TreeHelper treeHelper = new TreeHelper();

@@ -20,13 +20,22 @@ import tableFunc from './transform';
 import useTable from './TableContext';
 import { debounce } from 'lodash';
 
+import { useSearchParams } from 'react-router-dom';
+
 function GithubServerTable(props) {
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const updateQueryParams = (key, value) => {
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set(key, value);
+    setSearchParams(newSearchParams);
+  };
 
   const filtersMap = PersistStore(state => state.filtersMap)
   const setFiltersMap = PersistStore(state => state.setFiltersMap)
   const tableInitialState = PersistStore(state => state.tableInitialState)
   const setTableInitialState = PersistStore(state => state.setTableInitialState)
-  const currentPageKey = props?.filterStateUrl || window.location.href
+  const currentPageKey = props?.filterStateUrl || (window.location.pathname + "/" +  window.location.hash)
   const pageFiltersMap = filtersMap[currentPageKey]
 
   const handleRemoveAppliedFilter = (key) => {
@@ -70,16 +79,27 @@ function GithubServerTable(props) {
   const handleSelectedTab = (x) => {
     const tableTabs = props.tableTabs ? props.tableTabs : props.tabs
     if(tableTabs){
-      const primitivePath = window.location.origin + window.location.pathname
+      const primitivePath = window.location.origin + window.location.pathname + window.location?.search
       const newUrl = primitivePath + "#" +  tableTabs[x].id
       window.history.replaceState(null, null, newUrl)
     } 
   }
 
   useEffect(()=> {
-    setAppliedFilters(initialStateFilters)
+    let queryFilters 
+    if (performance.getEntriesByType('navigation')[0].type === 'reload') {
+      queryFilters = []
+    }else{
+      queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey)
+    }
+    const currentFilters = tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)
+    setAppliedFilters(currentFilters)
     setSortSelected(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
   },[currentPageKey])
+
+  useEffect(() => {
+    updateQueryParams("filters",tableFunc.getPrettifiedFilter(appliedFilters))
+  },[appliedFilters])
 
   async function fetchData(searchVal) {
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
@@ -91,11 +111,12 @@ function GithubServerTable(props) {
     tempData ? setData([...tempData.value]) : setData([])
     tempData ? setTotal(tempData.total) : setTotal(0)
     applyFilter(tempData.total)
-    
-    setTableInitialState({
-      ...tableInitialState,
-      [currentPageKey]: tempData.total
-    })
+    if(!performance.getEntriesByType('navigation')[0].type === 'reload'){
+      setTableInitialState({
+        ...tableInitialState,
+        [currentPageKey]: tempData.total
+      })
+    }
   }
 
   useEffect(() => {
@@ -107,6 +128,10 @@ function GithubServerTable(props) {
   useEffect(()=> {
     setSortableColumns(tableFunc.getSortableChoices(props?.headers))
   },[props?.headers])
+
+  useEffect(() => {
+    fetchData(queryValue)
+  },[props?.callFromOutside])
 
   const handleSort = (col, dir) => {
     let tempSortSelected = props?.sortOptions.filter(x => x.columnIndex === (col + 1))
@@ -275,12 +300,18 @@ function GithubServerTable(props) {
     setPage((page) => (page - 1));
   }
 
+  const handleTabChange = (x) => {
+    props?.onSelect(x); 
+    updateQueryParams("filters", tableFunc.getPrettifiedFilter([])) ;
+    handleSelectedTab(x)
+  }
+
   let tableHeightClass = props.increasedHeight ? "control-row" : (props.condensedHeight ? "condensed-row" : '') 
   let tableClass = props.useNewRow ? "new-table" : (props.selectable ? "removeHeaderColor" : "hideTableHead")
   return (
     <div className={tableClass}>
       <LegacyCard>
-        {props.tabs && <Tabs tabs={props.tabs} selected={props.selected} onSelect={(x) => {props?.onSelect(x); handleSelectedTab(x)}}></Tabs>}
+        {props.tabs && <Tabs tabs={props.tabs} selected={props.selected} onSelect={(x) => handleTabChange(x)}></Tabs>}
         {props.tabs && props.tabs[props.selected].component ? props.tabs[props.selected].component :
           <div>
             <LegacyCard.Section flush>
@@ -306,8 +337,9 @@ function GithubServerTable(props) {
                 setMode={setMode}
                 loading={props.loading || false}
                 selected={props?.selected}
-                onSelect={(x) => {props?.onSelect(x); handleSelectedTab(x)}}
+                onSelect={(x) => handleTabChange(x)}
               />
+              {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
               <div className={tableHeightClass}>
               <IndexTable
                 resourceName={props.resourceName}

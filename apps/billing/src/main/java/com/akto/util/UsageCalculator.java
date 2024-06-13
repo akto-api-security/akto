@@ -6,6 +6,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.Config;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.billing.OrganizationFlags;
 import com.akto.dto.billing.OrganizationUsage;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
@@ -33,14 +34,21 @@ public class UsageCalculator {
     private UsageCalculator() {}
 
     boolean statusDataSinks = false;
+    String currentCalcOrg = "";
 
     boolean statusAggregateUsage = false;
 
-    public void sendOrgUsageDataToAllSinks(Organization o) {
-        if (statusDataSinks) {
+    public void sendOrgUsageDataToAllSinks(Organization o, boolean justRun) {
+        boolean differentOrg = o != null && o.getId()!=null ? !currentCalcOrg.equals(o.getId()) : true;
+        justRun &= differentOrg;
+        if (statusDataSinks && !justRun) {
             throw new IllegalStateException("Data sinks already going on. Returning...");
         }
         try {
+            if(o == null){
+                return;
+            }
+            currentCalcOrg = o.getId();
             statusDataSinks = true;
             Bson filterQ =
                     Filters.and(
@@ -75,6 +83,7 @@ public class UsageCalculator {
             loggerMaker.infoAndAddToDb("marked "+updateResult.getModifiedCount()+" items as ignored", LoggerMaker.LogDb.BILLING);
         } finally {
             statusDataSinks = false;
+            currentCalcOrg = "";
         }
 
     }
@@ -178,7 +187,22 @@ public class UsageCalculator {
 
     }
 
-    public void aggregateUsageForOrg(Organization o, int usageLowerBound, int usageUpperBound) {
+    static boolean shouldProcessIncomplete(String orgId, OrganizationFlags flags) {
+
+        if(orgId == null){
+            return false;
+        }
+
+        if (flags == null) {
+            return false;
+        }
+        if (flags.getAggregateIncomplete() == null || flags.getAggregateIncomplete().isEmpty()) {
+            return false;
+        }
+        return flags.getAggregateIncomplete().contains(orgId);
+    }
+
+    public void aggregateUsageForOrg(Organization o, int usageLowerBound, int usageUpperBound, OrganizationFlags flags) {
         if (statusAggregateUsage) {
             throw new IllegalStateException("Aggregation already going on");
         }
@@ -220,7 +244,9 @@ public class UsageCalculator {
                     } else {
                         String err = "Missing account id: " + account + " orgId: " + organizationId+ " metricType: " + metricTypeString + " hour: " + hour;
                         loggerMaker.errorAndAddToDb(err, LoggerMaker.LogDb.BILLING);
-                        throw new Exception(err);
+                        if (!shouldProcessIncomplete(organizationId, flags)) {
+                            throw new Exception(err);
+                        }
                     }
 
                     int currentConsolidateUsage = consolidatedUsage.get(metricTypeString);

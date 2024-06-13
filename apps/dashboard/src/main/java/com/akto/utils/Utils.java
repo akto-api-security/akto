@@ -482,7 +482,7 @@ public class Utils {
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, accountSettings);
             info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
-            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, false);
+            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, false, info.getHttpCallParser().apiCatalogSync.existingAPIsInDb);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
 //            for (HttpResponseParams responseParams: responses)  {
@@ -492,7 +492,7 @@ public class Utils {
 //            info.getResourceAnalyser().syncWithDb();
             try {
                 DependencyFlow dependencyFlow = new DependencyFlow();
-                dependencyFlow.run();
+                dependencyFlow.run(apiCollectionId+"");
                 dependencyFlow.syncWithDb();
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e,"Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);

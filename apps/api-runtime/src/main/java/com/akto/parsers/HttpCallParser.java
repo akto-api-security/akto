@@ -1,14 +1,18 @@
 package com.akto.parsers;
 
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.*;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -24,6 +28,7 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import okhttp3.*;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 
@@ -216,8 +221,12 @@ public class HttpCallParser {
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
+
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(Context.accountId.get(), MetricTypes.ACTIVE_ENDPOINTS);
+            SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+
             numberOfSyncs++;
-            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI);
+            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
             dependencyAnalyser.dbState = apiCatalogSync.dbState;
             dependencyAnalyser.syncWithDb();
             syncTrafficMetricsWithDB();
@@ -314,7 +323,7 @@ public class HttpCallParser {
     }
 
     public static boolean useHostCondition(String hostName, HttpResponseParams.Source source) {
-        List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING);
+        List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING, HttpResponseParams.Source.OTHER, HttpResponseParams.Source.SDK);
         boolean hostNameCondition;
         if (hostName == null) {
             hostNameCondition = false;
@@ -414,8 +423,19 @@ public class HttpCallParser {
                 }
             }
 
-            String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
+            Map<String, List<String>> reqHeaders = httpResponseParam.getRequestParams().getHeaders();
+            String hostName = getHeaderValue(reqHeaders, "host");
 
+            if (StringUtils.isEmpty(hostName)) {
+                hostName = getHeaderValue(reqHeaders, "authority");
+                if (StringUtils.isEmpty(hostName)) {
+                    hostName = getHeaderValue(reqHeaders, ":authority");
+                }
+
+                if (!StringUtils.isEmpty(hostName)) {
+                    reqHeaders.put("host", Collections.singletonList(hostName));
+                }
+            }
 
             int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
             int apiCollectionId ;

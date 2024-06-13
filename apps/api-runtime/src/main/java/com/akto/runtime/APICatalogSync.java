@@ -8,6 +8,8 @@ import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.billing.SyncLimit;
+import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -16,13 +18,19 @@ import com.akto.dto.type.SingleTypeInfo.Domain;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.merge.MergeOnHostOnly;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
+import com.akto.usage.UsageMetricCalculator;
+import com.akto.usage.UsageMetricHandler;
 import com.akto.utils.RedactSampleData;
+import com.google.api.client.util.Charsets;
+import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
@@ -37,6 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
@@ -56,6 +65,7 @@ public class APICatalogSync {
     public AktoPolicyNew aktoPolicyNew;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
     public static boolean mergeAsyncOutside = true;
+    public BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
 
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
@@ -258,7 +268,7 @@ public class APICatalogSync {
     }
 
 
-    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic) {
+    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
         Bson filterQ = null;
@@ -287,6 +297,8 @@ public class APICatalogSync {
             List<String> templateUrls = new ArrayList<>();
             for(SingleTypeInfo sti: singleTypeInfos) {
                 String key = sti.getMethod() + " " + sti.getUrl();
+                fillExistingAPIsInDb(sti, existingAPIsInDb);
+
                 if (APICatalog.isTemplateUrl(sti.getUrl())) {
                     templateUrlSet.add(key);
                     continue;
@@ -791,10 +803,10 @@ public class APICatalogSync {
 
     }
 
-    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic) {
+    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb) {
         if (apiCollectionId == LLM_API_COLLECTION_ID || apiCollectionId == VULNERABLE_API_COLLECTION_ID) return;
 
-        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled, mergeUrlsBasic);
+        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled, mergeUrlsBasic, existingAPIsInDb);
 
         String deletedStaticUrlsString = "";
         int counter = 0;
@@ -1418,6 +1430,10 @@ public class APICatalogSync {
 
         loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
         boolean mergingCalled = false;
+
+        demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
+        existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
+
         if (mergeAsyncOutside && fetchAllSTI ) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
                 loggerMaker.infoAndAddToDb("Started mergeAsyncOutside", LogDb.RUNTIME);
@@ -1445,14 +1461,14 @@ public class APICatalogSync {
                             int start = Context.now();
                             loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollection.getId(), LogDb.RUNTIME);
                             try {
-                                mergeUrlsAndSave(apiCollection.getId(), true, true);
+                                mergeUrlsAndSave(apiCollection.getId(), true, true, existingAPIsInDb);
                                 loggerMaker.infoAndAddToDb("Finished merging API collection basic " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
                             }
 
                             try {
-                                mergeUrlsAndSave(apiCollection.getId(), true, false);
+                                mergeUrlsAndSave(apiCollection.getId(), true, false, existingAPIsInDb);
                                 loggerMaker.infoAndAddToDb("Finished merging API collection all" + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
@@ -1484,6 +1500,20 @@ public class APICatalogSync {
             Bson filterQ = Filters.and(filterForHostHeader, Filters.regex(SingleTypeInfo._URL, "STRING|INTEGER"));
             allParams = SingleTypeInfoDao.instance.findAll(filterQ, Projections.exclude(SingleTypeInfo._VALUES));
             allParams.addAll(SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES)));
+
+            int dependencyFlowLimit = 1_000;
+            if (mergingCalled && allParams.size() < dependencyFlowLimit) {
+                loggerMaker.infoAndAddToDb("ALl params less than " + dependencyFlowLimit +", running dependency flow", LogDb.RUNTIME);
+                try {
+                    DependencyFlow dependencyFlow = new DependencyFlow();
+                    dependencyFlow.run(null);
+                    dependencyFlow.syncWithDb();
+                    loggerMaker.infoAndAddToDb("Finished running dependency flow", LogDb.RUNTIME);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while running dependency flow in runtime: " + e.getMessage(), LogDb.RUNTIME);
+                }
+            }
+
         } else {
             List<Integer> apiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
             allParams = SingleTypeInfoDao.instance.fetchStiOfCollections(apiCollectionIds);
@@ -1491,7 +1521,7 @@ public class APICatalogSync {
         loggerMaker.infoAndAddToDb("Fetched STIs count: " + allParams.size(), LogDb.RUNTIME);
         this.dbState.clear();
         loggerMaker.infoAndAddToDb("Starting building dbState", LogDb.RUNTIME);
-        this.dbState = build(allParams);
+        this.dbState = build(allParams, existingAPIsInDb);
         loggerMaker.infoAndAddToDb("Done building dbState", LogDb.RUNTIME);
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
         List<SensitiveParamInfo> sensitiveParamInfos = SensitiveParamInfoDao.instance.getUnsavedSensitiveParamInfos();
@@ -1525,6 +1555,11 @@ public class APICatalogSync {
 
     public static void updateApiCollectionCount(APICatalog apiCatalog, int apiCollectionId) {
         Set<String> newURLs = new HashSet<>();
+        
+        if (apiCatalog == null) {
+            return;
+        }
+
         for(URLTemplate url: apiCatalog.getTemplateURLToMethods().keySet()) {
             newURLs.add(url.getTemplateString()+ " "+ url.getMethod().name());
         }
@@ -1642,13 +1677,25 @@ public class APICatalogSync {
         keyTypes.getOccurrences().put(param.getSubType(), param);
     }
 
+    private static Set<Integer> demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
 
-    private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams) {
+    private static void fillExistingAPIsInDb(SingleTypeInfo sti, BloomFilter<CharSequence> existingAPIsInDb) {
+        if (demosAndDeactivatedCollections.contains(sti.getApiCollectionId())) {
+            return;
+        }
+        String key = sti.composeApiInfoKey();
+        if (key != null) {
+            existingAPIsInDb.put(key);
+        }
+    }
+
+    private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams, BloomFilter<CharSequence> existingAPIsInDb) {
         Map<Integer, APICatalog> ret = new HashMap<>();
         
         for (SingleTypeInfo param: allParams) {
             try {
                 buildHelper(param, ret);
+                fillExistingAPIsInDb(param, existingAPIsInDb);
             } catch (Exception e) {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb("Error while building from db: " + e.getMessage(), LogDb.RUNTIME);
@@ -1660,7 +1707,7 @@ public class APICatalogSync {
 
     int counter = 0;
     
-    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {
+    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit syncLimit) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
         List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData = new ArrayList<>();
@@ -1683,6 +1730,56 @@ public class APICatalogSync {
         counter++;
         for(int apiCollectionId: this.delta.keySet()) {
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
+
+            Set<Integer> demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
+
+            if (syncLimit.checkLimit && !demosAndDeactivatedCollections.contains(apiCollectionId)) {
+
+                int deltaUsage = 0;
+                Iterator<Entry<URLStatic, RequestTemplate>> staticUrlIterator = deltaCatalog.getStrictURLToMethods().entrySet().iterator();
+                while (staticUrlIterator.hasNext()) {
+                    Entry<URLStatic, RequestTemplate> entry = staticUrlIterator.next();
+                    URLStatic urlStatic = entry.getKey();
+                    String checkString = apiCollectionId + " " + urlStatic.getFullString();
+                    if (!existingAPIsInDb.mightContain(checkString)) {
+                        if (syncLimit.updateUsageLeftAndCheckSkip()) {
+                            staticUrlIterator.remove();
+                        } else {
+                            existingAPIsInDb.put(checkString);
+                            deltaUsage++;
+                        }
+                    }
+                }
+
+                Iterator<Entry<URLTemplate, RequestTemplate>> templateUrlIterator = deltaCatalog.getTemplateURLToMethods().entrySet().iterator();
+                while(templateUrlIterator.hasNext()) {
+                    Entry<URLTemplate, RequestTemplate> entry = templateUrlIterator.next();
+                    URLTemplate urlTemplate = entry.getKey();
+                    String checkString = apiCollectionId + " " + urlTemplate.getTemplateString() + " "
+                            + urlTemplate.getMethod().name();
+                    if (!existingAPIsInDb.mightContain(checkString)) {
+                        if (syncLimit.updateUsageLeftAndCheckSkip()) {
+                            templateUrlIterator.remove();
+                        } else {
+                            existingAPIsInDb.put(checkString);
+                            deltaUsage++;
+                        }
+                    }
+                }
+
+                UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get(), deltaUsage);
+            }
+
+            /*
+             * Note: Since multiple runtime-instances are running simultaneously, all of
+             * them would get the same limit (say 5) and insert up to 5 new APIs each. This
+             * would cause an overage of roughly (n-1)*(5) endpoints, where n is no. of
+             * runtime instances, after which no new endpoints would be inserted.
+             * We can mitigate this minimal overage using DB lock, at organization level (we
+             * currently have db lock at account level), but are holding as it may
+             * slow the runtime instance.
+             */
+
             APICatalog dbCatalog = this.dbState.getOrDefault(apiCollectionId, new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>()));
             boolean redactCollectionLevel = apiCollectionToRedactPayload.getOrDefault(apiCollectionId, false);
             DbUpdateReturn dbUpdateReturn = getDBUpdatesForParams(deltaCatalog, dbCatalog, redact, redactCollectionLevel);

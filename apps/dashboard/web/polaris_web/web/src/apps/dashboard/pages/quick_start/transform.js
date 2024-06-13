@@ -9,6 +9,7 @@ import FutureConnection from "./components/shared/FutureConnection"
 import BannerComponent from "./components/shared/BannerComponent"
 import OpenApiSource from "./components/OpenApiSource"
 import ApiInventoryFromSourceCode from "./components/ApiInventoryFromSourceCode"
+import func from "@/util/func"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -744,6 +745,11 @@ const yaml_kubernetes = [
 
 const quickStartFunc = {
     getConnectorsList: function () {
+
+        if(func.checkLocal()){
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj]
+        }
+
         const connectorsList = [gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
             openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
