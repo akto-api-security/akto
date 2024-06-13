@@ -1,5 +1,6 @@
 package com.akto.rules;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,21 +18,20 @@ public class RequiredConfigs {
         return requiredConfigs;
     }
 
-    private static List<TestRoles> testRolesList = TestRolesDao.instance.findAll(
-        Filters.empty(),
-        Projections.fields(
-            Projections.include(TestRoles.NAME, TestRoles.AUTH_WITH_COND_LIST)
-        )
-    );
+    private static List<TestRoles> testRolesList = new ArrayList<>();
 
     private static final Map<String,Boolean> validRolesExist = new HashMap<>();
 
-    public static void initiate () {
+    public static void initiate() {
         validRolesExist.clear();
+        testRolesList = TestRolesDao.instance.findAll(
+            Filters.empty(),
+            Projections.fields(
+                Projections.include(TestRoles.NAME)
+            )
+        );
         for(TestRoles role: testRolesList){
-            if(role.getAuthWithCondList() != null && role.getAuthWithCondList().size() > 0){
-                validRolesExist.put(role.getName(), true);
-            }
+            validRolesExist.put(role.getName(), true);
         }
     }
 
@@ -40,3 +40,4 @@ public class RequiredConfigs {
     }
 
 }
+

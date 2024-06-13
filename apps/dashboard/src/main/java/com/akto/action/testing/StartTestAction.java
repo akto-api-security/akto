@@ -26,7 +26,6 @@ import com.akto.dto.testing.info.CurrentTestsStatus.StatusForIndividualTest;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.rules.RequiredConfigs;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
@@ -235,7 +234,6 @@ public class StartTestAction extends UserAction {
 
         }
 
-        RequiredConfigs.initiate();
         this.startTimestamp = 0;
         this.endTimestamp = 0;
         this.retrieveAllCollectionTests();
