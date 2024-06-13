@@ -32,6 +32,7 @@ import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
+import com.akto.rules.RequiredConfigs;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -242,7 +243,6 @@ public class Main {
                 int accountId = account.getId();
 
                 int start = Context.now();
-
                 TestingRunResultSummary trrs = findPendingTestingRunResultSummary();
                 boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
                 TestingRun testingRun;
@@ -377,6 +377,7 @@ public class Main {
 
                         }
                     }
+                    RequiredConfigs.initiate();
                     testExecutor.init(testingRun, summaryId, syncLimit);
                     raiseMixpanelEvent(summaryId, testingRun, accountId);
                 } catch (Exception e) {
