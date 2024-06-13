@@ -19,6 +19,7 @@ import org.bouncycastle.jce.provider.JDKDSASigner.stdDSA;
 
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.UrlModifierPayload;
@@ -846,6 +847,17 @@ public class Utils {
             return true;
         }
         return false;
+    }
+    
+    public static Object getEpochTime(Object value) {
+        Object val = null;
+        if (value.equals("${current_epoch_seconds}")) {
+            val = Context.now();
+        }
+        if (value.equals("${current_epoch_millis}")) {
+            val = Context.epochInMillis();
+        }
+        return val;
     }
 
 }

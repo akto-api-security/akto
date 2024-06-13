@@ -590,8 +590,16 @@ public class Executor {
             case "attach_file":
                 return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , key.toString());
             case "add_body_param":
+                Object epochVal = Utils.getEpochTime(value);
+                if (epochVal != null) {
+                    value = epochVal;
+                }
                 return Operations.addBody(rawApi, key.toString(), value);
             case "modify_body_param":
+                epochVal = Utils.getEpochTime(value);
+                if (epochVal != null) {
+                    value = epochVal;
+                }
                 return Operations.modifyBodyParam(rawApi, key.toString(), value);
             case "delete_graphql_field":
                 return Operations.deleteGraphqlField(rawApi, key == null ? "": key.toString());
@@ -625,6 +633,10 @@ public class Executor {
                         return new ExecutorSingleOperationResp(false, tokenResponse.getString("error"));
                     }
                 }
+                epochVal = Utils.getEpochTime(value);
+                if (epochVal != null) {
+                    value = epochVal;
+                }
 
                 return Operations.addHeader(rawApi, key.toString(), value.toString());
             case "modify_header":
@@ -648,13 +660,25 @@ public class Executor {
 
                     return new ExecutorSingleOperationResp(true, "Unable to match request headers " + key);
                 } else {
+                    epochVal = Utils.getEpochTime(valStr);
+                    if (epochVal != null) {
+                        valStr = epochVal.toString();
+                    }
                     return Operations.modifyHeader(rawApi, keyStr, valStr);
                 }
             case "delete_header":
                 return Operations.deleteHeader(rawApi, key.toString());
             case "add_query_param":
+                epochVal = Utils.getEpochTime(value);
+                if (epochVal != null) {
+                    value = epochVal;
+                }
                 return Operations.addQueryParam(rawApi, key.toString(), value);
             case "modify_query_param":
+                epochVal = Utils.getEpochTime(value);
+                if (epochVal != null) {
+                    value = epochVal;
+                }
                 return Operations.modifyQueryParam(rawApi, key.toString(), value);
             case "delete_query_param":
                 return Operations.deleteQueryParam(rawApi, key.toString());
