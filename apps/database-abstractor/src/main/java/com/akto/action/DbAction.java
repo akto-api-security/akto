@@ -5,19 +5,35 @@ import com.akto.dao.context.Context;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.AccessMatrixTaskInfo;
+import com.akto.dto.testing.AccessMatrixUrlToRole;
+import com.akto.dto.testing.EndpointLogicalGroup;
+import com.akto.dto.testing.TestRoles;
+import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.dto.testing.WorkflowTest;
+import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
+
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
@@ -25,6 +41,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class DbAction extends ActionSupport {
 
@@ -67,6 +84,70 @@ public class DbAction extends ActionSupport {
     boolean isHybridSaas;
     Setup setup;
     Organization organization;
+    String testingRunHexId;
+    int start;
+    int delta;
+    int now;
+    int testIdConfig;
+    String testingRunId;
+    List<String> urls;
+    ApiInfo.ApiInfoKey apiInfoKey;
+    int apiCollectionId;
+    String logicalGroupName;
+    Object[] issuesIds;
+    String testingRunResultSummaryId;
+    String summaryId;
+    int limit;
+    int skip;
+    String param;
+    int ts;
+    Set<Integer> apiCollectionIdsSet;
+    String url;
+    URLMethods.Method method;
+    String methodVal;
+    String key;
+    String roleFromTask;
+    String roleId;
+    Bson filterForRunResult;
+    String organizationId;
+    int workFlowTestId;
+    boolean fetchOnlyActive;
+    String apiCollectionName;
+    List<String> apiCollectionNames;
+    int responseCode;
+    boolean isHeader;
+    boolean isUrlParam;
+    TestingRunResultSummary trrs;
+    List<TestingRunResult> testingRunResults;
+    WorkflowTestResult workflowTestResult;
+    String taskId;
+    int frequencyInSeconds;
+    List<String> ret;
+    Map<String, Integer> totalCountIssues;
+    int testInitiatedCount;
+    int testResultsCount;
+    Bson completedUpdate;
+    int totalApiCount;
+    boolean hybridTestingEnabled;
+    TestingRun testingRun;
+    TestingRunConfig testingRunConfig;
+    Boolean exists;
+    AccessMatrixUrlToRole accessMatrixUrlToRole;
+    ApiCollection apiCollection;
+    ApiInfo apiInfo;
+    EndpointLogicalGroup endpointLogicalGroup;
+    List<TestingRunIssues> testingRunIssues;
+    List<AccessMatrixTaskInfo> accessMatrixTaskInfos;
+    List<SampleData> sampleDatas;
+    SampleData sampleData;
+    TestRoles testRole;
+    List<TestRoles> testRoles;
+    Map<ObjectId, TestingRunResultSummary> testingRunResultSummaryMap;
+    TestingRunResult testingRunResult;
+    Tokens token;
+    WorkflowTest workflowTest;
+    List<YamlTemplate> yamlTemplates;
+    SingleTypeInfo sti;
 
     private static final Gson gson = new Gson();
     ObjectMapper objectMapper = new ObjectMapper();
@@ -671,6 +752,510 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    // testing apis
+
+    public String createTRRSummaryIfAbsent() {
+        try {
+            trrs = DbLayer.createTRRSummaryIfAbsent(testingRunHexId, start);
+            trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String findPendingTestingRun() {
+        try {
+            testingRun = DbLayer.findPendingTestingRun(delta);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String findPendingTestingRunResultSummary() {
+        try {
+            trrs = DbLayer.findPendingTestingRunResultSummary(now, delta);
+            trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String findTestingRunConfig() {
+        try {
+            testingRunConfig = DbLayer.findTestingRunConfig(testIdConfig);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String findTestingRun() {
+        try {
+            testingRun = DbLayer.findTestingRun(testingRunId);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String apiInfoExists() {
+        try {
+            exists = DbLayer.apiInfoExists(apiCollectionIds, urls);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchAccessMatrixUrlToRole() {
+        try {
+            accessMatrixUrlToRole = DbLayer.fetchAccessMatrixUrlToRole(apiInfoKey);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchAllApiCollectionsMeta() {
+        try {
+           apiCollections = DbLayer.fetchAllApiCollectionsMeta();
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchApiCollectionMeta() {
+        try {
+            apiCollection = DbLayer.fetchApiCollectionMeta(apiCollectionId);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchApiInfo() {
+        try {
+            apiInfo = DbLayer.fetchApiInfo(apiInfoKey);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchEndpointLogicalGroup() {
+        try {
+            endpointLogicalGroup = DbLayer.fetchEndpointLogicalGroup(logicalGroupName);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchIssuesByIds() {
+        try {
+            testingRunIssues = DbLayer.fetchIssuesByIds(issuesIds);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchLatestTestingRunResult() {
+        try {
+            testingRunResults = DbLayer.fetchLatestTestingRunResult(testingRunResultSummaryId);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchLatestTestingRunResultBySummaryId() {
+        try {
+            testingRunResults = DbLayer.fetchLatestTestingRunResultBySummaryId(summaryId, limit, skip);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchMatchParamSti() {
+        try {
+            stis = DbLayer.fetchMatchParamSti(apiCollectionId, param);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchOpenIssues() {
+        try {
+            testingRunIssues = DbLayer.fetchOpenIssues(summaryId);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchPendingAccessMatrixInfo() {
+        try {
+            accessMatrixTaskInfos = DbLayer.fetchPendingAccessMatrixInfo(ts);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchSampleData() {
+        try {
+            sampleDatas = DbLayer.fetchSampleData(apiCollectionIdsSet, skip);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchSampleDataById() {
+        try {
+            sampleData = DbLayer.fetchSampleDataById(apiCollectionId, url, method);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchSampleDataByIdMethod() {
+        try {
+            sampleData = DbLayer.fetchSampleDataByIdMethod(apiCollectionId, url, methodVal);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchTestRole() {
+        try {
+            testRole = DbLayer.fetchTestRole(key);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+    
+    public String fetchTestRoles() {
+        try {
+            testRoles = DbLayer.fetchTestRoles();
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchTestRolesForRoleName() {
+        try {
+            testRoles = DbLayer.fetchTestRolesForRoleName(roleFromTask);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchTestRolesforId() {
+        try {
+            testRole = DbLayer.fetchTestRolesforId(roleId);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchTestingRunResultSummary() {
+        try {
+            trrs = DbLayer.fetchTestingRunResultSummary(testingRunResultSummaryId);
+            trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchTestingRunResultSummaryMap() {
+        try {
+            testingRunResultSummaryMap = DbLayer.fetchTestingRunResultSummaryMap(testingRunId);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchTestingRunResults() {
+        try {
+            testingRunResult = DbLayer.fetchTestingRunResults(filterForRunResult);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchToken() {
+        try {
+            token = DbLayer.fetchToken(organizationId, accountId);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchWorkflowTest() {
+        try {
+            workflowTest = DbLayer.fetchWorkflowTest(workFlowTestId);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchYamlTemplates() {
+        try {
+            yamlTemplates = DbLayer.fetchYamlTemplates(fetchOnlyActive, skip);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String findApiCollectionByName() {
+        try {
+            apiCollection = DbLayer.findApiCollectionByName(apiCollectionName);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String findApiCollections() {
+        try {
+            apiCollections = DbLayer.findApiCollections(apiCollectionNames);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String findSti() {
+        try {
+            sti = DbLayer.findSti(apiCollectionId, url, method);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String findStiByParam() {
+        try {
+            stis = DbLayer.findStiByParam(apiCollectionId, param);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String findStiWithUrlParamFilters() {
+        try {
+            sti = DbLayer.findStiWithUrlParamFilters(apiCollectionId, url, methodVal, responseCode, isHeader, param, isUrlParam);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String insertActivity() {
+        try {
+            DbLayer.insertActivity((int) count);  
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String insertApiCollection() {
+        try {
+            DbLayer.insertApiCollection(apiCollectionId, apiCollectionName);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String insertTestingRunResultSummary() {
+        try {
+            DbLayer.insertTestingRunResultSummary(trrs);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String insertTestingRunResults() {
+        try {
+            DbLayer.insertTestingRunResults(testingRunResults);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String insertWorkflowTestResult() {
+        try {
+            DbLayer.insertWorkflowTestResult(workflowTestResult);        
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String markTestRunResultSummaryFailed() {
+        try {
+            trrs = DbLayer.markTestRunResultSummaryFailed(testingRunResultSummaryId);
+            trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateAccessMatrixInfo() {
+        try {
+            DbLayer.updateAccessMatrixInfo(taskId, frequencyInSeconds);        
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateAccessMatrixUrlToRoles() {
+        try {
+            DbLayer.updateAccessMatrixUrlToRoles(apiInfoKey, ret);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateIssueCountInSummary() {
+        try {
+            trrs = DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues);
+            trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateIssueCountInTestSummary() {
+        try {
+            DbLayer.updateIssueCountInTestSummary(summaryId, totalCountIssues, false);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateLastTestedField() {
+        try {
+            DbLayer.updateLastTestedField(apiInfoKey);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateTestInitiatedCountInTestSummary() {
+        try {
+            DbLayer.updateTestInitiatedCountInTestSummary(summaryId, testInitiatedCount);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateTestResultsCountInTestSummary() {
+        try {
+            DbLayer.updateTestResultsCountInTestSummary(summaryId, testResultsCount);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateTestRunResultSummary() {
+        try {
+            DbLayer.updateTestRunResultSummary(summaryId);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateTestRunResultSummaryNoUpsert() {
+        try {
+            DbLayer.updateTestRunResultSummaryNoUpsert(testingRunResultSummaryId);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateTestingRun() {
+        try {
+            DbLayer.updateTestingRun(testingRunId);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateTestingRunAndMarkCompleted() {
+        try {
+            DbLayer.updateTestingRunAndMarkCompleted(testingRunId, completedUpdate);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateTotalApiCountInTestSummary() {
+        try {
+            DbLayer.updateTotalApiCountInTestSummary(summaryId, totalApiCount);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String modifyHybridTestingSetting() {
+        try {
+            DbLayer.modifyHybridTestingSetting(hybridTestingEnabled);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String insertTestingLog() {
+        try {
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            DbLayer.insertTestingLog(dbLog);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -982,6 +1567,518 @@ public class DbAction extends ActionSupport {
 
     public void setOrganization(Organization organization) {
         this.organization = organization;
+    }
+
+    public String getTestingRunHexId() {
+        return testingRunHexId;
+    }
+
+    public void setTestingRunHexId(String testingRunHexId) {
+        this.testingRunHexId = testingRunHexId;
+    }
+
+    public int getStart() {
+        return start;
+    }
+
+    public void setStart(int start) {
+        this.start = start;
+    }
+
+    public int getDelta() {
+        return delta;
+    }
+
+    public void setDelta(int delta) {
+        this.delta = delta;
+    }
+
+    public int getNow() {
+        return now;
+    }
+
+    public void setNow(int now) {
+        this.now = now;
+    }
+
+    public int getTestIdConfig() {
+        return testIdConfig;
+    }
+
+    public void setTestIdConfig(int testIdConfig) {
+        this.testIdConfig = testIdConfig;
+    }
+
+    public String getTestingRunId() {
+        return testingRunId;
+    }
+
+    public void setTestingRunId(String testingRunId) {
+        this.testingRunId = testingRunId;
+    }
+
+    public List<String> getUrls() {
+        return urls;
+    }
+
+    public void setUrls(List<String> urls) {
+        this.urls = urls;
+    }
+
+    public ApiInfo.ApiInfoKey getApiInfoKey() {
+        return apiInfoKey;
+    }
+
+    public void setApiInfoKey(ApiInfo.ApiInfoKey apiInfoKey) {
+        this.apiInfoKey = apiInfoKey;
+    }
+
+    public int getApiCollectionId() {
+        return apiCollectionId;
+    }
+
+    public void setApiCollectionId(int apiCollectionId) {
+        this.apiCollectionId = apiCollectionId;
+    }
+
+    public String getLogicalGroupName() {
+        return logicalGroupName;
+    }
+
+    public void setLogicalGroupName(String logicalGroupName) {
+        this.logicalGroupName = logicalGroupName;
+    }
+
+    public Object[] getIssuesIds() {
+        return issuesIds;
+    }
+
+    public void setIssuesIds(Object[] issuesIds) {
+        this.issuesIds = issuesIds;
+    }
+
+    public String getTestingRunResultSummaryId() {
+        return testingRunResultSummaryId;
+    }
+
+    public void setTestingRunResultSummaryId(String testingRunResultSummaryId) {
+        this.testingRunResultSummaryId = testingRunResultSummaryId;
+    }
+
+    public String getSummaryId() {
+        return summaryId;
+    }
+
+    public void setSummaryId(String summaryId) {
+        this.summaryId = summaryId;
+    }
+
+    public int getLimit() {
+        return limit;
+    }
+
+    public void setLimit(int limit) {
+        this.limit = limit;
+    }
+
+    public int getSkip() {
+        return skip;
+    }
+
+    public void setSkip(int skip) {
+        this.skip = skip;
+    }
+
+    public String getParam() {
+        return param;
+    }
+
+    public void setParam(String param) {
+        this.param = param;
+    }
+
+    public int getTs() {
+        return ts;
+    }
+
+    public void setTs(int ts) {
+        this.ts = ts;
+    }
+
+    public Set<Integer> getApiCollectionIdsSet() {
+        return apiCollectionIdsSet;
+    }
+
+    public void setApiCollectionIdsSet(Set<Integer> apiCollectionIdsSet) {
+        this.apiCollectionIdsSet = apiCollectionIdsSet;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
+    }
+
+    public URLMethods.Method getMethod() {
+        return method;
+    }
+
+    public void setMethod(URLMethods.Method method) {
+        this.method = method;
+    }
+
+    public String getMethodVal() {
+        return methodVal;
+    }
+
+    public void setMethodVal(String methodVal) {
+        this.methodVal = methodVal;
+    }
+
+    public String getKey() {
+        return key;
+    }
+
+    public void setKey(String key) {
+        this.key = key;
+    }
+
+    public String getRoleFromTask() {
+        return roleFromTask;
+    }
+
+    public void setRoleFromTask(String roleFromTask) {
+        this.roleFromTask = roleFromTask;
+    }
+
+    public String getRoleId() {
+        return roleId;
+    }
+
+    public void setRoleId(String roleId) {
+        this.roleId = roleId;
+    }
+
+    public Bson getFilterForRunResult() {
+        return filterForRunResult;
+    }
+
+    public void setFilterForRunResult(Bson filterForRunResult) {
+        this.filterForRunResult = filterForRunResult;
+    }
+
+    public String getOrganizationId() {
+        return organizationId;
+    }
+
+    public void setOrganizationId(String organizationId) {
+        this.organizationId = organizationId;
+    }
+
+    public int getWorkFlowTestId() {
+        return workFlowTestId;
+    }
+
+    public void setWorkFlowTestId(int workFlowTestId) {
+        this.workFlowTestId = workFlowTestId;
+    }
+
+    public boolean isFetchOnlyActive() {
+        return fetchOnlyActive;
+    }
+
+    public void setFetchOnlyActive(boolean fetchOnlyActive) {
+        this.fetchOnlyActive = fetchOnlyActive;
+    }
+
+    public String getApiCollectionName() {
+        return apiCollectionName;
+    }
+
+    public void setApiCollectionName(String apiCollectionName) {
+        this.apiCollectionName = apiCollectionName;
+    }
+
+    public List<String> getApiCollectionNames() {
+        return apiCollectionNames;
+    }
+
+    public void setApiCollectionNames(List<String> apiCollectionNames) {
+        this.apiCollectionNames = apiCollectionNames;
+    }
+
+    public int getResponseCode() {
+        return responseCode;
+    }
+
+    public void setResponseCode(int responseCode) {
+        this.responseCode = responseCode;
+    }
+
+    public boolean isHeader() {
+        return isHeader;
+    }
+
+    public void setHeader(boolean isHeader) {
+        this.isHeader = isHeader;
+    }
+
+    public boolean isUrlParam() {
+        return isUrlParam;
+    }
+
+    public void setUrlParam(boolean isUrlParam) {
+        this.isUrlParam = isUrlParam;
+    }
+
+    public TestingRunResultSummary getTrrs() {
+        return trrs;
+    }
+
+    public void setTrrs(TestingRunResultSummary trrs) {
+        this.trrs = trrs;
+    }
+
+    public List<TestingRunResult> getTestingRunResults() {
+        return testingRunResults;
+    }
+
+    public void setTestingRunResults(List<TestingRunResult> testingRunResults) {
+        this.testingRunResults = testingRunResults;
+    }
+
+    public WorkflowTestResult getWorkflowTestResult() {
+        return workflowTestResult;
+    }
+
+    public void setWorkflowTestResult(WorkflowTestResult workflowTestResult) {
+        this.workflowTestResult = workflowTestResult;
+    }
+
+    public String getTaskId() {
+        return taskId;
+    }
+
+    public void setTaskId(String taskId) {
+        this.taskId = taskId;
+    }
+
+    public int getFrequencyInSeconds() {
+        return frequencyInSeconds;
+    }
+
+    public void setFrequencyInSeconds(int frequencyInSeconds) {
+        this.frequencyInSeconds = frequencyInSeconds;
+    }
+
+    public List<String> getRet() {
+        return ret;
+    }
+
+    public void setRet(List<String> ret) {
+        this.ret = ret;
+    }
+
+    public Map<String, Integer> getTotalCountIssues() {
+        return totalCountIssues;
+    }
+
+    public void setTotalCountIssues(Map<String, Integer> totalCountIssues) {
+        this.totalCountIssues = totalCountIssues;
+    }
+
+    public int getTestInitiatedCount() {
+        return testInitiatedCount;
+    }
+
+    public void setTestInitiatedCount(int testInitiatedCount) {
+        this.testInitiatedCount = testInitiatedCount;
+    }
+
+    public int getTestResultsCount() {
+        return testResultsCount;
+    }
+
+    public void setTestResultsCount(int testResultsCount) {
+        this.testResultsCount = testResultsCount;
+    }
+
+    public Bson getCompletedUpdate() {
+        return completedUpdate;
+    }
+
+    public void setCompletedUpdate(Bson completedUpdate) {
+        this.completedUpdate = completedUpdate;
+    }
+
+    public int getTotalApiCount() {
+        return totalApiCount;
+    }
+
+    public void setTotalApiCount(int totalApiCount) {
+        this.totalApiCount = totalApiCount;
+    }
+
+    public boolean isHybridTestingEnabled() {
+        return hybridTestingEnabled;
+    }
+
+    public void setHybridTestingEnabled(boolean hybridTestingEnabled) {
+        this.hybridTestingEnabled = hybridTestingEnabled;
+    }
+
+    public TestingRun getTestingRun() {
+        return testingRun;
+    }
+
+    public void setTestingRun(TestingRun testingRun) {
+        this.testingRun = testingRun;
+    }
+
+    public TestingRunConfig getTestingRunConfig() {
+        return testingRunConfig;
+    }
+
+    public void setTestingRunConfig(TestingRunConfig testingRunConfig) {
+        this.testingRunConfig = testingRunConfig;
+    }
+
+    public Boolean getExists() {
+        return exists;
+    }
+
+    public void setExists(Boolean exists) {
+        this.exists = exists;
+    }
+
+    public AccessMatrixUrlToRole getAccessMatrixUrlToRole() {
+        return accessMatrixUrlToRole;
+    }
+
+    public void setAccessMatrixUrlToRole(AccessMatrixUrlToRole accessMatrixUrlToRole) {
+        this.accessMatrixUrlToRole = accessMatrixUrlToRole;
+    }
+
+    public ApiCollection getApiCollection() {
+        return apiCollection;
+    }
+
+    public void setApiCollection(ApiCollection apiCollection) {
+        this.apiCollection = apiCollection;
+    }
+
+    public ApiInfo getApiInfo() {
+        return apiInfo;
+    }
+
+    public void setApiInfo(ApiInfo apiInfo) {
+        this.apiInfo = apiInfo;
+    }
+
+    public EndpointLogicalGroup getEndpointLogicalGroup() {
+        return endpointLogicalGroup;
+    }
+
+    public void setEndpointLogicalGroup(EndpointLogicalGroup endpointLogicalGroup) {
+        this.endpointLogicalGroup = endpointLogicalGroup;
+    }
+
+    public List<TestingRunIssues> getTestingRunIssues() {
+        return testingRunIssues;
+    }
+
+    public void setTestingRunIssues(List<TestingRunIssues> testingRunIssues) {
+        this.testingRunIssues = testingRunIssues;
+    }
+
+    public List<AccessMatrixTaskInfo> getAccessMatrixTaskInfos() {
+        return accessMatrixTaskInfos;
+    }
+
+    public void setAccessMatrixTaskInfos(List<AccessMatrixTaskInfo> accessMatrixTaskInfos) {
+        this.accessMatrixTaskInfos = accessMatrixTaskInfos;
+    }
+
+    public List<SampleData> getSampleDatas() {
+        return sampleDatas;
+    }
+
+    public void setSampleDatas(List<SampleData> sampleDatas) {
+        this.sampleDatas = sampleDatas;
+    }
+
+    public SampleData getSampleData() {
+        return sampleData;
+    }
+
+    public void setSampleData(SampleData sampleData) {
+        this.sampleData = sampleData;
+    }
+
+    public TestRoles getTestRole() {
+        return testRole;
+    }
+
+    public void setTestRole(TestRoles testRole) {
+        this.testRole = testRole;
+    }
+
+    public List<TestRoles> getTestRoles() {
+        return testRoles;
+    }
+
+    public void setTestRoles(List<TestRoles> testRoles) {
+        this.testRoles = testRoles;
+    }
+
+    public Map<ObjectId, TestingRunResultSummary> getTestingRunResultSummaryMap() {
+        return testingRunResultSummaryMap;
+    }
+
+    public void setTestingRunResultSummaryMap(Map<ObjectId, TestingRunResultSummary> testingRunResultSummaryMap) {
+        this.testingRunResultSummaryMap = testingRunResultSummaryMap;
+    }
+
+    public TestingRunResult getTestingRunResult() {
+        return testingRunResult;
+    }
+
+    public void setTestingRunResult(TestingRunResult testingRunResult) {
+        this.testingRunResult = testingRunResult;
+    }
+
+    public Tokens getToken() {
+        return token;
+    }
+
+    public void setToken(Tokens token) {
+        this.token = token;
+    }
+
+    public WorkflowTest getWorkflowTest() {
+        return workflowTest;
+    }
+
+    public void setWorkflowTest(WorkflowTest workflowTest) {
+        this.workflowTest = workflowTest;
+    }
+
+    public List<YamlTemplate> getYamlTemplates() {
+        return yamlTemplates;
+    }
+
+    public void setYamlTemplates(List<YamlTemplate> yamlTemplates) {
+        this.yamlTemplates = yamlTemplates;
+    }
+
+    public SingleTypeInfo getSti() {
+        return sti;
+    }
+
+    public void setSti(SingleTypeInfo sti) {
+        this.sti = sti;
     }
 
 }
