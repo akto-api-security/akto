@@ -138,6 +138,11 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchAllCollectionsBasic(){
+        this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchCollection() {
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId)));
