@@ -1545,9 +1545,6 @@
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">API_DATA_REDACTION</param>
             </interceptor-ref>
-            <interceptor-ref name="usageInterceptor">
-                <param name="roleList">ADMIN</param>
-            </interceptor-ref>
             <result name="SUCCESS"  type="json"/>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
