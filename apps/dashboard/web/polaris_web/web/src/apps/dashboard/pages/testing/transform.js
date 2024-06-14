@@ -681,14 +681,14 @@ convertSubIntoSubcategory(resp){
       obj[objectKey] = {
         text: resp[key],
         color: func.getColorForCharts(key),
-        filterkey: objectKeyName
+        filterKey: objectKeyName
       }
       countObj.HIGH+=resp[key]
     }else{
       obj[objectKey] = {
         text: resp[key],
         color: func.getColorForCharts(subCategoryMap[key].superCategory.name),
-        filterkey: objectKeyName
+        filterKey: objectKeyName
       }
       countObj[subCategoryMap[key].superCategory.severity._name]+=resp[key]
     }
