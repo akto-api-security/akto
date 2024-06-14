@@ -88,13 +88,21 @@ function SampleDataComponent(props) {
             copyString = JSON.stringify(b)
             snackBarMessage = "Response data copied to clipboard"
         } else {
+            const completeDataWithoutResponse = { ...completeData };
+            // Check and transform the required fields
+            if (completeDataWithoutResponse["response"]) {
+                completeDataWithoutResponse["response"]= {"body": "{}", "headers": "{}"};
+            } else if (completeDataWithoutResponse["responsePayload"]) {
+                completeDataWithoutResponse["responsePayload"]= "{}";
+                completeDataWithoutResponse["responseHeaders"]= "{}";
+            }
             if (type === "CURL") { 
                 snackBarMessage = "Curl request copied to clipboard"
-                let resp = await inventoryApi.convertSampleDataToCurl(JSON.stringify(completeData))
+                let resp = await inventoryApi.convertSampleDataToCurl(JSON.stringify(completeDataWithoutResponse))
                 copyString = resp.curlString
             } else {
             snackBarMessage = "Burp request copied to clipboard"
-            let resp = await inventoryApi.convertSampleDataToBurpRequest(JSON.stringify(completeData))
+            let resp = await inventoryApi.convertSampleDataToBurpRequest(JSON.stringify(completeDataWithoutResponse))
             copyString = resp.burpRequest
             }
         }

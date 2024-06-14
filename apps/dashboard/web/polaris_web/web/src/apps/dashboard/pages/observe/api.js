@@ -123,6 +123,13 @@ export default {
             data: {}
         })
     },
+    async getAllCollectionsBasic() {
+        return await request({
+            url: '/api/getAllCollectionsBasic',
+            method: 'post',
+            data: {}
+        })
+    },
     async createCollection(name) {
         return await request({
             url: '/api/createCollection',

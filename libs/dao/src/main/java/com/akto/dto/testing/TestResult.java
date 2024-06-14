@@ -17,6 +17,9 @@ public class TestResult extends GenericTestResult {
     private double percentageMatch;
     private TestInfo testInfo;
 
+    public static final String REQUIRES_CONFIG = "requiresConfig";
+    private boolean requiresConfig;
+
     public enum Confidence {
         HIGH, MEDIUM, LOW
     }
@@ -38,7 +41,8 @@ public class TestResult extends GenericTestResult {
         SKIPPING_EXECUTION_BECAUSE_AUTH("Request API failed authentication check, skipping execution", true),
         SKIPPING_EXECUTION_BECAUSE_FILTERS("Request API failed to satisfy api_selection_filters block, skipping execution", true),
         DEACTIVATED_ENDPOINT("This is a deactivated endpoint", true),
-        USAGE_EXCEEDED("You have exceeded the limit of this feature, skipping execution", true);
+        USAGE_EXCEEDED("You have exceeded the limit of this feature, skipping execution", true),
+        ROLE_NOT_FOUND("config doesn't exist, skipping execution", false);
         private final String message;
         private final boolean skipTest;
 
@@ -116,5 +120,13 @@ public class TestResult extends GenericTestResult {
 
     public void setTestInfo(TestInfo testInfo) {
         this.testInfo = testInfo;
+    }
+
+    public boolean isRequiresConfig() {
+        return requiresConfig;
+    }
+
+    public void setRequiresConfig(boolean requiresConfig) {
+        this.requiresConfig = requiresConfig;
     }
 }

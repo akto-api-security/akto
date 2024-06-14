@@ -28,6 +28,7 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import okhttp3.*;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 
@@ -322,7 +323,7 @@ public class HttpCallParser {
     }
 
     public static boolean useHostCondition(String hostName, HttpResponseParams.Source source) {
-        List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING);
+        List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING, HttpResponseParams.Source.OTHER, HttpResponseParams.Source.SDK);
         boolean hostNameCondition;
         if (hostName == null) {
             hostNameCondition = false;
@@ -422,8 +423,19 @@ public class HttpCallParser {
                 }
             }
 
-            String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
+            Map<String, List<String>> reqHeaders = httpResponseParam.getRequestParams().getHeaders();
+            String hostName = getHeaderValue(reqHeaders, "host");
 
+            if (StringUtils.isEmpty(hostName)) {
+                hostName = getHeaderValue(reqHeaders, "authority");
+                if (StringUtils.isEmpty(hostName)) {
+                    hostName = getHeaderValue(reqHeaders, ":authority");
+                }
+
+                if (!StringUtils.isEmpty(hostName)) {
+                    reqHeaders.put("host", Collections.singletonList(hostName));
+                }
+            }
 
             int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
             int apiCollectionId ;

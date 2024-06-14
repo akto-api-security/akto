@@ -25,7 +25,6 @@ import { useSearchParams } from 'react-router-dom';
 function GithubServerTable(props) {
 
   const [searchParams, setSearchParams] = useSearchParams();
-
   const updateQueryParams = (key, value) => {
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set(key, value);
@@ -342,6 +341,7 @@ function GithubServerTable(props) {
                 selected={props?.selected}
                 onSelect={(x) => handleTabChange(x)}
               />
+              {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
               <div className={tableHeightClass}>
               <IndexTable
                 resourceName={props.resourceName}
