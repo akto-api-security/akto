@@ -270,24 +270,17 @@ public class Main {
                     }
                 }
                 testExecutor.init(testingRun, summaryId);
-                raiseMixpanelEvent(summaryId, testingRun, accountId);
+                //raiseMixpanelEvent(summaryId, testingRun, accountId);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in init " + e);
             }
-            Bson completedUpdate = Updates.combine(
-                    Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
-                    Updates.set(TestingRun.END_TIMESTAMP, Context.now())
-            );
+            int scheduleTs = 0;
 
             if (testingRun.getPeriodInSeconds() > 0 ) {
-                completedUpdate = Updates.combine(
-                        Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                        Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
-                        Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds())
-                );
+                scheduleTs = testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds();
             }
 
-            dataActor.updateTestingRunAndMarkCompleted(testingRun.getId().toHexString(), completedUpdate);
+            dataActor.updateTestingRunAndMarkCompleted(testingRun.getId().toHexString(), scheduleTs);
 
             if(summaryId != null && testingRun.getTestIdConfig() != 1){
                 TestExecutor.updateTestSummary(summaryId);

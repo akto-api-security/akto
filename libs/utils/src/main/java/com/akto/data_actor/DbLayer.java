@@ -54,6 +54,7 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.AktoDataType;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.Log;
@@ -527,7 +528,18 @@ public class DbLayer {
         TestingRunResultSummariesDao.instance.insertOne(trrs);
     }
 
-    public static void updateTestingRunAndMarkCompleted(String testingRunId, Bson completedUpdate) {
+    public static void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTimestamp) {
+        Bson completedUpdate = Updates.combine(
+            Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
+            Updates.set(TestingRun.END_TIMESTAMP, Context.now())
+        );
+        if (scheduleTimestamp > 0) {
+            completedUpdate = Updates.combine(
+                Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
+                Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)
+            );
+        }
         TestingRunDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq("_id", testingRunId),  completedUpdate
         );
@@ -597,15 +609,17 @@ public class DbLayer {
     public static void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount) {
         ObjectId summaryObjectId = new ObjectId(summaryId);
         TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, summaryObjectId),
-            Updates.set(TestingRunResultSummary.TESTS_INITIATED_COUNT, testResultsCount));
+            Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testResultsCount));
     }
 
-    public static void updateLastTestedField(ApiInfo.ApiInfoKey apiInfoKey) {
+    public static void updateLastTestedField(int apiCollectionId, String url, String method) {
+        URLMethods.Method methodEnum = URLMethods.Method.fromString(method);
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, methodEnum);
         ApiInfoDao.instance.updateLastTestedField(apiInfoKey);
     }
 
-    public static void insertTestingRunResults(List<TestingRunResult> testingRunResults) {
-        TestingRunResultDao.instance.insertMany(testingRunResults);
+    public static void insertTestingRunResults(TestingRunResult testingRunResult) {
+        TestingRunResultDao.instance.insertOne(testingRunResult);
     }
 
     public static void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount) {

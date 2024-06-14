@@ -1498,11 +1498,11 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void updateTestingRunAndMarkCompleted(String testingRunId, Bson completedUpdate) {
+    public void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTs) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunId", testingRunId);
-        obj.put("completedUpdate", completedUpdate);
+        obj.put("scheduleTs", scheduleTs);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestingRunAndMarkCompleted", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
@@ -1768,10 +1768,12 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void updateLastTestedField(ApiInfo.ApiInfoKey apiInfoKey) {
+    public void updateLastTestedField(int apiCollectionId, String urlVal, String method) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
-        obj.put("apiInfoKey", apiInfoKey);
+        obj.put("apiCollectionId", apiCollectionId);
+        obj.put("url", urlVal);
+        obj.put("methodVal", method);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateLastTestedField", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
@@ -1786,14 +1788,10 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void insertTestingRunResults(List<TestingRunResult> testingRunResults) {
+    public void insertTestingRunResults(TestingRunResult testingRunResult) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
-        BasicDBList objList = new BasicDBList();
-        for (TestingRunResult testingRunResult: testingRunResults) {
-            objList.add(testingRunResult);
-        }
-        obj.put("testingRunResults", testingRunResults);
+        obj.put("testingRunResult", testingRunResult);
         String objString = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingRunResults", "", "POST", objString, headers, "");
         try {
