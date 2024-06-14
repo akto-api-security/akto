@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
 import { Avatar, Box, Button, Popover, Modal, Tooltip } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
@@ -158,14 +159,14 @@ function ApiDetails(props) {
                 <Popover 
                     active={showDemerge}
                     activator={
-                        <Tooltip content="More actions" dismissOnMouseOut ><Button plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowDemerge(!showDemerge)} /></Tooltip>
+                        <Tooltip content="More actions" dismissOnMouseOut ><AktoButton plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowDemerge(!showDemerge)} /></Tooltip>
                     }
                     autofocusTarget="first-node"
                     onClose={() => setShowDemerge(false)}
                 >
                     <Popover.Pane fixed>
                         <Popover.Section>
-                            <Button plain monochrome removeUnderline size="slim" onClick={deMergeApis}>De merge</Button>
+                            <AktoButton plain monochrome removeUnderline size="slim" onClick={deMergeApis}>De merge</AktoButton>
                         </Popover.Section>
                     </Popover.Pane>
                 </Popover>
@@ -213,7 +214,7 @@ function ApiDetails(props) {
             key="akto-gpt"
             style={{right: isDemergingActive ? "48px" : '24px'}}
         >
-            <Button onClick={displayGPT} size="slim">Ask AktoGPT</Button> 
+            <AktoButton onClick={displayGPT} size="slim">Ask AktoGPT</AktoButton> 
         </div>
     )
 

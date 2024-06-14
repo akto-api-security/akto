@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { useEffect, useState } from "react"
 import api from "../api"
 import { Button, ButtonGroup, Card, LegacyCard, Page, Text } from "@shopify/polaris"
@@ -112,7 +113,7 @@ function WorkflowTests({ apiCollectionId, endpointsList }) {
             <LegacyCard.Header 
             title={
                 <ButtonGroup>
-                    <Button icon={MobileBackArrowMajor} plain onClick={() => {
+                    <AktoButton icon={MobileBackArrowMajor} plain onClick={() => {
                             setShowWorkflowbuilder(false)
                             setWorkflowTest(null)
                         }}
@@ -131,11 +132,11 @@ function WorkflowTests({ apiCollectionId, endpointsList }) {
                         primary={false} />
             </LegacyCard.Header> :
             <LegacyCard.Header title="Workflow tests">
-                <Button
+                <AktoButton
                     onClick={() => setShowWorkflowbuilder(true)}
                 >
                     Create workflow
-                </Button>
+                </AktoButton>
             </LegacyCard.Header>
     )
 

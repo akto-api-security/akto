@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, ButtonGroup, Badge, Banner,HorizontalGrid, HorizontalStack, Link } from "@shopify/polaris";
 import { TickMinor, CancelMajor } from "@shopify/polaris-icons"
 import { useEffect, useRef, useState } from "react";
@@ -148,7 +149,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const activator = (
         <div ref={runTestRef}>
-            <Button onClick={toggleRunTest} primary disabled={disabled} ><div data-testid="run_test_button">Run test</div></Button>
+            <AktoButton onClick={toggleRunTest} primary disabled={disabled} ><div data-testid="run_test_button">Run test</div></AktoButton>
         </div>
     );
 
@@ -436,7 +437,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 />
                             </div>
 
-                            <Button icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Remove All</div></Button>
+                            <AktoButton icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Remove All</div></AktoButton>
                         </div>
 
                         <br />

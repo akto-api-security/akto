@@ -1,3 +1,4 @@
+import AktoButton from './../../../../components/shared/AktoButton';
 import { Button, Text, Tooltip, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import SampleData from '../../../../components/shared/SampleData'
@@ -12,7 +13,7 @@ function JsonComponent({dataString, onClickFunc, title, toolTipContent, language
         <div className='copyRequest'>
             <Text>{title}</Text>
             <Tooltip dismissOnMouseOut preferredPosition='above' content={toolTipContent}>
-                <Button icon={ClipboardMinor} plain  onClick={() => onClickFunc()}/>
+                <AktoButton icon={ClipboardMinor} plain  onClick={() => onClickFunc()}/>
             </Tooltip>
         </div>
         <SampleData data={data} language={language} minHeight={minHeight}/>

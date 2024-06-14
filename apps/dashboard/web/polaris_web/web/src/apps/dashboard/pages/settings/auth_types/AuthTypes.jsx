@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import authTypesApi from "./api";
 import { useNavigate } from "react-router-dom";
@@ -101,9 +102,9 @@ function AuthTypes() {
         <Box>
         <PageWithMultipleCards
             title={"Auth types"}
-            primaryAction={<Button primary onClick={handleRedirect}>Create new auth type</Button>}
+            primaryAction={<AktoButton primary onClick={handleRedirect}>Create new auth type</AktoButton>}
             secondaryActions={
-                <Button onClick={() => handleResetModalChange()}>Reset</Button>
+                <AktoButton onClick={() => handleResetModalChange()}>Reset</AktoButton>
             }
             isFirstPage={true}
             components={[

@@ -1,3 +1,4 @@
+import AktoButton from './../../../../components/shared/AktoButton';
 import { useEffect, useState } from "react"
 import settingRequests from "../../api"
 import IntegrationsLayout from "../IntegrationsLayout"
@@ -136,9 +137,9 @@ function Webhooks() {
     )
 
     const createCustomWebhook =  (
-        <Button onClick={() => navigate('create_custom_webhook')}>
+        <AktoButton onClick={() => navigate('create_custom_webhook')}>
             Create Custom Webhook
-        </Button>
+        </AktoButton>
     )
 
     return (

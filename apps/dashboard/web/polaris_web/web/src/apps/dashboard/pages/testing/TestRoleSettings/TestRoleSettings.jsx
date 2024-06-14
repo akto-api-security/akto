@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import React, { useEffect, useState, useReducer } from 'react'
 import { LegacyCard, HorizontalGrid, TextField, Divider, Collapsible, LegacyStack, Button, FormLayout, HorizontalStack, Tooltip, Icon, Text, VerticalStack, Modal } from '@shopify/polaris'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -277,7 +278,7 @@ function TestRoleSettings() {
 
     const addAuthButton = (
         <HorizontalStack align="end" key="auth-button">
-            {isNew ? <Tooltip content= "Save the role first"><Button disabled>Add auth</Button></Tooltip> : <Button primary onClick={() => setShowAuthComponent(true)}><div data-testid="add_auth_button">Add auth</div></Button>}
+            {isNew ? <Tooltip content= "Save the role first"><AktoButton disabled>Add auth</AktoButton></Tooltip> : <AktoButton primary onClick={() => setShowAuthComponent(true)}><div data-testid="add_auth_button">Add auth</div></AktoButton>}
         </HorizontalStack>
     )
 
@@ -360,7 +361,7 @@ function TestRoleSettings() {
                 </LegacyCard.Section>
                 <LegacyCard.Section title="Token details">
                     <LegacyStack vertical>
-                        <Button
+                        <AktoButton
                             id={"hardcoded-token-expand-button"}
                             onClick={handleToggleHardcodedOpen}
                             ariaExpanded={hardcodedOpen}
@@ -368,7 +369,7 @@ function TestRoleSettings() {
                             ariaControls="hardcoded"
                         >
                             Hard coded
-                        </Button>
+                        </AktoButton>
                         <Collapsible
                             open={hardcodedOpen}
                             id="hardcoded"
@@ -380,7 +381,7 @@ function TestRoleSettings() {
                     </LegacyStack>
                 
                     <LegacyStack vertical>
-                        <Button
+                        <AktoButton
                             id={"automated-token-expand-button"}
                             onClick={handleToggleHardcodedOpen}
                             ariaExpanded={!hardcodedOpen}
@@ -388,7 +389,7 @@ function TestRoleSettings() {
                             ariaControls="automated"
                         >
                             Automated
-                        </Button>
+                        </AktoButton>
                         <Collapsible
                             open={!hardcodedOpen}
                             id="automated"

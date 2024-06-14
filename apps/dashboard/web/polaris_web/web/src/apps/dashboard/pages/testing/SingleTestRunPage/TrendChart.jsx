@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { useEffect, useReducer, useState, useCallback } from "react";
 import api from "../api";
 import values from "@/util/values";
@@ -304,7 +305,7 @@ function TrendChart(props) {
             <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
                 <HorizontalStack align="space-between">
                     <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
-                    <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
+                    <AktoButton plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
                 </HorizontalStack>
                 <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
                     <Box paddingBlockStart={3}><Divider/></Box>

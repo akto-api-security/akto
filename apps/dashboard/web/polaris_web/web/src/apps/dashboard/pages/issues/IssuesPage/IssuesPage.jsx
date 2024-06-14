@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubServerTable from "../../../components/tables/GithubServerTable"
 import { useState } from "react";
@@ -152,6 +153,7 @@ async function getNextUrl(issueId){
 }
 
 function IssuesPage(){
+    const userRole = PersistStore(state => state.userRole)
 
     const [loading, setLoading] = useState(true);
     const subCategoryMap = PersistStore(state => state.subCategoryMap);
@@ -193,20 +195,24 @@ function IssuesPage(){
         
         let issues = [{
             content: 'False positive',
-            onAction: () => { ignoreAction("False positive") }
+            onAction: () => { ignoreAction("False positive") },
+            'disabled': (userRole === 'GUEST')
         },
         {
             content: 'Acceptable risk',
-            onAction: () => { ignoreAction("Acceptable risk") }
+            onAction: () => { ignoreAction("Acceptable risk") },
+            'disabled': (userRole === 'GUEST')
         },
         {
             content: 'No time to fix',
-            onAction: () => { ignoreAction("No time to fix") }
+            onAction: () => { ignoreAction("No time to fix") },
+            'disabled': (userRole === 'GUEST')
         }]
         
         let reopen =  [{
             content: 'Reopen',
-            onAction: () => { reopenAction() }
+            onAction: () => { reopenAction() },
+            'disabled': (userRole === 'GUEST')
         }]
         
         let ret = [];
@@ -362,7 +368,7 @@ function IssuesPage(){
                     filterStateUrl={"/dashboard/issues"}
                 />
             ]}
-            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export vulnerability report</Button>}
+            primaryAction={<AktoButton primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export vulnerability report</AktoButton>}
             />
     )
 }

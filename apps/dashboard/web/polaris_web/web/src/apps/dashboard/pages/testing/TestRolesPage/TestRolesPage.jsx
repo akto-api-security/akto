@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { useEffect, useState } from "react"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable"
@@ -93,7 +94,7 @@ function TestRolesPage(){
     return (
         <PageWithMultipleCards
         title={"Test roles"}
-        primaryAction = {<Button primary onClick={handleRedirect}><div data-testid="new_test_role_button">Create new test role</div></Button>}
+        primaryAction = {<AktoButton primary onClick={handleRedirect}><div data-testid="new_test_role_button">Create new test role</div></AktoButton>}
         isFirstPage={true}
         components={[
             showEmptyScreen ? 

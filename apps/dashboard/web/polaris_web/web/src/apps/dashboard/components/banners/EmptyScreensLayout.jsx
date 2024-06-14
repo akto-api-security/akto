@@ -1,3 +1,4 @@
+import AktoButton from './../shared/AktoButton';
 import { Avatar, Box, Button, Card, HorizontalStack, Link, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import "../shared/style.css"
@@ -29,7 +30,7 @@ function EmptyScreensLayout({iconSrc,headingText,description, buttonText, redire
                                 
                                 <HorizontalStack align='center'>
                                     {redirectUrl ? <Box paddingBlockStart={2}>
-                                        <Button primary onClick={() => navigate(redirectUrl)}>{buttonText}</Button>
+                                        <AktoButton primary onClick={() => navigate(redirectUrl)}>{buttonText}</AktoButton>
                                     </Box> : null}
                                     {bodyComponent}
                                 </HorizontalStack>

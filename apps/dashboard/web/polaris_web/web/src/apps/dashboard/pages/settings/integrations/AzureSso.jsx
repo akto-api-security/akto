@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import React, { useEffect, useState } from 'react'
 import IntegrationsLayout from './IntegrationsLayout';
 import SpinnerCentered from '../../../components/progress/SpinnerCentered';
@@ -114,14 +115,14 @@ function AzureSso() {
                         <Tag>
                             <HorizontalStack gap={1}>
                                 <Text variant="bodyMd" fontWeight="medium">{files.name}</Text>
-                                <Button onClick={() => setFiles(null)} plain icon={CancelMajor} />
+                                <AktoButton onClick={() => setFiles(null)} plain icon={CancelMajor} />
                             </HorizontalStack>
                         </Tag>
                     : <Text variant="bodyLg" fontWeight="medium" color="subdued">Drop your Federation Metadata XML file here.</Text>}
                     <FileUpload fileType="file" acceptString=".xml" setSelectedFile={setFilesCheck} allowMultiple={false} />
                 </HorizontalStack>
                     <HorizontalStack align="end">
-                        <Button submit primary size="medium">Submit</Button>
+                        <AktoButton submit primary size="medium">Submit</AktoButton>
                     </HorizontalStack>
                 </FormLayout>
             </Form>

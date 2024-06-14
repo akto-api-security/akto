@@ -1,3 +1,4 @@
+import AktoButton from './../shared/AktoButton';
 import { HideMinor, ViewMinor } from '@shopify/polaris-icons';
 import { useState } from 'react';
 import { Button, TextField } from '@shopify/polaris';
@@ -20,7 +21,7 @@ function PasswordTextField(props) {
     let buttonIcon = isTextVisible ? HideMinor : ViewMinor
 
     const toggleButton = (
-        <Button icon={buttonIcon} onClick={toggleTextVisibility} plain />
+        <AktoButton icon={buttonIcon} onClick={toggleTextVisibility} plain />
     )
 
     return (
