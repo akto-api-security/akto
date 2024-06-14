@@ -11,6 +11,7 @@ import com.akto.dto.*;
 import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
+import com.akto.dto.sql.SampleDataAlt;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -22,6 +23,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.sql.SampleDataAltDb;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.hybrid_runtime.merge.MergeOnHostOnly;
@@ -29,6 +31,7 @@ import com.akto.hybrid_runtime.policies.AktoPolicyNew;
 import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
@@ -1313,6 +1316,9 @@ public class APICatalogSync {
         loggerMaker.infoAndAddToDb("Finished syncing with db", LogDb.RUNTIME);
     }
 
+    private static final Gson gson = new Gson();
+    private static final String AKTO_UUID = "akto_uuid";
+
     public List<BulkUpdates> getDBUpdatesForSampleDataHybrid(int apiCollectionId, APICatalog currentDelta, APICatalog dbCatalog, boolean forceUpdate, boolean accountLevelRedact, boolean apiCollectionLevelRedact) {
         List<SampleData> sampleData = new ArrayList<>();
         Map<URLStatic, RequestTemplate> deltaStrictURLToMethods = currentDelta.getStrictURLToMethods();
@@ -1336,15 +1342,29 @@ public class APICatalogSync {
         }
 
         List<BulkUpdates> bulkUpdates = new ArrayList<>();
+        List<SampleDataAlt> unfilteredSamples = new ArrayList<>();
         for (SampleData sample: sampleData) {
             if (sample.getSamples().size() == 0) {
                 continue;
             }
             List<String> finalSamples = new ArrayList<>();
+            List<String> sampleIds = new ArrayList<>();
             ArrayList<String> updates = new ArrayList<>();
             for (String s: sample.getSamples()) {
                 try {
                     String redactedSample = RedactSampleData.redactIfRequired(s, accountLevelRedact, apiCollectionLevelRedact);
+                    if (accountLevelRedact || apiCollectionLevelRedact) {
+                        Map<String, Object> json = gson.fromJson(redactedSample, Map.class);
+                        UUID uuid = UUID.randomUUID();
+                        json.put(AKTO_UUID, uuid);
+                        redactedSample = json.toString();
+                        int now = Context.now();
+                        Key id = sample.getId();
+                        SampleDataAlt sampleDataAlt = new SampleDataAlt(uuid, s, id.getApiCollectionId(),
+                                id.getMethod().name(), id.getUrl(), id.getResponseCode(), now);
+                        unfilteredSamples.add(sampleDataAlt);
+                        sampleIds.add(uuid.toString());
+                    }
                     finalSamples.add(redactedSample);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,"Error while redacting data" , LogDb.RUNTIME)
@@ -1357,9 +1377,20 @@ public class APICatalogSync {
             updatePayload = new UpdatePayload(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(sample.getId().getApiCollectionId()), "setOnInsert");
             updates.add(updatePayload.toString());
 
+            if (accountLevelRedact || apiCollectionLevelRedact) {
+                updatePayload = new UpdatePayload(SampleData.SAMPLE_IDS, sampleIds, "pushEach");
+                updates.add(updatePayload.toString());
+            }
+
             Map<String, Object> filterMap = new HashMap<>();
             filterMap.put("_id", sample.getId());
             bulkUpdates.add(new BulkUpdates(filterMap, updates));
+        }
+
+        try {
+            SampleDataAltDb.bulkInsert(unfilteredSamples);
+        } catch(Exception e) {
+            loggerMaker.errorAndAddToDb(e, "unable to insert sample data in postgres", LogDb.RUNTIME);
         }
 
         return bulkUpdates;
