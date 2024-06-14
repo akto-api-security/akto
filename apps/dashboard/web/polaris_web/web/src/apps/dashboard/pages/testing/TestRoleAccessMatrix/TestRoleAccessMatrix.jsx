@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Box, Button, HorizontalGrid, IndexFiltersMode, LegacyCard, ResourceItem, ResourceList, Text, TextField } from '@shopify/polaris'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import { useLocation } from 'react-router-dom'
@@ -88,8 +89,8 @@ function TestRoleAccessMatrix() {
             divider={true}
             secondaryActions={
                 [
-                    <Button key="deleteAccessMatrix" onClick={handleDeleteAccessMatrix}>Delete access matrix</Button>,
-                    <Button key="createAccessMatrix" primary onClick={handleCreateAccessMatrix}>Create access matrix</Button>
+                    <AktoButton key="deleteAccessMatrix" onClick={handleDeleteAccessMatrix}>Delete access matrix</AktoButton>,
+                    <AktoButton key="createAccessMatrix" primary onClick={handleCreateAccessMatrix}>Create access matrix</AktoButton>
                 ]}
         />
     )

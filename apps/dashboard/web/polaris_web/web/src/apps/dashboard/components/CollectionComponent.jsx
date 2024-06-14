@@ -1,3 +1,4 @@
+import AktoButton from './shared/AktoButton';
 import { Button } from '@shopify/polaris';
 import { DeleteMinor } from "@shopify/polaris-icons"
 import React, { useState, useEffect } from 'react'
@@ -191,7 +192,7 @@ function CollectionComponent(props) {
             {operatorComponent}
             {prefixLeft(condition, index)}
             {component(condition, index)}
-            <Button icon={DeleteMinor} onClick={() => handleDelete(index)} />
+            <AktoButton icon={DeleteMinor} onClick={() => handleDelete(index)} />
         </div>
     )
 

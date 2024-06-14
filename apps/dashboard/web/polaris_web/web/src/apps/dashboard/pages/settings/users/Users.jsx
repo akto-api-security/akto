@@ -5,11 +5,10 @@ import settingRequests from "../api";
 import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
 import Store from "../../../store";
-import PersistStore from '../../../../main/PersistStore';
 
 const Users = () => {
     const username = Store(state => state.username)
-    const userRole = PersistStore(state => state.userRole)
+    const userRole = window.USER_ROLE
 
     const [inviteUser, setInviteUser] = useState({
         isActive: false,
@@ -27,22 +26,26 @@ const Users = () => {
     const rolesOptions = [
         {
             items: [
-            {
-                content: 'Admin',
-                role: 'ADMIN',
-            },
-            {
-                content: 'Security Engineer',
-                role: 'MEMBER',
-            },
-            {
-                content: 'Developer',
-                role: 'DEVELOPER',
-            },
-            {
-                content: 'Guest',
-                role: 'GUEST',
-            }]
+                {
+                    content: 'Admin',
+                    role: 'ADMIN',
+                    icon: <div style={{padding: "10px"}}/>
+                },
+                {
+                    content: 'Security Engineer',
+                    role: 'MEMBER',
+                    icon: <div style={{padding: "10px"}}/>
+                },
+                {
+                    content: 'Developer',
+                    role: 'DEVELOPER',
+                    icon: <div style={{padding: "10px"}}/>
+                },
+                {
+                    content: 'Guest',
+                    role: 'GUEST',
+                    icon: <div style={{padding: "10px"}}/>
+                }]
         },
         {
             items: [{
@@ -116,6 +119,7 @@ const Users = () => {
     };
 
     const isLocalDeploy = false;
+    const currentUser = users.find(user => user.login === username)
 
     const toggleInviteUserModal = () => {
         setInviteUser({
@@ -135,7 +139,7 @@ const Users = () => {
         await settingRequests.makeAdmin(login, roleVal)
         func.setToast(true, false, "Role updated for " + login + " successfully")
     }
-    
+
     return (
         <Page
             title="Users"
@@ -160,7 +164,7 @@ const Users = () => {
                 </Banner>
             }
             <br />
-            
+
             <Banner>
                 <Text variant="headingMd">Role permissions</Text>
                 <Text variant="bodyMd">Each role have different permissions. <Link url="https://docs.akto.io/" target="_blank">Learn more</Link></Text>
@@ -175,7 +179,7 @@ const Users = () => {
                             const { id, name, login, role } = item;
                             const initials = func.initials(login)
                             const media = <Avatar user size="medium" name={login} initials={initials} />
-                            const shortcutActions = (username !== login && roleHierarchy.includes(role.toUpperCase())) ? 
+                            const shortcutActions = (username !== login && role !== currentUser.role && currentUser.role !== "GUEST" && roleHierarchy.includes(role.toUpperCase())) ?
                                 [
                                     {
                                         content: <Popover

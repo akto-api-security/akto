@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, Link, Tooltip } from "@shopify/polaris"
 import api from "../api"
@@ -263,10 +264,13 @@ function ApiCollections() {
     }
 
     const promotedBulkActions = (selectedResources) => {
+        const userRole = PersistStore(state => state.userRole)
+
         let actions = [
             {
                 content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-                onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
+                onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted"),
+                'disabled': (userRole === 'GUEST')
             }
         ];
 
@@ -279,7 +283,8 @@ function ApiCollections() {
                     onAction: () => {
                         const message = "Deactivating a collection will stop traffic ingestion and testing for this collection. Please sync the usage data via Settings > billing after deactivating a collection to reflect your updated usage. Are you sure, you want to deactivate this collection ?"
                         func.showConfirmationModal(message, "Deactivate collection", () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deactivated") )
-                    }
+                    },
+                    'disabled': (userRole === 'GUEST')
                 }
             )
         } else if (selectedResources.every(v => { return deactivated.includes(v) })) {
@@ -289,7 +294,8 @@ function ApiCollections() {
                     onAction: () =>  {
                         const message = "Please sync the usage data via Settings > billing after reactivating a collection to resume data ingestion and testing."
                         func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
-                    }
+                    },
+                    'disabled': (userRole === 'GUEST')
                 }
             )
         }
@@ -305,9 +311,9 @@ function ApiCollections() {
                     <ActionList
                         actionRole="menuitem"
                         items={[
-                            {content: 'Staging', onAction: () => updateEnvType(selectedResources, "STAGING")},
-                            {content: 'Production', onAction: () => updateEnvType(selectedResources, "PRODUCTION")},
-                            {content: 'Reset', onAction: () => updateEnvType(selectedResources, null)},
+                            {content: 'Staging', onAction: () => updateEnvType(selectedResources, "STAGING"), 'disabled': (userRole === 'GUEST')},
+                            {content: 'Production', onAction: () => updateEnvType(selectedResources, "PRODUCTION"), 'disabled': (userRole === 'GUEST')},
+                            {content: 'Reset', onAction: () => updateEnvType(selectedResources, null), 'disabled': (userRole === 'GUEST')},
                         ]}
                     />
                 </Popover.Pane>
@@ -417,7 +423,7 @@ function ApiCollections() {
                     docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                 />
             }
-            primaryAction={<Button id={"create-new-collection-popup"} primary secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
+            primaryAction={<AktoButton id={"create-new-collection-popup"} primary secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</AktoButton>}
             isFirstPage={true}
             components={components}
         />

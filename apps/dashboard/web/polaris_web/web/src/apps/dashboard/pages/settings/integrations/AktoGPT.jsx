@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import React, { useEffect, useState } from 'react'
 import IntegrationsLayout from './IntegrationsLayout'
 import { Box, Button, Icon, LegacyCard, ResourceItem, ResourceList, Text, TextField } from '@shopify/polaris'
@@ -75,7 +76,7 @@ function AktoGPT() {
         }, 0)
     }
     const sortFunc = (
-        <Button icon={SortMinor} onClick={sortItems}>Sort</Button>
+        <AktoButton icon={SortMinor} onClick={sortItems}>Sort</AktoButton>
     )
 
     const searchResult = (item) =>{

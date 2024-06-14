@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -79,7 +80,7 @@ function Tags(){
     return (
         <PageWithMultipleCards
         title={"Tags"}
-        primaryAction={<Button primary onClick={handleRedirect}>Create new tags</Button>}
+        primaryAction={<AktoButton primary onClick={handleRedirect}>Create new tags</AktoButton>}
         isFirstPage={true}
         components={[
 

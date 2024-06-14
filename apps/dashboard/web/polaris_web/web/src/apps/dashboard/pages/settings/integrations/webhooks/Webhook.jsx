@@ -1,3 +1,4 @@
+import AktoButton from './../../../../components/shared/AktoButton';
 import { Button, ButtonGroup, Card, Checkbox, ContextualSaveBar, Divider, Frame, HorizontalGrid, LegacyCard, LegacyTabs, Tabs, Text, TextField} from "@shopify/polaris"
 import PageWithMultipleCards from "../../../../components/layouts/PageWithMultipleCards"
 import { useNavigate, useParams } from "react-router-dom"
@@ -292,12 +293,12 @@ function Webhook() {
                     <br />
                     {intervals.map(interval => (
                         <span key={interval.name} style={{ padding: "10px" }}>
-                            <Button
+                            <AktoButton
                                 pressed={webhook.frequencyInSeconds === interval.value}
                                 onClick={() => updateWebhookState("frequencyInSeconds", interval.value)}
                             >
                                 {interval.name
-                                }</Button>
+                                }</AktoButton>
                         </span>
                     ))}
                 </div>
@@ -351,9 +352,9 @@ function Webhook() {
             message={hasChanges ? "Unsaved changes" : "No unsaved changes"}
             secondaryMenu={
                 <ButtonGroup>
-                    <Button onClick={handleDiscard} disabled={!hasChanges}>Discard</Button>
+                    <AktoButton onClick={handleDiscard} disabled={!hasChanges}>Discard</AktoButton>
                     {webhookId ?
-                        <Button
+                        <AktoButton
                             primary
                             onClick={saveWebhook}
                             connectedDisclosure={{
@@ -362,13 +363,13 @@ function Webhook() {
                             }}
                         >
                             Save
-                        </Button>
-                        : <Button
+                        </AktoButton>
+                        : <AktoButton
                             primary
                             onClick={saveWebhook}
                         >
                             Save
-                        </Button>
+                        </AktoButton>
                     }
                 </ButtonGroup>
             }

@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { useParams } from "react-router-dom"
@@ -97,7 +98,7 @@ function SingleRequest(){
             secondaryActions = {
                 <Popover
                 active={popoverActive}
-                activator={<Button onClick={togglePopoverActive} disclosure>Actions</Button>}
+                activator={<AktoButton onClick={togglePopoverActive} disclosure>Actions</AktoButton>}
                 onClose={togglePopoverActive}
             >
                 <ActionList

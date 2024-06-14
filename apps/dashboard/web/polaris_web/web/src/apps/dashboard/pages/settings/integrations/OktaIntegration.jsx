@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import React, { useEffect, useState } from 'react'
 import CopyCommand from '../../../components/shared/CopyCommand';
 import IntegrationsLayout from './IntegrationsLayout';
@@ -83,7 +84,7 @@ function OktaIntegration() {
                                 value={oktaDomain}
                     />
                     <HorizontalStack align="end">
-                        <Button submit primary size="medium">Submit</Button>
+                        <AktoButton submit primary size="medium">Submit</AktoButton>
                     </HorizontalStack>
                 </FormLayout>
             </Form>

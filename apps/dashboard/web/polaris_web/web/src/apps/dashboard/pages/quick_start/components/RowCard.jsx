@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Avatar, Button, Card, Text, VerticalStack, HorizontalStack, Badge, Box } from '@shopify/polaris';
 
 function RowCard(props) {
@@ -29,7 +30,7 @@ function RowCard(props) {
                     </Box>
                 </VerticalStack>
                 <HorizontalStack gap={"4"} align='start'>
-                    <Button onClick={handleAction}>{buttonText}</Button>
+                    <AktoButton onClick={handleAction}>{buttonText}</AktoButton>
                     <Button plain onClick={goToDocs} size='medium'>See Docs</Button>
                 </HorizontalStack>
             </VerticalStack>

@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { Text, Button, Modal } from "@shopify/polaris"
 import api from "../api"
@@ -170,8 +171,8 @@ function AllSensitiveData() {
                     docsUrl="https://docs.akto.io/api-inventory/concepts/sensitive-data" 
                 />
             }
-            primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
-            secondaryActions={<Button onClick={displayGPT}>Ask AktoGPT</Button>}
+            primaryAction={<AktoButton id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</AktoButton>}
+            secondaryActions={<AktoButton onClick={displayGPT}>Ask AktoGPT</AktoButton>}
             isFirstPage={true}
             components={[
                 <GithubSimpleTable

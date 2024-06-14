@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Box, Button, ButtonGroup, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
 import React, { useEffect, useState, useRef } from 'react'
 import {useNavigate} from "react-router-dom"
@@ -107,15 +108,15 @@ function HybridSaasSource() {
         //             <VerticalStack gap={1}>
         //                 <HorizontalStack gap={1}>
         //                     <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_IP:</Text>
-        //                     <Button onClick={() => copyText(aktoIp, "AKTO_IP")} plain>
+        //                     <AktoButton onClick={() => copyText(aktoIp, "AKTO_IP")} plain>
         //                         <div style={{maxWidth: "260px"}} className='overflow-text'>{aktoIp}</div>
-        //                     </Button>
+        //                     </AktoButton>
         //                 </HorizontalStack>
         //                 <HorizontalStack gap={1}>
         //                     <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_TOKEN:</Text>
-        //                     <Button onClick={() => copyText(aktoToken, "AKTO_TOKEN")} plain>
+        //                     <AktoButton onClick={() => copyText(aktoToken, "AKTO_TOKEN")} plain>
         //                         <div style={{maxWidth: "210px"}} className='overflow-text'>{aktoToken}</div>
-        //                     </Button>
+        //                     </AktoButton>
         //                 </HorizontalStack>
         //             </VerticalStack>
         //         </Box>
@@ -157,8 +158,8 @@ function HybridSaasSource() {
 
             {/* <VerticalStack gap="2">
                 <ButtonGroup>
-                    <Button onClick={primaryAction} primary>Check Connection</Button>
-                    <Button onClick={goToDocs}>Go to docs</Button>
+                    <AktoButton onClick={primaryAction} primary>Check Connection</AktoButton>
+                    <AktoButton onClick={goToDocs}>Go to docs</AktoButton>
                 </ButtonGroup>
             </VerticalStack> */}
 

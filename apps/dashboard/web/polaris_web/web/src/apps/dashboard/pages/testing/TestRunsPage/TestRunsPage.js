@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider} from '@shopify/polaris';
 import { ChevronDownMinor , ChevronUpMinor } from '@shopify/polaris-icons';
@@ -269,7 +270,7 @@ const SummaryCardComponent = () =>{
       <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
         <HorizontalStack align="space-between">
           <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
-          <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
+          <AktoButton plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
         </HorizontalStack>
         {totalVulnerabilities > 0 ? 
         <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
@@ -288,6 +289,8 @@ const SummaryCardComponent = () =>{
   )
 }
   const promotedBulkActions = (selectedTestRuns) => { 
+    const userRole = PersistStore(state => state.userRole)
+
     return [
     {
       content: <div data-testid="delete_result_button">{`Delete ${selectedTestRuns.length} test run${selectedTestRuns.length ===1 ? '' : 's'}`}</div>,
@@ -296,6 +299,7 @@ const SummaryCardComponent = () =>{
         func.setToast(true, false, <div data-testid="delete_success_message">{`${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`}</div>)
         window.location.reload();
       },
+      'disabled': (userRole === 'GUEST')
     },
   ]};
 

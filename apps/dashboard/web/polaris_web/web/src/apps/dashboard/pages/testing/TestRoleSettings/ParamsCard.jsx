@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Box, Button, HorizontalGrid, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import TooltipText from "../../../components/shared/TooltipText"
@@ -68,7 +69,7 @@ function ParamsCard({dataObj, handleDelete}) {
 
                 </VerticalStack>
                 <HorizontalStack align="end">
-                    <Button size="slim" onClick={handleDelete} icon={DeleteMajor}><div data-testid="delete_button">Delete</div></Button>
+                    <AktoButton size="slim" onClick={handleDelete} icon={DeleteMajor}><div data-testid="delete_button">Delete</div></AktoButton>
                 </HorizontalStack>
             </VerticalStack>
         </Box>

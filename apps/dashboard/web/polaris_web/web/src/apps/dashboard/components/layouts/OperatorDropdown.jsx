@@ -1,3 +1,4 @@
+import AktoButton from './../shared/AktoButton';
 import { Popover, Button, ActionList } from "@shopify/polaris"
 import { useState } from "react"
 
@@ -13,7 +14,7 @@ function OperatorDropdown(props) {
             <Popover
                 active={popoverActive}
                 activator={
-                    <Button onClick={togglePopoverActive} disclosure plain removeUnderline>{label}</Button>
+                    <AktoButton onClick={togglePopoverActive} disclosure plain removeUnderline>{label}</AktoButton>
                 }
                 onClose={togglePopoverActive}
             >

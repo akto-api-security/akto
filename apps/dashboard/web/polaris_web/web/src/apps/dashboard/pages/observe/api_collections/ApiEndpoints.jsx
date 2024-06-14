@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox } from "@shopify/polaris"
 import api from "../api"
@@ -482,9 +483,9 @@ function ApiEndpoints() {
             <Popover
                 active={exportOpen}
                 activator={(
-                    <Button onClick={() => setExportOpen(true)} disclosure>
+                    <AktoButton onClick={() => setExportOpen(true)} disclosure>
                         <div data-testid="more_actions_button">More Actions</div>
-                    </Button>
+                    </AktoButton>
                 )}
                 autofocusTarget="first-node"
                 onClose={() => { setExportOpen(false) }}
@@ -558,7 +559,7 @@ function ApiEndpoints() {
                 </Popover.Pane>
             </Popover>
 
-            {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null}
+            {isGptActive ? <AktoButton onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</AktoButton>: null}
                     
             <RunTest
                 apiCollectionId={apiCollectionId}
@@ -594,6 +595,7 @@ function ApiEndpoints() {
     }
 
     const promotedBulkActions = (selectedResources) => {
+        const userRole = PersistStore(state => state.userRole)
 
         let isApiGroup = allCollections.filter(x => {
             return x.id == apiCollectionId && x.type == "API_GROUP"
@@ -604,13 +606,15 @@ function ApiEndpoints() {
             ret.push(
                 {
                     content: 'Remove from API group',
-                    onAction: () => handleApiGroupAction(selectedResources, Operation.REMOVE)
+                    onAction: () => handleApiGroupAction(selectedResources, Operation.REMOVE),
+                    'disabled': (userRole === 'GUEST')
                 }
             )
         } else {
             ret.push({
                 content: <div data-testid="add_to_api_group_button">Add to API group</div>,
-                onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
+                onAction: () => handleApiGroupAction(selectedResources, Operation.ADD),
+                'disabled': (userRole === 'GUEST')
             })
         }
         return ret;

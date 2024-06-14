@@ -1,3 +1,4 @@
+import AktoButton from './../../shared/AktoButton';
 import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button } from '@shopify/polaris';
 import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor } from '@shopify/polaris-icons';
 import { useState, useCallback, useEffect } from 'react';
@@ -189,9 +190,9 @@ export default function Header() {
         <HorizontalStack gap={"4"}>
             {(Object.keys(currentTestsObj).length > 0 && currentTestsObj?.testRunsArr?.length !== 0) ? 
             <HorizontalStack gap={"2"}>
-                <Button plain monochrome onClick={() => {handleTestingNavigate()}}>
+                <AktoButton plain monochrome onClick={() => {handleTestingNavigate()}}>
                  <SemiCircleProgress key={"progress"} progress={progress} size={60} height={55} width={75}/>
-                </Button>
+                </AktoButton>
                 <VerticalStack gap={"0"}>
                     <Text fontWeight="medium">Test run status</Text>
                     <Text color="subdued" variant="bodySm">{`${currentTestsObj.totalTestsQueued} tests queued`}</Text>

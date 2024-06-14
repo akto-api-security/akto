@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { ResourceList, LegacyCard, ResourceItem, Modal, Text, Button, TextField, HorizontalStack, List, Link } from "@shopify/polaris";
 import { useEffect, useState, useCallback } from "react";
 import settingsApi from "../api";
@@ -187,7 +188,7 @@ function TestLibrary() {
                     Test library
                 </Text>
             }
-            primaryAction={<Button primary onClick={showAddTestLibraryModal}>Add new test library</Button>}
+            primaryAction={<AktoButton primary onClick={showAddTestLibraryModal}>Add new test library</AktoButton>}
             isFirstPage={true}
             divider={true}
         />

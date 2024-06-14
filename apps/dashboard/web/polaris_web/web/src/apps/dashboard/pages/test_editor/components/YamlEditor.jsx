@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -152,14 +153,14 @@ const YamlEditor = ({ fetchAllTests }) => {
                         <Icon source={InfoMinor}/> 
                     </Tooltip>
                     <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="below">
-                        <Button icon={ClipboardMinor} plain onClick={copyTestName} />
+                        <AktoButton icon={ClipboardMinor} plain onClick={copyTestName} />
                     </Tooltip>  
                     <Tooltip content={`Set as ${selectedTest.inactive ? "active" : "inactive" }`} dismissOnMouseOut preferredPosition="below">
-                        <Button icon={selectedTest.inactive ? CircleTickMinor : CircleCancelMinor} plain onClick={setTestInactive} />
+                        <AktoButton icon={selectedTest.inactive ? CircleTickMinor : CircleCancelMinor} plain onClick={setTestInactive} />
                     </Tooltip>  
                 </HorizontalStack>
         
-                <Button id={"save-button"} disabled={!isEdited} onClick={handleSave} size="slim">Save</Button>
+                <AktoButton id={"save-button"} disabled={!isEdited} onClick={handleSave} size="slim">Save</AktoButton>
             </div>
 
             <Divider />

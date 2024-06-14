@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Button, FormLayout, HorizontalStack, Icon, Text, TextField, Tooltip } from "@shopify/polaris"
 import { InfoMinor } from "@shopify/polaris-icons"
 import { useState } from "react";
@@ -87,14 +88,14 @@ function HardCoded({showOnlyApi, extractInformation, setInformation}) {
                 </FormLayout.Group>
             </FormLayout>
             <br />
-            {showOnlyApi ? null :<Button
+            {showOnlyApi ? null :<AktoButton
                 id={"save-token"}
                 primary
                 disabled={!hasChanges}
                 onClick={handleSave}
             >
                 <div data-testid="save_token_hardcoded">Save changes</div>
-            </Button>
+            </AktoButton>
             }
         </div>
     )
