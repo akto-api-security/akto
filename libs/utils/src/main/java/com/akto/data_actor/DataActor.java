@@ -120,7 +120,7 @@ public abstract class DataActor {
 
     public abstract void insertTestingRunResultSummary(TestingRunResultSummary trrs);
 
-    public abstract void updateTestingRunAndMarkCompleted(String testingRunId, Bson completedUpdate);
+    public abstract void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTs);
 
     public abstract Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId);
 
@@ -148,9 +148,9 @@ public abstract class DataActor {
 
     public abstract void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount);
 
-    public abstract void updateLastTestedField(ApiInfo.ApiInfoKey apiInfoKey);
+    public abstract void updateLastTestedField(int apiCollectionId, String url, String method);
 
-    public abstract void insertTestingRunResults(List<TestingRunResult> testingRunResults);
+    public abstract void insertTestingRunResults(TestingRunResult testingRunResults);
 
     public abstract void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount);
 

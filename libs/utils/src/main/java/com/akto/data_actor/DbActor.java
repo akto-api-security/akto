@@ -21,6 +21,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.client.model.WriteModel;
 
@@ -356,7 +357,7 @@ public class DbActor extends DataActor {
         DbLayer.insertTestingRunResultSummary(trrs);
     }
 
-    public void insertTestingRunResults(List<TestingRunResult> testingRunResults) {
+    public void insertTestingRunResults(TestingRunResult testingRunResults) {
         DbLayer.insertTestingRunResults(testingRunResults);
     }
 
@@ -385,8 +386,8 @@ public class DbActor extends DataActor {
         DbLayer.updateIssueCountInTestSummary(summaryId, totalCountIssues, false);
     }
 
-    public void updateLastTestedField(ApiInfoKey apiInfoKey) {
-        DbLayer.updateLastTestedField(apiInfoKey);
+    public void updateLastTestedField(int apiCollectionId, String url, String method) {
+        DbLayer.updateLastTestedField(apiCollectionId, url, method);
     }
 
     public void updateTestInitiatedCountInTestSummary(String summaryId, int testInitiatedCount) {
@@ -409,8 +410,8 @@ public class DbActor extends DataActor {
         DbLayer.updateTestingRun(testingRunId);
     }
 
-    public void updateTestingRunAndMarkCompleted(String testingRunId, Bson completedUpdate) {
-        DbLayer.updateTestingRunAndMarkCompleted(testingRunId, completedUpdate);
+    public void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTs) {
+        DbLayer.updateTestingRunAndMarkCompleted(testingRunId, scheduleTs);
     }
 
     public void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount) {

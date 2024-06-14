@@ -514,14 +514,24 @@ public class TestExecutor {
         if (resultSize > 0) {
             loggerMaker.infoAndAddToDb("testingRunResults size: " + resultSize, LogDb.TESTING);
             trim(testingRunResults);
-            dataActor.insertTestingRunResults(testingRunResults);
+            TestingRunResult trr = testingRunResults.get(0);
+            trr.setTestRunHexId(trr.getTestRunHexId());
+            trr.setTestRunResultSummaryHexId(trr.getTestRunResultSummaryHexId());
+            GenericTestResult testRes = trr.getTestResults().get(0);
+            if (testRes instanceof TestResult) {
+                trr.setSingleTestResult((TestResult) testRes);
+            } else {
+                trr.setMultiExecTestResult((MultiExecTestResult) testRes);
+            }
+            trr.setTestResults(null);
+            dataActor.insertTestingRunResults(testingRunResults.get(0));
             loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
             dataActor.updateTestResultsCountInTestSummary(testRunResultSummaryId.toHexString(), resultSize);
             loggerMaker.infoAndAddToDb("Updated count in summary", LogDb.TESTING);
 
             TestingIssuesHandler handler = new TestingIssuesHandler();
             boolean triggeredByTestEditor = false;
-            handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
+            //handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
             testingRunResults.clear();
         }
     }
@@ -563,7 +573,7 @@ public class TestExecutor {
             insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
         }
         if(countSuccessfulTests > 0){
-            dataActor.updateLastTestedField(apiInfoKey);
+            dataActor.updateLastTestedField(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().toString());
         }
 
     }

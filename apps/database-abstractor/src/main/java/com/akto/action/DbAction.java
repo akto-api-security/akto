@@ -148,6 +148,7 @@ public class DbAction extends ActionSupport {
     WorkflowTest workflowTest;
     List<YamlTemplate> yamlTemplates;
     SingleTypeInfo sti;
+    int scheduleTs;
 
     private static final Gson gson = new Gson();
     ObjectMapper objectMapper = new ObjectMapper();
@@ -1101,7 +1102,7 @@ public class DbAction extends ActionSupport {
 
     public String insertTestingRunResults() {
         try {
-            DbLayer.insertTestingRunResults(testingRunResults);
+            DbLayer.insertTestingRunResults(testingRunResult);
         } catch (Exception e) {
             System.out.println(e.getMessage());
             return Action.ERROR.toUpperCase();
@@ -1167,7 +1168,7 @@ public class DbAction extends ActionSupport {
 
     public String updateLastTestedField() {
         try {
-            DbLayer.updateLastTestedField(apiInfoKey);
+            DbLayer.updateLastTestedField(apiCollectionId, url, methodVal);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -1221,7 +1222,7 @@ public class DbAction extends ActionSupport {
 
     public String updateTestingRunAndMarkCompleted() {
         try {
-            DbLayer.updateTestingRunAndMarkCompleted(testingRunId, completedUpdate);
+            DbLayer.updateTestingRunAndMarkCompleted(testingRunId, scheduleTs);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -2081,4 +2082,12 @@ public class DbAction extends ActionSupport {
         this.sti = sti;
     }
 
+    public int getScheduleTs() {
+        return scheduleTs;
+    }
+
+    public void setScheduleTs(int scheduleTs) {
+        this.scheduleTs = scheduleTs;
+    }
+    
 }
