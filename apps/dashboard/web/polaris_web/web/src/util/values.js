@@ -53,6 +53,21 @@ const ranges = [
             ),
             until: todayDayEnd,
         }
+    },
+    {
+        title: 'Last 1 year',
+        alias: "lastYear",
+        period:{
+            since: new Date(
+                new Date(new Date().setDate(today.getDate() - 365)).setHours(
+                    0,
+                    0,
+                    0,
+                    0
+                )
+            ),
+            until: todayDayEnd,
+        }
     }
 ];
 
