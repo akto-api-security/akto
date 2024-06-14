@@ -111,12 +111,10 @@ function GithubServerTable(props) {
     tempData ? setData([...tempData.value]) : setData([])
     tempData ? setTotal(tempData.total) : setTotal(0)
     applyFilter(tempData.total)
-    if(!performance.getEntriesByType('navigation')[0].type === 'reload'){
-      setTableInitialState({
-        ...tableInitialState,
-        [currentPageKey]: tempData.total
-      })
-    }
+    setTableInitialState({
+      ...tableInitialState,
+      [currentPageKey]: tempData.total
+    })
   }
 
   useEffect(() => {
