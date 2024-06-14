@@ -107,7 +107,9 @@ public class RuntimeListener extends AfterMongoConnectListener {
         String url = "https://raw.githubusercontent.com/akto-api-security/tests-library/master/resources/juiceshop.har";
         String harString = "";
         try {
-            harString = new Scanner(new URL(url).openStream(), "UTF-8").useDelimiter("\\A").next();
+            Scanner scanner = new Scanner(new URL(url).openStream(), "UTF-8");
+            harString = scanner.useDelimiter("\\A").next();
+            scanner.close();
         } catch (IOException e) {
             loggerMaker.errorAndAddToDb(e,"Error downlaoding from github: " + e, LoggerMaker.LogDb.DASHBOARD);
             return;
@@ -116,7 +118,9 @@ public class RuntimeListener extends AfterMongoConnectListener {
         String tokensUrl = "https://raw.githubusercontent.com/akto-api-security/tests-library/master/resources/juiceshop_tokens.json";
         Map<String, String> tokens = new HashMap<>();
         try {
-            String tokenJsonString = new Scanner(new URL(tokensUrl).openStream(), "UTF-8").useDelimiter("\\A").next();
+            Scanner scanner = new Scanner(new URL(tokensUrl).openStream(), "UTF-8");
+            String tokenJsonString = scanner.useDelimiter("\\A").next();
+            scanner.close();
             tokens = new Gson().fromJson(tokenJsonString, Map.class);
         } catch (IOException e) {
             loggerMaker.errorAndAddToDb(e,"Error downloading from github: " + e, LoggerMaker.LogDb.DASHBOARD);

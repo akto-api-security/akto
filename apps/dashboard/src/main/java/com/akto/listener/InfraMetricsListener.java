@@ -26,7 +26,11 @@ public class InfraMetricsListener implements ServletContextListener {
         try {
             logger.info("Infra metrics initializing.......");
             new JvmThreadMetrics().bindTo(registry);
-            new JvmGcMetrics().bindTo(registry);
+            try (JvmGcMetrics jvmGcMetrics = new JvmGcMetrics()) {
+                jvmGcMetrics.bindTo(registry);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
             new JvmMemoryMetrics().bindTo(registry);
             new DiskSpaceMetrics(new File("/")).bindTo(registry);
             new ProcessorMetrics().bindTo(registry); // metrics related to the CPU stats
