@@ -255,6 +255,8 @@ function GithubServerTable(props) {
 
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(data, {
+      selectedResources: props?.initSelectedResources || [],
+      allResourcesSelected: props?.initAlllResourcesSelected || false,
       resourceIDResolver,
     });
 

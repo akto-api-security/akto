@@ -36,6 +36,8 @@ function GithubSimpleTable(props) {
         hasZebraStriping={props.hasZebraStriping}
         filterStateUrl={props?.filterStateUrl}
         hidePagination={props?.hidePagination}
+        initSelectedResources={props?.initSelectedResources}
+        initAlllResourcesSelected={props?.initAlllResourcesSelected}
     />
 
 }
