@@ -2,47 +2,43 @@ package com.akto.interceptor;
 
 import com.akto.dao.RBACDao;
 import com.akto.dto.User;
+import com.akto.dto.RBAC.Role;
+import com.akto.dto.rbac.RbacEnums.Feature;
+import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 import com.akto.log.LoggerMaker;
-import com.akto.util.DashboardMode;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.ActionInvocation;
 import com.opensymphony.xwork2.ActionSupport;
 import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public class RoleAccessInterceptor extends AbstractInterceptor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(RoleAccessInterceptor.class, LoggerMaker.LogDb.DASHBOARD);
 
-    String rolesList;
+    String featureLabel;
+    String accessType;
+
+    public void setFeatureLabel(String featureLabel) {
+        this.featureLabel = featureLabel;
+    }
+
+    public void setAccessType(String accessType) {
+        this.accessType = accessType;
+    }
 
     public final static String FORBIDDEN = "FORBIDDEN";
     private final static String USER_ID = "userId";
     private final static String USER = "user";
 
-    public void setRolesList(String rolesList) {
-        this.rolesList = rolesList;
-    }
 
     @Override
     public String intercept(ActionInvocation invocation) throws Exception {
         try {
-            if(!DashboardMode.isMetered()) {
-                return invocation.invoke();
+            if(featureLabel == null) {
+                throw new Exception("Feature list is null or empty");
             }
-
-            if(rolesList == null || rolesList.trim().isEmpty()) {
-                throw new Exception("Roles list is null or empty");
-            }
-
-            List<String> roles = Arrays.stream(rolesList.split(" "))
-                                        .map(String::trim)
-                                        .map(String::toUpperCase)
-                                        .collect(Collectors.toList());
 
             Map<String, Object> session = invocation.getInvocationContext().getSession();
             User user = (User) session.get(USER);
@@ -59,16 +55,17 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 throw new Exception("User role not found");
             }
 
-            boolean hasRequiredRole = false;
+            Role userRoleType = Role.valueOf(userRole.toUpperCase());
+            Feature featureType = Feature.valueOf(this.featureLabel.toUpperCase());
 
-            for(String requiredRole : roles) {
-                if (RoleHierarchy.hasRole(userRole, requiredRole)) {
-                    hasRequiredRole = true;
-                    break;
-                }
+            ReadWriteAccess accessGiven = userRoleType.getReadWriteAccessForFeature(featureType);
+            boolean hasRequiredAccess = false;
+
+            if(accessGiven.toString().equalsIgnoreCase(ReadWriteAccess.READ_WRITE.toString()) || accessGiven.toString().equalsIgnoreCase(this.accessType)){
+                hasRequiredAccess = true;
             }
-
-            if(!hasRequiredRole) {
+            
+            if(!hasRequiredAccess) {
                 ((ActionSupport) invocation.getAction()).addActionError("The role '" + userRole + "' does not have access.");
                 return FORBIDDEN;
             }
