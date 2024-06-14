@@ -16,7 +16,6 @@ function DonutChart({data, title, size,type,navUrl}) {
     let seriesData = []
     if(data && Object.keys(data).length > 0){
         seriesData = Object.keys(data).map((ele)=>{
-
             return {...data[ele], y: data[ele].text, name: ele }
         })
     }
@@ -68,7 +67,6 @@ function DonutChart({data, title, size,type,navUrl}) {
                             }
                             else if( navUrl && navUrl==='/dashboard/issues/'){
                                 const filterUrl = '/dashboard/issues'
-
                                 let updatedFiltersMap = { ...filtersMap };
                                 updatedFiltersMap[filterUrl] = {}
                                   

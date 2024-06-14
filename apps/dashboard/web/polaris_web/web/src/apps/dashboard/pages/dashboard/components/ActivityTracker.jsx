@@ -52,9 +52,9 @@ function ActivityTracker({latestActivity, onLoadMore, showLoadMore, collections 
           
         let updatedFiltersMap = { ...filtersMap }; 
 
-            const filterkey = '/dashboard/issues'
+            const filterKey = '/dashboard/issues'
 
-            const filterarray = [{
+            const filterArray = [{
               key: "severity",
               label: "High",
               value: ["HIGH"],
@@ -65,7 +65,7 @@ function ActivityTracker({latestActivity, onLoadMore, showLoadMore, collections 
               value: [timestamp-10000],
             }]
 
-            updatedFiltersMap[filterkey] = {filters: filterarray, sort : []};
+            updatedFiltersMap[filterKey] = {filters: filterArray, sort : []};
 
 
         setFiltersMap(updatedFiltersMap)
