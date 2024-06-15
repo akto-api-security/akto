@@ -1,8 +1,10 @@
 package com.akto.action;
 
+import java.util.List;
+
 import com.akto.dao.SampleDataDao;
 import com.akto.dto.traffic.SampleData;
-import com.mongodb.client.MongoCursor;
+import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -32,16 +34,27 @@ public class SampleDataAction extends ActionSupport {
                 1_000_000, 0.001);
 
         int skip = 0;
+        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(
+                Filters.exists(SampleData.SAMPLE_IDS),
+                skip, limit,
+                Sorts.descending(Constants.ID),
+                Projections.include(SampleData.SAMPLE_IDS));
 
-        MongoCursor<SampleData> cursor = SampleDataDao.instance.getMCollection()
-                .find(Filters.exists(SampleData.SAMPLE_IDS))
-                .projection(Projections.fields(
-                        Projections.excludeId(),
-                        Projections.include(SampleData.SAMPLE_IDS)))
-                .skip(skip)
-                .limit(limit)
-                .sort(Sorts.descending("_id"))
-                .cursor();
+        while (sampleDataList != null && !sampleDataList.isEmpty()) {
+            for (SampleData sampleData : sampleDataList) {
+                if (sampleData.getSampleIds() != null && !sampleData.getSampleIds().isEmpty()) {
+                    for (String id : sampleData.getSampleIds()) {
+                        sampleIdsFilter.put(id);
+                    }
+                }
+            }
+
+            skip += limit;
+            sampleDataList = SampleDataDao.instance.findAll(Filters.exists(SampleData.SAMPLE_IDS),
+                    skip, limit,
+                    Sorts.descending(Constants.ID),
+                    Projections.include(SampleData.SAMPLE_IDS));
+        }
 
         return Action.SUCCESS.toUpperCase();
     }
