@@ -145,10 +145,11 @@ public class KafkaUtils {
         List<BulkUpdates> bulkWrites = mapper.readValue(payload, new TypeReference<List<BulkUpdates>>(){});
 
         logger.info("Account id: " + accountId + " trigger method: " + triggerMethod);
-        logger.info("bulkWrites: ");
+        logger.info(" bulkWrites: \n");
         for(BulkUpdates update: bulkWrites){
             logger.info(update.getFilters().toString() + " " + update.getUpdates().toString());
         }
+        logger.info("\n");
 
         switch (triggerMethod) {
             case "bulkWriteSti":
