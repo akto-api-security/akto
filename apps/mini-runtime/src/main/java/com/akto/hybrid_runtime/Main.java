@@ -190,6 +190,8 @@ public class Main {
             }
         }, 5, 5, TimeUnit.MINUTES);
 
+        com.akto.sql.Main.createSampleDataTable();
+
         CleanPostgres.cleanPostgresCron();
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
