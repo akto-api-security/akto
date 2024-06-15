@@ -269,16 +269,23 @@ public class DbAction extends ActionSupport {
                 ArrayList<WriteModel<SampleData>> writes = new ArrayList<>();
                 for (BulkUpdates bulkUpdate: writesForSampleData) {
                     Map<String, Object> mObj = (Map) bulkUpdate.getFilters().get("_id");
-                    Long apiCollectionId = (Long) mObj.get("apiCollectionId");
-                    Long bucketEndEpoch = (Long) mObj.get("bucketEndEpoch");
-                    Long bucketStartEpoch = (Long) mObj.get("bucketStartEpoch");
-                    Long responseCode = (Long) mObj.get("responseCode");
+                    String apiCollectionIdStr = mObj.get("apiCollectionId").toString();
+                    int apiCollectionId = Integer.valueOf(apiCollectionIdStr);
+
+                    String bucketEndEpochStr = mObj.get("bucketEndEpoch").toString();
+                    int bucketEndEpoch = Integer.valueOf(bucketEndEpochStr);
+
+                    String bucketStartEpochStr = mObj.get("bucketStartEpoch").toString();
+                    int bucketStartEpoch = Integer.valueOf(bucketStartEpochStr);
+
+                    String responseCodeStr = mObj.get("responseCode").toString();
+                    int responseCode = Integer.valueOf(responseCodeStr);
     
-                    Bson filters = Filters.and(Filters.eq("_id.apiCollectionId", apiCollectionId.intValue()),
-                            Filters.eq("_id.bucketEndEpoch", bucketEndEpoch.intValue()),
-                            Filters.eq("_id.bucketStartEpoch", bucketStartEpoch.intValue()),
+                    Bson filters = Filters.and(Filters.eq("_id.apiCollectionId", apiCollectionId),
+                            Filters.eq("_id.bucketEndEpoch", bucketEndEpoch),
+                            Filters.eq("_id.bucketStartEpoch", bucketStartEpoch),
                             Filters.eq("_id.method", mObj.get("method")),
-                            Filters.eq("_id.responseCode", responseCode.intValue()),
+                            Filters.eq("_id.responseCode", responseCode),
                             Filters.eq("_id.url", mObj.get("url")));
                     List<String> updatePayloadList = bulkUpdate.getUpdates();
     
@@ -333,8 +340,9 @@ public class DbAction extends ActionSupport {
                     Bson filters = Filters.empty();
                     for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                         if (entry.getKey().equalsIgnoreCase("_id.apiCollectionId") || entry.getKey().equalsIgnoreCase("_id.responseCode")) {
-                            Long val = (Long) entry.getValue();
-                            filters = Filters.and(filters, Filters.eq(entry.getKey(), val.intValue()));
+                            String valStr = entry.getValue().toString();
+                            int val = Integer.valueOf(valStr);
+                            filters = Filters.and(filters, Filters.eq(entry.getKey(), val));
                         } else {
                             filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
                         }
@@ -459,8 +467,9 @@ public class DbAction extends ActionSupport {
                     Bson filters = Filters.empty();
                     for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                         if (entry.getKey().equalsIgnoreCase("_id.bucketStartEpoch") || entry.getKey().equalsIgnoreCase("_id.bucketEndEpoch") || entry.getKey().equalsIgnoreCase("_id.vxlanID")) {
-                            Long val = (Long) entry.getValue();
-                            filters = Filters.and(filters, Filters.eq(entry.getKey(), val.intValue()));
+                            String valStr = entry.getValue().toString();
+                            int val = Integer.valueOf(valStr);
+                            filters = Filters.and(filters, Filters.eq(entry.getKey(), val));
                         } else {
                             filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
                         }
