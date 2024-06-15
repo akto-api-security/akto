@@ -187,8 +187,9 @@ public class DbAction extends ActionSupport {
                             continue;
                         }
                         if (entry.getKey().equalsIgnoreCase("apiCollectionId") || entry.getKey().equalsIgnoreCase("responseCode")) {
-                            Long val = (Long) entry.getValue();
-                            filters.add(Filters.eq(entry.getKey(), val.intValue()));
+                            String valStr = entry.getValue().toString();
+                            int val = Integer.valueOf(valStr);
+                            filters.add(Filters.eq(entry.getKey(), val));
                         } else {
                             filters.add(Filters.eq(entry.getKey(), entry.getValue()));
                         }
