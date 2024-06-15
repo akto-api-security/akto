@@ -80,7 +80,7 @@ function getTestingRunType(testingRun, testingRunResultSummary, cicd) {
   if (testingRunResultSummary.metadata != null || cicd) {
     return 'CI/CD';
   }
-  if (testingRun.scheduleTimestamp >= func.timeNow() && testingRun.scheduleTimestamp < func.timeNow() + 86400) {
+  if (testingRun.state === "SCHEDULED" && testingRun.periodInSeconds !== 0) {
     return 'Recurring';
   }
   return 'One-time'
