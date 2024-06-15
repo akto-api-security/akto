@@ -243,7 +243,15 @@ public class DbAction extends ActionSupport {
     
                 DbLayer.bulkWriteSingleTypeInfo(writes);
             } catch (Exception e) {
-                System.out.println("Error" + e.toString());
+                String err = "Error: ";
+                if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
+                    StackTraceElement stackTraceElement = e.getStackTrace()[0];
+                    err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+                } else {
+                    err = String.format("Err msg: %s\nStackTrace not available", err);
+                    e.printStackTrace();
+                }
+                System.out.println(err);
                 return Action.ERROR.toUpperCase();
             }
         }
@@ -297,6 +305,15 @@ public class DbAction extends ActionSupport {
                 }
                 DbLayer.bulkWriteSampleData(writes);
             } catch (Exception e) {
+                String err = "Error: ";
+                if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
+                    StackTraceElement stackTraceElement = e.getStackTrace()[0];
+                    err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+                } else {
+                    err = String.format("Err msg: %s\nStackTrace not available", err);
+                    e.printStackTrace();
+                }
+                System.out.println(err);
                 return Action.ERROR.toUpperCase();
             }
         }
@@ -361,6 +378,15 @@ public class DbAction extends ActionSupport {
                 }
                 DbLayer.bulkWriteSensitiveSampleData(writes);
             } catch (Exception e) {
+                String err = "Error: ";
+                if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
+                    StackTraceElement stackTraceElement = e.getStackTrace()[0];
+                    err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+                } else {
+                    err = String.format("Err msg: %s\nStackTrace not available", err);
+                    e.printStackTrace();
+                }
+                System.out.println(err);
                 return Action.ERROR.toUpperCase();
             }
         }
@@ -404,6 +430,15 @@ public class DbAction extends ActionSupport {
                 }
                 DbLayer.bulkWriteTrafficInfo(writes);
             } catch (Exception e) {
+                String err = "Error: ";
+                if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
+                    StackTraceElement stackTraceElement = e.getStackTrace()[0];
+                    err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+                } else {
+                    err = String.format("Err msg: %s\nStackTrace not available", err);
+                    e.printStackTrace();
+                }
+                System.out.println(err);
                 return Action.ERROR.toUpperCase();
             }
         }
@@ -447,6 +482,15 @@ public class DbAction extends ActionSupport {
                 }
                 DbLayer.bulkWriteTrafficMetrics(writes);
             } catch (Exception e) {
+                String err = "Error: ";
+                if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
+                    StackTraceElement stackTraceElement = e.getStackTrace()[0];
+                    err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+                } else {
+                    err = String.format("Err msg: %s\nStackTrace not available", err);
+                    e.printStackTrace();
+                }
+                System.out.println(err);
                 return Action.ERROR.toUpperCase();
             }
         }
@@ -492,6 +536,15 @@ public class DbAction extends ActionSupport {
                 }
                 DbLayer.bulkWriteSensitiveParamInfo(writes);
             } catch (Exception e) {
+                String err = "Error: ";
+                if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
+                    StackTraceElement stackTraceElement = e.getStackTrace()[0];
+                    err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+                } else {
+                    err = String.format("Err msg: %s\nStackTrace not available", err);
+                    e.printStackTrace();
+                }
+                System.out.println(err);
                 return Action.ERROR.toUpperCase();
             }
         }
