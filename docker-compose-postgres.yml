@@ -14,9 +14,9 @@ services:
       timeout: 5s
       retries: 10
     volumes:
-      - pgdata3:/var/lib/postgresql/data 
+      - pgdata:/var/lib/postgresql/data 
     ports: 
       - 5432:5432
  
 volumes:
-  pgdata3:
+  pgdata:
