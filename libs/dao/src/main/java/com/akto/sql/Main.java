@@ -80,6 +80,9 @@ public class Main {
     private static DataSource createDataSource() {
         final String url = connectionUri;
         final PGSimpleDataSource dataSource = new PGSimpleDataSource();
+        if (connectionUri == null || user == null || password == null) {
+            return dataSource;
+        }
         dataSource.setUrl(url);
         dataSource.setUser(user);
         dataSource.setPassword(password);
