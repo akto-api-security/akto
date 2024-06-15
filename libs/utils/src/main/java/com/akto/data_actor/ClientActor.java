@@ -50,7 +50,7 @@ import com.google.gson.Gson;
 
 public class ClientActor extends DataActor {
 
-    private static final int batchWriteLimit = 1000;
+    private static final int batchWriteLimit = 10;
     private static final String url = buildDbAbstractorUrl();
     private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class);
     private static final int maxConcurrentBatchWrites = 2;
