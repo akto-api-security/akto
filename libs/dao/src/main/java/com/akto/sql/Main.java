@@ -15,11 +15,14 @@ import com.akto.dto.sql.SampleDataAlt;
 
 public class Main {
 
-    final static String connectionUri = System.getenv("POSTGRES_URL");
+    final static String connectionUri = 
+    System.getenv("POSTGRES_URL");
     // "jdbc:postgresql://localhost:5432/shivansh";
-    final static String user = System.getenv("POSTGRES_USER");
+    final static String user = 
+    System.getenv("POSTGRES_USER");
     // "shivansh";
-    final static String password = System.getenv("POSTGRES_PASSWORD");
+    final static String password = 
+    System.getenv("POSTGRES_PASSWORD");
     // "example";
 
     public static void main(String args[]) {
@@ -43,17 +46,35 @@ public class Main {
 
         // createSampleDataTable();
         try {
-            SampleDataAlt s1 = new SampleDataAlt(UUID.randomUUID(), "sample 2", 123, "GET", "/api/shivansh", -1, Context.now(), 1);
-            SampleDataAlt s2 = new SampleDataAlt(UUID.randomUUID(), "sample 1", 123, "GET", "/api/shivansh", -1, Context.now(), 1);
+            // SampleDataAlt s1 = new SampleDataAlt(UUID.randomUUID(), "sample 2", 123, "GET", "/api/shivansh", -1, Context.now(), 1);
+            // SampleDataAlt s2 = new SampleDataAlt(UUID.randomUUID(), "sample 1", 123, "GET", "/api/shivansh", -1, Context.now(), 1);
 
-            List<SampleDataAlt> list = new ArrayList<>();
-            list.add(s1);
-            list.add(s2);
-            SampleDataAltDb.bulkInsert(list);
+            // List<SampleDataAlt> list = new ArrayList<>();
+            // list.add(s1);
+            // list.add(s2);
+            // SampleDataAltDb.bulkInsert(list);
+        int limit = 5;
+        int skip = 0;
+        List<String> ids = SampleDataAltDb.iterateAndGetIds(limit, skip);
+        while (ids != null && !ids.isEmpty()) {
+
+            System.out.println(ids);
+            skip += limit;
+            ids = SampleDataAltDb.iterateAndGetIds(limit, skip);
+        }
+        ids = new ArrayList<>();
+        ids.add("f475af40-b533-409c-8def-f7d818be880f");
+        ids.add("0e83a826-369c-4a34-99ee-0c6bce494e1c");
+
+        SampleDataAltDb.delete(ids, 1718426392);
+
         } catch (Exception e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
+
+        
+
     }
 
     private static DataSource createDataSource() {

@@ -1103,8 +1103,14 @@ public class ClientActor extends DataActor {
 
     public Map<String, List<String>> buildHeaders() {
         Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Authorization", Collections.singletonList(System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));
+        headers.put(AUTHORIZATION, Collections.singletonList(getAuthToken()));
         return headers;
+    }
+
+    public static final String AUTHORIZATION = "Authorization";
+
+    public static String getAuthToken() {
+        return System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
     }
 
 }
