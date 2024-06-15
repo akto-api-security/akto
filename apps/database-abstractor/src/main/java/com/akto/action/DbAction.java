@@ -12,6 +12,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.utils.KafkaUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -70,6 +71,7 @@ public class DbAction extends ActionSupport {
 
     private static final Gson gson = new Gson();
     ObjectMapper objectMapper = new ObjectMapper();
+    KafkaUtils kafkaUtils = new KafkaUtils();
 
     public String fetchCustomDataTypes() {
         try {
@@ -170,295 +172,326 @@ public class DbAction extends ActionSupport {
 
     public String bulkWriteSti() {
         System.out.println("bulkWriteSti called");
-        try {
-            ArrayList<WriteModel<SingleTypeInfo>> writes = new ArrayList<>();
-            for (BulkUpdates bulkUpdate: writesForSti) {
-                List<Bson> filters = new ArrayList<>();
-                for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
-                    if (entry.getKey().equalsIgnoreCase("isUrlParam")) {
-                        continue;
-                    }
-                    if (entry.getKey().equalsIgnoreCase("apiCollectionId") || entry.getKey().equalsIgnoreCase("responseCode")) {
-                        Long val = (Long) entry.getValue();
-                        filters.add(Filters.eq(entry.getKey(), val.intValue()));
-                    } else {
-                        filters.add(Filters.eq(entry.getKey(), entry.getValue()));
-                    }
-                }
-                List<Boolean> urlParamQuery;
-                if ((Boolean) bulkUpdate.getFilters().get("isUrlParam") == true) {
-                    urlParamQuery = Collections.singletonList(true);
-                } else {
-                    urlParamQuery = Arrays.asList(false, null);
-                }
-                filters.add(Filters.in("isUrlParam", urlParamQuery));
-                List<String> updatePayloadList = bulkUpdate.getUpdates();
 
-                List<Bson> updates = new ArrayList<>();
-                boolean isDeleteWrite = false;
-                for (String payload: updatePayloadList) {
-                    Map<String, Object> json = gson.fromJson(payload, Map.class);
-                    String operation = (String) json.get("op");
-                    if (operation.equalsIgnoreCase("delete")) {
-                        isDeleteWrite = true;
-                    } else {
-                        String field = (String) json.get("field");
-                        Double val = (Double) json.get("val");
-                        if (field.equalsIgnoreCase("count")) {
-                            updates.add(Updates.inc(field, val.intValue()));
-                        } else if (field.equalsIgnoreCase("timestamp")) {
-                            updates.add(Updates.setOnInsert(field, val.intValue()));
-                        } else if (field.equalsIgnoreCase(SingleTypeInfo.LAST_SEEN)) {
-                            updates.add(Updates.max(field, val.longValue()));
-                        } else if (field.equalsIgnoreCase(SingleTypeInfo.MAX_VALUE)) {
-                            updates.add(Updates.max(field, val.longValue()));
-                        } else if (field.equalsIgnoreCase(SingleTypeInfo.MIN_VALUE)) {
-                            updates.add(Updates.min(field, val.longValue()));
-                        } else if (field.equalsIgnoreCase("collectionIds")) {
-                            updates.add(Updates.setOnInsert(field, Arrays.asList(val.intValue())));
+        if (kafkaUtils.isWriteEnabled()) {
+            int accId = Context.accountId.get();
+            kafkaUtils.insertData(writesForSti, "bulkWriteSti", accId);
+        } else {
+            try {
+                ArrayList<WriteModel<SingleTypeInfo>> writes = new ArrayList<>();
+                for (BulkUpdates bulkUpdate: writesForSti) {
+                    List<Bson> filters = new ArrayList<>();
+                    for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
+                        if (entry.getKey().equalsIgnoreCase("isUrlParam")) {
+                            continue;
+                        }
+                        if (entry.getKey().equalsIgnoreCase("apiCollectionId") || entry.getKey().equalsIgnoreCase("responseCode")) {
+                            Long val = (Long) entry.getValue();
+                            filters.add(Filters.eq(entry.getKey(), val.intValue()));
+                        } else {
+                            filters.add(Filters.eq(entry.getKey(), entry.getValue()));
                         }
                     }
+                    List<Boolean> urlParamQuery;
+                    if ((Boolean) bulkUpdate.getFilters().get("isUrlParam") == true) {
+                        urlParamQuery = Collections.singletonList(true);
+                    } else {
+                        urlParamQuery = Arrays.asList(false, null);
+                    }
+                    filters.add(Filters.in("isUrlParam", urlParamQuery));
+                    List<String> updatePayloadList = bulkUpdate.getUpdates();
+    
+                    List<Bson> updates = new ArrayList<>();
+                    boolean isDeleteWrite = false;
+                    for (String payload: updatePayloadList) {
+                        Map<String, Object> json = gson.fromJson(payload, Map.class);
+                        String operation = (String) json.get("op");
+                        if (operation.equalsIgnoreCase("delete")) {
+                            isDeleteWrite = true;
+                        } else {
+                            String field = (String) json.get("field");
+                            Double val = (Double) json.get("val");
+                            if (field.equalsIgnoreCase("count")) {
+                                updates.add(Updates.inc(field, val.intValue()));
+                            } else if (field.equalsIgnoreCase("timestamp")) {
+                                updates.add(Updates.setOnInsert(field, val.intValue()));
+                            } else if (field.equalsIgnoreCase(SingleTypeInfo.LAST_SEEN)) {
+                                updates.add(Updates.max(field, val.longValue()));
+                            } else if (field.equalsIgnoreCase(SingleTypeInfo.MAX_VALUE)) {
+                                updates.add(Updates.max(field, val.longValue()));
+                            } else if (field.equalsIgnoreCase(SingleTypeInfo.MIN_VALUE)) {
+                                updates.add(Updates.min(field, val.longValue()));
+                            } else if (field.equalsIgnoreCase("collectionIds")) {
+                                updates.add(Updates.setOnInsert(field, Arrays.asList(val.intValue())));
+                            }
+                        }
+                    }
+    
+                    System.out.println(filters);
+    
+                    if (isDeleteWrite) {
+                        writes.add(
+                                new DeleteOneModel<>(Filters.and(filters), new DeleteOptions())
+                        );
+                    } else {
+                        writes.add(
+                                new UpdateOneModel<>(Filters.and(filters), Updates.combine(updates), new UpdateOptions().upsert(true))
+                        );
+                    }
                 }
-
-                System.out.println(filters);
-
-                if (isDeleteWrite) {
-                    writes.add(
-                            new DeleteOneModel<>(Filters.and(filters), new DeleteOptions())
-                    );
-                } else {
-                    writes.add(
-                            new UpdateOneModel<>(Filters.and(filters), Updates.combine(updates), new UpdateOptions().upsert(true))
-                    );
-                }
+    
+                DbLayer.bulkWriteSingleTypeInfo(writes);
+            } catch (Exception e) {
+                return Action.ERROR.toUpperCase();
             }
-
-            DbLayer.bulkWriteSingleTypeInfo(writes);
-        } catch (Exception e) {
-            return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
     }
 
     public String bulkWriteSampleData() {
-        try {
-            System.out.println("called");
-            ArrayList<WriteModel<SampleData>> writes = new ArrayList<>();
-            for (BulkUpdates bulkUpdate: writesForSampleData) {
-                Map<String, Object> mObj = (Map) bulkUpdate.getFilters().get("_id");
-                Long apiCollectionId = (Long) mObj.get("apiCollectionId");
-                Long bucketEndEpoch = (Long) mObj.get("bucketEndEpoch");
-                Long bucketStartEpoch = (Long) mObj.get("bucketStartEpoch");
-                Long responseCode = (Long) mObj.get("responseCode");
-
-                Bson filters = Filters.and(Filters.eq("_id.apiCollectionId", apiCollectionId.intValue()),
-                        Filters.eq("_id.bucketEndEpoch", bucketEndEpoch.intValue()),
-                        Filters.eq("_id.bucketStartEpoch", bucketStartEpoch.intValue()),
-                        Filters.eq("_id.method", mObj.get("method")),
-                        Filters.eq("_id.responseCode", responseCode.intValue()),
-                        Filters.eq("_id.url", mObj.get("url")));
-                List<String> updatePayloadList = bulkUpdate.getUpdates();
-
-                List<Bson> updates = new ArrayList<>();
-                for (String payload: updatePayloadList) {
-                    Map<String, Object> json = gson.fromJson(payload, Map.class);
-                    String field = (String) json.get("field");
-                    UpdatePayload updatePayload;
-                    if (field.equals("collectionIds")) {
-                        List<Double> dVal = (List) json.get("val");
-                        List<Integer> val = new ArrayList<>();
-                        for (int i = 0; i < dVal.size(); i++) {
-                            val.add(dVal.get(i).intValue());
-                        }
-                        updates.add(Updates.setOnInsert(field, val));
-                    } else {
-                        List<String> dVal = (List) json.get("val");
-                        updatePayload = new UpdatePayload((String) json.get("field"), dVal , (String) json.get("op"));
-                        updates.add(Updates.pushEach(updatePayload.getField(), dVal, new PushOptions().slice(-10)));
-                    }
-                }
-                writes.add(
-                        new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
-                );
-            }
-            DbLayer.bulkWriteSampleData(writes);
-        } catch (Exception e) {
-            return Action.ERROR.toUpperCase();
-        }
-        return Action.SUCCESS.toUpperCase();
-    }
-
-    public String bulkWriteSensitiveSampleData() {
-        try {
-            System.out.println("bulkWriteSensitiveSampleData called");
-            ArrayList<WriteModel<SensitiveSampleData>> writes = new ArrayList<>();
-            for (BulkUpdates bulkUpdate: writesForSensitiveSampleData) {
-                Bson filters = Filters.empty();
-                for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
-                    if (entry.getKey().equalsIgnoreCase("_id.apiCollectionId") || entry.getKey().equalsIgnoreCase("_id.responseCode")) {
-                        Long val = (Long) entry.getValue();
-                        filters = Filters.and(filters, Filters.eq(entry.getKey(), val.intValue()));
-                    } else {
-                        filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
-                    }
-                }
-                List<String> updatePayloadList = bulkUpdate.getUpdates();
-
-                boolean isDeleteWrite = false;
-                List<Bson> updates = new ArrayList<>();
-
-                for (String payload: updatePayloadList) {
-                    Map<String, Object> json = gson.fromJson(payload, Map.class);
-                    String operation = (String) json.get("op");
-                    if (operation.equalsIgnoreCase("delete")) {
-                        isDeleteWrite = true;
-                    } else {
+        if (kafkaUtils.isWriteEnabled()) {
+            int accId = Context.accountId.get();
+            kafkaUtils.insertData(writesForSampleData, "bulkWriteSampleData", accId);
+        } else {
+            try {
+                System.out.println("called");
+                ArrayList<WriteModel<SampleData>> writes = new ArrayList<>();
+                for (BulkUpdates bulkUpdate: writesForSampleData) {
+                    Map<String, Object> mObj = (Map) bulkUpdate.getFilters().get("_id");
+                    Long apiCollectionId = (Long) mObj.get("apiCollectionId");
+                    Long bucketEndEpoch = (Long) mObj.get("bucketEndEpoch");
+                    Long bucketStartEpoch = (Long) mObj.get("bucketStartEpoch");
+                    Long responseCode = (Long) mObj.get("responseCode");
+    
+                    Bson filters = Filters.and(Filters.eq("_id.apiCollectionId", apiCollectionId.intValue()),
+                            Filters.eq("_id.bucketEndEpoch", bucketEndEpoch.intValue()),
+                            Filters.eq("_id.bucketStartEpoch", bucketStartEpoch.intValue()),
+                            Filters.eq("_id.method", mObj.get("method")),
+                            Filters.eq("_id.responseCode", responseCode.intValue()),
+                            Filters.eq("_id.url", mObj.get("url")));
+                    List<String> updatePayloadList = bulkUpdate.getUpdates();
+    
+                    List<Bson> updates = new ArrayList<>();
+                    for (String payload: updatePayloadList) {
+                        Map<String, Object> json = gson.fromJson(payload, Map.class);
                         String field = (String) json.get("field");
-                        Bson bson;
+                        UpdatePayload updatePayload;
                         if (field.equals("collectionIds")) {
                             List<Double> dVal = (List) json.get("val");
                             List<Integer> val = new ArrayList<>();
                             for (int i = 0; i < dVal.size(); i++) {
                                 val.add(dVal.get(i).intValue());
                             }
-                            
-                            bson = Updates.setOnInsert(field, val);
+                            updates.add(Updates.setOnInsert(field, val));
                         } else {
-                            bson = Updates.pushEach((String) json.get("field"), (ArrayList) json.get("val"), new PushOptions().slice(-1 * SensitiveSampleData.cap));
-                        }    
-                        updates.add(bson);
+                            List<String> dVal = (List) json.get("val");
+                            updatePayload = new UpdatePayload((String) json.get("field"), dVal , (String) json.get("op"));
+                            updates.add(Updates.pushEach(updatePayload.getField(), dVal, new PushOptions().slice(-10)));
+                        }
+                    }
+                    writes.add(
+                            new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
+                    );
+                }
+                DbLayer.bulkWriteSampleData(writes);
+            } catch (Exception e) {
+                return Action.ERROR.toUpperCase();
+            }
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String bulkWriteSensitiveSampleData() {
+        if (kafkaUtils.isWriteEnabled()) {
+            int accId = Context.accountId.get();
+            kafkaUtils.insertData(writesForSensitiveSampleData, "bulkWriteSensitiveSampleData", accId);
+        } else {
+            try {
+                System.out.println("bulkWriteSensitiveSampleData called");
+                ArrayList<WriteModel<SensitiveSampleData>> writes = new ArrayList<>();
+                for (BulkUpdates bulkUpdate: writesForSensitiveSampleData) {
+                    Bson filters = Filters.empty();
+                    for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
+                        if (entry.getKey().equalsIgnoreCase("_id.apiCollectionId") || entry.getKey().equalsIgnoreCase("_id.responseCode")) {
+                            Long val = (Long) entry.getValue();
+                            filters = Filters.and(filters, Filters.eq(entry.getKey(), val.intValue()));
+                        } else {
+                            filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
+                        }
+                    }
+                    List<String> updatePayloadList = bulkUpdate.getUpdates();
+    
+                    boolean isDeleteWrite = false;
+                    List<Bson> updates = new ArrayList<>();
+    
+                    for (String payload: updatePayloadList) {
+                        Map<String, Object> json = gson.fromJson(payload, Map.class);
+                        String operation = (String) json.get("op");
+                        if (operation.equalsIgnoreCase("delete")) {
+                            isDeleteWrite = true;
+                        } else {
+                            String field = (String) json.get("field");
+                            Bson bson;
+                            if (field.equals("collectionIds")) {
+                                List<Double> dVal = (List) json.get("val");
+                                List<Integer> val = new ArrayList<>();
+                                for (int i = 0; i < dVal.size(); i++) {
+                                    val.add(dVal.get(i).intValue());
+                                }
+                                
+                                bson = Updates.setOnInsert(field, val);
+                            } else {
+                                bson = Updates.pushEach((String) json.get("field"), (ArrayList) json.get("val"), new PushOptions().slice(-1 * SensitiveSampleData.cap));
+                            }    
+                            updates.add(bson);
+                        }
+                    }
+    
+                    if (isDeleteWrite) {
+                        writes.add(
+                            new DeleteOneModel<>(filters, new DeleteOptions())
+                        );
+                    } else {
+                        writes.add(
+                            new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
+                        );
                     }
                 }
-
-                if (isDeleteWrite) {
-                    writes.add(
-                        new DeleteOneModel<>(filters, new DeleteOptions())
-                    );
-                } else {
-                    writes.add(
-                        new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
-                    );
-                }
+                DbLayer.bulkWriteSensitiveSampleData(writes);
+            } catch (Exception e) {
+                return Action.ERROR.toUpperCase();
             }
-            DbLayer.bulkWriteSensitiveSampleData(writes);
-        } catch (Exception e) {
-            return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
     }
 
     public String bulkWriteTrafficInfo() {
-        try {
-            System.out.println("bulkWriteTrafficInfo called");
-            ArrayList<WriteModel<TrafficInfo>> writes = new ArrayList<>();
-            for (BulkUpdates bulkUpdate: writesForTrafficInfo) {
-                Bson filters = Filters.eq("_id", bulkUpdate.getFilters().get("_id"));
-                List<String> updatePayloadList = bulkUpdate.getUpdates();
-
-                List<Bson> updates = new ArrayList<>();                
-                for (String payload: updatePayloadList) {
-                    Map<String, Object> json = gson.fromJson(payload, Map.class);
-
-                    String field = (String) json.get("field");
-                    if (field.equals("collectionIds")) {
-                        List<Double> dVal = (List) json.get("val");
-                        List<Integer> val = new ArrayList<>();
-                        for (int i = 0; i < dVal.size(); i++) {
-                            val.add(dVal.get(i).intValue());
+        if (kafkaUtils.isWriteEnabled()) {
+            int accId = Context.accountId.get();
+            kafkaUtils.insertData(writesForTrafficInfo, "bulkWriteTrafficInfo", accId);
+        } else {
+            try {
+                System.out.println("bulkWriteTrafficInfo called");
+                ArrayList<WriteModel<TrafficInfo>> writes = new ArrayList<>();
+                for (BulkUpdates bulkUpdate: writesForTrafficInfo) {
+                    Bson filters = Filters.eq("_id", bulkUpdate.getFilters().get("_id"));
+                    List<String> updatePayloadList = bulkUpdate.getUpdates();
+    
+                    List<Bson> updates = new ArrayList<>();                
+                    for (String payload: updatePayloadList) {
+                        Map<String, Object> json = gson.fromJson(payload, Map.class);
+    
+                        String field = (String) json.get("field");
+                        if (field.equals("collectionIds")) {
+                            List<Double> dVal = (List) json.get("val");
+                            List<Integer> val = new ArrayList<>();
+                            for (int i = 0; i < dVal.size(); i++) {
+                                val.add(dVal.get(i).intValue());
+                            }
+                            updates.add(Updates.setOnInsert(field, val));
+                        } else {
+                            Double dVal = (Double) json.get("val");
+                            UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal.intValue() , (String) json.get("op"));
+                            updates.add(Updates.inc(updatePayload.getField(), (Integer) updatePayload.getVal()));
                         }
-                        updates.add(Updates.setOnInsert(field, val));
-                    } else {
-                        Double dVal = (Double) json.get("val");
-                        UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal.intValue() , (String) json.get("op"));
-                        updates.add(Updates.inc(updatePayload.getField(), (Integer) updatePayload.getVal()));
                     }
+    
+                    writes.add(
+                            new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
+                    );
                 }
-
-                writes.add(
-                        new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
-                );
+                DbLayer.bulkWriteTrafficInfo(writes);
+            } catch (Exception e) {
+                return Action.ERROR.toUpperCase();
             }
-            DbLayer.bulkWriteTrafficInfo(writes);
-        } catch (Exception e) {
-            return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
     }
 
     public String bulkWriteTrafficMetrics() {
-        try {
-            System.out.println("bulkWriteTrafficInfo called");
-            ArrayList<WriteModel<TrafficMetrics>> writes = new ArrayList<>();
-            for (BulkUpdates bulkUpdate: writesForTrafficMetrics) {
-                
-                Bson filters = Filters.empty();
-                for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
-                    if (entry.getKey().equalsIgnoreCase("_id.bucketStartEpoch") || entry.getKey().equalsIgnoreCase("_id.bucketEndEpoch") || entry.getKey().equalsIgnoreCase("_id.vxlanID")) {
-                        Long val = (Long) entry.getValue();
-                        filters = Filters.and(filters, Filters.eq(entry.getKey(), val.intValue()));
-                    } else {
-                        filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
+        if (kafkaUtils.isWriteEnabled()) {
+            int accId = Context.accountId.get();
+            kafkaUtils.insertData(writesForTrafficMetrics, "bulkWriteTrafficMetrics", accId);
+        } else {
+            try {
+                System.out.println("bulkWriteTrafficInfo called");
+                ArrayList<WriteModel<TrafficMetrics>> writes = new ArrayList<>();
+                for (BulkUpdates bulkUpdate: writesForTrafficMetrics) {
+                    
+                    Bson filters = Filters.empty();
+                    for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
+                        if (entry.getKey().equalsIgnoreCase("_id.bucketStartEpoch") || entry.getKey().equalsIgnoreCase("_id.bucketEndEpoch") || entry.getKey().equalsIgnoreCase("_id.vxlanID")) {
+                            Long val = (Long) entry.getValue();
+                            filters = Filters.and(filters, Filters.eq(entry.getKey(), val.intValue()));
+                        } else {
+                            filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
+                        }
                     }
+    
+                    //Bson filters = Filters.eq("_id", bulkUpdate.getFilters().get("_id"));
+                    List<String> updatePayloadList = bulkUpdate.getUpdates();
+    
+                    List<Bson> updates = new ArrayList<>();                
+                    for (String payload: updatePayloadList) {
+                        Map<String, Object> json = gson.fromJson(payload, Map.class);
+                        Double dVal = (Double) json.get("val");
+                        UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal.intValue() , (String) json.get("op"));
+                        updates.add(Updates.inc(updatePayload.getField(), (Integer) updatePayload.getVal()));
+                    }
+    
+                    writes.add(
+                            new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
+                    );
                 }
-
-                //Bson filters = Filters.eq("_id", bulkUpdate.getFilters().get("_id"));
-                List<String> updatePayloadList = bulkUpdate.getUpdates();
-
-                List<Bson> updates = new ArrayList<>();                
-                for (String payload: updatePayloadList) {
-                    Map<String, Object> json = gson.fromJson(payload, Map.class);
-                    Double dVal = (Double) json.get("val");
-                    UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal.intValue() , (String) json.get("op"));
-                    updates.add(Updates.inc(updatePayload.getField(), (Integer) updatePayload.getVal()));
-                }
-
-                writes.add(
-                        new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
-                );
+                DbLayer.bulkWriteTrafficMetrics(writes);
+            } catch (Exception e) {
+                return Action.ERROR.toUpperCase();
             }
-            DbLayer.bulkWriteTrafficMetrics(writes);
-        } catch (Exception e) {
-            return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
     }
 
     public String bulkWriteSensitiveParamInfo() {
-        try {
-            ArrayList<WriteModel<SensitiveParamInfo>> writes = new ArrayList<>();
-            for (BulkUpdates bulkUpdate: writesForSensitiveParamInfo) {
-                Bson filters = Filters.empty();
-                for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
-                    filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
-                }
-                List<String> updatePayloadList = bulkUpdate.getUpdates();
-
-                List<Bson> updates = new ArrayList<>();
-                for (String payload: updatePayloadList) {
-                    Map<String, Object> json = gson.fromJson(payload, Map.class);
-
-                    String field = (String) json.get("field");
-                    if (field.equals("collectionIds")) {
-                        List<Double> dVal = (List) json.get("val");
-                        List<Integer> val = new ArrayList<>();
-                        for (int i = 0; i < dVal.size(); i++) {
-                            val.add(dVal.get(i).intValue());
-                        }
-                        updates.add(Updates.setOnInsert(field, val));
-                    } else {
-                        boolean dVal = (boolean) json.get("val");
-                        UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
-                        updates.add(Updates.set(updatePayload.getField(), dVal));
+        if (kafkaUtils.isWriteEnabled()) {
+            int accId = Context.accountId.get();
+            kafkaUtils.insertData(writesForSensitiveParamInfo, "bulkWriteSensitiveParamInfo", accId);
+        } else {
+            try {
+                ArrayList<WriteModel<SensitiveParamInfo>> writes = new ArrayList<>();
+                for (BulkUpdates bulkUpdate: writesForSensitiveParamInfo) {
+                    Bson filters = Filters.empty();
+                    for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
+                        filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
                     }
+                    List<String> updatePayloadList = bulkUpdate.getUpdates();
+    
+                    List<Bson> updates = new ArrayList<>();
+                    for (String payload: updatePayloadList) {
+                        Map<String, Object> json = gson.fromJson(payload, Map.class);
+    
+                        String field = (String) json.get("field");
+                        if (field.equals("collectionIds")) {
+                            List<Double> dVal = (List) json.get("val");
+                            List<Integer> val = new ArrayList<>();
+                            for (int i = 0; i < dVal.size(); i++) {
+                                val.add(dVal.get(i).intValue());
+                            }
+                            updates.add(Updates.setOnInsert(field, val));
+                        } else {
+                            boolean dVal = (boolean) json.get("val");
+                            UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
+                            updates.add(Updates.set(updatePayload.getField(), dVal));
+                        }
+                    }
+    
+                    writes.add(
+                            new UpdateOneModel<>(filters, updates, new UpdateOptions().upsert(true))
+                    );
                 }
-
-                writes.add(
-                        new UpdateOneModel<>(filters, updates, new UpdateOptions().upsert(true))
-                );
+                DbLayer.bulkWriteSensitiveParamInfo(writes);
+            } catch (Exception e) {
+                return Action.ERROR.toUpperCase();
             }
-            DbLayer.bulkWriteSensitiveParamInfo(writes);
-        } catch (Exception e) {
-            return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
     }
