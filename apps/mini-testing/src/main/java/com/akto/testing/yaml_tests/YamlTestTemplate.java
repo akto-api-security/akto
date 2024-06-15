@@ -55,12 +55,12 @@ public class YamlTestTemplate extends SecurityTestTemplate {
             // loggerMaker.infoAndAddToDb("running noAuth check " + logId, LogDb.TESTING);
             ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy(), this.testingRunConfig, this.customAuthTypes, debug, testLogs);
             if(res.getSuccess()) {
-                OriginalHttpResponse resp = res.getResponse().;
-                int statusCode = StatusCodeAnalyser.getStatusCode(resp.getBody(), resp.getStatusCode());
-                if (statusCode >= 200 && statusCode < 300) {
+                // OriginalHttpResponse resp = res.getResponse().;
+                // int statusCode = StatusCodeAnalyser.getStatusCode(resp.getBody(), resp.getStatusCode());
+                // if (statusCode >= 200 && statusCode < 300) {
                     // loggerMaker.infoAndAddToDb("noAuth check failed, skipping execution " + logId, LogDb.TESTING);
-                    return false;
-                }
+                    // return false;
+                // }
             }
         }
         return true;
