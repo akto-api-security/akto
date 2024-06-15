@@ -45,33 +45,33 @@ public class Main {
         // System.out.println("Opened database successfully");
 
         // createSampleDataTable();
-        try {
-            // SampleDataAlt s1 = new SampleDataAlt(UUID.randomUUID(), "sample 2", 123, "GET", "/api/shivansh", -1, Context.now(), 1);
-            // SampleDataAlt s2 = new SampleDataAlt(UUID.randomUUID(), "sample 1", 123, "GET", "/api/shivansh", -1, Context.now(), 1);
+        // try {
+        //     // SampleDataAlt s1 = new SampleDataAlt(UUID.randomUUID(), "sample 2", 123, "GET", "/api/shivansh", -1, Context.now(), 1);
+        //     // SampleDataAlt s2 = new SampleDataAlt(UUID.randomUUID(), "sample 1", 123, "GET", "/api/shivansh", -1, Context.now(), 1);
 
-            // List<SampleDataAlt> list = new ArrayList<>();
-            // list.add(s1);
-            // list.add(s2);
-            // SampleDataAltDb.bulkInsert(list);
-        int limit = 5;
-        int skip = 0;
-        List<String> ids = SampleDataAltDb.iterateAndGetIds(limit, skip);
-        while (ids != null && !ids.isEmpty()) {
+        //     // List<SampleDataAlt> list = new ArrayList<>();
+        //     // list.add(s1);
+        //     // list.add(s2);
+        //     // SampleDataAltDb.bulkInsert(list);
+        // int limit = 5;
+        // int skip = 0;
+        // List<String> ids = SampleDataAltDb.iterateAndGetIds(limit, skip);
+        // while (ids != null && !ids.isEmpty()) {
 
-            System.out.println(ids);
-            skip += limit;
-            ids = SampleDataAltDb.iterateAndGetIds(limit, skip);
-        }
-        ids = new ArrayList<>();
-        ids.add("f475af40-b533-409c-8def-f7d818be880f");
-        ids.add("0e83a826-369c-4a34-99ee-0c6bce494e1c");
+        //     System.out.println(ids);
+        //     skip += limit;
+        //     ids = SampleDataAltDb.iterateAndGetIds(limit, skip);
+        // }
+        // ids = new ArrayList<>();
+        // ids.add("f475af40-b533-409c-8def-f7d818be880f");
+        // ids.add("0e83a826-369c-4a34-99ee-0c6bce494e1c");
 
-        SampleDataAltDb.delete(ids, 1718426392);
+        // SampleDataAltDb.delete(ids, 1718426392);
 
-        } catch (Exception e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+        // } catch (Exception e) {
+        //     // TODO Auto-generated catch block
+        //     e.printStackTrace();
+        // }
 
         
 
@@ -91,29 +91,28 @@ public class Main {
         return ds.getConnection();
     }
 
-    private static void createSampleDataTable() {
+    public static void createSampleDataTable() {
         DataSource ds = createDataSource();
 
         try {
             Connection conn = ds.getConnection();
             PreparedStatement stmt = conn.prepareStatement(
-                    "CREATE TABLE SAMPLEDATA " +
+                    "CREATE TABLE IF NOT EXISTS SAMPLEDATA " +
                             "(ID UUID PRIMARY KEY NOT NULL," +
                             "SAMPLE TEXT NOT NULL," +
                             "API_COLLECTION_ID INT NOT NULL," +
                             " METHOD VARCHAR(50) NOT NULL," +
                             " URL VARCHAR(2083) NOT NULL," +
                             " RESPONSE_CODE INT NOT NULL," +
-                            // add account id.
+                            // add account id, if needed.
                             " TIMESTAMP INT NOT NULL)");
-            stmt.executeQuery();
+            stmt.executeUpdate();
             stmt.close();
             conn.close();
 
         } catch (Exception e) {
             e.printStackTrace();
             System.err.println(e.getClass().getName() + ": " + e.getMessage());
-            System.exit(0);
         }
     }
 
