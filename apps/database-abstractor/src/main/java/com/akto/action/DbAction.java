@@ -177,6 +177,7 @@ public class DbAction extends ActionSupport {
             int accId = Context.accountId.get();
             kafkaUtils.insertData(writesForSti, "bulkWriteSti", accId);
         } else {
+            System.out.println("Entering writes size: " + writesForSti.size());
             try {
                 ArrayList<WriteModel<SingleTypeInfo>> writes = new ArrayList<>();
                 for (BulkUpdates bulkUpdate: writesForSti) {
@@ -227,7 +228,7 @@ public class DbAction extends ActionSupport {
                         }
                     }
     
-                    System.out.println(filters);
+                    System.out.println("filters: " + filters.toString());
     
                     if (isDeleteWrite) {
                         writes.add(
@@ -242,6 +243,7 @@ public class DbAction extends ActionSupport {
     
                 DbLayer.bulkWriteSingleTypeInfo(writes);
             } catch (Exception e) {
+                System.out.println("Error" + e.toString());
                 return Action.ERROR.toUpperCase();
             }
         }
