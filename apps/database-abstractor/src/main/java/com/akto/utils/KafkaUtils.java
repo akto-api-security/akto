@@ -144,6 +144,8 @@ public class KafkaUtils {
         Context.accountId.set(accountId);
         List<BulkUpdates> bulkWrites = mapper.readValue(payload, new TypeReference<List<BulkUpdates>>(){});
 
+        logger.info("Account id: " + accountId + " trigger method: " + triggerMethod + " bulkWrites: " + bulkWrites);
+
         switch (triggerMethod) {
             case "bulkWriteSti":
                 dbAction.setWritesForSti(bulkWrites);
