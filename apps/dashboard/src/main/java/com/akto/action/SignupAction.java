@@ -359,8 +359,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     public static int findUsersLimit(String email) {
         HashMap<String, Integer> domainsToBaselineUsersMap = new HashMap<>();
-        domainsToBaselineUsersMap.put("loom.com", 1);
-        domainsToBaselineUsersMap.put("atlassian.com", 1);
+        domainsToBaselineUsersMap.put("loom.com", 50);
+        domainsToBaselineUsersMap.put("atlassian.com", 50);
 
         String[] emailSplit = email.split("@");
         if (emailSplit.length < 2) return 0;
