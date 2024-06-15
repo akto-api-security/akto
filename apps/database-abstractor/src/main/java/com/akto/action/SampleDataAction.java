@@ -1,9 +1,11 @@
 package com.akto.action;
 
+import java.io.ByteArrayOutputStream;
 import java.util.List;
-
 import com.akto.dao.SampleDataDao;
 import com.akto.dto.traffic.SampleData;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -16,22 +18,15 @@ import com.google.common.hash.Funnels;
 
 public class SampleDataAction extends ActionSupport {
 
-    BloomFilter<CharSequence> sampleIdsFilter;
-
-    public BloomFilter<CharSequence> getSampleIdsFilter() {
-        return sampleIdsFilter;
-    }
-
-    public void setSampleIdsFilter(BloomFilter<CharSequence> sampleIdsFilter) {
-        this.sampleIdsFilter = sampleIdsFilter;
-    }
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SampleDataAction.class, LogDb.DASHBOARD);
 
     final static int limit = 100;
 
     public String fetchSampleIdsFilter() {
 
-        sampleIdsFilter = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8),
-                1_000_000, 0.001);
+        // Expected max size 4-5 MiB
+        BloomFilter<CharSequence> sampleIdsFilter = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8),
+                1_000_000, 0.01);
 
         int skip = 0;
         List<SampleData> sampleDataList = SampleDataDao.instance.findAll(
@@ -56,7 +51,25 @@ public class SampleDataAction extends ActionSupport {
                     Projections.include(SampleData.SAMPLE_IDS));
         }
 
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            sampleIdsFilter.writeTo(out);
+            outStr = out.toByteArray();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Unable to write bloom filter");
+        }
+
         return Action.SUCCESS.toUpperCase();
+    }
+
+    byte[] outStr;
+
+    public byte[] getOutStr() {
+        return outStr;
+    }
+
+    public void setOutStr(byte[] outStr) {
+        this.outStr = outStr;
     }
 
 }

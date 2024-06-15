@@ -190,6 +190,8 @@ public class Main {
             }
         }, 5, 5, TimeUnit.MINUTES);
 
+        CleanPostgres.cleanPostgresCron();
+
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
         APIConfig apiConfig = dataActor.fetchApiConfig(configName);

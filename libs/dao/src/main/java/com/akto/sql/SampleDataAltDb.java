@@ -2,11 +2,13 @@ package com.akto.sql;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 import com.akto.dto.sql.SampleDataAlt;
 
@@ -45,15 +47,58 @@ public class SampleDataAltDb {
         }
     }
 
-    public static void delete(int accountId, List<String> uuidList) {
+    final static String DELETE_QUERY = "DELETE from sampledata WHERE timestamp < ? AND id IN (?";
+
+    public static void delete(List<String> uuidList, int timestamp) throws Exception {
+
+        if (uuidList == null || uuidList.isEmpty()) {
+            return;
+        }
+
+        String query = DELETE_QUERY;
+        for (int i = 1; i < uuidList.size(); i++) {
+            query += ",?";
+        }
+        query += ")";
+
+        try (Connection conn = Main.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+
+            stmt.setInt(1, timestamp);
+            // bind the values
+            for (int i = 0; i < uuidList.size(); i++) {
+                stmt.setObject(i + 2, UUID.fromString(uuidList.get(i)));
+            }
+
+            int count = stmt.executeUpdate();
+            System.out.println("Deleted " + count);
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
 
     }
 
     final static String ITERATE_QUERY = "SELECT id FROM sampledata ORDER BY id limit ? offset ?";
 
-    public static List<String> iterateAndGetIds(int accountId, int limit, int offset){
+    public static List<String> iterateAndGetIds(int limit, int offset) throws Exception {
         List<String> idList = new ArrayList<>();
 
+        try (Connection conn = Main.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(ITERATE_QUERY, Statement.RETURN_GENERATED_KEYS)) {
+
+            // bind the values
+            stmt.setInt(1, limit);
+            stmt.setInt(2, offset);
+
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                idList.add(rs.getString(1));
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
 
         return idList;
     }
