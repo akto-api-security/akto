@@ -45,8 +45,10 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     private ObjectId testRunResultSummaryId;
     @BsonIgnore
     private String testRunResultSummaryHexId;
-    private TestResult singleTestResult;
-    private MultiExecTestResult multiExecTestResult;
+    @BsonIgnore
+    private List<TestResult> singleTestResults;
+    @BsonIgnore
+    private List<MultiExecTestResult> multiExecTestResults;
 
     public static final String ERRORS_LIST = "errorsList";
     private  List<String> errorsList;
@@ -350,20 +352,19 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
         this.errorsList = errorsList;
     }
 
-    public TestResult getSingleTestResult() {
-        return singleTestResult;
+    public List<TestResult> getSingleTestResults() {
+        return singleTestResults;
     }
 
-    public void setSingleTestResult(TestResult singleTestResult) {
-        this.singleTestResult = singleTestResult;
+    public void setSingleTestResults(List<TestResult> singleTestResults) {
+        this.singleTestResults = singleTestResults;
+    }
+    public List<MultiExecTestResult> getMultiExecTestResults() {
+        return multiExecTestResults;
     }
 
-    public MultiExecTestResult getMultiExecTestResult() {
-        return multiExecTestResult;
-    }
-
-    public void setMultiExecTestResult(MultiExecTestResult multiExecTestResult) {
-        this.multiExecTestResult = multiExecTestResult;
+    public void setMultiExecTestResults(List<MultiExecTestResult> multiExecTestResults) {
+        this.multiExecTestResults = multiExecTestResults;
     }
 
 }
