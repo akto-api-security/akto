@@ -80,6 +80,13 @@ jobs:
           cd ../internal
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_2 . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-internal:$IMAGE_TAG"
+          cd ../mini-runtime
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG_1 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG_2 . --push
+          echo "::set-output name=image::$ECR_REGISTRY/mini-runtime:$IMAGE_TAG"
+          cd ../mini-testing
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG_1 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG_2 . --push
+          echo "::set-output name=image::$ECR_REGISTRY/mini-testing:$IMAGE_TAG"
+          
       - name: Push git tag
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.1
