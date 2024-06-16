@@ -35,9 +35,16 @@ public class RedactSampleData {
         return redact(HttpCallParser.parseKafkaMessage(sample), false);
     }
 
+    private static final String HOST = "host";
+
     private static void handleHeaders(Map<String, List<String>> responseHeaders, boolean redactAll) {
         if(redactAll){
-            responseHeaders.replaceAll((n, v) -> Collections.singletonList(redactValue));
+            for(String header: responseHeaders.keySet()){
+                if(header.equals(HOST)){
+                    continue;
+                }
+                responseHeaders.put(header, Collections.singletonList(redactValue));
+            }
             return;
         }
         Set<Map.Entry<String, List<String>>> entries = responseHeaders.entrySet();
@@ -46,6 +53,9 @@ public class RedactSampleData {
             List<String> values = entry.getValue();
             SingleTypeInfo.SubType subType = KeyTypes.findSubType(values.get(0), key, null);
             if(SingleTypeInfo.isRedacted(subType.getName())){
+                if(key.equals(HOST)){
+                    continue;
+                }
                 responseHeaders.put(key, Collections.singletonList(redactValue));
             }
         }
