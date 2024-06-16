@@ -103,4 +103,26 @@ public class SampleDataAltDb {
         return idList;
     }
 
+    final static String FIND_QUERY = "SELECT * FROM sampledata where id=?";
+
+    public static String find(String id) throws Exception {
+        String result = null;
+
+        try (Connection conn = Main.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(FIND_QUERY, Statement.RETURN_GENERATED_KEYS)) {
+
+                    stmt.setObject(1, UUID.fromString(id));
+
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                result = rs.getString(2);
+                // System.out.println(result);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return result;
+    }
 }

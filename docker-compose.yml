@@ -11,14 +11,14 @@ services:
     ports:
       - "27017:27017"
 
-  akto-api-security-dashboard:
-    image: coastaldemigod/dashboard
-    env_file: ./docker.env
-    restart: always
-    ports: 
-      - "8080:8080"
-    depends_on:
-      - mongo
+  # akto-api-security-dashboard:
+  #   image: coastaldemigod/dashboard
+  #   env_file: ./docker.env
+  #   restart: always
+  #   ports: 
+  #     - "8080:8080"
+  #   depends_on:
+  #     - mongo
     
   # akto-api-security-testing:
   #   image: aktosecurity/akto-api-testing:local
@@ -63,7 +63,7 @@ services:
       - "29092:29092"
       - "9999:9999"
     environment:
-      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_EXTERNAL_DIFFHOST://10.191.60.236:9092, LISTENER_DOCKER_INTERNAL://akto-kafka1-1:19092,LISTENER_DOCKER_EXTERNAL_LOCALHOST://localhost:29092
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_EXTERNAL_DIFFHOST://192.168.1.4:9092, LISTENER_DOCKER_INTERNAL://akto-kafka1-1:19092,LISTENER_DOCKER_EXTERNAL_LOCALHOST://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_EXTERNAL_DIFFHOST:PLAINTEXT, LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL_LOCALHOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
       KAFKA_ZOOKEEPER_CONNECT: "zoo1:2181"
@@ -103,13 +103,13 @@ services:
       - kafka1
     network_mode: host
 
-  akto-api-security-database-abstractor:
-    image: coastaldemigod/db-abs
-    env_file: ./docker.env
-    restart: always
-    mem_limit: 7g
-    ports: 
-      - "9000:8080"
+  # akto-api-security-database-abstractor:
+  #   image: coastaldemigod/db-abs
+  #   env_file: ./docker.env
+  #   restart: always
+  #   mem_limit: 7g
+  #   ports: 
+  #     - "9000:8080"
 
 volumes:
   mongodata:
