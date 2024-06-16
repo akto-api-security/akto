@@ -795,7 +795,7 @@ public class APICatalogSync {
                     String redactedSample = RedactSampleData.redactIfRequired(s, accountLevelRedact, apiCollectionLevelRedact);
                     finalSamples.add(redactedSample);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e,"Error while redacting data" , LogDb.RUNTIME)
+                    loggerMaker.errorAndAddToDb(e,"Error while redacting data 1" , LogDb.RUNTIME)
                     ;
                 }
             }
@@ -1357,7 +1357,7 @@ public class APICatalogSync {
                         Map<String, Object> json = gson.fromJson(redactedSample, Map.class);
                         UUID uuid = UUID.randomUUID();
                         json.put(AKTO_UUID, uuid);
-                        redactedSample = json.toString();
+                        redactedSample = gson.toJson(json);
                         int now = Context.now();
                         Key id = sample.getId();
                         int accountId = Context.accountId.get();
