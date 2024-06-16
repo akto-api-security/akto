@@ -108,7 +108,7 @@ public class TestingRunConfig {
     }
 
     public String getStrAuthMechanismId() {
-        if (strAuthMechanismId == null) {
+        if (strAuthMechanismId == null && this.authMechanismId!=null) {
             return this.authMechanismId.toHexString();
         }
         return strAuthMechanismId;

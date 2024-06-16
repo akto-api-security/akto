@@ -13,6 +13,8 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
+import com.akto.dto.testing.CollectionWiseTestingEndpoints;
+import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRun;
@@ -768,6 +770,16 @@ public class DbAction extends ActionSupport {
     public String findPendingTestingRun() {
         try {
             testingRun = DbLayer.findPendingTestingRun(delta);
+
+            /*
+             * There is a db call involved for collectionWiseTestingEndpoints, thus this hack. 
+             */
+            if(testingRun.getTestingEndpoints() instanceof CollectionWiseTestingEndpoints){
+                CollectionWiseTestingEndpoints ts = (CollectionWiseTestingEndpoints) testingRun.getTestingEndpoints();
+                CustomTestingEndpoints endpoints = new CustomTestingEndpoints(ts.returnApis());
+                testingRun.setTestingEndpoints(endpoints);
+            }
+
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -1102,6 +1114,23 @@ public class DbAction extends ActionSupport {
 
     public String insertTestingRunResults() {
         try {
+
+            if(testingRunResult.getSingleTestResults()!=null){
+                testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getSingleTestResults()));
+            }else if(testingRunResult.getMultiExecTestResults() !=null){
+                testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getMultiExecTestResults()));
+            }
+
+            if (testingRunResult.getTestRunHexId() != null) {
+                ObjectId id = new ObjectId(testingRunResult.getTestRunHexId());
+                testingRunResult.setTestRunId(id);
+            }
+
+            if (testingRunResult.getTestRunResultSummaryHexId() != null) {
+                ObjectId id = new ObjectId(testingRunResult.getTestRunResultSummaryHexId());
+                testingRunResult.setTestRunResultSummaryId(id);
+            }
+
             DbLayer.insertTestingRunResults(testingRunResult);
         } catch (Exception e) {
             System.out.println(e.getMessage());
