@@ -206,7 +206,9 @@ public class ApiExecutor {
 
         String url = prepareUrl(request, testingRunConfig);
 
-        loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
+        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog"))) {
+            loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
+        }
         request.setUrl(url);
 
         Request.Builder builder = new Request.Builder();
