@@ -12,6 +12,8 @@ public class Account {
     private int statusChangeTimestamp = 0;
 
     private boolean hybridSaasAccount;
+    public static final String HYBRID_TESTING_ENABLED = "hybridTestingEnabled";
+    private boolean hybridTestingEnabled;
     private boolean mergingRunning = false;
 
     private int mergingInitiateTs = 0;
@@ -92,6 +94,14 @@ public class Account {
 
     public void setHybridSaasAccount(boolean hybridSaasAccount) {
         this.hybridSaasAccount = hybridSaasAccount;
+    }
+
+    public boolean isHybridTestingEnabled() {
+        return hybridTestingEnabled;
+    }
+
+    public void setHybridTestingEnabled(boolean hybridTestingEnabled) {
+        this.hybridTestingEnabled = hybridTestingEnabled;
     }
 
 }
