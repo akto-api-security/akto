@@ -2387,7 +2387,14 @@ public class ClientActor extends DataActor {
     public ApiInfo fetchApiInfo(ApiInfo.ApiInfoKey apiInfoKey) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
-        obj.put("apiInfoKey", apiInfoKey);
+
+        BasicDBObject temp2 = new BasicDBObject();
+        ApiInfoKey key = apiInfoKey;
+        temp2.put(ApiInfoKey.API_COLLECTION_ID, key.getApiCollectionId());
+        temp2.put(ApiInfoKey.METHOD, key.getMethod().name());
+        temp2.put(ApiInfoKey.URL, key.getUrl());
+
+        obj.put("apiInfoKey", temp2);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchApiInfo", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
