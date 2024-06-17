@@ -366,6 +366,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         if (emailSplit.length < 2) return 0;
         String domain = emailSplit[1];
         domain = domain.toLowerCase();
+        loggerMaker.infoAndAddToDb("Email Domain: " + domain, LogDb.DASHBOARD);
         return domainsToBaselineUsersMap.getOrDefault(domain, 0);
     }
 
@@ -409,6 +410,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             if (!InitializerListener.isSaas) {
                 long countUsers = UsersDao.instance.getMCollection().countDocuments();
                 int limitUsers = findUsersLimit(email);
+                loggerMaker.infoAndAddToDb("Users limit: " + limitUsers, LogDb.DASHBOARD);
                 if (countUsers > limitUsers) {
                     code = "Ask admin to invite you";
                     return ERROR.toUpperCase();
