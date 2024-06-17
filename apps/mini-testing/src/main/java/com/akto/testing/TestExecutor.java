@@ -540,7 +540,7 @@ public class TestExecutor {
 
             TestingIssuesHandler handler = new TestingIssuesHandler();
             boolean triggeredByTestEditor = false;
-            //handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
+            handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
             testingRunResults.clear();
         }
     }
