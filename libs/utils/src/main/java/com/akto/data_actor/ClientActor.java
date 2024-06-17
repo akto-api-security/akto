@@ -1178,6 +1178,12 @@ public class ClientActor extends DataActor {
                     case "WORKFLOW":
                         ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");
                         break;
+                    case "ALL":
+                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.AllTestingEndpoints");
+                        break;
+                    case "LOGICAL_GROUP":
+                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.LogicalGroupTestingEndpoint");
+                        break;
                     default:
                         break;
                 }
@@ -2041,7 +2047,7 @@ public class ClientActor extends DataActor {
                     break;
             }
         }
-        testRole.remove("endpointLogicalGroupId");
+        testRole.put("endpointLogicalGroupId", new ObjectId(testRole.getString("endpointLogicalGroupIdHexId")));
         TestRoles res = decode(testRoleCodec, testRole);
         return res;
     }
@@ -2288,8 +2294,13 @@ public class ClientActor extends DataActor {
             BasicDBObject payloadObj;
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBObject sti = (BasicDBObject) payloadObj.get("sti");
-                return objectMapper.readValue(sti.toJson(), SingleTypeInfo.class);
+                BasicDBObject stiObj = (BasicDBObject) payloadObj.get("sti");
+                stiObj.put("id", stiObj.get("strId"));
+                BasicDBObject subType = (BasicDBObject) stiObj.get("subType");
+                stiObj.remove("subType");
+                SingleTypeInfo s = objectMapper.readValue(stiObj.toJson(), SingleTypeInfo.class);
+                s.setSubType(SingleTypeInfo.subTypeMap.get(subType.get("name")));
+                return s;
             } catch(Exception e) {
                 return null;
             }
@@ -2400,8 +2411,13 @@ public class ClientActor extends DataActor {
             BasicDBObject payloadObj;
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBObject sti = (BasicDBObject) payloadObj.get("sti");
-                return objectMapper.readValue(sti.toJson(), SingleTypeInfo.class);
+                BasicDBObject stiObj = (BasicDBObject) payloadObj.get("sti");
+                stiObj.put("id", stiObj.get("strId"));
+                BasicDBObject subType = (BasicDBObject) stiObj.get("subType");
+                stiObj.remove("subType");
+                SingleTypeInfo s = objectMapper.readValue(stiObj.toJson(), SingleTypeInfo.class);
+                s.setSubType(SingleTypeInfo.subTypeMap.get(subType.get("name")));
+                return s;
             } catch(Exception e) {
                 return null;
             }
@@ -2512,6 +2528,129 @@ public class ClientActor extends DataActor {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in fetchEndpointLogicalGroup" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    public EndpointLogicalGroup fetchEndpointLogicalGroupById(String endpointLogicalGroupId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("endpointLogicalGroupId", endpointLogicalGroupId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchEndpointLogicalGroupById", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchEndpointLogicalGroupById", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                Document doc = Document.parse(responsePayload);
+                Document endpointLogicalGroup = (Document) doc.get("endpointLogicalGroup");
+                Codec<EndpointLogicalGroup> codec = codecRegistry.get(EndpointLogicalGroup.class);
+                String type = ((Document) endpointLogicalGroup.get("testingEndpoints")).getString("type");
+                switch (type) {
+                    case "CUSTOM":
+                        ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CustomTestingEndpoints");
+                        break;
+                    case "COLLECTION_WISE":
+                        ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CollectionWiseTestingEndpoints");
+                        break;
+                    case "WORKFLOW":
+                        ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");
+                        break;
+                    case "ALL":
+                        ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.AllTestingEndpoints");
+                        break;
+                    case "LOGICAL_GROUP":
+                        ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.LogicalGroupTestingEndpoint");
+                        break;
+                    default:
+                        break;
+                }
+                endpointLogicalGroup.put("id", null);
+                Document cond = (Document) ((Document) endpointLogicalGroup.get("testingEndpoints")).get("orConditions");
+                if (cond != null) {
+                    cond.put("_t", "com.akto.dto.data_types.Conditions");
+                    List<Document> predicateList = (List) cond.get("predicates");
+                    for (Document predicate: predicateList) {
+                        String predType = (String) predicate.get("type");
+                        switch (predType) {
+                            case "REGEX":
+                                predicate.put("_t", "com.akto.dto.data_types.RegexPredicate");
+                                break;
+                            case "STARTS_WITH":
+                                predicate.put("_t", "com.akto.dto.data_types.StartsWithPredicate");
+                                break;
+                            case "ENDS_WITH":
+                                predicate.put("_t", "com.akto.dto.data_types.ENDSWithPredicate");
+                                break;
+                            case "IS_NUMBER":
+                                predicate.put("_t", "com.akto.dto.data_types.IsNumberWithPredicate");
+                                break;
+                            case "EQUALS_TO":
+                                predicate.put("_t", "com.akto.dto.data_types.EqualsToWithPredicate");
+                                break;
+                            case "CONTAINS":
+                                predicate.put("_t", "com.akto.dto.data_types.ContainsPredicate");
+                                break;
+                            case "BELONGS_TO":
+                                predicate.put("_t", "com.akto.dto.data_types.BelongsToPredicate");
+                                break;
+                            case "NOT_BELONGS_TO":
+                                predicate.put("_t", "com.akto.dto.data_types.NotBelongsToPredicate");
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+
+                cond = (Document) ((Document) endpointLogicalGroup.get("testingEndpoints")).get("andConditions");
+                if (cond != null) {
+                    cond.put("_t", "com.akto.dto.data_types.Conditions");
+                    List<Document> predicateList = (List) cond.get("predicates");
+                    for (Document predicate: predicateList) {
+                        String predType = (String) predicate.get("type");
+                        switch (predType) {
+                            case "REGEX":
+                                predicate.put("_t", "com.akto.dto.data_types.RegexPredicate");
+                                break;
+                            case "STARTS_WITH":
+                                predicate.put("_t", "com.akto.dto.data_types.StartsWithPredicate");
+                                break;
+                            case "ENDS_WITH":
+                                predicate.put("_t", "com.akto.dto.data_types.ENDSWithPredicate");
+                                break;
+                            case "IS_NUMBER":
+                                predicate.put("_t", "com.akto.dto.data_types.IsNumberWithPredicate");
+                                break;
+                            case "EQUALS_TO":
+                                predicate.put("_t", "com.akto.dto.data_types.EqualsToWithPredicate");
+                                break;
+                            case "CONTAINS":
+                                predicate.put("_t", "com.akto.dto.data_types.ContainsPredicate");
+                                break;
+                            case "BELONGS_TO":
+                                predicate.put("_t", "com.akto.dto.data_types.BelongsToPredicate");
+                                break;
+                            case "NOT_BELONGS_TO":
+                                predicate.put("_t", "com.akto.dto.data_types.NotBelongsToPredicate");
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+
+                EndpointLogicalGroup res = decode(codec, endpointLogicalGroup);
+                return res;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchEndpointLogicalGroupById" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
         }
     }

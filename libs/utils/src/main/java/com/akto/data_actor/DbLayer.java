@@ -798,6 +798,10 @@ public class DbLayer {
         return EndpointLogicalGroupDao.instance.findOne(EndpointLogicalGroup.GROUP_NAME, logicalGroupName);
     }
 
+    public static EndpointLogicalGroup fetchEndpointLogicalGroupById(String endpointLogicalGroupId) {
+        return EndpointLogicalGroupDao.instance.findOne("_id", new ObjectId(endpointLogicalGroupId));
+    }
+
     public static void updateAccessMatrixUrlToRoles(ApiInfo.ApiInfoKey apiInfoKey, List<String> ret) {
         Bson q = Filters.eq(Constants.ID, apiInfoKey);
         Bson update = Updates.addEachToSet(AccessMatrixUrlToRole.ROLES, ret);

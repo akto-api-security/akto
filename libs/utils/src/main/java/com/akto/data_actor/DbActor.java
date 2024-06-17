@@ -248,6 +248,10 @@ public class DbActor extends DataActor {
         return DbLayer.fetchEndpointLogicalGroup(logicalGroupName);
     }
 
+    public EndpointLogicalGroup fetchEndpointLogicalGroupById(String endpointLogicalGroupId) {
+        return DbLayer.fetchEndpointLogicalGroupById(endpointLogicalGroupId);
+    }
+
     public List<TestingRunIssues> fetchIssuesByIds(Object[] issuesIds) {
         return DbLayer.fetchIssuesByIds(issuesIds);
     }

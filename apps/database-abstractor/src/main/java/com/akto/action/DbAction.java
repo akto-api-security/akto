@@ -156,6 +156,7 @@ public class DbAction extends ActionSupport {
     private static final Gson gson = new Gson();
     ObjectMapper objectMapper = new ObjectMapper();
     KafkaUtils kafkaUtils = new KafkaUtils();
+    String endpointLogicalGroupId;
 
     public String fetchCustomDataTypes() {
         try {
@@ -868,16 +869,16 @@ public class DbAction extends ActionSupport {
     public String findPendingTestingRun() {
         try {
             testingRun = DbLayer.findPendingTestingRun(delta);
-
-            /*
-             * There is a db call involved for collectionWiseTestingEndpoints, thus this hack. 
-             */
-            if(testingRun.getTestingEndpoints() instanceof CollectionWiseTestingEndpoints){
-                CollectionWiseTestingEndpoints ts = (CollectionWiseTestingEndpoints) testingRun.getTestingEndpoints();
-                CustomTestingEndpoints endpoints = new CustomTestingEndpoints(ts.returnApis());
-                testingRun.setTestingEndpoints(endpoints);
+            if (testingRun != null) {
+                /*
+                * There is a db call involved for collectionWiseTestingEndpoints, thus this hack. 
+                */
+                if(testingRun.getTestingEndpoints() instanceof CollectionWiseTestingEndpoints){
+                    CollectionWiseTestingEndpoints ts = (CollectionWiseTestingEndpoints) testingRun.getTestingEndpoints();
+                    CustomTestingEndpoints endpoints = new CustomTestingEndpoints(ts.returnApis());
+                    testingRun.setTestingEndpoints(endpoints);
+                }
             }
-
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -887,7 +888,9 @@ public class DbAction extends ActionSupport {
     public String findPendingTestingRunResultSummary() {
         try {
             trrs = DbLayer.findPendingTestingRunResultSummary(now, delta);
-            trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+            if (trrs != null) {
+                trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+            }
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -960,6 +963,15 @@ public class DbAction extends ActionSupport {
     public String fetchEndpointLogicalGroup() {
         try {
             endpointLogicalGroup = DbLayer.fetchEndpointLogicalGroup(logicalGroupName);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchEndpointLogicalGroupById() {
+        try {
+            endpointLogicalGroup = DbLayer.fetchEndpointLogicalGroupById(endpointLogicalGroupId);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -2215,6 +2227,14 @@ public class DbAction extends ActionSupport {
 
     public void setScheduleTs(int scheduleTs) {
         this.scheduleTs = scheduleTs;
+    }
+
+    public String getEndpointLogicalGroupId() {
+        return endpointLogicalGroupId;
+    }
+
+    public void setEndpointLogicalGroupId(String endpointLogicalGroupId) {
+        this.endpointLogicalGroupId = endpointLogicalGroupId;
     }
     
 }
