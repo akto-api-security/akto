@@ -625,7 +625,7 @@ public class DbLayer {
     public static void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount) {
         ObjectId summaryObjectId = new ObjectId(summaryId);
         TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, summaryObjectId),
-            Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testResultsCount));
+            Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, testResultsCount));
     }
 
     public static void updateLastTestedField(int apiCollectionId, String url, String method) {
