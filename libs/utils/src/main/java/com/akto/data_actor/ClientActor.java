@@ -1251,7 +1251,11 @@ public class ClientActor extends DataActor {
                 Codec<TestingRunConfig> apiInfoKeyCodec = codecRegistry.get(TestingRunConfig.class);
                 testingRunConfig.remove("authMechanismId");
                 TestingRunConfig res = decode(apiInfoKeyCodec, testingRunConfig);
-                res.setAuthMechanismId(new ObjectId(testingRunConfig.getString("strAuthMechanismId")));
+                try {
+                    res.setAuthMechanismId(new ObjectId(testingRunConfig.getString("strAuthMechanismId")));
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Unable to set auth in testingRunConfig", LoggerMaker.LogDb.TESTING);
+                }
                 return res;
             } catch(Exception e) {
                 return null;
@@ -1795,6 +1799,7 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunResult", testingRunResult);
         String objString = gson.toJson(obj);
+        System.out.println(objString);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingRunResults", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
@@ -1882,7 +1887,7 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         List<TestingRunResult> testingRunResultList = new ArrayList<>();
         BasicDBObject obj = new BasicDBObject();
-        obj.put("workFlowTestId", summaryId);
+        obj.put("summaryId", summaryId);
         obj.put("limit", limit);
         obj.put("skip", skip);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchLatestTestingRunResult", "", "POST", obj.toString(), headers, "");
@@ -1891,7 +1896,7 @@ public class ClientActor extends DataActor {
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in fetchLatestTestingRunResult", LoggerMaker.LogDb.RUNTIME);
-                return null;
+                return testingRunResultList;
             }
             BasicDBObject payloadObj;
             try {
@@ -1906,7 +1911,7 @@ public class ClientActor extends DataActor {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in fetchLatestTestingRunResult" + e, LoggerMaker.LogDb.RUNTIME);
-            return null;
+            return testingRunResultList;
         }
         return testingRunResultList;
     }
@@ -2007,6 +2012,7 @@ public class ClientActor extends DataActor {
             List<Document> authParams = (List<Document>) authMechanism.get("authParams");
             for (Document authParam: authParams) {
                 switch (type) {
+                    case "HardCoded":
                     case "HARDCODED":
                         authParam.put("_t", "com.akto.dto.testing.HardcodedAuthParam");
                         break;
@@ -2024,6 +2030,7 @@ public class ClientActor extends DataActor {
         List<Document> defaultAuthParams = (List<Document>) defaultAuthMechanism.get("authParams");
         for (Document defaultAuthParam: defaultAuthParams) {
             switch (type) {
+                case "HardCoded":
                 case "HARDCODED":
                     defaultAuthParam.put("_t", "com.akto.dto.testing.HardcodedAuthParam");
                     break;
@@ -2630,8 +2637,14 @@ public class ClientActor extends DataActor {
 
     public Map<String, List<String>> buildHeaders() {
         Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Authorization", Collections.singletonList(System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));
+        headers.put(AUTHORIZATION, Collections.singletonList(getAuthToken()));
         return headers;
+    }
+
+    public static final String AUTHORIZATION = "Authorization";
+
+    public static String getAuthToken() {
+        return System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
     }
 
 }

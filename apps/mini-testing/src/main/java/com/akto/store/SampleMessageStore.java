@@ -3,7 +3,6 @@ package com.akto.store;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.*;
 import com.akto.dto.traffic.Key;
@@ -11,6 +10,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.sql.SampleDataAltDb;
 
 import java.util.*;
 
@@ -70,9 +70,13 @@ public class SampleMessageStore {
 
         for (String message: samples) {
             try {
+                String uuid = OriginalHttpRequest.extractAktoUUid(message);
+                if (uuid != null) {
+                    message = SampleDataAltDb.find(uuid);
+                }
                 messages.add(RawApi.buildFromMessage(message));
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("Error while building RawAPI for "+ apiInfoKey +" : " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Error while building RawAPI for "+ apiInfoKey +" : " + e, LogDb.TESTING);
             }
 
         }
