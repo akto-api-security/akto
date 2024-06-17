@@ -625,8 +625,8 @@ public final class FilterAction {
         } else {
             String headerString = convertHeaders(headers);
             DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(headerString, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-            res = invokeFilter(dataOperandFilterRequest);
-            return new DataOperandsFilterResponse(res, null, null, null);
+            ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
+            return new DataOperandsFilterResponse(validationResult.getIsValid(), null, null, null, validationResult.getValidationReason());
         }
     }
 
