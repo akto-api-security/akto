@@ -4,12 +4,14 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
@@ -23,15 +25,19 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
+import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.utils.KafkaUtils;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLMethods.Method;
+import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -42,6 +48,8 @@ import com.google.gson.Gson;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -71,6 +79,36 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForSensitiveParamInfo;
     List<BulkUpdates> writesForTrafficInfo;
     List<BulkUpdates> writesForTrafficMetrics;
+    List<BulkUpdates> writesForTestingRunIssues;
+
+    public List<BulkUpdates> getWritesForTestingRunIssues() {
+        return writesForTestingRunIssues;
+    }
+
+    public void setWritesForTestingRunIssues(List<BulkUpdates> writesForTestingRunIssues) {
+        this.writesForTestingRunIssues = writesForTestingRunIssues;
+    }
+
+    String subType;
+
+    public String getSubType() {
+        return subType;
+    }
+
+    public void setSubType(String subType) {
+        this.subType = subType;
+    }
+
+    TestSourceConfig testSourceConfig;
+
+    public TestSourceConfig getTestSourceConfig() {
+        return testSourceConfig;
+    }
+
+    public void setTestSourceConfig(TestSourceConfig testSourceConfig) {
+        this.testSourceConfig = testSourceConfig;
+    }
+
     String configName;
     int lastFetchTimestamp;
     String lastSeenObjectId;
@@ -97,7 +135,16 @@ public class DbAction extends ActionSupport {
     ApiInfo.ApiInfoKey apiInfoKey;
     int apiCollectionId;
     String logicalGroupName;
-    Object[] issuesIds;
+    BasicDBList issuesIds;
+
+    public BasicDBList getIssuesIds() {
+        return issuesIds;
+    }
+
+    public void setIssuesIds(BasicDBList issuesIds) {
+        this.issuesIds = issuesIds;
+    }
+
     String testingRunResultSummaryId;
     String summaryId;
     int limit;
@@ -646,6 +693,73 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String bulkWriteTestingRunIssues() {
+        if (kafkaUtils.isWriteEnabled()) {
+            int accId = Context.accountId.get();
+            kafkaUtils.insertData(writesForTestingRunIssues, "bulkWriteTestingRunIssues", accId);
+        } else {
+            try {
+                ArrayList<WriteModel<TestingRunIssues>> writes = new ArrayList<>();
+                for (BulkUpdates bulkUpdate: writesForTestingRunIssues) {
+                    Bson filters = Filters.empty();
+                    for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
+                        filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
+                    }
+                    List<String> updatePayloadList = bulkUpdate.getUpdates();
+    
+                    List<Bson> updates = new ArrayList<>();
+                    for (String payload: updatePayloadList) {
+                        Map<String, Object> json = gson.fromJson(payload, Map.class);
+    
+                        String field = (String) json.get("field");
+                        if (field.equals("collectionIds")) {
+                            List<Double> dVal = (List) json.get("val");
+                            List<Integer> val = new ArrayList<>();
+                            for (int i = 0; i < dVal.size(); i++) {
+                                val.add(dVal.get(i).intValue());
+                            }
+                            updates.add(Updates.setOnInsert(field, val));
+                        }else if(field.equals(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID)){
+                            String val = (String)json.get("val");
+                            ObjectId id = new ObjectId(val);
+                            updates.add(Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, id));
+                        } else {
+                            boolean dVal = (boolean) json.get("val");
+                            UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
+                            updates.add(Updates.set(updatePayload.getField(), dVal));
+                        }
+                    }
+    
+                    writes.add(
+                            new UpdateOneModel<>(filters, updates, new UpdateOptions().upsert(true))
+                    );
+                }
+                DbLayer.bulkWriteTestingRunIssues(writes);
+            } catch (Exception e) {
+                String err = "Error: ";
+                if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
+                    StackTraceElement stackTraceElement = e.getStackTrace()[0];
+                    err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+                } else {
+                    err = String.format("Err msg: %s\nStackTrace not available", err);
+                    e.printStackTrace();
+                }
+                System.out.println(err);
+                return Action.ERROR.toUpperCase();
+            }
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String findTestSourceConfig(){
+        try {
+            testSourceConfig = DbLayer.findTestSourceConfig(subType);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchApiConfig() {
         try {
             apiConfig = DbLayer.fetchApiconfig(configName);
@@ -980,8 +1094,30 @@ public class DbAction extends ActionSupport {
 
     public String fetchIssuesByIds() {
         try {
-            testingRunIssues = DbLayer.fetchIssuesByIds(issuesIds);
+            Set<TestingIssuesId> ids = new HashSet<>();
+            for (Object obj : issuesIds) {
+                HashMap<String,Object> temp = (HashMap) obj;
+                HashMap<String,Object> apiInfoKey = (HashMap) temp.get(TestingIssuesId.API_KEY_INFO);
+                ApiInfoKey key = new ApiInfoKey(
+                        (int)((long)apiInfoKey.get(ApiInfoKey.API_COLLECTION_ID)),
+                        (String)apiInfoKey.get(ApiInfoKey.URL),
+                        Method.valueOf((String)apiInfoKey.get(ApiInfoKey.METHOD)));
+                TestingIssuesId id = new TestingIssuesId(key,
+                        TestErrorSource.valueOf((String)temp.get(TestingIssuesId.TEST_ERROR_SOURCE)),
+                        (String)temp.get(TestingIssuesId.TEST_SUB_CATEGORY));
+                ids.add(id);
+            }
+            testingRunIssues = DbLayer.fetchIssuesByIds(ids);
         } catch (Exception e) {
+            String err = "Error: ";
+            if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
+                StackTraceElement stackTraceElement = e.getStackTrace()[0];
+                err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+            } else {
+                err = String.format("Err msg: %s\nStackTrace not available", err);
+                e.printStackTrace();
+            }
+            System.out.println(err);
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -1789,13 +1925,6 @@ public class DbAction extends ActionSupport {
         this.logicalGroupName = logicalGroupName;
     }
 
-    public Object[] getIssuesIds() {
-        return issuesIds;
-    }
-
-    public void setIssuesIds(Object[] issuesIds) {
-        this.issuesIds = issuesIds;
-    }
 
     public String getTestingRunResultSummaryId() {
         return testingRunResultSummaryId;

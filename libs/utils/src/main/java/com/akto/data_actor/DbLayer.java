@@ -65,6 +65,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
@@ -84,6 +85,7 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
@@ -181,6 +183,18 @@ public class DbLayer {
 
     public static void bulkWriteSensitiveParamInfo(List<WriteModel<SensitiveParamInfo>> writesForSensitiveParamInfo) {
         SensitiveParamInfoDao.instance.getMCollection().bulkWrite(writesForSensitiveParamInfo);
+    }
+
+    public static void bulkWriteTestingRunIssues(List<WriteModel<TestingRunIssues>> writeModelList) {
+        BulkWriteResult result = TestingRunIssuesDao.instance.bulkWrite(writeModelList,
+                new BulkWriteOptions().ordered(false));
+        loggerMaker.infoAndAddToDb(String.format("Matched records : %s", result.getMatchedCount()), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb(String.format("inserted counts : %s", result.getInsertedCount()), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb(String.format("Modified counts : %s", result.getModifiedCount()), LogDb.TESTING);
+    }
+
+    public static TestSourceConfig findTestSourceConfig(String subType){
+        return TestSourceConfigsDao.instance.getTestSourceConfig(subType);
     }
 
     public static APIConfig fetchApiconfig(String configName) {
@@ -707,8 +721,8 @@ public class DbLayer {
         ApiCollectionsDao.instance.insertOne(apiCollection);
     }
 
-    public static List<TestingRunIssues> fetchIssuesByIds(Object[] issuesIds) {
-        Bson inQuery = Filters.in("_id", issuesIds);
+    public static List<TestingRunIssues> fetchIssuesByIds(Set<TestingIssuesId> issuesIds) {
+        Bson inQuery = Filters.in("_id", issuesIds.toArray());
         return TestingRunIssuesDao.instance.findAll(inQuery);
     }
 

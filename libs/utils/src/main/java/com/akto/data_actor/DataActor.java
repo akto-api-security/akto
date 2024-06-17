@@ -5,6 +5,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
@@ -120,6 +121,10 @@ public abstract class DataActor {
 
     public abstract void insertTestingRunResultSummary(TestingRunResultSummary trrs);
 
+    public abstract void bulkWriteTestingRunIssues(List<Object> writesForTestingRunIssues);
+
+    public abstract TestSourceConfig findTestSourceConfig(String subType);
+
     public abstract void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTs);
 
     public abstract Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId);
@@ -178,7 +183,9 @@ public abstract class DataActor {
 
     public abstract void insertApiCollection(int apiCollectionId, String apiCollectionName);
 
-    public abstract List<TestingRunIssues> fetchIssuesByIds(Object[] issuesIds);
+    public abstract List<TestingRunIssues> fetchIssuesByIds(Set<TestingIssuesId> issuesIds);
+
+    // public abstract List<Testing
 
     public abstract List<SingleTypeInfo> findStiByParam(int apiCollectionId, String param);
 

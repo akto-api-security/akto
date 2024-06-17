@@ -25,6 +25,7 @@ import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
@@ -36,6 +37,7 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
+import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -255,6 +257,36 @@ public class ClientActor extends DataActor {
     }
     public void bulkWriteTrafficMetrics(List<Object> writesForTrafficMetrics) {
         bulkWrite(writesForTrafficMetrics, "/bulkWriteTrafficMetrics", "writesForTrafficMetrics");
+    }
+
+    public void bulkWriteTestingRunIssues(List<Object> writesForTestingRunIssues) {
+        bulkWrite(writesForTestingRunIssues, "/bulkWriteTestingRunIssues", "writesForTestingRunIssues");
+    }
+
+    public TestSourceConfig findTestSourceConfig(String subType) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("subType", subType);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findTestSourceConfig", "", "GET", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findTestSourceConfig", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject testSourceConfigObj = (BasicDBObject) payloadObj.get("testSourceConfig");
+                return objectMapper.readValue(testSourceConfigObj.toJson(), TestSourceConfig.class);
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findTestSourceConfig" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
     }
 
     public List<SingleTypeInfo> fetchStiOfCollections(int batchCount, int lastStiFetchTs) {
@@ -985,25 +1017,25 @@ public class ClientActor extends DataActor {
     }
 
     public void insertRuntimeLog(Log log) {
-        Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject();
-        BasicDBObject logObj = new BasicDBObject();
-        logObj.put("key", log.getKey());
-        logObj.put("log", log.getLog());
-        logObj.put("timestamp", log.getTimestamp());
-        obj.put("log", logObj);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertRuntimeLog", "", "POST", obj.toString(), headers, "");
-        try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in insertRuntimeLog", LoggerMaker.LogDb.RUNTIME);
-                return;
-            }
-        } catch (Exception e) {
-            logger.error("error in insertRuntimeLog" + e);
-            return;
-        }
+        // Map<String, List<String>> headers = buildHeaders();
+        // BasicDBObject obj = new BasicDBObject();
+        // BasicDBObject logObj = new BasicDBObject();
+        // logObj.put("key", log.getKey());
+        // logObj.put("log", log.getLog());
+        // logObj.put("timestamp", log.getTimestamp());
+        // obj.put("log", logObj);
+        // OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertRuntimeLog", "", "POST", obj.toString(), headers, "");
+        // try {
+        //     OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+        //     String responsePayload = response.getBody();
+        //     if (response.getStatusCode() != 200 || responsePayload == null) {
+        //         loggerMaker.errorAndAddToDb("non 2xx response in insertRuntimeLog", LoggerMaker.LogDb.RUNTIME);
+        //         return;
+        //     }
+        // } catch (Exception e) {
+        //     loggerMaker.errorAndAddToDb("error in insertRuntimeLog" + e, LoggerMaker.LogDb.RUNTIME);
+        //     return;
+        // }
     }
 
     public void insertAnalyserLog(Log log) {
@@ -2217,11 +2249,24 @@ public class ClientActor extends DataActor {
         }
     }
     
-    public List<TestingRunIssues> fetchIssuesByIds(Object[] issuesIds) {
+    public List<TestingRunIssues> fetchIssuesByIds(Set<TestingIssuesId> issuesIds) {
         Map<String, List<String>> headers = buildHeaders();
         List<TestingRunIssues> issueList = new ArrayList<>();
         BasicDBObject obj = new BasicDBObject();
-        obj.put("issuesIds", issuesIds);
+        BasicDBList list = new BasicDBList();
+        for(TestingIssuesId id: issuesIds){
+            BasicDBObject temp = new BasicDBObject();
+            BasicDBObject temp2 = new BasicDBObject();
+            ApiInfoKey key = id.getApiInfoKey();
+            temp2.put(ApiInfoKey.API_COLLECTION_ID, key.getApiCollectionId());
+            temp2.put(ApiInfoKey.METHOD, key.getMethod().name());
+            temp2.put(ApiInfoKey.URL, key.getUrl());
+            temp.put(TestingIssuesId.API_KEY_INFO, temp2);
+            temp.put(TestingIssuesId.TEST_SUB_CATEGORY, id.getTestSubCategory());
+            temp.put(TestingIssuesId.TEST_ERROR_SOURCE, id.getTestErrorSource().name());
+            list.add(temp);
+        }
+        obj.put("issuesIds", list);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchIssuesByIds", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
@@ -2756,25 +2801,25 @@ public class ClientActor extends DataActor {
     }
 
     public void insertTestingLog(Log log) {
-        Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject();
-        BasicDBObject logObj = new BasicDBObject();
-        logObj.put("key", log.getKey());
-        logObj.put("log", log.getLog());
-        logObj.put("timestamp", log.getTimestamp());
-        obj.put("log", logObj);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingLog", "", "POST", obj.toString(), headers, "");
-        try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in insertTestingLog", LoggerMaker.LogDb.RUNTIME);
-                return;
-            }
-        } catch (Exception e) {
-            logger.error("error in insertTestingLog" + e);
-            return;
-        }
+        // Map<String, List<String>> headers = buildHeaders();
+        // BasicDBObject obj = new BasicDBObject();
+        // BasicDBObject logObj = new BasicDBObject();
+        // logObj.put("key", log.getKey());
+        // logObj.put("log", log.getLog());
+        // logObj.put("timestamp", log.getTimestamp());
+        // obj.put("log", logObj);
+        // OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingLog", "", "POST", obj.toString(), headers, "");
+        // try {
+        //     OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+        //     String responsePayload = response.getBody();
+        //     if (response.getStatusCode() != 200 || responsePayload == null) {
+        //         loggerMaker.errorAndAddToDb("non 2xx response in insertTestingLog", LoggerMaker.LogDb.RUNTIME);
+        //         return;
+        //     }
+        // } catch (Exception e) {
+        //     loggerMaker.errorAndAddToDb("error in insertTestingLog" + e, LoggerMaker.LogDb.RUNTIME);
+        //     return;
+        // }
     }
 
     public Map<String, List<String>> buildHeaders() {
