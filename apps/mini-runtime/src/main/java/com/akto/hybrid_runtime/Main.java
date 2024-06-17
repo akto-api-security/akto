@@ -468,10 +468,6 @@ public class Main {
         }
 
         isOnprem = dashboardMode.equalsIgnoreCase(DashboardMode.ON_PREM.name());
-
-        List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
-        List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
-        List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
         
         RuntimeVersion runtimeVersion = new RuntimeVersion();
         try {
@@ -480,8 +476,22 @@ public class Main {
             loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.getMessage(), LogDb.RUNTIME);
         }
 
-        SingleTypeInfo.initFromRuntime(customDataTypes, aktoDataTypes, customAuthTypes, account.getId());
+        initFromRuntime(account.getId());
         
+    }
+
+    public static void initFromRuntime(int accountId) {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
+                System.out.println("customdata type " + customDataTypes.size());
+                List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
+                List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
+                SingleTypeInfo.fetchCustomDataTypes(accountId, customDataTypes, aktoDataTypes);
+                SingleTypeInfo.fetchCustomAuthTypes(accountId, customAuthTypes);
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+
     }
 
     public static void initializeRuntimeHelper() {
