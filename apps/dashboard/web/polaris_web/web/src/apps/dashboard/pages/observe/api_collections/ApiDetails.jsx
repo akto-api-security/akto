@@ -183,7 +183,7 @@ function ApiDetails(props) {
                 badgeClicked={badgeClicked}
             />
             <Box paddingBlockStart={"05"}>
-                <Button plain onClick={() => func.copyToClipboard(apiDetail['endpoint'], ref, "URL copied")}>
+                <Button plain onClick={() => func.copyToClipboard(apiDetail['method']+ " " + apiDetail['endpoint'], ref, "URL copied")}>
                     <Tooltip content="Copy endpoint" dismissOnMouseOut>
                         <div className="reduce-size">
                             <Avatar size="extraSmall" source="/public/copy_icon.svg" />

@@ -21,11 +21,12 @@ function SignUp() {
   const oktaUrl = window.OKTA_AUTH_URL
   const azureUrl = window.AZURE_REQUEST_URL
   const githubId = window.GITHUB_CLIENT_ID
+  const githubUrl = window.GITHUB_URL ? window.GITHUB_URL : "https://github.com"
 
   const githubAuthObj = {
     logo: '/public/github_icon.svg',
     text: 'Continue with Github SSO',
-    onClickFunc: () => { window.location.href = ("https://github.com/login/oauth/authorize?client_id=" + githubId); }
+    onClickFunc: () => { window.location.href = (githubUrl + "/login/oauth/authorize?client_id=" + githubId); }
   }
 
   const azureAuthObj = {

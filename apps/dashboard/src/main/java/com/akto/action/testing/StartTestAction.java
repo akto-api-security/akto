@@ -14,6 +14,8 @@ import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.TestingRun.TestingRunType;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRun.State;
@@ -26,6 +28,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
+import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
@@ -37,7 +40,6 @@ import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.kafka.common.protocol.types.Field.Str;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -526,6 +528,10 @@ public class StartTestAction extends UserAction {
                 case SECURED:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
                     testingRunResultFilters.add(Filters.nin(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
+                    testingRunResultFilters.add(Filters.eq(TestingRunResult.REQUIRES_CONFIG, false));
+                    break;
+                case SKIPPED_EXEC_NEED_CONFIG:
+                    testingRunResultFilters.add(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
                     break;
             }
         }
@@ -691,7 +697,6 @@ public class StartTestAction extends UserAction {
     }
 
     public String stopTest() {
-        // stop only scheduled and running tests
         Bson filter = Filters.or(
                 Filters.eq(TestingRun.STATE, State.SCHEDULED),
                 Filters.eq(TestingRun.STATE, State.RUNNING));
@@ -701,6 +706,11 @@ public class StartTestAction extends UserAction {
                 TestingRunDao.instance.updateOne(
                         Filters.and(filter, Filters.eq(Constants.ID, testingId)),
                         Updates.set(TestingRun.STATE, State.STOPPED));
+                Bson testingSummaryFilter = Filters.and(
+                    Filters.eq(TestingRunResultSummary.TESTING_RUN_ID,testingId),
+                    filter
+                );
+                TestingRunResultSummariesDao.instance.updateManyNoUpsert(testingSummaryFilter, Updates.set(TestingRunResultSummary.STATE, State.STOPPED));
                 return SUCCESS.toUpperCase();
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "ERROR: Stop test failed - " + e.toString(), LogDb.DASHBOARD);
@@ -777,7 +787,7 @@ public class StartTestAction extends UserAction {
         int accountId = Context.accountId.get();
         Runnable r = () -> {
             Context.accountId.set(accountId);
-            DeleteTestRunsDao.instance.deleteTestRunsFromDb(DeleteTestRuns);
+            DeleteTestRunUtils.deleteTestRunsFromDb(DeleteTestRuns);
         };
         executorService.submit(r);
     }

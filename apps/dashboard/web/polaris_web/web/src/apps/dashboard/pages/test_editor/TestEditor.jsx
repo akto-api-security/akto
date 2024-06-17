@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { Badge, Button, Frame, HorizontalStack, Text, TopBar } from "@shopify/polaris"
+import { Badge, Box, Button, Frame, HorizontalGrid, HorizontalStack, TopBar } from "@shopify/polaris"
 import { ExitMajor } from "@shopify/polaris-icons"
 
 import TestEditorFileExplorer from "./components/TestEditorFileExplorer"
@@ -26,6 +26,7 @@ const TestEditor = () => {
     const setVulnerableRequestMap = TestEditorStore(state => state.setVulnerableRequestMap)
     const setDefaultRequest = TestEditorStore(state => state.setDefaultRequest)
     const setActive = PersistStore(state => state.setActive)
+    const setSubCategoryMap = PersistStore(state => state.setSubCategoryMap)
 
     const [loading, setLoading] = useState(true)
 
@@ -41,6 +42,11 @@ const TestEditor = () => {
         const allSubCategoriesResponse = await testEditorRequests.fetchAllSubCategories("testEditor")
         if (allSubCategoriesResponse) {
             try {
+                let subCategoryMap = {};
+                allSubCategoriesResponse?.subCategories.forEach((x) => {
+                    subCategoryMap[x.name] = x;
+                });
+                setSubCategoryMap(subCategoryMap);
                 const obj = convertFunc.mapCategoryToSubcategory(allSubCategoriesResponse.subCategories)
                 setTestsObj(obj)
     
@@ -115,12 +121,12 @@ const TestEditor = () => {
         }
             navigation={ <TestEditorFileExplorer addCustomTest={(e) => addCustomTest(e)}/> }
         >
-            
-            <div style={{ "paddingLeft":"6vh", display: "grid", gridTemplateColumns: "50% 50%" }}>
-                <YamlEditor fetchAllTests={fetchAllTests} />
-                <SampleApi />
-            </div>
-            
+            <Box paddingInlineStart={12}>
+                <HorizontalGrid columns={2}>
+                    <YamlEditor fetchAllTests={fetchAllTests} />
+                    <SampleApi />
+                </HorizontalGrid>
+            </Box>
 
         </Frame>
     )

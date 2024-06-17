@@ -14,9 +14,9 @@ import TooltipText from '../../shared/TooltipText';
 
 function GithubCell(props){
 
-    const {data, headers, getStatus, width, nameWidth, isBadgeClickable, badgeClicked} = props
+    const {data, headers, getStatus, width, nameWidth, isBadgeClickable, badgeClicked, divWrap} = props
     return (
-    <HorizontalStack gap="1">
+    <HorizontalStack gap="1" wrap={false}>
     {
         headers?.filter((header) => {
             return header.itemOrder==0
@@ -40,7 +40,7 @@ function GithubCell(props){
         })
     }
     <VerticalStack gap="2" inlineAlign='baseline'>
-        <HorizontalStack wrap={false} gap="2" align='start'>
+        <HorizontalStack wrap={divWrap || false} gap="2" align='start'>
             {
                 headers?.filter((header) => {
                     return header.itemOrder == 1
@@ -138,7 +138,7 @@ function GithubCell(props){
                     </div>
                     
                 : <Badge key={item} status={getStatus(item)}>
-                    <Text {...header.dataProps}>
+                    <Text {...header.dataProps} breakWord>
                         {item}
                     </Text>
                 </Badge>

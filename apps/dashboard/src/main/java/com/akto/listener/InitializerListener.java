@@ -66,6 +66,7 @@ import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.util.AccountTask;
@@ -108,6 +109,7 @@ import com.slack.api.webhook.WebhookResponse;
 
 import okhttp3.OkHttpClient;
 
+import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
@@ -116,6 +118,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.print.attribute.standard.Severity;
 import javax.servlet.ServletContextListener;
 import java.io.*;
 import java.net.URI;
@@ -781,7 +784,7 @@ public class InitializerListener implements ServletContextListener {
                     ex.printStackTrace(); // or loggger would be better
                 }
             }
-        }, 0, 5, TimeUnit.MINUTES);
+        }, 0, 4, TimeUnit.HOURS);
 
     }
 
@@ -895,7 +898,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "webhook-sener");
             }
-        }, 0, 15, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.HOURS);
     }
 
     static class ChangesInfo {
@@ -1077,6 +1080,21 @@ public class InitializerListener implements ServletContextListener {
         return ret;
     }
 
+    public static void dropApiDependencies(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDropApiDependencies() == 0) {
+            DependencyNodeDao.instance.getMCollection().drop();
+            DependencyFlowNodesDao.instance.getMCollection().drop();
+            DependencyNodeDao.instance.createIndicesIfAbsent();
+            DependencyFlowNodesDao.instance.createIndicesIfAbsent();
+        } else {
+            return;
+        }
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DROP_API_DEPENDENCIES, Context.now())
+        );
+    }
+
     public static void dropFilterSampleDataCollection(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDropFilterSampleData() == 0) {
             FilterSampleDataDao.instance.getMCollection().drop();
@@ -1130,6 +1148,7 @@ public class InitializerListener implements ServletContextListener {
         ArrayList<TestingEndpoints> loginConditions = new ArrayList<>();
         loginConditions.add(new RegexTestingEndpoints(TestingEndpoints.Operator.OR, regex));
         loginGroup.setConditions(loginConditions);
+        loginGroup.setAutomated(true);
         ApiCollectionUsers.removeFromCollectionsForCollectionId(loginGroup.getConditions(), id);
 
         ApiCollectionsDao.instance.insertOne(loginGroup);
@@ -1162,6 +1181,7 @@ public class InitializerListener implements ServletContextListener {
 
         riskScoreGroup.setConditions(riskScoreConditions);
         riskScoreGroup.setType(ApiCollection.Type.API_GROUP);
+        riskScoreGroup.setAutomated(true);
 
         ApiCollectionsDao.instance.insertOne(riskScoreGroup); 
     }
@@ -1175,6 +1195,47 @@ public class InitializerListener implements ServletContextListener {
             BackwardCompatibilityDao.instance.updateOne(
                     Filters.eq("_id", backwardCompatibility.getId()),
                     Updates.set(BackwardCompatibility.RISK_SCORE_GROUPS, Context.now())
+            );
+        }
+    }
+
+    public static void setApiCollectionAutomatedField(BackwardCompatibility backwardCompatibility) {
+        // Set automated field of existing automated API collections
+        if (backwardCompatibility.getApiCollectionAutomatedField() == 0) {
+            int[] apiCollectionIds = {111_111_128, 111_111_129, 111_111_130, 111_111_148, 111_111_149, 111_111_150};
+
+            for (int apiCollectionId : apiCollectionIds) {
+                ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id", apiCollectionId));
+
+                if (apiCollection != null) {
+                    if (!apiCollection.getAutomated()) {
+                        apiCollection.setAutomated(true);
+                        ApiCollectionsDao.instance.updateOne(
+                            Filters.eq("_id", apiCollectionId), 
+                            Updates.set(ApiCollection.AUTOMATED, true));
+                    }
+                }
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.API_COLLECTION_AUTOMATED_FIELD, Context.now())
+            );
+        }
+    }
+
+    public static void createAutomatedAPIGroups(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getAutomatedApiGroups() == 0) {
+            // Fetch automated API groups csv records
+            List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups(false);
+
+            if (apiGroupRecords != null) {
+                AutomatedApiGroupsUtils.processAutomatedGroups(apiGroupRecords);
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.AUTOMATED_API_GROUPS, Context.now())
             );
         }
     }
@@ -1692,13 +1753,8 @@ public class InitializerListener implements ServletContextListener {
         subdomain += "/signup-google";
     }
 
-    public static boolean isKubernetes() {
-        String isKubernetes = System.getenv("IS_KUBERNETES");
-        return isKubernetes != null && isKubernetes.equalsIgnoreCase("true");
-    }
-
     public static boolean isNotKubernetes() {
-        return !isKubernetes();
+        return !DashboardMode.isKubernetes();
     }
 
 
@@ -1754,7 +1810,6 @@ public class InitializerListener implements ServletContextListener {
                 }
                 trimCappedCollections();
                 setUpPiiAndTestSourcesScheduler();
-//                setUpDependencyFlowScheduler();
                 setUpTrafficAlertScheduler();
                 // setUpAktoMixpanelEndpointsScheduler();
                 SingleTypeInfo.init();
@@ -1762,6 +1817,7 @@ public class InitializerListener implements ServletContextListener {
                 setUpWebhookScheduler();
                 setUpDefaultPayloadRemover();
                 setUpTestEditorTemplatesScheduler();
+                setUpDependencyFlowScheduler();
                 tokenGeneratorCron.tokenGeneratorScheduler();
                 crons.deleteTestRunsScheduler();
                 updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
@@ -1779,6 +1835,7 @@ public class InitializerListener implements ServletContextListener {
 
                 setUpUpdateCustomCollections();
                 setUpFillCollectionIdArrayJob();
+                setupAutomatedApiGroupsScheduler();
             }
         }, 0, TimeUnit.SECONDS);
 
@@ -1787,6 +1844,13 @@ public class InitializerListener implements ServletContextListener {
 
 
     private void setUpDependencyFlowScheduler() {
+        int minutes = DashboardMode.isOnPremDeployment() ? 60 : 24*60;
+        Context.accountId.set(1000_000);
+        boolean dibs = callDibs(Cluster.DEPENDENCY_FLOW_CRON,  minutes, 60);
+        if(!dibs){
+            loggerMaker.infoAndAddToDb("Cron for updating dependency flow not acquired, thus skipping cron", LogDb.DASHBOARD);
+            return;
+        }
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
@@ -1795,7 +1859,7 @@ public class InitializerListener implements ServletContextListener {
                         try {
                             DependencyFlow dependencyFlow = new DependencyFlow();
                             loggerMaker.infoAndAddToDb("Starting dependency flow");
-                            dependencyFlow.run();
+                            dependencyFlow.run(null);
                             dependencyFlow.syncWithDb();
                             loggerMaker.infoAndAddToDb("Finished running dependency flow");
                         } catch (Exception e) {
@@ -1806,7 +1870,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "dependency_flow");
             }
-        }, 0, 4, TimeUnit.HOURS);
+        }, 0, minutes, TimeUnit.MINUTES);
     }
 
     private void updateGlobalAktoVersion() {
@@ -1909,7 +1973,10 @@ public class InitializerListener implements ServletContextListener {
 
             BasicDBList entitlements = OrganizationUtils.fetchEntitlements(organizationId,
                     organization.getAdminEmail());
+
             featureWiseAllowed = OrganizationUtils.getFeatureWiseAllowed(entitlements);
+            Set<Integer> accounts = organization.getAccounts();
+            featureWiseAllowed = UsageMetricHandler.updateFeatureMapWithLocalUsageMetrics(featureWiseAllowed, accounts);
 
             loggerMaker.infoAndAddToDb(String.format("Processed %s features", featureWiseAllowed.size()),LogDb.DASHBOARD);
 
@@ -2059,6 +2126,7 @@ public class InitializerListener implements ServletContextListener {
         dropLastCronRunInfoField(backwardCompatibility);
         fetchIntegratedConnections(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
+        dropApiDependencies(backwardCompatibility);
         resetSingleTypeInfoCount(backwardCompatibility);
         dropWorkflowTestResultCollection(backwardCompatibility);
         readyForNewTestingFramework(backwardCompatibility);
@@ -2068,6 +2136,8 @@ public class InitializerListener implements ServletContextListener {
         moveAuthMechanismDataToRole(backwardCompatibility);
         createLoginSignupGroups(backwardCompatibility);
         createRiskScoreGroups(backwardCompatibility);
+        setApiCollectionAutomatedField(backwardCompatibility);
+        createAutomatedAPIGroups(backwardCompatibility);
         deleteAccessListFromApiToken(backwardCompatibility);
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
@@ -2479,6 +2549,12 @@ public class InitializerListener implements ServletContextListener {
     public void setupUsageScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                Context.accountId.set(1000_000);
+                boolean dibs = callDibs("usage-scheduler", 60*60, 60);
+                if (!dibs) {
+                    loggerMaker.infoAndAddToDb("Usage cron dibs not acquired, skipping usage cron", LoggerMaker.LogDb.DASHBOARD);
+                    return;
+                }
                 calcUsage();
             }
         }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
@@ -2505,5 +2581,40 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public void setupAutomatedApiGroupsScheduler() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+
+                // Acquire dibs for updating automated API groups
+                Context.accountId.set(1000_000);
+                boolean dibs = callDibs(Cluster.AUTOMATED_API_GROUPS_CRON,  4*60*60, 60);
+                if(!dibs){
+                    loggerMaker.infoAndAddToDb("Cron for updating automated API groups not acquired, thus skipping cron", LogDb.DASHBOARD);
+                    return;
+                }
+
+                loggerMaker.infoAndAddToDb("Cron for updating automated API groups picked up.", LogDb.DASHBOARD);
+
+                // Fetch automated API groups csv records
+                List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups(true);
+
+                if (apiGroupRecords == null) {
+                    return;
+                }
+
+                AutomatedApiGroupsUtils.delete_account_ctr = 0;
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            AutomatedApiGroupsUtils.processAutomatedGroups(apiGroupRecords);
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb("Error while processing automated api groups: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "automated-api-groups-scheduler");
+            }
+        }, 0, 4, TimeUnit.HOURS);
+    }
 }
 

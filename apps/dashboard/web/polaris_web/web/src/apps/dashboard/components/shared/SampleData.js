@@ -10,7 +10,13 @@ function highlightPaths(highlightPathMap, ref){
       if (highlightPathMap[key].highlight) {
         let path = key.split("#");
         let mainKey = path[path.length - 1];
-        let matches = ref.getModel().findMatches(mainKey, false, false, false, null, true);
+        let matches = []
+        try {
+          matches = ref.getModel().findMatches(mainKey, false, false, false, null, true);
+        } catch (error) {
+          console.error(error)
+          console.log("mainKey: " + mainKey)
+        }
         matches.forEach((match) => {
           ref.createDecorationsCollection([
               {
@@ -55,7 +61,13 @@ function highlightHeaders(data, ref, getLineNumbers){
   let changesArr = []
   headerKeysMap && Object.keys(headerKeysMap).forEach((key) => {
     const header = key
-    let matchRanges = ref.getModel().findMatches(header, false, false, true, null, true, 1)
+    let matchRanges = []
+    try {
+      matchRanges = ref.getModel().findMatches(header, false, false, true, null, true, 1)
+    } catch (error) {
+      console.error(error)
+      console.log("header: " + header)
+    }
     changesArr = [ ...changesArr, ...matchRanges]
     matchRanges.forEach((obj) => {
       let matchRange = obj.range
@@ -202,7 +214,8 @@ function SampleData(props) {
             lightbulb: { enabled: false },
             scrollbar:{
               alwaysConsumeMouseWheel: false
-            }
+            },
+            fixedOverflowWidgets: true 
         }
         let instance = "";
         if(editorLanguage.includes("custom")){

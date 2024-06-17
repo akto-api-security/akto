@@ -19,10 +19,10 @@ public class TestInviteUserAction {
         code = InviteUserAction.validateEmail("ankita", "avneesh@akto.io");
         assertEquals(code, InviteUserAction.INVALID_EMAIL_ERROR);
 
-        code = InviteUserAction.validateEmail("anuj@amazon.com", "avneesh@akto.io");
+        code = InviteUserAction.validateEmail("anuj@amazon.com", "avneesh@gmail.io");
         assertEquals(code, InviteUserAction.DIFFERENT_ORG_EMAIL_ERROR);
 
-        code = InviteUserAction.validateEmail("jim@akto", "avneesh@akto.io");
+        code = InviteUserAction.validateEmail("jim@akto", "avneesh@gmail.io");
         assertEquals(code, InviteUserAction.DIFFERENT_ORG_EMAIL_ERROR);
     }
 }

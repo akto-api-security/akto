@@ -10,7 +10,7 @@ import {ResourcesMajor,
   ReplayMinor,
   PlayMinor,
 } from '@shopify/polaris-icons';
-import React, {  } from 'react'
+import React from 'react'
 import { Text,HorizontalStack, Badge, Link, List, Box, Icon, Avatar, Tag, Tooltip} from '@shopify/polaris';
 import { history } from "@/util/history";
 import PersistStore from "../../../main/PersistStore";
@@ -148,7 +148,7 @@ function minimizeTagList(items){
 }
 
 function checkTestFailure(summaryState, testRunState) {
-  if (testRunState == 'COMPLETED' && summaryState != 'COMPLETED') {
+  if (testRunState === 'COMPLETED' && summaryState !== 'COMPLETED' && summaryState !== "STOPPED") {
     return true;
   }
   return false;
@@ -280,8 +280,8 @@ const transform = {
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
       obj['runTypeStatus'] = [obj['run_type']]
       obj['nextUrl'] = "/dashboard/testing/"+data.hexId
-      obj['testRunState'] = data.state
-      obj['summaryState'] = state
+      obj['testRunState'] = state
+      obj['summaryState'] = testingRunResultSummary.state
       obj['startTimestamp'] = testingRunResultSummary?.startTimestamp
       obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
@@ -291,7 +291,7 @@ const transform = {
         const prettifiedTest={
           ...obj,
           testName: transform.prettifyTestName(data.name || "Test", iconObj.icon,iconObj.color, iconObj.tooltipContent),
-          severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues))
+          severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues || {"HIGH" : 0, "MEDIUM": 0, "LOW": 0}))
         }
         return prettifiedTest
       }else{
@@ -331,6 +331,7 @@ const transform = {
       obj['cve'] = subCategoryMap[data.testSubType]?.cve ? subCategoryMap[data.testSubType]?.cve : []
       obj['cveDisplay'] = minimizeTagList(obj['cve'])
       obj['errorsList'] = data.errorsList || []
+      obj['testCategoryId'] = data.testSubType
       return obj;
     },
     prepareTestRunResults : (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap) => {
@@ -606,7 +607,7 @@ const transform = {
       const date = new Date(obj.startTimestamp * 1000)
       return{
         ...obj,
-        prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues),
+        prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues || {"HIGH" : 0, "MEDIUM": 0, "LOW": 0}),
         startTime: date.toLocaleTimeString() + " on " +  date.toLocaleDateString(),
         id: obj.hexId
       }
@@ -753,7 +754,7 @@ getCollapsibleRow(urls, severity){
 getTestErrorType(message){
   const errorsObject = TestingStore.getState().errorsObject
   for(var key in errorsObject){
-    if(errorsObject[key] === message){
+    if(errorsObject[key] === message || message.includes(errorsObject[key])){
       return key
     }
   }
@@ -769,7 +770,25 @@ getPrettifiedTestRunResults(testRunResults){
     if(test?.errorsList.length > 0){
       const errorType = this.getTestErrorType(test.errorsList[0])
       key = key + ': ' + errorType
-      error_message = errorsObject[errorType]
+      if(errorType === "ROLE_NOT_FOUND"){
+        const baseUrl = window.location.origin+"/dashboard/testing/roles/details?system="
+        const missingConfigs = func.toSentenceCase(test.errorsList[0].split(errorsObject["ROLE_NOT_FOUND"])[0]).split(" ");
+        error_message = (
+          <HorizontalStack gap={"1"}>
+            {missingConfigs.map((config, index) => {
+              return(
+                config.length > 0 ?
+                  <div className="div-link" onClick={(e) => {e.stopPropagation();window.open(baseUrl + config.toUpperCase(), "_blank")}} key={index}>
+                    <span style={{ lineHeight: '16px', fontSize: '14px', color: "#B98900"}}>{func.toSentenceCase(config || "")}</span>
+                  </div>
+                : null
+              )
+            })}
+          </HorizontalStack>
+        )
+      }else{
+        error_message = errorsObject[errorType]
+      }
     }
 
     if(testRunResultsObj.hasOwnProperty(key)){
@@ -806,7 +825,7 @@ getPrettifiedTestRunResults(testRunResults){
       ...obj,
       nameComp: <div data-testid={obj.name}><Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box></div>,
       severityComp: obj?.vulnerable === true ? <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge> : <Text>-</Text>,
-      cweDisplayComp: obj?.cweDisplay?.length > 0 ? <HorizontalStack gap={1}>
+      cweDisplayComp: obj?.cweDisplay?.length > 0 ? <HorizontalStack gap={1} wrap={false}>
         {obj.cweDisplay.map((ele,index)=>{
           return(
             <Badge size="small" status={func.getTestResultStatus(ele)} key={index}>{ele}</Badge>
@@ -919,14 +938,23 @@ stopTest(hexId){
   });
 },
 
-rerunTest(hexId, refreshSummaries){
+rerunTest(hexId, refreshSummaries, shouldRefresh){
   api.rerunTest(hexId).then((resp) => {
+    window.location.reload()
     func.setToast(true, false, "Test re-run initiated")
-    setTimeout(() => {
-      refreshSummaries();
-    }, 2000)
+    if(shouldRefresh){
+      setTimeout(() => {
+        refreshSummaries();
+      }, 2000)
+    }
   }).catch((resp) => {
-    func.setToast(true, true, "Unable to re-run test")
+    let additionalMessage = "";
+    const { data } = resp?.response
+    const { actionErrors } = data
+    if (actionErrors !== null && actionErrors !== undefined && actionErrors.length > 0) {
+      additionalMessage = ", " + actionErrors[0]
+    }
+    func.setToast(true, true, "Unable to re-run test" + additionalMessage);
   });
 },
 getActionsList(hexId){
@@ -950,7 +978,7 @@ getActionsList(hexId){
       content: 'Stop',
       icon: CircleCancelMajor,
       destructive:true,
-      onAction: () => {this.stopTest(hexId || "")},
+      onAction: () => {this.stopTest(hexId || ""); window.location.reload();},
       disabled: true,
   }
 ]},
@@ -958,17 +986,17 @@ getActions(item){
   let arr = []
   let section1 = {title: 'Actions', items:[]}
   let actionsList = this.getActionsList(item.id);
+  if(item.orderPriority === 1){
+    actionsList[1].disabled = true
+  }
   if(item['run_type'] === 'One-time'){
     section1.items.push(actionsList[1])
   }
   if(item['run_type'] !== 'CI/CD'){
     section1.items.push(actionsList[2])
   }
-  
-  if(item['orderPriority'] === 1 || item['orderPriority'] === 2){
-      actionsList[3].disabled = false
-  }else{
-      actionsList[3].disabled = true
+  if(item.orderPriority < 3){
+    actionsList[3].disabled = false
   }
   section1.items.push(actionsList[3]);
   arr.push(section1)
@@ -992,12 +1020,36 @@ getHeaders: (tab)=> {
               return header;
           })
 
+      case "need_configurations":
+        return headers.filter((header) => header.title !== "CWE tags").map((header) => {
+          if (header.title === "Severity") {
+              // Modify the object as needed
+              return { type: CellType.TEXT, title: "Configuration missing", value: 'errorMessage' };
+          }
+          return header;
+      })
+
       default:
           return headers
   }
 },
-convertErrorEnumsToErrorObjects(errorEnums){
-  console.log(errorEnums)
+getMissingConfigs(testResults){
+  const errorsObject = TestingStore.getState().errorsObject
+  if(Object.keys(errorsObject).length === 0){
+    return []
+  }
+  const configsSet = new Set();
+  testResults.forEach((res) => {
+    if(res?.errorsList.length > 0 && res.errorsList[0].includes(errorsObject["ROLE_NOT_FOUND"])){
+      const config = func.toSentenceCase(res.errorsList[0].split(errorsObject["ROLE_NOT_FOUND"])[0])
+      if(config.length > 0){
+        let allConfigs = config.split(" ")
+        allConfigs.filter(x => x.length > 1).forEach((x) => configsSet.add(func.toSentenceCase(x)))
+      }
+    }
+  })
+
+  return [...configsSet]
 }
 }
 

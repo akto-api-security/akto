@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
 
+import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationsDao;
@@ -29,6 +30,7 @@ import com.akto.dto.usage.UsageMetric;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricHandler;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.ApiCollection.ENV_TYPE;
@@ -42,6 +44,9 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.DeleteResult;
+import com.mongodb.client.result.UpdateResult;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UnwindOptions;
 import com.opensymphony.xwork2.Action;
@@ -133,6 +138,11 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchAllCollectionsBasic(){
+        this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchCollection() {
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId)));
@@ -220,8 +230,17 @@ public class ApiCollectionsAction extends UserAction {
         SampleDataDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         SensitiveSampleDataDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         TrafficInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
-        ApiInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
+        DeleteResult apiInfoDeleteResult = ApiInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         SensitiveParamInfoDao.instance.updateMany(filter, update);
+
+        /*
+         * This delta might not be accurate, since it may also include deletions from
+         * deactivated/demo collections or old collections, which were not being used
+         * for usage calculation
+         * Any inaccuracies here, would be fixed in the next calcUsage cycle (4 hrs)
+         */
+        int deltaUsage = -1 * (int) apiInfoDeleteResult.getDeletedCount();
+        UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get(), deltaUsage);
 
         List<ApiCollection> apiGroups = ApiCollectionsDao.instance.fetchApiGroups();
         for(ApiCollection collection: apiGroups){
@@ -482,29 +501,41 @@ public class ApiCollectionsAction extends UserAction {
         return apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
     }
 
-    private List<ApiCollection> filterDeactivatedCollections(List<ApiCollection> apiCollections) {
+    private List<ApiCollection> filterCollections(List<ApiCollection> apiCollections, boolean deactivated) {
         if (apiCollections == null) {
             return new ArrayList<>();
         }
         List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
+        Bson deactivatedFilter = Filters.eq(ApiCollection._DEACTIVATED, true);
+        if(!deactivated){
+            deactivatedFilter = Filters.or(
+                Filters.exists(ApiCollection._DEACTIVATED, false),
+                Filters.eq(ApiCollection._DEACTIVATED, false)
+            );
+        }
+
         /*
          * The apiCollections from request contain only the IDs,
          * thus we need to fetch the active status from the db.
          */
         return ApiCollectionsDao.instance.findAll(Filters.and(
                 Filters.in(Constants.ID, apiCollectionIds),
-                Filters.eq(ApiCollection._DEACTIVATED, true)));
+                deactivatedFilter));
     }
 
     public String deactivateCollections() {
+        this.apiCollections = filterCollections(this.apiCollections, false);
+        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
+        int deltaUsage = (-1) * this.apiCollections.stream().mapToInt(apiCollection -> apiCollection.getUrlsCount()).sum();
         List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
         ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
                 Updates.set(ApiCollection._DEACTIVATED, true));
+        UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get(), deltaUsage);
         return Action.SUCCESS.toUpperCase();
     }
 
     public String activateCollections() {
-        this.apiCollections = filterDeactivatedCollections(this.apiCollections);
+        this.apiCollections = filterCollections(this.apiCollections, true);
         if (this.apiCollections.isEmpty()) {
             return Action.SUCCESS.toUpperCase();
         }
@@ -525,8 +556,10 @@ public class ApiCollectionsAction extends UserAction {
             addActionError(errorMessage);
             return Action.ERROR.toUpperCase();
         }
+        UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get(), count);
         return Action.SUCCESS.toUpperCase();
     }
+
     public String fetchCustomerEndpoints(){
         try {
             ApiCollection juiceShop = ApiCollectionsDao.instance.findByName("juice_shop_demo");

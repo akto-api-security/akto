@@ -11,16 +11,19 @@ import com.akto.DaoInit;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.billing.OrganizationFlagsDao;
 import com.akto.dao.billing.OrganizationUsageDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dao.usage.UsageSyncDao;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.billing.OrganizationFlags;
 import com.akto.dto.usage.UsageSync;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.UsageCalculator;
 import com.akto.util.UsageUtils;
 import com.akto.util.tasks.OrganizationTask;
+import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -122,10 +125,14 @@ public class InitializerListener implements ServletContextListener {
                     int finalUsageUpperBound = usageUpperBound;
 
                     loggerMaker.infoAndAddToDb(String.format("Lower Bound: %d Upper bound: %d", usageLowerBound, usageUpperBound), LogDb.BILLING);
+
+                    OrganizationFlags flags = OrganizationFlagsDao.instance.findOne(new BasicDBObject());
+
                     OrganizationTask.instance.executeTask(new Consumer<Organization>() {
                         @Override
                         public void accept(Organization o) {
-                            aggregateAndSinkUsageData(o, finalUsageLowerBound, finalUsageUpperBound);                        }
+                            aggregateAndSinkUsageData(o, finalUsageLowerBound, finalUsageUpperBound, flags, false);
+                        }
                     }, "usage-reporting-scheduler");
 
                     UsageSyncDao.instance.updateOne(
@@ -139,9 +146,8 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
     }
 
-    public static void aggregateAndSinkUsageData(Organization organization, int usageLowerBound, int usageUpperBound) {
-        UsageCalculator.instance.aggregateUsageForOrg(organization, usageLowerBound, usageUpperBound);
-        UsageCalculator.instance.sendOrgUsageDataToAllSinks(organization);
+    public static void aggregateAndSinkUsageData(Organization organization, int usageLowerBound, int usageUpperBound, OrganizationFlags flags, boolean justRun) {
+        UsageCalculator.instance.aggregateUsageForOrg(organization, usageLowerBound, usageUpperBound, flags);
+        UsageCalculator.instance.sendOrgUsageDataToAllSinks(organization, justRun);
     }
-
 }

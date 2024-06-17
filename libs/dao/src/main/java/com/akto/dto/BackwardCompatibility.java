@@ -73,6 +73,14 @@ public class BackwardCompatibility {
     public static final String DISABLE_AWS_SECRET_PII = "disableAwsSecretPii";
     private int disableAwsSecretPii;
 
+    public static final String API_COLLECTION_AUTOMATED_FIELD = "apiCollectionAutomatedField";
+    private int apiCollectionAutomatedField;
+    public static final String AUTOMATED_API_GROUPS = "automatedApiGroups";
+    private int automatedApiGroups;
+
+    public static final String DROP_API_DEPENDENCIES = "dropApiDependencies";
+    private int dropApiDependencies;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -80,7 +88,8 @@ public class BackwardCompatibility {
                                  int aktoDefaultNewUI, int initializeOrganizationAccountBelongsTo, int orgsInBilling,
                                  int computeIntegratedConnections, int deleteLastCronRunInfo, int moveAuthMechanismToRole,
                                  int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
-                                 int deactivateCollections, int disableAwsSecretPii) {
+                                 int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
+                                 int automatedApiGroups) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -105,6 +114,8 @@ public class BackwardCompatibility {
         this.riskScoreGroups = riskScoreGroups;
         this.deactivateCollections = deactivateCollections;
         this.disableAwsSecretPii = disableAwsSecretPii;
+        this.apiCollectionAutomatedField = apiCollectionAutomatedField;
+        this.automatedApiGroups = automatedApiGroups;
     }
 
     public BackwardCompatibility() {
@@ -318,4 +329,27 @@ public class BackwardCompatibility {
         this.disableAwsSecretPii = disableAwsSecretPii;
     }
 
+    public int getApiCollectionAutomatedField() {
+        return apiCollectionAutomatedField;
+    }
+
+    public void setApiCollectionAutomatedField(int apiCollectionAutomatedField) {
+        this.apiCollectionAutomatedField = apiCollectionAutomatedField;
+    }
+
+    public int getAutomatedApiGroups() {
+        return automatedApiGroups;
+    }
+
+    public void setAutomatedApiGroups(int automatedApiGroups) {
+        this.automatedApiGroups = automatedApiGroups;
+    }
+
+    public int getDropApiDependencies() {
+        return dropApiDependencies;
+    }
+
+    public void setDropApiDependencies(int dropApiDependencies) {
+        this.dropApiDependencies = dropApiDependencies;
+    }
 }

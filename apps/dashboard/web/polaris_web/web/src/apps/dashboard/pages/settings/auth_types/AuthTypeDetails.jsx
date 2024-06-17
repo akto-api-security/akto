@@ -95,6 +95,8 @@ function AuthTypeDetails() {
         dispatchCurrState({type:"update", obj:obj})
     }
 
+    const errorMessage = func.nameValidationFunc(currState.name || "", !isNew)
+
     const descriptionCard = (
         <LegacyCard title="Details" key="desc">
             <LegacyCard.Section>
@@ -102,7 +104,10 @@ function AuthTypeDetails() {
                     <TextField
                         id={"name-field"} 
                         label="Name" value={currState.name}
-                        placeholder='New auth type name' onChange={(val) => { (isNew || isEditMode) ? handleChange({ name: val }) : {} }}
+                        placeholder='New auth type name' 
+                        {...isNew  ? {onChange: (val) => handleChange({name: val})} : {}}
+                        requiredIndicator={true}
+                        {...errorMessage.length > 0 ? {error: errorMessage} : {}}
                     />
                     {isNew ? null :
                     <Dropdown id={"active-dropdown"} 
@@ -156,11 +161,10 @@ function AuthTypeDetails() {
         let headerKeys = transform.convertPredicateToArray(currState.headerConditions);
         let payloadKeys = transform.convertPredicateToArray(currState.payloadConditions);
         let name = currState.name
-        let isValidOrError = func.validateName(name);
         if( (!headerKeys || headerKeys.length==0 ) && (!payloadKeys || payloadKeys.length==0 ) ){
             func.setToast(true, true, "Invalid header or payload keys");
-        } else if (isValidOrError!==true){
-            func.setToast(true, true, isValidOrError);
+        } else if (errorMessage.length > 0){
+            func.setToast(true, true, errorMessage);
         } else {
             if(isNew || isEditMode){
                 authTypesApi.addCustomAuthType(name, headerKeys, payloadKeys, true).then((res) => {

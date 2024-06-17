@@ -13,14 +13,17 @@ import {
   Popover,
   ActionList,
   Card,
-  ProgressBar
+  ProgressBar,
+  Tooltip,
+  Banner
 } from '@shopify/polaris';
 
 import {
   CircleInformationMajor,
   ArchiveMinor,
   PriceLookupMinor,
-  ReportMinor
+  ReportMinor,
+  RefreshMajor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import func from '@/util/func';
@@ -99,14 +102,14 @@ let filters = [
 
 function SingleTestRunPage() {
 
-  const [testRunResults, setTestRunResults] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [] })
-  const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [] })
+  const [testRunResults, setTestRunResults] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [] })
+  const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [] })
   const [ selectedTestRun, setSelectedTestRun ] = useState({});
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const subCategoryMap = PersistStore(state => state.subCategoryMap);
   const params= useParams()
   const [loading, setLoading] = useState(false);
-  const [tempLoading , setTempLoading] = useState({vulnerable: false, no_vulnerability_found: false, skipped: false, running: false})
+  const [tempLoading , setTempLoading] = useState({vulnerable: false, no_vulnerability_found: false, skipped: false, running: false,need_configurations:false})
   const [selectedTab, setSelectedTab] = useState("vulnerable")
   const [selected, setSelected] = useState(0)
   const [workflowTest, setWorkflowTest ] = useState(false);
@@ -118,6 +121,7 @@ function SingleTestRunPage() {
     testsInsertedInDb: 0,
     testingRunId: -1
   })
+  const [missingConfigs, setMissingConfigs] = useState([])
 
   const refreshId = useRef(null);
   const hexId = params.hexId;
@@ -164,6 +168,7 @@ function SingleTestRunPage() {
       prev.vulnerable = true;
       prev.no_vulnerability_found = true;
       prev.skipped = true;
+      prev.need_configurations = true
       return {...prev};
     });
     let testRunResults = [];
@@ -180,6 +185,15 @@ function SingleTestRunPage() {
     })
     fillTempData(testRunResults, 'skipped')
     fillData(transform.getPrettifiedTestRunResults(testRunResults), 'skipped')
+
+    await api.fetchTestingRunResults(summaryHexId, "SKIPPED_EXEC_NEED_CONFIG").then(({ testingRunResults }) => {
+      testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+    })
+    fillTempData(testRunResults, 'need_configurations')
+    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'need_configurations')
+    if(testRunResults.length > 0){
+      setMissingConfigs(transform.getMissingConfigs(testRunResults))
+    }
 
     await api.fetchTestingRunResults(summaryHexId, "SECURED").then(({ testingRunResults }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
@@ -199,22 +213,11 @@ function SingleTestRunPage() {
       }
       let cicd = testingRunType === "CI_CD";
       localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0], cicd, false);
-      if(localSelectedTestRun.orderPriority === 1){
-        if(setData){
-          setTimeout(() => {
-            refreshSummaries();
-          }, 2000)
-        }
-        setTempLoading((prev) => {
-            prev.running = true;
-            return {...prev};
-        });
-      }
 
       if(setData){
         setSelectedTestRun(localSelectedTestRun);
       }
-      if((localSelectedTestRun.testingRunResultSummaryHexId && testRunResults[selectedTab].length === 0) || !setData) {
+      if((localSelectedTestRun.testingRunResultSummaryHexId && testRunResults[selectedTab].length === 0) || setData) {
         await fetchTestingRunResultsData(localSelectedTestRun.testingRunResultSummaryHexId);
         }
       }) 
@@ -222,31 +225,6 @@ function SingleTestRunPage() {
     return localSelectedTestRun;
 }
 
-  const refreshSummaries = () => {
-    let intervalId = setInterval(async() => {
-      let localSelectedTestRun = await fetchData(false);
-      if(localSelectedTestRun.id){
-        if(localSelectedTestRun.orderPriority !== 1){
-          setSelectedTestRun(localSelectedTestRun);
-          setTempLoading((prev) => {
-            prev.running = false;
-            return prev;
-          });
-          clearInterval(intervalId)
-        } else {
-          setSelectedTestRun((prev) => {
-            if(func.deepComparison(prev, localSelectedTestRun)){
-              return prev;
-            }
-            return localSelectedTestRun;
-          });
-        }
-      } else {
-        clearInterval(intervalId)
-      }
-      refreshId.current = intervalId;
-    },5000)
-  }
 
   useEffect(()=>{
     async function loadData(){
@@ -321,7 +299,31 @@ const promotedBulkActions = (selectedDataHexIds) => {
     }
   }
 
-  const definedTableTabs = ['Vulnerable', 'Skipped', 'No vulnerability found']
+  const baseUrl = window.location.origin+"/dashboard/testing/roles/details?system=";
+
+  const bannerComp = (
+    missingConfigs.length > 0 ? 
+    <div className="banner-wrapper">
+      <Banner status="critical">
+        <HorizontalStack gap={3}>
+          <Box>
+            <Text fontWeight="semibold">
+              {`${missingConfigs.length} configuration${missingConfigs.length > 1 ? 's' : ''} missing: `}  
+            </Text>
+          </Box>
+          <HorizontalStack gap={2}>
+            {missingConfigs.map((config) => {
+              return(<Link url={baseUrl + config.toUpperCase()} key={config} target="_blank">
+                {config}
+              </Link>) 
+            })}
+          </HorizontalStack>
+        </HorizontalStack>
+      </Banner>
+    </div> : null
+  )
+
+  const definedTableTabs = ['Vulnerable', 'Need configurations','Skipped', 'No vulnerability found']
 
   const { tabsInfo } = useTable()
   const tableCountObj = func.getTabsCount(definedTableTabs, testRunResults)
@@ -335,6 +337,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
           setLoading(false)
       },200)
   }
+
   const resultTable = (
     <GithubSimpleTable
         key={"table"}
@@ -358,7 +361,12 @@ const promotedBulkActions = (selectedDataHexIds) => {
         selected={selected}
         tableTabs={tableTabs}
         onSelect={handleSelectedTab}
-        filterStateUrl={"dashboard/testing/" + selectedTestRun?.id + "/" + selectedTab}
+        filterStateUrl={"/dashboard/testing/" + selectedTestRun?.id + "/#" + selectedTab}
+        bannerComp={{
+          "comp": bannerComp,
+          "selected": 1
+          }
+        }
       />
   )
 
@@ -442,7 +450,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     )
   }
 
-  const allResultsLength = testRunResults.skipped.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length + progress
+  const allResultsLength = testRunResults.skipped.length + testRunResults.need_configurations.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length + progress
   const useComponents = (!workflowTest && allResultsLength === 0) ? [<EmptyData key="empty"/>] : components
   const headingComp = (
     <Box paddingBlockStart={1}>
@@ -468,6 +476,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
               </Text>
             </Badge>
             )}
+            <Button plain monochrome onClick={() => fetchData(true)}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
         </HorizontalStack>
         <HorizontalStack gap={"2"}>
           <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
@@ -520,7 +529,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
         secondaryActions={!workflowTest ? moreActionsComp: undefined}
         components={useComponents}
       />
-      <ReRunModal selectedTestRun={selectedTestRun} refreshSummaries={refreshSummaries}/>
+      <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false}/>
     </>
   );
 }

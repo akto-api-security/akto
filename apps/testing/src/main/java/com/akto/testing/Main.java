@@ -2,6 +2,7 @@ package com.akto.testing;
 
 import com.akto.DaoInit;
 import com.akto.billing.UsageMetricUtils;
+import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
@@ -10,6 +11,9 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.SyncLimit;
+import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -18,14 +22,17 @@ import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
+import com.akto.usage.UsageMetricHandler;
 import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
+import com.akto.rules.RequiredConfigs;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -225,21 +232,17 @@ public class Main {
                 },"matrix-analyser-task");
             }
         }, 0, 1, TimeUnit.MINUTES);
-
-
+        GetRunningTestsStatus.getRunningTests().getStatusOfRunningTests();
 
         loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
-        
-        Map<Integer, Integer> logSentMap = new HashMap<>();
 
         while (true) {
             AccountTask.instance.executeTask(account -> {
                 int accountId = account.getId();
 
                 int start = Context.now();
-
                 TestingRunResultSummary trrs = findPendingTestingRunResultSummary();
                 boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
                 TestingRun testingRun;
@@ -269,17 +272,14 @@ public class Main {
                     return;
                 }
 
+                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
+
                 loggerMaker.infoAndAddToDb("Starting test for accountID: " + accountId);
 
                 boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
 
-                if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
-                    int lastSent = logSentMap.getOrDefault(accountId, 0);
-                    if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
-                        logSentMap.put(accountId, start);
-                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
-                                + " . Failing test run : " + start, LogDb.TESTING);
-                    }
+                if (featureAccess.checkInvalidAccess()) {
+                    loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId + ". Failing test run at " + start, LogDb.TESTING);
                     TestingRunDao.instance.getMCollection().findOneAndUpdate(
                             Filters.eq(Constants.ID, testingRun.getId()),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
@@ -287,9 +287,12 @@ public class Main {
                     TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                             Filters.eq(Constants.ID, summaryId),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
-
                     return;
                 }
+
+                SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+                // saving the initial usageLeft, to calc delta later.
+                int usageLeft = syncLimit.getUsageLeft();
 
                 try {
                     setTestingRunConfig(testingRun, trrs);
@@ -374,7 +377,8 @@ public class Main {
 
                         }
                     }
-                    testExecutor.init(testingRun, summaryId);
+                    RequiredConfigs.initiate();
+                    testExecutor.init(testingRun, summaryId, syncLimit);
                     raiseMixpanelEvent(summaryId, testingRun, accountId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error in init " + e);
@@ -391,10 +395,11 @@ public class Main {
                             Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds())
                     );
                 }
-
-                TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                        Filters.eq("_id", testingRun.getId()),  completedUpdate
-                );
+                if(GetRunningTestsStatus.getRunningTests().isTestRunning(testingRun.getId())){
+                    TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                            Filters.eq("_id", testingRun.getId()),  completedUpdate
+                    );
+                }
 
                 if(summaryId != null && testingRun.getTestIdConfig() != 1){
                     TestExecutor.updateTestSummary(summaryId);
@@ -417,10 +422,17 @@ public class Main {
                             loggerMaker.errorAndAddToDb(e, "Error in sending test telemetry for account: " + accountId);
                         }
                     });
-
                 } else {
                     loggerMaker.infoAndAddToDb("Test telemetry disabled for account: " + accountId, LogDb.TESTING);
                 }
+
+                // update usage after test is completed.
+                 int deltaUsage = 0;
+                 if(syncLimit.checkLimit){
+                     deltaUsage = usageLeft - syncLimit.getUsageLeft();
+                 }
+ 
+                 UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.TEST_RUNS, accountId, deltaUsage);
 
             }, "testing");
             Thread.sleep(1000);
