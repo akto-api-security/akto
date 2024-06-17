@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Box, Button, Divider,LegacyCard, Text, VerticalStack} from '@shopify/polaris'
 import React from 'react'
 import StepperComponent from '../../../components/shared/StepperComponent'
@@ -30,7 +31,7 @@ function OnboardingLayout({stepObj, requestStepChange, currentStep, skipOnboardi
                 <Box padding="2"/>
             </LegacyCard>
 
-            <Button plain onClick={() => skipOnboarding()} fullWidth>I'm a ninja!! I dont need onboarding.</Button>
+            <AktoButton plain onClick={() => skipOnboarding()} fullWidth>I'm a ninja!! I dont need onboarding.</AktoButton>
         </div>
     )
 }

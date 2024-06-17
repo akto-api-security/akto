@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Page, LegacyCard, TextField, VerticalStack, Button } from '@shopify/polaris'
 import Dropdown from '../../../components/layouts/Dropdown'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
@@ -129,7 +130,7 @@ function DefaultPayloads() {
                         }
                         {
                             <div className='footer-save'>
-                                <Button primary onClick={savePattern} disabled={patternText === '' || selectedDDefaultPayload === patternText}>Save</Button>
+                                <AktoButton primary onClick={savePattern} disabled={patternText === '' || selectedDDefaultPayload === patternText}>Save</AktoButton>
                             </div>
                         }
                     </VerticalStack>

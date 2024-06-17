@@ -1,3 +1,4 @@
+import AktoButton from './../../components/shared/AktoButton';
 import func from "@/util/func";
 import api from "./api";
 import {ResourcesMajor,
@@ -405,7 +406,7 @@ const transform = {
           </Box>
     ) : <Text> No Jira ticket created. Click on the top right button to create a new ticket.</Text>
     
-    //<Box width="300px"><Button onClick={createJiraTicket} plain disabled={window.JIRA_INTEGRATED != "true"}>Click here to create a new ticket</Button></Box>
+    //<Box width="300px"><AktoButton onClick={createJiraTicket} plain disabled={window.JIRA_INTEGRATED != "true"}>Click here to create a new ticket</AktoButton></Box>
     let filledSection = []
     moreInfoSections.forEach((section) => {
       let sectionLocal = {...section}

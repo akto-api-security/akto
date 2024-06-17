@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Button, ButtonGroup, HorizontalGrid, HorizontalStack, LegacyCard, Page, Scrollable, Select, Spinner, Text } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
@@ -101,8 +102,8 @@ const Logs = () => {
                     selected={handleSelectLogGroup}
                     />
                 <ButtonGroup segmented>
-                    <Button onClick={handleRefresh} disabled={!logGroupSelected}>Refresh</Button>
-                    <Button onClick={handlePreviousFiveMinutesLogs} disabled={!logGroupSelected}>-5 minutes</Button>
+                    <AktoButton onClick={handleRefresh} disabled={!logGroupSelected}>Refresh</AktoButton>
+                    <AktoButton onClick={handlePreviousFiveMinutesLogs} disabled={!logGroupSelected}>-5 minutes</AktoButton>
                 </ButtonGroup>
             </div>
           

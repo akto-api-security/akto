@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {
   Text,
@@ -465,7 +466,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     <Popover
       active={secondaryPopover}
       onClose={() => setSecondaryPopover(false)}
-      activator={<Button disclosure onClick={() => setSecondaryPopover(!secondaryPopover)}>More actions</Button>}
+      activator={<AktoButton disclosure onClick={() => setSecondaryPopover(!secondaryPopover)}>More actions</AktoButton>}
       autofocusTarget="first-node"
     >
       <ActionList
@@ -481,9 +482,9 @@ const promotedBulkActions = (selectedDataHexIds) => {
       <PageWithMultipleCards
         title={headingComp}
         backUrl={`/dashboard/testing/`}
-        primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() => 
+        primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><AktoButton primary onClick={() => 
           func.downloadAsCSV((testRunResultsText[selectedTab]), selectedTestRun)
-          }>Export results</Button></Box>: undefined}
+          }>Export results</AktoButton></Box>: undefined}
         secondaryActions={!workflowTest ? moreActionsComp: undefined}
         components={useComponents}
       />

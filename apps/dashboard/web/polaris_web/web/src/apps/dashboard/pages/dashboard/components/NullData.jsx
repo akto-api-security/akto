@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Button, HorizontalStack, LegacyCard, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -13,7 +14,7 @@ function NullData({text,url,description,urlText}) {
                     <Text variant="bodyMd">{description}</Text>
                     <HorizontalStack gap={1}>
                         <Text>Click</Text>
-                        <Button plain onClick={()=> navigate(url)}>here</Button>
+                        <AktoButton plain onClick={()=> navigate(url)}>here</AktoButton>
                         <Text>{urlText}</Text>
                     </HorizontalStack>
                 </VerticalStack>

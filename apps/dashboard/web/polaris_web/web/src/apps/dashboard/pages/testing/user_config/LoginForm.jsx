@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { TextField, Text, Button, LegacyCard, LegacyTabs } from "@shopify/polaris"
 import { useState } from "react"
 import SampleData from "../../../components/shared/SampleData"
@@ -78,7 +79,7 @@ function LoginForm({ step, setSteps }) {
                 <LegacyCard subdued>
                     <div style={{ display: "grid", gridTemplateColumns: "auto max-content", gap: "10px", alignItems: "center", padding: "20px" }}>
                         <Text variant="headingMd">Test Response</Text>
-                        <Button id={"test-button"} onClick={handleLoginFlowTest} disabled={testDisable}>Test</Button>
+                        <AktoButton id={"test-button"} onClick={handleLoginFlowTest} disabled={testDisable}>Test</AktoButton>
                     </div>
                     {step.testResponse ?
                         <div>
