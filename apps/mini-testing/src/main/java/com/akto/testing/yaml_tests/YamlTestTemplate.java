@@ -7,6 +7,7 @@ import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.*;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.auth.AuthValidator;
 import com.akto.test_editor.execution.Executor;
@@ -55,12 +56,12 @@ public class YamlTestTemplate extends SecurityTestTemplate {
             // loggerMaker.infoAndAddToDb("running noAuth check " + logId, LogDb.TESTING);
             ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy(), this.testingRunConfig, this.customAuthTypes, debug, testLogs);
             if(res.getSuccess()) {
-                // OriginalHttpResponse resp = res.getResponse().;
-                // int statusCode = StatusCodeAnalyser.getStatusCode(resp.getBody(), resp.getStatusCode());
-                // if (statusCode >= 200 && statusCode < 300) {
-                    // loggerMaker.infoAndAddToDb("noAuth check failed, skipping execution " + logId, LogDb.TESTING);
-                    // return false;
-                // }
+                OriginalHttpResponse resp = res.getResponse();
+                int statusCode = StatusCodeAnalyser.getStatusCode(resp.getBody(), resp.getStatusCode());
+                if (statusCode >= 200 && statusCode < 300) {
+                    loggerMaker.infoAndAddToDb("noAuth check failed, skipping execution " + logId);
+                    return false;
+                }
             }
         }
         return true;
