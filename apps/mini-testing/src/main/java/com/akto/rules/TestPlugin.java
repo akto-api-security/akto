@@ -1,5 +1,7 @@
 package com.akto.rules;
 
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
@@ -31,6 +33,8 @@ public abstract class TestPlugin {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
     static final LoggerMaker loggerMaker = new LoggerMaker(TestPlugin.class);
+
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     private static final Logger logger = LoggerFactory.getLogger(TestPlugin.class);
 
@@ -296,7 +300,10 @@ public abstract class TestPlugin {
             this.enemies = new ArrayList<>();
 
             for (TestRoles testRoles: testRolesList) {
-                EndpointLogicalGroup endpointLogicalGroup = testRoles.fetchEndpointLogicalGroup();
+                EndpointLogicalGroup endpointLogicalGroup = testRoles.getEndpointLogicalGroup();
+                if (endpointLogicalGroup == null) {
+                    endpointLogicalGroup = dataActor.fetchEndpointLogicalGroupById(testRoles.getEndpointLogicalGroupId().toHexString());
+                }
                 if (endpointLogicalGroup == null) continue;
                 TestingEndpoints testingEndpoints = endpointLogicalGroup.getTestingEndpoints();
                 if (testingEndpoints == null) continue;

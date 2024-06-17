@@ -210,4 +210,6 @@ public abstract class DataActor {
 
     public abstract void insertTestingLog(Log log);
 
+    public abstract EndpointLogicalGroup fetchEndpointLogicalGroupById(String endpointLogicalGroupId);
+
 }

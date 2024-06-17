@@ -104,7 +104,10 @@ public class Executor {
         if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
             TestRoles role = dataActor.fetchTestRolesforId(testingRunConfig.getTestRoleId());
             if (role != null) {
-                EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
+                EndpointLogicalGroup endpointLogicalGroup = role.getEndpointLogicalGroup();
+                if (endpointLogicalGroup == null) {
+                    endpointLogicalGroup = dataActor.fetchEndpointLogicalGroupById(role.getEndpointLogicalGroupId().toHexString());
+                }
                 if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
                     if (role.getDefaultAuthMechanism() != null) {
                         loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
