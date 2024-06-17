@@ -6,14 +6,20 @@ import com.akto.test_editor.Utils;
 public class LesserThanFilter extends DataOperandsImpl {
     
     @Override
-    public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
+    public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
         Boolean result = false;
         Object data = dataOperandFilterRequest.getData();
         Object querySet = dataOperandFilterRequest.getQueryset();
         
         result = Utils.applyIneqalityOperation(data, querySet, "lt");
+        String validationReson = null;
+        if (result) {
+            validationReson = "Less than filter passed";
+        } else {
+            validationReson = "Less than filter failed: data -"+ data +", querySet" + querySet;
+        }
 
-        return result;
+        return new ValidationResult(result, validationReson);
     }
 }

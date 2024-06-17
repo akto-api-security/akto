@@ -6,14 +6,18 @@ import com.akto.test_editor.Utils;
 public class GreaterThanFilter extends DataOperandsImpl {
     
     @Override
-    public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
+    public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
         Boolean result = false;
         Object data = dataOperandFilterRequest.getData();
         Object querySet = dataOperandFilterRequest.getQueryset();
-        
-        result = Utils.applyIneqalityOperation(data, querySet, "gt");
+        String validationReson = null;
+        if (result) {
+            validationReson = "Greater than filter passed";
+        } else {
+            validationReson = "Greater than filter failed: data -"+ data +", querySet" + querySet;
+        }
 
-        return result;
+        return new ValidationResult(result, validationReson);
     }
 }

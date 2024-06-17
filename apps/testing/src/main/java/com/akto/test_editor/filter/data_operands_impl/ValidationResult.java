@@ -9,11 +9,11 @@ public class ValidationResult {
         this.validationReason = validationReason;
     }
 
-    Boolean getIsValid() {
+    public Boolean getIsValid() {
         return isValid;
     }
 
-    String getValidationReason() {
+    public String getValidationReason() {
         return validationReason;
     }
 }

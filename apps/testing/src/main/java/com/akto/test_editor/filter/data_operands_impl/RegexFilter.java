@@ -29,7 +29,13 @@ public class RegexFilter extends DataOperandsImpl {
             }
             result = result || res;
         }
-        return result;
+        String validationString = null;
+        if (result) {
+            validationString = "regex filter passed";
+        } else {
+            validationString = "regex filter failed because :data - " + data + ", queryset - " + querySet;;
+        }
+        return new ValidationResult(result, validationString);
     }
 
 }

@@ -14,6 +14,7 @@ public class NotContainsFilter extends DataOperandsImpl {
         Boolean res;
         List<String> querySet = new ArrayList<>();
         String data;
+        String validationString = null;
         try {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
@@ -29,7 +30,12 @@ public class NotContainsFilter extends DataOperandsImpl {
             }
             result = result && res;
         }
-        return result;    
+        if (result) {
+            validationString = "not contains filter passed";
+        } else {
+            validationString = "not contains filter failed because :data - " + data + ", queryset - " + querySet;
+        }
+        return new ValidationResult(result, validationString);
     }
 
 

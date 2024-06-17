@@ -7,25 +7,30 @@ import com.akto.dto.test_editor.DataOperandFilterRequest;
 public class NeqFilter extends DataOperandsImpl {
 
     @Override
-    public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
+    public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
         Boolean result = false;
         Object data = dataOperandFilterRequest.getData();
         Object querySet = dataOperandFilterRequest.getQueryset();
-        
+        String validationString = null;
         try {
             if (data instanceof String) {
                 List<String> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
-                    return false;
+                    return new ValidationResult(false, "neq filter failed because empty queryset");
                 }
                 result = !data.toString().toLowerCase().equals(queryList.get(0).toLowerCase());
+                if (result) {
+                    validationString = "neq validation passed";
+                } else {
+                    validationString = "neq validation failed: data - "+ data.toString().toLowerCase() + "query - " + queryList.get(0).toLowerCase();
+                }
             }
 
             if (data instanceof Integer) {
                 List<Integer> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
-                    return false;
+                    return new ValidationResult(false, "neq filter failed because empty queryset");
                 }
                 Integer dataInt = (Integer) data;
 
@@ -36,12 +41,17 @@ public class NeqFilter extends DataOperandsImpl {
                 } else {
                     result = ((int) dataInt != (int) queryList.get(0));
                 }
+                if (result) {
+                    validationString = "neq filter passed";
+                } else {
+                    validationString = "neq filter failed: data - "+ data + ", query - " + queryList.get(0);
+                }
             }
             
             if (data instanceof Boolean && querySet instanceof Boolean) {
                 List<Boolean> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
-                    return false;
+                    return new ValidationResult(false, "neq filter failed because empty queryset");
                 }
                 Boolean dataBool = (Boolean) data;
                 Object query = queryList.get(0);
@@ -51,13 +61,19 @@ public class NeqFilter extends DataOperandsImpl {
                 } else {
                     result = ((boolean) dataBool != (boolean) queryList.get(0));
                 }
+                if (result) {
+                    validationString = "neq filter passed";
+                } else {
+                    validationString = "neq filter failed because boolean data and query matched";
+                }
             }
             
         } catch (Exception e) {
-            return false;
+            return new ValidationResult(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
+
         
-        return result;
+        return new ValidationResult(result, validationString);
     }
 
 }

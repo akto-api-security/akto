@@ -27,7 +27,7 @@ public class EqFilter extends DataOperandsImpl {
             if (data instanceof Integer) {
                 List<Integer> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
-                    return false;
+                    new ValidationResult(false, "eq validation failed because of empty query");
                 }
                 Integer dataInt = (Integer) data;
 
@@ -38,12 +38,17 @@ public class EqFilter extends DataOperandsImpl {
                 } else {
                     result = ((int) dataInt == (int) queryList.get(0));
                 }
+                if (result) {
+                    return new ValidationResult(result, "eq validation passed ");
+                } else {
+                    return new ValidationResult(result, "eq validation failed because: "+ dataInt +" != " + query);
+                }
             }
             
             if (data instanceof Boolean ) {
                 List<Boolean> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
-                    return false;
+                    new ValidationResult(false, "eq validation failed because of empty query");
                 }
                 Boolean dataBool = (Boolean) data;
 
@@ -54,13 +59,17 @@ public class EqFilter extends DataOperandsImpl {
                 } else {
                     result = ((boolean) dataBool == (boolean) queryList.get(0));
                 }
+                if (result) {
+                    return new ValidationResult(result, "eq validation passed ");
+                } else {
+                    return new ValidationResult(result, "eq validation failed because: boolean query do not match");
+                }
             }
             
         } catch (Exception e) {
-            return false;
+            return new ValidationResult(false, "eq validation failed because of empty query");
         }
-        
-        return result;
+        return new ValidationResult(result, "eq validation failed because of empty query");
     }
 
 }

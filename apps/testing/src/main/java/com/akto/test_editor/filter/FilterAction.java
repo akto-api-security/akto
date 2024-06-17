@@ -174,8 +174,8 @@ public final class FilterAction {
         String url = filterActionRequest.getApiInfoKey().getUrl();
 
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(url, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-        Boolean res = invokeFilter(dataOperandFilterRequest);
-        return new DataOperandsFilterResponse(res, null, null, null);
+        ValidationResult res = invokeFilter(dataOperandFilterRequest);
+        return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
     }
 
     public void extractUrl(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
@@ -191,8 +191,8 @@ public final class FilterAction {
 
         String method = filterActionRequest.getApiInfoKey().getMethod().toString();
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(method, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-        Boolean res = invokeFilter(dataOperandFilterRequest);
-        return new DataOperandsFilterResponse(res, null, null, null);
+        ValidationResult res = invokeFilter(dataOperandFilterRequest);
+        return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
     }
 
     public void extractMethod(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
@@ -208,8 +208,8 @@ public final class FilterAction {
 
         String apiCollectionId = Integer.toString(filterActionRequest.getApiInfoKey().getApiCollectionId());
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(apiCollectionId, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-        Boolean res = invokeFilter(dataOperandFilterRequest);
-        return new DataOperandsFilterResponse(res, null, null, null);
+        ValidationResult res = invokeFilter(dataOperandFilterRequest);
+        return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
     }
 
     public void extractApiCollectionId(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
@@ -232,8 +232,8 @@ public final class FilterAction {
         }
         int respCode = rawApi.getResponse().getStatusCode();
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(respCode, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-        Boolean res = invokeFilter(dataOperandFilterRequest);
-        return new DataOperandsFilterResponse(res, null, null, null);
+        ValidationResult res = invokeFilter(dataOperandFilterRequest);
+        return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
     }
 
     public void extractResponseCode(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
@@ -355,12 +355,12 @@ public final class FilterAction {
             }
             
             DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(val, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-            res = invokeFilter(dataOperandFilterRequest);
-            return new DataOperandsFilterResponse(res, null, null, null);
+            ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
+            return new DataOperandsFilterResponse(validationResult.getIsValid(), null, null, null, validationResult.getValidationReason());
         } else if (filterActionRequest.getConcernedSubProperty() == null) {
             DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(payload, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-            res = invokeFilter(dataOperandFilterRequest);
-            return new DataOperandsFilterResponse(res, null, null, null);
+            ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
+            return new DataOperandsFilterResponse(validationResult.getIsValid(), null, null, null, validationResult.getValidationReason());
         }
 
         return new DataOperandsFilterResponse(false, null, null, null);
@@ -749,7 +749,6 @@ public final class FilterAction {
         if (handler == null) {
           return new ValidationResult(false, "operand:" + dataOperandFilterRequest.getOperand().toLowerCase()+ " not found in filters");
         }
-
         return handler.isValid(dataOperandFilterRequest);
     }
 

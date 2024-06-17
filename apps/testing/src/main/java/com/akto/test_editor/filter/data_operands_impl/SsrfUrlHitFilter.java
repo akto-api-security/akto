@@ -27,8 +27,13 @@ public class SsrfUrlHitFilter extends DataOperandsImpl {
                 break;
             }
         }
-
-        return result;
+        String validationString = null;
+        if (result) {
+            validationString = "ssrfUrl hit filter passed";
+        } else {
+            validationString = "ssrfUrl hit filter failed because : queryset - " + querySet;;
+        }
+        return new ValidationResult(result, validationString);
     }
 
 }
