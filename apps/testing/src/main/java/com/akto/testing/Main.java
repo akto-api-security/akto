@@ -88,7 +88,7 @@ public class Main {
     private static void setupRateLimitWatcher () {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                AccountTask.instance.executeTask(new Consumer<Account>() {
+                AccountTask.instance.executeTaskForNonHybridAccounts(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
                         AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
@@ -222,7 +222,7 @@ public class Main {
 
         schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                AccountTask.instance.executeTask(account -> {
+                AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
                     AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
                     try {
                         matrixAnalyzer.run();
@@ -239,7 +239,7 @@ public class Main {
         loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
 
         while (true) {
-            AccountTask.instance.executeTask(account -> {
+            AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
                 int accountId = account.getId();
 
                 int start = Context.now();

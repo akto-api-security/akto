@@ -162,4 +162,32 @@ public class AccountTask {
         }
 
     }
+
+    public void executeTaskForNonHybridAccounts(Consumer<Account> consumeAccount, String taskName) {
+
+        Bson activeFilter = Filters.or(
+                Filters.exists(Account.INACTIVE_STR, false),
+                Filters.eq(Account.INACTIVE_STR, false)
+        );
+
+        Bson nonHybridAccountsFilter = Filters.or(
+            Filters.exists(Account.HYBRID_TESTING_ENABLED, false),
+            Filters.eq(Account.HYBRID_TESTING_ENABLED, false)
+        );
+
+        List<Account> activeAccounts = AccountsDao.instance.findAll(Filters.and(activeFilter, nonHybridAccountsFilter));
+        for(Account account: activeAccounts) {
+            if (inactiveAccountsSet.contains(account.getId())) {
+                continue;
+            }
+            try {
+                Context.accountId.set(account.getId());
+                consumeAccount.accept(account);
+            } catch (Exception e) {
+                String msgString = String.format("Error in executing task %s for account %d", taskName, account.getId());
+                logger.error(msgString, e);
+            }
+        }
+
+    }
 }

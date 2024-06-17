@@ -20,6 +20,8 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public static final String TEST_RUN_ID = "testRunId";
     private ObjectId testRunId;
+    @BsonIgnore
+    private String testRunHexId;
     public static final String API_INFO_KEY = "apiInfoKey";
     private ApiInfo.ApiInfoKey apiInfoKey;
     public static final String TEST_SUPER_TYPE = "testSuperType";
@@ -41,6 +43,10 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     private int endTimestamp;
     public static final String TEST_RUN_RESULT_SUMMARY_ID = "testRunResultSummaryId";
     private ObjectId testRunResultSummaryId;
+    @BsonIgnore
+    private String testRunResultSummaryHexId;
+    private TestResult singleTestResult;
+    private MultiExecTestResult multiExecTestResult;
 
     public static final String ERRORS_LIST = "errorsList";
     private  List<String> errorsList;
@@ -228,6 +234,24 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
         this.workflowTest = workflowTest;
     }
 
+    public String getTestRunHexId() {
+        if (testRunHexId == null) return this.testRunId.toHexString();
+        return this.testRunHexId;
+    }
+
+    public void setTestRunHexId(String testRunHexId) {
+        this.testRunHexId = testRunHexId;
+    }
+
+    public String getTestRunResultSummaryHexId() {
+        if (testRunResultSummaryHexId == null) return this.testRunResultSummaryId.toHexString();
+        return this.testRunResultSummaryHexId;
+    }
+
+    public void setTestRunResultSummaryHexId(String testRunResultSummaryHexId) {
+        this.testRunResultSummaryHexId = testRunResultSummaryHexId;
+    }
+
     @Override
     public String toString() {
         return "TestingRunResult{" +
@@ -326,4 +350,21 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     public void setErrorsList(List<String> errorsList) {
         this.errorsList = errorsList;
     }
+
+    public TestResult getSingleTestResult() {
+        return singleTestResult;
+    }
+
+    public void setSingleTestResult(TestResult singleTestResult) {
+        this.singleTestResult = singleTestResult;
+    }
+
+    public MultiExecTestResult getMultiExecTestResult() {
+        return multiExecTestResult;
+    }
+
+    public void setMultiExecTestResult(MultiExecTestResult multiExecTestResult) {
+        this.multiExecTestResult = multiExecTestResult;
+    }
+
 }

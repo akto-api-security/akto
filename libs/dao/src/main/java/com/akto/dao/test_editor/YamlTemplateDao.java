@@ -48,6 +48,27 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         return testConfigMap;
     }
 
+    public Map<String, TestConfig> fetchTestConfigMap(boolean includeYamlContent, boolean fetchOnlyActive, List<YamlTemplate> yamlTemplates) {
+        Map<String, TestConfig> testConfigMap = new HashMap<>();
+        for (YamlTemplate yamlTemplate: yamlTemplates) {
+            try {
+                TestConfig testConfig = TestConfigYamlParser.parseTemplate(yamlTemplate.getContent());
+                if (includeYamlContent) {
+                    testConfig.setContent(yamlTemplate.getContent());
+                    testConfig.setTemplateSource(yamlTemplate.getSource());
+                    testConfig.setUpdateTs(yamlTemplate.getUpdatedAt());
+                }
+                testConfig.setInactive(yamlTemplate.getInactive());
+                testConfig.setAuthor(yamlTemplate.getAuthor());
+                testConfigMap.put(testConfig.getId(), testConfig);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        return testConfigMap;
+    }
+
     public Map<String, Info> fetchTestInfoMap() {
         Map<String, Info> ret = new HashMap<>();
         List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(new BasicDBObject(), Projections.include("info"));
