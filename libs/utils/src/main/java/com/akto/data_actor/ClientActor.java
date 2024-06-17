@@ -51,6 +51,8 @@ import org.bson.codecs.DecoderContext;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -71,6 +73,7 @@ public class ClientActor extends DataActor {
     private static final int maxConcurrentBatchWrites = 2;
     private static final Gson gson = new Gson();
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
+    private static final Logger logger = LoggerFactory.getLogger(ClientActor.class);
     
     ObjectMapper objectMapper = new ObjectMapper();
 
@@ -998,7 +1001,7 @@ public class ClientActor extends DataActor {
                 return;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in insertRuntimeLog" + e, LoggerMaker.LogDb.RUNTIME);
+            logger.error("error in insertRuntimeLog" + e);
             return;
         }
     }
@@ -2769,7 +2772,7 @@ public class ClientActor extends DataActor {
                 return;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in insertTestingLog" + e, LoggerMaker.LogDb.RUNTIME);
+            logger.error("error in insertTestingLog" + e);
             return;
         }
     }
