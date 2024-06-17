@@ -701,10 +701,12 @@ public class DbAction extends ActionSupport {
             try {
                 ArrayList<WriteModel<TestingRunIssues>> writes = new ArrayList<>();
                 for (BulkUpdates bulkUpdate: writesForTestingRunIssues) {
-                    Bson filters = Filters.empty();
-                    for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
-                        filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
-                    }
+                    Object filterObj = bulkUpdate.getFilters().get("_id");
+                    HashMap<String, Object> filterMap = (HashMap) filterObj;
+                    HashMap<String, Object> keyMap = (HashMap) filterMap.get("apiInfoKey");
+                    ApiInfoKey key = new ApiInfoKey((int)((long)keyMap.get("apiCollectionId")), (String)keyMap.get("url"), Method.valueOf((String)keyMap.get("method")));
+                    TestingIssuesId idd = new TestingIssuesId(key, TestErrorSource.valueOf((String)filterMap.get("testErrorSource")), (String)filterMap.get("testSubCategory"));
+                    Bson filters = Filters.eq("_id", idd);
                     List<String> updatePayloadList = bulkUpdate.getUpdates();
     
                     List<Bson> updates = new ArrayList<>();
@@ -712,7 +714,7 @@ public class DbAction extends ActionSupport {
                         Map<String, Object> json = gson.fromJson(payload, Map.class);
     
                         String field = (String) json.get("field");
-                        if (field.equals("collectionIds")) {
+                        if (field.equals(TestingRunIssues.COLLECTION_IDS)) {
                             List<Double> dVal = (List) json.get("val");
                             List<Integer> val = new ArrayList<>();
                             for (int i = 0; i < dVal.size(); i++) {
@@ -723,15 +725,26 @@ public class DbAction extends ActionSupport {
                             String val = (String)json.get("val");
                             ObjectId id = new ObjectId(val);
                             updates.add(Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, id));
-                        } else {
+                        } else if(field.equals(TestingRunIssues.UNREAD)){
                             boolean dVal = (boolean) json.get("val");
+                            UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
+                            updates.add(Updates.set(updatePayload.getField(), dVal));
+                        } else if (field.equals(TestingRunIssues.LAST_UPDATED) ||
+                                field.equals(TestingRunIssues.LAST_SEEN) ||
+                                field.equals(TestingRunIssues.CREATION_TIME)) {
+                            Double val = (double) json.get("val");
+                            int dVal = val.intValue();
+                            UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
+                            updates.add(Updates.set(updatePayload.getField(), dVal));
+                        } else {
+                            String dVal = (String) json.get("val");
                             UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
                             updates.add(Updates.set(updatePayload.getField(), dVal));
                         }
                     }
     
                     writes.add(
-                            new UpdateOneModel<>(filters, updates, new UpdateOptions().upsert(true))
+                            new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
                     );
                 }
                 DbLayer.bulkWriteTestingRunIssues(writes);
