@@ -278,7 +278,7 @@ public class TestExecutor {
         } while (fetchMore);
 
         TestingRunResultSummary testingRunResultSummary = dataActor.updateIssueCountInSummary(summaryId.toHexString(), totalCountIssues);
-        GithubUtils.publishGithubComments(testingRunResultSummary);
+        // GithubUtils.publishGithubComments(testingRunResultSummary);
 
         loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
         if(totalCountIssues.get(Severity.HIGH.toString()) > 0) {
@@ -519,12 +519,21 @@ public class TestExecutor {
             trr.setTestRunResultSummaryHexId(trr.getTestRunResultSummaryHexId());
             GenericTestResult testRes = trr.getTestResults().get(0);
             if (testRes instanceof TestResult) {
-                trr.setSingleTestResult((TestResult) testRes);
+                List<TestResult> list = new ArrayList<>();
+                for(GenericTestResult testResult: trr.getTestResults()){
+                    list.add((TestResult) testResult);
+                }
+                trr.setSingleTestResults(list);
             } else {
-                trr.setMultiExecTestResult((MultiExecTestResult) testRes);
+                List<MultiExecTestResult> list = new ArrayList<>();
+                for(GenericTestResult testResult: trr.getTestResults()){
+                    list.add((MultiExecTestResult) testResult);
+                }
+                trr.setMultiExecTestResults(list);
             }
             trr.setTestResults(null);
-            dataActor.insertTestingRunResults(testingRunResults.get(0));
+            trr.setTestLogs(null);
+            dataActor.insertTestingRunResults(trr);
             loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
             dataActor.updateTestResultsCountInTestSummary(testRunResultSummaryId.toHexString(), resultSize);
             loggerMaker.infoAndAddToDb("Updated count in summary", LogDb.TESTING);
@@ -654,7 +663,7 @@ public class TestExecutor {
         String testExecutionLogId = UUID.randomUUID().toString();
         
         loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
-            testSubType + "logId" + testExecutionLogId, LogDb.TESTING);
+            testSubType + " logId " + testExecutionLogId, LogDb.TESTING);
 
         List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
         // TestingUtil -> authMechanism

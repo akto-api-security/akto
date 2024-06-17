@@ -541,8 +541,9 @@ public class DbLayer {
                 Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)
             );
         }
+        ObjectId id = new ObjectId(testingRunId);
         TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                Filters.eq("_id", testingRunId),  completedUpdate
+                Filters.eq("_id", id),  completedUpdate
         );
     }
 

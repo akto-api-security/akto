@@ -190,6 +190,19 @@ public class Main {
             }
         }, 5, 5, TimeUnit.MINUTES);
 
+        try {
+            com.akto.sql.Main.createSampleDataTable();
+        } catch(Exception e){
+            logger.error("Unable to connect to postgres sql db", e);
+        }
+
+        try {
+            CleanPostgres.cleanPostgresCron();
+        } catch(Exception e){
+            logger.error("Unable to clean postgres", e);
+        }
+
+
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
         APIConfig apiConfig = dataActor.fetchApiConfig(configName);
