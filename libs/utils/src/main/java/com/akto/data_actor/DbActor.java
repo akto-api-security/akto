@@ -6,6 +6,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
@@ -17,6 +18,7 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
+import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
@@ -107,6 +109,19 @@ public class DbActor extends DataActor {
             writes.add(write);
         }
         DbLayer.bulkWriteTrafficMetrics(writes);
+    }
+
+    public void bulkWriteTestingRunIssues(List<Object> writesForTestingRunIssues) {
+        ArrayList<WriteModel<TestingRunIssues>> writes = new ArrayList<>();
+        for (Object obj : writesForTestingRunIssues) {
+            WriteModel<TestingRunIssues> write = (WriteModel<TestingRunIssues>) obj;
+            writes.add(write);
+        }
+        DbLayer.bulkWriteTestingRunIssues(writes);
+    }
+
+    public TestSourceConfig findTestSourceConfig(String subType){
+        return DbLayer.findTestSourceConfig(subType);
     }
 
     public List<SingleTypeInfo> fetchStiOfCollections(int batchCount, int lastStiFetchTs) {
@@ -252,7 +267,7 @@ public class DbActor extends DataActor {
         return DbLayer.fetchEndpointLogicalGroupById(endpointLogicalGroupId);
     }
 
-    public List<TestingRunIssues> fetchIssuesByIds(Object[] issuesIds) {
+    public List<TestingRunIssues> fetchIssuesByIds(Set<TestingIssuesId> issuesIds) {
         return DbLayer.fetchIssuesByIds(issuesIds);
     }
 

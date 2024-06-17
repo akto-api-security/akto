@@ -19,6 +19,7 @@ public class TestingIssuesId {
 
     public static final String API_KEY_INFO = "apiInfoKey";
     private ApiInfoKey apiInfoKey;
+    public static final String TEST_ERROR_SOURCE = "testErrorSource";
     private TestErrorSource testErrorSource;
     public static final String TEST_SUB_CATEGORY = "testSubCategory";
     // ?? enum in db
