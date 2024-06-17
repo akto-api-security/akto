@@ -1431,7 +1431,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       const tabId = this.getKeyFromName(tab)
       return {
           content: tab,
-          badge: selectedTab === tabId ? currentCount.toString() : countObj[tabId].toString(),
+          badge: selectedTab === (tabId && currentCount !==0) ? currentCount.toString() : countObj[tabId].toString(),
           onAction: () => { setSelectedTab(tabId) },
           id: this.getKeyFromName(tabId),
           index: ind 
