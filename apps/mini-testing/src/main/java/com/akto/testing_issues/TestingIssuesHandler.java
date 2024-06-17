@@ -106,14 +106,14 @@ public class TestingIssuesHandler {
             UpdatePayload updatePayload = new UpdatePayload();
             if (runResult.isVulnerable()) {
                 if (status == TestRunIssueStatus.IGNORED) {
-                    updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED, SET_OPERATION);
+                    updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED.name(), SET_OPERATION);
                     updates.add(updatePayload.toString());
                 } else {
-                    updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN, SET_OPERATION);
+                    updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name(), SET_OPERATION);
                     updates.add(updatePayload.toString());
                 }
             } else {
-                updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED, SET_OPERATION);
+                updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name(), SET_OPERATION);
                 updates.add(updatePayload.toString());
             }
 
@@ -162,9 +162,9 @@ public class TestingIssuesHandler {
                 Map<String, Object> filterMap = new HashMap<>();
                 filterMap.put(ID, testingIssuesId);
                 ArrayList<String> updates = new ArrayList<>();
-                UpdatePayload updatePayload = new UpdatePayload(TestingRunIssues.KEY_SEVERITY, severity, SET_OPERATION);
+                UpdatePayload updatePayload = new UpdatePayload(TestingRunIssues.KEY_SEVERITY, severity.name(), SET_OPERATION);
                 updates.add(updatePayload.toString());
-                updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN, SET_OPERATION);
+                updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name(), SET_OPERATION);
                 updates.add(updatePayload.toString());
                 updatePayload = new UpdatePayload(TestingRunIssues.CREATION_TIME, lastSeen, SET_OPERATION);
                 updates.add(updatePayload.toString());
