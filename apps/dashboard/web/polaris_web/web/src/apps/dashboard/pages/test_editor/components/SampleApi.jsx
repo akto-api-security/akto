@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip} from "@shopify/polaris"
 import {ChevronUpMinor } from "@shopify/polaris-icons"
 
@@ -220,13 +221,16 @@ const SampleApi = () => {
         editorSetup.setEditorTheme();
     }
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+
     const resultComponent = (
         <Box background={getColor()} width="100%" padding={"2"}>
-            <Button id={"test-results"} removeUnderline monochrome plain 
+            <AktoButton disabled={disableButton} id={"test-results"} removeUnderline monochrome plain 
             onClick={testResult ? showResults : () => {}}
             icon={testResult ? ChevronUpMinor : undefined}>
                 {getResultDescription()}
-            </Button>
+            </AktoButton>
         </Box>
 
     )
@@ -238,14 +242,14 @@ const SampleApi = () => {
                     <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
                 </div>
                 <HorizontalStack gap={2}>
-                    <Button id={"select-sample-api"} onClick={toggleSelectApiActive} size="slim">
+                    <AktoButton disabled={disableButton} id={"select-sample-api"} onClick={toggleSelectApiActive} size="slim">
                         <Box maxWidth="200px">
                             <Tooltip content={copySelectedApiEndpoint} hoverDelay={"100"}>
                                 <Text variant="bodyMd" truncate>{copySelectedApiEndpoint}</Text>
                             </Tooltip>
                         </Box>
-                    </Button>
-                    <Button id={"run-test"} loading={loading} primary onClick={runTest} size="slim">Run Test</Button>
+                    </AktoButton>
+                    <AktoButton disabled={disableButton} id={"run-test"} loading={loading} primary onClick={runTest} size="slim">Run Test</AktoButton>
                 </HorizontalStack>
             </div>
 
@@ -278,6 +282,7 @@ const SampleApi = () => {
                     id:"save",
                     content: 'Save',
                     onAction: saveFunc,
+                    'disabled': disableButton
                 }}
                 secondaryActions={[
                     {

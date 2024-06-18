@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import React, { useEffect, useState } from 'react'
 import FlyLayout from '../../../components/layouts/FlyLayout'
 import func from '@/util/func'
@@ -10,9 +11,11 @@ import issuesApi from "../../issues/api"
 import GridRows from '../../../components/shared/GridRows'
 import { useNavigate } from 'react-router-dom'
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
+import PersistStore from '../../../../main/PersistStore';
 
 function TestRunResultFlyout(props) {
-
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
 
     const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage} = props
     const [fullDescription, setFullDescription] = useState(false)
@@ -61,20 +64,24 @@ function TestRunResultFlyout(props) {
     
     const issues = [{
         content: 'False positive',
-        onAction: () => { ignoreAction("False positive") }
+        onAction: () => { ignoreAction("False positive") },
+        'disabled': disableButton
     },
     {
         content: 'Acceptable risk',
-        onAction: () => { ignoreAction("Acceptable risk") }
+        onAction: () => { ignoreAction("Acceptable risk") },
+        'disabled': disableButton
     },
     {
         content: 'No time to fix',
-        onAction: () => { ignoreAction("No time to fix") }
+        onAction: () => { ignoreAction("No time to fix") },
+        'disabled': disableButton
     }]
 
     const  reopen =  [{
         content: 'Reopen',
-        onAction: () => { reopenAction() }
+        onAction: () => { reopenAction() },
+        'disabled': disableButton
     }]
 
     const handleClose = () => {
@@ -92,7 +99,7 @@ function TestRunResultFlyout(props) {
         return(
             issueDetails?.id &&
         <Popover
-            activator={<Button disclosure plain onClick={() => setPopoverActive(!popoverActive)}>Actions</Button>}
+            activator={<AktoButton disabled={disableButton} disclosure plain onClick={() => setPopoverActive(!popoverActive)}>Actions</AktoButton>}
             active={popoverActive}
             onClose={() => setPopoverActive(false)}
             autofocusTarget="first-node"
@@ -103,12 +110,12 @@ function TestRunResultFlyout(props) {
                 <Popover.Section>
                     <VerticalStack gap={"4"}>
                         <Text variant="headingSm">Create</Text>
-                        <Button plain monochrome removeUnderline onClick={()=>{createJiraTicket(issueDetails)}} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>
+                        <AktoButton plain monochrome removeUnderline onClick={()=>{createJiraTicket(issueDetails)}} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true" || disableButton}>
                             <HorizontalStack gap={"2"}>
                                 <Avatar shape="square" size="extraSmall" source="/public/logo_jira.svg"/>
                                 <Text>Jira Ticket</Text>
                             </HorizontalStack>
-                        </Button>
+                        </AktoButton>
                     </VerticalStack>
                 </Popover.Section>
                 <Popover.Section>

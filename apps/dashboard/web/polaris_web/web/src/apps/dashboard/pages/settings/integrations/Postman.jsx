@@ -73,10 +73,14 @@ function Postman() {
         await settingFunctions.addOrUpdatePostmanCred(postmanKey,selected)
         setToast(true,false,"Collection Saved")
     }
+
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
+
     const PostmanCard = (
         <LegacyCard
             secondaryFooterActions={[{content: 'See how it works',onAction: seeWork}]}
-            primaryFooterAction={{content: 'Save', onAction: saveCollection}}
+            primaryFooterAction={{content: 'Save', onAction: saveCollection, 'disabled': disableButton}}
         >
           <LegacyCard.Section>
             <Text variant="headingMd">Integrate Postman</Text>

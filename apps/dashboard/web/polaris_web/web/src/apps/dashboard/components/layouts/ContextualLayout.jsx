@@ -1,8 +1,11 @@
 import React from 'react'
 import { Frame, ContextualSaveBar } from '@shopify/polaris'
 import "./ContextualLayoutStyle.css"
+import PersistStore from '../../../main/PersistStore'
 
 function ContextualLayout(props){
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
 
     const {saveAction, discardAction, isDisabled, pageMarkup } = props
 
@@ -19,13 +22,13 @@ function ContextualLayout(props){
             saveAction={{
             onAction: () => saveAction(),
             loading: false,
-            disabled: isDisabled(),
+            disabled: (disableButton || isDisabled()),
             content: "Save"
             }}
             discardAction={{
             onAction: () => discardAction(),
             content: "Discard",
-            disabled: isDisabled(),
+            disabled: (disableButton || isDisabled()),
             }}
         />
     )

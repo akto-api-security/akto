@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Text, Modal, TextField, VerticalStack, HorizontalStack, Button, Card } from "@shopify/polaris"
 import api from "../api"
 import func from "@/util/func"
@@ -133,9 +134,9 @@ function CreateNewCollectionModal(props) {
                     {...newCollectionName.length === 0 ? {error: "Collection name cannot be empty"} : {}}
                 />
                 <span>
-                    <Button plain onClick={() => setShowApiSelector(!showApiSelector)}>
+                    <AktoButton  plain onClick={() => setShowApiSelector(!showApiSelector)}>
                         {showApiSelector ? "Create empty collection" : "Add endpoints"}
-                    </Button>
+                    </AktoButton>
                 </span>
                 {
                     ApiCountComponent()
@@ -166,8 +167,8 @@ function CreateNewCollectionModal(props) {
                                 ))
                             }
                         <HorizontalStack gap={4} align="start">
-                            <Button onClick={() => handleAddField()}>Add condition</Button>
-                            <Button plain destructive onClick={() => dispatchConditions({ type: "clear" })}>Clear all</Button>
+                            <AktoButton  onClick={() => handleAddField()}>Add condition</AktoButton>
+                            <AktoButton  plain destructive onClick={() => dispatchConditions({ type: "clear" })}>Clear all</AktoButton>
                         </HorizontalStack>
                         </VerticalStack>
                     </Card> : null

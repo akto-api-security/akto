@@ -1,3 +1,4 @@
+import AktoButton from './../../shared/AktoButton';
 import {
     IndexTable,
     Text,
@@ -125,7 +126,7 @@ function GithubRow(props) {
                         {
                             <Popover
                                 active={popoverActive === data.id}
-                                activator={<Button onClick={(e) => togglePopoverActive(e,data.id)} plain icon={HorizontalDotsMinor} />}
+                                activator={<AktoButton  onClick={(e) => togglePopoverActive(e,data.id)} plain icon={HorizontalDotsMinor} />}
                                 autofocusTarget="first-node"
                                 onClose={(e) => togglePopoverActive(e,popoverActive)}
                             >
@@ -173,7 +174,7 @@ function GithubRow(props) {
                     {
                         <Popover
                             active={popoverActive === data.id}
-                            activator={<Button onClick={(e) => togglePopoverActive(e,data.id)} plain icon={HorizontalDotsMinor} />}
+                            activator={<AktoButton  onClick={(e) => togglePopoverActive(e,data.id)} plain icon={HorizontalDotsMinor} />}
                             autofocusTarget="first-node"
                             onClose={(e) => togglePopoverActive(e,popoverActive)}
                         >

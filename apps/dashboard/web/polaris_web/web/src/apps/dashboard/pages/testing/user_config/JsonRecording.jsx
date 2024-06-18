@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { CalloutCard, LegacyCard, Text, TextField, Card, Button, Spinner, Divider } from "@shopify/polaris"
 import { useEffect, useRef, useState } from "react"
 import TestingStore from "../testingStore"
@@ -182,7 +183,7 @@ function JsonRecording({extractInformation, showOnlyApi, setStoreData}) {
             <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
 
             <br />
-            { showOnlyApi ? null : <Button id={"save-token"} onClick={handleSave} primary>Save changes</Button> }
+            { showOnlyApi ? null : <AktoButton  id={"save-token"} onClick={handleSave} primary>Save changes</AktoButton> }
         </div>
     )
 }

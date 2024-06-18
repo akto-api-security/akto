@@ -1,8 +1,11 @@
+import AktoButton from './../../../../components/shared/AktoButton';
 import { Button, HorizontalStack, LegacyCard, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import LineComponent from './LineComponent'
 
 function Details({onClickFunc, values}) {
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
     return (    
         <LegacyCard.Section title="Integration details">
             <br/>
@@ -15,7 +18,7 @@ function Details({onClickFunc, values}) {
                     })}
                 </VerticalStack>
                 <HorizontalStack align="end">
-                    <Button primary onClick={onClickFunc} >Delete SSO</Button>
+                    <AktoButton disabled={disableButton} primary onClick={onClickFunc} >Delete SSO</AktoButton>
                 </HorizontalStack>
             </VerticalStack>
         </LegacyCard.Section>

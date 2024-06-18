@@ -1,3 +1,4 @@
+import AktoButton from './../../components/shared/AktoButton';
 import func from "@/util/func";
 import api from "./api";
 import {ResourcesMajor,
@@ -405,7 +406,7 @@ const transform = {
           </Box>
     ) : <Text> No Jira ticket created. Click on the top right button to create a new ticket.</Text>
     
-    //<Box width="300px"><Button onClick={createJiraTicket} plain disabled={window.JIRA_INTEGRATED != "true"}>Click here to create a new ticket</Button></Box>
+    //<Box width="300px"><AktoButton  onClick={createJiraTicket} plain disabled={window.JIRA_INTEGRATED != "true"}>Click here to create a new ticket</AktoButton></Box>
     let filledSection = []
     moreInfoSections.forEach((section) => {
       let sectionLocal = {...section}
@@ -953,28 +954,34 @@ rerunTest(hexId, refreshSummaries, shouldRefresh){
   });
 },
 getActionsList(hexId){
+  const userRole = window.USER_ROLE
+  const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+  
   return [
   {
       content: 'Schedule test',
       icon: CalendarMinor,
       onAction: () => {console.log("schedule test function")},
+      'disabled': disableButton
   },
   {
       content: 'Re-run',
       icon: ReplayMinor,
       onAction: () => TestingStore.getState().setRerunModal(true),
+      'disabled': disableButton
   },
   {
       content: 'Add to CI/CD pipeline',
       icon: PlayMinor,
       onAction: () => {window.open('https://docs.akto.io/testing/run-tests-in-cicd', '_blank');},
+      'disabled': disableButton
   },
   {
       content: 'Stop',
       icon: CircleCancelMajor,
       destructive:true,
       onAction: () => {this.stopTest(hexId || ""); window.location.reload();},
-      disabled: true,
+      disabled: true || disableButton,
   }
 ]},
 getActions(item){

@@ -1,3 +1,4 @@
+import AktoButton from './../shared/AktoButton';
 import React, { useEffect, useRef, useState } from 'react'
 import { Avatar, Box, Button, HorizontalStack, Icon, Scrollable, Spinner,Text,TextField, Tooltip, VerticalStack } from "@shopify/polaris"
 import { SendMajor } from "@shopify/polaris-icons"
@@ -154,21 +155,21 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                             {buttonState === 2 ? 
                                 queryType === "generate_regex" && response?.responses[0]?.regex ?
                                     <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
-                                        <Button primary onClick={addRegex}>Add Regex to Akto</Button>
+                                        <AktoButton primary onClick={addRegex}>Add Regex to Akto</AktoButton>
                                     </div>
                                 : queryType === "suggest_tests" && response?.responses[0]?.tests ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
-                                    <Button primary onClick={runTests}>Run tests via Akto</Button>
+                                    <AktoButton primary onClick={runTests}>Run tests via Akto</AktoButton>
                                 </div>
                                 : queryType === "find_auth_related_tokens" && response?.responses?.length>0 ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
-                                    <Button primary onClick={() => addAuthTypes("", response.responses)}>Add above Auth Types</Button>
+                                    <AktoButton primary onClick={() => addAuthTypes("", response.responses)}>Add above Auth Types</AktoButton>
                                 </div>
                                 : queryType === "generate_curl_for_test" && response?.responses[0]?.curl ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
                                     <div ref={ref}/>
                                     <Tooltip content="Copy curl command">
-                                        <Button icon={ClipboardMinor} onClick={()=> func.copyToClipboard(response.responses[0].curl, ref)} />
+                                        <AktoButton icon={ClipboardMinor} onClick={()=> func.copyToClipboard(response.responses[0].curl, ref)} />
                                     </Tooltip>
                                 </div>
                                 :null
@@ -184,7 +185,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                         prefix={<Text color="subdued">{activePrompt.split("${input}")[0]}</Text>} 
                         suffix={
                             <div {...checkQuery() ? null : {style: {background: "#19C37D", padding: "4px", borderRadius: "4px"}}}>
-                                <Button plain disabled={checkQuery()} onClick={handleClick} icon={SendMajor}/>
+                                <AktoButton plain disabled={checkQuery()} onClick={handleClick} icon={SendMajor}/>
                             </div>
                         } 
                         placeholder={placeHolderText}

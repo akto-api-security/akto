@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Avatar, Badge, Box, Button, HorizontalGrid, HorizontalStack, LegacyCard, ProgressBar, ResourceItem, ResourceList, Scrollable, Text, VerticalStack, VideoThumbnail } from '@shopify/polaris'
 import React, { useState } from 'react'
 import quickStartFunc from '../transform'
@@ -30,7 +31,7 @@ function NewConnection() {
                 <Text variant='bodyMd'>
                     Akto is an open source, instant API security platform that takes only 60 secs to get started. Akto is used by security teams to maintain a continuous inventory of APIs, test APIs for vulnerabilities and find runtime issues. Akto offers tests for all OWASP top 10 and HackerOne Top 10 categories including BOLA, authentication, SSRF, XSS, security configurations, etc.
                 </Text>
-                <Button onClick={() => setTasksCompleted(1)} primary>Mark as complete</Button>
+                <AktoButton  onClick={() => setTasksCompleted(1)} primary>Mark as complete</AktoButton>
             </VerticalStack>
             <VideoThumbnail
                 videoLength={195}
@@ -75,13 +76,13 @@ function NewConnection() {
                         {badge && badge.length > 0 ? <Badge size='small' status='info'>{badge}</Badge> : null}
                     </Text>
                     <div className='see-docs'>
-                    <Button plain onClick={(event) => { 
+                    <AktoButton  plain onClick={(event) => { 
                             event.stopPropagation(); 
                             openDocs(docsUrl); 
                         }}    
                     >
                         Go to docs
-                    </Button>
+                    </AktoButton>
                     </div>
                 </div>
                 <Text variant='bodySm' color="subdued">{text}</Text>
@@ -150,11 +151,11 @@ function NewConnection() {
                         {tasksList.map((element,index) => (
                             <VerticalStack gap="5" key={element?.id}>
                                 <HorizontalStack gap="3">
-                                    <Button plain monochrome onClick={() => setTasksCompleted(index)}>
+                                    <AktoButton  plain monochrome onClick={() => setTasksCompleted(index)}>
                                         <Avatar customer name='circle' size="extraSmall"
                                             source={tasksCompleted > index ? "/public/circle_check.svg" : "/public/circle_icon.svg"}
                                         />
-                                    </Button>
+                                    </AktoButton>
                                     <Text variant='bodyMd' fontWeight={tasksCompleted === index ? "semibold" : "medium"}>{element?.label}</Text>
                                     {tasksCompleted === index ? element?.component : null}
                                 </HorizontalStack>

@@ -1,3 +1,4 @@
+import AktoButton from './../../../../components/shared/AktoButton';
 import { Button, HorizontalStack, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -20,7 +21,7 @@ function NoAccessComponent({steps , dataString, onClickFunc, toolTipContent, tit
                     </HorizontalStack>
                 </VerticalStack>
             ))}
-            <span>6. Click <Button plain onClick={() => navigate(0)}>here</Button> to refresh.</span>
+            <span>6. Click <AktoButton  plain onClick={() => navigate(0)}>here</AktoButton> to refresh.</span>
         </VerticalStack>
     )
 

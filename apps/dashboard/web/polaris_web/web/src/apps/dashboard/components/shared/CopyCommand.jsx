@@ -1,3 +1,4 @@
+import AktoButton from './AktoButton';
 import { Box, Button, TextField, Tooltip } from '@shopify/polaris'
 import { ClipboardMinor } from "@shopify/polaris-icons"
 import React, { useRef } from 'react'
@@ -17,7 +18,7 @@ function CopyCommand({command}) {
                 connectedRight={(<Tooltip dismissOnMouseOut content="Copy URL">
                     <Box>
                         <div ref={ref} />
-                        <Button onClick={copyContent} icon={ClipboardMinor} />
+                        <AktoButton  onClick={copyContent} icon={ClipboardMinor} />
                     </Box>
                 </Tooltip>)}
                 value={command}

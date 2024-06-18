@@ -1,3 +1,4 @@
+import AktoButton from './../../components/shared/AktoButton';
 import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import observeFunc from "../observe/transform"
@@ -242,7 +243,7 @@ const transform = {
         let tableRows = []
         finalArr.forEach((c)=> {
             let tempRow = [
-                <Button onClick={()=>setActive(true)} plain monochrome removeUnderline  >
+                <AktoButton  onClick={()=>setActive(true)} plain monochrome removeUnderline  >
 
                   <Box width='250px'  > 
                  <HorizontalStack align="space-between" gap="2">
@@ -253,7 +254,7 @@ const transform = {
                 <Badge status={c.status} size="small">{c.score.toString()}</Badge>
                 </HorizontalStack>   
                 </Box>
-                </Button>
+                </AktoButton>
             
              
                

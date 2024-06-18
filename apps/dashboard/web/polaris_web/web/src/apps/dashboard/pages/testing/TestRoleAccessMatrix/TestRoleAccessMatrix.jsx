@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Box, Button, HorizontalGrid, IndexFiltersMode, LegacyCard, ResourceItem, ResourceList, Text, TextField } from '@shopify/polaris'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import { useLocation } from 'react-router-dom'
@@ -80,6 +81,9 @@ function TestRoleAccessMatrix() {
         <div key="access-matrix">{accessMatrixComponent}</div>
     ]
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+
     return (
         <PageWithMultipleCards
             backUrl='/dashboard/testing/roles'
@@ -88,8 +92,8 @@ function TestRoleAccessMatrix() {
             divider={true}
             secondaryActions={
                 [
-                    <Button key="deleteAccessMatrix" onClick={handleDeleteAccessMatrix}>Delete access matrix</Button>,
-                    <Button key="createAccessMatrix" primary onClick={handleCreateAccessMatrix}>Create access matrix</Button>
+                    <AktoButton disabled={disableButton} key="deleteAccessMatrix" onClick={handleDeleteAccessMatrix}>Delete access matrix</AktoButton>,
+                    <AktoButton disabled={disableButton} key="createAccessMatrix" primary onClick={handleCreateAccessMatrix}>Create access matrix</AktoButton>
                 ]}
         />
     )

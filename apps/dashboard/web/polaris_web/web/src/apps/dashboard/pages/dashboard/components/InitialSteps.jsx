@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Avatar, Box, Button, Card, Divider, HorizontalStack, ProgressBar, Text, VerticalStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
@@ -76,6 +77,9 @@ function InitialSteps({initialSteps}) {
     }
 
     function StepConnection({step,index}) {
+        const userRole = window.USER_ROLE
+        const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
+
         return(
             <VerticalStack gap={4}>
                 <HorizontalStack gap={2}>
@@ -96,8 +100,8 @@ function InitialSteps({initialSteps}) {
                     <VerticalStack gap={2}>
                             <Text variant="bodyMd">{step.text}</Text>
                         <HorizontalStack gap={2}>
-                            <Button onClick={()=> navigate(step.url)} size="slim">Configure now</Button>
-                            <Button plain onClick={()=> markAsComplete(step.id)} size="slim">Skip step</Button>
+                            <AktoButton disabled={disableButton} onClick={()=> navigate(step.url)} size="slim">Configure now</AktoButton>
+                            <AktoButton disabled={disableButton} plain onClick={()=> markAsComplete(step.id)} size="slim">Skip step</AktoButton>
                         </HorizontalStack>
                         <br/>
                     </VerticalStack>

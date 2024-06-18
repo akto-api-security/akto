@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import React, { useEffect, useState } from 'react'
 import CopyCommand from '../../../components/shared/CopyCommand';
 import IntegrationsLayout from './IntegrationsLayout';
@@ -48,7 +49,12 @@ function OktaIntegration() {
         }
     ]
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
+
     const handleSubmit = async() => {
+        if(disableButton) return
+
         if(clientId.length > 0 && clientSecret.length > 0 && oktaDomain.length > 0 && authorizationServerId.length > 0){
             await settingRequests.addOktaSso(clientId,clientSecret, authorizationServerId, oktaDomain, redirectUri)
             func.setToast(true, false, "Okta SSO fields saved successfully!")
@@ -83,7 +89,7 @@ function OktaIntegration() {
                                 value={oktaDomain}
                     />
                     <HorizontalStack align="end">
-                        <Button submit primary size="medium">Submit</Button>
+                        <AktoButton disabled={disableButton} submit primary size="medium">Submit</AktoButton>
                     </HorizontalStack>
                 </FormLayout>
             </Form>
@@ -138,7 +144,7 @@ function OktaIntegration() {
     const oktaSSOComponent = (
         loading ? <SpinnerCentered /> :
         <LegacyCard title="Okta SSO">
-            {componentType === 0 ? <StepsComponent integrationSteps={integrationSteps} onClickFunc={()=> setComponentType(1)} buttonActive={nextButtonActive}/> 
+            {componentType === 0 ? <StepsComponent integrationSteps={integrationSteps} onClickFunc={()=> setComponentType(1)} buttonActive={nextButtonActive || disableButton}/> 
             : componentType === 1 ? formComponent : <Details values={listValues} onClickFunc={() => setShowDeleteModal(true)} /> }
         </LegacyCard>
     )

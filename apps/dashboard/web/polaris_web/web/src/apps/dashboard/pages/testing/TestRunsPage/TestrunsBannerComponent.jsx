@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import React, { useState } from 'react'
 import BannerLayout from '../../../components/banners/BannerLayout'
 import { TESTING_VIDEO_LENGTH, TESTING_VIDEO_URL, TESTING_VIDEO_THUMBNAIL } from '../../../../main/onboardingData'
@@ -24,9 +25,9 @@ function SelectCollectionComponent() {
         urlsCount > 0 ?<Popover
             active={popoverActive}
             activator={(
-                <Button onClick={() => setPopoverActive(true)} disclosure>
+                <AktoButton  onClick={() => setPopoverActive(true)} disclosure>
                     Select collection
-                </Button>
+                </AktoButton>
             )}
             onClose={() => { setPopoverActive(false) }}
             autofocusTarget="first-node"

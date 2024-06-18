@@ -30,11 +30,14 @@ function TokensLayout(props) {
     setTokenList(arr)
   }
 
+  const userRole = window.USER_ROLE
+  const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
+
   const listComponent = (
     tokenList.map((item,index) =>(
       <div data-testid={`data_${index + 1}`}>
       <LegacyCard.Section title={`Token ${index + 1}`} key={index} 
-        actions={[{ content: <div data-testid={`delete_token_${index + 1}`}>Delete</div>, destructive: true, onAction: () => deleteToken(item.id)}]}>
+        actions={[{ content: <div data-testid={`delete_token_${index + 1}`}>Delete</div>, destructive: true, onAction: () => deleteToken(item.id), 'disabled': disableButton}]}>
           <div style={{ paddingBottom: "5px" }}>
             <Text variant="bodyMd">{func.prettifyEpoch(item.timestamp)}</Text>
           </div>
@@ -48,7 +51,7 @@ function TokensLayout(props) {
       <LegacyCard.Section>
         <EmptyState
           heading='No tokens found'
-          action={{content: <div data-testid="generate_token_button">Generate Token</div>,onAction: generateNewToken}}
+          action={{content: <div data-testid="generate_token_button">Generate Token</div>,onAction: generateNewToken, 'disabled': disableButton}}
           // secondaryAction={{
           //   content: 'Learn more',
           // }}
@@ -61,7 +64,7 @@ function TokensLayout(props) {
   const BurpSuiteCard = (
     <LegacyCard title="Tokens" 
         secondaryFooterActions={tokenList.length > 0 ? [{content: 'See how it works', onAction: seeWork}] : []}
-        primaryFooterAction={tokenList.length > 0 ? {content: 'Generate token', onAction: generateNewToken} : null}
+        primaryFooterAction={tokenList.length > 0 ? {content: 'Generate token', onAction: generateNewToken, 'disabled': disableButton} : null}
     >
         {tokenList.length > 0 ? 
           (

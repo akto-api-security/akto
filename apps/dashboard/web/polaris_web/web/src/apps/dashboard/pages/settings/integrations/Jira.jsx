@@ -51,11 +51,14 @@ function Jira() {
         await settingFunctions.addJiraIntegration(userEmail, apiToken, baseUrl, projId, issueType)
         setToast(true,false,"Successfully added Jira Integration")
     }
+
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
     
     const JCard = (
         <LegacyCard
-            secondaryFooterActions={[{content: 'Test Integration',onAction: testJiraIntegration}]}
-            primaryFooterAction={{content: 'Save', onAction: addJiraIntegration, disabled: (issueType==="" ? true : false) }}
+            secondaryFooterActions={[{content: 'Test Integration',onAction: testJiraIntegration, 'disabled': disableButton}]}
+            primaryFooterAction={{content: 'Save', onAction: addJiraIntegration, disabled: ((issueType==="" ? true : false) || disableButton) }}
         >
           <LegacyCard.Section>
             <Text variant="headingMd">Integrate Jira</Text>

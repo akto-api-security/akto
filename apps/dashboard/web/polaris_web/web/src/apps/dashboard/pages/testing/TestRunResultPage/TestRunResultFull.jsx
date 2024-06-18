@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Box, Button, Collapsible, Divider, HorizontalStack, Icon, LegacyCard, Scrollable, Text, VerticalStack } from '@shopify/polaris'
 import React, { useState } from 'react'
 import SpinnerCentered from '../../../components/progress/SpinnerCentered'
@@ -129,7 +130,7 @@ function TestRunResultFull(props) {
             divider= {true}
             backUrl = {source === "editor" ? undefined : (hexId ==="issues" ? "/dashboard/issues" : `/dashboard/testing/${hexId}`)}
             isFirstPage = {source === "editor"}
-            primaryAction = {<Button primary onClick={()=>createJiraTicket(issueDetails)} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"} >Create Jira Ticket</Button>} 
+            primaryAction = {<AktoButton  primary onClick={()=>createJiraTicket(issueDetails)} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"} >Create Jira Ticket</AktoButton>} 
             components = {components}
         />
     )

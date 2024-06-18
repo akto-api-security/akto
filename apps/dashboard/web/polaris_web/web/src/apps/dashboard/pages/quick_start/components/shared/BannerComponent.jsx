@@ -1,3 +1,4 @@
+import AktoButton from './../../../../components/shared/AktoButton';
 import { Banner, Button } from '@shopify/polaris'
 import React from 'react'
 
@@ -11,7 +12,7 @@ function BannerComponent({title,docsUrl,content}) {
             <Banner title={title} status='warning'>
                 <span>{content}</span>
                 <br/>
-                <Button plain onClick={() => openLink()}>Go to docs</Button>
+                <AktoButton  plain onClick={() => openLink()}>Go to docs</AktoButton>
             </Banner>
         </div>
     )

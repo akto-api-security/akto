@@ -1,3 +1,4 @@
+import AktoButton from './shared/AktoButton';
 import { Button, LegacyCard, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import Dropdown from './layouts/Dropdown';
@@ -52,7 +53,7 @@ function ConditionsPicker(props) {
                             dispatch={handleConditionDispatch}
                         />
                     </div>
-                    <Button id={`${id}-delete-button-${index}`} icon={DeleteMinor} onClick={() => handleDelete(index)} />
+                    <AktoButton id={`${id}-delete-button-${index}`} icon={DeleteMinor} onClick={() => handleDelete(index)} />
                 </div>
             ))}
         </VerticalStack>
@@ -64,7 +65,7 @@ function ConditionsPicker(props) {
         } >
             {fieldsComponent}
             <br/>
-            <Button id={`${id}-add-condition`} onClick={handleAddField}>Add condition</Button>
+            <AktoButton id={`${id}-add-condition`} onClick={handleAddField}>Add condition</AktoButton>
         </LegacyCard.Section>
     )
 }

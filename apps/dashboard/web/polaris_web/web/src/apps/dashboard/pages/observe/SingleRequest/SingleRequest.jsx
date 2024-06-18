@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { useParams } from "react-router-dom"
@@ -63,6 +64,9 @@ function SingleRequest(){
         fetchData();
     },[])
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+
     return (
         <PageWithMultipleCards
             title={
@@ -97,7 +101,7 @@ function SingleRequest(){
             secondaryActions = {
                 <Popover
                 active={popoverActive}
-                activator={<Button onClick={togglePopoverActive} disclosure>Actions</Button>}
+                activator={<AktoButton disabled={disableButton} onClick={togglePopoverActive} disclosure>Actions</AktoButton>}
                 onClose={togglePopoverActive}
             >
                 <ActionList
@@ -107,18 +111,22 @@ function SingleRequest(){
                             {
                                 content: 'Ignore',
                                 onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
+                                'disabled': disableButton
                             },
                             {
                                 content: 'Mark as false positive',
                                 onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
+                                'disabled': disableButton
                             },
                             {
                                 content: 'Create issue',
                                 onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
+                                'disabled': disableButton
                             },
                             {
                                 content: 'Configure data types',
                                 onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
+                                'disabled': disableButton
                             },
                         ]
                     }

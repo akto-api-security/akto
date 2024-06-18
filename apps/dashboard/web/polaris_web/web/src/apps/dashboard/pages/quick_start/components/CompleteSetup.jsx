@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import React, { useEffect, useState, useRef } from 'react'
 import Store from '../../../store'
 import BannerComponent from './shared/BannerComponent'
@@ -164,7 +165,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
         <SpinnerCentered />
         :
         <VerticalStack gap="2">
-            {isButtonActive ? <Button primary onClick={creatFargateStack} loading={loading}>{setupButtonText}</Button> : null}
+            {isButtonActive ? <AktoButton  primary onClick={creatFargateStack} loading={loading}>{setupButtonText}</AktoButton> : null}
             <Text variant="bodyMd" as="h3">{statusText}</Text>
             {progressBar.show ? <ProgressBar progress={progressBar.value} size="small" color="primary" /> : null }
             {/* {stackCompleteComponent} */}

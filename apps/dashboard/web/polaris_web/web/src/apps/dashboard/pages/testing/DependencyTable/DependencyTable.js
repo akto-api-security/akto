@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Box, Button, HorizontalStack, Icon, Link, Modal, Select, Spinner, Text, TextField, VerticalStack } from "@shopify/polaris";
 import { useEffect, useRef, useState } from "react";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
@@ -283,15 +284,15 @@ function DependencyTable() {
     }
 
     const secondaryActionsComponent = (
-        <Button onClick={invokeDependencyTable} primary  >
+        <AktoButton  onClick={invokeDependencyTable} primary  >
             {invokeLoading ? <Spinner size="small" /> : "Invoke"}
-        </Button>
+        </AktoButton>
     )
 
     const globalVarsComponent = (
-        <Button onClick={() => { setGlobalVarActive(true) }} >
+        <AktoButton  onClick={() => { setGlobalVarActive(true) }} >
             Edit Global vars
-        </Button>
+        </AktoButton>
     )
 
     return (

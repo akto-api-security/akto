@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Box, Card, Divider, LegacyCard, Page, Text, Button, HorizontalStack } from '@shopify/polaris'
 import { Paywall, StiggProvider, SubscribeIntentionType, useStiggContext } from '@stigg/react-sdk'
 import {
@@ -62,9 +63,9 @@ function Billing() {
                 <Box>
                     <Text variant="headingMd">Your plan</Text>
                 </Box>
-                <Button onClick={() => refreshUsageData()}>
+                <AktoButton  onClick={() => refreshUsageData()}>
                     Sync usage data
-                </Button>
+                </AktoButton>
             </HorizontalStack>
         </Box>
     )

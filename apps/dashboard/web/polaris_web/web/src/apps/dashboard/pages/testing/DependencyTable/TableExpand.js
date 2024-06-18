@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Box, Button, Spinner, Text, VerticalStack } from "@shopify/polaris"
 import { useState } from "react";
 import api from "../api";
@@ -52,7 +53,7 @@ function TableExpand({ data, childApiCollectionId, childUrl, childMethod, showEd
             </td>
             <td style={{ width: '20%', verticalAlign: 'top', textAlign: 'right', padding: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', height: '100%' }}>
-                    <Button key={childMethod + "-" + childUrl} onClick={() => { showEditModal(childApiCollectionId, childUrl, childMethod, data) }}>Edit</Button>
+                    <AktoButton  key={childMethod + "-" + childUrl} onClick={() => { showEditModal(childApiCollectionId, childUrl, childMethod, data) }}>Edit</AktoButton>
                 </div>
             </td>
         </tr>

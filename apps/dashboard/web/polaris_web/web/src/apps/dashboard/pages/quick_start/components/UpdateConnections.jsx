@@ -39,6 +39,9 @@ function UpdateConnections(props) {
         currentCardObj ? currentCardObj.component : null
     ]
 
+    const userRole = window.USER_ROLE
+    const disableConfButton = (userRole === "GUEST" || userRole === "MEMBER")
+
     return (
         <Page 
             divider fullWidth
@@ -54,7 +57,7 @@ function UpdateConnections(props) {
                 <Tag>{obj.myConnections.length.toString()}</Tag>
             </HorizontalStack>
             </div>
-            <GridRows CardComponent={RowCard} columns="3" 
+            <GridRows disable={disableConfButton} CardComponent={RowCard} columns="3" 
                 items={obj.myConnections} buttonText="Configure" onButtonClick={onButtonClick}
                 changedColumns={newCol}
             />
@@ -65,7 +68,7 @@ function UpdateConnections(props) {
                 <Tag>{obj.moreConnections.length.toString()}</Tag>
             </HorizontalStack>
             </div>
-            <GridRows CardComponent={RowCard} columns="3" 
+            <GridRows disable={disableConfButton} CardComponent={RowCard} columns="3" 
                 items={obj.moreConnections} buttonText="Connect" onButtonClick={onButtonClick}     
                 changedColumns={newCol}
             />

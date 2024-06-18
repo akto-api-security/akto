@@ -1,3 +1,4 @@
+import AktoButton from './../../components/shared/AktoButton';
 import React, { useEffect } from 'react'
 import { Avatar, Button, ButtonGroup, Frame, TopBar } from "@shopify/polaris"
 import {ClipboardMinor} from "@shopify/polaris-icons"
@@ -16,10 +17,10 @@ function Onboarding() {
 
     const topbarButtons = (
       <ButtonGroup>
-        <Button size="slim" onClick={() => openUrl("https://docs.akto.io")} icon={ClipboardMinor}> Docs </Button>
-        <Button size="slim" onClick={()=> openUrl("https://discord.com/invite/Wpc6xVME4s")} icon={avatar}>
+        <AktoButton  size="slim" onClick={() => openUrl("https://docs.akto.io")} icon={ClipboardMinor}> Docs </AktoButton>
+        <AktoButton  size="slim" onClick={()=> openUrl("https://discord.com/invite/Wpc6xVME4s")} icon={avatar}>
           Discord
-        </Button>
+        </AktoButton>
       </ButtonGroup>
     )
 

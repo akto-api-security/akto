@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import React, { useEffect, useState, useRef } from 'react'
 import api from '../api'
 import quickStartFunc from '../transform'
@@ -180,7 +181,7 @@ function AwsSource() {
             />
 
           <Box>
-            <Button onClick={saveFunc} disabled={func.deepComparison(preSelectedLBs,selectedLBs)} primary loading={loading}>Apply </Button>
+            <AktoButton  onClick={saveFunc} disabled={func.deepComparison(preSelectedLBs,selectedLBs)} primary loading={loading}>Apply </AktoButton>
           </Box>
           <Text variant="bodyMd" as="h3">{statusText}</Text>
           {progressBar.show ? <ProgressBar progress={progressBar.value} size="small" color="primary" /> : null }

@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, HorizontalStack, Icon, Scrollable, TextField, Tooltip, Tag, Form } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
@@ -11,6 +12,7 @@ import isCidr from "is-cidr"
 import func from "@/util/func"
 import TextFieldWithInfo from '../../../components/shared/TextFieldWithInfo'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
+import PersistStore from '../../../../main/PersistStore';
 
 function About() {
 
@@ -37,6 +39,9 @@ function About() {
     const [enableTelemetry, setEnableTelemetry] = useState(false)
     const [privateCidrList, setPrivateCidrList] = useState([])
     const [partnerIpsList, setPartnerIpsList] = useState([])
+
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
@@ -149,12 +154,12 @@ function About() {
             <VerticalStack gap={1}>
                 <Text color="subdued">{text}</Text>
                 <ButtonGroup segmented>
-                    <Button size="slim" onClick={() => onToggle(true)} pressed={initial === true}>
+                    <AktoButton  size="slim" onClick={() => onToggle(true)} pressed={initial === true}>
                         True
-                    </Button>
-                    <Button size="slim" onClick={() => onToggle(false)} pressed={initial === false}>
+                    </AktoButton>
+                    <AktoButton  size="slim" onClick={() => onToggle(false)} pressed={initial === false}>
                         False
-                    </Button>
+                    </AktoButton>
                 </ButtonGroup>
             </VerticalStack>
         )
@@ -251,7 +256,7 @@ function About() {
                             <HorizontalGrid gap={2} columns={3} key={key}>
                                 <TooltipText textProps={{variant:"bodyMd", fontWeight:"medium"}} tooltip={key} text={key}/>
                                 <TooltipText textProps={{variant:"bodyMd", color: "subdued"}} tooltip={trafficFiltersMap[key]} text={trafficFiltersMap[key]}/>
-                                <Button plain icon={DeleteMajor} onClick={() => deleteFilterHeader(key)}/>
+                                <AktoButton  plain icon={DeleteMajor} onClick={() => deleteFilterHeader(key)}/>
                             </HorizontalGrid>
                         )
                     })}
@@ -274,7 +279,7 @@ function About() {
                     value={headerValue}
                     setValue={setHeaderValue}
                 />
-            {checkSaveActive('filterHeader') ? <Box paddingBlockStart={5} width="100px"><Button onClick={saveFilterHeader} size="medium" primary>Save</Button></Box> : null}
+            {checkSaveActive('filterHeader') ? <Box paddingBlockStart={5} width="100px"><AktoButton  onClick={saveFilterHeader} size="medium" primary>Save</AktoButton></Box> : null}
             </HorizontalGrid>
         </VerticalStack>
     )
@@ -292,7 +297,7 @@ function About() {
                             <HorizontalGrid gap={2} columns={3} key={key}>
                                 <TooltipText textProps={{variant:"bodyMd", fontWeight:"medium"}} tooltip={headerLine} text={headerLine}/>
                                 <TooltipText textProps={{variant:"bodyMd", color: "subdued"}} tooltip={newName} text={newName}/>
-                                <Button plain icon={DeleteMajor} onClick={() => deleteApiCollectionNameMapper(regex)}/>
+                                <AktoButton  plain icon={DeleteMajor} onClick={() => deleteApiCollectionNameMapper(regex)}/>
                             </HorizontalGrid>
                         )
                     })}
@@ -323,7 +328,7 @@ function About() {
                     value={replaceNewCollectionName}
                     setValue={setReplaceNewCollectionName}
                 />
-            {checkSaveActive('replaceCollection') ? <Box paddingBlockStart={5} width="100px"><Button onClick={addApiCollectionNameMapper} size="medium" primary>Save</Button></Box> : null}
+            {checkSaveActive('replaceCollection') ? <Box paddingBlockStart={5} width="100px"><AktoButton  onClick={addApiCollectionNameMapper} size="medium" primary>Save</AktoButton></Box> : null}
             </HorizontalGrid>
         </VerticalStack>
     )
@@ -337,7 +342,7 @@ function About() {
               <LegacyCard.Section title={<Text variant="headingMd">Details</Text>}>
                   {infoComponent}
               </LegacyCard.Section>
-              {isOnPrem ?
+              {isOnPrem && userRole === "ADMIN" ?
                   <LegacyCard.Section title={<Text variant="headingMd">More settings</Text>}>
                       <div style={{ display: 'flex' }}>
                           <div style={{ flex: "1" }}>
@@ -440,7 +445,7 @@ function About() {
     }
 
     const components = [accountInfoComponent, 
-                        window.IS_SAAS !== "true" ? <UpdateIpsComponent 
+                        (window.IS_SAAS !== "true" && disableButton) ? <UpdateIpsComponent 
                             key={"cidr"} 
                             description={"We use these CIDRs to mark the endpoints as PRIVATE"} 
                             title={"Private CIDRs list"}
@@ -450,7 +455,7 @@ function About() {
                             onRemove={(val) => handleIpsChange(val, false, "cidr")}
                             type={"cidr"}
                         /> : null,
-                        window.IS_SAAS !== "true" ? <UpdateIpsComponent
+                        (window.IS_SAAS !== "true" && disableButton) ? <UpdateIpsComponent
                             key={"partner"}
                             description={"We use these IPS to mark the endpoints as PARTNER"} 
                             title={"Third parties Ips list"}

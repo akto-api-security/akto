@@ -1,3 +1,4 @@
+import AktoButton from './AktoButton';
 import { Button, DropZone } from '@shopify/polaris'
 import {UploadMajor} from "@shopify/polaris-icons"
 import React, { useCallback } from 'react'
@@ -31,7 +32,7 @@ function FileUpload(props) {
                 allowMultiple={allowMultiple}
                 validates={(file) => file.size <= limitSize}
             >
-                <Button plain icon={UploadMajor} />
+                <AktoButton plain icon={UploadMajor} />
             </DropZone>
         </div>
     )

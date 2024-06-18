@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 
 import React, { useState, useEffect} from 'react'
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
@@ -54,9 +55,9 @@ const ScheduleBox = (props) => {
 
     const finalButton = () => {
         if (testingRun) {
-            return <Button onClick={deleteSchedule} style={{color: "white"}} size="small">Delete</Button>
+            return <AktoButton  onClick={deleteSchedule} style={{color: "white"}} size="small">Delete</AktoButton>
         } else {
-            return <Button onClick={save} style={{color: "white"}} size="small">Save</Button>
+            return <AktoButton  onClick={save} style={{color: "white"}} size="small">Save</AktoButton>
         }
     }
     

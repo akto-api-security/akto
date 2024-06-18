@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Box, Button, Collapsible, Divider, LegacyCard, LegacyStack, Text } from "@shopify/polaris"
 import { ChevronRightMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import { useState } from "react";
@@ -12,8 +13,11 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import Dropdown from "../../../components/layouts/Dropdown";
 import settingRequests from "../../settings/api";
 import TestCollectionConfiguration from '../configurations/TestCollectionConfiguration'
+import PersistStore from '../../../../main/PersistStore';
 
 function UserConfig() {
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setAuthMechanism = TestingStore(state => state.setAuthMechanism)
@@ -57,6 +61,11 @@ function UserConfig() {
     })
 
     const handleSelect = async(limit) => {
+        if(disableButton) {
+            setToastConfig({ isActive: true, isError: true, message: `You don't have permissions` })
+            return
+        }
+        
         setInitialLimit(limit)
         await api.updateGlobalRateLimit(limit)
         setToastConfig({ isActive: true, isError: false, message: `Global rate limit set successfully` })
@@ -67,7 +76,7 @@ function UserConfig() {
             <Divider />
             <LegacyCard.Section>
                 <LegacyStack vertical>
-                    <Button
+                    <AktoButton 
                         id={"hardcoded-token-expand-button"}
                         onClick={handleToggleHardcodedOpen}
                         ariaExpanded={hardcodedOpen}
@@ -75,7 +84,7 @@ function UserConfig() {
                         ariaControls="hardcoded"
                     >
                         Hard coded
-                    </Button>
+                    </AktoButton>
                     <Collapsible
                         open={hardcodedOpen}
                         id="hardcoded"
@@ -90,7 +99,7 @@ function UserConfig() {
 
             <LegacyCard.Section>
                 <LegacyStack vertical>
-                    <Button
+                    <AktoButton 
                         id={"automated-token-expand-button"}
                         onClick={handleToggleHardcodedOpen}
                         ariaExpanded={!hardcodedOpen}
@@ -98,7 +107,7 @@ function UserConfig() {
                         ariaControls="automated"
                     >
                         Automated
-                    </Button>
+                    </AktoButton>
                     <Collapsible
                         open={!hardcodedOpen}
                         id="automated"
@@ -135,7 +144,7 @@ function UserConfig() {
         </LegacyCard>
     )
 
-    const components = [<TestCollectionConfiguration/>, rateLimit]
+    const components = [<TestCollectionConfiguration/>, (disableButton ? <></> : rateLimit)]
 
     return (
         isLoading ? <SpinnerCentered /> 
@@ -148,7 +157,7 @@ function UserConfig() {
                         User config
                     </Text>
                 }
-                primaryAction={{ content: 'Stop all tests', onAction: handleStopAllTests }}
+                primaryAction={{ content: 'Stop all tests', onAction: handleStopAllTests, 'disabled': disableButton }}
             />
 
     )

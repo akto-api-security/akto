@@ -23,7 +23,7 @@ const initialState = {
     selectedSampleApi: {},
     coverageMap:{},
     filtersMap:{},
-    tableInitialState: {},
+    tableInitialState:{},
 };
 
 let persistStore = (set) => ({

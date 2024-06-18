@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import React, { useEffect, useState } from 'react'
 import OnboardingStore from '../OnboardingStore'
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
@@ -87,14 +88,14 @@ function ResultsSummary() {
             <ButtonGroup segmented>
                 {severities.map((item,index)=> {
                     return(
-                        <Button onClick={()=> setActiveTab(item)} key={index} pressed={item === activeTab}>
+                        <AktoButton  onClick={()=> setActiveTab(item)} key={index} pressed={item === activeTab}>
                             <div style={{display: "flex", justifyContent: "center", width: "9.4vw"}}>
                                 <HorizontalStack gap="2">
                                     <Text variant="bodyLg" fontWeight="medium">{item}</Text>
                                     <Badge>{countIssues[item.toUpperCase()]?.toString()}</Badge>
                                 </HorizontalStack>
                             </div>
-                        </Button>
+                        </AktoButton>
                     )
                 })}
             </ButtonGroup>

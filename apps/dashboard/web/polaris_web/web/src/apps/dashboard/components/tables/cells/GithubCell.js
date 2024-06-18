@@ -1,3 +1,4 @@
+import AktoButton from './../../shared/AktoButton';
 import {
     Badge,
     VerticalStack,
@@ -76,13 +77,13 @@ function GithubCell(props){
                     return data?.[header?.value]
                     ?.map((item) =>
                     isBadgeClickable ? 
-                        <Button key={item} onClick={() =>badgeClicked()} plain monochrome>
+                        <AktoButton  key={item} onClick={() =>badgeClicked()} plain monochrome>
                             <Badge status={getStatus(item)}>
                                 <Text {...header.dataProps}>
                                     {item}
                                 </Text>
                             </Badge>
-                        </Button>
+                        </AktoButton>
                         
                     : <Badge key={item} status={getStatus(item)}>
                         <Text {...header.dataProps}>

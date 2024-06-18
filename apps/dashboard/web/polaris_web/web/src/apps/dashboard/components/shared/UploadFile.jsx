@@ -1,3 +1,4 @@
+import AktoButton from './AktoButton';
 import { Button, Tooltip } from "@shopify/polaris"
 import { UploadMajor } from '@shopify/polaris-icons';
 import { useRef } from "react"
@@ -24,7 +25,7 @@ function UploadFile({ fileFormat, fileChanged, tooltipText, label, primary, plai
 
     return (
         <Tooltip content={tooltipText}>
-            <Button 
+            <AktoButton 
                 // icon={UploadMajor} 
                 primary={primary !== undefined ? primary : true}
                 plain={plain === undefined ? true: plain}
@@ -38,7 +39,7 @@ function UploadFile({ fileFormat, fileChanged, tooltipText, label, primary, plai
                     accept={fileFormat}
                     onChange={onFilePicked} 
                 />
-            </Button>
+            </AktoButton>
         </Tooltip>
     )
 }

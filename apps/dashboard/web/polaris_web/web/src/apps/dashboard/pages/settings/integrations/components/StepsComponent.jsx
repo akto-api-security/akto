@@ -1,3 +1,4 @@
+import AktoButton from './../../../../components/shared/AktoButton';
 import { Button, HorizontalStack, LegacyCard, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 
@@ -17,7 +18,7 @@ function StepsComponent({integrationSteps, onClickFunc, buttonActive}) {
                     )
                 })}
                 <HorizontalStack align="end">
-                    <Button primary size="medium" onClick={onClickFunc} disabled={!buttonActive}>Next</Button>
+                    <AktoButton  primary size="medium" onClick={onClickFunc} disabled={!buttonActive}>Next</AktoButton>
                 </HorizontalStack>
             </VerticalStack>
         </LegacyCard.Section>

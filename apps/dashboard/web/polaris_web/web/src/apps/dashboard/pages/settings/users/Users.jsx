@@ -5,11 +5,10 @@ import settingRequests from "../api";
 import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
 import Store from "../../../store";
-import PersistStore from '../../../../main/PersistStore';
 
 const Users = () => {
     const username = Store(state => state.username)
-    const userRole = PersistStore(state => state.userRole)
+    const userRole = window.USER_ROLE
 
     const [inviteUser, setInviteUser] = useState({
         isActive: false,
@@ -30,18 +29,22 @@ const Users = () => {
             {
                 content: 'Admin',
                 role: 'ADMIN',
+                icon: <div style={{padding: "10px"}}/>
             },
             {
                 content: 'Security Engineer',
                 role: 'MEMBER',
+                icon: <div style={{padding: "10px"}}/>
             },
             {
                 content: 'Developer',
                 role: 'DEVELOPER',
+                icon: <div style={{padding: "10px"}}/>
             },
             {
                 content: 'Guest',
                 role: 'GUEST',
+                icon: <div style={{padding: "10px"}}/>
             }]
         },
         {
@@ -49,7 +52,7 @@ const Users = () => {
                 destructive: true,
                 content: 'Remove',
                 role: 'REMOVE',
-                icon: DeleteMajor
+                icon: <Icon source={DeleteMajor} />
             }]
         }
     ]
@@ -65,9 +68,10 @@ const Users = () => {
     }, [])
 
     const handleRoleSelectChange = async (id, newRole, login) => {
-        if(newRole === 'REMOVE') {
+        if(newRole === 'REMOVE' && userRole === 'ADMIN') {
             await handleRemoveUser(login)
             toggleRoleSelectionPopup(id)
+            window.location.reload()
             return
         }
 
@@ -87,15 +91,17 @@ const Users = () => {
     }
 
     const getRolesOptionsWithTick = (currentRole) => {
-        const tempArr =  rolesOptions.map(section => ({
+        return rolesOptions.map(section => ({
             ...section,
-            items: section.items.filter((c) => roleHierarchy.includes(c.role)).map(item => ({
+            items: section.items.filter(item => {
+                if (item.role === 'REMOVE' && userRole !== 'ADMIN') return false;
+                return item.role === 'REMOVE' || roleHierarchy.includes(item.role);
+            }).map(item => ({
                 ...item,
-                prefix: item.role === currentRole ? <Box><Icon source={TickMinor}/></Box> : <div style={{padding: "10px"}}/>
+                prefix: item.role !== 'REMOVE' && item.role === currentRole ? <Box><Icon source={TickMinor} /></Box> : item.icon
             }))
         }));
-        return tempArr
-    }
+    };
 
     const getRoleDisplayName = (role) => {
         for(let section of rolesOptions) {
@@ -116,6 +122,7 @@ const Users = () => {
     };
 
     const isLocalDeploy = false;
+    const currentUser = users.find(user => user.login === username)
 
     const toggleInviteUserModal = () => {
         setInviteUser({
@@ -135,7 +142,7 @@ const Users = () => {
         await settingRequests.makeAdmin(login, roleVal)
         func.setToast(true, false, "Role updated for " + login + " successfully")
     }
-    
+
     return (
         <Page
             title="Users"
@@ -160,7 +167,7 @@ const Users = () => {
                 </Banner>
             }
             <br />
-            
+
             <Banner>
                 <Text variant="headingMd">Role permissions</Text>
                 <Text variant="bodyMd">Each role have different permissions. <Link url="https://docs.akto.io/" target="_blank">Learn more</Link></Text>
@@ -175,7 +182,7 @@ const Users = () => {
                             const { id, name, login, role } = item;
                             const initials = func.initials(login)
                             const media = <Avatar user size="medium" name={login} initials={initials} />
-                            const shortcutActions = (username !== login && roleHierarchy.includes(role.toUpperCase())) ? 
+                            const shortcutActions = (username !== login && role !== currentUser.role && currentUser.role !== "GUEST" && roleHierarchy.includes(role.toUpperCase())) ?
                                 [
                                     {
                                         content: <Popover
@@ -198,7 +205,7 @@ const Users = () => {
                                 ] : [
                                     {
                                         content: <Text color="subdued">{getRoleDisplayName(role)}</Text>,
-                                        url: '#',
+                                        onAction: (event) => event.preventDefault(),
                                     }
                                 ]
 

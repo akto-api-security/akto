@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { Text, Button, Modal } from "@shopify/polaris"
 import api from "../api"
@@ -75,6 +76,7 @@ function AllSensitiveData() {
             items: [{
                 content: 'Edit',
                 onAction: () => navigate("/dashboard/observe/data-types", {state: {name: item.subType, dataObj: mapData[item.subType], type: item.isCustomType ? 'Custom' : 'Akto'}}),
+                'disabled': disableButton
             }]
         }]
     }
@@ -160,6 +162,9 @@ function AllSensitiveData() {
         const activePrompts = dashboardFunc.getPrompts(requestObj)
         setPrompts(activePrompts)
     }
+
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
     
     return (
         <PageWithMultipleCards
@@ -170,8 +175,8 @@ function AllSensitiveData() {
                     docsUrl="https://docs.akto.io/api-inventory/concepts/sensitive-data" 
                 />
             }
-            primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
-            secondaryActions={<Button onClick={displayGPT}>Ask AktoGPT</Button>}
+            primaryAction={<AktoButton disabled={disableButton} id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</AktoButton>}
+            secondaryActions={<AktoButton disabled={disableButton} onClick={displayGPT}>Ask AktoGPT</AktoButton>}
             isFirstPage={true}
             components={[
                 <GithubSimpleTable

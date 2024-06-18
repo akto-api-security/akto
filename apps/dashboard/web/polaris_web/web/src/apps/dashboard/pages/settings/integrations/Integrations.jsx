@@ -13,6 +13,7 @@ import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs';
 import { useNavigate} from 'react-router-dom'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards';
 import func from "@/util/func"
+import PersistStore from '../../../../main/PersistStore';
 
 function Integrations() {
 
@@ -180,6 +181,9 @@ function Integrations() {
     }
 
     function renderItem(item) {
+        const userRole = window.USER_ROLE
+        const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
+        
         const {id, source, name} = item;
         const media = <Avatar customer size="medium" name={name} source={source}/>;
         const sourceActions = (item) => {
@@ -187,6 +191,7 @@ function Integrations() {
               {
                 content: <div data-testid={`configure_${id}`}>Configure</div>,
                 onClick: () => handleTab(item),
+                'disabled': disableButton
               },
             ];
           };

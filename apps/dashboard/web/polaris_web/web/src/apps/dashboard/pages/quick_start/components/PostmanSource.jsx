@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Badge, Button, ButtonGroup, Checkbox, HorizontalStack, RadioButton, Text, VerticalStack, Modal, DescriptionList, Tooltip, Icon } from '@shopify/polaris'
 import React, { useCallback, useEffect, useState } from 'react'
 import Dropdown from '../../../components/layouts/Dropdown'
@@ -135,7 +136,7 @@ function PostmanSource() {
                     {files ? 
                         <Badge size='medium' status='success'>
                             {files.name}
-                            <Button icon={CancelMajor} plain onClick={() => setFiles(null)} />
+                            <AktoButton  icon={CancelMajor} plain onClick={() => setFiles(null)} />
                         </Badge> 
                     : null}
                     <FileUpload fileType="file" acceptString=".json" setSelectedFile={setFilesCheck} allowMultiple={false} allowedSize={20*1024*1024}/>
@@ -317,14 +318,14 @@ function PostmanSource() {
             <VerticalStack gap="2">
                 <Checkbox label="Allow Akto to replay API requests if responses are not found." checked={allowResponses} onChange={toggleResponse} />
                 <ButtonGroup>
-                    <Button onClick={primaryAction} primary disabled={!buttonActive} loading={loading}>{primaryText}</Button>
-                    <Button onClick={goToDocs}>Go to docs</Button>
+                    <AktoButton  onClick={primaryAction} primary disabled={!buttonActive} loading={loading}>{primaryText}</AktoButton>
+                    <AktoButton  onClick={goToDocs}>Go to docs</AktoButton>
                 </ButtonGroup>
                 <ButtonGroup>
-                    <Button plain onClick={(event) => { 
+                    <AktoButton  plain onClick={(event) => { 
                                 event.stopPropagation(); 
                                 window.open('https://docs.akto.io/traffic-connections/traffic-data-sources/postman#troubleshooting-guide')
-                            }}>postman trouble-shooting guide</Button>
+                            }}>postman trouble-shooting guide</AktoButton>
                 </ButtonGroup>
             </VerticalStack>
             <Modal

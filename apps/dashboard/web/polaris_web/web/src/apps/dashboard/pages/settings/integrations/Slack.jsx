@@ -41,12 +41,15 @@ function Slack() {
         }
     }
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
+
     const cardContent = "Send alerts to your slack to get notified when new endpoints are discovered"
 
     const listComponent = (
         slackWebhooks.map((slackWebhook, index) => (
             <LegacyCard.Section title={`Slack Webhook ${index + 1}`} key={index}
-                actions={[{ content: 'Delete', destructive: true, onAction: () => handleDeleteSlackWebhook(slackWebhook.id) }]}>
+                actions={[{ content: 'Delete', destructive: true, onAction: () => handleDeleteSlackWebhook(slackWebhook.id), 'disabled': disableButton }]}>
                 <p>{func.prettifyEpoch(slackWebhook.timestamp)}</p>
                 <PasswordTextField field={slackWebhook.key} />
             </LegacyCard.Section>
@@ -64,7 +67,7 @@ function Slack() {
     
     const SlackCard = (
         <LegacyCard title="Slack Webhooks"
-            primaryFooterAction={{ content: 'Add Slack Webhook', onAction: handleAddSlackWebhook }} 
+            primaryFooterAction={{ content: 'Add Slack Webhook', onAction: handleAddSlackWebhook, 'disabled': disableButton }} 
         >
             {listComponent}
             {slackFormComponent}

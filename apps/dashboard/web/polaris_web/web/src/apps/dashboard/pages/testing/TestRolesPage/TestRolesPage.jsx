@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { useEffect, useState } from "react"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable"
@@ -37,6 +38,9 @@ const resourceName = {
     plural: 'test roles',
 };
 
+const userRole = window.USER_ROLE
+const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+
 function TestRolesPage(){
 
     const [testRoles, setTestRoles] = useState([]);
@@ -59,7 +63,9 @@ function TestRolesPage(){
                         name: item.name,
                         endpoints: item.endpointLogicalGroup.testingEndpoints,
                         authWithCondList: item.authWithCondList
-                    }})
+                    }}),
+                    'disabled': disableButton
+                    
                 },
                 {
                     content: 'Access matrix',
@@ -67,7 +73,8 @@ function TestRolesPage(){
                         name: item.name,
                         endpoints: item.endpointLogicalGroup.testingEndpoints,
                         authWithCondList: item.authWithCondList
-                    }})
+                    }}),
+                    'disabled': disableButton
                 }
             ]
         }]
@@ -93,7 +100,7 @@ function TestRolesPage(){
     return (
         <PageWithMultipleCards
         title={"Test roles"}
-        primaryAction = {<Button primary onClick={handleRedirect}><div data-testid="new_test_role_button">Create new test role</div></Button>}
+        primaryAction = {<AktoButton disabled={disableButton} primary onClick={handleRedirect}><div data-testid="new_test_role_button">Create new test role</div></AktoButton>}
         isFirstPage={true}
         components={[
             showEmptyScreen ? 

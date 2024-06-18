@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { HorizontalStack, Text, Badge, VerticalStack, ButtonGroup, Button, Modal, DescriptionList, RadioButton, Icon, Tooltip } from "@shopify/polaris";
 import { CancelMajor } from "@shopify/polaris-icons"
 import { useState } from "react";
@@ -150,7 +151,7 @@ function OpenApiSource() {
                 {files ?
                     <Badge size='medium' status='success'>
                         {files.name}
-                        <Button icon={CancelMajor} plain onClick={() => setFiles(null)} />
+                        <AktoButton  icon={CancelMajor} plain onClick={() => setFiles(null)} />
                     </Badge>
                     : null}
                 File: <FileUpload
@@ -163,14 +164,14 @@ function OpenApiSource() {
 
             <VerticalStack gap="2">
                 <ButtonGroup>
-                    <Button 
+                    <AktoButton  
                     onClick={uploadFile} 
                     primary 
                     disabled={files === null} 
                     loading={loading}>
                         Upload
-                    </Button>
-                    <Button onClick={goToDocs}>Go to docs</Button>
+                    </AktoButton>
+                    <AktoButton  onClick={goToDocs}>Go to docs</AktoButton>
                 </ButtonGroup>
             </VerticalStack>
             <Modal

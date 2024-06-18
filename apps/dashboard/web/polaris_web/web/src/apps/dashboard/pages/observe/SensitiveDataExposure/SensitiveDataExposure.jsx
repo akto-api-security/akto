@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import { Text, Button, HorizontalStack } from "@shopify/polaris"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubServerTable from "../../../components/tables/GithubServerTable"
@@ -196,10 +197,14 @@ const handleRedirect = () => {
     navigate("/dashboard/observe/data-types")
 }
 
+
+const userRole = window.USER_ROLE
+const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+
 const primaryActions = (
     <HorizontalStack gap={"2"}>
         <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
-        <Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>
+        <AktoButton disabled={disableButton} id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</AktoButton>
     </HorizontalStack>
 )
 

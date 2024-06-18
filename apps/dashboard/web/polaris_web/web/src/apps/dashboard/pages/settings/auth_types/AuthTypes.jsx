@@ -1,3 +1,4 @@
+import AktoButton from './../../../components/shared/AktoButton';
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import authTypesApi from "./api";
 import { useNavigate } from "react-router-dom";
@@ -96,14 +97,17 @@ function AuthTypes() {
         }
         fetchData();
     }, [])
+    
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
 
     return (
         <Box>
         <PageWithMultipleCards
             title={"Auth types"}
-            primaryAction={<Button primary onClick={handleRedirect}>Create new auth type</Button>}
+            primaryAction={<AktoButton disabled={disableButton} primary onClick={handleRedirect}>Create new auth type</AktoButton>}
             secondaryActions={
-                <Button onClick={() => handleResetModalChange()}>Reset</Button>
+                <AktoButton disabled={disableButton} onClick={() => handleResetModalChange()}>Reset</AktoButton>
             }
             isFirstPage={true}
             components={[
@@ -116,6 +120,7 @@ function AuthTypes() {
                     redirectUrl={"/dashboard/settings/auth-types/details"}
                     learnText={"Creating auth type"}
                     docsUrl={AUTH_TYPES_PAGE_DOCS_URL}
+                    disable={disableButton}
                 />
 
             
