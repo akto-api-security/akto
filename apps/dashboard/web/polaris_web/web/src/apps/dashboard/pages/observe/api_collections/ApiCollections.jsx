@@ -180,6 +180,23 @@ function ApiCollections() {
 
     async function fetchData() {
         setLoading(true)
+        let apiCollectionsResp = await api.getAllCollectionsBasic();
+        setLoading(false)
+        let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
+        let envTypeObj = {}
+        tmp.forEach((c) => {
+            envTypeObj[c.id] = c.envType
+        })
+        setEnvTypeMap(envTypeObj)
+        let dataObj = {}
+        dataObj = convertToNewData(tmp, {}, {}, {}, {}, {});
+        let res = {}
+        res.all = dataObj.prettify
+        res.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
+        res.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
+        res.custom = res.all.filter(x => !res.hostname.includes(x) && !res.groups.includes(x));
+        setData(res);
+
         let apiPromises = [
             api.getAllCollections(),
             api.getCoverageInfoForCollections(),
@@ -189,15 +206,15 @@ function ApiCollections() {
         
         let results = await Promise.allSettled(apiPromises);
 
-        let apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
+        apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
         let coverageInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
         let hasUserEndpoints = results[3].status === 'fulfilled' ? results[3].value : true;
         setHasUsageEndpoints(hasUserEndpoints)
         setCoverageMap(coverageInfo)
 
-        let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
-        let envTypeObj = {}
+        tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
+        envTypeObj = {}
         tmp.forEach((c) => {
             envTypeObj[c.id] = c.envType
         })
@@ -207,9 +224,8 @@ function ApiCollections() {
         const severityObj = issuesObj.severityObj;
         const riskScoreObj = issuesObj.riskScoreObj;
         const sensitiveInfo = await transform.fetchSensitiveInfo();
-        setLoading(false)
 
-        const dataObj = convertToNewData(tmp, sensitiveInfo.sensitiveInfoMap, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap);
+        dataObj = convertToNewData(tmp, sensitiveInfo.sensitiveInfoMap, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap);
 
         const summary = transform.getSummaryData(dataObj.normal)
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;

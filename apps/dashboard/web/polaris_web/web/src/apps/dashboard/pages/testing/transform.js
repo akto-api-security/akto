@@ -11,7 +11,7 @@ import {ResourcesMajor,
   ReplayMinor,
   PlayMinor,
 } from '@shopify/polaris-icons';
-import React, {  } from 'react'
+import React from 'react'
 import { Text,HorizontalStack, Badge, Link, List, Box, Icon, Avatar, Tag, Tooltip} from '@shopify/polaris';
 import { history } from "@/util/history";
 import PersistStore from "../../../main/PersistStore";
@@ -81,7 +81,7 @@ function getTestingRunType(testingRun, testingRunResultSummary, cicd) {
   if (testingRunResultSummary.metadata != null || cicd) {
     return 'CI/CD';
   }
-  if (testingRun.scheduleTimestamp >= func.timeNow() && testingRun.scheduleTimestamp < func.timeNow() + 86400) {
+  if (testingRun.state === "SCHEDULED" && testingRun.periodInSeconds !== 0) {
     return 'Recurring';
   }
   return 'One-time'
@@ -292,7 +292,7 @@ const transform = {
         const prettifiedTest={
           ...obj,
           testName: transform.prettifyTestName(data.name || "Test", iconObj.icon,iconObj.color, iconObj.tooltipContent),
-          severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues))
+          severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues || {"HIGH" : 0, "MEDIUM": 0, "LOW": 0}))
         }
         return prettifiedTest
       }else{
@@ -603,7 +603,7 @@ const transform = {
       const date = new Date(obj.startTimestamp * 1000)
       return{
         ...obj,
-        prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues),
+        prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues || {"HIGH" : 0, "MEDIUM": 0, "LOW": 0}),
         startTime: date.toLocaleTimeString() + " on " +  date.toLocaleDateString(),
         id: obj.hexId
       }
@@ -682,14 +682,14 @@ convertSubIntoSubcategory(resp){
       obj[objectKey] = {
         text: resp[key],
         color: func.getColorForCharts(key),
-        filterkey: objectKeyName
+        filterKey: objectKeyName
       }
       countObj.HIGH+=resp[key]
     }else{
       obj[objectKey] = {
         text: resp[key],
         color: func.getColorForCharts(subCategoryMap[key].superCategory.name),
-        filterkey: objectKeyName
+        filterKey: objectKeyName
       }
       countObj[subCategoryMap[key].superCategory.severity._name]+=resp[key]
     }
@@ -750,7 +750,7 @@ getCollapsibleRow(urls, severity){
 getTestErrorType(message){
   const errorsObject = TestingStore.getState().errorsObject
   for(var key in errorsObject){
-    if(errorsObject[key] === message){
+    if(errorsObject[key] === message || message.includes(errorsObject[key])){
       return key
     }
   }
@@ -766,7 +766,25 @@ getPrettifiedTestRunResults(testRunResults){
     if(test?.errorsList.length > 0){
       const errorType = this.getTestErrorType(test.errorsList[0])
       key = key + ': ' + errorType
-      error_message = errorsObject[errorType]
+      if(errorType === "ROLE_NOT_FOUND"){
+        const baseUrl = window.location.origin+"/dashboard/testing/roles/details?system="
+        const missingConfigs = func.toSentenceCase(test.errorsList[0].split(errorsObject["ROLE_NOT_FOUND"])[0]).split(" ");
+        error_message = (
+          <HorizontalStack gap={"1"}>
+            {missingConfigs.map((config, index) => {
+              return(
+                config.length > 0 ?
+                  <div className="div-link" onClick={(e) => {e.stopPropagation();window.open(baseUrl + config.toUpperCase(), "_blank")}} key={index}>
+                    <span style={{ lineHeight: '16px', fontSize: '14px', color: "#B98900"}}>{func.toSentenceCase(config || "")}</span>
+                  </div>
+                : null
+              )
+            })}
+          </HorizontalStack>
+        )
+      }else{
+        error_message = errorsObject[errorType]
+      }
     }
 
     if(testRunResultsObj.hasOwnProperty(key)){
@@ -998,12 +1016,36 @@ getHeaders: (tab)=> {
               return header;
           })
 
+      case "need_configurations":
+        return headers.filter((header) => header.title !== "CWE tags").map((header) => {
+          if (header.title === "Severity") {
+              // Modify the object as needed
+              return { type: CellType.TEXT, title: "Configuration missing", value: 'errorMessage' };
+          }
+          return header;
+      })
+
       default:
           return headers
   }
 },
-convertErrorEnumsToErrorObjects(errorEnums){
-  console.log(errorEnums)
+getMissingConfigs(testResults){
+  const errorsObject = TestingStore.getState().errorsObject
+  if(Object.keys(errorsObject).length === 0){
+    return []
+  }
+  const configsSet = new Set();
+  testResults.forEach((res) => {
+    if(res?.errorsList.length > 0 && res.errorsList[0].includes(errorsObject["ROLE_NOT_FOUND"])){
+      const config = func.toSentenceCase(res.errorsList[0].split(errorsObject["ROLE_NOT_FOUND"])[0])
+      if(config.length > 0){
+        let allConfigs = config.split(" ")
+        allConfigs.filter(x => x.length > 1).forEach((x) => configsSet.add(func.toSentenceCase(x)))
+      }
+    }
+  })
+
+  return [...configsSet]
 }
 }
 

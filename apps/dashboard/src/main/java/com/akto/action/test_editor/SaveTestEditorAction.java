@@ -39,6 +39,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.rules.RequiredConfigs;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.execution.VariableResolver;
@@ -293,6 +294,9 @@ public class SaveTestEditorAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        // initiating map creation for storing required
+        RequiredConfigs.initiate();
+
         ApiInfo.ApiInfoKey infoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getInt(ApiInfo.ApiInfoKey.API_COLLECTION_ID),
                 apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
                 URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
@@ -324,6 +328,7 @@ public class SaveTestEditorAction extends UserAction {
         TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
         List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
         int lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
+        
         testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs);
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(

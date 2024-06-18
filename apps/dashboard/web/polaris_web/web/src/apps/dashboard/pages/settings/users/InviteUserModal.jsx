@@ -5,7 +5,7 @@ import Store from "../../../store"
 import settingRequests from "../api"
 import Dropdown from "../../../components/layouts/Dropdown"
 
-const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) => {
+const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, roleHierarchy }) => {
     const setToastConfig = Store(state => state.setToastConfig)
     const ref = useRef(null)
     const [inviteEmail, setInviteEmail] = useState()
@@ -14,7 +14,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) =
     const rolesOptions = [
         {label: 'Guest', value: 'GUEST'},
         {label: 'Admin', value: 'ADMIN'},
-        {label: 'Security engineer', value: 'SECURITY_ENGINEER'},
+        {label: 'Security engineer', value: 'MEMBER'},
         {label: 'Developer', value: 'DEVELOPER'},
     ]
 
@@ -36,7 +36,8 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) =
         const spec = {
             inviteeName: "there",
             inviteeEmail: inviteEmail,
-            websiteHostName: window.location.origin
+            websiteHostName: window.location.origin,
+            inviteeRole: inviteRole,
         }
 
         const inviteUsersResponse = await settingRequests.inviteUsers(spec)
@@ -62,6 +63,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) =
         func.copyToClipboard(inviteUser.inviteLink, ref, "Invitation link copied to clipboard")
     }
 
+    const filteredRoleOptions = rolesOptions.filter((c) => roleHierarchy.includes(c.value))
     if (inviteUser.state !== "success") {
         return (
             <Modal
@@ -96,7 +98,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) =
                     <Dropdown
                         id={"inviteRoleSelection"}
                         selected={handleRoleSelectChange}
-                        menuItems={rolesOptions} 
+                        menuItems={filteredRoleOptions} 
                         initial={inviteRole} />
 
                 </Modal.Section>

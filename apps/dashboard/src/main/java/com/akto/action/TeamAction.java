@@ -47,7 +47,7 @@ public class TeamAction extends UserAction {
         for(Object obj: users) {
             BasicDBObject userObj = (BasicDBObject) obj;
             RBAC rbac = userToRBAC.get(userObj.getInt("id"));
-            String status = rbac == null ? "Member" : rbac.getRole().name();
+            String status = rbac == null ? "Guest" : rbac.getRole().name();
             userObj.append("role", status);
         }
 
@@ -60,45 +60,55 @@ public class TeamAction extends UserAction {
             if (pendingInviteCode.getAccountId() == 0) {//case where account id doesn't exists belonged to older 1_000_000 account
                 pendingInviteCode.setAccountId(1_000_000);
             }
+            Role inviteeRole = pendingInviteCode.getInviteeRole();
+            String roleText = "Invitation sent";
+            if (inviteeRole == null) {
+                roleText += "for Security Engineer";
+            } else {
+                roleText += "for " + inviteeRole.name();
+            }
             if (pendingInviteCode.getAccountId() == accountId) {
                 users.add(
                         new BasicDBObject("id", pendingInviteCode.getIssuer())
                                 .append("login", pendingInviteCode.getInviteeEmailId())
                                 .append("name", "-")
-                                .append("role", "Invitation sent")
+                                .append("role", roleText)
                 );
             }
         }
-
         return SUCCESS.toUpperCase();
     }
 
     private enum ActionType {
         REMOVE_USER,
-        MAKE_ADMIN
+        UPDATE_USER_ROLE
     }
     
     String email;
-    public String performAction(ActionType action) {
+    public String performAction(ActionType action, String reqUserRole) {
         int currUserId = getSUser().getId();
         int accId = Context.accountId.get();
 
         Bson findQ = Filters.eq(User.LOGIN, email);
         User userDetails = UsersDao.instance.findOne(findQ);
         boolean userExists =  userDetails != null;
+
+        Bson filterRbac = Filters.and(
+            Filters.eq(RBAC.USER_ID, userDetails.getId()),
+            Filters.eq(RBAC.ACCOUNT_ID, accId));
+
         if (userExists && userDetails.getId() == currUserId) {
             addActionError("You cannot perform this action on yourself");
             return Action.ERROR.toUpperCase();
         }
 
+        Role currentUserRole = RBACDao.getCurrentRoleForUser(currUserId, accId);
+        Role userRole = RBACDao.getCurrentRoleForUser(userDetails.getId(), accId); // current role of the user whose role is changing
         switch (action) {
             case REMOVE_USER:
                 if (userExists) {
                     UsersDao.instance.updateOne(findQ, Updates.unset("accounts." + accId));
-                    RBACDao.instance.deleteAll(
-                            Filters.and(
-                                    Filters.eq(RBAC.USER_ID, userDetails.getId()),
-                                    Filters.eq(RBAC.ACCOUNT_ID, accId)));
+                    RBACDao.instance.deleteAll(filterRbac);
                     return Action.SUCCESS.toUpperCase();
                 } else {
                     DeleteResult delResult = PendingInviteCodesDao.instance.getMCollection().deleteMany(Filters.eq("inviteeEmailId", email));
@@ -109,14 +119,31 @@ public class TeamAction extends UserAction {
                     }
                 }
 
-            case MAKE_ADMIN:
+            case UPDATE_USER_ROLE:
                 if (userExists) {
-                    RBACDao.instance.updateOne(
-                            Filters.and(
-                                    Filters.eq(RBAC.USER_ID, userDetails.getId()),
-                                    Filters.eq(RBAC.ACCOUNT_ID, accId)),
-                            Updates.set(RBAC.ROLE, Role.ADMIN));
-                    return Action.SUCCESS.toUpperCase();
+                    try {
+                        Role[] rolesHierarchy = currentUserRole.getRoleHierarchy();
+                        boolean isValidUpdateRole = false;
+                        for(Role role: rolesHierarchy){
+                            if(role == userRole){
+                                isValidUpdateRole = true;
+                                break;
+                            }
+                        }
+                        if(isValidUpdateRole){
+                            RBACDao.instance.updateOne(
+                                filterRbac,
+                                Updates.set(RBAC.ROLE, Role.valueOf(reqUserRole)));
+                            return Action.SUCCESS.toUpperCase();
+                        }else{
+                            addActionError("User doesn't have access to modify this role.");
+                            return Action.ERROR.toUpperCase();
+                        }
+                    } catch (Exception e) {
+                        addActionError("User role doesn't exist.");
+                        return Action.ERROR.toUpperCase();
+                    }
+                    
                 } else {
                     addActionError("User doesn't exist");
                     return Action.ERROR.toUpperCase();
@@ -129,11 +156,29 @@ public class TeamAction extends UserAction {
     }
 
     public String removeUser() {
-        return performAction(ActionType.REMOVE_USER);
+        return performAction(ActionType.REMOVE_USER, null);
     }
 
+    private String userRole;
+
     public String makeAdmin(){
-        return performAction(ActionType.MAKE_ADMIN);
+        return performAction(ActionType.UPDATE_USER_ROLE, this.userRole.toUpperCase());
+    }
+
+    private Role[] userRoleHierarchy;
+
+    public String getRoleHierarchy(){
+        if(this.userRole == null || this.userRole.isEmpty()){
+            addActionError("Role cannot be null or empty");
+            return Action.ERROR.toUpperCase();
+        }
+        try {
+            this.userRoleHierarchy = Role.valueOf(userRole).getRoleHierarchy();
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("User role doesn't exist.");
+            return Action.ERROR.toUpperCase();
+        }
     }
 
     public int getId() {
@@ -158,6 +203,14 @@ public class TeamAction extends UserAction {
 
     public String getEmail() {
         return this.email;
+    }
+
+    public void setUserRole(String userRole) {
+        this.userRole = userRole;
+    }
+
+    public Role[] getUserRoleHierarchy() {
+        return userRoleHierarchy;
     }
 
 }

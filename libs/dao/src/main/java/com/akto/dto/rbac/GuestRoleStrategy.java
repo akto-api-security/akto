@@ -22,6 +22,7 @@ public class GuestRoleStrategy implements RoleStrategy{
                 accessMap.put(feature, access);
             }
         }
+        RbacEnums.mergeUserFeaturesAccess(accessMap);
         return accessMap;
     }
 }

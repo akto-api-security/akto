@@ -61,7 +61,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             ReadWriteAccess accessGiven = userRoleType.getReadWriteAccessForFeature(featureType);
             boolean hasRequiredAccess = false;
 
-            if(accessGiven.toString().equalsIgnoreCase(ReadWriteAccess.READ_WRITE.toString()) || accessGiven.toString().equalsIgnoreCase(this.accessType)){
+            if(this.accessType.equalsIgnoreCase(ReadWriteAccess.READ.toString()) || this.accessType.equalsIgnoreCase(accessGiven.toString())){
                 hasRequiredAccess = true;
             }
             
