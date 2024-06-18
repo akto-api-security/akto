@@ -1,12 +1,16 @@
-import { Avatar, Banner, Button, Card, LegacyCard, Modal, Page, ResourceItem, ResourceList, Scrollable, Text, TextContainer, TextField } from "@shopify/polaris"
-import { useCallback, useEffect, useState } from "react";
+import AktoButton from './../../../components/shared/AktoButton';
+import { ActionList, Avatar, Banner, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text } from "@shopify/polaris"
+import { DeleteMajor, TickMinor } from "@shopify/polaris-icons"
+import { useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
 import Store from "../../../store";
+import PersistStore from '../../../../main/PersistStore';
 
 const Users = () => {
     const username = Store(state => state.username)
+    const userRole = PersistStore(state => state.userRole)
 
     const [inviteUser, setInviteUser] = useState({
         isActive: false,
@@ -17,6 +21,86 @@ const Users = () => {
 
     const [loading, setLoading] = useState(false)
     const [users, setUsers] = useState([])
+
+    const [roleSelectionPopup, setRoleSelectionPopup] = useState({})
+
+    const rolesOptions = [
+        {
+            items: [
+            {
+                content: 'Admin',
+                role: 'ADMIN',
+                icon: <div style={{padding: "10px"}}/>
+            },
+            {
+                content: 'Security Engineer',
+                role: 'MEMBER',
+                icon: <div style={{padding: "10px"}}/>
+            },
+            {
+                content: 'Developer',
+                role: 'DEVELOPER',
+                icon: <div style={{padding: "10px"}}/>
+            },
+            {
+                content: 'Guest',
+                role: 'GUEST',
+                icon: <div style={{padding: "10px"}}/>
+            }]
+        },
+        {
+            items: [{
+                destructive: true,
+                content: 'Remove',
+                role: 'REMOVE',
+                icon: DeleteMajor
+            }]
+        }
+    ]
+
+    const handleRoleSelectChange = async (id, newRole, login) => {
+        if(newRole === 'REMOVE') {
+            // await handleRemoveUser(login)
+            console.log("removing user ", login)
+            toggleRoleSelectionPopup(id)
+            return
+        }
+
+        // Call Update Role API
+        setUsers(users.map(user => user.login === login ? { ...user, role: newRole } : user))
+        setRoleSelectionPopup(prevState => ({ ...prevState, [login]: false }))
+        console.log(newRole, login)
+
+        toggleRoleSelectionPopup(id)
+    }
+
+    const toggleRoleSelectionPopup = (id) => {
+        setRoleSelectionPopup(prevState => ({
+            ...prevState,
+            [id]: !prevState[id]
+        }));
+    }
+
+    const getRolesOptionsWithTick = (currentRole) => {
+        return rolesOptions.map(section => ({
+            ...section,
+            items: section.items.map(item => ({
+                ...item,
+                icon: item.role === currentRole ? TickMinor : item.icon
+            }))
+        }));
+    }
+
+    const getRoleDisplayName = (role) => {
+        for(let section of rolesOptions) {
+            for(let item of section.items) {
+                if(item.role === role) {
+                    return item.content;
+                }
+            }
+        }
+        return role;
+    }
 
     const getTeamData = async () => {
         setLoading(true);
@@ -31,11 +115,6 @@ const Users = () => {
 
     const isLocalDeploy = false;
     const currentUser = users.find(user => user.login === username)
-
-    let isAdmin = false
-    if (currentUser) {
-        isAdmin = currentUser.role === "ADMIN"
-    } 
 
     const toggleInviteUserModal = () => {
         setInviteUser({
@@ -55,14 +134,14 @@ const Users = () => {
         await settingRequests.makeAdmin(login)
         func.setToast(true, false, "User " + login + " made admin successfully")
     }
-
+    
     return (
         <Page
             title="Users"
             primaryAction={{
                 content: 'Invite user',
                 onAction: () => toggleInviteUserModal(),
-                disabled: isLocalDeploy
+                'disabled': (isLocalDeploy || userRole === 'GUEST')
             }}
             divider
         >
@@ -80,30 +159,47 @@ const Users = () => {
                 </Banner>
             }
             <br />
-            <Text variant="headingMd">Team details</Text>
-            <Text variant="bodyMd">Find and manage your team permissions here</Text>
+            
+            <Banner>
+                <Text variant="headingMd">Role permissions</Text>
+                <Text variant="bodyMd">Each role have different permissions. <Link url="https://docs.akto.io/" target="_blank">Learn more</Link></Text>
+            </Banner>
+
             <div style={{ paddingTop: "20px" }}>
                 <LegacyCard>
                     <ResourceList
                         resourceName={{ singular: 'user', plural: 'users' }}
                         items={users}
                         renderItem={(item) => {
-                            const { id, login, role } = item;
-
+                            const { id, name, login, role } = item;
                             const initials = func.initials(login)
                             const media = <Avatar user size="medium" name={login} initials={initials} />
-                            const shortcutActions = username !== login && isAdmin  ? 
+                            const shortcutActions = username !== login && role !== currentUser.role && currentUser.role !== "GUEST" ? 
                                 [
                                     {
-                                        content: 'Remove user',
-                                        onAction: () => {handleRemoveUser(login)},
-                                    },
-                                    ( role.toUpperCase() === "MEMBER" ) &&
-                                    {
-                                        content: 'Make admin',
-                                        onAction: () => {handleMakeAdmin(login)},
+                                        content: <Popover
+                                                    active={roleSelectionPopup[id]}
+                                                    onClose={() => toggleRoleSelectionPopup(id)}
+                                                    activator={<AktoButton disclosure onClick={() => toggleRoleSelectionPopup(id)}>{getRoleDisplayName(role)}</AktoButton>}
+                                                 >
+                                                    <ActionList
+                                                        actionRole="menuitem"
+                                                        sections={getRolesOptionsWithTick(role).map(section => ({
+                                                            ...section,
+                                                            items: section.items.map(item => ({
+                                                                ...item,
+                                                                onAction: () => handleRoleSelectChange(id, item.role, login)
+                                                            }))
+                                                        }))}
+                                                    />
+                                                 </Popover>
                                     }
-                                ] : []
+                                ] : [
+                                    {
+                                        content: <Text color="subdued">{getRoleDisplayName(role)}</Text>,
+                                        url: '#',
+                                    }
+                                ]
 
                             return (
                                 <ResourceItem
@@ -113,10 +209,10 @@ const Users = () => {
                                     persistActions
                                 >
                                     <Text variant="bodyMd" fontWeight="bold" as="h3">
-                                        {login}
+                                        {name}
                                     </Text>
                                     <Text variant="bodyMd">
-                                        {role}
+                                        {login}
                                     </Text>
                                 </ResourceItem>
                             );

@@ -10,7 +10,9 @@ public class RbacEnums {
         INVENTORY,
         TESTING,
         TEST_LIBRARY,
-        SETTINGS;
+        SETTINGS,
+        ADMIN,
+        USER;
     
         public static AccessGroups[] getAccessGroups() {
             return values();
@@ -22,7 +24,9 @@ public class RbacEnums {
         SENSITIVE_DATA(AccessGroups.INVENTORY),
         TRAFFIC_FILTERS(AccessGroups.INVENTORY),
         DEFAULT_PAYLOADS(AccessGroups.INVENTORY),
+        SAMPLE_DATA(AccessGroups.INVENTORY),
         TAGS(AccessGroups.INVENTORY),
+        ASK_GPT(AccessGroups.INVENTORY),
         START_TEST_RUN(AccessGroups.TESTING),
         TEST_RESULTS(AccessGroups.TESTING),
         TEST_ROLES(AccessGroups.TESTING),
@@ -34,8 +38,10 @@ public class RbacEnums {
         INTEGRATIONS(AccessGroups.SETTINGS),
         METRICS(AccessGroups.SETTINGS),
         LOGS(AccessGroups.SETTINGS),
-        BILLING(AccessGroups.SETTINGS);
-
+        BILLING(AccessGroups.SETTINGS),
+        INVITE_MEMBERS(AccessGroups.SETTINGS),
+        ADMIN_ACTIONS(AccessGroups.ADMIN),
+        USER_ACTIONS(AccessGroups.USER);
         private final AccessGroups accessGroup;
 
         Feature(AccessGroups accessGroup) {

@@ -17,7 +17,10 @@ public class DeveloperRoleStrategy implements RoleStrategy{
     public Map<Feature, ReadWriteAccess> getFeatureAccessMap() {
         Map<Feature, ReadWriteAccess> accessMap = new HashMap<>();
         for (AccessGroups group : AccessGroups.getAccessGroups()) {
-            ReadWriteAccess access = group == AccessGroups.SETTINGS ? ReadWriteAccess.READ_WRITE : ReadWriteAccess.READ;
+            ReadWriteAccess access = ReadWriteAccess.READ ;
+            if(group == AccessGroups.SETTINGS ){
+                access = ReadWriteAccess.READ_WRITE;
+            }
             for (Feature feature : Feature.getFeaturesForAccessGroup(group)) {
                 accessMap.put(feature, access);
             }

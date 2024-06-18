@@ -1,13 +1,29 @@
 import { Modal, Text, TextField } from "@shopify/polaris"
-import { useState, useRef } from "react"
+import { useState, useRef, useCallback } from "react"
 import func from "@/util/func"
 import Store from "../../../store"
 import settingRequests from "../api"
+import Dropdown from "../../../components/layouts/Dropdown"
 
 const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) => {
     const setToastConfig = Store(state => state.setToastConfig)
     const ref = useRef(null)
     const [inviteEmail, setInviteEmail] = useState()
+    const [inviteRole, setInviteRole] = useState('GUEST')
+
+    const rolesOptions = [
+        {label: 'Guest', value: 'GUEST'},
+        {label: 'Admin', value: 'ADMIN'},
+        {label: 'Security engineer', value: 'MEMBER'},
+        {label: 'Developer', value: 'DEVELOPER'},
+    ]
+
+    const handleRoleSelectChange = useCallback(
+        (value) => {
+            setInviteRole(value)
+        },
+        [],
+    );
 
     const handleSendInvitation = async () => {
         setInviteUser(previousState => ({
@@ -39,6 +55,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) =
         })
 
         setInviteEmail("")
+        setInviteRole("GUEST")
     }
 
     const handleCopyInvitation = () => {
@@ -75,6 +92,12 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) =
                     <Text variant="bodyMd" color="subdued">
                         We'll use this address if we need to contact you about your account.
                     </Text>
+
+                    <Dropdown
+                        id={"inviteRoleSelection"}
+                        selected={handleRoleSelectChange}
+                        menuItems={rolesOptions} 
+                        initial={inviteRole} />
 
                 </Modal.Section>
             </Modal>
