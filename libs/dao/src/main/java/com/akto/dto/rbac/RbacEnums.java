@@ -2,6 +2,7 @@ package com.akto.dto.rbac;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class RbacEnums {
@@ -62,5 +63,11 @@ public class RbacEnums {
     public enum ReadWriteAccess {
         READ,
         READ_WRITE
+    }
+
+    public static void mergeUserFeaturesAccess (Map<Feature, ReadWriteAccess> accessMap){
+        for(Feature feature: Feature.getFeaturesForAccessGroup(AccessGroups.USER)){
+            accessMap.put(feature, ReadWriteAccess.READ_WRITE);
+        }
     }
 }
