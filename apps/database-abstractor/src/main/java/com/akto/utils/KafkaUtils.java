@@ -181,10 +181,10 @@ public class KafkaUtils {
                 dbAction.setWritesForTrafficMetrics(bulkWrites);
                 dbAction.bulkWriteTrafficMetrics();
                 break;
-            // case "bulkWriteTestingRunIssues":
-            //     dbAction.setWritesForTestingRunIssues(bulkWrites);
-            //     dbAction.bulkWriteTestingRunIssues();
-            //     break;
+            case "bulkWriteTestingRunIssues":
+                dbAction.setWritesForTestingRunIssues(bulkWrites);
+                dbAction.bulkWriteTestingRunIssues();
+                break;
 
             default:
                 break;
