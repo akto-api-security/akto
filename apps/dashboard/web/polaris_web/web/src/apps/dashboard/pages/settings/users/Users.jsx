@@ -20,6 +20,7 @@ const Users = () => {
 
     const [loading, setLoading] = useState(false)
     const [users, setUsers] = useState([])
+    const [roleHierarchy, setRoleHierarchy] = useState([])
 
     const [roleSelectionPopup, setRoleSelectionPopup] = useState({})
 
@@ -57,10 +58,19 @@ const Users = () => {
         }
     ]
 
+    const getRoleHierarchy = async() => {
+        const roleHierarchyResp = await settingRequests.getRoleHierarchy(window.USER_ROLE)
+        setRoleHierarchy(roleHierarchyResp)
+    }
+
+    useEffect(() => {
+        getTeamData();
+        getRoleHierarchy()
+    }, [])
+
     const handleRoleSelectChange = async (id, newRole, login) => {
         if(newRole === 'REMOVE') {
-            // await handleRemoveUser(login)
-            console.log("removing user ", login)
+            await handleRemoveUser(login)
             toggleRoleSelectionPopup(id)
             return
         }
@@ -68,7 +78,7 @@ const Users = () => {
         // Call Update Role API
         setUsers(users.map(user => user.login === login ? { ...user, role: newRole } : user))
         setRoleSelectionPopup(prevState => ({ ...prevState, [login]: false }))
-        console.log(newRole, login)
+        await updateUserRole(login, userRole)
 
         toggleRoleSelectionPopup(id)
     }
@@ -81,13 +91,14 @@ const Users = () => {
     }
 
     const getRolesOptionsWithTick = (currentRole) => {
-        return rolesOptions.map(section => ({
+        const tempArr =  rolesOptions.map(section => ({
             ...section,
-            items: section.items.map(item => ({
+            items: section.items.filter((c) => roleHierarchy.includes(c.role)).map(item => ({
                 ...item,
                 icon: item.role === currentRole ? TickMinor : item.icon
             }))
         }));
+        return tempArr
     }
 
     const getRoleDisplayName = (role) => {
@@ -108,12 +119,7 @@ const Users = () => {
         setLoading(false)
     };
 
-    useEffect(() => {
-        getTeamData();
-    }, [])
-
     const isLocalDeploy = false;
-    const currentUser = users.find(user => user.login === username)
 
     const toggleInviteUserModal = () => {
         setInviteUser({
@@ -129,9 +135,9 @@ const Users = () => {
         func.setToast(true, false, "User removed successfully")
     }
 
-    const handleMakeAdmin = async (login) => {
-        await settingRequests.makeAdmin(login)
-        func.setToast(true, false, "User " + login + " made admin successfully")
+    const updateUserRole = async (login,roleVal) => {
+        await settingRequests.makeAdmin(login, roleVal)
+        func.setToast(true, false, "Role updated for " + login + " successfully")
     }
     
     return (
@@ -173,7 +179,7 @@ const Users = () => {
                             const { id, name, login, role } = item;
                             const initials = func.initials(login)
                             const media = <Avatar user size="medium" name={login} initials={initials} />
-                            const shortcutActions = username !== login && role !== currentUser.role && currentUser.role !== "GUEST" ? 
+                            const shortcutActions = (username !== login && roleHierarchy.includes(role.toUpperCase())) ? 
                                 [
                                     {
                                         content: <Popover

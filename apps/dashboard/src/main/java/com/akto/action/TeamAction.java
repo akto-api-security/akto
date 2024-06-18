@@ -6,7 +6,6 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
-import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -75,30 +74,34 @@ public class TeamAction extends UserAction {
 
     private enum ActionType {
         REMOVE_USER,
-        MAKE_ADMIN
+        UPDATE_USER_ROLE
     }
     
     String email;
-    public String performAction(ActionType action) {
+    public String performAction(ActionType action, String reqUserRole) {
         int currUserId = getSUser().getId();
         int accId = Context.accountId.get();
 
         Bson findQ = Filters.eq(User.LOGIN, email);
         User userDetails = UsersDao.instance.findOne(findQ);
         boolean userExists =  userDetails != null;
+
+        Bson filterRbac = Filters.and(
+            Filters.eq(RBAC.USER_ID, userDetails.getId()),
+            Filters.eq(RBAC.ACCOUNT_ID, accId));
+
         if (userExists && userDetails.getId() == currUserId) {
             addActionError("You cannot perform this action on yourself");
             return Action.ERROR.toUpperCase();
         }
 
+        RBAC.Role currentUserRole = RBACDao.getCurrentRoleForUser(currUserId, accId);
+        RBAC.Role userRole = RBACDao.getCurrentRoleForUser(userDetails.getId(), accId); // current role of the user whose role is changing
         switch (action) {
             case REMOVE_USER:
                 if (userExists) {
                     UsersDao.instance.updateOne(findQ, Updates.unset("accounts." + accId));
-                    RBACDao.instance.deleteAll(
-                            Filters.and(
-                                    Filters.eq(RBAC.USER_ID, userDetails.getId()),
-                                    Filters.eq(RBAC.ACCOUNT_ID, accId)));
+                    RBACDao.instance.deleteAll(filterRbac);
                     return Action.SUCCESS.toUpperCase();
                 } else {
                     DeleteResult delResult = PendingInviteCodesDao.instance.getMCollection().deleteMany(Filters.eq("inviteeEmailId", email));
@@ -109,14 +112,31 @@ public class TeamAction extends UserAction {
                     }
                 }
 
-            case MAKE_ADMIN:
+            case UPDATE_USER_ROLE:
                 if (userExists) {
-                    RBACDao.instance.updateOne(
-                            Filters.and(
-                                    Filters.eq(RBAC.USER_ID, userDetails.getId()),
-                                    Filters.eq(RBAC.ACCOUNT_ID, accId)),
-                            Updates.set(RBAC.ROLE, Role.ADMIN));
-                    return Action.SUCCESS.toUpperCase();
+                    try {
+                        RBAC.Role[] rolesHierarchy = currentUserRole.getRoleHierarchy();
+                        boolean isValidUpdateRole = false;
+                        for(RBAC.Role role: rolesHierarchy){
+                            if(role == userRole){
+                                isValidUpdateRole = true;
+                                break;
+                            }
+                        }
+                        if(isValidUpdateRole){
+                            RBACDao.instance.updateOne(
+                                filterRbac,
+                                Updates.set(RBAC.ROLE, RBAC.Role.valueOf(reqUserRole)));
+                            return Action.SUCCESS.toUpperCase();
+                        }else{
+                            addActionError("User doesn't have access to modify this role.");
+                            return Action.ERROR.toUpperCase();
+                        }
+                    } catch (Exception e) {
+                        addActionError("User role doesn't exist.");
+                        return Action.ERROR.toUpperCase();
+                    }
+                    
                 } else {
                     addActionError("User doesn't exist");
                     return Action.ERROR.toUpperCase();
@@ -129,11 +149,30 @@ public class TeamAction extends UserAction {
     }
 
     public String removeUser() {
-        return performAction(ActionType.REMOVE_USER);
+        return performAction(ActionType.REMOVE_USER, null);
     }
 
+    private String userRole;
+
     public String makeAdmin(){
-        return performAction(ActionType.MAKE_ADMIN);
+        return performAction(ActionType.UPDATE_USER_ROLE, userRole.toUpperCase());
+    }
+
+    private RBAC.Role[] userRoleHierarchy;
+
+    public String getRoleHierarchy(){
+        if(this.userRole == null || this.userRole.isEmpty()){
+            addActionError("Role cannot be null or empty");
+            return Action.ERROR.toUpperCase();
+        }
+        try {
+            RBAC.Role[] rolesHierarchy = RBAC.Role.valueOf(userRole).getRoleHierarchy();
+            this.userRoleHierarchy = rolesHierarchy;
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("User role doesn't exist.");
+            return Action.ERROR.toUpperCase();
+        }
     }
 
     public int getId() {
@@ -158,6 +197,14 @@ public class TeamAction extends UserAction {
 
     public String getEmail() {
         return this.email;
+    }
+
+    public void setUserRole(String userRole) {
+        this.userRole = userRole;
+    }
+
+    public RBAC.Role[] getUserRoleHierarchy() {
+        return userRoleHierarchy;
     }
 
 }
