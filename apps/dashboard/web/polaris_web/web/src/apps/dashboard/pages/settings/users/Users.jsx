@@ -227,6 +227,7 @@ const Users = () => {
                     inviteUser={inviteUser} 
                     setInviteUser={setInviteUser}
                     toggleInviteUserModal={toggleInviteUserModal}
+                    roleHierarchy={roleHierarchy}
                 />
             </div>
 

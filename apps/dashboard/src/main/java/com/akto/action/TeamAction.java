@@ -46,7 +46,7 @@ public class TeamAction extends UserAction {
         for(Object obj: users) {
             BasicDBObject userObj = (BasicDBObject) obj;
             RBAC rbac = userToRBAC.get(userObj.getInt("id"));
-            String status = rbac == null ? "Member" : rbac.getRole().name();
+            String status = rbac == null ? "Guest" : rbac.getRole().name();
             userObj.append("role", status);
         }
 
