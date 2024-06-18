@@ -6,6 +6,7 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -59,16 +60,22 @@ public class TeamAction extends UserAction {
             if (pendingInviteCode.getAccountId() == 0) {//case where account id doesn't exists belonged to older 1_000_000 account
                 pendingInviteCode.setAccountId(1_000_000);
             }
+            Role inviteeRole = pendingInviteCode.getInviteeRole();
+            String roleText = "Invitation sent";
+            if (inviteeRole == null) {
+                roleText += "for Security Engineer";
+            } else {
+                roleText += "for " + inviteeRole.name();
+            }
             if (pendingInviteCode.getAccountId() == accountId) {
                 users.add(
                         new BasicDBObject("id", pendingInviteCode.getIssuer())
                                 .append("login", pendingInviteCode.getInviteeEmailId())
                                 .append("name", "-")
-                                .append("role", "Invitation sent")
+                                .append("role", roleText)
                 );
             }
         }
-
         return SUCCESS.toUpperCase();
     }
 
@@ -95,8 +102,8 @@ public class TeamAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        RBAC.Role currentUserRole = RBACDao.getCurrentRoleForUser(currUserId, accId);
-        RBAC.Role userRole = RBACDao.getCurrentRoleForUser(userDetails.getId(), accId); // current role of the user whose role is changing
+        Role currentUserRole = RBACDao.getCurrentRoleForUser(currUserId, accId);
+        Role userRole = RBACDao.getCurrentRoleForUser(userDetails.getId(), accId); // current role of the user whose role is changing
         switch (action) {
             case REMOVE_USER:
                 if (userExists) {
@@ -115,9 +122,9 @@ public class TeamAction extends UserAction {
             case UPDATE_USER_ROLE:
                 if (userExists) {
                     try {
-                        RBAC.Role[] rolesHierarchy = currentUserRole.getRoleHierarchy();
+                        Role[] rolesHierarchy = currentUserRole.getRoleHierarchy();
                         boolean isValidUpdateRole = false;
-                        for(RBAC.Role role: rolesHierarchy){
+                        for(Role role: rolesHierarchy){
                             if(role == userRole){
                                 isValidUpdateRole = true;
                                 break;
@@ -126,7 +133,7 @@ public class TeamAction extends UserAction {
                         if(isValidUpdateRole){
                             RBACDao.instance.updateOne(
                                 filterRbac,
-                                Updates.set(RBAC.ROLE, RBAC.Role.valueOf(reqUserRole)));
+                                Updates.set(RBAC.ROLE, Role.valueOf(reqUserRole)));
                             return Action.SUCCESS.toUpperCase();
                         }else{
                             addActionError("User doesn't have access to modify this role.");
@@ -158,7 +165,7 @@ public class TeamAction extends UserAction {
         return performAction(ActionType.UPDATE_USER_ROLE, this.userRole.toUpperCase());
     }
 
-    private RBAC.Role[] userRoleHierarchy;
+    private Role[] userRoleHierarchy;
 
     public String getRoleHierarchy(){
         if(this.userRole == null || this.userRole.isEmpty()){
@@ -166,8 +173,7 @@ public class TeamAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
         try {
-            RBAC.Role[] rolesHierarchy = RBAC.Role.valueOf(userRole).getRoleHierarchy();
-            this.userRoleHierarchy = rolesHierarchy;
+            this.userRoleHierarchy = Role.valueOf(userRole).getRoleHierarchy();
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             addActionError("User role doesn't exist.");
@@ -203,7 +209,7 @@ public class TeamAction extends UserAction {
         this.userRole = userRole;
     }
 
-    public RBAC.Role[] getUserRoleHierarchy() {
+    public Role[] getUserRoleHierarchy() {
         return userRoleHierarchy;
     }
 

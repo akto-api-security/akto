@@ -1,9 +1,11 @@
 package com.akto.action;
 
 import com.akto.dao.PendingInviteCodesDao;
+import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
+import com.akto.dto.RBAC;
 import com.akto.dto.User;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.util.DashboardMode;
@@ -28,6 +30,7 @@ public class InviteUserAction extends UserAction{
 
     public static final String INVALID_EMAIL_ERROR = "Invalid email";
     public static final String DIFFERENT_ORG_EMAIL_ERROR = "Email must belong to same organisation";
+    public static final String NOT_ALLOWED_TO_INVITE = "you're not authorised to invite for this role";
     public static final String AKTO_DOMAIN = "akto.io";
 
     public static String validateEmail(String email, String adminLogin) {
@@ -52,6 +55,7 @@ public class InviteUserAction extends UserAction{
     }
 
     private String finalInviteCode;
+    private RBAC.Role inviteeRole;
 
     @Override
     public String execute() {
@@ -62,6 +66,17 @@ public class InviteUserAction extends UserAction{
 
         if (code != null) {
             addActionError(code);
+            return ERROR.toUpperCase();
+        }
+
+        RBAC userRbac = RBACDao.instance.findOne(Filters.and(
+                Filters.eq(RBAC.USER_ID, user_id),
+                Filters.eq(RBAC.ACCOUNT_ID, Context.accountId.get())
+        ));
+
+        RBAC.Role userRole = userRbac.getRole();
+        if (!Arrays.asList(userRole.getRoleHierarchy()).contains(this.inviteeRole)) {
+            addActionError("User not allowed to invite for this role");
             return ERROR.toUpperCase();
         }
 
@@ -89,10 +104,8 @@ public class InviteUserAction extends UserAction{
         try {
             Jws<Claims> jws = JWT.parseJwt(inviteCode,"");
             PendingInviteCodesDao.instance.insertOne(
-                    new PendingInviteCode(inviteCode, user_id, inviteeEmail,jws.getBody().getExpiration().getTime(),Context.accountId.get())
+                    new PendingInviteCode(inviteCode, user_id, inviteeEmail,jws.getBody().getExpiration().getTime(),Context.accountId.get(), this.inviteeRole)
             );
-
-
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             e.printStackTrace();
             return ERROR.toUpperCase();
@@ -137,5 +150,13 @@ public class InviteUserAction extends UserAction{
 
     public String getFinalInviteCode() {
         return finalInviteCode;
+    }
+
+    public RBAC.Role getInviteeRole() {
+        return inviteeRole;
+    }
+
+    public void setInviteeRole(RBAC.Role inviteeRole) {
+        this.inviteeRole = inviteeRole;
     }
 }

@@ -110,6 +110,7 @@
             </result>
         </action>
 
+<!--        //method for API does not exists-->
         <action name="api/createNewTeam" class="com.akto.action.TeamAction" method="saveNewTeam">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
