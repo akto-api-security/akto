@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.akto.listener.InitializerListener;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -58,10 +59,8 @@ public class AutomatedApiGroupsUtils {
             if (!updateGroups) {
                 // Use the local file as a fallback only for the initial creation of the automated groups
                 try {
-                    String resourceName = "automated-api-groups/automated-api-groups.csv";
-                    byte[] fileBytes = Files.readAllBytes(Paths.get(resourceName));
-                    String fileContent = new String(fileBytes, StandardCharsets.UTF_8);
-                    groupsCsvContent = fileContent;
+                    String resourceName = "automated-api-groups.csv";
+                    groupsCsvContent = InitializerListener.convertStreamToString(InitializerListener.class.getResourceAsStream("/" + resourceName));
                 } catch (Exception ex) {
                     loggerMaker.errorAndAddToDb(ex, String.format("Error while loading automated groups csv file. Error: %s", ex.getMessage()), LogDb.DASHBOARD);
                 }

@@ -2483,7 +2483,7 @@ public class InitializerListener implements ServletContextListener {
         return files;
     }
 
-    private static String convertStreamToString(InputStream in) throws Exception {
+    public static String convertStreamToString(InputStream in) throws Exception {
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(in));
         StringBuilder stringbuilder = new StringBuilder();
