@@ -29,12 +29,13 @@ const settingRequests = {
             }
         })
     },
-    makeAdmin(email) {
+    makeAdmin(email, roleVal) {
         return request({
             url: '/api/makeAdmin',
             method: 'post',
             data: {
-                email: email
+                email: email,
+                userRole: roleVal
             }
         })
     },

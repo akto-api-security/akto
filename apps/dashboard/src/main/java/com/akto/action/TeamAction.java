@@ -155,7 +155,7 @@ public class TeamAction extends UserAction {
     private String userRole;
 
     public String makeAdmin(){
-        return performAction(ActionType.UPDATE_USER_ROLE, userRole.toUpperCase());
+        return performAction(ActionType.UPDATE_USER_ROLE, this.userRole.toUpperCase());
     }
 
     private RBAC.Role[] userRoleHierarchy;

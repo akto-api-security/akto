@@ -1,4 +1,4 @@
-import { ActionList, Avatar, Banner, Button, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text } from "@shopify/polaris"
+import { ActionList, Avatar, Banner, Box, Button, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text } from "@shopify/polaris"
 import { DeleteMajor, TickMinor } from "@shopify/polaris-icons"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
@@ -30,22 +30,18 @@ const Users = () => {
             {
                 content: 'Admin',
                 role: 'ADMIN',
-                icon: <div style={{padding: "10px"}}/>
             },
             {
                 content: 'Security Engineer',
                 role: 'MEMBER',
-                icon: <div style={{padding: "10px"}}/>
             },
             {
                 content: 'Developer',
                 role: 'DEVELOPER',
-                icon: <div style={{padding: "10px"}}/>
             },
             {
                 content: 'Guest',
                 role: 'GUEST',
-                icon: <div style={{padding: "10px"}}/>
             }]
         },
         {
@@ -78,7 +74,7 @@ const Users = () => {
         // Call Update Role API
         setUsers(users.map(user => user.login === login ? { ...user, role: newRole } : user))
         setRoleSelectionPopup(prevState => ({ ...prevState, [login]: false }))
-        await updateUserRole(login, userRole)
+        await updateUserRole(login, newRole)
 
         toggleRoleSelectionPopup(id)
     }
@@ -95,7 +91,7 @@ const Users = () => {
             ...section,
             items: section.items.filter((c) => roleHierarchy.includes(c.role)).map(item => ({
                 ...item,
-                icon: item.role === currentRole ? TickMinor : item.icon
+                prefix: item.role === currentRole ? <Box><Icon source={TickMinor}/></Box> : <div style={{padding: "10px"}}/>
             }))
         }));
         return tempArr
