@@ -1,5 +1,4 @@
-import AktoButton from './../../../components/shared/AktoButton';
-import { ActionList, Avatar, Banner, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text } from "@shopify/polaris"
+import { ActionList, Avatar, Banner, Button, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text } from "@shopify/polaris"
 import { DeleteMajor, TickMinor } from "@shopify/polaris-icons"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
@@ -180,7 +179,7 @@ const Users = () => {
                                         content: <Popover
                                                     active={roleSelectionPopup[id]}
                                                     onClose={() => toggleRoleSelectionPopup(id)}
-                                                    activator={<AktoButton disclosure onClick={() => toggleRoleSelectionPopup(id)}>{getRoleDisplayName(role)}</AktoButton>}
+                                                    activator={<Button disclosure onClick={() => toggleRoleSelectionPopup(id)}>{getRoleDisplayName(role)}</Button>}
                                                  >
                                                     <ActionList
                                                         actionRole="menuitem"
