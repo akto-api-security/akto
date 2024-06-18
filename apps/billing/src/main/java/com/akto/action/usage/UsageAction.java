@@ -117,7 +117,7 @@ public class UsageAction extends ActionSupport implements ServletRequestAware {
             OrganizationFlags flags = OrganizationFlagsDao.instance.findOne(new BasicDBObject());
             executorService.schedule(new Runnable() {
                 public void run() {
-                    InitializerListener.aggregateAndSinkUsageData(organization, usageLowerBound, usageUpperBound, flags);
+                    InitializerListener.aggregateAndSinkUsageData(organization, usageLowerBound, usageUpperBound, flags, true);
                     loggerMaker.infoAndAddToDb(String.format("Flushed usage data for organization %s", organizationId), LogDb.BILLING);
                 }
             }, 0, TimeUnit.SECONDS);

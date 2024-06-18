@@ -86,7 +86,7 @@ public class ApiCollection {
         this.type = Type.API_GROUP;
     }
 
-    public static boolean useHost = Objects.equals(System.getenv("USE_HOSTNAME"), "true");
+    public static boolean useHost = true;
 
     public int getId() {
         return this.id;

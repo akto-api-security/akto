@@ -1399,6 +1399,17 @@
                 <param name="status">401</param>
             </result>
         </action>
+
+        <action name="api/getAllCollectionsBasic" class="com.akto.action.ApiCollectionsAction" method="fetchAllCollectionsBasic">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>   
+     
         <action name="api/getSensitiveInfoForCollections" class="com.akto.action.ApiCollectionsAction" method="fetchSensitiveInfoInCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

@@ -1,3 +1,19 @@
 .filterClass .Polaris-Filters__FiltersWrapper {
     border-bottom:0
 }
+
+.div-link{
+    cursor: pointer;
+}
+.div-link:hover{
+    border-bottom: 1px solid #B98900;
+}
+
+.banner-wrapper .Polaris-Banner--withinContentContainer{
+    border-radius: 0px !important;
+    border: unset !important;
+}
+
+.banner-wrapper .Polaris-Banner--statusCritical {
+    background-color: #FFF4F4 !important;
+}
