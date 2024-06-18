@@ -65,6 +65,6 @@ jobs:
           cd apps/mini-runtime
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-runtime:$IMAGE_TAG"
-          cd apps/mini-testing
+          cd ../mini-testing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-testing:$IMAGE_TAG"
