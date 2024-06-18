@@ -36,7 +36,8 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
         const spec = {
             inviteeName: "there",
             inviteeEmail: inviteEmail,
-            websiteHostName: window.location.origin
+            websiteHostName: window.location.origin,
+            inviteeRole: inviteRole,
         }
 
         const inviteUsersResponse = await settingRequests.inviteUsers(spec)

@@ -113,9 +113,7 @@ public class ProfileAction extends UserAction {
         String dashboardVersion = accountSettings.getDashboardVersion();
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
-        RBAC userRbac = RBACDao.instance.findOne(
-            Filters.eq(RBAC.USER_ID, user.getId())
-        );
+        RBAC.Role userRole = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
 
         boolean jiraIntegrated = false;
         try {
@@ -137,7 +135,7 @@ public class ProfileAction extends UserAction {
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name())
                 .append("jiraIntegrated", jiraIntegrated)
-                .append("userRole", userRbac.getRole().toString().toUpperCase());
+                .append("userRole", userRole.toString().toUpperCase());
 
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));

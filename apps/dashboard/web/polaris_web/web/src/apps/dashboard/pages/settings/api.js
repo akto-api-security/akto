@@ -9,7 +9,7 @@ const settingRequests = {
                 inviteeName: apiSpec.inviteeName,
                 inviteeEmail: apiSpec.inviteeEmail,
                 websiteHostName: apiSpec.websiteHostName,
-
+                inviteeRole: apiSpec.inviteeRole,
             }
         })
     },
