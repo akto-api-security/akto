@@ -704,7 +704,13 @@ public class DbAction extends ActionSupport {
                     Object filterObj = bulkUpdate.getFilters().get("_id");
                     HashMap<String, Object> filterMap = (HashMap) filterObj;
                     HashMap<String, Object> keyMap = (HashMap) filterMap.get("apiInfoKey");
-                    ApiInfoKey key = new ApiInfoKey((int)((long)keyMap.get("apiCollectionId")), (String)keyMap.get("url"), Method.valueOf((String)keyMap.get("method")));
+                    int apiCollectionId = 0;
+                    try {
+                        apiCollectionId = (int)(long) keyMap.get("apiCollectionId");
+                    } catch(Exception f){
+                        apiCollectionId = (int) keyMap.get("apiCollectionId");
+                    }
+                    ApiInfoKey key = new ApiInfoKey(apiCollectionId, (String)keyMap.get("url"), Method.valueOf((String)keyMap.get("method")));
                     TestingIssuesId idd = new TestingIssuesId(key, TestErrorSource.valueOf((String)filterMap.get("testErrorSource")), (String)filterMap.get("testSubCategory"));
                     Bson filters = Filters.eq("_id", idd);
                     List<String> updatePayloadList = bulkUpdate.getUpdates();

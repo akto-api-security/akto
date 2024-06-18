@@ -1931,12 +1931,12 @@ public class ClientActor extends DataActor {
         obj.put("summaryId", summaryId);
         obj.put("limit", limit);
         obj.put("skip", skip);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchLatestTestingRunResult", "", "POST", obj.toString(), headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchLatestTestingRunResultBySummaryId", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in fetchLatestTestingRunResult", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchLatestTestingRunResultBySummaryId", LoggerMaker.LogDb.RUNTIME);
                 return testingRunResultList;
             }
             BasicDBObject payloadObj;
@@ -1945,6 +1945,8 @@ public class ClientActor extends DataActor {
                 BasicDBList testingRunResults = (BasicDBList) payloadObj.get("testingRunResults");
                 for (Object testingRunResult: testingRunResults) {
                     BasicDBObject obj2 = (BasicDBObject) testingRunResult;
+                    TestingRunResult temp = new TestingRunResult();
+                    obj2.get("testResults");
                     testingRunResultList.add(objectMapper.readValue(obj2.toJson(), TestingRunResult.class));
                 }
             } catch(Exception e) {
