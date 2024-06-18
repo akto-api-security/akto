@@ -221,9 +221,12 @@ const SampleApi = () => {
         editorSetup.setEditorTheme();
     }
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+
     const resultComponent = (
         <Box background={getColor()} width="100%" padding={"2"}>
-            <AktoButton id={"test-results"} removeUnderline monochrome plain 
+            <AktoButton disabled={disableButton} id={"test-results"} removeUnderline monochrome plain 
             onClick={testResult ? showResults : () => {}}
             icon={testResult ? ChevronUpMinor : undefined}>
                 {getResultDescription()}
@@ -239,14 +242,14 @@ const SampleApi = () => {
                     <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
                 </div>
                 <HorizontalStack gap={2}>
-                    <AktoButton id={"select-sample-api"} onClick={toggleSelectApiActive} size="slim">
+                    <AktoButton disabled={disableButton} id={"select-sample-api"} onClick={toggleSelectApiActive} size="slim">
                         <Box maxWidth="200px">
                             <Tooltip content={copySelectedApiEndpoint} hoverDelay={"100"}>
                                 <Text variant="bodyMd" truncate>{copySelectedApiEndpoint}</Text>
                             </Tooltip>
                         </Box>
                     </AktoButton>
-                    <AktoButton id={"run-test"} loading={loading} primary onClick={runTest} size="slim">Run Test</AktoButton>
+                    <AktoButton disabled={disableButton} id={"run-test"} loading={loading} primary onClick={runTest} size="slim">Run Test</AktoButton>
                 </HorizontalStack>
             </div>
 
@@ -279,6 +282,7 @@ const SampleApi = () => {
                     id:"save",
                     content: 'Save',
                     onAction: saveFunc,
+                    'disabled': disableButton
                 }}
                 secondaryActions={[
                     {

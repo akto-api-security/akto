@@ -181,7 +181,8 @@ function Integrations() {
     }
 
     function renderItem(item) {
-        const userRole = PersistStore(state => state.userRole)
+        const userRole = window.USER_ROLE
+        const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
         
         const {id, source, name} = item;
         const media = <Avatar customer size="medium" name={name} source={source}/>;
@@ -190,7 +191,7 @@ function Integrations() {
               {
                 content: <div data-testid={`configure_${id}`}>Configure</div>,
                 onClick: () => handleTab(item),
-                'disabled': (userRole === 'GUEST')
+                'disabled': disableButton
               },
             ];
           };

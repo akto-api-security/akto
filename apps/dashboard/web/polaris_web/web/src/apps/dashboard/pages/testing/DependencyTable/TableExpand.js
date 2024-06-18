@@ -53,7 +53,7 @@ function TableExpand({ data, childApiCollectionId, childUrl, childMethod, showEd
             </td>
             <td style={{ width: '20%', verticalAlign: 'top', textAlign: 'right', padding: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', height: '100%' }}>
-                    <AktoButton key={childMethod + "-" + childUrl} onClick={() => { showEditModal(childApiCollectionId, childUrl, childMethod, data) }}>Edit</AktoButton>
+                    <AktoButton  key={childMethod + "-" + childUrl} onClick={() => { showEditModal(childApiCollectionId, childUrl, childMethod, data) }}>Edit</AktoButton>
                 </div>
             </td>
         </tr>

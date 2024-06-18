@@ -80,14 +80,17 @@ const Logs = () => {
         const endTime = logs.startTime;
         fetchLogsFromDb(startTime, endTime)
     }
+    
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
 
     return (
         <LegacyCard
             sectioned
             title="Logs"
             actions={[
-                { content: 'Export', onAction: exportLogsCsv },
-                { content: 'Configure log level'}
+                { content: 'Export', onAction: exportLogsCsv, 'disabled': disableButton },
+                { content: 'Configure log level', 'disabled': disableButton}
             ]}
         >
             <Text variant="bodyMd">
@@ -102,8 +105,8 @@ const Logs = () => {
                     selected={handleSelectLogGroup}
                     />
                 <ButtonGroup segmented>
-                    <AktoButton onClick={handleRefresh} disabled={!logGroupSelected}>Refresh</AktoButton>
-                    <AktoButton onClick={handlePreviousFiveMinutesLogs} disabled={!logGroupSelected}>-5 minutes</AktoButton>
+                    <AktoButton  onClick={handleRefresh} disabled={!logGroupSelected || disableButton}>Refresh</AktoButton>
+                    <AktoButton  onClick={handlePreviousFiveMinutesLogs} disabled={!logGroupSelected || disableButton}>-5 minutes</AktoButton>
                 </ButtonGroup>
             </div>
           

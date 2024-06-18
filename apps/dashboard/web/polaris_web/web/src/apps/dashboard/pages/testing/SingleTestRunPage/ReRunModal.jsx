@@ -16,6 +16,9 @@ function ReRunModal({refreshSummaries, selectedTestRun, shouldRefresh}) {
         setLocalModal(false)
         setRerunModal(false)
     }
+
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
     
     return (
         <Modal
@@ -24,7 +27,8 @@ function ReRunModal({refreshSummaries, selectedTestRun, shouldRefresh}) {
             title={"Re-run test"}
             primaryAction={{
                 content: "Re-run test",
-                onAction: () => {transform.rerunTest(selectedTestRun.id, refreshSummaries, shouldRefresh) ; handleClose()}
+                onAction: () => {transform.rerunTest(selectedTestRun.id, refreshSummaries, shouldRefresh) ; handleClose()},
+                'disabled': disableButton
             }}
             secondaryActions={[
                 {

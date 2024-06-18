@@ -141,6 +141,9 @@ const YamlEditor = ({ fetchAllTests }) => {
         })
     }
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+
     return (
         <VerticalStack>
             <div className="editor-header">
@@ -153,14 +156,14 @@ const YamlEditor = ({ fetchAllTests }) => {
                         <Icon source={InfoMinor}/> 
                     </Tooltip>
                     <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="below">
-                        <AktoButton icon={ClipboardMinor} plain onClick={copyTestName} />
+                        <AktoButton  icon={ClipboardMinor} plain onClick={copyTestName} />
                     </Tooltip>  
                     <Tooltip content={`Set as ${selectedTest.inactive ? "active" : "inactive" }`} dismissOnMouseOut preferredPosition="below">
-                        <AktoButton icon={selectedTest.inactive ? CircleTickMinor : CircleCancelMinor} plain onClick={setTestInactive} />
+                        <AktoButton disabled={disableButton} icon={selectedTest.inactive ? CircleTickMinor : CircleCancelMinor} plain onClick={setTestInactive} />
                     </Tooltip>  
                 </HorizontalStack>
         
-                <AktoButton id={"save-button"} disabled={!isEdited} onClick={handleSave} size="slim">Save</AktoButton>
+                <AktoButton  id={"save-button"} disabled={!isEdited || disableButton} onClick={handleSave} size="slim">Save</AktoButton>
             </div>
 
             <Divider />

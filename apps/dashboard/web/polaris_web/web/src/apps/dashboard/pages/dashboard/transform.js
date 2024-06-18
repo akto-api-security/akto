@@ -243,7 +243,7 @@ const transform = {
         let tableRows = []
         finalArr.forEach((c)=> {
             let tempRow = [
-                <AktoButton onClick={()=>setActive(true)} plain monochrome removeUnderline  >
+                <AktoButton  onClick={()=>setActive(true)} plain monochrome removeUnderline  >
 
                   <Box width='250px'  > 
                  <HorizontalStack align="space-between" gap="2">

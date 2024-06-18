@@ -153,7 +153,8 @@ async function getNextUrl(issueId){
 }
 
 function IssuesPage(){
-    const userRole = PersistStore(state => state.userRole)
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
 
     const [loading, setLoading] = useState(true);
     const subCategoryMap = PersistStore(state => state.subCategoryMap);
@@ -196,23 +197,23 @@ function IssuesPage(){
         let issues = [{
             content: 'False positive',
             onAction: () => { ignoreAction("False positive") },
-            'disabled': (userRole === 'GUEST')
+            'disabled': disableButton
         },
         {
             content: 'Acceptable risk',
             onAction: () => { ignoreAction("Acceptable risk") },
-            'disabled': (userRole === 'GUEST')
+            'disabled': disableButton
         },
         {
             content: 'No time to fix',
             onAction: () => { ignoreAction("No time to fix") },
-            'disabled': (userRole === 'GUEST')
+            'disabled': disableButton
         }]
         
         let reopen =  [{
             content: 'Reopen',
             onAction: () => { reopenAction() },
-            'disabled': (userRole === 'GUEST')
+            'disabled': disableButton
         }]
         
         let ret = [];
@@ -368,7 +369,7 @@ function IssuesPage(){
                     filterStateUrl={"/dashboard/issues"}
                 />
             ]}
-            primaryAction={<AktoButton primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export vulnerability report</AktoButton>}
+            primaryAction={<AktoButton  primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen || disableButton}>Export vulnerability report</AktoButton>}
             />
     )
 }

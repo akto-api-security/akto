@@ -284,13 +284,13 @@ function DependencyTable() {
     }
 
     const secondaryActionsComponent = (
-        <AktoButton onClick={invokeDependencyTable} primary  >
+        <AktoButton  onClick={invokeDependencyTable} primary  >
             {invokeLoading ? <Spinner size="small" /> : "Invoke"}
         </AktoButton>
     )
 
     const globalVarsComponent = (
-        <AktoButton onClick={() => { setGlobalVarActive(true) }} >
+        <AktoButton  onClick={() => { setGlobalVarActive(true) }} >
             Edit Global vars
         </AktoButton>
     )

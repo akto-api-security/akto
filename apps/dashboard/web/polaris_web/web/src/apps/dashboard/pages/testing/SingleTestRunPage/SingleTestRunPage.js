@@ -495,19 +495,23 @@ const promotedBulkActions = (selectedDataHexIds) => {
     </Box>
   )
 
+  const userRole = window.USER_ROLE
+  const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+
   let moreActionsList = transform.getActions(selectedTestRun)
   moreActionsList.push({title: 'Export', items: [
     {
      content: 'Export vulnerability report', 
      icon: ReportMinor, 
-     onAction: () => openVulnerabilityReport()
+     onAction: () => openVulnerabilityReport(),
+     'disabled': disableButton
     }
   ]})
   const moreActionsComp = (
     <Popover
       active={secondaryPopover}
       onClose={() => setSecondaryPopover(false)}
-      activator={<AktoButton disclosure onClick={() => setSecondaryPopover(!secondaryPopover)}>More actions</AktoButton>}
+      activator={<AktoButton disabled={disableButton} disclosure onClick={() => setSecondaryPopover(!secondaryPopover)}>More actions</AktoButton>}
       autofocusTarget="first-node"
     >
       <ActionList
@@ -523,7 +527,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
       <PageWithMultipleCards
         title={headingComp}
         backUrl={`/dashboard/testing/`}
-        primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><AktoButton primary onClick={() => 
+        primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><AktoButton disabled={disableButton} primary onClick={() => 
           func.downloadAsCSV((testRunResultsText[selectedTab]), selectedTestRun)
           }>Export results</AktoButton></Box>: undefined}
         secondaryActions={!workflowTest ? moreActionsComp: undefined}

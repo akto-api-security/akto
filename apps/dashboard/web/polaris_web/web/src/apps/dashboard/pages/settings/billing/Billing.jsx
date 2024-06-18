@@ -63,7 +63,7 @@ function Billing() {
                 <Box>
                     <Text variant="headingMd">Your plan</Text>
                 </Box>
-                <AktoButton onClick={() => refreshUsageData()}>
+                <AktoButton  onClick={() => refreshUsageData()}>
                     Sync usage data
                 </AktoButton>
             </HorizontalStack>

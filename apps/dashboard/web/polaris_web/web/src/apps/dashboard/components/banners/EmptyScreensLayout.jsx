@@ -5,7 +5,7 @@ import "../shared/style.css"
 import { useNavigate } from 'react-router-dom'
 import { InfoComponent } from "../../pages/dashboard/components/DashboardBanner"
 
-function EmptyScreensLayout({iconSrc,headingText,description, buttonText, redirectUrl, docsUrl, infoTitle, infoItems, learnText, bodyComponent}) {
+function EmptyScreensLayout({disable, iconSrc,headingText,description, buttonText, redirectUrl, docsUrl, infoTitle, infoItems, learnText, bodyComponent}) {
   const navigate = useNavigate();  
   return (
     <VerticalStack gap={5}>
@@ -30,7 +30,7 @@ function EmptyScreensLayout({iconSrc,headingText,description, buttonText, redire
                                 
                                 <HorizontalStack align='center'>
                                     {redirectUrl ? <Box paddingBlockStart={2}>
-                                        <AktoButton primary onClick={() => navigate(redirectUrl)}>{buttonText}</AktoButton>
+                                        <AktoButton disabled={disable} primary onClick={() => navigate(redirectUrl)}>{buttonText}</AktoButton>
                                     </Box> : null}
                                     {bodyComponent}
                                 </HorizontalStack>

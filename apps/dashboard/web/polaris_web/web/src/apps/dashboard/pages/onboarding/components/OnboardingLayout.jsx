@@ -31,7 +31,7 @@ function OnboardingLayout({stepObj, requestStepChange, currentStep, skipOnboardi
                 <Box padding="2"/>
             </LegacyCard>
 
-            <AktoButton plain onClick={() => skipOnboarding()} fullWidth>I'm a ninja!! I dont need onboarding.</AktoButton>
+            <AktoButton  plain onClick={() => skipOnboarding()} fullWidth>I'm a ninja!! I dont need onboarding.</AktoButton>
         </div>
     )
 }

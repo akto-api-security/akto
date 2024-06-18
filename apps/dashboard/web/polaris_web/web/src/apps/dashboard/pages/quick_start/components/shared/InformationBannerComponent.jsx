@@ -11,7 +11,7 @@ function InformationBannerComponent({docsUrl,content}) {
         <div className='card-items'>
             <Banner status="info">
                 <span>{content}</span>
-                {docsUrl !== '' ?  <AktoButton plain onClick={() => openLink()}>here</AktoButton>: ""}
+                {docsUrl !== '' ?  <AktoButton  plain onClick={() => openLink()}>here</AktoButton>: ""}
             </Banner>
         </div>
     )

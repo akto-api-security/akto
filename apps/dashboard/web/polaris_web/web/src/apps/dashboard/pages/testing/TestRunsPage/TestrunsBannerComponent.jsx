@@ -25,7 +25,7 @@ function SelectCollectionComponent() {
         urlsCount > 0 ?<Popover
             active={popoverActive}
             activator={(
-                <AktoButton onClick={() => setPopoverActive(true)} disclosure>
+                <AktoButton  onClick={() => setPopoverActive(true)} disclosure>
                     Select collection
                 </AktoButton>
             )}

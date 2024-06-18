@@ -93,6 +93,9 @@ function DefaultPayloads() {
         }
     }
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
+
     return (
         <Page title='Default payloads' divider>
             <LegacyCard>
@@ -130,7 +133,7 @@ function DefaultPayloads() {
                         }
                         {
                             <div className='footer-save'>
-                                <AktoButton primary onClick={savePattern} disabled={patternText === '' || selectedDDefaultPayload === patternText}>Save</AktoButton>
+                                <AktoButton  primary onClick={savePattern} disabled={patternText === '' || selectedDDefaultPayload === patternText || disableButton}>Save</AktoButton>
                             </div>
                         }
                     </VerticalStack>

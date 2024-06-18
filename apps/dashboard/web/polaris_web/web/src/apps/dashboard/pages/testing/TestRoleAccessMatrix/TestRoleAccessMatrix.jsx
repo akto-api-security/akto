@@ -81,6 +81,9 @@ function TestRoleAccessMatrix() {
         <div key="access-matrix">{accessMatrixComponent}</div>
     ]
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+
     return (
         <PageWithMultipleCards
             backUrl='/dashboard/testing/roles'
@@ -89,8 +92,8 @@ function TestRoleAccessMatrix() {
             divider={true}
             secondaryActions={
                 [
-                    <AktoButton key="deleteAccessMatrix" onClick={handleDeleteAccessMatrix}>Delete access matrix</AktoButton>,
-                    <AktoButton key="createAccessMatrix" primary onClick={handleCreateAccessMatrix}>Create access matrix</AktoButton>
+                    <AktoButton disabled={disableButton} key="deleteAccessMatrix" onClick={handleDeleteAccessMatrix}>Delete access matrix</AktoButton>,
+                    <AktoButton disabled={disableButton} key="createAccessMatrix" primary onClick={handleCreateAccessMatrix}>Create access matrix</AktoButton>
                 ]}
         />
     )

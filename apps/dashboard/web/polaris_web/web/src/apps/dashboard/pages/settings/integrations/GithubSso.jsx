@@ -82,6 +82,9 @@ function GithubSso() {
         }
     }
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
+
     const cardContent = "Enable Login via GitHub on your Akto dashboard"
 
     const listComponent = (
@@ -123,7 +126,8 @@ function GithubSso() {
             title="Are you sure?"
             primaryAction={{
                 content: githubPresent ? 'Delete Github SSO' : 'Add GitHub SSO',
-                onAction: githubPresent ? handleDeleteGithubSso : handleAddGithubSso
+                onAction: githubPresent ? handleDeleteGithubSso : handleAddGithubSso,
+                'disabled': disableButton
             }}
         >
             <Modal.Section>
@@ -137,7 +141,7 @@ function GithubSso() {
 
     const card = (
         <LegacyCard title="GitHub SSO"
-        {...componentType === 0 ? {} : {primaryFooterAction:{ content: (githubPresent ? 'Delete GitHub SSO' : 'Add GitHub SSO'), onAction: () => setShowGithubSsoModal(true) } }} 
+        {...componentType === 0 ? {} : {primaryFooterAction:{ content: (githubPresent ? 'Delete GitHub SSO' : 'Add GitHub SSO'), onAction: () => setShowGithubSsoModal(true), 'disabled': disableButton } }} 
         >
             {listComponent}
         </LegacyCard>

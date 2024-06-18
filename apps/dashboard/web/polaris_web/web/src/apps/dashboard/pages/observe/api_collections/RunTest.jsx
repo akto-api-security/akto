@@ -149,7 +149,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const activator = (
         <div ref={runTestRef}>
-            <AktoButton onClick={toggleRunTest} primary disabled={disabled} ><div data-testid="run_test_button">Run test</div></AktoButton>
+            <AktoButton  onClick={toggleRunTest} primary disabled={disabled} ><div data-testid="run_test_button">Run test</div></AktoButton>
         </div>
     );
 
@@ -437,7 +437,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 />
                             </div>
 
-                            <AktoButton icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Remove All</div></AktoButton>
+                            <AktoButton  icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Remove All</div></AktoButton>
                         </div>
 
                         <br />

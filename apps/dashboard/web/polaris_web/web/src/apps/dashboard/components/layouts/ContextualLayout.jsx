@@ -4,7 +4,8 @@ import "./ContextualLayoutStyle.css"
 import PersistStore from '../../../main/PersistStore'
 
 function ContextualLayout(props){
-    const userRole = PersistStore(state => state.userRole)
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
 
     const {saveAction, discardAction, isDisabled, pageMarkup } = props
 
@@ -21,13 +22,13 @@ function ContextualLayout(props){
             saveAction={{
             onAction: () => saveAction(),
             loading: false,
-            disabled: ((userRole === 'GUEST') || isDisabled()),
+            disabled: (disableButton || isDisabled()),
             content: "Save"
             }}
             discardAction={{
             onAction: () => discardAction(),
             content: "Discard",
-            disabled: ((userRole === 'GUEST') || isDisabled()),
+            disabled: (disableButton || isDisabled()),
             }}
         />
     )

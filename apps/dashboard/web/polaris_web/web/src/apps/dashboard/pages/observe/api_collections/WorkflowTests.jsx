@@ -113,7 +113,7 @@ function WorkflowTests({ apiCollectionId, endpointsList }) {
             <LegacyCard.Header 
             title={
                 <ButtonGroup>
-                    <AktoButton icon={MobileBackArrowMajor} plain onClick={() => {
+                    <AktoButton  icon={MobileBackArrowMajor} plain onClick={() => {
                             setShowWorkflowbuilder(false)
                             setWorkflowTest(null)
                         }}
@@ -132,7 +132,7 @@ function WorkflowTests({ apiCollectionId, endpointsList }) {
                         primary={false} />
             </LegacyCard.Header> :
             <LegacyCard.Header title="Workflow tests">
-                <AktoButton
+                <AktoButton 
                     onClick={() => setShowWorkflowbuilder(true)}
                 >
                     Create workflow

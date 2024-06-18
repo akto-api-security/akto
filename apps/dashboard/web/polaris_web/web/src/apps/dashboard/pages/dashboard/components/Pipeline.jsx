@@ -15,8 +15,8 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
     const navigate = useNavigate();
 
     function CicdModal({ active, setActive }) {
-
-        
+        const userRole = window.USER_ROLE
+        const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
     
         const primaryAction = () => {
             navigate('/dashboard/settings/integrations/ci-cd');
@@ -35,7 +35,8 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
                 primaryAction={{
                     id: "add-ci-cd",
                     content: 'Create Token',
-                    onAction: primaryAction
+                    onAction: primaryAction,
+                    'disabled': disableButton
                 }}
                 secondaryActions={{
                     id: "close-ci-cd",

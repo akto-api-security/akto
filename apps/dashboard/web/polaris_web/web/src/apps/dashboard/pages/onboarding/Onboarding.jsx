@@ -17,8 +17,8 @@ function Onboarding() {
 
     const topbarButtons = (
       <ButtonGroup>
-        <AktoButton size="slim" onClick={() => openUrl("https://docs.akto.io")} icon={ClipboardMinor}> Docs </AktoButton>
-        <AktoButton size="slim" onClick={()=> openUrl("https://discord.com/invite/Wpc6xVME4s")} icon={avatar}>
+        <AktoButton  size="slim" onClick={() => openUrl("https://docs.akto.io")} icon={ClipboardMinor}> Docs </AktoButton>
+        <AktoButton  size="slim" onClick={()=> openUrl("https://discord.com/invite/Wpc6xVME4s")} icon={avatar}>
           Discord
         </AktoButton>
       </ButtonGroup>

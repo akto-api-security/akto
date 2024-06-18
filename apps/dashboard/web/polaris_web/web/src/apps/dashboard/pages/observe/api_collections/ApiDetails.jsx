@@ -159,14 +159,14 @@ function ApiDetails(props) {
                 <Popover 
                     active={showDemerge}
                     activator={
-                        <Tooltip content="More actions" dismissOnMouseOut ><AktoButton plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowDemerge(!showDemerge)} /></Tooltip>
+                        <Tooltip content="More actions" dismissOnMouseOut ><AktoButton disabled={disableButton} plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowDemerge(!showDemerge)} /></Tooltip>
                     }
                     autofocusTarget="first-node"
                     onClose={() => setShowDemerge(false)}
                 >
                     <Popover.Pane fixed>
                         <Popover.Section>
-                            <AktoButton plain monochrome removeUnderline size="slim" onClick={deMergeApis}>De merge</AktoButton>
+                            <AktoButton disabled={disableButton} plain monochrome removeUnderline size="slim" onClick={deMergeApis}>De merge</AktoButton>
                         </Popover.Section>
                     </Popover.Pane>
                 </Popover>
@@ -208,13 +208,16 @@ function ApiDetails(props) {
 
     const componentsArr = isDemergingActive ? [...components, <DeMergeButton key={"demerge"} />] : components
  
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+
     const aktoGptButton = (
         <div 
             className={"button-fixed"}
             key="akto-gpt"
             style={{right: isDemergingActive ? "48px" : '24px'}}
         >
-            <AktoButton onClick={displayGPT} size="slim">Ask AktoGPT</AktoButton> 
+            <AktoButton disabled={disableButton} onClick={displayGPT} size="slim">Ask AktoGPT</AktoButton> 
         </div>
     )
 

@@ -66,6 +66,9 @@ function GithubAppIntegration() {
         }
     }
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
+
     const githubAppModal = (
         <Modal
             open={showGithubAppModal}
@@ -73,7 +76,8 @@ function GithubAppIntegration() {
             title="Are you sure?"
             primaryAction={{
                 content: githubAppIdPresent ? 'Delete Github App settings' : 'Add GitHub App settings',
-                onAction: githubAppIdPresent ? handleDeleteGithubAppSettings : handleAddGithubAppSettings
+                onAction: githubAppIdPresent ? handleDeleteGithubAppSettings : handleAddGithubAppSettings,
+                'disabled': disableButton
             }}
         >
             <Modal.Section>
@@ -117,7 +121,7 @@ function GithubAppIntegration() {
     const GithubAppSecret = (
         <LegacyCard
             title="GitHub App settings"
-            primaryFooterAction={{ content: (githubAppIdPresent ? 'Delete GitHub App settings' : 'Add GitHub App settings'), onAction: () => setShowGithubAppModal(true) }}
+            primaryFooterAction={{ content: (githubAppIdPresent ? 'Delete GitHub App settings' : 'Add GitHub App settings'), onAction: () => setShowGithubAppModal(true), 'disabled': disableButton }}
             >
             {GithubAppComponent}
         </LegacyCard>

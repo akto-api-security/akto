@@ -31,7 +31,7 @@ function NewConnection() {
                 <Text variant='bodyMd'>
                     Akto is an open source, instant API security platform that takes only 60 secs to get started. Akto is used by security teams to maintain a continuous inventory of APIs, test APIs for vulnerabilities and find runtime issues. Akto offers tests for all OWASP top 10 and HackerOne Top 10 categories including BOLA, authentication, SSRF, XSS, security configurations, etc.
                 </Text>
-                <AktoButton onClick={() => setTasksCompleted(1)} primary>Mark as complete</AktoButton>
+                <AktoButton  onClick={() => setTasksCompleted(1)} primary>Mark as complete</AktoButton>
             </VerticalStack>
             <VideoThumbnail
                 videoLength={195}
@@ -76,7 +76,7 @@ function NewConnection() {
                         {badge && badge.length > 0 ? <Badge size='small' status='info'>{badge}</Badge> : null}
                     </Text>
                     <div className='see-docs'>
-                    <AktoButton plain onClick={(event) => { 
+                    <AktoButton  plain onClick={(event) => { 
                             event.stopPropagation(); 
                             openDocs(docsUrl); 
                         }}    
@@ -151,7 +151,7 @@ function NewConnection() {
                         {tasksList.map((element,index) => (
                             <VerticalStack gap="5" key={element?.id}>
                                 <HorizontalStack gap="3">
-                                    <AktoButton plain monochrome onClick={() => setTasksCompleted(index)}>
+                                    <AktoButton  plain monochrome onClick={() => setTasksCompleted(index)}>
                                         <Avatar customer name='circle' size="extraSmall"
                                             source={tasksCompleted > index ? "/public/circle_check.svg" : "/public/circle_icon.svg"}
                                         />

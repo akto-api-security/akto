@@ -183,7 +183,7 @@ function JsonRecording({extractInformation, showOnlyApi, setStoreData}) {
             <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
 
             <br />
-            { showOnlyApi ? null : <AktoButton id={"save-token"} onClick={handleSave} primary>Save changes</AktoButton> }
+            { showOnlyApi ? null : <AktoButton  id={"save-token"} onClick={handleSave} primary>Save changes</AktoButton> }
         </div>
     )
 }

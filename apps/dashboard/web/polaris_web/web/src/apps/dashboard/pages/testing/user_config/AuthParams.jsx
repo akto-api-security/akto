@@ -67,14 +67,14 @@ function AuthParams({ authParams, setAuthParams }) {
                                     <TextField id={`auth-param-key-${index}`} value={authParam.key} onChange={(key) => handleUpdate(index, "key", key)} />
                                     <Text variant="bodyMd">Value: </Text>
                                     <TextField id={`auth-param-value-${index}`} value={authParam.value} onChange={(value) => handleUpdate(index, "value", value)} />
-                                    <AktoButton id={`delete-auth-param-${index}`} icon={DeleteMajor} onClick={() => handleRemove(index)} plain />
+                                    <AktoButton  id={`delete-auth-param-${index}`} icon={DeleteMajor} onClick={() => handleRemove(index)} plain />
                                 </div>
                                 { index < authParams.length - 1 &&  <br /> }
                             </div>
                     )})}
                 </div>
                 <br />
-                <AktoButton id={"add-auth-param"} icon={CirclePlusMajor} onClick={handleAdd} plain />
+                <AktoButton  id={"add-auth-param"} icon={CirclePlusMajor} onClick={handleAdd} plain />
             </LegacyCard.Section>
         </LegacyCard>
     )

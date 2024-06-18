@@ -16,7 +16,8 @@ import TestCollectionConfiguration from '../configurations/TestCollectionConfigu
 import PersistStore from '../../../../main/PersistStore';
 
 function UserConfig() {
-    const userRole = PersistStore(state => state.userRole)
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setAuthMechanism = TestingStore(state => state.setAuthMechanism)
@@ -60,7 +61,7 @@ function UserConfig() {
     })
 
     const handleSelect = async(limit) => {
-        if(userRole === 'GUEST') {
+        if(disableButton) {
             setToastConfig({ isActive: true, isError: true, message: `You don't have permissions` })
             return
         }
@@ -75,7 +76,7 @@ function UserConfig() {
             <Divider />
             <LegacyCard.Section>
                 <LegacyStack vertical>
-                    <AktoButton
+                    <AktoButton 
                         id={"hardcoded-token-expand-button"}
                         onClick={handleToggleHardcodedOpen}
                         ariaExpanded={hardcodedOpen}
@@ -98,7 +99,7 @@ function UserConfig() {
 
             <LegacyCard.Section>
                 <LegacyStack vertical>
-                    <AktoButton
+                    <AktoButton 
                         id={"automated-token-expand-button"}
                         onClick={handleToggleHardcodedOpen}
                         ariaExpanded={!hardcodedOpen}
@@ -143,7 +144,7 @@ function UserConfig() {
         </LegacyCard>
     )
 
-    const components = [<TestCollectionConfiguration/>, rateLimit]
+    const components = [<TestCollectionConfiguration/>, (disableButton ? <></> : rateLimit)]
 
     return (
         isLoading ? <SpinnerCentered /> 
@@ -156,7 +157,7 @@ function UserConfig() {
                         User config
                     </Text>
                 }
-                primaryAction={{ content: 'Stop all tests', onAction: handleStopAllTests, 'disabled': (userRole === 'GUEST') }}
+                primaryAction={{ content: 'Stop all tests', onAction: handleStopAllTests, 'disabled': disableButton }}
             />
 
     )

@@ -134,7 +134,7 @@ function CreateNewCollectionModal(props) {
                     {...newCollectionName.length === 0 ? {error: "Collection name cannot be empty"} : {}}
                 />
                 <span>
-                    <AktoButton plain onClick={() => setShowApiSelector(!showApiSelector)}>
+                    <AktoButton  plain onClick={() => setShowApiSelector(!showApiSelector)}>
                         {showApiSelector ? "Create empty collection" : "Add endpoints"}
                     </AktoButton>
                 </span>
@@ -167,8 +167,8 @@ function CreateNewCollectionModal(props) {
                                 ))
                             }
                         <HorizontalStack gap={4} align="start">
-                            <AktoButton onClick={() => handleAddField()}>Add condition</AktoButton>
-                            <AktoButton plain destructive onClick={() => dispatchConditions({ type: "clear" })}>Clear all</AktoButton>
+                            <AktoButton  onClick={() => handleAddField()}>Add condition</AktoButton>
+                            <AktoButton  plain destructive onClick={() => dispatchConditions({ type: "clear" })}>Clear all</AktoButton>
                         </HorizontalStack>
                         </VerticalStack>
                     </Card> : null

@@ -59,7 +59,7 @@ function Auth0Redirects({bodyText, errorText}) {
                                     <Text alignment="center" variant="bodyMd" color="subdued">{bodyText}</Text>
                                 </VerticalStack>
                             </VerticalStack>
-                            <AktoButton fullWidth onClick={handleLogout}>
+                            <AktoButton  fullWidth onClick={handleLogout}>
                                 Redirect to login
                             </AktoButton>
                         </VerticalStack>
@@ -67,9 +67,9 @@ function Auth0Redirects({bodyText, errorText}) {
                 </HorizontalStack>
                 <div style={{position: 'absolute' , bottom: '3vh', width: '84%'}}>
                     <HorizontalStack gap={3} align="center">
-                        <AktoButton plain onClick={() => window.open("https://www.akto.io/terms-and-policies","_blank")}>Terms of use</AktoButton>
+                        <AktoButton  plain onClick={() => window.open("https://www.akto.io/terms-and-policies","_blank")}>Terms of use</AktoButton>
                             <div style={{width: '1px', height: '24px', background: "#E1E3E5"}} />
-                        <AktoButton plain onClick={() => window.open("https://www.akto.io/terms/privacy","_blank")}>Privacy policy</AktoButton>
+                        <AktoButton  plain onClick={() => window.open("https://www.akto.io/terms/privacy","_blank")}>Privacy policy</AktoButton>
                     </HorizontalStack>
                 </div>
             </Box>

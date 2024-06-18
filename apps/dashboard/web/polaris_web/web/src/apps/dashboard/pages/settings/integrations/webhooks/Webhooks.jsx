@@ -93,12 +93,16 @@ function Webhooks() {
             fetchCustomWebhooks()
         }
     }
+
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
     
     const getActions = (item) => {
         return [{
             items: [{
                 content: item.activeStatus === "ACTIVE" ? 'Deactivate' : 'Activate',
                 onAction: () => handleWebhookStatusChange(item.id, item.activeStatus === "ACTIVE" ? "INACTIVE": "ACTIVE"),
+                'disabled': disableButton
             }]
         }]
     }
@@ -137,7 +141,7 @@ function Webhooks() {
     )
 
     const createCustomWebhook =  (
-        <AktoButton onClick={() => navigate('create_custom_webhook')}>
+        <AktoButton disabled={disableButton} onClick={() => navigate('create_custom_webhook')}>
             Create Custom Webhook
         </AktoButton>
     )

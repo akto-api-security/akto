@@ -18,7 +18,7 @@ function StepsComponent({integrationSteps, onClickFunc, buttonActive}) {
                     )
                 })}
                 <HorizontalStack align="end">
-                    <AktoButton primary size="medium" onClick={onClickFunc} disabled={!buttonActive}>Next</AktoButton>
+                    <AktoButton  primary size="medium" onClick={onClickFunc} disabled={!buttonActive}>Next</AktoButton>
                 </HorizontalStack>
             </VerticalStack>
         </LegacyCard.Section>

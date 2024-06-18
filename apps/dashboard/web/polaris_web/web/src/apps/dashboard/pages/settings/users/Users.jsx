@@ -202,7 +202,7 @@ const Users = () => {
                                 ] : [
                                     {
                                         content: <Text color="subdued">{getRoleDisplayName(role)}</Text>,
-                                        url: '#',
+                                        onAction: (event) => event.preventDefault(),
                                     }
                                 ]
 

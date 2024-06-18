@@ -276,9 +276,12 @@ function TestRoleSettings() {
     
     }
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+
     const addAuthButton = (
         <HorizontalStack align="end" key="auth-button">
-            {isNew ? <Tooltip content= "Save the role first"><AktoButton disabled>Add auth</AktoButton></Tooltip> : <AktoButton primary onClick={() => setShowAuthComponent(true)}><div data-testid="add_auth_button">Add auth</div></AktoButton>}
+            {isNew ? <Tooltip content= "Save the role first"><AktoButton  disabled>Add auth</AktoButton></Tooltip> : <AktoButton disabled={disableButton} primary onClick={() => setShowAuthComponent(true)}><div data-testid="add_auth_button">Add auth</div></AktoButton>}
         </HorizontalStack>
     )
 
@@ -361,7 +364,7 @@ function TestRoleSettings() {
                 </LegacyCard.Section>
                 <LegacyCard.Section title="Token details">
                     <LegacyStack vertical>
-                        <AktoButton
+                        <AktoButton 
                             id={"hardcoded-token-expand-button"}
                             onClick={handleToggleHardcodedOpen}
                             ariaExpanded={hardcodedOpen}
@@ -381,7 +384,7 @@ function TestRoleSettings() {
                     </LegacyStack>
                 
                     <LegacyStack vertical>
-                        <AktoButton
+                        <AktoButton 
                             id={"automated-token-expand-button"}
                             onClick={handleToggleHardcodedOpen}
                             ariaExpanded={!hardcodedOpen}

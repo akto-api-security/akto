@@ -130,7 +130,7 @@ function TestRunResultFull(props) {
             divider= {true}
             backUrl = {source === "editor" ? undefined : (hexId ==="issues" ? "/dashboard/issues" : `/dashboard/testing/${hexId}`)}
             isFirstPage = {source === "editor"}
-            primaryAction = {<AktoButton primary onClick={()=>createJiraTicket(issueDetails)} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"} >Create Jira Ticket</AktoButton>} 
+            primaryAction = {<AktoButton  primary onClick={()=>createJiraTicket(issueDetails)} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"} >Create Jira Ticket</AktoButton>} 
             components = {components}
         />
     )

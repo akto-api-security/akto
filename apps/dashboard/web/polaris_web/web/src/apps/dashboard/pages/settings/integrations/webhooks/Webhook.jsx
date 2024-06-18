@@ -293,7 +293,7 @@ function Webhook() {
                     <br />
                     {intervals.map(interval => (
                         <span key={interval.name} style={{ padding: "10px" }}>
-                            <AktoButton
+                            <AktoButton 
                                 pressed={webhook.frequencyInSeconds === interval.value}
                                 onClick={() => updateWebhookState("frequencyInSeconds", interval.value)}
                             >
@@ -347,24 +347,28 @@ function Webhook() {
         accessibilityLabel: 'Akto Icon',
     }
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
+
     const contextualMarkup = (
         <ContextualSaveBar
             message={hasChanges ? "Unsaved changes" : "No unsaved changes"}
             secondaryMenu={
                 <ButtonGroup>
-                    <AktoButton onClick={handleDiscard} disabled={!hasChanges}>Discard</AktoButton>
+                    <AktoButton  onClick={handleDiscard} disabled={!hasChanges || disableButton}>Discard</AktoButton>
                     {webhookId ?
-                        <AktoButton
+                        <AktoButton 
                             primary
                             onClick={saveWebhook}
                             connectedDisclosure={{
                                 accessibilityLabel: 'Other save actions',
-                                actions: [{ content: 'Run once', onAction: () => runOnce() }],
+                                actions: [{ content: 'Run once', onAction: () => runOnce(), 'disabled': disableButton }],
                             }}
                         >
                             Save
                         </AktoButton>
                         : <AktoButton
+                            disabled={disableButton}
                             primary
                             onClick={saveWebhook}
                         >

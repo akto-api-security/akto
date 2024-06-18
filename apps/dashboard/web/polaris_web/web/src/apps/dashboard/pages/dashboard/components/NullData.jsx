@@ -14,7 +14,7 @@ function NullData({text,url,description,urlText}) {
                     <Text variant="bodyMd">{description}</Text>
                     <HorizontalStack gap={1}>
                         <Text>Click</Text>
-                        <AktoButton plain onClick={()=> navigate(url)}>here</AktoButton>
+                        <AktoButton  plain onClick={()=> navigate(url)}>here</AktoButton>
                         <Text>{urlText}</Text>
                     </HorizontalStack>
                 </VerticalStack>

@@ -12,7 +12,7 @@ function BannerComponent({title,docsUrl,content}) {
             <Banner title={title} status='warning'>
                 <span>{content}</span>
                 <br/>
-                <AktoButton plain onClick={() => openLink()}>Go to docs</AktoButton>
+                <AktoButton  plain onClick={() => openLink()}>Go to docs</AktoButton>
             </Banner>
         </div>
     )

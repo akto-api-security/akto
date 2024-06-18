@@ -14,7 +14,8 @@ import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
 import PersistStore from '../../../../main/PersistStore';
 
 function TestRunResultFlyout(props) {
-    const userRole = PersistStore(state => state.userRole)
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
 
     const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage} = props
     const [fullDescription, setFullDescription] = useState(false)
@@ -64,23 +65,23 @@ function TestRunResultFlyout(props) {
     const issues = [{
         content: 'False positive',
         onAction: () => { ignoreAction("False positive") },
-        'disabled': (userRole === 'GUEST')
+        'disabled': disableButton
     },
     {
         content: 'Acceptable risk',
         onAction: () => { ignoreAction("Acceptable risk") },
-        'disabled': (userRole === 'GUEST')
+        'disabled': disableButton
     },
     {
         content: 'No time to fix',
         onAction: () => { ignoreAction("No time to fix") },
-        'disabled': (userRole === 'GUEST')
+        'disabled': disableButton
     }]
 
     const  reopen =  [{
         content: 'Reopen',
         onAction: () => { reopenAction() },
-        'disabled': (userRole === 'GUEST')
+        'disabled': disableButton
     }]
 
     const handleClose = () => {
@@ -98,7 +99,7 @@ function TestRunResultFlyout(props) {
         return(
             issueDetails?.id &&
         <Popover
-            activator={<AktoButton disclosure plain onClick={() => setPopoverActive(!popoverActive)}>Actions</AktoButton>}
+            activator={<AktoButton disabled={disableButton} disclosure plain onClick={() => setPopoverActive(!popoverActive)}>Actions</AktoButton>}
             active={popoverActive}
             onClose={() => setPopoverActive(false)}
             autofocusTarget="first-node"
@@ -109,7 +110,7 @@ function TestRunResultFlyout(props) {
                 <Popover.Section>
                     <VerticalStack gap={"4"}>
                         <Text variant="headingSm">Create</Text>
-                        <AktoButton plain monochrome removeUnderline onClick={()=>{createJiraTicket(issueDetails)}} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>
+                        <AktoButton plain monochrome removeUnderline onClick={()=>{createJiraTicket(issueDetails)}} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true" || disableButton}>
                             <HorizontalStack gap={"2"}>
                                 <Avatar shape="square" size="extraSmall" source="/public/logo_jira.svg"/>
                                 <Text>Jira Ticket</Text>

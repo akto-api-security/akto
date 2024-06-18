@@ -76,7 +76,7 @@ function AktoGPT() {
         }, 0)
     }
     const sortFunc = (
-        <AktoButton icon={SortMinor} onClick={sortItems}>Sort</AktoButton>
+        <AktoButton  icon={SortMinor} onClick={sortItems}>Sort</AktoButton>
     )
 
     const searchResult = (item) =>{
@@ -109,10 +109,13 @@ function AktoGPT() {
         />
     )
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
+
     const component = (
         <LegacyCard title="Akto GPT configuration" 
-                    secondaryFooterActions={[{content: 'Discard Changes', destructive: true, onAction: discardAction, disabled: compareItems() }]}
-                    primaryFooterAction={{content: 'Save', onAction: saveAction, disabled: compareItems()}}
+                    secondaryFooterActions={[{content: 'Discard Changes', destructive: true, onAction: discardAction, disabled: (compareItems() || disableButton) }]}
+                    primaryFooterAction={{content: 'Save', onAction: saveAction, disabled: (compareItems() || disableButton)}}
         >
             <LegacyCard.Section 
                 title={(

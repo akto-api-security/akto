@@ -3,7 +3,7 @@ import { Avatar, Button, Card, Text, VerticalStack, HorizontalStack, Badge, Box 
 
 function RowCard(props) {
 
-    const {cardObj, onButtonClick, buttonText} = props ;
+    const {disable, cardObj, onButtonClick, buttonText} = props ;
     const goToDocs = () => {
         window.open(cardObj.docsUrl)
     }
@@ -30,7 +30,7 @@ function RowCard(props) {
                     </Box>
                 </VerticalStack>
                 <HorizontalStack gap={"4"} align='start'>
-                    <AktoButton onClick={handleAction}>{buttonText}</AktoButton>
+                    <AktoButton disabled={disable} onClick={handleAction}>{buttonText}</AktoButton>
                     <Button plain onClick={goToDocs} size='medium'>See Docs</Button>
                 </HorizontalStack>
             </VerticalStack>

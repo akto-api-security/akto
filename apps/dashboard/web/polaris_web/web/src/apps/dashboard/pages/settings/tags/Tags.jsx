@@ -76,11 +76,14 @@ function Tags(){
         }
         fetchData();
     }, [])
+    
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
 
     return (
         <PageWithMultipleCards
         title={"Tags"}
-        primaryAction={<AktoButton primary onClick={handleRedirect}>Create new tags</AktoButton>}
+        primaryAction={<AktoButton disabled={disableButton} primary onClick={handleRedirect}>Create new tags</AktoButton>}
         isFirstPage={true}
         components={[
 
@@ -93,6 +96,7 @@ function Tags(){
                     redirectUrl={"/dashboard/settings/tags/details"}
                     learnText={"Creating tags"}
                     docsUrl={TAGS_PAGE_DOCS_URL}
+                    disable={disableButton}
                 />
 
             

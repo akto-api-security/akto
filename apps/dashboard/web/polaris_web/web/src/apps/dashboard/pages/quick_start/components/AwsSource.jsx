@@ -181,7 +181,7 @@ function AwsSource() {
             />
 
           <Box>
-            <AktoButton onClick={saveFunc} disabled={func.deepComparison(preSelectedLBs,selectedLBs)} primary loading={loading}>Apply </AktoButton>
+            <AktoButton  onClick={saveFunc} disabled={func.deepComparison(preSelectedLBs,selectedLBs)} primary loading={loading}>Apply </AktoButton>
           </Box>
           <Text variant="bodyMd" as="h3">{statusText}</Text>
           {progressBar.show ? <ProgressBar progress={progressBar.value} size="small" color="primary" /> : null }

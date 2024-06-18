@@ -4,6 +4,8 @@ import React from 'react'
 import LineComponent from './LineComponent'
 
 function Details({onClickFunc, values}) {
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
     return (    
         <LegacyCard.Section title="Integration details">
             <br/>
@@ -16,7 +18,7 @@ function Details({onClickFunc, values}) {
                     })}
                 </VerticalStack>
                 <HorizontalStack align="end">
-                    <AktoButton primary onClick={onClickFunc} >Delete SSO</AktoButton>
+                    <AktoButton disabled={disableButton} primary onClick={onClickFunc} >Delete SSO</AktoButton>
                 </HorizontalStack>
             </VerticalStack>
         </LegacyCard.Section>

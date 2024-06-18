@@ -88,7 +88,7 @@ function HardCoded({showOnlyApi, extractInformation, setInformation}) {
                 </FormLayout.Group>
             </FormLayout>
             <br />
-            {showOnlyApi ? null :<AktoButton
+            {showOnlyApi ? null :<AktoButton 
                 id={"save-token"}
                 primary
                 disabled={!hasChanges}

@@ -24,7 +24,6 @@ const initialState = {
     coverageMap:{},
     filtersMap:{},
     tableInitialState:{},
-    userRole: 'GUEST',
 };
 
 let persistStore = (set) => ({
@@ -47,7 +46,6 @@ let persistStore = (set) => ({
     setCoverageMap:(coverageMap)=>{set({coverageMap: coverageMap})},
     setFiltersMap: (filtersMap) => set({ filtersMap }),
     setTableInitialState: (tableInitialState) => set({ tableInitialState }),
-    setUserRole: (userRole) => set({ userRole }),
 
     resetAll: () => set(initialState), // Reset function
 })

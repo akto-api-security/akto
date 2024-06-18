@@ -79,7 +79,7 @@ function LoginForm({ step, setSteps }) {
                 <LegacyCard subdued>
                     <div style={{ display: "grid", gridTemplateColumns: "auto max-content", gap: "10px", alignItems: "center", padding: "20px" }}>
                         <Text variant="headingMd">Test Response</Text>
-                        <AktoButton id={"test-button"} onClick={handleLoginFlowTest} disabled={testDisable}>Test</AktoButton>
+                        <AktoButton  id={"test-button"} onClick={handleLoginFlowTest} disabled={testDisable}>Test</AktoButton>
                     </div>
                     {step.testResponse ?
                         <div>

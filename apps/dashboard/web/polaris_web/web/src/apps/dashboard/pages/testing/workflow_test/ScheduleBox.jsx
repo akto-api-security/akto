@@ -55,9 +55,9 @@ const ScheduleBox = (props) => {
 
     const finalButton = () => {
         if (testingRun) {
-            return <AktoButton onClick={deleteSchedule} style={{color: "white"}} size="small">Delete</AktoButton>
+            return <AktoButton  onClick={deleteSchedule} style={{color: "white"}} size="small">Delete</AktoButton>
         } else {
-            return <AktoButton onClick={save} style={{color: "white"}} size="small">Save</AktoButton>
+            return <AktoButton  onClick={save} style={{color: "white"}} size="small">Save</AktoButton>
         }
     }
     

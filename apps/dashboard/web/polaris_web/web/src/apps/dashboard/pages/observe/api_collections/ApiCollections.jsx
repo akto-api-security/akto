@@ -264,13 +264,14 @@ function ApiCollections() {
     }
 
     const promotedBulkActions = (selectedResources) => {
-        const userRole = PersistStore(state => state.userRole)
+        const userRole = window.USER_ROLE
+        const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
 
         let actions = [
             {
                 content: `Remove collection${func.addPlurality(selectedResources.length)}`,
                 onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted"),
-                'disabled': (userRole === 'GUEST')
+                'disabled': disableButton
             }
         ];
 
@@ -284,7 +285,7 @@ function ApiCollections() {
                         const message = "Deactivating a collection will stop traffic ingestion and testing for this collection. Please sync the usage data via Settings > billing after deactivating a collection to reflect your updated usage. Are you sure, you want to deactivate this collection ?"
                         func.showConfirmationModal(message, "Deactivate collection", () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deactivated") )
                     },
-                    'disabled': (userRole === 'GUEST')
+                    'disabled': disableButton
                 }
             )
         } else if (selectedResources.every(v => { return deactivated.includes(v) })) {
@@ -295,7 +296,7 @@ function ApiCollections() {
                         const message = "Please sync the usage data via Settings > billing after reactivating a collection to resume data ingestion and testing."
                         func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
                     },
-                    'disabled': (userRole === 'GUEST')
+                    'disabled': disableButton
                 }
             )
         }
@@ -311,9 +312,9 @@ function ApiCollections() {
                     <ActionList
                         actionRole="menuitem"
                         items={[
-                            {content: 'Staging', onAction: () => updateEnvType(selectedResources, "STAGING"), 'disabled': (userRole === 'GUEST')},
-                            {content: 'Production', onAction: () => updateEnvType(selectedResources, "PRODUCTION"), 'disabled': (userRole === 'GUEST')},
-                            {content: 'Reset', onAction: () => updateEnvType(selectedResources, null), 'disabled': (userRole === 'GUEST')},
+                            {content: 'Staging', onAction: () => updateEnvType(selectedResources, "STAGING"), 'disabled': disableButton},
+                            {content: 'Production', onAction: () => updateEnvType(selectedResources, "PRODUCTION"), 'disabled': disableButton},
+                            {content: 'Reset', onAction: () => updateEnvType(selectedResources, null), 'disabled': disableButton},
                         ]}
                     />
                 </Popover.Pane>
@@ -414,6 +415,9 @@ function ApiCollections() {
 
     const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+
     return(
         <PageWithMultipleCards
             title={
@@ -423,7 +427,7 @@ function ApiCollections() {
                     docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                 />
             }
-            primaryAction={<AktoButton id={"create-new-collection-popup"} primary secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</AktoButton>}
+            primaryAction={<AktoButton disabled={disableButton} id={"create-new-collection-popup"} primary secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</AktoButton>}
             isFirstPage={true}
             components={components}
         />

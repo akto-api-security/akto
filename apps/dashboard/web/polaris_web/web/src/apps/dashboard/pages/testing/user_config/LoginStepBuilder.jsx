@@ -183,7 +183,7 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                                     checked={steps[selectedStep].allowAllStatusCodes}
                                     onChange={() => handleStatusCodeToggle(!steps[selectedStep].allowAllStatusCodes)}
                                 />
-                                <AktoButton id={"add-step-button"} primary onClick={handleAddStep}>Add step</AktoButton>
+                                <AktoButton  id={"add-step-button"} primary onClick={handleAddStep}>Add step</AktoButton>
                             </HorizontalStack>
                         </div>
 
@@ -207,7 +207,7 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                                 {steps[selectedStep].type === "LOGIN_FORM" && <LoginForm step={steps[selectedStep]} setSteps={setSteps}/>}
                                 {steps[selectedStep].type === "OTP_VERIFICATION" && <OtpVerification step={steps[selectedStep]} setSteps={setSteps}/>}
                                 <br />
-                                <AktoButton id={"remove-step-button"} destructive onClick={handleRemoveStep}>Remove step</AktoButton>
+                                <AktoButton  id={"remove-step-button"} destructive onClick={handleRemoveStep}>Remove step</AktoButton>
                             </div>
                         </LegacyCard.Section>
 
@@ -216,7 +216,7 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                     <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
 
                     <br />
-                    {showOnlyApi ? null :<AktoButton id={"save-token"} primary onClick={handleSave}><div data-testid="save_token_automated">Save changes</div></AktoButton>}
+                    {showOnlyApi ? null :<AktoButton  id={"save-token"} primary onClick={handleSave}><div data-testid="save_token_automated">Save changes</div></AktoButton>}
 
                 </div>
             }

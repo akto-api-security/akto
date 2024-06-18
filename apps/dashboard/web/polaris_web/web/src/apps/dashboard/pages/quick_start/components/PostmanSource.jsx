@@ -136,7 +136,7 @@ function PostmanSource() {
                     {files ? 
                         <Badge size='medium' status='success'>
                             {files.name}
-                            <AktoButton icon={CancelMajor} plain onClick={() => setFiles(null)} />
+                            <AktoButton  icon={CancelMajor} plain onClick={() => setFiles(null)} />
                         </Badge> 
                     : null}
                     <FileUpload fileType="file" acceptString=".json" setSelectedFile={setFilesCheck} allowMultiple={false} allowedSize={20*1024*1024}/>
@@ -318,11 +318,11 @@ function PostmanSource() {
             <VerticalStack gap="2">
                 <Checkbox label="Allow Akto to replay API requests if responses are not found." checked={allowResponses} onChange={toggleResponse} />
                 <ButtonGroup>
-                    <AktoButton onClick={primaryAction} primary disabled={!buttonActive} loading={loading}>{primaryText}</AktoButton>
-                    <AktoButton onClick={goToDocs}>Go to docs</AktoButton>
+                    <AktoButton  onClick={primaryAction} primary disabled={!buttonActive} loading={loading}>{primaryText}</AktoButton>
+                    <AktoButton  onClick={goToDocs}>Go to docs</AktoButton>
                 </ButtonGroup>
                 <ButtonGroup>
-                    <AktoButton plain onClick={(event) => { 
+                    <AktoButton  plain onClick={(event) => { 
                                 event.stopPropagation(); 
                                 window.open('https://docs.akto.io/traffic-connections/traffic-data-sources/postman#troubleshooting-guide')
                             }}>postman trouble-shooting guide</AktoButton>

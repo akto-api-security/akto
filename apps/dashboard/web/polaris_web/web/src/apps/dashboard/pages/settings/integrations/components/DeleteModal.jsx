@@ -4,6 +4,9 @@ import React from 'react'
 function DeleteModal({showDeleteModal, setShowDeleteModal, SsoType, onAction}) {
 
     const deleteText = "Are you sure you want to remove " + SsoType + "SSO Integration? This might take away access from existing Akto users. This action cannot be undone."
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
+
     return (
         <Modal
             open={showDeleteModal}
@@ -11,7 +14,8 @@ function DeleteModal({showDeleteModal, setShowDeleteModal, SsoType, onAction}) {
             title="Are you sure?"
             primaryAction={{
                 content: 'Delete ' + SsoType + ' SSO',
-                onAction: onAction
+                onAction: onAction,
+                'disabled': disableButton
             }}
         >
             <Modal.Section>

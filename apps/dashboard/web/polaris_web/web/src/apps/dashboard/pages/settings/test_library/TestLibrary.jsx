@@ -178,6 +178,9 @@ function TestLibrary() {
     )
 
     const components = [titleComp, bodyComp]
+    
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
 
     return (
 
@@ -188,7 +191,7 @@ function TestLibrary() {
                     Test library
                 </Text>
             }
-            primaryAction={<AktoButton primary onClick={showAddTestLibraryModal}>Add new test library</AktoButton>}
+            primaryAction={<AktoButton disabled={disableButton} primary onClick={showAddTestLibraryModal}>Add new test library</AktoButton>}
             isFirstPage={true}
             divider={true}
         />

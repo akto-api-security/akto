@@ -108,13 +108,13 @@ function HybridSaasSource() {
         //             <VerticalStack gap={1}>
         //                 <HorizontalStack gap={1}>
         //                     <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_IP:</Text>
-        //                     <AktoButton onClick={() => copyText(aktoIp, "AKTO_IP")} plain>
+        //                     <AktoButton  onClick={() => copyText(aktoIp, "AKTO_IP")} plain>
         //                         <div style={{maxWidth: "260px"}} className='overflow-text'>{aktoIp}</div>
         //                     </AktoButton>
         //                 </HorizontalStack>
         //                 <HorizontalStack gap={1}>
         //                     <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_TOKEN:</Text>
-        //                     <AktoButton onClick={() => copyText(aktoToken, "AKTO_TOKEN")} plain>
+        //                     <AktoButton  onClick={() => copyText(aktoToken, "AKTO_TOKEN")} plain>
         //                         <div style={{maxWidth: "210px"}} className='overflow-text'>{aktoToken}</div>
         //                     </AktoButton>
         //                 </HorizontalStack>
@@ -158,8 +158,8 @@ function HybridSaasSource() {
 
             {/* <VerticalStack gap="2">
                 <ButtonGroup>
-                    <AktoButton onClick={primaryAction} primary>Check Connection</AktoButton>
-                    <AktoButton onClick={goToDocs}>Go to docs</AktoButton>
+                    <AktoButton  onClick={primaryAction} primary>Check Connection</AktoButton>
+                    <AktoButton  onClick={goToDocs}>Go to docs</AktoButton>
                 </ButtonGroup>
             </VerticalStack> */}
 

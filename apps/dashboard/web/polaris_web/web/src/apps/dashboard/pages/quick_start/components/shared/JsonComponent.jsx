@@ -13,7 +13,7 @@ function JsonComponent({dataString, onClickFunc, title, toolTipContent, language
         <div className='copyRequest'>
             <Text>{title}</Text>
             <Tooltip dismissOnMouseOut preferredPosition='above' content={toolTipContent}>
-                <AktoButton icon={ClipboardMinor} plain  onClick={() => onClickFunc()}/>
+                <AktoButton  icon={ClipboardMinor} plain  onClick={() => onClickFunc()}/>
             </Tooltip>
         </div>
         <SampleData data={data} language={language} minHeight={minHeight}/>
