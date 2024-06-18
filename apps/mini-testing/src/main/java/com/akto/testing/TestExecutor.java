@@ -541,7 +541,11 @@ public class TestExecutor {
 
             TestingIssuesHandler handler = new TestingIssuesHandler();
             boolean triggeredByTestEditor = false;
-            handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
+            try{
+                handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
+            } catch (Exception e){
+                loggerMaker.errorAndAddToDb(e, "Unable to create issues", LogDb.TESTING);
+            }
             testingRunResults.clear();
         }
     }
