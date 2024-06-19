@@ -33,7 +33,7 @@ public class Kafka {
     }
 
     public void close() {
-        this.producerReady = false;
+        //this.producerReady = false;
         //producer.close(Duration.ofMillis(0)); // close immediately
     }
 
