@@ -56,7 +56,9 @@ public class AktoPolicyNew {
             if ( cidrList != null && !cidrList.isEmpty()) {
                 apiAccessTypePolicy.setPrivateCidrList(cidrList);
             }
-            redact = accountSettings.isRedactPayload();
+            int accountId = Context.accountId.get();
+    
+            redact = accountId == 1718042191 || accountSettings.isRedactPayload();
         }
 
         apiInfoCatalogMap = new HashMap<>();
