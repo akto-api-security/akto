@@ -296,12 +296,11 @@ const router = createBrowserRouter([
       },
       {
         path: "testing/summary/:summaryId",
-        //element: <ExportHtml />
         element: <VulnerabilityReport />
       },
       {
         path: "issues/summary/:issuesFilter",
-        element: <ExportHtml />
+        element: <VulnerabilityReport />
       }
     ],
     errorElement: <ErrorComponent/>
