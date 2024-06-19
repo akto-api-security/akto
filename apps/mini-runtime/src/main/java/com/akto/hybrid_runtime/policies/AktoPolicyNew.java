@@ -130,19 +130,6 @@ public class AktoPolicyNew {
 
     }
 
-    public void main(List<HttpResponseParams> httpResponseParamsList) throws Exception {
-        if (httpResponseParamsList == null) httpResponseParamsList = new ArrayList<>();
-        loggerMaker.infoAndAddToDb("AktoPolicy main: httpResponseParamsList size: " + httpResponseParamsList.size(), LogDb.RUNTIME);
-        for (HttpResponseParams httpResponseParams: httpResponseParamsList) {
-            try {
-                process(httpResponseParams);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
-                ;
-            }
-        }
-    }
-
     public static ApiInfoKey generateFromHttpResponseParams(HttpResponseParams httpResponseParams) {
         int apiCollectionId = httpResponseParams.getRequestParams().getApiCollectionId();
         String url = httpResponseParams.getRequestParams().getURL();
@@ -157,19 +144,12 @@ public class AktoPolicyNew {
         return new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
     }
 
-    public void process(HttpResponseParams httpResponseParams) throws Exception {
+    public void process(HttpResponseParams httpResponseParams, List<String> partnerIpsList) throws Exception {
         List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(Integer.parseInt(httpResponseParams.getAccountId()));
         ApiInfo.ApiInfoKey apiInfoKey = generateFromHttpResponseParams(httpResponseParams);
         PolicyCatalog policyCatalog = getApiInfoFromMap(apiInfoKey);
         policyCatalog.setSeenEarlier(true);
         ApiInfo apiInfo = policyCatalog.getApiInfo();
-
-        List<String> partnerIpsList = new ArrayList<>();
-
-        AccountSettings accountSettings = dataActor.fetchAccountSettings();
-        if(accountSettings != null){
-            partnerIpsList = accountSettings.getPartnerIpList();
-        }
 
         Map<Integer, FilterSampleData> filterSampleDataMap = policyCatalog.getFilterSampleDataMap();
         if (filterSampleDataMap == null) {

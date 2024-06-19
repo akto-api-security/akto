@@ -162,7 +162,7 @@ public class Main {
         boolean fetchAllSTI = true;
         Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
 
-        boolean isDashboardInstance = instanceType != null && instanceType.equals("DASHBOARD");
+        boolean isDashboardInstance = false;
         if (isDashboardInstance) {
             syncImmediately = true;
             fetchAllSTI = false;

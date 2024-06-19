@@ -338,7 +338,7 @@ public class ClientActor extends DataActor {
 
     public List<SingleTypeInfo> fetchAllStis(int batchCount, int lastStiFetchTs) {
         Map<String, List<String>> headers = buildHeaders();
-        List<SingleTypeInfo> allStis = fetchStiInBatches(batchCount, lastStiFetchTs);
+        List<SingleTypeInfo> allStis = new ArrayList<>();
         List<SingleTypeInfo> uniqueStis = new ArrayList<>();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStiBasedOnHostHeaders", "", "GET", null, headers, "");
         try {
