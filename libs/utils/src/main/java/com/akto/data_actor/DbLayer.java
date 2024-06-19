@@ -217,8 +217,7 @@ public class DbLayer {
 
     public static List<SingleTypeInfo> fetchStiBasedOnHostHeaders() {
         Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1,false);
-        Bson filterQ = Filters.and(filterForHostHeader, Filters.regex(SingleTypeInfo._URL, "STRING|INTEGER"));
-        return SingleTypeInfoDao.instance.findAll(filterQ, Projections.exclude(SingleTypeInfo._VALUES));
+        return SingleTypeInfoDao.instance.findAll(filterForHostHeader, Projections.exclude(SingleTypeInfo._VALUES));
     }
 
     public static List<Integer> fetchApiCollectionIds() {

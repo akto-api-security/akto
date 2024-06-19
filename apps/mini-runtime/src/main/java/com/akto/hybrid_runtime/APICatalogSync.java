@@ -208,7 +208,7 @@ public class APICatalogSync {
             Set<HttpResponseParams> value = entry.getValue();
             for (HttpResponseParams responseParams: value) {
                 try {
-                    aktoPolicyNew.process(responseParams);
+                    aktoPolicyNew.process(responseParams, partnerIpList);
                 } catch (Exception e) {
                     e.printStackTrace();
                     throw new RuntimeException(e);
@@ -1232,6 +1232,10 @@ public class APICatalogSync {
 
     int counter = 0;
     
+    static int lastBuildFromDb = 0;
+    final static int DB_REFRESH_CYCLE = 15 * 60 * 60; // 15 minutes
+
+    List<String> partnerIpList = new ArrayList<>();
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
         List<Object> writesForParams = new ArrayList<>();
@@ -1246,7 +1250,10 @@ public class APICatalogSync {
         }
 
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
-
+        if (accountSettings != null) {
+            partnerIpList = accountSettings.getPartnerIpList();
+        }
+        
         int accountId = Context.accountId.get();
         boolean redact = accountId == 1718042191;
         if (accountSettings != null) {
@@ -1312,9 +1319,14 @@ public class APICatalogSync {
             dataActor.bulkWriteSensitiveParamInfo(writesForSensitiveParamInfo);
         }
 
-        loggerMaker.infoAndAddToDb("starting build from db inside syncWithDb", LogDb.RUNTIME);
-        buildFromDB(true, fetchAllSTI);
-        loggerMaker.infoAndAddToDb("Finished syncing with db", LogDb.RUNTIME);
+        int now = Context.now();
+        if (lastBuildFromDb + DB_REFRESH_CYCLE < now) {
+            loggerMaker.infoAndAddToDb("starting build from db inside syncWithDb at : " + now, LogDb.RUNTIME);
+            buildFromDB(true, fetchAllSTI);
+            now = Context.now();
+            loggerMaker.infoAndAddToDb("Finished syncing with db at : " + now, LogDb.RUNTIME);
+            lastBuildFromDb = now;
+        }
     }
 
     private static final Gson gson = new Gson();
