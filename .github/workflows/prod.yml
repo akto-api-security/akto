@@ -58,7 +58,7 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: akto-api-security
           REGISTRY_ALIAS: p7q3h0z2
-          IMAGE_TAG: kafkalatest
+          IMAGE_TAG: a-feature-kafka-poll-db-abstractor-test
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
