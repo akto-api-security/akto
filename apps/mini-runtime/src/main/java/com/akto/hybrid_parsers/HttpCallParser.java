@@ -36,6 +36,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 
@@ -365,6 +367,14 @@ public class HttpCallParser {
             String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(),Constants.AKTO_IGNORE_FLAG);
             if (ignoreAktoFlag != null) continue;
 
+            List<String> healthCheckEnpoints = new ArrayList<>();
+            healthCheckEnpoints.add("/health");
+            healthCheckEnpoints.add("/api");
+            if(isHealthCheckEndpoint(httpResponseParam.getRequestParams().getURL(), healthCheckEnpoints)){
+                loggerMaker.infoAndAddToDb("url discarded " + httpResponseParam.getRequestParams().getURL(), LogDb.RUNTIME);
+                continue;
+            }
+
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
 
@@ -424,6 +434,18 @@ public class HttpCallParser {
         int filteredSize = filteredResponseParams.size();
         loggerMaker.debugInfoAddToDb("Filtered " + (originalSize - filteredSize) + " responses", LogDb.RUNTIME);
         return filteredResponseParams;
+    }
+
+    public boolean isHealthCheckEndpoint(String url, List<String> discardedUrlList){
+        StringJoiner joiner = new StringJoiner("|", ".*\\.(", ")(\\?.*)?");
+        for (String extension : discardedUrlList) {
+            joiner.add(extension);
+        }
+        String regex = joiner.toString();
+
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(url);
+        return matcher.matches();
     }
 
     private Map<Integer, URLAggregator> aggregatorMap = new HashMap<>();

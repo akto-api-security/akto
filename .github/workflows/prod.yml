@@ -62,6 +62,7 @@ jobs:
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
-          cd apps/database-abstractor
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-database-abstractor:$IMAGE_TAG . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG"
+          cd apps/mini-runtime
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG . --push
+          echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-runtime:$IMAGE_TAG"
+
