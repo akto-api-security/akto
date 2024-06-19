@@ -69,13 +69,14 @@ import com.google.gson.Gson;
 
 public class ClientActor extends DataActor {
 
-    private static final int batchWriteLimit = 10;
+    private static final int batchWriteLimit = 8;
     private static final String url = buildDbAbstractorUrl();
     private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class);
-    private static final int maxConcurrentBatchWrites = 2;
+    private static final int maxConcurrentBatchWrites = 150;
     private static final Gson gson = new Gson();
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     private static final Logger logger = LoggerFactory.getLogger(ClientActor.class);
+    private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
     
     ObjectMapper objectMapper = new ObjectMapper();
 
@@ -200,8 +201,6 @@ public class ClientActor extends DataActor {
 
 
     public void bulkWrite(List<Object> bulkWrites, String path, String key) {
-        ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
-
         ArrayList<BulkUpdates> writes = new ArrayList<>();
         for (int i = 0; i < bulkWrites.size(); i++) {
             writes.add((BulkUpdates) bulkWrites.get(i));
@@ -428,7 +427,7 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("error in fetchAllStis " + e, LoggerMaker.LogDb.RUNTIME);
             }
 
-            if (stiBatch.size() < batchWriteLimit) {
+            if (stiBatch.size() < 1000) {
                 allStis.addAll(stiBatch);
                 if (!objectIdRequired) {
                     break;
