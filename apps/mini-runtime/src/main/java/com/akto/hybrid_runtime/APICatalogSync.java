@@ -1247,7 +1247,8 @@ public class APICatalogSync {
 
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
 
-        boolean redact = false;
+        int accountId = Context.accountId.get();
+        boolean redact = accountId == 1718042191;
         if (accountSettings != null) {
             redact =  accountSettings.isRedactPayload();
         }

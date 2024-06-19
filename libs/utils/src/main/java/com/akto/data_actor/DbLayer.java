@@ -1,5 +1,7 @@
 package com.akto.data_actor;
 
+import static com.akto.util.Constants.ID;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -305,12 +307,13 @@ public class DbLayer {
     }
 
     public static Account fetchActiveAccount() {
+        int accountId = Context.accountId.get();
         Bson activeFilter = Filters.or(
                 Filters.exists(Account.INACTIVE_STR, false),
-                Filters.eq(Account.INACTIVE_STR, false)
-        );
+                Filters.eq(Account.INACTIVE_STR, false));
+        Bson idFilter = Filters.eq(ID, accountId);
 
-        return AccountsDao.instance.findOne(activeFilter);
+        return AccountsDao.instance.findOne(Filters.and(idFilter, activeFilter));
     }
 
     public static void updateKafkaIp(String currentInstanceIp) {
