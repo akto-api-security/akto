@@ -367,11 +367,7 @@ public class HttpCallParser {
             String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(),Constants.AKTO_IGNORE_FLAG);
             if (ignoreAktoFlag != null) continue;
 
-            List<String> healthCheckEnpoints = new ArrayList<>();
-            healthCheckEnpoints.add("/health");
-            healthCheckEnpoints.add("/api");
-            if (httpResponseParam.getRequestParams().getURL().contains("/health") || httpResponseParam.getRequestParams().getURL().contains("/api")) {
-                loggerMaker.infoAndAddToDb("url discarded " + httpResponseParam.getRequestParams().getURL(), LogDb.RUNTIME);
+            if (httpResponseParam.getRequestParams().getURL().toLowerCase().contains("/health")) {
                 continue;
             }
 
@@ -434,18 +430,6 @@ public class HttpCallParser {
         int filteredSize = filteredResponseParams.size();
         loggerMaker.debugInfoAddToDb("Filtered " + (originalSize - filteredSize) + " responses", LogDb.RUNTIME);
         return filteredResponseParams;
-    }
-
-    public boolean isHealthCheckEndpoint(String url, List<String> discardedUrlList){
-        StringJoiner joiner = new StringJoiner("|", ".*\\.(", ")(\\?.*)?");
-        for (String extension : discardedUrlList) {
-            joiner.add(extension);
-        }
-        String regex = joiner.toString();
-
-        Pattern pattern = Pattern.compile(regex);
-        Matcher matcher = pattern.matcher(url);
-        return matcher.matches();
     }
 
     private Map<Integer, URLAggregator> aggregatorMap = new HashMap<>();
