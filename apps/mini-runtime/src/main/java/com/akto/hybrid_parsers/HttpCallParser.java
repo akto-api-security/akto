@@ -370,7 +370,7 @@ public class HttpCallParser {
             List<String> healthCheckEnpoints = new ArrayList<>();
             healthCheckEnpoints.add("/health");
             healthCheckEnpoints.add("/api");
-            if(isHealthCheckEndpoint(httpResponseParam.getRequestParams().getURL(), healthCheckEnpoints)){
+            if (httpResponseParam.getRequestParams().getURL().contains("/health") || httpResponseParam.getRequestParams().getURL().contains("/api")) {
                 loggerMaker.infoAndAddToDb("url discarded " + httpResponseParam.getRequestParams().getURL(), LogDb.RUNTIME);
                 continue;
             }
