@@ -22,23 +22,28 @@ export default function LeftNav(){
   const handleSelect = (selectedId) => {
     setLeftNavSelected(selectedId);
   };
+
+  const userRole = window.USER_ROLE
+  const quickStart = (userRole === 'GUEST' || userRole === 'MEMBER') ? [] : [
+    {
+      label: <Text variant="bodyMd" fontWeight="medium">Quick Start</Text>,
+      icon: AppsFilledMajor,
+      onClick: ()=>{
+        handleSelect("dashboard_quick_start")
+        setActive("normal")
+        navigate("/dashboard/quick-start")
+      },
+      selected: leftNavSelected === 'dashboard_quick_start',
+      key: '1',
+    },
+  ]
   
     const navigationMarkup = (
       <div className={active}>
         <Navigation location="/"> 
           <Navigation.Section
             items={[
-              {
-                label: <Text variant="bodyMd" fontWeight="medium">Quick Start</Text>,
-                icon: AppsFilledMajor,
-                onClick: ()=>{
-                  handleSelect("dashboard_quick_start")
-                  setActive("normal")
-                  navigate("/dashboard/quick-start")
-                },
-                selected: leftNavSelected === 'dashboard_quick_start',
-                key: '1',
-              },
+              ...quickStart,
               {
                 label: 'API Security Posture',
                 icon: ReportFilledMinor,

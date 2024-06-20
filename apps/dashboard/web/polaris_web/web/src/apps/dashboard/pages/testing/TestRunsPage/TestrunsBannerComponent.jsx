@@ -53,7 +53,11 @@ function TestrunsBannerComponent({isInventory,onButtonClick}) {
         .forEach(collection => {
             urlsCount += collection.urlsCount}
         )
+
+    const userRole = window.USER_ROLE
+
     return (
+        (userRole === 'GUEST' || userRole === 'DEVELOPER') ? <></> :
         <BannerLayout
             title={"Test your APIs"}
             text={"400+ built-in tests covering OWASP Top 10, HackerOne top 10 and all the business logic vulnerabilities for your API Security testing needs."}
