@@ -189,9 +189,14 @@ public class HttpCallParser {
         filteredResponseParams = filterHttpResponseParams(filteredResponseParams);
         boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
 
+        boolean newStiUpdatesOnly = false;
+        if (accountSettings != null) {
+            newStiUpdatesOnly = accountSettings.getNewStiUpdatesOnly();
+        }
+
         for (int apiCollectionId: aggregatorMap.keySet()) {
             URLAggregator aggregator = aggregatorMap.get(apiCollectionId);
-            apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
+            apiCatalogSync.computeDelta(aggregator, false, apiCollectionId, newStiUpdatesOnly);
         }
 
         //  for (HttpResponseParams responseParam: filteredResponseParams) {

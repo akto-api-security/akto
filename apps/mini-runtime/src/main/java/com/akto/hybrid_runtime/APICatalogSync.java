@@ -184,7 +184,7 @@ public class APICatalogSync {
         return users.size();
     }
 
-    public void computeDelta(URLAggregator origAggregator, boolean triggerTemplateGeneration, int apiCollectionId) {
+    public void computeDelta(URLAggregator origAggregator, boolean triggerTemplateGeneration, int apiCollectionId, boolean newStiUpdatesOnly) {
         long start = System.currentTimeMillis();
 
         APICatalog deltaCatalog = this.delta.get(apiCollectionId);
@@ -217,7 +217,7 @@ public class APICatalogSync {
         }
 
         start = System.currentTimeMillis();
-        processKnownStaticURLs(aggregator, deltaCatalog, dbCatalog);
+        processKnownStaticURLs(aggregator, deltaCatalog, dbCatalog, newStiUpdatesOnly);
         logger.info("processKnownStaticURLs: " +  (System.currentTimeMillis() - start));
 
         start = System.currentTimeMillis();
@@ -225,7 +225,7 @@ public class APICatalogSync {
         logger.info("pendingRequests: " + (System.currentTimeMillis() - start));
 
         start = System.currentTimeMillis();
-        tryWithKnownURLTemplates(pendingRequests, deltaCatalog, dbCatalog, apiCollectionId );
+        tryWithKnownURLTemplates(pendingRequests, deltaCatalog, dbCatalog, apiCollectionId, newStiUpdatesOnly);
         logger.info("tryWithKnownURLTemplates: " + (System.currentTimeMillis() - start));
 
         if (!mergeAsyncOutside) {
@@ -628,7 +628,8 @@ public class APICatalogSync {
         Map<URLStatic, RequestTemplate> pendingRequests, 
         APICatalog deltaCatalog,
         APICatalog dbCatalog,
-        int apiCollectionId
+        int apiCollectionId,
+        boolean newStiUpdatesOnly
     ) {
         Iterator<Map.Entry<URLStatic, RequestTemplate>> iterator = pendingRequests.entrySet().iterator();
         try {
@@ -645,6 +646,10 @@ public class APICatalogSync {
                             alreadyInDelta.fillUrlParams(tokenize(newUrl.getUrl()), urlTemplate, apiCollectionId);
                             alreadyInDelta.mergeFrom(newRequestTemplate);
                         } else {
+                            if (newStiUpdatesOnly) {
+                                iterator.remove();
+                                break;
+                            }
                             RequestTemplate dbTemplate = dbCatalog.getTemplateURLToMethods().get(urlTemplate);
                             RequestTemplate dbCopy = dbTemplate.copy();
                             dbCopy.mergeFrom(newRequestTemplate);
@@ -686,7 +691,7 @@ public class APICatalogSync {
         return ret;
     }
 
-    private void processKnownStaticURLs(URLAggregator aggregator, APICatalog deltaCatalog, APICatalog dbCatalog) {
+    private void processKnownStaticURLs(URLAggregator aggregator, APICatalog deltaCatalog, APICatalog dbCatalog, boolean newStiUpdatesOnly) {
         Iterator<Map.Entry<URLStatic, Set<HttpResponseParams>>> iterator = aggregator.urls.entrySet().iterator();
         List<SingleTypeInfo> deletedInfo = deltaCatalog.getDeletedInfo();
         try {
@@ -697,6 +702,10 @@ public class APICatalogSync {
 
                 RequestTemplate strictMatch = dbCatalog.getStrictURLToMethods().get(url);
                 if (strictMatch != null) {
+                    if (newStiUpdatesOnly) {
+                        iterator.remove();
+                        continue;
+                    }
                     Map<URLStatic, RequestTemplate> deltaCatalogStrictURLToMethods = deltaCatalog.getStrictURLToMethods();
                     RequestTemplate requestTemplate = deltaCatalogStrictURLToMethods.get(url);
                     if (requestTemplate == null) {
