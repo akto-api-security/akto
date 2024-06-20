@@ -116,7 +116,7 @@ function TestRunsPage() {
 
   filters = func.getCollectionFilters(filters)
 
-const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3]);
+const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[4]);
 const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
 }
@@ -233,7 +233,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
   }
 
   const definedTableTabs = ['All', 'One time', 'Scheduled', 'CI/CD']
-  const initialCount = [countMap['allTestRuns'], countMap['ontTime'], countMap['scheduled'], countMap['cicd']]
+  const initialCount = [countMap['allTestRuns'], countMap['oneTime'], countMap['scheduled'], countMap['cicd']]
 
   const { tabsInfo } = useTable()
   const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
@@ -244,8 +244,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     api.getUserTestRuns().then((resp)=> {
       setHasUserInitiatedTestRuns(resp)
     })
-    setLoading(false)
-    
+    setLoading(false)    
   }
 
   useEffect(()=>{
