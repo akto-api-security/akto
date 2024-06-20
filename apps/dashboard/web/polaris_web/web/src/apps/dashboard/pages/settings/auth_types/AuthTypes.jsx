@@ -73,7 +73,7 @@ function AuthTypes() {
             items: [{
                 content: 'Edit',
                 onAction: () => navigate("details", { state: { name: item?.name, active: item?.active,
-                    headerConditions: item?.headerKeys, payloadConditions: item?.payloadKeys } }),
+                    headerConditions: item?.headerKeys, payloadConditions: item?.payloadKeys } }), 'disabled': disableButton
             }]
         }]
     }
@@ -99,7 +99,7 @@ function AuthTypes() {
     }, [])
     
     const userRole = window.USER_ROLE
-    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
 
     return (
         <Box>

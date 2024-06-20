@@ -1,10 +1,11 @@
 import AktoButton from './../../../components/shared/AktoButton';
-import { Button, ButtonGroup, HorizontalGrid, HorizontalStack, LegacyCard, Page, Scrollable, Select, Spinner, Text } from "@shopify/polaris"
+import { ButtonGroup, LegacyCard, Text } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import LogsContainer from "./LogsContainer";
 import Dropdown from "../../../components/layouts/Dropdown"
+import { saveAs } from 'file-saver'
 
 const Logs = () => {
     const fiveMins = 1000 * 60 * 5
@@ -16,6 +17,8 @@ const Logs = () => {
         logData: []
     })
     const [ loading, setLoading ] = useState(false)
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
 
     const logGroupSelected = logs.logGroup !== ''
 
@@ -32,7 +35,6 @@ const Logs = () => {
     const fetchLogsFromDb = async (startTime, endTime, refresh = false) => {
         if (logs.logGroup !== '') {
             setLoading(true)
-
             const logsResponse = await settingRequests.fetchLogsFromDb(
                 Math.floor(startTime / 1000), 
                 Math.floor(endTime  / 1000),
@@ -54,7 +56,9 @@ const Logs = () => {
     useEffect(() => {
         const startTime = Date.now() - fiveMins
         const endTime = Date.now() 
-        fetchLogsFromDb(startTime, endTime)
+        if(!disableButton){
+            fetchLogsFromDb(startTime, endTime)
+        }
     }, [logs.logGroup])
 
    const exportLogsCsv = () => {
@@ -72,17 +76,20 @@ const Logs = () => {
     const handleRefresh = () => {
         const startTime = Date.now() - fiveMins;
         const endTime = Date.now();
-        fetchLogsFromDb(startTime, endTime, true)
+        if(!disableButton){
+            fetchLogsFromDb(startTime, endTime, true)
+        }
     }
 
     const handlePreviousFiveMinutesLogs = () => {
         const startTime = logs.startTime - fiveMins;
         const endTime = logs.startTime;
-        fetchLogsFromDb(startTime, endTime)
+        if(!disableButton){
+            fetchLogsFromDb(startTime, endTime)
+        }
     }
     
-    const userRole = window.USER_ROLE
-    const disableButton = (userRole === "GUEST" || userRole === "MEMBER")
+   
 
     return (
         <LegacyCard

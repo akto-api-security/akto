@@ -182,7 +182,7 @@ const Users = () => {
                             const { id, name, login, role } = item;
                             const initials = func.initials(login)
                             const media = <Avatar user size="medium" name={login} initials={initials} />
-                            const shortcutActions = (username !== login && role !== currentUser.role && currentUser.role !== "GUEST" && roleHierarchy.includes(role.toUpperCase())) ?
+                            const shortcutActions = (username !== login && currentUser.role !== "GUEST" && roleHierarchy.includes(role.toUpperCase())) ?
                                 [
                                     {
                                         content: <Popover
