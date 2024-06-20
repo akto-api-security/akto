@@ -1077,7 +1077,7 @@ public class APICatalogSync {
         loggerMaker.infoAndAddToDb("Started building from dB with calcDiff " + calcDiff + " fetchAllSTI: " + fetchAllSTI, LogDb.RUNTIME);
         loggerMaker.infoAndAddToDb("Fetching STIs: " + fetchAllSTI, LogDb.RUNTIME);
         List<SingleTypeInfo> allParams;
-        allParams = dataActor.fetchAllStis(1000, lastStiFetchTs);
+        allParams = dataActor.fetchAllStis();
         if (allParams.size() > 0) {
             lastStiFetchTs = allParams.get(allParams.size() - 1).getTimestamp();
         }
