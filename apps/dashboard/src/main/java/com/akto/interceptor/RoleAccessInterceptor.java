@@ -66,7 +66,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             }
             
             if(!hasRequiredAccess) {
-                ((ActionSupport) invocation.getAction()).addActionError("The role '" + userRole + "' does not have access.");
+                ((ActionSupport) invocation.getAction()).addActionError("The role '" + userRoleType.getName() + "' does not have access.");
                 return FORBIDDEN;
             }
         } catch(Exception e) {

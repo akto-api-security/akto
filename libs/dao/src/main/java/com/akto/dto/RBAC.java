@@ -20,14 +20,15 @@ public class RBAC {
     public static final String ACCOUNT_ID = "accountId";
 
     public enum Role {
-        ADMIN(new AdminRoleStrategy()),
-        MEMBER(new MemberRoleStrategy()),
-        DEVELOPER(new DeveloperRoleStrategy()),
-        GUEST(new GuestRoleStrategy());
+        ADMIN("ADMIN",new AdminRoleStrategy()),
+        MEMBER("SECURITY ENGINEER", new MemberRoleStrategy()),
+        DEVELOPER("DEVELOPER", new DeveloperRoleStrategy()),
+        GUEST("GUEST", new GuestRoleStrategy());
 
         private final RoleStrategy roleStrategy;
+        private String name;
 
-        Role(RoleStrategy roleStrategy) {
+        Role(String name ,RoleStrategy roleStrategy) {
             this.roleStrategy = roleStrategy;
         }
 
@@ -37,6 +38,10 @@ public class RBAC {
 
         public ReadWriteAccess getReadWriteAccessForFeature(Feature feature) {
             return roleStrategy.getFeatureAccessMap().getOrDefault(feature, ReadWriteAccess.READ);
+        }
+
+        public String getName() {
+            return name;
         }
     }
 
