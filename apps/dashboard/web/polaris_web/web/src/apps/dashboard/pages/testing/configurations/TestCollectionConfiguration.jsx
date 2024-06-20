@@ -24,6 +24,10 @@ function TestCollectionConfiguration() {
     }
 
     function drawComponentToEdit(propsFromConfig, propertyIds) {
+        const userRole = window.USER_ROLE
+        const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+        console.log(disableButton)
+
         let possibleProp = propertyIds[propsFromConfig.name]
         let ret = <div></div>
         if (possibleProp) {
@@ -31,7 +35,13 @@ function TestCollectionConfiguration() {
             case "CUSTOM_AUTH":
                ret =
                 <div>{propsFromConfig.values.map(v => {
-                    return <span style={{marginRight: "8px"}}><Link onClick={(e) => e.stopPropagation()}  monochrome target="_blank" url={window.location.origin+"/dashboard/settings/auth-types/details?name="+v}>{v}</Link></span>
+                    return <span style={{marginRight: "8px"}}><Link onClick={(e) => {
+                        e.stopPropagation()
+                        
+                        if(disableButton) {
+                            func.setToast(true, true, "You do not have permission to access config.")
+                        }
+                    }}  monochrome target={disableButton ? "" : "_blank"} url={window.location.origin+ (disableButton ? "/dashboard/observe/inventory/" : "/dashboard/settings/auth-types/details?name="+v)}>{v}</Link></span>
                 })}</div>
                 break;
 
@@ -39,7 +49,13 @@ function TestCollectionConfiguration() {
                ret =
                 (propsFromConfig.values?.length) ?
                 <div>{propsFromConfig.values.map(v => {
-                    return <span style={{marginRight: "8px"}}><Link onClick={(e) => e.stopPropagation()} monochrome target="_blank" url={window.location.origin+"/dashboard/observe/inventory/"+v}>{mapCollectionIdToName[v]}</Link></span>
+                    return <span style={{marginRight: "8px"}}><Link onClick={(e) => {
+                        e.stopPropagation()
+                        
+                        if(disableButton) {
+                            func.setToast(true, true, "You do not have permission to access config.")
+                        }
+                    }} monochrome target={disableButton ? "" : "_blank"} url={window.location.origin+ (disableButton ? "/dashboard/observe/inventory/" : "/dashboard/observe/inventory/"+v)}>{mapCollectionIdToName[v]}</Link></span>
                 })}</div>
                 :<div>Not Implemented</div>
 
@@ -48,7 +64,13 @@ function TestCollectionConfiguration() {
             case "ROLE":
                ret =
                    <div>{propsFromConfig.values.map(v => {
-                       return <Link onClick={(e) => e.stopPropagation()} monochrome target="_blank" url={window.location.origin+"/dashboard/testing/roles/details?name="+v}>{v}</Link>
+                       return <Link onClick={(e) => {
+                        e.stopPropagation()
+                        
+                        if(disableButton) {
+                            func.setToast(true, true, "You do not have permission to access config.")
+                        }
+                    }} monochrome target={disableButton ? "" : "_blank"} url={window.location.origin+ (disableButton ? "/dashboard/observe/inventory/" : "/dashboard/testing/roles/details?name="+v)}>{v}</Link>
                    })}</div>
                break;
 
@@ -60,16 +82,31 @@ function TestCollectionConfiguration() {
     }
 
     function drawComponentToCreateNew(type, name) {
+        const userRole = window.USER_ROLE
+        const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+
         let ret = null
         switch(type) {
             case "CUSTOM_AUTH":
                ret =
-               <Link onClick={(e) => e.stopPropagation()}  target="_blank" url={window.location.origin+"/dashboard/settings/auth-types/details"}>
+               <Link onClick={(e) => {
+                        e.stopPropagation()
+                        
+                        if(disableButton) {
+                            func.setToast(true, true, "You do not have permission to access config.")
+                        }
+                    }}  target={disableButton ? "" : "_blank"} url={window.location.origin+ (disableButton ? "/dashboard/observe/inventory/" : "/dashboard/settings/auth-types/details")}>
                 Create
                </Link>
                break;
             case "ROLE":
-                ret =  <Link onClick={(e) => e.stopPropagation()}  target="_blank" url={window.location.origin+"/dashboard/testing/roles/details?system="+name}>
+                ret =  <Link onClick={(e) => {
+                        e.stopPropagation()
+                        
+                        if(disableButton) {
+                            func.setToast(true, true, "You do not have permission to access config.")
+                        }
+                    }}  target={disableButton ? "" : "_blank"} url={window.location.origin+ (disableButton ? "/dashboard/observe/inventory/" : "/dashboard/testing/roles/details?system="+name)}>
                Create
                </Link>
 

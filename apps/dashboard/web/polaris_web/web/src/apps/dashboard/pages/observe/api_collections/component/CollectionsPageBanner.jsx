@@ -31,7 +31,10 @@ function CollectionsPageBanner() {
         </HorizontalStack>
     )
 
+    const userRole = window.USER_ROLE
+
     return(
+        (userRole === 'GUEST' || userRole === 'MEMBER') ? <></> :
         <BannerLayout 
             title={"Upload your traffic to get started"}
             text={"Akto Discovers API inventory by connecting to your source of traffic. Connect a traffic connector to get started."}

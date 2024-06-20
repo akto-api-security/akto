@@ -383,6 +383,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         })
     }
 
+    const userRole = window.USER_ROLE
+    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
+
     return (
         <div>
             {activator}
@@ -394,7 +397,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 primaryAction={{
                     content: scheduleString(),
                     onAction: handleRun,
-                    disabled: !testRun.authMechanismPresent
+                    disabled: (!testRun.authMechanismPresent || disableButton)
                 }}
                 large
             >
@@ -437,7 +440,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 />
                             </div>
 
-                            <AktoButton  icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Remove All</div></AktoButton>
+                            <AktoButton  icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll() || disableButton}><div data-testid="remove_all_tests">Remove All</div></AktoButton>
                         </div>
 
                         <br />

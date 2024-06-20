@@ -154,10 +154,10 @@ function About() {
             <VerticalStack gap={1}>
                 <Text color="subdued">{text}</Text>
                 <ButtonGroup segmented>
-                    <AktoButton  size="slim" onClick={() => onToggle(true)} pressed={initial === true}>
+                    <AktoButton disabled={userRole === "GUEST"} size="slim" onClick={() => onToggle(true)} pressed={initial === true}>
                         True
                     </AktoButton>
-                    <AktoButton  size="slim" onClick={() => onToggle(false)} pressed={initial === false}>
+                    <AktoButton disabled={userRole === "GUEST"} size="slim" onClick={() => onToggle(false)} pressed={initial === false}>
                         False
                     </AktoButton>
                 </ButtonGroup>
@@ -297,7 +297,7 @@ function About() {
                             <HorizontalGrid gap={2} columns={3} key={key}>
                                 <TooltipText textProps={{variant:"bodyMd", fontWeight:"medium"}} tooltip={headerLine} text={headerLine}/>
                                 <TooltipText textProps={{variant:"bodyMd", color: "subdued"}} tooltip={newName} text={newName}/>
-                                <AktoButton  plain icon={DeleteMajor} onClick={() => deleteApiCollectionNameMapper(regex)}/>
+                                <AktoButton disabled={userRole === "GUEST"} plain icon={DeleteMajor} onClick={() => deleteApiCollectionNameMapper(regex)}/>
                             </HorizontalGrid>
                         )
                     })}
@@ -328,7 +328,7 @@ function About() {
                     value={replaceNewCollectionName}
                     setValue={setReplaceNewCollectionName}
                 />
-            {checkSaveActive('replaceCollection') ? <Box paddingBlockStart={5} width="100px"><AktoButton  onClick={addApiCollectionNameMapper} size="medium" primary>Save</AktoButton></Box> : null}
+            {checkSaveActive('replaceCollection') ? <Box paddingBlockStart={5} width="100px"><AktoButton disabled={userRole === "GUEST"} onClick={addApiCollectionNameMapper} size="medium" primary>Save</AktoButton></Box> : null}
             </HorizontalGrid>
         </VerticalStack>
     )
@@ -427,7 +427,7 @@ function About() {
                 <LegacyCard.Section>
                     <VerticalStack gap={"2"}>
                         <Form onSubmit={() => onFormSubmit(value)}>
-                            <TextField onChange={setValue} value={value} label={<Text color="subdued" fontWeight="medium" variant="bodySm">{labelText}</Text>} {...isError ? {error: "Invalid address"} : {}}/>
+                            <TextField disabled={userRole === "GUEST"} onChange={setValue} value={value} label={<Text color="subdued" fontWeight="medium" variant="bodySm">{labelText}</Text>} {...isError ? {error: "Invalid address"} : {}}/>
                         </Form>
                         <HorizontalStack gap={"2"}>
                             {ipsList && ipsList.length > 0 && ipsList.map((ip, index) => {
@@ -445,7 +445,7 @@ function About() {
     }
 
     const components = [accountInfoComponent, 
-                        (window.IS_SAAS !== "true" && disableButton) ? <UpdateIpsComponent 
+                        (window.IS_SAAS !== "true" || disableButton) ? <UpdateIpsComponent 
                             key={"cidr"} 
                             description={"We use these CIDRs to mark the endpoints as PRIVATE"} 
                             title={"Private CIDRs list"}
@@ -455,7 +455,7 @@ function About() {
                             onRemove={(val) => handleIpsChange(val, false, "cidr")}
                             type={"cidr"}
                         /> : null,
-                        (window.IS_SAAS !== "true" && disableButton) ? <UpdateIpsComponent
+                        (window.IS_SAAS !== "true" || disableButton) ? <UpdateIpsComponent
                             key={"partner"}
                             description={"We use these IPS to mark the endpoints as PARTNER"} 
                             title={"Third parties Ips list"}
