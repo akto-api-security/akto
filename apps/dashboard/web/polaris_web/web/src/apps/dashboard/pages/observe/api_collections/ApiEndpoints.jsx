@@ -565,6 +565,7 @@ function ApiEndpoints() {
                 endpoints={filteredEndpoints}
                 filtered={loading ? false : filteredEndpoints.length !== endpointData["all"].length}
                 runTestFromOutside={runTests}
+                closeRunTest={() => setRunTests(false)}
                 disabled={showEmptyScreen}
             />
         </HorizontalStack>
