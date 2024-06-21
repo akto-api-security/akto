@@ -121,10 +121,10 @@ public class InitializerListener implements ServletContextListener {
         Context.accountId.set(1718042191);
 
         List<SampleData> val = new ArrayList<>();
-        boolean first = true;
         SampleData lastSd = null;
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         for (ApiCollection apiCollection: apiCollections) {
+            boolean first = true;
             logger.info("Starting for apiCollection: " + apiCollection.getId());
             SampleData sdata = SampleDataDao.instance.findOne(Filters.eq("_id.apiCollectionId", apiCollection.getId()));
             if (sdata == null) {
