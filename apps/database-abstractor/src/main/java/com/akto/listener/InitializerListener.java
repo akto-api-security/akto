@@ -70,6 +70,9 @@ public class InitializerListener implements ServletContextListener {
                             cron.cron(true);
                         }
 
+                        logger.info("triggering redact job");
+                        redactJob();
+
                     } catch (Exception e) {
                         logger.error("error running initializer method for db abstractor", e);
                     } finally {
@@ -94,9 +97,6 @@ public class InitializerListener implements ServletContextListener {
             logger.info("init kafka consumer");
             kafkaUtils.initKafkaConsumer();
         }
-
-        logger.info("triggering redact job");
-        redactJob();
     }
 
     private static void checkMongoConnection() throws Exception {
