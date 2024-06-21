@@ -16,10 +16,12 @@ import org.slf4j.LoggerFactory;
 
 import com.akto.DaoInit;
 import com.akto.dao.AccountsDao;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic.SampleData;
 import com.akto.log.LoggerMaker;
 import com.akto.merging.Cron;
@@ -120,88 +122,95 @@ public class InitializerListener implements ServletContextListener {
         List<SampleData> val = new ArrayList<>();
         boolean first = true;
         SampleData lastSd = null;
-        do {
-            MongoCursor<SampleData> cursor = null;
-            if (first) {
-                try {
-                cursor = SampleDataDao.instance.getMCollection().find(Filters.exists("_id.method")).sort(Sorts.ascending("_id.url", "_id.method")).limit(1).cursor();
-                first = false;
-                } catch (Exception e) {
-                    System.out.println(e.getMessage());
-                    e.printStackTrace();
-                }
-            } else {
-                if (lastSd == null) break;
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.getMetaAll();
+        for (ApiCollection apiCollection: apiCollections) {
 
-                Bson filter = 
-                    Filters.or(
-                        Filters.gt("_id.url", lastSd.getId().getUrl()),
-                        Filters.and(
-                                Filters.eq("_id.url", lastSd.getId().getUrl()),
-                                Filters.gt("_id.method", lastSd.getId().getMethod().name())
-                        )
-
-                    );
-                
-
-                cursor = SampleDataDao.instance.getMCollection().find(filter).sort(Sorts.ascending("_id.url", "_id.method")).limit(1).cursor();
-
-            }
-
-            if (cursor.hasNext()) {
-                val = Collections.singletonList(cursor.next());
-            } else {
-                System.out.println("exiting: ");
-                break;
-            }
-
-            if (val.size() == 0) {
-                return;
-            }
-
-            SampleData sd = val.get(val.size()-1);
-            lastSd = sd;
-
-            System.out.println("sd: " + sd.getId().getApiCollectionId() + " " + sd.getId().getMethod() + " " + sd.getId().getUrl());
-
-            List<String> samples = sd.getSamples();
-            boolean changed = false;
-            for(int i =0; i < samples.size(); i++) {
-                String sample = samples.get(i);
-                if (!sample.contains("****")) {
+            do {
+                MongoCursor<SampleData> cursor = null;
+                if (first) {
                     try {
-                    sample = RedactSampleData.redactIfRequired(sample, true, true);
-                    samples.set(i, sample);
-                    changed = true;
+                    cursor = SampleDataDao.instance.getMCollection().find(Filters.and(Filters.eq("_id.apiCollectionId", apiCollection.getId()), Filters.exists("_id.method"))).sort(Sorts.ascending("_id.url", "_id.method")).limit(1).cursor();
+                    first = false;
                     } catch (Exception e) {
-                        System.out.println("Error: " + e.getMessage());
+                        System.out.println(e.getMessage());
+                        e.printStackTrace();
                     }
-                }
-                
-            }
+                } else {
+                    if (lastSd == null) break;
 
-            if (changed) {
-                System.out.println("Updating.. " + sd.getId().getUrl() + " " + sd.getId().getMethod() + " " + sd.getId().getApiCollectionId());
-                try {
-                    SampleData updated = SampleDataDao.instance.updateOne(
-                        Filters.and(
-                            Filters.eq("_id.apiCollectionId", sd.getId().getApiCollectionId()),
-                            Filters.eq("_id.url", sd.getId().getUrl()),
-                            Filters.eq("_id.method", sd.getId().getMethod())
-                            
-                        ),
-                        Updates.set("samples", samples)
+                    Bson filter = 
+                    Filters.and(
+                        Filters.eq("_id.apiCollectionId", apiCollection.getId()),
+                        Filters.or(
+                            Filters.gt("_id.url", lastSd.getId().getUrl()),
+                            Filters.and(
+                                    Filters.eq("_id.url", lastSd.getId().getUrl()),
+                                    Filters.gt("_id.method", lastSd.getId().getMethod().name())
+                            )
+
+                        )
                     );
-                    System.out.println("Updated: " + samples);
+                    
 
-                } catch (Exception e) {
-                    System.out.println(e.getMessage());
-                    e.printStackTrace();
+                    cursor = SampleDataDao.instance.getMCollection().find(filter).sort(Sorts.ascending("_id.url", "_id.method")).limit(1).cursor();
+
                 }
 
-            }
+                if (cursor.hasNext()) {
+                    val = Collections.singletonList(cursor.next());
+                } else {
+                    System.out.println("exiting: ");
+                    break;
+                }
 
-        } while(val.size() > 0);
+                if (val.size() == 0) {
+                    return;
+                }
+
+                SampleData sd = val.get(val.size()-1);
+                lastSd = sd;
+
+                System.out.println("sd: " + sd.getId().getApiCollectionId() + " " + sd.getId().getMethod() + " " + sd.getId().getUrl());
+
+                List<String> samples = sd.getSamples();
+                boolean changed = false;
+                for(int i =0; i < samples.size(); i++) {
+                    String sample = samples.get(i);
+                    if (!sample.contains("****")) {
+                        try {
+                        sample = RedactSampleData.redactIfRequired(sample, true, true);
+                        samples.set(i, sample);
+                        changed = true;
+                        } catch (Exception e) {
+                            System.out.println("Error: " + e.getMessage());
+                        }
+                    }
+                    
+                }
+
+                if (changed) {
+                    System.out.println("Updating.. " + sd.getId().getUrl() + " " + sd.getId().getMethod() + " " + sd.getId().getApiCollectionId());
+                    try {
+                        SampleData updated = SampleDataDao.instance.updateOne(
+                            Filters.and(
+                                Filters.eq("_id.apiCollectionId", sd.getId().getApiCollectionId()),
+                                Filters.eq("_id.url", sd.getId().getUrl()),
+                                Filters.eq("_id.method", sd.getId().getMethod())
+                                
+                            ),
+                            Updates.set("samples", samples)
+                        );
+                        System.out.println("Updated: " + samples);
+
+                    } catch (Exception e) {
+                        System.out.println(e.getMessage());
+                        e.printStackTrace();
+                    }
+
+                }
+
+            } while(val.size() > 0);
+        }
 
         System.out.println("done");
        
