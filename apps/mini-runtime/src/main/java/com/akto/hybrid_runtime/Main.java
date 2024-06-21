@@ -167,9 +167,17 @@ public class Main {
             syncImmediately = true;
             fetchAllSTI = false;
         }
-        int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
+        int maxPollRecordsConfig = 10;//Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
 
         if (topicName == null) topicName = "akto.api.logs";
+
+        AccountSettings aSettings = dataActor.fetchAccountSettings();
+        if (aSettings == null) {
+            loggerMaker.errorAndAddToDb("error fetch account settings, exiting process");
+            System.exit(0);
+        }
+
+        aSettings = dataActor.fetchAccountSettings();
 
         //DaoInit.init(new ConnectionString(mongoURI));
 

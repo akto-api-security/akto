@@ -77,7 +77,8 @@ public class ClientActor extends DataActor {
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     private static final Logger logger = LoggerFactory.getLogger(ClientActor.class);
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
-    
+    private static AccountSettings accSettings;
+
     ObjectMapper objectMapper = new ObjectMapper();
 
     public static String buildDbAbstractorUrl() {
@@ -91,13 +92,30 @@ public class ClientActor extends DataActor {
     
 
     public AccountSettings fetchAccountSettings() {
+        AccountSettings acc = null;
+        for (int i=0; i < 5; i++) {
+            acc = fetchAccountSettingsRetry();
+            if (acc != null) {
+                break;
+            }
+        }
+        if (acc == null) {
+            return accSettings;
+        } else {
+            accSettings = acc;
+            return acc;
+        }
+        
+    }
+
+    public AccountSettings fetchAccountSettingsRetry() {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAccountSettings", "", "GET", null, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in fetchEstimatedDocCount", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchAccountSettings", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
             BasicDBObject payloadObj;
@@ -105,12 +123,15 @@ public class ClientActor extends DataActor {
                 payloadObj =  BasicDBObject.parse(responsePayload);
                 BasicDBObject accountSettingsObj = (BasicDBObject) payloadObj.get("accountSettings");
                 accountSettingsObj.put("telemetrySettings", null);
-                return objectMapper.readValue(accountSettingsObj.toJson(), AccountSettings.class);
+                AccountSettings ac = objectMapper.readValue(accountSettingsObj.toJson(), AccountSettings.class);
+                accSettings = ac;
+                return ac;
             } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error in fetchAccountSettings" + e, LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchEstimatedDocCount" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in fetchAccountSettings" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
         }
     }
