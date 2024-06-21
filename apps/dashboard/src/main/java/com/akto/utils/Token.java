@@ -29,10 +29,9 @@ public class Token {
                 claims,
                 "Akto",
                 "login",
-                Calendar.MINUTE,
+                Calendar.HOUR,
                 15
         );
-
     }
     
     public Token(String refreshToken) throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {

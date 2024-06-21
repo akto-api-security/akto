@@ -398,6 +398,12 @@ export default {
             method: 'post',
             data: {}
         })
+    },
+    initiateReportDownload() {
+        return request({
+            url: '/api/initiateReportDownload',
+            method: 'post',
+            data: {}
+        })
     }
-
 }
