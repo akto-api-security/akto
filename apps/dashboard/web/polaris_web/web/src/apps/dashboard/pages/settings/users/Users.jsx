@@ -21,8 +21,25 @@ const Users = () => {
     const [loading, setLoading] = useState(false)
     const [users, setUsers] = useState([])
     const [roleHierarchy, setRoleHierarchy] = useState([])
+    const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
+    let rbacAccess = false;
+
+    if(stiggFeatures && stiggFeatures['RBAC_FEATURE']){
+        rbacAccess = stiggFeatures['RBAC_FEATURE'].isGranted
+    }
 
     const [roleSelectionPopup, setRoleSelectionPopup] = useState({})
+
+    let paidFeatureRoleOptions =  rbacAccess ? [
+        {
+            content: 'Developer',
+            role: 'DEVELOPER',
+        },
+        {
+            content: 'Guest',
+            role: 'GUEST',
+        }
+    ] : []
 
     const rolesOptions = [
         {
@@ -34,15 +51,7 @@ const Users = () => {
             {
                 content: 'Security Engineer',
                 role: 'MEMBER',
-            },
-            {
-                content: 'Developer',
-                role: 'DEVELOPER',
-            },
-            {
-                content: 'Guest',
-                role: 'GUEST',
-            }]
+            }, {...paidFeatureRoleOptions}]
         },
         {
             items: [{
@@ -228,6 +237,7 @@ const Users = () => {
                     setInviteUser={setInviteUser}
                     toggleInviteUserModal={toggleInviteUserModal}
                     roleHierarchy={roleHierarchy}
+                    rolesOptions={rolesOptions}
                 />
             </div>
 

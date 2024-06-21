@@ -5,18 +5,11 @@ import Store from "../../../store"
 import settingRequests from "../api"
 import Dropdown from "../../../components/layouts/Dropdown"
 
-const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, roleHierarchy }) => {
+const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, roleHierarchy, rolesOptions}) => {
     const setToastConfig = Store(state => state.setToastConfig)
     const ref = useRef(null)
     const [inviteEmail, setInviteEmail] = useState()
-    const [inviteRole, setInviteRole] = useState('GUEST')
-
-    const rolesOptions = [
-        {label: 'Guest', value: 'GUEST'},
-        {label: 'Admin', value: 'ADMIN'},
-        {label: 'Security engineer', value: 'MEMBER'},
-        {label: 'Developer', value: 'DEVELOPER'},
-    ]
+    const [inviteRole, setInviteRole] = useState('MEMBER')
 
     const handleRoleSelectChange = useCallback(
         (value) => {
@@ -63,7 +56,12 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
         func.copyToClipboard(inviteUser.inviteLink, ref, "Invitation link copied to clipboard")
     }
 
-    const filteredRoleOptions = rolesOptions.filter((c) => roleHierarchy.includes(c.value))
+    const filteredRoleOptions = rolesOptions[0].items.map((c) => {
+        return{
+            label: c?.content,
+            value: c?.role,
+        }
+    }).filter((c) => roleHierarchy.includes(c.value))
     if (inviteUser.state !== "success") {
         return (
             <Modal
