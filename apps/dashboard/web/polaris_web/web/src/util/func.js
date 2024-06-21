@@ -1484,6 +1484,10 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return true;
     }
     return false;
+  },
+  checkUserValidForIntegrations(){
+    const userRole = window.USER_ROLE
+    return !(userRole === "GUEST" || userRole === "MEMBER")
   }
 }
 

@@ -25,7 +25,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
 
-        String[] fieldNames = {RBAC.USER_ID};
+        String[] fieldNames = {RBAC.USER_ID, RBAC.ACCOUNT_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
     }
 

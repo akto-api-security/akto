@@ -16,10 +16,8 @@ const Logs = () => {
         logData: []
     })
     const [ loading, setLoading ] = useState(false)
-    const userRole = window.USER_ROLE
-    const disableButton = (userRole === "GUEST" || userRole === "DEVELOPER")
-
     const logGroupSelected = logs.logGroup !== ''
+    const hasAccess = func.checkUserValidForIntegrations()
 
     const logGroupOptions = [
         { label: "Runtime", value: "RUNTIME" },
@@ -55,7 +53,7 @@ const Logs = () => {
     useEffect(() => {
         const startTime = Date.now() - fiveMins
         const endTime = Date.now() 
-        if(!disableButton){
+        if(hasAccess){
             fetchLogsFromDb(startTime, endTime)
         }
     }, [logs.logGroup])
@@ -75,7 +73,7 @@ const Logs = () => {
     const handleRefresh = () => {
         const startTime = Date.now() - fiveMins;
         const endTime = Date.now();
-        if(!disableButton){
+        if(hasAccess){
             fetchLogsFromDb(startTime, endTime, true)
         }
     }
@@ -83,7 +81,7 @@ const Logs = () => {
     const handlePreviousFiveMinutesLogs = () => {
         const startTime = logs.startTime - fiveMins;
         const endTime = logs.startTime;
-        if(!disableButton){
+        if(hasAccess){
             fetchLogsFromDb(startTime, endTime)
         }
     }

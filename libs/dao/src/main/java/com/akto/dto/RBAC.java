@@ -30,6 +30,7 @@ public class RBAC {
 
         Role(String name ,RoleStrategy roleStrategy) {
             this.roleStrategy = roleStrategy;
+            this.name = name;
         }
 
         public Role[] getRoleHierarchy() {
