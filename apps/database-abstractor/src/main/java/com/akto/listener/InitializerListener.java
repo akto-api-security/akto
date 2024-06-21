@@ -170,7 +170,7 @@ public class InitializerListener implements ServletContextListener {
                 }
 
                 if (val.size() == 0) {
-                    continue;
+                    break;
                 }
 
                 SampleData sd = val.get(val.size()-1);
