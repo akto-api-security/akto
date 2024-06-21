@@ -100,7 +100,6 @@ public class AccountSettings {
 
 
     private static final String NEW_STI_UPDATES_ONLY = "newStiUpdatesOnly";
-    private boolean newStiUpdatesOnly;
 
     public AccountSettings() {
     }
@@ -387,13 +386,4 @@ public class AccountSettings {
     public void setAllowRedundantEndpointsList(List<String> allowRedundantEndpointsList) {
         this.allowRedundantEndpointsList = allowRedundantEndpointsList;
     }
-
-    public boolean getNewStiUpdatesOnly() {
-        return newStiUpdatesOnly;
-    }
-
-    public void setNewStiUpdatesOnly(boolean newStiUpdatesOnly) {
-        this.newStiUpdatesOnly = newStiUpdatesOnly;
-    }
-
 }
