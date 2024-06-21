@@ -95,6 +95,7 @@ public class InitializerListener implements ServletContextListener {
             kafkaUtils.initKafkaConsumer();
         }
 
+        logger.info("triggering redact job");
         redactJob();
     }
 
@@ -122,9 +123,13 @@ public class InitializerListener implements ServletContextListener {
         List<SampleData> val = new ArrayList<>();
         boolean first = true;
         SampleData lastSd = null;
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.getMetaAll();
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         for (ApiCollection apiCollection: apiCollections) {
 
+            SampleData sdata = SampleDataDao.instance.findOne(Filters.eq("_id.apiCollectionId", apiCollection.getId()));
+            if (sdata == null) {
+                continue;
+            }
             do {
                 MongoCursor<SampleData> cursor = null;
                 if (first) {
