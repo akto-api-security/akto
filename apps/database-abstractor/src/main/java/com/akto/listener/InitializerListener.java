@@ -125,11 +125,12 @@ public class InitializerListener implements ServletContextListener {
         SampleData lastSd = null;
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         for (ApiCollection apiCollection: apiCollections) {
-
+            logger.info("Starting for apiCollection: " + apiCollection.getId());
             SampleData sdata = SampleDataDao.instance.findOne(Filters.eq("_id.apiCollectionId", apiCollection.getId()));
             if (sdata == null) {
                 continue;
             }
+            logger.info("found sd: " + sdata.getId());
             do {
                 MongoCursor<SampleData> cursor = null;
                 if (first) {
@@ -169,7 +170,7 @@ public class InitializerListener implements ServletContextListener {
                 }
 
                 if (val.size() == 0) {
-                    return;
+                    continue;
                 }
 
                 SampleData sd = val.get(val.size()-1);
