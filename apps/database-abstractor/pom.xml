@@ -42,6 +42,11 @@
             <artifactId>utils</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.akto.apps.mini-runtime</groupId>
+            <artifactId>mini-runtime</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         
         <dependency>
             <groupId>org.apache.struts</groupId>
