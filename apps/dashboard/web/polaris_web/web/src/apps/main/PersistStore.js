@@ -3,6 +3,7 @@ import {devtools, persist, createJSONStorage} from "zustand/middleware"
 
 const initialState = {
     quickstartTasksCompleted: 0,
+    categoryMap: {},
     subCategoryMap: {},
     subCategoryFromSourceConfigMap: {},
     active: '',
@@ -31,6 +32,7 @@ let persistStore = (set) => ({
     accessToken: null,
     storeAccessToken: (accessToken) => set({ accessToken: accessToken }),
     setQuickstartTasksCompleted: (quickstartTasksCompleted) => set({ quickstartTasksCompleted }),
+    setCategoryMap: (categoryMap) => set({ categoryMap }),
     setSubCategoryMap: (subCategoryMap) => set({ subCategoryMap }),
     setSubCategoryFromSourceConfigMap: (subCategoryFromSourceConfigMap) => set({ subCategoryFromSourceConfigMap }),
     setActive: (selected) => set({ active: selected }),

@@ -648,5 +648,12 @@ export default {
                 apiCollectionId: apiInfoKey.apiCollectionId
             }
         })
-    }
+    },
+    async fetchTestConfigsRequired(subCategories){
+        return await request({
+            url: '/api/fetchTestConfigsRequired',
+            method: 'post',
+            data: { subCategories }
+        })
+    },    
 }

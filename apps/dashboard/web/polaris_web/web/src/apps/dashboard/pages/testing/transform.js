@@ -594,8 +594,13 @@ const transform = {
     resp.testSourceConfigs.forEach((x_1) => {
       subCategoryFromSourceConfigMap[x_1.id] = x_1;
     });
+    let categoryMap = {};
+    resp.categories.forEach((category) => {
+      categoryMap[category.name] = category;
+    });
     PersistStore.getState().setSubCategoryMap(subCategoryMap);
     PersistStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap);
+    PersistStore.getState().setCategoryMap(categoryMap);
   },
   prettifySummaryTable(summaries) {
     summaries = summaries.map((obj) => {

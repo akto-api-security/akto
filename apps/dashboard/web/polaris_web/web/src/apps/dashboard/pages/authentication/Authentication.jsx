@@ -149,7 +149,9 @@ function ItemGroupCard({ cardObj }) {
     const selectedItemsCount = cardObj.selectedCtr || 0
     const itemsCount = cardObj[cardObj?.itemsListFieldName]?.length || 0
     const itemsResourceName = cardObj?.itemsResourceName
-    const itemGroupName = cardObj?.name
+    
+    const itemGroupNameField = cardObj?.itemGroupNameField || "name"
+    const itemGroupName = cardObj[itemGroupNameField] || ""
 
     return (
         <div onClick={() => cardObj.onSelect()}>
@@ -159,8 +161,11 @@ function ItemGroupCard({ cardObj }) {
                         <Text variant="headingSm">{itemGroupName}</Text>
                         <Checkbox checked={selectedItemsCount >= 1} />
                     </HorizontalStack>
-                    <Box width="50%">
-                        <Badge size="small">{selectedItemsCount} of {itemsCount} {itemsCount == 1 ? itemsResourceName.singular : itemsResourceName.plural} selected</Badge>
+                    <Box width="80%">
+                        <HorizontalStack align="space-between">
+                            <Badge size="small">{selectedItemsCount} of {itemsCount} {itemsCount == 1 ? itemsResourceName.singular : itemsResourceName.plural} selected</Badge>
+                            {cardObj.additionalCardBadge || null}
+                        </HorizontalStack>
                     </Box>
                 </VerticalStack>
             </Card>
@@ -173,16 +178,29 @@ function MultipleItemsSelector({ itemGroups, selectedItems, setSelectedItems, it
     const [showGroupItems, setShowGroupItems] = useState(false)
     const [currentItemGroup, setCurrentItemGroup] = useState(null)
 
-    itemGroups = itemGroups.map(itemGroup => {
-        return {
-            ...itemGroup,
-            onSelect: () => {
-                setShowGroupItems(true)
-                setCurrentItemGroup(itemGroup)
-            },
-            itemsListFieldName: itemsListFieldName,
-            itemsResourceName: itemsResourceName
+    itemGroups.forEach(itemGroup => {
+
+        itemGroup.onSelect = () => {
+            setShowGroupItems(true)
+            setCurrentItemGroup(itemGroup)
         }
+        itemGroup.itemsListFieldName = itemsListFieldName
+        itemGroup.itemsResourceName = itemsResourceName
+
+        let selectedCtr = 0
+
+        itemGroup[itemsListFieldName].forEach(item => {
+            const id = item.id
+            const processedItemId = processItemId !== undefined ? processItemId(id) : id
+
+            if (selectedItems.includes(processedItemId)) {
+                item.selected = true
+                selectedCtr += 1
+            } else {
+                item.selected = false
+            }
+        })
+        itemGroup.selectedCtr = selectedCtr
     })
 
     const handleClose = () => {
@@ -191,23 +209,22 @@ function MultipleItemsSelector({ itemGroups, selectedItems, setSelectedItems, it
 
     const itemGroupTitle = currentItemGroup ?
         <HorizontalStack gap="2">
-            <Text variant="headingSm">{currentItemGroup.name}</Text>
+            <Text variant="headingSm">{currentItemGroup[currentItemGroup.itemGroupNameField || "name"]}</Text>
             <Badge size="small">
                 {currentItemGroup[itemsListFieldName]?.length} {currentItemGroup[itemsListFieldName]?.length === 1 ? itemsResourceName.singular : itemsResourceName.plural}
             </Badge>
+            {currentItemGroup.additionalCardBadge || null}
         </HorizontalStack> : null
 
     const promotedBulkActions = (selectedResources) => {
         let ret = []
         ret.push(
             {
-                content: 'Confirm APIs selection',
+                content: `Confirm ${itemsResourceName.plural} selection`,
                 onAction: () => {
                     const updatedSelectedItems = [...selectedItems]
 
                     selectedResources.forEach(id => {
-                        const idParts = id.split("###")
-                        const idWithoutRandomStr = idParts.slice(0, 3).join("###");
                         const processedItemId = processItemId !== undefined ? processItemId(id) : id
                         if (!updatedSelectedItems.includes(processedItemId)) {
                             updatedSelectedItems.push(processedItemId)
@@ -269,29 +286,36 @@ function AuthenticationSetup() {
         "POST###http://sampl-aktol-1exannwybqov-67928726.ap-south-1.elb.amazonaws.com/api/college/account/recover###1111111111"
     ]
 
-    const allCollections = PersistStore(state => state.allCollections);
+    const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const [selectedApis, setSelectedApis] = useState(tmpSelected)
     const [authenticationApiGroups, setAuthenticationApiGroups] = useState([])
+    
+    const categoryMap = PersistStore(state => state.categoryMap)
+    const subCategoryMap = PersistStore(state => state.subCategoryMap)
+    const [selectedSubCategories, setSelectedSubCategories] = useState([])
+    const [authenticationTestCategories, setAuthenticationTestCategories] = useState([])
 
-    authenticationApiGroups.forEach(apiGroup => {
-        let selectedCtr = 0
+    // authenticationApiGroups.forEach(apiGroup => {
+    //     let selectedCtr = 0
 
-        apiGroup.apis.forEach(api => {
-            const id = api.id
-            const idParts = id.split("###")
-            const idWithoutRandomStr = idParts.slice(0, 3).join("###");
+    //     apiGroup.apis.forEach(api => {
+    //         const id = api.id
+    //         const idParts = id.split("###")
+    //         const idWithoutRandomStr = idParts.slice(0, 3).join("###");
 
-            if (selectedApis.includes(idWithoutRandomStr)) {
-                api.selected = true
-                selectedCtr += 1
-            } else {
-                api.selected = false
-            }
-        })
+    //         if (selectedApis.includes(idWithoutRandomStr)) {
+    //             api.selected = true
+    //             selectedCtr += 1
+    //         } else {
+    //             api.selected = false
+    //         }
+    //     })
 
-        apiGroup.selectedCtr = selectedCtr
-    })
+    //     apiGroup.selectedCtr = selectedCtr
+    // })
+
+
 
 
 
@@ -308,7 +332,55 @@ function AuthenticationSetup() {
             authenticationApiGroup.apis = transform.prettifyEndpointsData(mergeApiInfoAndApiCollectionResult)
         }
 
+
         setAuthenticationApiGroups(authenticationApiGroupsCopy)
+
+        const subCategoryMapCopy = { ...subCategoryMap }
+        let authenticationTestCategoriesCopy = { ...categoryMap }
+        // Initialize sub categories
+        Object.values(authenticationTestCategoriesCopy).forEach(category => {
+            category.itemGroupNameField = "shortName"
+            category.subCategories = []
+        })
+
+        // Add sub categories to categories
+        Object.values(subCategoryMapCopy).forEach(subCategory => {
+            const category = authenticationTestCategoriesCopy[subCategory.superCategory.name]
+            
+            subCategory.id = subCategory.name
+            category.subCategories.push(subCategory)
+        })
+
+        // Add missing configs to sub categories
+        const subCategories = []
+        Object.values(authenticationTestCategoriesCopy).forEach(category => {
+            category.subCategories.forEach(subCategory => {
+                subCategories.push(subCategory.name)
+            })
+        })
+
+        const fetchTestConfigsRequired = await api.fetchTestConfigsRequired(subCategories)
+        const subCategoryVsMissingConfigsMap = fetchTestConfigsRequired?.subCategoryVsMissingConfigsMap || {}
+        Object.values(authenticationTestCategoriesCopy).forEach(category => {
+            let categorySubCategoriesRequireConfigs = false
+            category.subCategories.forEach(subCategory => {
+                subCategory.missingConfigs = subCategoryVsMissingConfigsMap[subCategory.name] || []
+
+                if (subCategory.missingConfigs.length > 0) {
+                    categorySubCategoriesRequireConfigs = true
+                }
+            })
+
+            if (categorySubCategoriesRequireConfigs) {
+                category.additionalCardBadge = <Badge size="small" status="warning">Config needed</Badge>
+            } 
+        })
+
+
+        authenticationTestCategoriesCopy = Object.values(authenticationTestCategoriesCopy)
+        setAuthenticationTestCategories(authenticationTestCategoriesCopy)
+
+        console.log(authenticationTestCategoriesCopy)
     }
 
     useEffect(() => {
@@ -332,6 +404,20 @@ function AuthenticationSetup() {
         {
             title: "Collection",
             value: "apiCollectionName",
+            type: CellType.TEXT,
+        }
+    ]
+
+    // Sub Categories Selector
+    const subCategoriesSelectorResourceName = {
+        singular: 'test',
+        plural: 'tests',
+    };
+
+    const subCategoriesSelectorTableHeaders = [
+        {
+            title: "Tests",
+            value: "testName",
             type: CellType.TEXT,
         }
     ]
@@ -363,7 +449,16 @@ function AuthenticationSetup() {
             ]
         }, 
         {
-            title: "Select Tests"
+            title: "Select Tests",
+            pageComponent: 
+                (<MultipleItemsSelector
+                    itemGroups={authenticationTestCategories}
+                    selectedItems={selectedSubCategories}
+                    setSelectedItems={setSelectedSubCategories}
+                    itemsResourceName={subCategoriesSelectorResourceName}
+                    itemsListFieldName="subCategories"
+                    itemsTableHeaders={subCategoriesSelectorTableHeaders}
+                />),
         },
         {
             title: "Set configurations"
@@ -376,8 +471,8 @@ function AuthenticationSetup() {
 
             <div style={{display: "flex", justifyContent: "center", alignItems: "center", height: "100px"}}>
                 <HorizontalStack>
-                <Button>heelo</Button>
-                <Button>heelo</Button>
+                <Button>Setup APIs</Button>
+                <Button>Setup Tests</Button>
 
                 </HorizontalStack>
             </div>
@@ -403,11 +498,15 @@ function AuthenticationSetup() {
                 }}
             /> */}
 
-            {authenticationScreenPages[authenticationScreenState.currentPageIndex].pageComponent}
+            {/* {authenticationScreenPages[authenticationScreenState.currentPageIndex].pageComponent} */}
+            {authenticationScreenPages[1].pageComponent}
 
             <Divider />
             <Box minHeight="76px">
-                <Button>hello</Button>
+                <HorizontalStack>
+                    <Button>Previous</Button>
+                    <Button>Next</Button>
+                </HorizontalStack>
             </Box>
         </LegacyCard>
     )
