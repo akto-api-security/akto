@@ -51,7 +51,7 @@ const Users = () => {
             {
                 content: 'Security Engineer',
                 role: 'MEMBER',
-            }, {...paidFeatureRoleOptions}]
+            }, ...paidFeatureRoleOptions]
         },
         {
             items: [{
