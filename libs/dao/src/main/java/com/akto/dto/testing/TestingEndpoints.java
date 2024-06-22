@@ -76,6 +76,8 @@ public abstract class TestingEndpoints {
                 case METHOD:
                     condition = new MethodCondition(operator, Method.valueOf(data.getString("method")));
                     break;
+                case REGEX:
+                    condition = new RegexTestingEndpoints(operator, data.getString("regex"));
                 default:
                     break;
             }

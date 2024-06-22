@@ -1227,8 +1227,8 @@ mapCollectionIdToHostName(apiCollections){
     }
   },
 
-  getSensitiveIcons(data){
-    const key = data.toUpperCase();
+  getSensitiveIcons(data) {
+    const key = data.toUpperCase().replace(/ /g, '_');
     switch (key) {
         case "DATABASE":
           return DynamicSourceMinor;
@@ -1244,41 +1244,41 @@ mapCollectionIdToHostName(apiCollections){
           return KeyMajor;
         case "EMAIL":
           return InviteMinor;
-        case "CREDIT CARD":
+        case "CREDIT_CARD":
           return CreditCardMajor;
         case "SSN":
           return IdentityCardMajor;
         case "ADDRESS":
           return LocationsMinor;
-        case "IP ADDRESS":
+        case "IP_ADDRESS":
           return LocationsMinor;
-        case "PHONE NUMBER":
+        case "PHONE_NUMBER":
           return PhoneMajor;
         case "UUID":
           return IdentityCardMajor;
-        case "DATA FILE":
+        case "DATA_FILE":
           return FileMinor;
         case "IMAGE":
           return ImageMajor;
-        case "US ADDRESS":
-          return LocationsMinor
-        case "IBAN EUROPE":
+        case "US_ADDRESS":
+          return LocationsMinor;
+        case "IBAN_EUROPE":
           return BankMajor;
-        case "JAPANESE SOCIAL INSURANCE NUMBER":
+        case "JAPANESE_SOCIAL_INSURANCE_NUMBER":
           return HashtagMinor;
-        case "GERMAN INSURANCE IDENTITY NUMBER":
+        case "GERMAN_INSURANCE_IDENTITY_NUMBER":
           return IdentityCardMajor;
-        case "CANADIAN SOCIAL IDENTITY NUMBER":
+        case "CANADIAN_SOCIAL_IDENTITY_NUMBER":
           return IdentityCardMajor;
-        case "FINNISH PERSONAL IDENTITY NUMBER":
+        case "FINNISH_PERSONAL_IDENTITY_NUMBER":
           return IdentityCardMajor;
-        case "UK NATIONAL INSURANCE NUMBER":
+        case "UK_NATIONAL_INSURANCE_NUMBER":
           return HashtagMinor;
-        case "INDIAN UNIQUE HEALTH IDENTIFICATION":
+        case "INDIAN_UNIQUE_HEALTH_IDENTIFICATION":
           return IdentityCardMajor;
-        case "US MEDICARE HEALTH INSURANCE CLAIM NUMBER":
+        case "US_MEDICARE_HEALTH_INSURANCE_CLAIM_NUMBER":
           return HashtagMinor;
-        case "PAN CARD":
+        case "PAN_CARD":
           return IdentityCardMajor;
         case "ENCRYPT":
           return LockMinor;
@@ -1307,9 +1307,9 @@ mapCollectionIdToHostName(apiCollections){
         case "DOB":
           return CalendarMinor;
         case "BIRTH":
-          return CalendarTimeMinor
+          return CalendarTimeMinor;
         default: 
-            return KeyMajor;
+          return KeyMajor;
     }
   },
   getCollectionFilters(filters) {
@@ -1431,7 +1431,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       const tabId = this.getKeyFromName(tab)
       return {
           content: tab,
-          badge: selectedTab === tabId ? currentCount.toString() : countObj[tabId].toString(),
+          badge: selectedTab === (tabId && currentCount !==0) ? currentCount.toString() : countObj[tabId].toString(),
           onAction: () => { setSelectedTab(tabId) },
           id: this.getKeyFromName(tabId),
           index: ind 

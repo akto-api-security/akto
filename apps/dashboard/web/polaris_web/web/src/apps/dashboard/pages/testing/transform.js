@@ -80,7 +80,7 @@ function getTestingRunType(testingRun, testingRunResultSummary, cicd) {
   if (testingRunResultSummary.metadata != null || cicd) {
     return 'CI/CD';
   }
-  if (testingRun.scheduleTimestamp >= func.timeNow() && testingRun.scheduleTimestamp < func.timeNow() + 86400) {
+  if (testingRun.state === "SCHEDULED" && testingRun.periodInSeconds !== 0) {
     return 'Recurring';
   }
   return 'One-time'
@@ -686,14 +686,14 @@ convertSubIntoSubcategory(resp){
       obj[objectKey] = {
         text: resp[key],
         color: func.getColorForCharts(key),
-        filterkey: objectKeyName
+        filterKey: objectKeyName
       }
       countObj.HIGH+=resp[key]
     }else{
       obj[objectKey] = {
         text: resp[key],
         color: func.getColorForCharts(subCategoryMap[key].superCategory.name),
-        filterkey: objectKeyName
+        filterKey: objectKeyName
       }
       countObj[subCategoryMap[key].superCategory.severity._name]+=resp[key]
     }
