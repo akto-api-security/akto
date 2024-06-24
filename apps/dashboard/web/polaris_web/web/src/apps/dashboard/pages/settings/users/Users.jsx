@@ -64,7 +64,7 @@ const Users = () => {
     ]
 
     const getRoleHierarchy = async() => {
-        const roleHierarchyResp = await settingRequests.getRoleHierarchy(window.USER_ROLE)
+        const roleHierarchyResp = await settingRequests.getRoleHierarchy(window?.USER_ROLE || "GUEST")
         setRoleHierarchy(roleHierarchyResp)
     }
 
