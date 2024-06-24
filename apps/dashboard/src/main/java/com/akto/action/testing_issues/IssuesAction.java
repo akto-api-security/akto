@@ -2,6 +2,7 @@ package com.akto.action.testing_issues;
 
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
+import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -9,6 +10,7 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
@@ -167,6 +169,9 @@ public class IssuesAction extends UserAction {
         if (issueId == null) {
             throw new IllegalStateException();
         }
+
+        Role currentUserRole = RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get());
+
         TestingRunIssues issue = TestingRunIssuesDao.instance.findOne(Filters.eq(ID, issueId));
         String testSubType = null;
         // ?? enum stored in db
@@ -182,7 +187,7 @@ public class IssuesAction extends UserAction {
                 Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey())
         );
         testingRunResult = TestingRunResultDao.instance.findOne(filterForRunResult);
-        if (issue.isUnread()) {
+        if (issue.isUnread() && (currentUserRole.equals(Role.ADMIN) || currentUserRole.equals(Role.MEMBER))) {
             logger.info("Issue id from db to be marked as read " + issueId);
             Bson update = Updates.combine(Updates.set(TestingRunIssues.UNREAD, false),
                     Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
