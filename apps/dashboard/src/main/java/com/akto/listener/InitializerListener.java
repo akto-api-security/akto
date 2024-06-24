@@ -1227,7 +1227,7 @@ public class InitializerListener implements ServletContextListener {
     public static void createAutomatedAPIGroups(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getAutomatedApiGroups() == 0) {
             // Fetch automated API groups csv records
-            List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups(false);
+            List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups();
 
             if (apiGroupRecords != null) {
                 AutomatedApiGroupsUtils.processAutomatedGroups(apiGroupRecords);
@@ -2483,7 +2483,7 @@ public class InitializerListener implements ServletContextListener {
         return files;
     }
 
-    private static String convertStreamToString(InputStream in) throws Exception {
+    public static String convertStreamToString(InputStream in) throws Exception {
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(in));
         StringBuilder stringbuilder = new StringBuilder();
@@ -2596,7 +2596,7 @@ public class InitializerListener implements ServletContextListener {
                 loggerMaker.infoAndAddToDb("Cron for updating automated API groups picked up.", LogDb.DASHBOARD);
 
                 // Fetch automated API groups csv records
-                List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups(true);
+                List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups();
 
                 if (apiGroupRecords == null) {
                     return;
