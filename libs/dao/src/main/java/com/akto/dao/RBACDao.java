@@ -1,11 +1,33 @@
 package com.akto.dao;
 
 
+import org.bson.conversions.Bson;
+
+import com.akto.dao.context.Context;
 import com.akto.dto.RBAC;
+import com.akto.dto.RBAC.Role;
 import com.mongodb.client.model.Filters;
 
 public class RBACDao extends CommonContextDao<RBAC> {
     public static final RBACDao instance = new RBACDao();
+
+    public void createIndicesIfAbsent() {
+
+        boolean exists = false;
+        for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
+            if (getCollName().equalsIgnoreCase(col)){
+                exists = true;
+                break;
+            }
+        };
+
+        if (!exists) {
+            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
+        }
+
+        String[] fieldNames = {RBAC.USER_ID, RBAC.ACCOUNT_ID};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+    }
 
     public boolean isAdmin(int userId, int accountId) {
         RBAC rbac = RBACDao.instance.findOne(
@@ -25,6 +47,19 @@ public class RBACDao extends CommonContextDao<RBAC> {
             rbac.setAccountId(1_000_000);
         }
         return rbac != null && rbac.getAccountId() == accountId;
+    }
+
+    public static Role getCurrentRoleForUser(int userId, int accountId){
+        Bson filterRbac = Filters.and(
+            Filters.eq(RBAC.USER_ID, userId),
+            Filters.eq(RBAC.ACCOUNT_ID, accountId));
+
+        RBAC userRbac = RBACDao.instance.findOne(filterRbac);
+        if(userRbac != null){
+            return userRbac.getRole();
+        }else{
+            return null;
+        }
     }
 
     @Override
