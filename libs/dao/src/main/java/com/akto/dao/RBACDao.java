@@ -58,7 +58,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
         if(userRbac != null){
             return userRbac.getRole();
         }else{
-            return null;
+            return Role.MEMBER;
         }
     }
 
