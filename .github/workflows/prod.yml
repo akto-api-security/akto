@@ -34,6 +34,7 @@ jobs:
           wget -O general.json https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json
           wget -O fintech.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json
           wget -O filetypes.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json
+          wget -O automated_api_groups.csv https://raw.githubusercontent.com/akto-api-security/akto/master/automated-api-groups/automated-api-groups.csv
 
       - name: Prepare Dashboard polaris UI
         working-directory: ./apps/dashboard/web/polaris_web
