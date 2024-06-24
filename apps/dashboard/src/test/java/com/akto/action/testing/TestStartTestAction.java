@@ -4,7 +4,6 @@ import com.akto.MongoBasedTest;
 import com.akto.action.ApiTokenAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiTokensDao;
-import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
@@ -13,11 +12,9 @@ import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiToken;
-import com.akto.dto.RBAC;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
 import com.akto.dto.ApiToken.Utility;
-import com.akto.dto.RBAC.Role;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
@@ -172,17 +169,10 @@ public class TestStartTestAction extends MongoBasedTest {
         accountAccessMap.put(ACCOUNT_ID+"", userAccountEntry);
         
         User user = new User();
-        String login="test@akto.io";
-        user.setLogin(login);
+        user.setLogin("test@akto.io");
         user.setAccounts(accountAccessMap);
 
         UsersDao.instance.insertOne(user);
-
-        user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, login));
-
-        RBAC rbac = new RBAC(user.getId(), Role.ADMIN, ACCOUNT_ID);
-        RBACDao.instance.insertOne(rbac);
-
         AccountSettings acc = new AccountSettings();
         acc.setDashboardVersion("test - test - test");
         acc.setId(ACCOUNT_ID);
