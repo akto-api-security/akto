@@ -322,8 +322,9 @@ public final class FilterAction {
 
         } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
             matchingKeys = filterActionRequest.getMatchingKeySet();
+            StringBuilder validationReason = new StringBuilder();
             // if concerned prop for_all, all values should satisfy
-            valueExists(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeys, filterActionRequest.getKeyValOperandSeen(), matchingValueKeySet, doAllSatisfy);
+            valueExists(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeys, filterActionRequest.getKeyValOperandSeen(), matchingValueKeySet, doAllSatisfy, validationReason);
             Boolean filterResp = matchingValueKeySet.size() > 0;
             if (allShouldSatisfy) {
                 filterResp = filterResp && doAllSatisfy;
@@ -332,7 +333,11 @@ public final class FilterAction {
             //     int keyCount = getKeyCount(payloadObj, null);
             //     filterResp = matchingKeySet.size() == keyCount;
             // }
-            return new DataOperandsFilterResponse(filterResp, matchingValueKeySet, null, null);
+            if (filterResp) {
+                return new DataOperandsFilterResponse(true, matchingValueKeySet, null, null);
+            } else {
+                return new DataOperandsFilterResponse(false, matchingValueKeySet, null, null, validationReason.toString());
+            }
         } else if (filterActionRequest.getConcernedSubProperty() == null) {
             Object val = payload;
 
@@ -888,7 +893,7 @@ public final class FilterAction {
         return doAllSatisfy;
     }
 
-    public void valueExists(Object obj, String parentKey, Object querySet, String operand, List<String> matchingKeys, Boolean keyOperandSeen, List<String> matchingValueKeySet, boolean doAllSatisfy) {
+    public void valueExists(Object obj, String parentKey, Object querySet, String operand, List<String> matchingKeys, Boolean keyOperandSeen, List<String> matchingValueKeySet, boolean doAllSatisfy, StringBuilder validationReason) {
         Boolean res = false;
         if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
@@ -900,20 +905,23 @@ public final class FilterAction {
                     continue;
                 }
                 Object value = basicDBObject.get(key);
-                valueExists(value, key, querySet, operand, matchingKeys, keyOperandSeen, matchingValueKeySet, doAllSatisfy);
+                valueExists(value, key, querySet, operand, matchingKeys, keyOperandSeen, matchingValueKeySet, doAllSatisfy, validationReason);
             }
         } else if (obj instanceof BasicDBList) {
             for(Object elem: (BasicDBList) obj) {
-                valueExists(elem, parentKey, querySet, operand, matchingKeys, keyOperandSeen, matchingValueKeySet, doAllSatisfy);
+                valueExists(elem, parentKey, querySet, operand, matchingKeys, keyOperandSeen, matchingValueKeySet, doAllSatisfy, validationReason);
             }
         } else {
             if (keyOperandSeen && matchingKeys != null && !matchingKeys.contains(parentKey)) {
                 return;
             }
             DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(obj, querySet, operand);
-            res = invokeFilter(dataOperandFilterRequest);
+            ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
+            res = validationResult.getIsValid();
             if (res) {
                 matchingValueKeySet.add(parentKey);
+            } else {
+                validationReason.append("\n").append("querySet:").append(querySet).append(" - ").append(validationResult.getValidationReason());
             }
             doAllSatisfy = Utils.evaluateResult("and", doAllSatisfy, res);
         }
@@ -1102,19 +1110,27 @@ public final class FilterAction {
     public DataOperandsFilterResponse evaluatePrivateVariables(FilterActionRequest filterActionRequest) {
 
         List<BasicDBObject> privateValues = new ArrayList<>();
+        StringBuilder vulnerabilityReasonString = null;
         if (filterActionRequest.getOperand().equalsIgnoreCase(TestEditorEnums.DataOperands.REGEX.toString())) {
             if (filterActionRequest.getContextEntities() == null) {
                 return new DataOperandsFilterResponse(false, null, filterActionRequest.getContextEntities(), null);
             } else {
                 for (BasicDBObject obj: filterActionRequest.getContextEntities()) {
                     DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(obj.get("value"), filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-                    Boolean res = invokeFilter(dataOperandFilterRequest);
+                    ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
+                    boolean res = validationResult.getIsValid();
                     if (res) {
                         privateValues.add(obj);
                         break;
+                    } else {
+                        vulnerabilityReasonString.append("\n").append(validationResult.getValidationReason());
                     }
                 }
-                return new DataOperandsFilterResponse(privateValues.size() > 0, null, privateValues, null);
+                if (privateValues.size() > 0) {
+                    return new DataOperandsFilterResponse(true, null, privateValues, null);
+                } else {
+                    return new DataOperandsFilterResponse(false, null, privateValues, null, vulnerabilityReasonString.toString());
+                }
             }
         }
 

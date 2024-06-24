@@ -17,7 +17,7 @@ public class LesserThanEqFilter extends DataOperandsImpl {
         if (result) {
             validationReson = "Less than eq filter passed";
         } else {
-            validationReson = "Less than eq filter failed: data -"+ data +", querySet" + querySet;
+            validationReson = "Less than eq filter failed: data:- "+ data +", querySet:- " + querySet;
         }
 
         return new ValidationResult(result, validationReson);

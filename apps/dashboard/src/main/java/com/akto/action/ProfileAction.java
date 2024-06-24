@@ -131,7 +131,7 @@ public class ProfileAction extends UserAction {
                 .append("cloudType", Utils.getCloudType())
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name())
-                .append("jiraIntegrated", jiraIntegrated);;
+                .append("jiraIntegrated", jiraIntegrated);
 
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));

@@ -28,8 +28,12 @@ public class Filter {
     public Filter() {
         this.filterAction = new FilterAction();
     }
-    
     public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, List<BasicDBObject> contextEntities, boolean keyValOperandSeen, String context, Map<String, Object> varMap, String logId, boolean skipExtractExecution) {
+        StringBuilder stringBuilder = new StringBuilder();
+        return isEndpointValid(node, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOperandSeen, context, varMap, logId,skipExtractExecution, stringBuilder);
+    }
+    
+    public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, List<BasicDBObject> contextEntities, boolean keyValOperandSeen, String context, Map<String, Object> varMap, String logId, boolean skipExtractExecution, StringBuilder validationReason) {
 
         List<FilterNode> childNodes = node.getChildNodes();
         if (node.getNodeType().equalsIgnoreCase(OperandTypes.Term.toString()) || node.getNodeType().equalsIgnoreCase(OperandTypes.Collection.toString())) {
@@ -97,7 +101,11 @@ public class Filter {
             if (node.getNodeType().equalsIgnoreCase(TestEditorEnums.OperandTypes.Collection.toString()) && i == 0) {
                 skipExecutingExtractNode = (firstExtractNode == null);
             }
-            dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId, skipExecutingExtractNode);
+            dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId, skipExecutingExtractNode, validationReason);
+            if (!dataOperandsFilterResponse.getResult()) {
+                validationReason.append("\n").append(dataOperandsFilterResponse.getValidationReason());
+            }
+
             // if (!dataOperandsFilterResponse.getResult()) {
             //     loggerMaker.infoAndAddToDb("invalid node condition " + logId + " operand " + childNode.getOperand() + 
             //     " concernedProperty " + childNode.getConcernedProperty() + " subConcernedProperty " + childNode.getSubConcernedProperty()
@@ -119,11 +127,14 @@ public class Filter {
         }
 
         if (node.getNodeType().equalsIgnoreCase(TestEditorEnums.OperandTypes.Collection.toString()) && firstExtractNode != null && result) {
-            DataOperandsFilterResponse resp = isEndpointValid(firstExtractNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId, false);
+            DataOperandsFilterResponse resp = isEndpointValid(firstExtractNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId, false, validationReason);
+            if (!resp.getResult()) {
+                validationReason.append("\n").append(resp.getValidationReason());
+            }
             result = result && resp.getResult();
         }
 
-        return new DataOperandsFilterResponse(result, matchingKeySet, contextEntities, firstExtractNode);
+        return new DataOperandsFilterResponse(result, matchingKeySet, contextEntities, firstExtractNode, validationReason.toString());
 
     }
 

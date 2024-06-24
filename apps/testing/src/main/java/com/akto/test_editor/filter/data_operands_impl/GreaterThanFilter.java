@@ -15,7 +15,7 @@ public class GreaterThanFilter extends DataOperandsImpl {
         if (result) {
             validationReson = "Greater than filter passed";
         } else {
-            validationReson = "Greater than filter failed: data -"+ data +", querySet" + querySet;
+            validationReson = "Greater than filter failed: data :- "+ data +", querySet:- " + querySet;
         }
 
         return new ValidationResult(result, validationReson);

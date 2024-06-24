@@ -9,6 +9,7 @@ import com.akto.dto.test_editor.Strategy;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.test_editor.execution.Memory;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 
 import java.util.Collections;
 import java.util.ArrayList;
@@ -57,7 +58,7 @@ public abstract class SecurityTestTemplate {
         return new YamlTestResult(testResults, null);
     }
 
-    public abstract boolean filter();
+    public abstract ValidationResult filter();
 
     public abstract Set<String> requireConfig();
 
@@ -78,9 +79,10 @@ public abstract class SecurityTestTemplate {
             return getResultWithError(missingConfigs + " " + ROLE_NOT_FOUND.getMessage(), true);
         }
         
-        boolean valid = filter();
+        ValidationResult validationResult = filter();
+        boolean valid = validationResult.getIsValid();
         if (!valid) {
-            return getResultWithError(SKIPPING_EXECUTION_BECAUSE_FILTERS.getMessage(), false);
+            return getResultWithError(SKIPPING_EXECUTION_BECAUSE_FILTERS.getMessage() + "\n" + validationResult.getValidationReason(), false);
         }
         valid = checkAuthBeforeExecution(debug, testLogs);
         if (!valid) {
