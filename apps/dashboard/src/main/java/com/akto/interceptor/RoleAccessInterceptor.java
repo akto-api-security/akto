@@ -47,7 +47,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
         }
         Organization organization = OrganizationsDao.instance.findOne(Filters.in(Organization.ACCOUNTS, accountId));
         if(organization == null || organization.getFeatureWiseAllowed() == null || organization.getFeatureWiseAllowed().isEmpty()){
-            return false;
+            return true;
         }
 
         HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
