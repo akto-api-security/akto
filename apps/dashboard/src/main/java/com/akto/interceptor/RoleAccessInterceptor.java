@@ -77,16 +77,15 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
             int userId = user.getId();
 
-            String userRole = RBACDao.instance.findOne(Filters.eq(USER_ID, userId)).getRole().name().toUpperCase();
+            Role userRoleRecord = RBACDao.getCurrentRoleForUser(userId, sessionAccId);
+            String userRole = userRoleRecord != null ? userRoleRecord.getName().toUpperCase() : "";
 
             if(userRole == null || userRole.isEmpty()) {
                 throw new Exception("User role not found");
             }
-
-            Role userRoleType = Role.valueOf(userRole.toUpperCase());
             Feature featureType = Feature.valueOf(this.featureLabel.toUpperCase());
 
-            ReadWriteAccess accessGiven = userRoleType.getReadWriteAccessForFeature(featureType);
+            ReadWriteAccess accessGiven = userRoleRecord.getReadWriteAccessForFeature(featureType);
             boolean hasRequiredAccess = false;
 
             if(this.accessType.equalsIgnoreCase(ReadWriteAccess.READ.toString()) || this.accessType.equalsIgnoreCase(accessGiven.toString())){
@@ -94,7 +93,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             }
             
             if(!hasRequiredAccess) {
-                ((ActionSupport) invocation.getAction()).addActionError("The role '" + userRoleType.getName() + "' does not have access.");
+                ((ActionSupport) invocation.getAction()).addActionError("The role '" + userRole + "' does not have access.");
                 return FORBIDDEN;
             }
         } catch(Exception e) {
