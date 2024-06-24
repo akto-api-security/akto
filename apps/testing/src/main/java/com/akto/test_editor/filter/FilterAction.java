@@ -545,6 +545,7 @@ public final class FilterAction {
         // result && res if concerned prop for_all
         // remove not contains logic 
 
+        StringBuilder validationErrorString = new StringBuilder();
         String operation = "or";
         if (filterActionRequest.getCollectionProperty() != null && filterActionRequest.getCollectionProperty().equalsIgnoreCase(CollectionOperands.FOR_ALL.toString())) {
             operation = "and";
@@ -555,9 +556,12 @@ public final class FilterAction {
             for (String key: headers.keySet()) {
 
                 DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(key, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-                res = invokeFilter(dataOperandFilterRequest);
-                if (res) {
+                ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
+                res = validationResult.getIsValid();
+                if (validationResult.getIsValid()) {
                     newMatchingKeys.add(key);
+                } else {
+                    validationErrorString.append("\n header-key:").append(key).append(": ").append(validationResult.getValidationReason());
                 }
                 
                 if (!res && (key.equals("cookie") || key.equals("set-cookie"))) {
@@ -565,11 +569,14 @@ public final class FilterAction {
                     Map<String,String> cookieMap = AuthPolicy.parseCookie(cookieList);
                     for (String cookieKey : cookieMap.keySet()) {
                         dataOperandFilterRequest = new DataOperandFilterRequest(cookieKey, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-                        res = invokeFilter(dataOperandFilterRequest);
+                        validationResult = invokeFilter(dataOperandFilterRequest);
+                        res = validationResult.getIsValid();
                         if (res) {
                             newMatchingKeys.add(cookieKey);
                             result = Utils.evaluateResult(operation, result, res);
                             break;
+                        } else {
+                            validationErrorString.append("\n header-cookie-key:").append(cookieKey).append(": ").append(validationResult.getValidationReason());
                         }
                     }
                 }
@@ -581,7 +588,7 @@ public final class FilterAction {
             //     newMatchingKeys = new ArrayList<>();
             // }
 
-            return new DataOperandsFilterResponse(result, newMatchingKeys, null, null);
+            return new DataOperandsFilterResponse(result, newMatchingKeys, null, null, validationErrorString.toString());
         } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
             
             for (String key: headers.keySet()) {
@@ -590,10 +597,13 @@ public final class FilterAction {
                 }
                 for (String val: headers.get(key)) {
                     DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(val, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-                    res = invokeFilter(dataOperandFilterRequest);
+                    ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
+                    res = validationResult.getIsValid();
                     if (res) {
                         matchingValueKeySet.add(key);
                         break;
+                    } else {
+                        validationErrorString.append("\n header-value:").append(val).append(": ").append(validationResult.getValidationReason());
                     }
                 }
 
@@ -602,11 +612,14 @@ public final class FilterAction {
                     Map<String,String> cookieMap = AuthPolicy.parseCookie(cookieList);
                     for (String cookieKey : cookieMap.keySet()) {
                         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(cookieMap.get(cookieKey), filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-                        res = invokeFilter(dataOperandFilterRequest);
+                        ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
+                        res = validationResult.getIsValid();
                         if (res) {
                             matchingValueKeySet.add(cookieKey);
                             result = Utils.evaluateResult(operation, result, res);
                             break;
+                        } else {
+                            validationErrorString.append("\n header-cookie-value:").append(cookieKey).append(": ").append(validationResult.getValidationReason());
                         }
                     }
                 }
@@ -621,7 +634,7 @@ public final class FilterAction {
             // if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains") || filterActionRequest.getOperand().equalsIgnoreCase("not_contains_either")) {
             //     result = matchingValueKeySet.size() == headers.size();
             // }
-            return new DataOperandsFilterResponse(result, matchingValueKeySet, null, null);
+            return new DataOperandsFilterResponse(result, matchingValueKeySet, null, null, validationErrorString.toString());
         } else {
             String headerString = convertHeaders(headers);
             DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(headerString, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
@@ -631,7 +644,7 @@ public final class FilterAction {
     }
 
     public DataOperandsFilterResponse applyFilterOnQueryParams(FilterActionRequest filterActionRequest) {
-
+        StringBuilder validationErrorString = new StringBuilder();
         RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
         if (rawApi == null) {
             return new DataOperandsFilterResponse(false, null, null, null);
@@ -655,17 +668,20 @@ public final class FilterAction {
         if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
             for (String key: queryParamObj.keySet()) {
                 DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(key, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-                res = invokeFilter(dataOperandFilterRequest);
+                ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
+                res = validationResult.getIsValid();
                 result = Utils.evaluateResult(operation, result, res);
                 if (res) {
                     matchingKeys.add(key);
+                } else {
+                    validationErrorString.append("\n query-param-key:").append(key).append(": ").append(validationResult.getValidationReason());
                 }
             }
             // if (!result) {
             //     // some keys could match in case of for_all, so setting this empty again if all keys are not matching
             //     matchingKeys = new ArrayList<>();
             // }
-            return new DataOperandsFilterResponse(result, matchingKeys, null, null);
+            return new DataOperandsFilterResponse(result, matchingKeys, null, null, validationErrorString.toString());
         } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
             matchingKeys = filterActionRequest.getMatchingKeySet();
             for (String key: queryParamObj.keySet()) {
@@ -673,22 +689,26 @@ public final class FilterAction {
                     continue;
                 }
                 DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(queryParamObj.getString(key), filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-                res = invokeFilter(dataOperandFilterRequest);
+                ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
+                res = validationResult.getIsValid();
                 result = Utils.evaluateResult(operation, result, res);
                 if (res) {
                     matchingValueKeySet.add(key);
                     break;
+                } else {
+                    validationErrorString.append("\n query-param-value:").append(key).append(": ").append(validationResult.getValidationReason());
                 }
             }
             // if (!result) {
             //     // some keys could match in case of for_all, so setting this empty again if all keys are not matching
             //     matchingValueKeySet = new ArrayList<>();
             // }
-            return new DataOperandsFilterResponse(result, matchingValueKeySet, null, null);
+            return new DataOperandsFilterResponse(result, matchingValueKeySet, null, null, validationErrorString.toString());
         } else {
             DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(queryParams, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-            res = invokeFilter(dataOperandFilterRequest);
-            return new DataOperandsFilterResponse(res, null, null, null);
+            ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
+            res = validationResult.getIsValid();
+            return new DataOperandsFilterResponse(res, null, null, null, validationResult.getValidationReason());
         }
     }
 
@@ -857,7 +877,8 @@ public final class FilterAction {
         } else {
             if (!TestEditorEnums.DataOperands.VALUETYPE.toString().equals(operand)) {
                 DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(parentKey, querySet, operand);
-                res = invokeFilter(dataOperandFilterRequest);
+                ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
+                res = validationResult.getIsValid();
                 if (res) {
                     matchingKeys.add(parentKey);
                 }
