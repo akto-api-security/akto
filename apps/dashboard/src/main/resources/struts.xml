@@ -150,7 +150,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="featureLabel">USER_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">

@@ -47,7 +47,7 @@ public class TeamAction extends UserAction {
         for(Object obj: users) {
             BasicDBObject userObj = (BasicDBObject) obj;
             RBAC rbac = userToRBAC.get(userObj.getInt("id"));
-            String status = rbac == null ? "Guest" : rbac.getRole().name();
+            String status = rbac == null ? Role.MEMBER.getName() : rbac.getRole().name();
             userObj.append("role", status);
         }
 
@@ -61,7 +61,7 @@ public class TeamAction extends UserAction {
                 pendingInviteCode.setAccountId(1_000_000);
             }
             Role inviteeRole = pendingInviteCode.getInviteeRole();
-            String roleText = "Invitation sent";
+            String roleText = "Invitation sent ";
             if (inviteeRole == null) {
                 roleText += "for Security Engineer";
             } else {
