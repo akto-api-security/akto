@@ -124,6 +124,8 @@ public class ProfileAction extends UserAction {
         } catch (Exception e) {
         }
 
+        String userRoleString = userRole != null ? userRole.toString().toUpperCase() : "";
+
         userDetails.append("accounts", accounts)
                 .append("username",username)
                 .append("avatar", "dummy")
@@ -135,7 +137,7 @@ public class ProfileAction extends UserAction {
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name())
                 .append("jiraIntegrated", jiraIntegrated)
-                .append("userRole", userRole.toString().toUpperCase());
+                .append("userRole", userRoleString);
 
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));
