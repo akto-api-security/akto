@@ -1,9 +1,9 @@
-import { Avatar, Box, Button, HorizontalGrid, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
+import { Avatar, Box, Button, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 
-function Steps({currentStep, totalSteps, stepObj}) {
+function Steps({currentStep, totalSteps, stepsTextArr}) {
 
-    const CurrentStepComp = (state) =>{       
+    function CurrentStepComp ({state}) {   
         return(<Button plain monochrome disabled={state}><Avatar shape="round" size="extraSmall" source="/public/steps_icon.svg"/></Button>) 
     }
 
@@ -13,28 +13,43 @@ function Steps({currentStep, totalSteps, stepObj}) {
         </div>
     )
 
-    const StepsCardHeader= () => {
+    const StepsCardHeader = () => {
+        return(
         <Box padding={"2"}>
-            <VerticalStack>
-                
-            </VerticalStack>
+            <HorizontalStack align="center">
+                {Array.from({ length: totalSteps }).map((_, index) => {
+                    return(
+                        <Box width={index === totalSteps - 1 ? "24px" :"252px"} key={"index " + index}>
+                            <HorizontalStack wrap={false} key={index}>
+                                {index < currentStep ? completedStepComponent : <CurrentStepComp state={currentStep !== index}/>}
+                                {index < totalSteps - 1 ? <Box width="100%" minHeight='1px' borderWidth="2" borderColor={currentStep > index ? "border-primary" : "border-subdued"}></Box> : null}
+                            </HorizontalStack>
+                        </Box>
+                    )}
+                )}
+            </HorizontalStack>
         </Box>
-    }
+    )}
 
     const stepsComp = (
         Array.from({ length: totalSteps }).map((_, index) => {
             return(
                 <HorizontalStack key={index}>
-                   {currentStepComp}
+                    <Box width='252px' padding={"2"} paddingBlockStart={"0"}>
+                        <Text alignment="center" variant="headingMd">{stepsTextArr[index]}</Text>
+                    </Box> 
                 </HorizontalStack>
             )}
         )
     )
 
     return (
-        <HorizontalGrid columns={totalSteps}>
-           {stepsComp}
-        </HorizontalGrid>
+        <VerticalStack>
+            <StepsCardHeader />
+            <HorizontalStack align="center">
+                {stepsComp}
+            </HorizontalStack>
+        </VerticalStack>
     )
 }
 

@@ -1,6 +1,6 @@
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
-import { Box, Button, Divider, LegacyCard,Badge, HorizontalStack } from "@shopify/polaris";
+import { Divider, LegacyCard } from "@shopify/polaris";
 import { useEffect, useState } from "react";
 import PersistStore from "@/apps/main/PersistStore";
 import api from "@/apps/dashboard/pages/observe/api";
@@ -17,13 +17,13 @@ function AuthenticationSetup() {
     const [selectedApis, setSelectedApis] = useState([])
     const [authenticationApiGroups, setAuthenticationApiGroups] = useState([])
     
-    const categoryMap = PersistStore(state => state.categoryMap)
-    const subCategoryMap = PersistStore(state => state.subCategoryMap)
     const [selectedSubCategories, setSelectedSubCategories] = useState([])
     const [authenticationTestCategories, setAuthenticationTestCategories] = useState([])
 
+    const [currentStep, setCurrentStep] = useState(0)
+
     const fetchAuthenticationSetupData = async () => {
-        const authenticationApiGroupsCopy = allCollections.filter(x => [111_111_128, 111_111_129, 111_111_130].includes(x.id))
+        const authenticationApiGroupsCopy = allCollections.filter(x => (x.urlsCount > 0 && x?.conditions !== null && !x?.deactivated))
         for (const authenticationApiGroup of authenticationApiGroupsCopy) {
             const collectionId = authenticationApiGroup.id
             const apiCollectionData = await api.fetchAPICollection(collectionId)
@@ -35,53 +35,6 @@ function AuthenticationSetup() {
 
 
         setAuthenticationApiGroups(authenticationApiGroupsCopy)
-
-        const subCategoryMapCopy = { ...subCategoryMap }
-        let authenticationTestCategoriesCopy = { ...categoryMap }
-        // Initialize sub categories
-        Object.values(authenticationTestCategoriesCopy).forEach(category => {
-            category.itemGroupNameField = "shortName"
-            category.subCategories = []
-        })
-
-        // Add sub categories to categories
-        Object.values(subCategoryMapCopy).forEach(subCategory => {
-            const category = authenticationTestCategoriesCopy[subCategory.superCategory.name]
-            
-            subCategory.id = subCategory.name
-            category.subCategories.push(subCategory)
-        })
-
-        // Add missing configs to sub categories
-        const subCategories = []
-        Object.values(authenticationTestCategoriesCopy).forEach(category => {
-            category.subCategories.forEach(subCategory => {
-                subCategories.push(subCategory.name)
-            })
-        })
-
-        const fetchTestConfigsRequired = await api.fetchTestConfigsRequired(subCategories)
-        const subCategoryVsMissingConfigsMap = fetchTestConfigsRequired?.subCategoryVsMissingConfigsMap || {}
-        Object.values(authenticationTestCategoriesCopy).forEach(category => {
-            let categorySubCategoriesRequireConfigs = false
-            category.subCategories.forEach(subCategory => {
-                subCategory.missingConfigs = subCategoryVsMissingConfigsMap[subCategory.name] || []
-
-                if (subCategory.missingConfigs.length > 0) {
-                    categorySubCategoriesRequireConfigs = true
-                }
-            })
-
-            if (categorySubCategoriesRequireConfigs) {
-                category.additionalCardBadge = <Badge size="small" status="warning">Config needed</Badge>
-            } 
-        })
-
-
-        authenticationTestCategoriesCopy = Object.values(authenticationTestCategoriesCopy)
-        setAuthenticationTestCategories(authenticationTestCategoriesCopy)
-
-        console.log(authenticationTestCategoriesCopy)
     }
 
     useEffect(() => {
@@ -123,15 +76,8 @@ function AuthenticationSetup() {
         }
     ]
 
-    const [authenticationScreenState, setAuthenticationScreenState] = useState({
-        currentPageIndex: 0,
-        selectedApis: [],
-        selectedTests: [],
-    })
-
     const authenticationScreenPages = [
         {
-            title: "Select APIs",
             pageComponent: 
                 (<ItemsSelectorFromCard
                     itemGroups={authenticationApiGroups}
@@ -145,12 +91,8 @@ function AuthenticationSetup() {
                         return idParts.slice(0, 3).join("###");
                     }}
                 />),
-            pageNavigation: [
-                <Button>Next</Button>
-            ]
         }, 
         {
-            title: "Select Tests",
             pageComponent: 
                 (<ItemsSelectorFromCard
                     itemGroups={authenticationTestCategories}
@@ -159,22 +101,24 @@ function AuthenticationSetup() {
                     itemsResourceName={subCategoriesSelectorResourceName}
                     itemsListFieldName="subCategories"
                     itemsTableHeaders={subCategoriesSelectorTableHeaders}
-                />),
+                />)
         },
         {
-            title: "Set configurations"
+           pageComponent: <div>hey</div>
         }
     ]
 
-
     return (
-        // <LegacyCard primaryFooterAction={{content: stepObj.actionText, onAction: next}}
-        // {...(currentStep > 1 && currentStep < 4) ? {secondaryFooterActions: [{content: "Back", onAction: ()=> requestStepChange(currentStep - 1)}]}: null}>
-        // </LegacyCard>
-        <LegacyCard>
+        <LegacyCard
+        {...(currentStep < 3) ?  {primaryFooterAction: {content: currentStep < 2 ? 'Next step' : 'Run Test', onAction: () => setCurrentStep(currentStep + 1)}} :null}
+        {...(currentStep > 0 && currentStep < 3) ? {secondaryFooterActions: [{content: "Back", onAction: ()=> setCurrentStep(currentStep - 1)}]}: null}>
             <LegacyCard.Section>
-                <Steps totalSteps={3} currentStep={1}/>
+                <Steps totalSteps={3} currentStep={currentStep} stepsTextArr={['Select APIs', "Select tests", 'Set Configurations'] }/>
             </LegacyCard.Section>
+            <LegacyCard.Section>
+                {authenticationScreenPages[currentStep].pageComponent}
+            </LegacyCard.Section>
+            <Divider/>
         </LegacyCard>
     )
 }
@@ -188,7 +132,7 @@ function Authentication() {
                 tooltipContent={"Configure authentication based tests."}
             />}
             isFirstPage={true}
-            components={[<AuthenticationSetup />]}
+            components={[<AuthenticationSetup key={"setup-screens"}/>]}
         />
     )
 }

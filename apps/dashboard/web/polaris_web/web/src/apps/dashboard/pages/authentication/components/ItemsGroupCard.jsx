@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Card, Checkbox, HorizontalStack, Text, VerticalStack } from "@shopify/polaris"
+import { Badge, Box, Card, Checkbox, HorizontalStack, Text, VerticalStack } from "@shopify/polaris"
 
 function ItemsGroupCard({ cardObj }) {
     const selectedItemsCount = cardObj.selectedCtr || 0
@@ -9,7 +9,7 @@ function ItemsGroupCard({ cardObj }) {
     const itemGroupName = cardObj[itemGroupNameField] || ""
 
     return (
-        <Button onClick={() => cardObj.onSelect()} plain monochrome removeUnderline>
+        <div onClick={() => cardObj.onSelect()} style={{cursor: 'auto'}}>
             <Card>
                 <VerticalStack gap="2">
                     <HorizontalStack align="space-between">
@@ -24,7 +24,7 @@ function ItemsGroupCard({ cardObj }) {
                     </Box>
                 </VerticalStack>
             </Card>
-        </Button>
+        </div>
     )
 }
 
