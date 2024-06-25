@@ -51,8 +51,12 @@ public abstract class SecurityTestTemplate {
     }
 
     private YamlTestResult getResultWithError(String errorMessage, boolean requiresConfig){
+        return getResultWithError(Collections.singletonList(errorMessage), requiresConfig);
+    }
+
+    private YamlTestResult getResultWithError(List<String> errorMessages, boolean requiresConfig){
         List<GenericTestResult> testResults = new ArrayList<>();
-        TestResult testResult = new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(errorMessage), 0, false, TestResult.Confidence.HIGH, null);
+        TestResult testResult = new TestResult(null, rawApi.getOriginalMessage(), errorMessages, 0, false, TestResult.Confidence.HIGH, null);
         testResult.setRequiresConfig(requiresConfig);
         testResults.add(testResult);
         return new YamlTestResult(testResults, null);
@@ -82,7 +86,10 @@ public abstract class SecurityTestTemplate {
         ValidationResult validationResult = filter();
         boolean valid = validationResult.getIsValid();
         if (!valid) {
-            return getResultWithError(SKIPPING_EXECUTION_BECAUSE_FILTERS.getMessage() + "\n" + validationResult.getValidationReason(), false);
+            List<String> errorList = new ArrayList<>();
+            errorList.add(SKIPPING_EXECUTION_BECAUSE_FILTERS.getMessage());
+            errorList.add(validationResult.getValidationReason());
+            return getResultWithError(errorList, false);
         }
         valid = checkAuthBeforeExecution(debug, testLogs);
         if (!valid) {

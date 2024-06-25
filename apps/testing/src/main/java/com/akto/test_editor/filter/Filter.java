@@ -103,7 +103,7 @@ public class Filter {
             }
             dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId, skipExecutingExtractNode, validationReason);
             if (!dataOperandsFilterResponse.getResult()) {
-                validationReason.append("\n").append(dataOperandsFilterResponse.getValidationReason());
+                validationReason.append("\n ParentOperand:- ").append(node.getOperand()).append(" - ").append(dataOperandsFilterResponse.getValidationReason());
             }
 
             // if (!dataOperandsFilterResponse.getResult()) {
@@ -129,7 +129,7 @@ public class Filter {
         if (node.getNodeType().equalsIgnoreCase(TestEditorEnums.OperandTypes.Collection.toString()) && firstExtractNode != null && result) {
             DataOperandsFilterResponse resp = isEndpointValid(firstExtractNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId, false, validationReason);
             if (!resp.getResult()) {
-                validationReason.append("\n").append(resp.getValidationReason());
+                validationReason.append("\n ParentOperand:- ").append(node.getOperand()).append(" - ").append(resp.getValidationReason());
             }
             result = result && resp.getResult();
         }
