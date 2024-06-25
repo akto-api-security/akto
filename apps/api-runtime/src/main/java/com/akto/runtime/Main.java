@@ -450,6 +450,7 @@ public class Main {
 
     public static void initializeRuntimeHelper() {
         SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
+        // DaoInit.createIndices();
         insertRuntimeFilters();
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
