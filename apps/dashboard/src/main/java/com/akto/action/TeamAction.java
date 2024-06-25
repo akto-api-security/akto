@@ -8,6 +8,7 @@ import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
+import com.akto.util.Pair;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -152,6 +153,7 @@ public class TeamAction extends UserAction {
             default:
                 break;
         }
+        RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
         return Action.SUCCESS.toUpperCase();
     }
 

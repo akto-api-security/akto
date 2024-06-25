@@ -1,6 +1,8 @@
 package com.akto.dao;
 
 
+import com.akto.util.Pair;
+import io.swagger.models.auth.In;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.context.Context;
@@ -8,9 +10,14 @@ import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.mongodb.client.model.Filters;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 public class RBACDao extends CommonContextDao<RBAC> {
     public static final RBACDao instance = new RBACDao();
 
+    //Caching for RBACDAO
+    private static final ConcurrentHashMap<Pair<Integer, Integer>, Pair<Role, Integer>> userRolesMap = new ConcurrentHashMap<>();
+    private static final int EXPIRY_TIME = 15 * 60; // 15 minute
     public void createIndicesIfAbsent() {
 
         boolean exists = false;
@@ -29,6 +36,9 @@ public class RBACDao extends CommonContextDao<RBAC> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
     }
 
+    public void deleteUserEntryFromCache(Pair<Integer, Integer> key) {
+        userRolesMap.remove(key);
+    }
     public boolean isAdmin(int userId, int accountId) {
         RBAC rbac = RBACDao.instance.findOne(
                 Filters.or(Filters.and(
@@ -50,18 +60,27 @@ public class RBACDao extends CommonContextDao<RBAC> {
     }
 
     public static Role getCurrentRoleForUser(int userId, int accountId){
-        Bson filterRbac = Filters.and(
-            Filters.eq(RBAC.USER_ID, userId),
-            Filters.eq(RBAC.ACCOUNT_ID, accountId));
+        Pair<Integer, Integer> key = new Pair<>(userId, accountId);
+        Pair<Role, Integer> userRoleEntry = userRolesMap.get(key);
+        Role currentRole;
+        if (userRoleEntry == null || (Context.now() - userRoleEntry.getSecond() > EXPIRY_TIME)) {
+            Bson filterRbac = Filters.and(
+                    Filters.eq(RBAC.USER_ID, userId),
+                    Filters.eq(RBAC.ACCOUNT_ID, accountId));
 
-        RBAC userRbac = RBACDao.instance.findOne(filterRbac);
-        if(userRbac != null){
-            return userRbac.getRole();
-        }else{
-            return Role.MEMBER;
+            RBAC userRbac = RBACDao.instance.findOne(filterRbac);
+            if(userRbac != null){
+                currentRole = userRbac.getRole();
+            }else{
+                currentRole = Role.MEMBER;
+            }
+
+            userRolesMap.put(key, new Pair<>(currentRole, Context.now()));
+        } else {
+            currentRole = userRoleEntry.getFirst();
         }
+        return currentRole;
     }
-
     @Override
     public String getCollName() {
         return "rbac";
