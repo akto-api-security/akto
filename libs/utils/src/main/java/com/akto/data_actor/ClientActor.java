@@ -1,10 +1,6 @@
 package com.akto.data_actor;
 
-import com.akto.DaoInit;
 import com.akto.testing.ApiExecutor;
-import com.akto.bulk_update_util.ApiInfoBulkUpdate;
-import com.akto.dao.SetupDao;
-import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.bulk_updates.BulkUpdates;
@@ -22,21 +18,12 @@ import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
-import com.akto.dto.traffic.SampleData;
-import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
-import com.mongodb.client.model.WriteModel;
-
-import org.apache.commons.collections.functors.EqualPredicate;
-import org.bson.types.ObjectId;
-import org.checkerframework.checker.units.qual.s;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -51,10 +38,12 @@ import com.google.gson.Gson;
 public class ClientActor extends DataActor {
 
     private static final int batchWriteLimit = 1000;
+    private static final int bulkWriteLimit = 8;
     private static final String url = buildDbAbstractorUrl();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class);
-    private static final int maxConcurrentBatchWrites = 2;
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class, LogDb.RUNTIME);
+    private static final int maxConcurrentBatchWrites = 150;
     private static final Gson gson = new Gson();
+    private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
     
     ObjectMapper objectMapper = new ObjectMapper();
 
@@ -179,12 +168,11 @@ public class ClientActor extends DataActor {
 
 
     public void bulkWrite(List<Object> bulkWrites, String path, String key) {
-        ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
 
         ArrayList<BulkUpdates> writes = new ArrayList<>();
         for (int i = 0; i < bulkWrites.size(); i++) {
             writes.add((BulkUpdates) bulkWrites.get(i));
-            if (writes.size() % batchWriteLimit == 0) {
+            if (writes.size() % bulkWriteLimit == 0) {
                 List<BulkUpdates> finalWrites = writes;
                 threadPool.submit(
                         () -> writeBatch(finalWrites, path, key)
@@ -715,12 +703,11 @@ public class ClientActor extends DataActor {
     }
 
     public void bulkWriteApiInfo(List<ApiInfo> apiInfoList) {
-        ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
 
         List<ApiInfo> apiInfoBatch = new ArrayList<>();
         for (int i = 0; i < apiInfoList.size(); i++) {
             apiInfoBatch.add(apiInfoList.get(i));
-            if (apiInfoBatch.size() % batchWriteLimit == 0) {
+            if (apiInfoBatch.size() % bulkWriteLimit == 0) {
                 List<ApiInfo> finalWrites = apiInfoBatch;
                 threadPool.submit(
                         () -> writeApiInfoBatch(finalWrites)
