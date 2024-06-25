@@ -141,7 +141,15 @@ public class AccountTask {
                 }
             }
         } catch (Exception e) {
-            logger.error("Error in execute task" + e.getMessage());
+            String err = "";
+            if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
+                StackTraceElement stackTraceElement = e.getStackTrace()[0];
+                err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+            } else {
+                err = String.format("Err msg: %s\nStackTrace not available", err);
+                e.printStackTrace();
+            }
+            logger.error("Error in execute task: " + err);
         }
 
     }
