@@ -147,9 +147,9 @@ public class AccountTask {
                 err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
             } else {
                 err = String.format("Err msg: %s\nStackTrace not available", err);
-                e.printStackTrace();
             }
-            logger.error("Error in execute task: " + err);
+            logger.error("Error in execute task: " + e.getMessage() + " : " + err);
+            e.printStackTrace();
         }
 
     }
