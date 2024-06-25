@@ -2174,27 +2174,35 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void runInitializerFunctions() {
+        System.out.println("creating indices...");
         DaoInit.createIndices();
-
+        System.out.println("created indices...");
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
             backwardCompatibility = new BackwardCompatibility();
             BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
         }
+        System.out.println("fetched backwardCompatibility...");
 
         // backward compatibility
         try {
             setBackwardCompatibilities(backwardCompatibility);
-            insertPiiSources();
 
+            System.out.println("fetch pii sources"); 
+            insertPiiSources();
+            System.out.println("fetched pii sources");
 //            setUpPiiCleanerScheduler();
 //            setUpDailyScheduler();
 //            setUpWebhookScheduler();
 //            setUpPiiAndTestSourcesScheduler();
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            System.out.println("fetched account settings");
+
             dropSampleDataIfEarlierNotDroped(accountSettings);
+            System.out.println("dropped sample data settings");
+
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,"error while setting up dashboard: " + e.toString(), LogDb.DASHBOARD);
         }
