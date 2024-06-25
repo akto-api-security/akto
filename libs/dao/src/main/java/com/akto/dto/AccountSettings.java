@@ -373,7 +373,7 @@ public class AccountSettings {
                 "mp4", "webm", "ogg", "ogv", "avi", "mov",  // Video formats
                 "mp3", "wav", "oga",  // Audio formats
                 "woff", "woff2", "ttf", "otf", // Font formats
-                "pptx", "json" // file formats
+                ".pptx", ".json" // file formats
             );
             return ignoreUrlTypesList;
         }

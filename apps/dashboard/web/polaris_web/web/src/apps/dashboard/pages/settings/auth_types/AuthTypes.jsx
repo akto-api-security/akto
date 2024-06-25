@@ -72,7 +72,7 @@ function AuthTypes() {
             items: [{
                 content: 'Edit',
                 onAction: () => navigate("details", { state: { name: item?.name, active: item?.active,
-                    headerConditions: item?.headerKeys, payloadConditions: item?.payloadKeys } })
+                    headerConditions: item?.headerKeys, payloadConditions: item?.payloadKeys } }),
             }]
         }]
     }
