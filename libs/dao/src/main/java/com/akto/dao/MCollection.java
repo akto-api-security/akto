@@ -289,6 +289,7 @@ public abstract class MCollection<T> {
             db.getCollection(collName).createIndex(idx, options);
 
         } catch (Exception e){
+            e.printStackTrace();
             return false;
         }
 
@@ -328,6 +329,7 @@ public abstract class MCollection<T> {
 
         name += ("_");
         name += (isAscending ? "1" : "-1");
+        System.out.println(name);
         return name;
     }
 

@@ -2,6 +2,7 @@ package com.akto;
 
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -343,37 +344,65 @@ public class DaoInit {
     }
 
     public static void createIndices() {
+        // if(true){
+        // return;
+        // }
         try {
             TestingRunResultDao.instance.convertToCappedCollection();
         } catch (Exception e) {
                 logger.error("Error while converting TestingRunResults to capped collection: " + e.getMessage());
         }
 
+        System.out.println("OrganizationsDao indices creating for account: " + Context.accountId.get());
         OrganizationsDao.createIndexIfAbsent();
+        System.out.println("UsageMetricsDao indices creating for account: " + Context.accountId.get());
         UsageMetricsDao.createIndexIfAbsent();
+        System.out.println("SingleTypeInfoDao indices creating for account: " + Context.accountId.get());
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
+        System.out.println("TrafficMetricsDao indices creating for account: " + Context.accountId.get());
         TrafficMetricsDao.instance.createIndicesIfAbsent();
+        System.out.println("TestRolesDao indices creating for account: " + Context.accountId.get());
         TestRolesDao.instance.createIndicesIfAbsent();
+        System.out.println("UsersDao indices creating for account: " + Context.accountId.get());
         UsersDao.instance.createIndicesIfAbsent();
+        System.out.println("AccountsDao indices creating for account: " + Context.accountId.get());
         AccountsDao.instance.createIndexIfAbsent();
 
+        System.out.println("ApiInfoDao indices creating for account: " + Context.accountId.get());
         ApiInfoDao.instance.createIndicesIfAbsent();
+        System.out.println("RuntimeLogsDao indices creating for account: " + Context.accountId.get());
         RuntimeLogsDao.instance.createIndicesIfAbsent();
+        System.out.println("LogsDao indices creating for account: " + Context.accountId.get());
         LogsDao.instance.createIndicesIfAbsent();
+        System.out.println("DashboardLogsDao indices creating for account: " + Context.accountId.get());
         DashboardLogsDao.instance.createIndicesIfAbsent();
+        System.out.println("AnalyserLogsDao indices creating for account: " + Context.accountId.get());
         AnalyserLogsDao.instance.createIndicesIfAbsent();
+        System.out.println("SampleDataDao indices creating for account: " + Context.accountId.get());
         SampleDataDao.instance.createIndicesIfAbsent();
+        System.out.println("LoadersDao indices creating for account: " + Context.accountId.get());
         LoadersDao.instance.createIndicesIfAbsent();
+        System.out.println("TestingRunResultDao indices creating for account: " + Context.accountId.get());
         TestingRunResultDao.instance.createIndicesIfAbsent();
+        System.out.println("TestingRunResultSummariesDao indices creating for account: " + Context.accountId.get());
         TestingRunResultSummariesDao.instance.createIndicesIfAbsent();
+        System.out.println("TestingRunDao indices creating for account: " + Context.accountId.get());
         TestingRunDao.instance.createIndicesIfAbsent();
+        System.out.println("TestingRunIssuesDao indices creating for account: " + Context.accountId.get());
         TestingRunIssuesDao.instance.createIndicesIfAbsent();
+        System.out.println("ApiCollectionsDao indices creating for account: " + Context.accountId.get());
         ApiCollectionsDao.instance.createIndicesIfAbsent();
+        System.out.println("ActivitiesDao indices creating for account: " + Context.accountId.get());
         ActivitiesDao.instance.createIndicesIfAbsent();
+        System.out.println("DependencyNodeDao indices creating for account: " + Context.accountId.get());
         DependencyNodeDao.instance.createIndicesIfAbsent();
+        System.out.println("DependencyFlowNodesDao indices creating for account: " + Context.accountId.get());
         DependencyFlowNodesDao.instance.createIndicesIfAbsent();
+        System.out.println("CodeAnalysisCollectionDao indices creating for account: " + Context.accountId.get());
         CodeAnalysisCollectionDao.instance.createIndicesIfAbsent();
+        System.out.println("CodeAnalysisApiInfoDao indices creating for account: " + Context.accountId.get());
         CodeAnalysisApiInfoDao.instance.createIndicesIfAbsent();
+        System.out.println("All indices created for account: " + Context.accountId.get());
     }
 
 }
