@@ -116,24 +116,32 @@ public class AccountTask {
 
 
     public void executeTask(Consumer<Account> consumeAccount, String taskName) {
+        try {
+            Bson activeFilter = Filters.or(
+                    Filters.exists(Account.INACTIVE_STR, false),
+                    Filters.eq(Account.INACTIVE_STR, false));
 
-        Bson activeFilter = Filters.or(
-                Filters.exists(Account.INACTIVE_STR, false),
-                Filters.eq(Account.INACTIVE_STR, false)
-        );
-
-        List<Account> activeAccounts = AccountsDao.instance.findAll(activeFilter);
-        for(Account account: activeAccounts) {
-            if (inactiveAccountsSet.contains(account.getId())) {
-                continue;
+            List<Account> activeAccounts = AccountsDao.instance.findAll(activeFilter);
+            if (activeAccounts == null || activeAccounts.isEmpty()) {
+                logger.error("Active accounts is null or empty");
+                return;
             }
-            try {
-                Context.accountId.set(account.getId());
-                consumeAccount.accept(account);
-            } catch (Exception e) {
-                String msgString = String.format("Error in executing task %s for account %d", taskName, account.getId());
-                logger.error(msgString, e);
+            logger.info("Active accounts found: " + activeAccounts.size());
+            for (Account account : activeAccounts) {
+                if (inactiveAccountsSet.contains(account.getId())) {
+                    continue;
+                }
+                try {
+                    Context.accountId.set(account.getId());
+                    consumeAccount.accept(account);
+                } catch (Exception e) {
+                    String msgString = String.format("Error in executing task %s for account %d", taskName,
+                            account.getId());
+                    logger.error(msgString, e);
+                }
             }
+        } catch (Exception e) {
+            logger.error("Error in execute task" + e.getMessage());
         }
 
     }

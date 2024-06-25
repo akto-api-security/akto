@@ -1799,8 +1799,16 @@ public class InitializerListener implements ServletContextListener {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account account) {
-                        AccountSettingsDao.instance.getStats();
-                        runInitializerFunctions();
+                        try {
+                            AccountSettingsDao.instance.getStats();
+                        } catch(Exception e){
+                            loggerMaker.errorAndAddToDb(e, "ERROR in getting account settings stats", LogDb.DASHBOARD);
+                        }
+                        try {
+                            runInitializerFunctions();
+                        } catch(Exception e){
+                            loggerMaker.errorAndAddToDb(e, "ERROR in running initializer functions", LogDb.DASHBOARD);
+                        }
                     }
                 }, "context-initializer");
 
