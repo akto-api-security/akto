@@ -773,6 +773,11 @@
                 <param name="featureLabel">USER_ACTIONS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS"   type="json">
                 <param name="root">apiCatalogData</param>
             </result>
@@ -1426,6 +1431,15 @@
         <action name="api/getAllCollectionsBasic" class="com.akto.action.ApiCollectionsAction" method="fetchAllCollectionsBasic">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS"  type="json">
             </result>
             <result name="ERROR" type="httpheader">
@@ -3244,6 +3258,7 @@
             </result>
         </action>
 
+<!--        currently not being used-->
         <action name="api/fetchParamsStatus" class="com.akto.action.ParamStateAction" method="fetchParamsStatus">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -3254,6 +3269,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
+
         <action name="api/fetchLogs" class="com.akto.action.LogsAction" method="fetchLogs">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -4077,6 +4093,7 @@
             </result>
         </action>
 
+<!--        currently not being used anywhere-->
         <action name="api/uploadWorkflowJson" class="com.akto.action.testing.WorkflowTestAction" method="uploadWorkflowJson">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
