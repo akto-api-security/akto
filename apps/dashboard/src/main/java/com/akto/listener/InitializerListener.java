@@ -2175,7 +2175,7 @@ public class InitializerListener implements ServletContextListener {
 
     public void runInitializerFunctions() {
         System.out.println("creating indices...");
-        DaoInit.createIndices();
+        // DaoInit.createIndices();
         System.out.println("created indices...");
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
