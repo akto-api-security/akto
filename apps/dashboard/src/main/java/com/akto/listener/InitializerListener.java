@@ -2200,7 +2200,7 @@ public class InitializerListener implements ServletContextListener {
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             System.out.println("fetched account settings");
 
-            dropSampleDataIfEarlierNotDroped(accountSettings);
+            // dropSampleDataIfEarlierNotDroped(accountSettings);
             System.out.println("dropped sample data settings");
 
         } catch (Exception e) {
@@ -2208,8 +2208,8 @@ public class InitializerListener implements ServletContextListener {
         }
 
         try {
-            loggerMaker.infoAndAddToDb("Updating account version", LogDb.DASHBOARD);
-            AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
+            loggerMaker.infoAndAddToDb("Updating account version" + Context.accountId.get(), LogDb.DASHBOARD);
+            // AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
         }
