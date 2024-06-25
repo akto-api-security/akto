@@ -129,11 +129,14 @@ public class AccountTask {
             logger.info("Active accounts found: " + activeAccounts.size());
             for (Account account : activeAccounts) {
                 if (inactiveAccountsSet.contains(account.getId())) {
+                    logger.info("skipping task for accountId: " + account.getId() + " " + taskName);
                     continue;
                 }
                 try {
+                    logger.info("attempting task for accountId: " + account.getId() + " " + taskName);
                     Context.accountId.set(account.getId());
                     consumeAccount.accept(account);
+                    logger.info("attempted task for accountId: " + account.getId() + " " + taskName);
                 } catch (Exception e) {
                     String msgString = String.format("Error in executing task %s for account %d", taskName,
                             account.getId());
