@@ -31,6 +31,7 @@ import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.utils.KafkaUtils;
+import com.akto.utils.RedactAlert;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
@@ -361,8 +362,6 @@ public class DbAction extends ActionSupport {
                         }
                     }
     
-                    System.out.println("filters: " + filters.toString());
-    
                     if (isDeleteWrite) {
                         writes.add(
                                 new DeleteOneModel<>(Filters.and(filters), new DeleteOptions())
@@ -412,13 +411,16 @@ public class DbAction extends ActionSupport {
 
                     String responseCodeStr = mObj.get("responseCode").toString();
                     int responseCode = Integer.valueOf(responseCodeStr);
-    
+
+                    String url = (String) mObj.get("url");
+                    String method = (String) mObj.get("method");
+
                     Bson filters = Filters.and(Filters.eq("_id.apiCollectionId", apiCollectionId),
                             Filters.eq("_id.bucketEndEpoch", bucketEndEpoch),
                             Filters.eq("_id.bucketStartEpoch", bucketStartEpoch),
-                            Filters.eq("_id.method", mObj.get("method")),
+                            Filters.eq("_id.method", method),
                             Filters.eq("_id.responseCode", responseCode),
-                            Filters.eq("_id.url", mObj.get("url")));
+                            Filters.eq("_id.url", url));
                     List<String> updatePayloadList = bulkUpdate.getUpdates();
     
                     List<Bson> updates = new ArrayList<>();
@@ -433,6 +435,11 @@ public class DbAction extends ActionSupport {
                                 val.add(dVal.get(i).intValue());
                             }
                             updates.add(Updates.setOnInsert(field, val));
+                        } else if(field.equals(SampleData.SAMPLES)){
+                            List<String> dVal = (List) json.get("val");
+                            RedactAlert.submitSampleDataForChecking(dVal, apiCollectionId, method, url);
+                            updatePayload = new UpdatePayload((String) json.get("field"), dVal , (String) json.get("op"));
+                            updates.add(Updates.pushEach(updatePayload.getField(), dVal, new PushOptions().slice(-10)));
                         } else {
                             List<String> dVal = (List) json.get("val");
                             updatePayload = new UpdatePayload((String) json.get("field"), dVal , (String) json.get("op"));
@@ -451,8 +458,8 @@ public class DbAction extends ActionSupport {
                     err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
                 } else {
                     err = String.format("Err msg: %s\nStackTrace not available", err);
-                    e.printStackTrace();
                 }
+                e.printStackTrace();
                 System.out.println(err);
                 return Action.ERROR.toUpperCase();
             }
@@ -470,8 +477,14 @@ public class DbAction extends ActionSupport {
                 ArrayList<WriteModel<SensitiveSampleData>> writes = new ArrayList<>();
                 for (BulkUpdates bulkUpdate: writesForSensitiveSampleData) {
                     Bson filters = Filters.empty();
+                    int apiCollectionId = 0;
                     for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
-                        if (entry.getKey().equalsIgnoreCase("_id.apiCollectionId") || entry.getKey().equalsIgnoreCase("_id.responseCode")) {
+                        if (entry.getKey().equalsIgnoreCase("_id.apiCollectionId") ) {
+                            String valStr = entry.getValue().toString();
+                            int val = Integer.valueOf(valStr);
+                            apiCollectionId = val;
+                            filters = Filters.and(filters, Filters.eq(entry.getKey(), val));
+                        } else if(entry.getKey().equalsIgnoreCase("_id.responseCode")) {
                             String valStr = entry.getValue().toString();
                             int val = Integer.valueOf(valStr);
                             filters = Filters.and(filters, Filters.eq(entry.getKey(), val));
@@ -512,6 +525,7 @@ public class DbAction extends ActionSupport {
                             new DeleteOneModel<>(filters, new DeleteOptions())
                         );
                     } else {
+                        RedactAlert.submitSensitiveSampleDataCall(apiCollectionId);
                         writes.add(
                             new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
                         );
