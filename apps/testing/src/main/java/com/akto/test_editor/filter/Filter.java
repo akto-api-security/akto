@@ -17,6 +17,7 @@ import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterActionRequest;
 import com.akto.dto.test_editor.FilterNode;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.mongodb.BasicDBObject;
 
 public class Filter {
@@ -27,8 +28,12 @@ public class Filter {
     public Filter() {
         this.filterAction = new FilterAction();
     }
-    
     public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, List<BasicDBObject> contextEntities, boolean keyValOperandSeen, String context, Map<String, Object> varMap, String logId, boolean skipExtractExecution) {
+        StringBuilder stringBuilder = new StringBuilder();
+        return isEndpointValid(node, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOperandSeen, context, varMap, logId,skipExtractExecution, stringBuilder);
+    }
+    
+    public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, List<BasicDBObject> contextEntities, boolean keyValOperandSeen, String context, Map<String, Object> varMap, String logId, boolean skipExtractExecution, StringBuilder validationReason) {
 
         List<FilterNode> childNodes = node.getChildNodes();
         if (node.getNodeType().equalsIgnoreCase(OperandTypes.Term.toString()) || node.getNodeType().equalsIgnoreCase(OperandTypes.Collection.toString())) {
@@ -39,15 +44,15 @@ public class Filter {
                 Object updatedQuerySet = filterAction.resolveQuerySetValues(null, node.fetchNodeValues(), varMap);
                 List<Object> val = (List<Object>) updatedQuerySet;
                 DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(val.get(0), Arrays.asList(val.get(1)), "gt");
-                Boolean res = filterAction.invokeFilter(dataOperandFilterRequest);
-                return new DataOperandsFilterResponse(res, matchingKeySet, contextEntities, null);
+                ValidationResult validationResult = filterAction.invokeFilter(dataOperandFilterRequest);
+                return new DataOperandsFilterResponse(validationResult.getIsValid(), matchingKeySet, contextEntities, null, validationResult.getValidationReason());
             }
             if (node.getOperand().equalsIgnoreCase(TestEditorEnums.PredicateOperator.SSRF_URL_HIT.toString())) {
                 Object updatedQuerySet = filterAction.resolveQuerySetValues(null, node.fetchNodeValues(), varMap);
                 List<Object> val = (List<Object>) updatedQuerySet;
                 DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(null, val, "ssrf_url_hit");
-                Boolean res = filterAction.invokeFilter(dataOperandFilterRequest);
-                return new DataOperandsFilterResponse(res, matchingKeySet, contextEntities, null);
+                ValidationResult validationResult = filterAction.invokeFilter(dataOperandFilterRequest);
+                return new DataOperandsFilterResponse(validationResult.getIsValid(), matchingKeySet, contextEntities, null, validationResult.getValidationReason());
             }
             if (! (node.getNodeType().toLowerCase().equals(OperandTypes.Data.toString().toLowerCase()) || node.getNodeType().toLowerCase().equals(OperandTypes.Extract.toString().toLowerCase()) || node.getNodeType().toLowerCase().equals(OperandTypes.Context.toString().toLowerCase() ))) {
                 return new DataOperandsFilterResponse(false, null, null, null);
@@ -96,7 +101,11 @@ public class Filter {
             if (node.getNodeType().equalsIgnoreCase(TestEditorEnums.OperandTypes.Collection.toString()) && i == 0) {
                 skipExecutingExtractNode = (firstExtractNode == null);
             }
-            dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId, skipExecutingExtractNode);
+            dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId, skipExecutingExtractNode, validationReason);
+            if (!dataOperandsFilterResponse.getResult()) {
+                validationReason.append("\n ParentOperand:- ").append(node.getOperand()).append(" - ").append(dataOperandsFilterResponse.getValidationReason());
+            }
+
             // if (!dataOperandsFilterResponse.getResult()) {
             //     loggerMaker.infoAndAddToDb("invalid node condition " + logId + " operand " + childNode.getOperand() + 
             //     " concernedProperty " + childNode.getConcernedProperty() + " subConcernedProperty " + childNode.getSubConcernedProperty()
@@ -118,11 +127,14 @@ public class Filter {
         }
 
         if (node.getNodeType().equalsIgnoreCase(TestEditorEnums.OperandTypes.Collection.toString()) && firstExtractNode != null && result) {
-            DataOperandsFilterResponse resp = isEndpointValid(firstExtractNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId, false);
+            DataOperandsFilterResponse resp = isEndpointValid(firstExtractNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId, false, validationReason);
+            if (!resp.getResult()) {
+                validationReason.append("\n ParentOperand:- ").append(node.getOperand()).append(" - ").append(resp.getValidationReason());
+            }
             result = result && resp.getResult();
         }
 
-        return new DataOperandsFilterResponse(result, matchingKeySet, contextEntities, firstExtractNode);
+        return new DataOperandsFilterResponse(result, matchingKeySet, contextEntities, firstExtractNode, validationReason.toString());
 
     }
 

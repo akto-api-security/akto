@@ -8,17 +8,18 @@ import com.akto.dto.test_editor.DataOperandFilterRequest;
 public class ContainsEitherFilter extends DataOperandsImpl {
     
     @Override
-    public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
+    public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
         
         Boolean result = false;
         Boolean res;
         List<String> querySet = new ArrayList<>();
+        List<String> notMatchedQuerySet = new ArrayList<>();
         String data;
         try {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return result;
+            return new ValidationResult(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
         for (String queryString: querySet) {
             try {
@@ -26,9 +27,15 @@ public class ContainsEitherFilter extends DataOperandsImpl {
             } catch (Exception e) {
                 res = false;
             }
+            if (!res) {
+                notMatchedQuerySet.add(queryString);
+            }
             result = result || res;
         }
-        return result;    
+        if (result) {
+            return new ValidationResult(result, "");
+        }
+        return new ValidationResult(result, "ContainsEitherFilter skipped due to following not matching with '"+data+"':" + notMatchedQuerySet);
     }
 
     public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {

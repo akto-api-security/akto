@@ -7,27 +7,27 @@ import com.akto.dto.test_editor.DataOperandFilterRequest;
 public class DatatypeFilter extends DataOperandsImpl {
 
     @Override
-    public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
+    public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
         Object data = dataOperandFilterRequest.getData();
         Object querySet = dataOperandFilterRequest.getQueryset();        
         try {
             List<String> queryList = (List) querySet;
             if (queryList == null || queryList.size() == 0) {
-                return false;
+                return new ValidationResult(false, "datatype validation is passed without any query");
             }
 
             if (data instanceof String && queryList.get(0).equalsIgnoreCase("string")) {
-                return true;
+                return new ValidationResult(true, "datatype: string validation is passed because: "+ data + " is string type");
             }
             if (data instanceof Integer && queryList.get(0).equalsIgnoreCase("number")) {
-                return true;
+                return new ValidationResult(true, "datatype: number validation is passed because: "+ data + " is number type");
             }
             if (data instanceof Boolean && queryList.get(0).equalsIgnoreCase("boolean")) {
-                return true;
+                return new ValidationResult(true, "datatype: boolean validation is passed");
             }
-            return false;
+            return new ValidationResult(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         } catch (Exception e) {
-            return false;
+            return new ValidationResult(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
         
     }

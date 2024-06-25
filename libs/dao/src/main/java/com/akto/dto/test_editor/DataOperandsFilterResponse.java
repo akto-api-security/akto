@@ -10,12 +10,22 @@ public class DataOperandsFilterResponse {
     private List<String> matchedEntities;
     private List<BasicDBObject> contextEntities;
     private FilterNode extractNode;
+    private String validationReason;
 
     public DataOperandsFilterResponse(Boolean result, List<String> matchedEntities, List<BasicDBObject> contextEntities, FilterNode extractNode) {
         this.result = result;
         this.matchedEntities = matchedEntities;
         this.contextEntities = contextEntities;
         this.extractNode = extractNode;
+        this.validationReason = null;
+    }
+
+    public DataOperandsFilterResponse(Boolean result, List<String> matchedEntities, List<BasicDBObject> contextEntities, FilterNode extractNode, String validationReason) {
+        this.result = result;
+        this.matchedEntities = matchedEntities;
+        this.contextEntities = contextEntities;
+        this.extractNode = extractNode;
+        this.validationReason = validationReason;
     }
 
     public DataOperandsFilterResponse() { }
@@ -52,4 +62,11 @@ public class DataOperandsFilterResponse {
         this.extractNode = extractNode;
     }
 
+    public String getValidationReason() {
+        return validationReason;
+    }
+
+    public void setValidationReason(String validationReason) {
+        this.validationReason = validationReason;
+    }
 }

@@ -15,6 +15,7 @@ import com.akto.runtime.RelationshipSync;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.filter.Filter;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.testing.StatusCodeAnalyser;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
@@ -363,9 +364,9 @@ public abstract class TestPlugin {
         return comparisonExcludedKeys;
     }
 
-    public static boolean validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
-        if (filterNode == null) return true;
-        if (rawApi == null) return false;
+    public static ValidationResult validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
+        if (filterNode == null) return new ValidationResult(true, "");
+        if (rawApi == null) return  new ValidationResult(true, "raw api is null");
         return validate(filterNode, rawApi, null, apiInfoKey,"filter", varMap, logId);
     }
 
@@ -376,16 +377,16 @@ public abstract class TestPlugin {
         OriginalHttpResponse response = testRawApi.getResponse();
         String body = response == null ? null : response.getBody();
         boolean isDefaultPayload = StatusCodeAnalyser.isDefaultPayload(body);
-        boolean validateResult = validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator", varMap, logId);
+        ValidationResult validateResult = validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator", varMap, logId);
 
         // loggerMaker.infoAndAddToDb(logId + " isDefaultPayload = " + isDefaultPayload + "; validateResult = " + validateResult, LogDb.TESTING);
-        return !isDefaultPayload && validateResult;
+        return !isDefaultPayload && validateResult.getIsValid();
     }
 
-    private static boolean validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId) {
+    private static ValidationResult validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId) {
         Filter filter = new Filter();
         DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap, logId, false);
-        return dataOperandsFilterResponse.getResult();
+        return new ValidationResult(dataOperandsFilterResponse.getResult(), dataOperandsFilterResponse.getValidationReason());
     }
 
     public static class ApiExecutionDetails {

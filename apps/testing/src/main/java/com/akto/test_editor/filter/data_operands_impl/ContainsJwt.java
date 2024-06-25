@@ -11,7 +11,7 @@ import com.akto.dto.type.KeyTypes;
 public class ContainsJwt extends DataOperandsImpl {
     
     @Override
-    public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
+    public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
         List<Boolean> querySet = new ArrayList<>();
         Boolean queryVal;
@@ -23,20 +23,30 @@ public class ContainsJwt extends DataOperandsImpl {
             queryVal = (Boolean) querySet.get(0);
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return false;
+            return new ValidationResult(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
 
         if (data == null || queryVal == null) {
-            return false;
+            return new ValidationResult(result, "");
         }
 
         String[] splitValue = data.toString().split(" ");
+        String jwtKeyType = null;
         for (String x: splitValue) {
             if (KeyTypes.isJWT(x)) {
                 result = true;
+                jwtKeyType = x;
                 break;
             }
         }
-        return result && queryVal;
+        if (queryVal == result) {
+            return new ValidationResult(true,
+                    queryVal? "contains_jwt: true passed because key:"+ jwtKeyType+" is jwt type":
+                            "contains_jwt: false passed because no jwt type found");
+        }
+        if (queryVal) {
+            return new ValidationResult(false, "contains_jwt: true failed because no jwt type found");
+        }
+        return new ValidationResult(false, "contains_jwt: false failed because key:"+ jwtKeyType+" is jwt type");
     }
 }

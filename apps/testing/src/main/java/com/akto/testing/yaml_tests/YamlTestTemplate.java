@@ -13,6 +13,7 @@ import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.auth.AuthValidator;
 import com.akto.test_editor.execution.Executor;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.testing.StatusCodeAnalyser;
 
 import java.util.ArrayList;
@@ -89,7 +90,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     }
 
     @Override
-    public boolean filter() {
+    public ValidationResult filter() {
         // loggerMaker.infoAndAddToDb("filter started" + logId, LogDb.TESTING);
         List<String> authHeaders = AuthValidator.getHeaders(this.auth, this.authMechanism);
         // loggerMaker.infoAndAddToDb("found authHeaders " + authHeaders + " " + logId, LogDb.TESTING);
@@ -100,11 +101,12 @@ public class YamlTestTemplate extends SecurityTestTemplate {
             // loggerMaker.infoAndAddToDb("validating auth, authenticated value is " + this.auth.getAuthenticated() + " " + logId, LogDb.TESTING);
             boolean validAuthHeaders = AuthValidator.validate(this.auth, this.rawApi, this.authMechanism);
             if (!validAuthHeaders) {
+                ValidationResult validationResult = new ValidationResult(false, "No valid auth headers");
                 // loggerMaker.infoAndAddToDb("invalid auth, skipping filter " + logId, LogDb.TESTING);
-                return false;
+                return validationResult;
             }
         }
-        boolean isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId);
+        ValidationResult isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId);
         // loggerMaker.infoAndAddToDb("filter status " + isValid + " " + logId, LogDb.TESTING);
         return isValid;
     }

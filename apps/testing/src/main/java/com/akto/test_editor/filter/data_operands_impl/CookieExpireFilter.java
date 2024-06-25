@@ -15,7 +15,7 @@ import com.akto.runtime.policies.AuthPolicy;
 public class CookieExpireFilter extends DataOperandsImpl {
     
     @Override
-    public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
+    public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
         List<Boolean> querySet = new ArrayList<>();
         Boolean queryVal;
@@ -26,11 +26,11 @@ public class CookieExpireFilter extends DataOperandsImpl {
             queryVal = (Boolean) querySet.get(0);
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return false;
+            return new ValidationResult(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
 
         if (data == null || queryVal == null) {
-            return false;
+            return new ValidationResult(false, queryVal == null ? "cookie_expire_filter is not set true": "no data to be matched for validation");
         }
 
         Map<String,String> cookieMap = AuthPolicy.parseCookie(Arrays.asList(data));
@@ -70,6 +70,13 @@ public class CookieExpireFilter extends DataOperandsImpl {
                 res = true;
             }
         }
-        return result == res;
+        if (result == res) {
+            return new ValidationResult(true, result? "cookie_expire_filter: true passed because cookie:"+ data+" expired":
+                    "cookie_expire_filter: false passed because cookie:"+ data+" not expired");
+        }
+        if (result) {
+            return new ValidationResult(false, "cookie_expire_filter: true failed cookie:"+ data+" not expired");
+        }
+        return new ValidationResult(false, "cookie_expire_filter: false failed because cookie:"+ data+" expired");
     }
 }

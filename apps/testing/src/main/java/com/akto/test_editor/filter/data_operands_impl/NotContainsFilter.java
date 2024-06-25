@@ -8,17 +8,18 @@ import com.akto.dto.test_editor.DataOperandFilterRequest;
 public class NotContainsFilter extends DataOperandsImpl {
     
     @Override
-    public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
+    public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
         Boolean result = true;
         Boolean res;
         List<String> querySet = new ArrayList<>();
         String data;
+        String validationString = null;
         try {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return result;
+            return new ValidationResult(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
 
         for (String queryString: querySet) {
@@ -29,7 +30,12 @@ public class NotContainsFilter extends DataOperandsImpl {
             }
             result = result && res;
         }
-        return result;    
+        if (result) {
+            validationString = "not contains filter passed";
+        } else {
+            validationString = "not contains filter failed because :data - " + data + ", queryset - " + querySet;
+        }
+        return new ValidationResult(result, validationString);
     }
 
 
