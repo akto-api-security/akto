@@ -606,7 +606,7 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private String getNodeResultLastMessage(String message) {
+    public static String getNodeResultLastMessage(String message) {
         if (StringUtils.isEmpty(message) || "[]".equals(message)) {
             return null;
         }

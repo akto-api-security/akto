@@ -3,6 +3,7 @@ package com.akto.action.testing_issues;
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
 import com.akto.dao.RBACDao;
+import com.akto.action.testing.StartTestAction;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -17,9 +18,7 @@ import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.GenericTestResult;
-import com.akto.dto.testing.TestResult;
-import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.*;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -32,6 +31,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
+import org.bouncycastle.util.test.Test;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -149,12 +149,38 @@ public class IssuesAction extends UserAction {
             // todo: fix
             for (TestingRunResult runResult: this.testingRunResults) {
                 List<GenericTestResult> testResults = new ArrayList<>();
+                WorkflowTest workflowTest = runResult.getWorkflowTest();
                 for (GenericTestResult tr : runResult.getTestResults()) {
-                    TestResult testResult = (TestResult) tr;
-                    if (testResult.isVulnerable()) {
-                        testResults.add(testResult);
-                        sampleDataVsCurlMap.put(testResult.getMessage(), ExportSampleDataAction.getCurl(testResult.getMessage()));
-                        sampleDataVsCurlMap.put(testResult.getOriginalMessage(), ExportSampleDataAction.getCurl(testResult.getOriginalMessage()));
+                    if (tr.isVulnerable()) {
+                        if (tr instanceof TestResult) {
+                            TestResult testResult = (TestResult) tr;
+                            testResults.add(testResult);
+                            sampleDataVsCurlMap.put(testResult.getMessage(), ExportSampleDataAction.getCurl(testResult.getMessage()));
+                            sampleDataVsCurlMap.put(testResult.getOriginalMessage(), ExportSampleDataAction.getCurl(testResult.getOriginalMessage()));
+                        } else if (tr instanceof MultiExecTestResult){
+                            MultiExecTestResult testResult = (MultiExecTestResult) tr;
+                            Map<String, WorkflowTestResult.NodeResult> nodeResultMap = testResult.getNodeResultMap();
+                            for (String order : nodeResultMap.keySet()) {
+                                WorkflowTestResult.NodeResult nodeResult = nodeResultMap.get(order);
+                                String nodeResultLastMessage = StartTestAction.getNodeResultLastMessage(nodeResult.getMessage());
+                                if (nodeResultLastMessage != null) {
+                                    nodeResult.setMessage(nodeResultLastMessage);
+                                    sampleDataVsCurlMap.put(nodeResultLastMessage,
+                                            ExportSampleDataAction.getCurl(nodeResultLastMessage));
+                                }
+                            }
+                        }
+                    }
+                    if (workflowTest != null) {
+                        Map<String, WorkflowNodeDetails> nodeDetailsMap = workflowTest.getMapNodeIdToWorkflowNodeDetails();
+                        for (String nodeName: nodeDetailsMap.keySet()) {
+                            if (nodeDetailsMap.get(nodeName) instanceof YamlNodeDetails) {
+                                YamlNodeDetails details = (YamlNodeDetails) nodeDetailsMap.get(nodeName);
+                                sampleDataVsCurlMap.put(details.getOriginalMessage(),
+                                        ExportSampleDataAction.getCurl(details.getOriginalMessage()));
+                            }
+
+                        }
                     }
                 }
                 runResult.setTestResults(testResults);
