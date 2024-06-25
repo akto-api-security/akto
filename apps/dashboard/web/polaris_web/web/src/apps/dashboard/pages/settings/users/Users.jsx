@@ -66,8 +66,12 @@ const Users = () => {
     ]
 
     const getRoleHierarchy = async() => {
-        const roleHierarchyResp = await settingRequests.getRoleHierarchy(window.USER_ROLE)
+        let roleHierarchyResp = await settingRequests.getRoleHierarchy(window.USER_ROLE)
+        if(window.USER_ROLE === 'ADMIN'){
+            roleHierarchyResp.push('REMOVE')
+        }
         setRoleHierarchy(roleHierarchyResp)
+        
     }
 
     useEffect(() => {
@@ -79,6 +83,7 @@ const Users = () => {
         if(newRole === 'REMOVE') {
             await handleRemoveUser(login)
             toggleRoleSelectionPopup(id)
+            setUsers(users.filter(user => user.login !== login))
             return
         }
 
@@ -102,7 +107,7 @@ const Users = () => {
             ...section,
             items: section.items.filter((c) => roleHierarchy.includes(c.role)).map(item => ({
                 ...item,
-                prefix: item.role === currentRole ? <Box><Icon source={TickMinor}/></Box> : <div style={{padding: "10px"}}/>
+                prefix: item.role === "REMOVE"?  <Box><Icon source={DeleteMajor}/></Box> : item.role === currentRole ? <Box><Icon source={TickMinor}/></Box> : <div style={{padding: "10px"}}/>
             }))
         }));
         return tempArr
