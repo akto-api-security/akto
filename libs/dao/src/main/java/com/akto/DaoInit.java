@@ -376,6 +376,7 @@ public class DaoInit {
         CodeAnalysisCollectionDao.instance.createIndicesIfAbsent();
         CodeAnalysisApiInfoDao.instance.createIndicesIfAbsent();
         YamlTemplateDao.instance.createIndicesIfAbsent();
+        RBACDao.instance.createIndicesIfAbsent();
     }
 
 }

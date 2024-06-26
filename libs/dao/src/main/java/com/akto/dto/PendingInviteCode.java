@@ -11,6 +11,7 @@ public class PendingInviteCode {
     private String inviteeEmailId;
     private long expiry;
     private int accountId;
+    private RBAC.Role inviteeRole;
 
     public PendingInviteCode() {
     }
@@ -21,8 +22,17 @@ public class PendingInviteCode {
         this.inviteeEmailId = inviteeEmailId;
         this.expiry = expiry;
         this.accountId = accountId;
+        this.inviteeRole = RBAC.Role.GUEST;
     }
 
+    public PendingInviteCode(String inviteCode, int issuer, String inviteeEmailId, long expiry, int accountId, RBAC.Role inviteeRole) {
+        this.inviteCode = inviteCode;
+        this.issuer = issuer;
+        this.inviteeEmailId = inviteeEmailId;
+        this.expiry = expiry;
+        this.accountId = accountId;
+        this.inviteeRole = inviteeRole;
+    }
     public ObjectId getId() {
         return id;
     }
@@ -69,5 +79,13 @@ public class PendingInviteCode {
 
     public void setAccountId(int accountId) {
         this.accountId = accountId;
+    }
+
+    public RBAC.Role getInviteeRole() {
+        return inviteeRole;
+    }
+
+    public void setInviteeRole(RBAC.Role inviteeRole) {
+        this.inviteeRole = inviteeRole;
     }
 }
