@@ -21,7 +21,7 @@ function AuthenticationSetup() {
     const [authenticationTestCategories, setAuthenticationTestCategories] = useState([])
 
     const [currentStep, setCurrentStep] = useState(0)
-    const authenticationCollectionIds = [111_111_128, 111_111_130, 111_111_129, 111_111_202]
+    const authenticationCollectionIds = [111_111_128, 111_111_130, 111_111_129, 111_111_202, 111_111_208]
 
     const fetchAuthenticationSetupData = async () => {
         const authenticationApiGroupsCopy = allCollections.filter(x => (x.urlsCount > 0 && x?.conditions !== null && !x?.deactivated && authenticationCollectionIds.includes(x.id)))
