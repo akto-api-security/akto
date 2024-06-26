@@ -277,7 +277,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 if(user != null){
                     AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId());
                 }
-                createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), Config.ConfigType.AUTH0.toString());
+                createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), Config.ConfigType.AUTH0.toString(), pendingInviteCode.getInviteeRole());
 
                 return SUCCESS.toUpperCase();
             } else if(pendingInviteCode == null){
@@ -367,6 +367,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             return ERROR.toUpperCase();
         }
         int invitedToAccountId = 0;
+        RBAC.Role inviteeRole = null;
         if (!invitationCode.isEmpty()) {
             Jws<Claims> jws;
             try {
@@ -393,6 +394,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             // deleting the invitation code
             PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
             invitedToAccountId = pendingInviteCode.getAccountId();
+            inviteeRole = pendingInviteCode.getInviteeRole();
         } else {
             if (!InitializerListener.isSaas) {
                 long countUsers = UsersDao.instance.getMCollection().countDocuments();
@@ -425,7 +427,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
         try {
             shouldLogin = "true";
-            createUserAndRedirect(email, email, signupInfo, invitedToAccountId, "email");
+            createUserAndRedirect(email, email, signupInfo, invitedToAccountId, "email", inviteeRole);
         } catch (IOException e) {
             e.printStackTrace();
             return ERROR.toUpperCase();
@@ -690,6 +692,11 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
                                        int invitationToAccount, String method) throws IOException {
+        createUserAndRedirect(userEmail, username, signupInfo, invitationToAccount, method, null);
+    }
+
+    private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
+                                       int invitationToAccount, String method, RBAC.Role invitedRole) throws IOException {
         User user = UsersDao.instance.findOne(eq("login", userEmail));
         if (user == null && "false".equalsIgnoreCase(shouldLogin)) {
             SignupUserInfo signupUserInfo = SignupDao.instance.insertSignUp(userEmail, username, signupInfo, invitationToAccount);
@@ -739,7 +746,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 return;
             }
 
-            user = AccountAction.initializeAccount(userEmail, accountId, "My account",invitationToAccount == 0);
+            user = AccountAction.initializeAccount(userEmail, accountId, "My account",invitationToAccount == 0, invitedRole == null ? RBAC.Role.MEMBER : invitedRole);
 
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);

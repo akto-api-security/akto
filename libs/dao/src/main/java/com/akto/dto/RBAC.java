@@ -3,6 +3,11 @@ package com.akto.dto;
 
 import org.bson.types.ObjectId;
 
+import com.akto.dto.rbac.*;
+
+import com.akto.dto.rbac.RbacEnums.Feature;
+import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
+
 public class RBAC {
 
     private ObjectId id;
@@ -15,7 +20,30 @@ public class RBAC {
     public static final String ACCOUNT_ID = "accountId";
 
     public enum Role {
-        ADMIN, MEMBER
+        ADMIN("ADMIN",new AdminRoleStrategy()),
+        MEMBER("SECURITY ENGINEER", new MemberRoleStrategy()),
+        DEVELOPER("DEVELOPER", new DeveloperRoleStrategy()),
+        GUEST("GUEST", new GuestRoleStrategy());
+
+        private final RoleStrategy roleStrategy;
+        private String name;
+
+        Role(String name ,RoleStrategy roleStrategy) {
+            this.roleStrategy = roleStrategy;
+            this.name = name;
+        }
+
+        public Role[] getRoleHierarchy() {
+            return roleStrategy.getRoleHierarchy();
+        }
+
+        public ReadWriteAccess getReadWriteAccessForFeature(Feature feature) {
+            return roleStrategy.getFeatureAccessMap().getOrDefault(feature, ReadWriteAccess.READ);
+        }
+
+        public String getName() {
+            return name;
+        }
     }
 
     public RBAC(int userId, Role role) {
