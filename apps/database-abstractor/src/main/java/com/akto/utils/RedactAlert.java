@@ -1,6 +1,8 @@
 package com.akto.utils;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
@@ -23,28 +25,31 @@ public class RedactAlert {
     static final Pattern pattern = Pattern.compile(regex);
 
     private static final int CACHE_INTERVAL = 2 * 60;
-    private static int lastFetched = 0;
-    private static boolean isRedactOn = false;
+    private static Map<Integer, Integer> lastFetchedMap = new HashMap<>();
+    private static Map<Integer, Boolean> redactMap = new HashMap<>();
 
     private static boolean checkRedact() {
         int now = Context.now();
-        if (lastFetched + CACHE_INTERVAL > now) {
-            return isRedactOn;
+        int accountId = Context.accountId.get();
+        if (redactMap.containsKey(accountId) &&
+                lastFetchedMap.containsKey(accountId) &&
+                lastFetchedMap.get(accountId) + CACHE_INTERVAL > now) {
+            return redactMap.get(accountId);
         }
 
-        isRedactOn = false;
+        redactMap.put(accountId, false);
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         List<ApiCollection> all = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         for (ApiCollection apiCollection : all) {
             if (apiCollection.getRedact()) {
-                isRedactOn = true;
+                redactMap.put(accountId, true);
             }
         }
         if (accountSettings.isRedactPayload()) {
-            isRedactOn = true;
+            redactMap.put(accountId, true);
         }
-        lastFetched = now;
-        return isRedactOn;
+        lastFetchedMap.put(accountId, now);
+        return redactMap.get(accountId);
     }
 
     public static void sendToCyborgSlack(String message) {
