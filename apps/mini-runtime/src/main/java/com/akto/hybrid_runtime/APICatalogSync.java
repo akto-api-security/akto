@@ -1252,6 +1252,8 @@ public class APICatalogSync {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         if (accountSettings != null) {
             partnerIpList = accountSettings.getPartnerIpList();
+            int acc = accountSettings.getId();
+            Context.accountId.set(acc);
         }
         
         int accountId = Context.accountId.get();

@@ -118,7 +118,7 @@ public class HttpCallParser {
         payload = HttpRequestResponseUtils.rawToJsonString(payload, responseHeaders);
         payload = JSONUtils.parseIfJsonP(payload);
         int time = Integer.parseInt(json.get("time").toString());
-        String accountId = (String) json.get("akto_account_id");
+        String accountId = Context.accountId.get() + "";
         String sourceIP = (String) json.get("ip");
 
         String isPendingStr = (String) json.getOrDefault("is_pending", "false");
