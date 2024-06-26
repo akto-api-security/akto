@@ -77,10 +77,6 @@ public class Main {
                 if (json.containsKey(VPC_CIDR)) {
                     List<String> cidrList = (List<String>) json.get(VPC_CIDR);
                     logger.info("cidrList: " + cidrList);
-                    // For old deployments, we won't receive ACCOUNT_ID. If absent, we assume 1_000_000.
-                    String accountIdStr = (String) (json.get(ACCOUNT_ID));
-                    int accountId = StringUtils.isNumeric(accountIdStr) ? Integer.parseInt(accountIdStr) : 1_000_000;
-                    Context.accountId.set(accountId);
                     dataActor.updateCidrList(cidrList);
                 }
             }

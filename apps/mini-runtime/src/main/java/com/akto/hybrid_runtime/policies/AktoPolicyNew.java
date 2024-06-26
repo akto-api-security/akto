@@ -51,13 +51,15 @@ public class AktoPolicyNew {
         fetchFilters();
 
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
+        int accountId = Context.accountId.get();
+        redact = accountId == 1718042191;
         if (accountSettings != null) {
             List<String> cidrList = accountSettings.getPrivateCidrList();
             if ( cidrList != null && !cidrList.isEmpty()) {
                 apiAccessTypePolicy.setPrivateCidrList(cidrList);
             }
-            int accountId = Context.accountId.get();
-    
+            accountId = accountSettings.getId();
+            Context.accountId.set(accountId);
             redact = accountId == 1718042191 || accountSettings.isRedactPayload();
         }
 
