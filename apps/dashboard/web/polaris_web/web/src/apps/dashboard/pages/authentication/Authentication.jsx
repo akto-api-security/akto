@@ -1,6 +1,6 @@
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
-import { Divider, LegacyCard } from "@shopify/polaris";
+import { Box, Divider, LegacyCard } from "@shopify/polaris";
 import { useEffect, useState } from "react";
 import PersistStore from "@/apps/main/PersistStore";
 import api from "@/apps/dashboard/pages/observe/api";
@@ -21,9 +21,10 @@ function AuthenticationSetup() {
     const [authenticationTestCategories, setAuthenticationTestCategories] = useState([])
 
     const [currentStep, setCurrentStep] = useState(0)
+    const authenticationCollectionIds = [111_111_128, 111_111_130, 111_111_129, 111_111_202]
 
     const fetchAuthenticationSetupData = async () => {
-        const authenticationApiGroupsCopy = allCollections.filter(x => (x.urlsCount > 0 && x?.conditions !== null && !x?.deactivated))
+        const authenticationApiGroupsCopy = allCollections.filter(x => (x.urlsCount > 0 && x?.conditions !== null && !x?.deactivated && authenticationCollectionIds.includes(x.id)))
         for (const authenticationApiGroup of authenticationApiGroupsCopy) {
             const collectionId = authenticationApiGroup.id
             const apiCollectionData = await api.fetchAPICollection(collectionId)
@@ -118,7 +119,9 @@ function AuthenticationSetup() {
             <LegacyCard.Section>
                 {authenticationScreenPages[currentStep].pageComponent}
             </LegacyCard.Section>
-            <Divider/>
+            <Box paddingBlockEnd={"5"}>
+                <Divider/>
+            </Box>
         </LegacyCard>
     )
 }

@@ -1,4 +1,4 @@
-import { Badge, Box, HorizontalStack, LegacyCard, Text } from "@shopify/polaris"
+import { Badge, Box, HorizontalStack, LegacyCard, Text, VerticalStack } from "@shopify/polaris"
 import { useState } from "react"
 import ItemsGroupCard from "./ItemsGroupCard"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable"
@@ -10,7 +10,31 @@ function ItemsSelectorFromCard({ itemGroups, selectedItems, setSelectedItems, it
     const [showGroupItems, setShowGroupItems] = useState(false)
     const [currentItemGroup, setCurrentItemGroup] = useState(null)
 
-    
+    itemGroups.forEach(itemGroup => {
+
+        itemGroup.onSelect = () => {
+            setShowGroupItems(true)
+            setCurrentItemGroup(itemGroup)
+        }
+        itemGroup.itemsListFieldName = itemsListFieldName
+        itemGroup.itemsResourceName = itemsResourceName
+
+        let selectedCtr = 0
+
+        itemGroup[itemsListFieldName].forEach(item => {
+            const id = item.id
+            const processedItemId = processItemId !== undefined ? processItemId(id) : id
+
+            if (selectedItems.includes(processedItemId)) {
+                item.selected = true
+                selectedCtr += 1
+            } else {
+                item.selected = false
+            }
+        })
+        itemGroup.selectedCtr = selectedCtr
+    })
+
 
     const handleClose = () => {
         setCurrentItemGroup(null)
@@ -71,11 +95,26 @@ function ItemsSelectorFromCard({ itemGroups, selectedItems, setSelectedItems, it
         </LegacyCard>
     ] : []
 
+    const aktoRecLen =  itemsListFieldName === 'apis' ? itemGroups.filter((x) => x.automated).length : -1
+    const customLen =  itemsListFieldName === 'apis' ? itemGroups.filter((x) => !x.automated).length : -1
+
+    const rowsCardComp = (
+        itemsListFieldName !== 'apis' ? <GridRows CardComponent={ItemsGroupCard} columns="3" items={itemGroups}/> :
+        <VerticalStack gap={"5"}>
+            {aktoRecLen > 0 ? <VerticalStack gap={"4"}>
+                <Text variant="headingMd">Akto recommended</Text>
+                <GridRows CardComponent={ItemsGroupCard} columns="3" items={itemGroups.filter((x) => x.automated)}/>
+            </VerticalStack> : null}
+            {customLen > 0 ? <VerticalStack gap={"4"}>
+                <Text variant="headingMd">Custom</Text>
+                <GridRows CardComponent={ItemsGroupCard} columns="3" items={itemGroups.filter((x) => !x.automated)}/>
+            </VerticalStack>: null}
+        </VerticalStack>
+    )
+
     return (
-        <Box minHeight="300px" padding={'4'}>
-
-            <GridRows CardComponent={ItemsGroupCard} columns="3" items={itemGroups}/>
-
+        <Box>
+            {rowsCardComp}
             <FlyLayout
                 show={showGroupItems}
                 titleComp={itemGroupTitle}

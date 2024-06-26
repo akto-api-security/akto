@@ -23,6 +23,7 @@ public class YamlTemplate {
     public static final String INACTIVE = "inactive";
     private String repositoryUrl;
     public static final String REPOSITORY_URL = "repositoryUrl";
+    public static final String CATEGORY_STRING = "info.category.name";
 
     public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info) {
         this.id = id;

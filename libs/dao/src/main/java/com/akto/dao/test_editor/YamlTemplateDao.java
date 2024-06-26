@@ -1,6 +1,8 @@
 package com.akto.dao.test_editor;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.MCollection;
+import com.akto.dao.context.Context;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -18,6 +20,23 @@ import org.bson.conversions.Bson;
 public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
 
     public static final YamlTemplateDao instance = new YamlTemplateDao();
+    
+    public void createIndicesIfAbsent() {
+        boolean exists = false;
+        for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
+            if (getCollName().equalsIgnoreCase(col)){
+                exists = true;
+                break;
+            }
+        };
+
+        if (!exists) {
+            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
+        }
+       
+        String [] fieldNames = new String[]{YamlTemplate.CATEGORY_STRING};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+    }
 
     public Map<String, TestConfig> fetchTestConfigMap(boolean includeYamlContent, boolean fetchOnlyActive) {
         Map<String, TestConfig> testConfigMap = new HashMap<>();

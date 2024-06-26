@@ -3,6 +3,7 @@ package com.akto;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.loaders.LoadersDao;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -374,6 +375,7 @@ public class DaoInit {
         DependencyFlowNodesDao.instance.createIndicesIfAbsent();
         CodeAnalysisCollectionDao.instance.createIndicesIfAbsent();
         CodeAnalysisApiInfoDao.instance.createIndicesIfAbsent();
+        YamlTemplateDao.instance.createIndicesIfAbsent();
     }
 
 }
