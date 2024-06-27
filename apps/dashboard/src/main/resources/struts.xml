@@ -360,15 +360,6 @@
         <action name="signup-email" class="com.akto.action.SignupAction" method="registerViaEmail">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_ACTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="root">code</param>
@@ -378,15 +369,6 @@
         <action name="signup-google" class="com.akto.action.SignupAction" method="registerViaGoogle">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_ACTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="root">code</param>
@@ -397,15 +379,6 @@
         <action name="signup-github" class="com.akto.action.SignupAction" method="registerViaGithub">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_ACTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="root">code</param>
@@ -415,15 +388,6 @@
         <action name="authorization-code/callback" class="com.akto.action.SignupAction" method="registerViaOkta">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_ACTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="root">code</param>
@@ -433,15 +397,6 @@
         <action name="signup-azure-request" class="com.akto.action.SignupAction" method="sendRequestToAzure">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_ACTIONS</param>
-                <param name="accessType">READ_WRITE</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="root">code</param>
@@ -451,15 +406,6 @@
         <action name="signup-azure-saml" class="com.akto.action.SignupAction" method="registerViaAzure">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_ACTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="root">code</param>
@@ -5357,16 +5303,6 @@
         <action name="callback" class="com.akto.action.SignupAction" method="registerViaAuth0">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_ACTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
             <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="json">
                 <param name="root">code</param>

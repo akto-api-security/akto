@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, Link, Tooltip } from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList} from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
@@ -83,6 +83,8 @@ const headers = [
 ]
 
 const sortOptions = [
+    { label: 'Name', value: 'displayName asc', directionLabel: 'A-Z', sortKey: 'displayName' },
+    { label: 'Name', value: 'displayName desc', directionLabel: 'Z-A', sortKey: 'displayName' },
     { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'deactivatedRiskScore' },
     { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'activatedRiskScore' },
     { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: 3 },
@@ -111,7 +113,7 @@ function convertToCollectionData(c) {
     }    
 }
 
-const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap) => {
+const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading) => {
 
     const newData = collectionsArr.map((c) => {
         if(c.deactivated){
@@ -131,7 +133,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         }
     })
 
-    const prettifyData = transform.prettifyCollectionsData(newData)
+    const prettifyData = transform.prettifyCollectionsData(newData, isLoading)
     return { prettify: prettifyData, normal: newData }
 }
 
@@ -177,18 +179,27 @@ function ApiCollections() {
 
     const setCoverageMap = PersistStore(state => state.setCoverageMap)
 
+    const lastFetchedInfo = PersistStore.getState().lastFetchedInfo
+    const lastFetchedResp = PersistStore.getState().lastFetchedResp
+    const lastFetchedSeverityResp = PersistStore.getState().lastFetchedSeverityResp
+    const lastFetchedSensitiveResp = PersistStore.getState().lastFetchedSensitiveResp
+    const setLastFetchedInfo = PersistStore.getState().setLastFetchedInfo
+    const setLastFetchedResp = PersistStore.getState().setLastFetchedResp
+    const setLastFetchedSeverityResp = PersistStore.getState().setLastFetchedSeverityResp
+    const setLastFetchedSensitiveResp = PersistStore.getState().setLastFetchedSensitiveResp
+
+    // as riskScore cron runs every 5 min, we will cache the data and refresh in 5 mins
+    // similarly call sensitive and severityInfo
+
     async function fetchData() {
+
+        // first api call to get only collections name and collection id
         setLoading(true)
         let apiCollectionsResp = await api.getAllCollectionsBasic();
         setLoading(false)
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
-        let envTypeObj = {}
-        tmp.forEach((c) => {
-            envTypeObj[c.id] = c.envType
-        })
-        setEnvTypeMap(envTypeObj)
         let dataObj = {}
-        dataObj = convertToNewData(tmp, {}, {}, {}, {}, {});
+        dataObj = convertToNewData(tmp, {}, {}, {}, {}, {}, true);
         let res = {}
         res.all = dataObj.prettify
         res.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
@@ -196,12 +207,22 @@ function ApiCollections() {
         res.custom = res.all.filter(x => !res.hostname.includes(x) && !res.groups.includes(x));
         setData(res);
 
+        const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
+
+        // fire all the other apis in parallel
+
         let apiPromises = [
             api.getAllCollections(),
             api.getCoverageInfoForCollections(),
             api.getLastTrafficSeen(),
             api.getUserEndpoints(),
         ];
+        if(shouldCallHeavyApis){
+            apiPromises = [
+                ...apiPromises,
+                ...[api.getRiskScoreInfo(), api.getSensitiveInfoForCollections(), api.getSeverityInfoForCollections()]
+            ]
+        }
         
         let results = await Promise.allSettled(apiPromises);
 
@@ -209,22 +230,52 @@ function ApiCollections() {
         let coverageInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
         let hasUserEndpoints = results[3].status === 'fulfilled' ? results[3].value : true;
+
+        let riskScoreObj = lastFetchedResp
+        let sensitiveInfo = lastFetchedSensitiveResp
+        let severityObj = lastFetchedSeverityResp
+
+        if(shouldCallHeavyApis){
+            if(results[4]?.status === "fulfilled"){
+                const res = results[4].value
+                riskScoreObj = {
+                    criticalUrls: res.criticalEndpointsCount,
+                    riskScoreMap: res.riskScoreOfCollectionsMap
+                } 
+            }
+
+            if(results[5]?.status === "fulfilled"){
+                const res = results[5].value
+                sensitiveInfo ={ 
+                    sensitiveUrls: res.sensitiveUrlsInResponse,
+                    sensitiveInfoMap: res.sensitiveSubtypesInCollection
+                }
+            }
+
+            if(results[6]?.status === "fulfilled"){
+                const res = results[6].value
+                severityObj = res
+            }
+
+            // update the store which has the cached response
+            setLastFetchedInfo({lastRiskScoreInfo: func.timeNow(), lastSensitiveInfo: func.timeNow()})
+            setLastFetchedResp(riskScoreObj)
+            setLastFetchedSeverityResp(severityObj)
+            setLastFetchedSensitiveResp(sensitiveInfo)
+
+        }
+
         setHasUsageEndpoints(hasUserEndpoints)
         setCoverageMap(coverageInfo)
 
         tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
-        envTypeObj = {}
+        let envTypeObj = {}
         tmp.forEach((c) => {
             envTypeObj[c.id] = c.envType
         })
         setEnvTypeMap(envTypeObj)
 
-        const issuesObj = await transform.fetchRiskScoreInfo();
-        const severityObj = issuesObj.severityObj;
-        const riskScoreObj = issuesObj.riskScoreObj;
-        const sensitiveInfo = await transform.fetchSensitiveInfo();
-
-        dataObj = convertToNewData(tmp, sensitiveInfo.sensitiveInfoMap, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap);
+        dataObj = convertToNewData(tmp, sensitiveInfo.sensitiveInfoMap, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap, false);
 
         const summary = transform.getSummaryData(dataObj.normal)
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;

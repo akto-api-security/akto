@@ -382,7 +382,7 @@ const transform = {
         )
     },
 
-    prettifyCollectionsData(newData){
+    prettifyCollectionsData(newData, isLoading){
         const prettifyData = newData.map((c)=>{
             let calcCoverage = '0%';
             if(c.endpoints > 0){
@@ -392,6 +392,7 @@ const transform = {
                     calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%'
                 }
             }
+            const loadingComp = <Text color="subdued" variant="bodyMd">...</Text>
             return{
                 ...c,
                 id: c.id,
@@ -399,15 +400,15 @@ const transform = {
                 displayName: c.displayName,
                 displayNameComp: c.displayNameComp,
                 endpoints: c.endpoints,
-                riskScoreComp: <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
-                coverage: calcCoverage,
-                issuesArr: this.getIssuesList(c.severityInfo),
-                sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes, c.deactivated),
-                lastTraffic: c.detected,
+                riskScoreComp: isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
+                coverage: isLoading ? '...' : calcCoverage,
+                issuesArr: isLoading ? loadingComp : this.getIssuesList(c.severityInfo),
+                sensitiveSubTypes: isLoading ? loadingComp : this.prettifySubtypes(c.sensitiveInRespTypes, c.deactivated),
+                lastTraffic: isLoading ? '...' : c.detected,
                 riskScore: c.riskScore,
                 deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
                 activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 )),
-                envTypeComp: c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null
+                envTypeComp: isLoading ? loadingComp : c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null
             }
         })
 
