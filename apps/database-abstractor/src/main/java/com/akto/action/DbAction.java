@@ -33,6 +33,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.utils.KafkaUtils;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.kafka.Kafka;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
@@ -45,6 +46,7 @@ import org.bson.types.ObjectId;
 
 import com.google.gson.Gson;
 
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -53,6 +55,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class DbAction extends ActionSupport {
 
@@ -83,6 +88,108 @@ public class DbAction extends ActionSupport {
 
     public List<BulkUpdates> getWritesForTestingRunIssues() {
         return writesForTestingRunIssues;
+    }
+
+    public static String generateSampleData() {
+        String a = "{ \"path\": \"/api/books/AVNEESH\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"host\\\" : \\\"akto.io\\\"}\", \"requestPayload\": \"[\\r\\n" + //
+                        "  {\\r\\n" + //
+                        "    \\\"_id\\\": \\\"667cf080347262e676b83e2f\\\",\\r\\n" + //
+                        "    \\\"index\\\": 0,\\r\\n" + //
+                        "    \\\"guid\\\": \\\"3f71af1a-906d-4e5d-9f9d-89566bc95a85\\\",\\r\\n" + //
+                        "    \\\"isActive\\\": false,\\r\\n" + //
+                        "    \\\"balance\\\": \\\"$1,726.16\\\",\\r\\n" + //
+                        "    \\\"picture\\\": \\\"http:\\/\\/placehold.it\\/32x32\\\",\\r\\n" + //
+                        "    \\\"email\\\": \\\"averyrivas@venoflex.com\\\",\\r\\n" + //
+                        "    \\\"about\\\": \\\"Eiusmod nostrud dolor dolore proident voluptate laboris consequat laboris occaecat. Et tempor cupidatat eu Lorem do Lorem. Velit pariatur irure do quis velit occaecat voluptate cupidatat non magna.\\\\r\\\\n" + //
+                        "\\\",\\r\\n" + //
+                        "    \\\"registered\\\": \\\"2020-04-25T02:44:07 -06:-30\\\",\\r\\n" + //
+                        "    \\\"latitude\\\": -74.692953,\\r\\n" + //
+                        "    \\\"longitude\\\": -167.354501,\\r\\n" + //
+                        "    \\\"tags\\\": [\\r\\n" + //
+                        "      \\\"duis\\\"\\r\\n" + //
+                        "    ],\\r\\n" + //
+                        "    \\\"friends\\\": [\\r\\n" + //
+                        "      {\\r\\n" + //
+                        "        \\\"id\\\": 0,\\r\\n" + //
+                        "        \\\"name\\\": \\\"Schultz Buckner\\\"\\r\\n" + //
+                        "      }\\r\\n" + //
+                        "    ],\\r\\n" + //
+                        "    \\\"greeting\\\": \\\"Hello, undefined! You have 1 unread messages.\\\",\\r\\n" + //
+                        "    \\\"favoriteFruit\\\": \\\"strawberry\\\"\\r\\n" + //
+                        "  }\\r\\n" + //
+                        "]\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"resHeader\\\" : \\\"1\\\"}\", \"status\": \"OK\", \"responsePayload\": \"{\\\"user_resp\\\": \\\"akto\\\"}\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": -1, \"source\": \"MIRRORING\" }";
+        SecureRandom random = new SecureRandom();
+        int STRING_LENGTH = 10;
+        StringBuilder sb = new StringBuilder(STRING_LENGTH);
+
+        String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        for (int i = 0; i < STRING_LENGTH; i++) {
+            int randomIndex = random.nextInt(CHARACTERS.length());
+            sb.append(CHARACTERS.charAt(randomIndex));
+        }
+
+        String randomString = sb.toString();
+        return a.replace("AVNEESH", randomString);
+    }
+    private static final ExecutorService executorService = Executors.newFixedThreadPool(1);
+
+    private static void fillData() throws InterruptedException, ExecutionException{
+        String centralKafkaBrokerUrl = System.getenv("KAFKA_IP");
+        if(centralKafkaBrokerUrl == null || centralKafkaBrokerUrl.isEmpty()){
+            centralKafkaBrokerUrl = "hybrid-redact-akto-mini-runtime.dev.svc.cluster.local:9092";
+        }
+        int centralKafkaBatchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
+        int centralKafkaLingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
+        Kafka kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
+        String centralKafkaTopicName = "akto.api.logs";
+        String dataVolumeStr = System.getenv("DATA_VOLUME");
+        int dataVolume = 1;
+        if (dataVolumeStr == null || dataVolumeStr.isEmpty()) {
+
+        } else {
+            dataVolume = Integer.parseInt(dataVolumeStr);
+        }
+        for (int j = 0; j < dataVolume; j++) {
+            String v = generateSampleData();
+            for (int i = 0; i < dataVolume; i++) {
+                kafkaProducer.send(v, centralKafkaTopicName);
+            }
+        }
+        while (true) {
+            Thread.sleep(1000);
+        }
+    }
+
+    // public static void main(String[] args) throws InterruptedException, ExecutionException {
+        
+    // }
+
+    public String tempAPI(){
+        // int accountId = Context.accountId.get();
+        System.out.println("API hit");
+        executorService.submit(() -> {
+            // Context.accountId.set(accountId);
+            try {
+                fillData();
+            } catch(Exception e){
+                String err = "Error: ";
+                if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
+                    StackTraceElement stackTraceElement = e.getStackTrace()[0];
+                    err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+                } else {
+                    err = String.format("Err msg: %s\nStackTrace not available", err);
+                }
+                e.printStackTrace();
+                System.out.println("error: ");
+                System.out.println(err);
+            }
+        });
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String healthAPI(){
+        System.out.println("health hit");
+        return Action.SUCCESS.toUpperCase();
     }
 
     public void setWritesForTestingRunIssues(List<BulkUpdates> writesForTestingRunIssues) {

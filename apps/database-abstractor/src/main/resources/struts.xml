@@ -145,6 +145,27 @@
             </result>
         </action>
 
+        <action name="api/tempAPI" class="com.akto.action.DbAction" method="tempAPI">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+                <action name="api/healthAPI" class="com.akto.action.DbAction" method="healthAPI">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/bulkWriteSampleData" class="com.akto.action.DbAction" method="bulkWriteSampleData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

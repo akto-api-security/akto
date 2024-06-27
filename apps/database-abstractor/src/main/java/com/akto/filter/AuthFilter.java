@@ -21,17 +21,17 @@ public class AuthFilter implements Filter {
 
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain chain) throws IOException, ServletException {
-        HttpServletRequest httpServletRequest= (HttpServletRequest) servletRequest;
-        HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
-        String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
+        // HttpServletRequest httpServletRequest= (HttpServletRequest) servletRequest;
+        // HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
+        // String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
 
-        try {
-            Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
-            Context.accountId.set((int) claims.getBody().get("accountId"));
-        } catch (Exception e) {
-            System.out.println(e.getMessage());
-            httpServletResponse.sendError(401);
-        }
+        // try {
+        //     Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
+        //     Context.accountId.set((int) claims.getBody().get("accountId"));
+        // } catch (Exception e) {
+        //     System.out.println(e.getMessage());
+        //     httpServletResponse.sendError(401);
+        // }
         chain.doFilter(servletRequest, servletResponse);
 
     }

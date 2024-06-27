@@ -30,37 +30,37 @@ public class InitializerListener implements ServletContextListener {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         String triggerMergingCron = System.getenv("TRIGGER_MERGING_CRON");
 
-        executorService.schedule(new Runnable() {
-            public void run() {
-                boolean calledOnce = false;
-                do {
-                    try {
-                        if (!calledOnce) {
-                            DaoInit.init(new ConnectionString(mongoURI));
-                            calledOnce = true;
-                        }
-                        checkMongoConnection();
+        // executorService.schedule(new Runnable() {
+        //     public void run() {
+        //         boolean calledOnce = false;
+        //         do {
+        //             try {
+        //                 if (!calledOnce) {
+        //                     DaoInit.init(new ConnectionString(mongoURI));
+        //                     calledOnce = true;
+        //                 }
+        //                 checkMongoConnection();
 
-                        if (triggerMergingCron != null && triggerMergingCron.equalsIgnoreCase("false")) {
-                            logger.info("skipping triggering merging cron");
-                        } else {
-                            Cron cron = new Cron();
-                            logger.info("triggering merging cron for db abstractor " + Context.now());
-                            cron.cron(true);
-                        }
+        //                 if (triggerMergingCron != null && triggerMergingCron.equalsIgnoreCase("false")) {
+        //                     logger.info("skipping triggering merging cron");
+        //                 } else {
+        //                     Cron cron = new Cron();
+        //                     logger.info("triggering merging cron for db abstractor " + Context.now());
+        //                     cron.cron(true);
+        //                 }
 
-                    } catch (Exception e) {
-                        logger.error("error running initializer method for db abstractor", e);
-                    } finally {
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                } while (!connectedToMongo);
-            }
-        }, 0, TimeUnit.SECONDS);
+        //             } catch (Exception e) {
+        //                 logger.error("error running initializer method for db abstractor", e);
+        //             } finally {
+        //                 try {
+        //                     Thread.sleep(1000);
+        //                 } catch (InterruptedException e) {
+        //                     throw new RuntimeException(e);
+        //                 }
+        //             }
+        //         } while (!connectedToMongo);
+        //     }
+        // }, 0, TimeUnit.SECONDS);
 
         KafkaUtils kafkaUtils = new KafkaUtils();
         logger.info("trying to init kafka consumer and producer");
