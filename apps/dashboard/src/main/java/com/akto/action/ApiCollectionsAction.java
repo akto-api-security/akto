@@ -30,6 +30,7 @@ import com.akto.dto.usage.UsageMetric;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
@@ -382,7 +383,12 @@ public class ApiCollectionsAction extends UserAction {
             return;
         }
         loggerMaker.infoAndAddToDb(String.format("Fixing sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
+        Set<Integer> demoCollections = UsageMetricCalculator.getDemos();
         for (ApiCollection apiCollection: apiCollections) {
+            if (demoCollections.contains(apiCollection.getId())) {
+                continue;
+            }
+
             int apiCollectionId = apiCollection.getId();
             UpdateResult updateResult = SampleDataDao.instance.updateManyNoUpsert(Filters.eq("_id.apiCollectionId", apiCollectionId), Updates.set("samples", Collections.emptyList()));
             loggerMaker.infoAndAddToDb(String.format("Fixed %d sample data for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);

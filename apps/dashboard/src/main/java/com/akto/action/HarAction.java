@@ -52,8 +52,11 @@ public class HarAction extends UserAction {
     private byte[] tcpContent;
     private static final LoggerMaker loggerMaker = new LoggerMaker(HarAction.class);
 
+    private boolean internalCall = false;
+
     public String executeWithSkipKafka(boolean skipKafka) throws IOException {
         this.skipKafka = skipKafka;
+        this.internalCall = true;
         execute();
         return SUCCESS.toUpperCase();
     }
@@ -117,7 +120,7 @@ public class HarAction extends UserAction {
 
         String commonErrorMessage = "collection can't be used, please create a new collection.";
 
-        if(demoCollections.contains(apiCollectionId)) {
+        if(!internalCall && demoCollections.contains(apiCollectionId)) {
             addActionError("Demo " + commonErrorMessage);
             return ERROR.toUpperCase();
         }
