@@ -144,7 +144,7 @@ public class ApiCollectionsAction extends UserAction {
     public String fetchAllCollectionsBasic(){
         this.apiCollections = ApiCollectionsDao.instance.findAll(
             new BasicDBObject(), 
-            Projections.include(ApiCollection.ID, ApiCollection.NAME)
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME)
         );
         return Action.SUCCESS.toUpperCase();
     }
