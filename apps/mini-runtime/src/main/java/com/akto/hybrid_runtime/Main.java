@@ -21,7 +21,9 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
+import com.akto.util.AccountTask;
 import com.akto.util.DashboardMode;
+import com.akto.util.enums.GlobalEnums;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
 
@@ -40,7 +42,7 @@ public class Main {
     public static final String VPC_CIDR = "vpc_cidr";
     public static final String ACCOUNT_ID = "account_id";
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.RUNTIME);
 
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
@@ -147,6 +149,8 @@ public class Main {
 
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
+        setUpLogAppStatusScheduler();
+        
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
         String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
@@ -500,5 +504,17 @@ public class Main {
         properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
 
         return properties;
+    }
+
+    public static void setUpLogAppStatusScheduler() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                try {
+                    loggerMaker.infoAndAddToDb("Mini Runtime up and running");
+                } catch (Exception e) {
+                    logger.error("Error in setUpLogAppStatusScheduler: {}", e.getMessage());
+                }
+            }
+        }, 0, 1, TimeUnit.HOURS);
     }
 }
