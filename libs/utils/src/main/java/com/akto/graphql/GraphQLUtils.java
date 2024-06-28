@@ -144,6 +144,13 @@ public class GraphQLUtils {//Singleton class
         return editGraphqlField(payload, field, value, "MODIFY", false);
     }
 
+    /*
+     * Used to edit arguments which are not variables.
+     */
+    public String modifyGraphqlStaticArguments(String payload, String value) {
+        return editGraphqlField(payload, "", value, "MODIFY_ARG", false);
+    }
+
     private String editGraphqlField(String payload, String field, String value, String type, boolean unique) {
         String tempVariable = "__tempDummyVariableToReplace";
         Object payloadObj = JSON.parse(payload);
@@ -239,7 +246,22 @@ public class GraphQLUtils {//Singleton class
                         return super.visitField(node, context);
                     }
                 }
+
+                @Override
+                public TraversalControl visitArgument(Argument node, TraverserContext<Node> context) {
+                    switch (type) {
+                        case "MODIFY_ARG":
+                            if (!(node.getValue() instanceof VariableReference)) {
+                                Argument arg = new Argument(node.getName(), parser.parseValue(tempVariable));
+                                return TreeTransformerUtil.changeNode(context, arg);
+                            }
+                        default:
+                            return super.visitArgument(node, context);
+                    }
+                }
+
             });
+
             String modifiedQuery = AstPrinter.printAst(result);
             if (modifiedQuery.contains(tempVariable)) {
                 modifiedQuery = modifiedQuery.replace(tempVariable, value);

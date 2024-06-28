@@ -3,6 +3,9 @@ package com.akto.utils;
 import com.akto.dto.*;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.graphql.GraphQLUtils;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.policies.AuthPolicy;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -22,6 +25,7 @@ import static com.akto.dto.RawApi.convertHeaders;
 public class RedactSampleData {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
+    private static final LoggerMaker loggerMaker = new LoggerMaker(RedactSampleData.class, LogDb.TESTING);
 
     public static final String redactValue = "****";
 
@@ -90,7 +94,7 @@ public class RedactSampleData {
         try {
             JsonParser jp = factory.createParser(responsePayload);
             JsonNode node = mapper.readTree(jp);
-            change(null, node, redactValue, redactAll);
+            change(null, node, redactValue, redactAll, false);
             if (node != null) {
                 responsePayload = node.toString();
             } else {
@@ -111,9 +115,19 @@ public class RedactSampleData {
         String requestPayload = httpResponseParams.requestParams.getPayload();
         if (requestPayload == null) requestPayload = "{}";
         try {
+            // TODO: support subtype/collection wise redact for graphql
+            boolean isGraphqlModified = false;
+            if (redactAll) {
+                try {
+                    requestPayload = GraphQLUtils.getUtils().modifyGraphqlStaticArguments(requestPayload, redactValue);
+                    isGraphqlModified = true;
+                } catch(Exception e){
+                    loggerMaker.infoAndAddToDb("query key not graphql, working as usual");
+                }
+            }
             JsonParser jp = factory.createParser(requestPayload);
             JsonNode node = mapper.readTree(jp);
-            change(null, node, redactValue, redactAll);
+            change(null, node, redactValue, redactAll, isGraphqlModified);
             if (node != null) {
                 requestPayload= node.toString();
             } else {
@@ -134,7 +148,7 @@ public class RedactSampleData {
 
     }
 
-    public static void change(String parentName, JsonNode parent, String newValue, boolean redactAll) {
+    public static void change(String parentName, JsonNode parent, String newValue, boolean redactAll, boolean isGraphqlModified) {
         if (parent == null) return;
 
         if (parent.isArray()) {
@@ -151,7 +165,7 @@ public class RedactSampleData {
                         }
                     }
                 } else {
-                    change(parentName, arrayElement, newValue, redactAll);
+                    change(parentName, arrayElement, newValue, redactAll, isGraphqlModified);
                 }
             }
         } else {
@@ -160,7 +174,7 @@ public class RedactSampleData {
                 String f = fieldNames.next();
                 JsonNode fieldValue = parent.get(f);
                 if (fieldValue.isValueNode()) {
-                    if(redactAll){
+                    if(redactAll && !(isGraphqlModified && f.equalsIgnoreCase(GraphQLUtils.QUERY))){
                         ((ObjectNode) parent).put(f, newValue);
                     }
                     else {
@@ -171,7 +185,7 @@ public class RedactSampleData {
                     }
 
                 } else {
-                    change(f, fieldValue, newValue, redactAll);
+                    change(f, fieldValue, newValue, redactAll, isGraphqlModified);
                 }
             }
         }
