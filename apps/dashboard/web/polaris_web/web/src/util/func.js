@@ -1504,6 +1504,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     const year = date.getFullYear();
     const daySuffix = func.getDaySuffix(day);
     return `${day}${daySuffix} ${month}, ${year}`;
+  },
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 
