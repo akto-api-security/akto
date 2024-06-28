@@ -4,6 +4,7 @@ import com.akto.dto.*;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.hybrid_parsers.HttpCallParser;
+import com.akto.hybrid_runtime.policies.AuthPolicy;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -35,9 +36,29 @@ public class RedactSampleData {
         return redact(HttpCallParser.parseKafkaMessage(sample), false);
     }
 
+    public static String redactCookie(Map<String, List<String>> headers, String header) {
+        String cookie = "";
+        List<String> cookieList = headers.getOrDefault(header, new ArrayList<>());
+        Map<String, String> cookieMap = AuthPolicy.parseCookie(cookieList);
+        for (String cookieKey : cookieMap.keySet()) {
+            cookie += cookieKey + "=" + redactValue + ";";
+        }
+        if (cookie.isEmpty()) {
+            cookie = redactValue;
+        }
+        return cookie;
+    }
+
     private static void handleHeaders(Map<String, List<String>> responseHeaders, boolean redactAll) {
         if(redactAll){
-            responseHeaders.replaceAll((n, v) -> Collections.singletonList(redactValue));
+            for (String header : responseHeaders.keySet()) {
+                if (header.equalsIgnoreCase(AuthPolicy.COOKIE_NAME)) {
+                    String cookie = redactCookie(responseHeaders, header);
+                    responseHeaders.put(header, Collections.singletonList(cookie));
+                    continue;
+                }
+                responseHeaders.put(header, Collections.singletonList(redactValue));
+            }
             return;
         }
         Set<Map.Entry<String, List<String>>> entries = responseHeaders.entrySet();
@@ -46,6 +67,11 @@ public class RedactSampleData {
             List<String> values = entry.getValue();
             SingleTypeInfo.SubType subType = KeyTypes.findSubType(values.get(0), key, null);
             if(SingleTypeInfo.isRedacted(subType.getName())){
+                if (key.equalsIgnoreCase(AuthPolicy.COOKIE_NAME)) {
+                    String cookie = redactCookie(responseHeaders, key);
+                    responseHeaders.put(key, Collections.singletonList(cookie));
+                    continue;
+                }
                 responseHeaders.put(key, Collections.singletonList(redactValue));
             }
         }
