@@ -58,12 +58,14 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: akto-api-security
           REGISTRY_ALIAS: p7q3h0z2
-          IMAGE_TAG: a-feature-kafka-poll-db-abstractor-test-4
+          IMAGE_TAG: testruntime
+          IMAGE_TAG_2: local
+          IMAGE_TAG_3: latest
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
           cd apps/mini-runtime
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG . --push
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG_2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG_3 . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-runtime:$IMAGE_TAG"
 
       - name: DockerHub login
@@ -77,10 +79,12 @@ jobs:
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG: a-feature-kafka-poll-db-abstractor-test-4
+          IMAGE_TAG: testruntime
+          IMAGE_TAG_2: local
+          IMAGE_TAG_3: latest
         run: |
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
           cd apps/mini-runtime
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG . --push
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG_2 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG_3 . --push
