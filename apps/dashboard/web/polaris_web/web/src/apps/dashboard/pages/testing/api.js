@@ -400,7 +400,6 @@ export default {
         })
     },
     downloadReportPDF(reportId, organizationName, reportDate, reportUrl) {
-        console.log("hello")
         return request({
             url: '/api/downloadReportPDF',
             method: 'post',

@@ -33,7 +33,7 @@ public class ReportAction extends UserAction {
     private String pdf;
     private String status;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ReportAction.class);
     
     public String downloadReportPDF() {
         if (reportId == null) {
