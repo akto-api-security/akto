@@ -25,6 +25,7 @@ const headers = [
         text: "API collection name",
         value: "displayNameComp",
         filterKey:"displayName",
+        textValue: 'displayName',
         showFilter:true
     },
     {
@@ -37,6 +38,8 @@ const headers = [
     {
         title: <HeadingWithTooltip content={<Text variant="bodySm">Risk score of collection is maximum risk score of the endpoints inside this collection</Text>} title="Risk score" />,
         value: 'riskScoreComp',
+        textValue: 'riskScore',
+        text: 'Risk Score',
         sortActive: true
     },
     {   
@@ -50,12 +53,14 @@ const headers = [
         title: 'Issues', 
         text: 'Issues', 
         value: 'issuesArr',
+        textValue: 'issuesArrVal',
         tooltipContent: (<Text variant="bodySm">Severity and count of issues present in the collection</Text>)
     },
     {   
         title: 'Sensitive data' , 
         text: 'Sensitive data' , 
         value: 'sensitiveSubTypes',
+        textValue: 'sensitiveSubTypesVal',
         tooltipContent: (<Text variant="bodySm">Types of data type present in response of endpoint inside the collection</Text>)
     },
     {
@@ -64,6 +69,7 @@ const headers = [
         value: 'envTypeComp',
         filterKey: "envType",
         showFilter: true,
+        textValue: 'envType',
         tooltipContent: (<Text variant="bodySm">Environment type for an API collection, Staging or Production </Text>)
     },
     {   
@@ -454,6 +460,7 @@ function ApiCollections() {
             tableTabs={tableTabs}
             onSelect={handleSelectedTab}
             selected={selected}
+            csvFileName={"Inventory"}
         />
     )
 

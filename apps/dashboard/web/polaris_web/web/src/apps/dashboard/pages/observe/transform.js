@@ -365,6 +365,16 @@ const transform = {
         )
     },
 
+    getIssuesListText(severityInfo){
+        let val = "-"
+        if(Object.keys(severityInfo).length > 0){
+            Object.keys(severityInfo).map((key) => {
+                val += (key + ": " + severityInfo[key] + ", ")
+            })
+        } 
+        return val
+    },
+
     prettifySubtypes(sensitiveTags, deactivated){
         return(
             <Box maxWidth="200px">
@@ -403,12 +413,14 @@ const transform = {
                 riskScoreComp: isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
                 coverage: isLoading ? '...' : calcCoverage,
                 issuesArr: isLoading ? loadingComp : this.getIssuesList(c.severityInfo),
+                issuesArrVal: this.getIssuesListText(c.severityInfo),
                 sensitiveSubTypes: isLoading ? loadingComp : this.prettifySubtypes(c.sensitiveInRespTypes, c.deactivated),
                 lastTraffic: isLoading ? '...' : c.detected,
                 riskScore: c.riskScore,
                 deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
                 activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 )),
-                envTypeComp: isLoading ? loadingComp : c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null
+                envTypeComp: isLoading ? loadingComp : c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null,
+                sensitiveSubTypesVal: c?.sensitiveInRespTypes.join(" ") ||  "-"
             }
         })
 
