@@ -368,8 +368,9 @@ const transform = {
     getIssuesListText(severityInfo){
         let val = "-"
         if(Object.keys(severityInfo).length > 0){
+            val = ""
             Object.keys(severityInfo).map((key) => {
-                val += (key + ": " + severityInfo[key] + ", ")
+                val += (key + ": " + severityInfo[key] + " ")
             })
         } 
         return val
