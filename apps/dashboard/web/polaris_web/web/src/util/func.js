@@ -1485,6 +1485,10 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
     return false;
   },
+  checkUserValidForIntegrations(){
+    const userRole = window.USER_ROLE
+    return !(userRole === "GUEST" || userRole === "MEMBER")
+  },
   capitalizeFirstLetter(str) {
     if (!str) return str;
     return str.charAt(0).toUpperCase() + str.slice(1);

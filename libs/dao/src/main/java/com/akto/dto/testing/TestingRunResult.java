@@ -178,7 +178,9 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     }
 
     public String getTestRunHexId() {
-        if (testRunHexId == null) return this.testRunId.toHexString();
+        if (testRunHexId == null && this.testRunId != null) {
+            return this.testRunId.toHexString();
+        }
         return this.testRunHexId;
     }
 

@@ -231,10 +231,6 @@ function GithubServerTable(props) {
                   appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
                     appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
                 }
-                value={
-                  appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
-                    appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
-                }
               />
           ),
           // shortcut: true,

@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
 
+import com.akto.DaoInit;
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.billing.UsageMetricUtils;
@@ -42,8 +43,10 @@ import com.akto.util.LastCronRunInfo;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
@@ -139,7 +142,10 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchAllCollectionsBasic(){
-        this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        this.apiCollections = ApiCollectionsDao.instance.findAll(
+            new BasicDBObject(), 
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME)
+        );
         return Action.SUCCESS.toUpperCase();
     }
 
