@@ -82,7 +82,7 @@ public class ClientActor extends DataActor {
     ObjectMapper objectMapper = new ObjectMapper();
 
     public static String buildDbAbstractorUrl() {
-        String dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        String dbAbsHost = "https://cyborg.akto.io";
         if (dbAbsHost.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
