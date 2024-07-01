@@ -25,7 +25,7 @@ import static com.akto.dto.RawApi.convertHeaders;
 public class RedactSampleData {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(RedactSampleData.class, LogDb.TESTING);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(RedactSampleData.class, LogDb.RUNTIME);
 
     public static final String redactValue = "****";
 
