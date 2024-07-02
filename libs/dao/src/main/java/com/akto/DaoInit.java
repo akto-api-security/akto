@@ -199,6 +199,8 @@ public class DaoInit {
                 .builder(BelongsToPredicate.class).enableDiscriminator(true).build();
         ClassModel<YamlNodeDetails> yamlNodeDetails = ClassModel
                 .builder(YamlNodeDetails.class).enableDiscriminator(true).build();
+        ClassModel<UnauthenticatedEndpoint> unauthenticatedEndpointsClassModel = ClassModel
+                .builder(UnauthenticatedEndpoint.class).enableDiscriminator(true).build();
         // ClassModel<AwsResource> awsResourceModel =
         // ClassModel.builder(AwsResource.class).enableDiscriminator(true)
         // .build();
@@ -275,7 +277,7 @@ public class DaoInit {
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
-                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel).automatic(true).build());
+                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, unauthenticatedEndpointsClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),

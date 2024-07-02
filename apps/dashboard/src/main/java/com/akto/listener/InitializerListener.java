@@ -83,8 +83,6 @@ import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.*;
 import com.akto.util.DashboardMode;
-import com.akto.utils.GithubSync;
-import com.akto.utils.RedactSampleData;
 import com.akto.utils.scripts.FixMultiSTIs;
 import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
@@ -1170,6 +1168,44 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void createUnauthenticatedApiGroup(){
+        loggerMaker.infoAndAddToDb("Creating unauthenticated api group.", LogDb.DASHBOARD);
+        ApiCollection unauthenticatedApisGroup = new ApiCollection(111_111_120, "Unauthenticated Apis", Context.now(), new HashSet<>(), null, 0, false, false);
+
+        unauthenticatedApisGroup.setAutomated(true);
+        unauthenticatedApisGroup.setType(ApiCollection.Type.API_GROUP);
+        List<TestingEndpoints> conditions = new ArrayList<>();
+        conditions.add(new UnauthenticatedEndpoint());
+        unauthenticatedApisGroup.setConditions(conditions);
+
+        ApiCollectionsDao.instance.insertOne(unauthenticatedApisGroup); 
+    }
+
+    public static void createAllApisGroup(){
+        loggerMaker.infoAndAddToDb("Creating all apis group.", LogDb.DASHBOARD);
+        ApiCollection allApisGroup = new ApiCollection(111_111_121, "All Apis", Context.now(), new HashSet<>(), null, 0, false, false);
+
+        allApisGroup.setAutomated(true);
+        allApisGroup.setType(ApiCollection.Type.API_GROUP);
+        List<TestingEndpoints> conditions = new ArrayList<>();
+        conditions.add(new AllTestingEndpoints());
+        allApisGroup.setConditions(conditions);
+
+        ApiCollectionsDao.instance.insertOne(allApisGroup); 
+    }
+    
+
+    public static void createFirstUnauthenticatedApiGroup(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getCreateFirstUnauthenticatedGroup() == 0){
+            createUnauthenticatedApiGroup();
+            createAllApisGroup();
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.CREATE_FIRST_UNAUTHENTICATED_GROUP, Context.now())
+            );
+        }
+    }
+
     public static void createRiskScoreApiGroup(int id, String name, RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType) {
         loggerMaker.infoAndAddToDb("Creating risk score group: " + name, LogDb.DASHBOARD);
         
@@ -2143,6 +2179,7 @@ public class InitializerListener implements ServletContextListener {
         enableNewMerging(backwardCompatibility);
         setDefaultTelemetrySettings(backwardCompatibility);
         disableAwsSecretPiiType(backwardCompatibility);
+        createFirstUnauthenticatedApiGroup(backwardCompatibility);
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
         }

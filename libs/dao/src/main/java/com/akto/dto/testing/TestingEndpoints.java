@@ -38,7 +38,7 @@ public abstract class TestingEndpoints {
 
 
     public enum Type {
-        CUSTOM, COLLECTION_WISE, WORKFLOW, LOGICAL_GROUP, METHOD, ALL, REGEX, RISK_SCORE
+        CUSTOM, COLLECTION_WISE, WORKFLOW, LOGICAL_GROUP, METHOD, ALL, REGEX, RISK_SCORE, UNAUTHENTICATED
     }
 
     public Type getType() {
