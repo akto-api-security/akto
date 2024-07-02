@@ -326,6 +326,15 @@ const transform = {
         }
         return finalArr
     },
+
+    convertSampleDataToSensitiveSampleData(samples, sensitiveInfo) {
+        let sensitiveSampleData = {}
+        samples.forEach(x => {
+            sensitiveSampleData[x] = sensitiveInfo
+        })
+        return { sensitiveSampleData: sensitiveSampleData };
+    },
+
     getColor(key){
         switch(key.toUpperCase()){
             case "HIGH" : return "critical";
