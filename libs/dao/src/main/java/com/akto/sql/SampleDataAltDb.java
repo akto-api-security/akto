@@ -134,7 +134,7 @@ public class SampleDataAltDb {
              PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
 
             stmt.setObject(1, key.getApiCollectionId());
-            stmt.setObject(2, key.getMethod());
+            stmt.setObject(2, key.getMethod().toString());
             stmt.setObject(3, key.getUrl());
 
             ResultSet rs = stmt.executeQuery();
