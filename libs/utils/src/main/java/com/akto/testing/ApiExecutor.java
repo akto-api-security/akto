@@ -38,14 +38,22 @@ public class ApiExecutor {
             boolean rateLimitHit = true;
             while (RateLimitHandler.getInstance(accountId).shouldWait(request)) {
                 if(rateLimitHit){
-                    loggerMaker.infoAndAddToDb("Rate limit hit, sleeping", LogDb.TESTING);
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
+                        loggerMaker.infoAndAddToDb("Rate limit hit, sleeping", LogDb.TESTING);
+                    }else {
+                        System.out.println("Rate limit hit, sleeping");
+                    }
                 }
                 rateLimitHit = false;
                 Thread.sleep(1000);
                 i++;
 
                 if (i%30 == 0) {
-                    loggerMaker.infoAndAddToDb("waiting for rate limit availability", LogDb.TESTING);
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
+                        loggerMaker.infoAndAddToDb("waiting for rate limit availability", LogDb.TESTING);
+                    }else{
+                        System.out.println("waiting for rate limit availability");
+                    }
                 }
             }
         }
@@ -76,11 +84,19 @@ public class ApiExecutor {
             try {
                 body = responseBody.string();
             } catch (IOException e) {
-                loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
+                if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
+                    loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
+                } else {
+                    System.out.println("Error while parsing response body: " + e);
+                }
                 body = "{}";
             }
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
+            if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
+                loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
+            } else {
+                System.out.println("Error while executing request " + request.url() + ": " + e);
+            }
             throw new Exception("Api Call failed");
         } finally {
             if (response != null) {

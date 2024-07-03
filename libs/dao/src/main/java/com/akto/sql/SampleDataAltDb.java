@@ -149,4 +149,107 @@ public class SampleDataAltDb {
 
         return result;
     }
+    final static String ITERATE_QUERY_ALL = "SELECT id, api_collection_id, method, url FROM sampledata where api_collection_id=? ORDER BY id limit ? offset ?";
+
+    public static List<SampleDataAlt> iterateAndGetAll(int apiCollectionId, int limit, int offset) throws Exception {
+        List<SampleDataAlt> data = new ArrayList<>();
+
+        try (Connection conn = Main.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(ITERATE_QUERY_ALL, Statement.RETURN_GENERATED_KEYS)) {
+
+            // bind the values
+            stmt.setInt(1, apiCollectionId);
+            stmt.setInt(2, limit);
+            stmt.setInt(3, offset);
+
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                String id = rs.getString(1);
+                apiCollectionId = rs.getInt(2);
+                String method = rs.getString(3);
+                String url = rs.getString(4);
+                UUID uuid = UUID.fromString(id);
+                SampleDataAlt sampleDataAlt = new SampleDataAlt(uuid, "", apiCollectionId, method, url, 0, 0, 0);
+                data.add(sampleDataAlt);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return data;
+    }
+
+    final static String DELETE_OLD_QUERY = "DELETE FROM sampledata\n" + //
+            "WHERE id IN (\n" + //
+            "    SELECT id\n" + //
+            "    FROM (\n" + //
+            "        SELECT \n" + //
+            "            id,\n" + //
+            "            ROW_NUMBER() OVER (PARTITION BY api_collection_id, method, url ORDER BY timestamp DESC) AS row_num\n"
+            + //
+            "        FROM \n" + //
+            "            sampledata\n" + //
+            "    ) ranked\n" + //
+            "    WHERE ranked.row_num > 10\n" + //
+            ")\n" + //
+            "";
+
+    public static void deleteOld() throws Exception {
+
+        try (Connection conn = Main.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(DELETE_OLD_QUERY, Statement.RETURN_GENERATED_KEYS)) {
+
+            int count = stmt.executeUpdate();
+            System.out.println("Deleted " + count);
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    final static String CREATE_INDEX_QUERY = "CREATE INDEX IF NOT EXISTS idx_sampledata_composite ON sampledata(api_collection_id, method, url, timestamp DESC)";
+
+    public static void createIndex() throws Exception {
+        try (Connection conn = Main.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(CREATE_INDEX_QUERY, Statement.RETURN_GENERATED_KEYS)) {
+
+            stmt.execute();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    final static String UPDATE_URL_QUERY = "update sampledata set url=? where id in (?";
+
+    public static void updateUrl(List<String> uuidList, String newUrl) throws Exception {
+
+        if (uuidList == null || uuidList.isEmpty()) {
+            return;
+        }
+
+        String query = UPDATE_URL_QUERY;
+        for (int i = 1; i < uuidList.size(); i++) {
+            query += ",?";
+        }
+        query += ")";
+
+        try (Connection conn = Main.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+
+            stmt.setString(1, newUrl);
+            // bind the values
+            for (int i = 0; i < uuidList.size(); i++) {
+                stmt.setObject(i + 2, UUID.fromString(uuidList.get(i)));
+            }
+
+            int count = stmt.executeUpdate();
+            System.out.println("Updated " + count);
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
 }
