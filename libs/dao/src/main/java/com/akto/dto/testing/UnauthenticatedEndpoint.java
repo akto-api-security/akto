@@ -9,51 +9,46 @@ import java.util.Set;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.conversions.Bson;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.MCollection;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 
 public class UnauthenticatedEndpoint extends TestingEndpoints {
 
     private static int limit = 50;
 
     @BsonIgnore
-    int skip;
+    private List<ApiInfoKey> apiInfos;
 
     public UnauthenticatedEndpoint() {
         super(Type.UNAUTHENTICATED, Operator.OR);
     }
 
-    Bson unauthenticatedFilter = Filters.in(
-        ApiInfo.ALL_AUTH_TYPES_FOUND, 
-        Collections.singletonList(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED))
-    );
-
-    public int getSkip() {
-        return skip;
+    public List<ApiInfoKey> getApiInfos() {
+        return apiInfos;
     }
 
-    public void setSkip(int skip) {
-        this.skip = skip;
+    public void setApiInfos(List<ApiInfoKey> apiInfos) {
+        this.apiInfos = apiInfos;
     }
 
     @Override
-    public List<ApiInfo.ApiInfoKey> returnApis() {
-        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(unauthenticatedFilter, this.skip, limit, Projections.include("_id"));
-        List<ApiInfo.ApiInfoKey> apiInfoKeys= new ArrayList<>();
-        for(ApiInfo apiInfo: apiInfos){
-            apiInfoKeys.add(apiInfo.getId());
-        }
-        return apiInfoKeys;
+    public List<ApiInfoKey> returnApis() {
+       return this.apiInfos;
     }
 
     @Override
-    public boolean containsApi(ApiInfo.ApiInfoKey key) {
+    public boolean containsApi(ApiInfoKey key) {
         throw new UnsupportedOperationException("Not implemented");
     }
 
@@ -65,6 +60,58 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
                 Filters.eq(prefix + SingleTypeInfo._URL, api.getUrl()),
                 Filters.eq(prefix + SingleTypeInfo._METHOD, api.getMethod().toString()),
                 Filters.in(SingleTypeInfo._COLLECTION_IDS, api.getApiCollectionId()));
+
+    }
+
+    public final static int UNAUTHENTICATED_GROUP_ID = 111_111_120;
+
+    public static void updateCollections(){
+        ApiCollectionUsers.reset(UNAUTHENTICATED_GROUP_ID);
+
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
+            Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP), Projections.include("_id")
+        );
+
+        Bson unauthenticatedFilter = Filters.in(
+            ApiInfo.ALL_AUTH_TYPES_FOUND, 
+            Collections.singletonList(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED))
+        );
+
+        for(ApiCollection apiCollection: apiCollections){
+            
+            int lastTimeStampRecorded = Context.now() + (5*60) ;
+            int apiCollectionId = apiCollection.getId(); 
+            int skip = 0 ;
+
+            // create instance of the conditions class
+            UnauthenticatedEndpoint unauthenticatedEndpoint = new UnauthenticatedEndpoint();
+            while (true) {
+                Bson filterQ = Filters.and(
+                    Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+                    Filters.gt(ApiInfo.LAST_SEEN, lastTimeStampRecorded),
+                    unauthenticatedFilter
+                );
+                List<ApiInfo> apiInfosBatched = ApiInfoDao.instance.findAll(
+                    filterQ, skip, limit, Sorts.descending(ApiInfo.LAST_SEEN), Projections.include(
+                        "_id", ApiInfo.LAST_SEEN
+                    )
+                );
+
+                List<ApiInfoKey> apiInfoKeysTemp = new ArrayList<>();
+                for(ApiInfo apiInfo: apiInfosBatched){
+                    apiInfoKeysTemp.add(apiInfo.getId());
+                    lastTimeStampRecorded = Math.min(lastTimeStampRecorded, apiInfo.getLastSeen());
+                }
+                lastTimeStampRecorded -= 2;
+
+                unauthenticatedEndpoint.setApiInfos(apiInfoKeysTemp);
+                ApiCollectionUsers.addToCollectionsForCollectionId(Collections.singletonList(unauthenticatedEndpoint), UNAUTHENTICATED_GROUP_ID);
+
+                if(apiInfosBatched.size() < limit){
+                    break;
+                }
+            }
+        }
 
     }
 

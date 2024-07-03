@@ -33,6 +33,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.SensitiveDataEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.testing.UnauthenticatedEndpoint;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
@@ -148,6 +149,12 @@ public class ApiCollectionUsers {
     }
 
     public static void computeCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
+
+        if(UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID == apiCollectionId){
+            UnauthenticatedEndpoint.updateCollections();
+            return;
+        }
+
         addToCollectionsForCollectionId(conditions, apiCollectionId);
         removeFromCollectionsForCollectionId(conditions, apiCollectionId);
         updateApiCollection(conditions, apiCollectionId);
@@ -229,60 +236,9 @@ public class ApiCollectionUsers {
         logger.info("Total time taken : " + (Context.now() - time) + " for " + collection.getCollName() + " in account id: " + accountId);
     }
 
-    private static void reset(int apiCollectionId) {
+    public static void reset(int apiCollectionId) {
         CustomTestingEndpoints ep = new CustomTestingEndpoints(new ArrayList<>());
         removeFromCollectionsForCollectionId(Collections.singletonList(ep), apiCollectionId);
     }
-
-    private static void updateBatchedEndpointsCollections(int apiGroupId) {
-        reset(apiGroupId);
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.fetchNonApiGroupsIds();
-        SensitiveDataEndpoints endpoints = new SensitiveDataEndpoints();
-
-        for (ApiCollection apiCollection : apiCollections) {
-            int id = apiCollection.getId();
-            endpoints.setApiCollectionId(id);
-            int skip = 0;
-            endpoints.setSkip(skip);
-            boolean hasMore = true;
-            while (hasMore) {
-                hasMore = false;
-                addToCollectionsForCollectionId(Collections.singletonList(endpoints), apiGroupId);
-                if (!endpoints.getUrls().isEmpty()) {
-                    skip += SensitiveDataEndpoints.LIMIT;
-                    endpoints.setSkip(skip);
-                    hasMore = true;
-                }
-            }
-        }
-    }
-
-    public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
-
-        SensitiveDataEndpoints ep = new SensitiveDataEndpoints();
-        int id = 111_111_007;
-
-        ApiCollection collection = new ApiCollection(id, "Sensitive APIs", Collections.singletonList(ep));
-        // ApiCollectionsDao.instance.insertOne(collection);
-
-        updateBatchedEndpointsCollections(id);
-
-        // ep.setApiCollectionId(1719900296);
-        // ep.returnApis();
-
-    }
-
-    // private static TestingEndpoints getApiGroup(int apiCollectionId){
-    //     switch (apiCollectionId) {
-    //         case 111_111_007:
-    //             break;
-    //         case 111_111_008:
-    //         default:
-    //             break;
-    //     }
-    // }
-
 
 }

@@ -81,9 +81,6 @@ public class BackwardCompatibility {
     public static final String DROP_API_DEPENDENCIES = "dropApiDependencies";
     private int dropApiDependencies;
 
-    public static final String CREATE_FIRST_UNAUTHENTICATED_GROUP = "createFirstUnauthenticatedGroup";
-    private int createFirstUnauthenticatedGroup;
-
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -92,7 +89,7 @@ public class BackwardCompatibility {
                                  int computeIntegratedConnections, int deleteLastCronRunInfo, int moveAuthMechanismToRole,
                                  int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
-                                 int automatedApiGroups, int createFirstUnauthenticatedGroup) {
+                                 int automatedApiGroups) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -119,7 +116,6 @@ public class BackwardCompatibility {
         this.disableAwsSecretPii = disableAwsSecretPii;
         this.apiCollectionAutomatedField = apiCollectionAutomatedField;
         this.automatedApiGroups = automatedApiGroups;
-        this.createFirstUnauthenticatedGroup = createFirstUnauthenticatedGroup;
     }
 
     public BackwardCompatibility() {
@@ -355,13 +351,5 @@ public class BackwardCompatibility {
 
     public void setDropApiDependencies(int dropApiDependencies) {
         this.dropApiDependencies = dropApiDependencies;
-    }
-
-    public int getCreateFirstUnauthenticatedGroup() {
-        return createFirstUnauthenticatedGroup;
-    }
-
-    public void setCreateFirstUnauthenticatedGroup(int createFirstUnauthenticatedGroup) {
-        this.createFirstUnauthenticatedGroup = createFirstUnauthenticatedGroup;
     }
 }

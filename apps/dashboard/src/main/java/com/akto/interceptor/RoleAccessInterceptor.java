@@ -77,7 +77,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
             int userId = user.getId();
 
-            Role userRoleRecord = RBACDao.getCurrentRoleForUser(userId, sessionAccId);
+        Role userRoleRecord = RBACDao.getCurrentRoleForUser(userId, sessionAccId);
             String userRole = userRoleRecord != null ? userRoleRecord.getName().toUpperCase() : "";
 
             if(userRole == null || userRole.isEmpty()) {
