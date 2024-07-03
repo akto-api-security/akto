@@ -18,6 +18,7 @@ import CollectionsPageBanner from "./component/CollectionsPageBanner"
 import useTable from "@/apps/dashboard/components/tables/TableContext"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
+import { saveAs } from 'file-saver'
 
 const headers = [
     {
@@ -319,11 +320,31 @@ function ApiCollections() {
         func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
     }
 
+    const exportCsv = () =>{
+        const csvFileName = definedTableTabs[selected] + " Collections.csv"
+        if (!loading) {
+            let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.isText === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0]?.length > 0));
+            let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
+            data[selectedTab].forEach(i => {
+                csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
+            })
+            let blob = new Blob([csv], {
+                type: "application/csvcharset=UTF-8"
+            });
+            saveAs(blob, csvFileName) ;
+            func.setToast(true, false,"CSV exported successfully")
+        }
+    }
+
     const promotedBulkActions = (selectedResources) => {
         let actions = [
             {
                 content: `Remove collection${func.addPlurality(selectedResources.length)}`,
                 onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
+            },
+            {
+                content: 'Export as CSV',
+                onAction: () => exportCsv()
             }
         ];
 

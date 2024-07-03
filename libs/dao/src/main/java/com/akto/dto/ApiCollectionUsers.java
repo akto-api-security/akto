@@ -2,10 +2,8 @@ package com.akto.dto;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -16,7 +14,6 @@ import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.FilterSampleDataDao;
@@ -29,15 +26,13 @@ import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
-import com.akto.dto.testing.SensitiveDataEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
-import com.akto.dto.testing.UnauthenticatedEndpoint;
+import com.akto.dto.testing.custom_groups.AllAPIsGroup;
+import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
@@ -152,6 +147,10 @@ public class ApiCollectionUsers {
 
         if(UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID == apiCollectionId){
             UnauthenticatedEndpoint.updateCollections();
+            return;
+        }
+        if(AllAPIsGroup.ALL_APIS_GROUP_ID == apiCollectionId){
+            AllAPIsGroup.updateCollections();
             return;
         }
 

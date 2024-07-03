@@ -45,6 +45,8 @@ import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.custom_groups.AllAPIsGroup;
+import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
@@ -249,14 +251,12 @@ public class InitializerListener implements ServletContextListener {
 
     public void updateApiGroupsForAccounts(){
 
-        List<Integer> accounts = new ArrayList<>(Arrays.asList(1_000_000));
+        List<Integer> accounts = new ArrayList<>(Arrays.asList(1_000_000, 1718042191, 1664578207, 1693004074, 1685916748));
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-
                 for(int account : accounts){
                     Context.accountId.set(account);
                     createFirstUnauthenticatedApiGroup();
-                    createAllApisGroup();
                 }
 
             }
@@ -1213,7 +1213,7 @@ public class InitializerListener implements ServletContextListener {
             allApisGroup.setAutomated(true);
             allApisGroup.setType(ApiCollection.Type.API_GROUP);
             List<TestingEndpoints> conditions = new ArrayList<>();
-            conditions.add(new AllTestingEndpoints());
+            conditions.add(new AllAPIsGroup());
             allApisGroup.setConditions(conditions);
 
             ApiCollectionsDao.instance.insertOne(allApisGroup);
@@ -1223,8 +1223,8 @@ public class InitializerListener implements ServletContextListener {
     
 
     public static void createFirstUnauthenticatedApiGroup(){
-            createUnauthenticatedApiGroup();
-            createAllApisGroup();
+        createUnauthenticatedApiGroup();
+        createAllApisGroup();
     }
 
     public static void createRiskScoreApiGroup(int id, String name, RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType) {
@@ -1889,7 +1889,7 @@ public class InitializerListener implements ServletContextListener {
                         loggerMaker.errorAndAddToDb("Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
                     }
                 }
-
+                updateApiGroupsForAccounts();
                 setUpUpdateCustomCollections();
                 setUpFillCollectionIdArrayJob();
                 setupAutomatedApiGroupsScheduler();
