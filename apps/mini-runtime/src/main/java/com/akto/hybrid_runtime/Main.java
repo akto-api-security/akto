@@ -7,7 +7,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-import com.akto.DaoInit;
 import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
@@ -17,15 +16,12 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.sql.SampleDataAltDb;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
-import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
-import com.mongodb.ConnectionString;
-
-import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -42,7 +38,7 @@ public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
 
-    private static final DataActor dataActor = DataActorFactory.fetchInstance();
+    public static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
@@ -196,6 +192,7 @@ public class Main {
 
         try {
             com.akto.sql.Main.createSampleDataTable();
+            SampleDataAltDb.createIndex();
         } catch(Exception e){
             logger.error("Unable to connect to postgres sql db", e);
         }
@@ -237,6 +234,16 @@ public class Main {
         });
 
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
+
+        try {
+            String accountId = Context.accountId.get() + "";
+            if (httpCallParserMap.containsKey(accountId)) {
+                HttpCallParser parser = httpCallParserMap.get(accountId + "");
+                MergeLogicLocal.sendTestSampleDataCron(parser.apiCatalogSync.dbState);
+            }
+        } catch (Exception e) {
+            logger.error("Unable to send data from postgres", e);
+        }
 
         // sync infra metrics thread
         // ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
