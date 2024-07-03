@@ -2,7 +2,6 @@ package com.akto.interceptor;
 
 import com.akto.dao.RBACDao;
 import com.akto.dao.billing.OrganizationsDao;
-import com.akto.dto.RBAC;
 import com.akto.dto.User;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
@@ -12,6 +11,7 @@ import com.akto.dto.rbac.RbacEnums.Feature;
 import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 import com.akto.filter.UserDetailsFilter;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.ActionInvocation;
@@ -37,7 +37,6 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
     }
 
     public final static String FORBIDDEN = "FORBIDDEN";
-    private final static String USER_ID = "userId";
     private final static String USER = "user";
     private final static String FEATURE_LABEL_STRING = "RBAC_FEATURE";
 
@@ -64,6 +63,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             }
 
             Map<String, Object> session = invocation.getInvocationContext().getSession();
+            loggerMaker.infoAndAddToDb("Found session in interceptor.", LogDb.DASHBOARD);
             User user = (User) session.get(USER);
             int sessionAccId = (int) session.get(UserDetailsFilter.ACCOUNT_ID);
 
@@ -75,9 +75,11 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 throw new Exception("User not found in session");
             }
 
+            loggerMaker.infoAndAddToDb("Found user in interceptor: " + user.getLogin(), LogDb.DASHBOARD);
+
             int userId = user.getId();
 
-            Role userRoleRecord = RBACDao.getCurrentRoleForUser(userId, sessionAccId);
+        Role userRoleRecord = RBACDao.getCurrentRoleForUser(userId, sessionAccId);
             String userRole = userRoleRecord != null ? userRoleRecord.getName().toUpperCase() : "";
 
             if(userRole == null || userRole.isEmpty()) {

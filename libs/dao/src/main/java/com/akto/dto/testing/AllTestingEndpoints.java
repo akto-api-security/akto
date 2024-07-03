@@ -2,6 +2,8 @@ package com.akto.dto.testing;
 
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
+import com.mongodb.client.model.Filters;
+
 import org.apache.commons.lang3.NotImplementedException;
 import org.bson.conversions.Bson;
 
@@ -24,6 +26,6 @@ public class AllTestingEndpoints extends TestingEndpoints {
 
     @Override
     public Bson createFilters(ApiCollectionUsers.CollectionType type) {
-        throw new NotImplementedException();
+        return Filters.empty();
     }
 }
