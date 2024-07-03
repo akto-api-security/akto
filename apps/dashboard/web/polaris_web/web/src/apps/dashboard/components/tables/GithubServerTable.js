@@ -361,7 +361,7 @@ function GithubServerTable(props) {
                 loading={props.loading || false}
                 selected={props?.selected}
                 onSelect={(x) => handleTabChange(x)}
-              />
+              ></IndexFilters>
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
               <div className={tableHeightClass}>
                 <div className="add-new-buttons">
