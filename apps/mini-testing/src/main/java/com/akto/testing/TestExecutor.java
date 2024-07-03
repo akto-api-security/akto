@@ -636,10 +636,7 @@ public class TestExecutor {
 
         String message = messages.get(messages.size() - 1);
         try {
-            String uuid = OriginalHttpRequest.extractAktoUUid(message);
-            if (uuid != null) {
-                message = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey);
-            }
+            message = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey);
         } catch (Exception e) {
             e.printStackTrace();
         }
