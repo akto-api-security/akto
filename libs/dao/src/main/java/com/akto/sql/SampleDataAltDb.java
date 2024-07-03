@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
+import com.akto.dto.ApiInfo;
 import com.akto.dto.sql.SampleDataAlt;
 
 public class SampleDataAltDb {
@@ -112,6 +113,29 @@ public class SampleDataAltDb {
                 PreparedStatement stmt = conn.prepareStatement(FIND_QUERY, Statement.RETURN_GENERATED_KEYS)) {
 
                     stmt.setObject(1, UUID.fromString(id));
+
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                result = rs.getString(2);
+                // System.out.println(result);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return result;
+    }
+
+    public static String findLatestSampleByApiInfoKey(ApiInfo.ApiInfoKey key) throws Exception{
+        String result = null;
+        String query = "SELECT * FROM sampledata where api_collection_id=? and method=? and url=? order by timestamp desc limit 1;";
+        try (Connection conn = Main.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+
+            stmt.setObject(1, key.getApiCollectionId());
+            stmt.setObject(2, key.getMethod());
+            stmt.setObject(3, key.getUrl());
 
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) {
