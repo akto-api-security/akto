@@ -248,11 +248,9 @@ function GithubServerTable(props) {
 
   function exportCsv(csvFileName) {
     if (!props?.loading) {
-        const startInd = page * pageLimit + Math.min(0, total);
-        const endInd = Math.min((page + 1) * pageLimit, total)
         let headerTextToValueMap = Object.fromEntries(props?.headings.map(x => [x.text, x.isText === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0]?.length > 0));
         let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
-        data.slice(startInd, endInd).forEach(i => {
+        data.forEach(i => {
             csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
         })
         let blob = new Blob([csv], {
@@ -363,7 +361,7 @@ function GithubServerTable(props) {
                 loading={props.loading || false}
                 selected={props?.selected}
                 onSelect={(x) => handleTabChange(x)}
-              />
+              ></IndexFilters>
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
               <div className={tableHeightClass}>
                 <div className="add-new-buttons">

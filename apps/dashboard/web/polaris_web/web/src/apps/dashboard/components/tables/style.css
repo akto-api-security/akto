@@ -20,7 +20,7 @@
 
 .add-new-buttons{
     position: absolute;
-    z-index: 1000;
+    z-index: 2;
     right: 144px;
     margin-top: -36px;
 }
