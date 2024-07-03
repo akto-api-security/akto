@@ -9,11 +9,7 @@ import {
   HorizontalStack,
   Key,
   ChoiceList,
-  Tabs,
-  Button,
-  Icon,
-  Box,
-  Tooltip} from '@shopify/polaris';
+  Tabs} from '@shopify/polaris';
 import {CellType, GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect } from 'react';
 import "./style.css"
@@ -23,11 +19,8 @@ import PersistStore from '../../../main/PersistStore';
 import tableFunc from './transform';
 import useTable from './TableContext';
 import { debounce } from 'lodash';
-import { saveAs } from 'file-saver'
-import { FileMinor } from "@shopify/polaris-icons"
 
 import { useSearchParams } from 'react-router-dom';
-import func from '@/util/func';
 
 function GithubServerTable(props) {
 
@@ -246,21 +239,6 @@ function GithubServerTable(props) {
       })
   }
 
-  function exportCsv(csvFileName) {
-    if (!props?.loading) {
-        let headerTextToValueMap = Object.fromEntries(props?.headings.map(x => [x.text, x.isText === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0]?.length > 0));
-        let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
-        data.forEach(i => {
-            csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
-        })
-        let blob = new Blob([csv], {
-            type: "application/csvcharset=UTF-8"
-        });
-        saveAs(blob, csvFileName + ".csv");
-        func.setToast(true, false,"CSV exported successfully")
-    }
-}
-
   const handleFiltersClearAll = useCallback(() => {
     setFiltersMap({
       ...filtersMap,
@@ -364,12 +342,6 @@ function GithubServerTable(props) {
               ></IndexFilters>
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
               <div className={tableHeightClass}>
-                <div className="add-new-buttons">
-                  {props?.csvFileName ? <Button plain monochrome removeUnderline onClick={() => exportCsv(props?.csvFileName)}>
-                    <Tooltip content="Download as CSV" dismissOnMouseOut><Box minHeight="36px" minWidth="36px"><Icon source={FileMinor} /></Box></Tooltip>
-                  </Button>
-                  : null}
-                </div>
               <IndexTable
                 resourceName={props.resourceName}
                 itemCount={data.length}

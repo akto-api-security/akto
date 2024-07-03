@@ -6,6 +6,8 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
+import com.akto.dto.ApiCollection.ENV_TYPE;
+import com.akto.dto.ApiCollection.Type;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CodeAnalysisApiInfo.CodeAnalysisApiInfoKey;
 import com.akto.dto.traffic.SampleData;
