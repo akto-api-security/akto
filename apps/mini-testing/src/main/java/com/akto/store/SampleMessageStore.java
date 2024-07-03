@@ -72,7 +72,7 @@ public class SampleMessageStore {
             try {
                 String uuid = OriginalHttpRequest.extractAktoUUid(message);
                 if (uuid != null) {
-                    message = SampleDataAltDb.find(uuid);
+                    message = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey);
                 }
                 messages.add(RawApi.buildFromMessage(message));
             } catch(Exception e) {
