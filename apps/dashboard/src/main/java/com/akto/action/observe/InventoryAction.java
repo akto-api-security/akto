@@ -88,7 +88,7 @@ public class InventoryAction extends UserAction {
                 Filters.nin(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
                 hostFilterQ
         );
-        List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 100_000, Sorts.descending("timestamp"), Projections.exclude("values"));
+        List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 1_000, Sorts.descending("timestamp"), Projections.exclude("values"));
         for(SingleTypeInfo sti: latestHosts) {
             loggerMaker.debugInfoAddToDb(sti.getUrl() + " discovered_ts: " + sti.getTimestamp() + " inserted_ts: " + sti.getId().getTimestamp(), LogDb.DASHBOARD);
             BasicDBObject id = 
@@ -159,7 +159,7 @@ public class InventoryAction extends UserAction {
 
     public String fetchCollectionWiseApiEndpoints() {
         listOfEndpointsInCollection = new HashSet<>();
-        List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0);
+        List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
 
         if (list != null && !list.isEmpty()) {
             list.forEach(element -> {
@@ -344,7 +344,7 @@ public class InventoryAction extends UserAction {
     }
 
     public String fetchAPICollection() {
-        List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0);
+        List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
         APISpec apiSpec = APISpecDao.instance.findById(apiCollectionId);
         Set<String> unused = null;
         try {
