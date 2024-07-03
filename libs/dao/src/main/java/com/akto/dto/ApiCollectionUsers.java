@@ -229,7 +229,7 @@ public class ApiCollectionUsers {
         logger.info("Total time taken : " + (Context.now() - time) + " for " + collection.getCollName() + " in account id: " + accountId);
     }
 
-    private static void reset(int apiCollectionId) {
+    public static void reset(int apiCollectionId) {
         CustomTestingEndpoints ep = new CustomTestingEndpoints(new ArrayList<>());
         removeFromCollectionsForCollectionId(Collections.singletonList(ep), apiCollectionId);
     }

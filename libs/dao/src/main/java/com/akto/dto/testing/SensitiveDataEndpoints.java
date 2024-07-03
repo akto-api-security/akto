@@ -15,9 +15,11 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.util.Constants;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -83,6 +85,44 @@ public class SensitiveDataEndpoints extends TestingEndpoints {
         }
         urls.addAll(SingleTypeInfoDao.instance.fetchSensitiveEndpoints(apiCollectionId, skip, LIMIT));
         return urls;
+    }
+
+    final static int API_GROUP_ID = 111_111_999;
+
+    public static void updateCollections(){
+        ApiCollectionUsers.reset(API_GROUP_ID);
+
+        Set<Integer> responseCodes = SingleTypeInfoDao.instance.findDistinctFields(SingleTypeInfo._RESPONSE_CODE, Integer.class, Filters.exists(SingleTypeInfo._RESPONSE_CODE));
+        Set<String> subTypes = SingleTypeInfoDao.instance.findDistinctFields(SingleTypeInfo.SUB_TYPE, String.class, Filters.exists(SingleTypeInfo.SUB_TYPE));
+
+        Set<String> sensitiveInResponse = new HashSet<>(SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames());
+        Set<String> sensitiveInRequest = new HashSet<>(SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames());
+
+        for(int responseCode : responseCodes){
+            for(String subType : subTypes){
+
+                Bson responseCodeFilter = Filters.eq(SingleTypeInfo._RESPONSE_CODE, responseCode);
+                Bson subTypeFilter = Filters.eq(SingleTypeInfo.SUB_TYPE, subType);
+
+                if ((responseCode == -1 && sensitiveInRequest.contains(subType))
+                        || responseCode != -1 && sensitiveInResponse.contains(subType)) {
+
+                            int timestamp = Context.now() + Constants.ONE_DAY_TIMESTAMP;
+
+                            boolean hasMore = true;
+
+                            while(hasMore){
+                                hasMore = false;
+
+                                
+
+                            }
+                            
+
+                }
+            }
+        }
+
     }
 
     @Override
