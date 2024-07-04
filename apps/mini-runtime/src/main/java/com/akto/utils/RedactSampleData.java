@@ -55,6 +55,33 @@ public class RedactSampleData {
         return cookie;
     }
 
+    private static String handleQueryParams(String url, boolean redactAll, String redactValue) {
+
+        if (!redactAll || url == null || url.isEmpty()) {
+            return url;
+        }
+        String finalUrl = url;
+        try {
+            String[] split = url.split("\\?");
+            if (split.length == 2) {
+                finalUrl = split[0];
+                finalUrl += "?";
+                String[] urlParams = split[1].split("&");
+                for (int i = 0; i < urlParams.length; i++) {
+                    String[] param = urlParams[i].split("=");
+                    if (i != 0) {
+                        finalUrl += "&";
+                    }
+                    finalUrl += param[0] + "=" + redactValue;
+                }
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "unable to redact query params");
+        }
+        return finalUrl;
+    }
+
     private static void handleHeaders(Map<String, List<String>> responseHeaders, boolean redactAll) {
         if(redactAll){
             for (String header : responseHeaders.keySet()) {
@@ -121,6 +148,9 @@ public class RedactSampleData {
 
         // request payload
         String requestPayload = httpResponseParams.requestParams.getPayload();
+        //query params
+        String url = handleQueryParams(httpResponseParams.requestParams.getURL(), redactAll, redactValue);
+        httpResponseParams.requestParams.setUrl(url);
         if (requestPayload == null) requestPayload = "{}";
         try {
             // TODO: support subtype/collection wise redact for graphql
