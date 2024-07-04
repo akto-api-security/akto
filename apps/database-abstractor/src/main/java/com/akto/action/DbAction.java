@@ -32,6 +32,7 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.RedactAlert;
+import com.akto.utils.SampleDataLogs;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
@@ -422,6 +423,7 @@ public class DbAction extends ActionSupport {
                             Filters.eq("_id.responseCode", responseCode),
                             Filters.eq("_id.url", url));
                     List<String> updatePayloadList = bulkUpdate.getUpdates();
+                    SampleDataLogs.printLog(apiCollectionId, method, url);
     
                     List<Bson> updates = new ArrayList<>();
                     for (String payload: updatePayloadList) {
@@ -438,6 +440,7 @@ public class DbAction extends ActionSupport {
                         } else if(field.equals(SampleData.SAMPLES)){
                             List<String> dVal = (List) json.get("val");
                             RedactAlert.submitSampleDataForChecking(dVal, apiCollectionId, method, url);
+                            SampleDataLogs.insertCount(apiCollectionId, method, url, dVal.size());
                             updatePayload = new UpdatePayload((String) json.get("field"), dVal , (String) json.get("op"));
                             updates.add(Updates.pushEach(updatePayload.getField(), dVal, new PushOptions().slice(-10)));
                         } else {
