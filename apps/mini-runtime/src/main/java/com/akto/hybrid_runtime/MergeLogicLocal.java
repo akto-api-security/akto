@@ -8,15 +8,20 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
+import com.akto.DaoInit;
+import com.akto.dao.context.Context;
 import com.akto.dto.sql.SampleDataAlt;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLTemplate;
+import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.sql.SampleDataAltDb;
+import com.mongodb.ConnectionString;
 
 public class MergeLogicLocal {
     final static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -26,14 +31,21 @@ public class MergeLogicLocal {
 
         scheduler.scheduleAtFixedRate(new Runnable() {
         public void run() {
-                mergingJob(dbState);
+                try {
+                    loggerMaker.infoAndAddToDb("Running merging job for sql");
+                    mergingJob(dbState);
+                } catch (Exception e){
+                    loggerMaker.errorAndAddToDb(e, "error in sql merge cron");
+                }
             }
-        }, 0, 15, TimeUnit.MINUTES);
+        }, 0, 2, TimeUnit.MINUTES);
     }
 
-    final static int LIMIT = 4;
+    final static int LIMIT = 1000;
 
     public static void main(String[] args) {
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
+        Context.accountId.set(1_000_000);
         Map<Integer, APICatalog> dbState = new HashMap<>();
         dbState.put(0, new APICatalog(0, new HashMap<>(), new HashMap<>()));
         dbState.put(1718641552, new APICatalog(0, new HashMap<>(), new HashMap<>()));
@@ -48,7 +60,12 @@ public class MergeLogicLocal {
         templateURLToMethods.put(urlTemplate, null);
         APICatalog apiCatalog = new APICatalog(123, null, templateURLToMethods);
         dbState.put(123, apiCatalog);
-        mergingJob(dbState);
+
+        HttpCallParser parser = new HttpCallParser(null, LIMIT, LIMIT, LIMIT, false);
+        parser.apiCatalogSync.dbState = dbState;
+        mergingJob(parser.apiCatalogSync.dbState);
+        parser.apiCatalogSync.dbState.put(1234, apiCatalog);
+        mergingJob(parser.apiCatalogSync.dbState);
     }
         
     public static void mergingJob(Map<Integer, APICatalog> dbState) {
@@ -60,12 +77,15 @@ public class MergeLogicLocal {
 
             int skip = 0;
             while (true) {
+                loggerMaker.infoAndAddToDb(String.format("Running for apiCollectionId %d with skip %d", apiCollectionId, skip));
                 Map<String, List<String>> updates = new HashMap<>();
                 List<SampleDataAlt> data = new ArrayList<>();
                 try {
                     data = SampleDataAltDb.iterateAndGetAll(apiCollectionId, LIMIT, skip);
+                    loggerMaker.infoAndAddToDb(String.format("data size: %d template urls: %d", data.size(), templateUrls.size()));
                     for (SampleDataAlt sampleDataAlt : data) {
                         for (URLTemplate urlTemplate : templateUrls) {
+                            loggerMaker.infoAndAddToDb("template urls: " + urlTemplate.getTemplateString());
                             if (urlTemplate.match(sampleDataAlt.getUrl(), Method.valueOf(sampleDataAlt.getMethod()))) {
                                 String templateUrl = urlTemplate.getTemplateString();
                                 List<String> ids = new ArrayList<>();
@@ -84,14 +104,18 @@ public class MergeLogicLocal {
                 }
 
                 try {
-                    for (String url : updates.keySet()) {
-                        SampleDataAltDb.updateUrl(updates.get(url), url);
+                    if(updates!=null && !updates.isEmpty()){
+                        loggerMaker.infoAndAddToDb(String.format("%d updates found, updating sql db", updates.size()));
+                        for (String url : updates.keySet()) {
+                            SampleDataAltDb.updateUrl(updates.get(url), url);
+                        }
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "ERROR in update data in postgres");
                 }
 
                 if (data.size() < LIMIT) {
+                    loggerMaker.infoAndAddToDb(String.format("No more data for apiCollectionId %d with skip %d, breaking", apiCollectionId, skip));
                     break;
                 }
                 skip += LIMIT;
