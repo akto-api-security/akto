@@ -1,15 +1,18 @@
-import { ActionList, Avatar, Banner, Box, Button, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text } from "@shopify/polaris"
+import { ActionList, Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Modal, Page, Popover, ResourceItem, ResourceList, Text, TextField } from "@shopify/polaris"
 import { DeleteMajor, TickMinor } from "@shopify/polaris-icons"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
 import Store from "../../../store";
-import PersistStore from '../../../../main/PersistStore';
+import PersistStore from "../../../../main/PersistStore";
+import SearchableResourceList from "../../../components/shared/SearchableResourceList";
+import ResourceListModal from "../../../components/shared/ResourceListModal";
+import observeApi from "../../observe/api";
 
 const Users = () => {
     const username = Store(state => state.username)
-    const userRole = PersistStore(state => state.userRole)
+    const userRole = window.USER_ROLE
 
     const [inviteUser, setInviteUser] = useState({
         isActive: false,
@@ -20,9 +23,23 @@ const Users = () => {
 
     const [loading, setLoading] = useState(false)
     const [users, setUsers] = useState([])
+    const [usersCollection, setUsersCollection] = useState([])
     const [roleHierarchy, setRoleHierarchy] = useState([])
+    const [allCollections, setAllCollections] = useState([])
     const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
     let rbacAccess = false;
+
+    const collectionsMap = PersistStore(state => state.collectionsMap)
+
+    const [selectedItems, setSelectedItems] = useState({})
+
+    const handleSelectedItems = (id, items) => {
+        setSelectedItems(prevSelectedItems => ({
+            ...prevSelectedItems,
+            [id]: items
+        }));
+    }
+
 
     if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
         rbacAccess = true
@@ -71,12 +88,17 @@ const Users = () => {
             roleHierarchyResp.push('REMOVE')
         }
         setRoleHierarchy(roleHierarchyResp)
-        
+
     }
 
     useEffect(() => {
         getTeamData();
         getRoleHierarchy()
+
+        setAllCollections(Object.entries(collectionsMap).map(([id, collectionName]) => ({
+            id: parseInt(id, 10),
+            collectionName
+        })));
     }, [])
 
     const handleRoleSelectChange = async (id, newRole, login) => {
@@ -127,7 +149,11 @@ const Users = () => {
     const getTeamData = async () => {
         setLoading(true);
         const usersResponse = await settingRequests.getTeamData()
-        setUsers(usersResponse.users)
+        if(userRole === 'ADMIN') {
+            const usersCollectionList = await settingRequests.getAllUsersCollections()
+            setUsersCollection(usersCollectionList)
+        }
+        setUsers(usersResponse)
         setLoading(false)
     };
 
@@ -152,6 +178,10 @@ const Users = () => {
         func.setToast(true, false, "Role updated for " + login + " successfully")
     }
     
+    const getUserApiCollectionIds = (userId) => {
+        return usersCollection[userId] || [];
+    };
+
     return (
         <Page
             title="Users"
@@ -191,14 +221,68 @@ const Users = () => {
                             const { id, name, login, role } = item;
                             const initials = func.initials(login)
                             const media = <Avatar user size="medium" name={login} initials={initials} />
-                            const shortcutActions = (username !== login && roleHierarchy.includes(role.toUpperCase())) ? 
+
+                            const usersCollectionRenderItem = (item) => {
+                                const { id, collectionName } = item;
+
+                                return (
+                                    <ResourceItem id={id}>
+                                        <Text variant="bodyMd" fontWeight="semibold" as="h3">{collectionName}</Text>
+                                    </ResourceItem>
+                                );
+                            }
+
+                            const updateUsersCollection = async () => {
+                                const collectionIdList = selectedItems[id];
+                                const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
+                                await observeApi.updateUserCollections(collectionIdListObj, [id])
+                                func.setToast(true, false, `User's ${selectedItems[id].length} collection${func.addPlurality(selectedItems[id].length)} have been updated!`)
+                                await getTeamData()
+                            }
+
+                            const userCollectionsHandler = () => {
+                                updateUsersCollection()
+                                return true
+                            }
+
+                            const handleSelectedItemsChange = (items) => {
+                                handleSelectedItems(id, items)
+                            }
+
+                            const userCollectionsModalComp = (
+                                <Box>
+                                    <SearchableResourceList
+                                        resourceName={'collection'}
+                                        items={allCollections}
+                                        renderItem={usersCollectionRenderItem}
+                                        isFilterControlEnabale={userRole === 'ADMIN'}
+                                        selectable={userRole === 'ADMIN'}
+                                        onSelectedItemsChange={handleSelectedItemsChange}
+                                        alreadySelectedItems={getUserApiCollectionIds(id)}
+                                    />
+                                </Box>
+                            )
+
+                            const shortcutActions = (username !== login && roleHierarchy.includes(role.toUpperCase())) ?
                                 [
                                     {
-                                        content: <Popover
+                                        content: (
+                                            <HorizontalStack gap={4}>
+                                                {role === 'ADMIN' || userRole !== 'ADMIN' ? undefined :
+                                                    <ResourceListModal
+                                                        title={"Collection list"}
+                                                        activatorPlaceaholder={`${(usersCollection[id] || []).length} Collections accessible`}
+                                                        isColoredActivator={true}
+                                                        component={userCollectionsModalComp}
+                                                        primaryAction={userCollectionsHandler}
+                                                    />
+                                                }
+
+                                                <Popover
                                                     active={roleSelectionPopup[id]}
                                                     onClose={() => toggleRoleSelectionPopup(id)}
                                                     activator={<Button disclosure onClick={() => toggleRoleSelectionPopup(id)}>{getRoleDisplayName(role)}</Button>}
-                                                 >
+                                                >
                                                     <ActionList
                                                         actionRole="menuitem"
                                                         sections={getRolesOptionsWithTick(role).map(section => ({
@@ -209,7 +293,9 @@ const Users = () => {
                                                             }))
                                                         }))}
                                                     />
-                                                 </Popover>
+                                                </Popover>
+                                            </HorizontalStack>
+                                        )
                                     }
                                 ] : [
                                     {

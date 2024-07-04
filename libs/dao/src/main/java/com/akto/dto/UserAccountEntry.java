@@ -1,9 +1,13 @@
 package com.akto.dto;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class UserAccountEntry {
     private int accountId;
     private String name;
     private boolean isDefault = false;
+    private List<Integer> apiCollections;
 
     public UserAccountEntry() {}
 
@@ -14,6 +18,7 @@ public class UserAccountEntry {
     public UserAccountEntry(int accountId, String name) {
         this.accountId = accountId;
         this.name = name;
+        this.apiCollections = new ArrayList<>();
     }
 
     public int getAccountId() {
@@ -38,5 +43,12 @@ public class UserAccountEntry {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public List<Integer> getApiCollections() {
+        return apiCollections;
+    }
+    public void setApiCollections(List<Integer> apiCollections) {
+        this.apiCollections = apiCollections;
     }
 }
