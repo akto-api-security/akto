@@ -1233,7 +1233,7 @@ public class APICatalogSync {
     int counter = 0;
     
     static int lastBuildFromDb = 0;
-    final static int DB_REFRESH_CYCLE = 15 * 60 * 60; // 15 minutes
+    final static int DB_REFRESH_CYCLE = 15 * 60; // 15 minutes
 
     List<String> partnerIpList = new ArrayList<>();
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {

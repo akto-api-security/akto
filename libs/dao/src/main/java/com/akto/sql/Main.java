@@ -100,7 +100,7 @@ public class Main {
         try {
             Connection conn = ds.getConnection();
             PreparedStatement stmt = conn.prepareStatement(
-                    "CREATE TABLE IF NOT EXISTS SAMPLEDATA " +
+                    "CREATE TABLE IF NOT EXISTS SAMPLEDATA02 " +
                             "(ID UUID PRIMARY KEY NOT NULL," +
                             "SAMPLE TEXT NOT NULL," +
                             "API_COLLECTION_ID INT NOT NULL," +
