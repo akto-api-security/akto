@@ -89,6 +89,7 @@ public class CustomAuthTypeAction extends UserAction{
                         Updates.set("timestamp", Context.now())));
         }
         fetchCustomAuthTypes();
+        CustomAuthUtil.resetAllCustomAuthTypes();
         int accountId = Context.accountId.get();
         SingleTypeInfo.fetchCustomAuthTypes(accountId);
         customAuthType = CustomAuthTypeDao.instance.findOne(CustomAuthType.NAME,name);
