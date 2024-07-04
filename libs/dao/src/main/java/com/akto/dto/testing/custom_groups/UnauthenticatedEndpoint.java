@@ -18,6 +18,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.ApiInfo.AuthType;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.model.Filters;
@@ -50,7 +51,22 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
 
     @Override
     public boolean containsApi(ApiInfoKey key) {
-        throw new UnsupportedOperationException("Not implemented");
+        ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(key));
+        if (apiInfo == null) {
+            return false;
+        }
+        apiInfo.calculateActualAuth();
+        if (apiInfo.getActualAuthType() == null || apiInfo.getActualAuthType().isEmpty()) {
+            return false;
+        }
+        Set<AuthType> authTypes = new HashSet<>(apiInfo.getActualAuthType());
+        if (authTypes == null || authTypes.isEmpty()) {
+            return false;
+        }
+        if (authTypes.contains(AuthType.UNAUTHENTICATED)) {
+            return true;
+        }
+        return false;
     }
 
     private static Bson createApiFilters(CollectionType type, ApiInfoKey api) {
