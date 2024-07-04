@@ -136,6 +136,7 @@ public class Main {
             }
         }
     }
+    static boolean schedulerStarted = false;
 
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
@@ -345,6 +346,15 @@ public class Main {
                     }
 
                     HttpCallParser parser = httpCallParserMap.get(accountId);
+                    try {
+                        if (!schedulerStarted) {
+                            loggerMaker.infoAndAddToDb(String.format("Starting merging sql scheduler for accountId %s", accountId));
+                            MergeLogicLocal.sendTestSampleDataCron(parser.apiCatalogSync.dbState);
+                            schedulerStarted=true;
+                        }
+                    } catch (Exception e) {
+                        logger.error("Unable to send data from postgres", e);
+                    }
 
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);

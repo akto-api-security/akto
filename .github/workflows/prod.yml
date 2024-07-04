@@ -87,5 +87,5 @@ jobs:
           # Build a docker container and push it to DockerHub 
           cd apps/mini-runtime
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG . --push
-          cd apps/mini-testing
+          cd ../mini-testing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG . --push
