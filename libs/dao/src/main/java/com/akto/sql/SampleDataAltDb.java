@@ -25,7 +25,7 @@ public class SampleDataAltDb {
         stmt.addBatch();
     }
 
-    final static String INSERT_QUERY = "INSERT INTO sampledata(id, sample, api_collection_id,method,url, response_code, timestamp) "
+    final static String INSERT_QUERY = "INSERT INTO sampledata02(id, sample, api_collection_id,method,url, response_code, timestamp) "
             + "VALUES(?,?,?,?,?,?,?)";
 
     public static void bulkInsert(List<SampleDataAlt> list) throws Exception {
@@ -47,7 +47,7 @@ public class SampleDataAltDb {
         }
     }
 
-    final static String DELETE_QUERY = "DELETE from sampledata WHERE timestamp < ? AND id IN (?";
+    final static String DELETE_QUERY = "DELETE from sampledata02 WHERE timestamp < ? AND id IN (?";
 
     public static void delete(List<String> uuidList, int timestamp) throws Exception {
 
@@ -79,7 +79,7 @@ public class SampleDataAltDb {
 
     }
 
-    final static String ITERATE_QUERY = "SELECT id FROM sampledata ORDER BY id limit ? offset ?";
+    final static String ITERATE_QUERY = "SELECT id FROM sampledata02 ORDER BY id limit ? offset ?";
 
     public static List<String> iterateAndGetIds(int limit, int offset) throws Exception {
         List<String> idList = new ArrayList<>();
@@ -103,7 +103,7 @@ public class SampleDataAltDb {
         return idList;
     }
 
-    final static String FIND_QUERY = "SELECT * FROM sampledata where id=?";
+    final static String FIND_QUERY = "SELECT * FROM sampledata02 where id=?";
 
     public static String find(String id) throws Exception {
         String result = null;
