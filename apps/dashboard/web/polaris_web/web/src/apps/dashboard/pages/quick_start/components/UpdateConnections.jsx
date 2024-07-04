@@ -10,8 +10,7 @@ import FlyLayout from '../../../components/layouts/FlyLayout';
 function UpdateConnections(props) {
 
     const { myConnections } = props; 
-    const allConnections = quickStartFunc.getConnectorsList()
-    const obj = quickStartFunc.getConnectionsObject(myConnections,allConnections)
+    const obj = quickStartFunc.getConnectorsList()
     const [newCol, setNewCol] = useState(0)
 
     const currentCardObj = QuickStartStore(state => state.currentConnector)
@@ -48,25 +47,14 @@ function UpdateConnections(props) {
                         docsUrl={"https://docs.akto.io/traffic-connections/traffic-data-sources"}
                     />}
         >
-            <div style={{marginBottom: '16px'}}>
-            <HorizontalStack gap={"3"}>
-                <Text variant="headingMd" as="h6" color='subdued'> Your connections </Text>
-                <Tag>{obj.myConnections.length.toString()}</Tag>
-            </HorizontalStack>
-            </div>
-            <GridRows CardComponent={RowCard} columns="3" 
-                items={obj.myConnections} buttonText="Configure" onButtonClick={onButtonClick}
-                changedColumns={newCol}
-            />
-
             <div style={{margin: '24px 0 16px 0'}}>
             <HorizontalStack gap={"3"}>
                 <Text variant="headingMd" as="h6" color='subdued'> Explore other connections </Text>
-                <Tag>{obj.moreConnections.length.toString()}</Tag>
+                <Tag>{obj.length.toString()}</Tag>
             </HorizontalStack>
             </div>
             <GridRows CardComponent={RowCard} columns="3" 
-                items={obj.moreConnections} buttonText="Connect" onButtonClick={onButtonClick}     
+                items={obj} buttonText="Connect" onButtonClick={onButtonClick}     
                 changedColumns={newCol}
             />
                 {currentCardObj ?<FlyLayout

@@ -152,7 +152,7 @@ function ApiCollections() {
     const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
-    const [hasUsageEndpoints, setHasUsageEndpoints] = useState(false)
+    const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
     const [refreshData, setRefreshData] = useState(false)
     const [popover,setPopover] = useState(false)
@@ -204,6 +204,8 @@ function ApiCollections() {
         setLoading(true)
         let apiCollectionsResp = await api.getAllCollectionsBasic();
         setLoading(false)
+        let hasUserEndpoints = await api.getUserEndpoints()
+        setHasUsageEndpoints(hasUserEndpoints)
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
         let dataObj = {}
         dataObj = convertToNewData(tmp, {}, {}, {}, {}, {}, true);
@@ -222,7 +224,6 @@ function ApiCollections() {
             api.getAllCollections(),
             api.getCoverageInfoForCollections(),
             api.getLastTrafficSeen(),
-            api.getUserEndpoints(),
         ];
         if(shouldCallHeavyApis){
             apiPromises = [
@@ -236,31 +237,30 @@ function ApiCollections() {
         apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
         let coverageInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
-        let hasUserEndpoints = results[3].status === 'fulfilled' ? results[3].value : true;
 
         let riskScoreObj = lastFetchedResp
         let sensitiveInfo = lastFetchedSensitiveResp
         let severityObj = lastFetchedSeverityResp
 
         if(shouldCallHeavyApis){
-            if(results[4]?.status === "fulfilled"){
-                const res = results[4].value
+            if(results[3]?.status === "fulfilled"){
+                const res = results[3].value
                 riskScoreObj = {
                     criticalUrls: res.criticalEndpointsCount,
                     riskScoreMap: res.riskScoreOfCollectionsMap
                 } 
             }
 
-            if(results[5]?.status === "fulfilled"){
-                const res = results[5].value
+            if(results[4]?.status === "fulfilled"){
+                const res = results[4].value
                 sensitiveInfo ={ 
                     sensitiveUrls: res.sensitiveUrlsInResponse,
                     sensitiveInfoMap: res.sensitiveSubtypesInCollection
                 }
             }
 
-            if(results[6]?.status === "fulfilled"){
-                const res = results[6].value
+            if(results[5]?.status === "fulfilled"){
+                const res = results[5].value
                 severityObj = res
             }
 
