@@ -153,6 +153,18 @@ export default {
             data: { apiCollections: items }
         })
     },
+    
+    async updateUserCollections(apiCollectionsList, userIdList) {
+        return await request({
+            url: '/api/updateUserCollections',
+            method: 'post',
+            data: {
+                apiCollections: apiCollectionsList,
+                userIdList: userIdList
+            }
+        })
+    },
+
     askAi(data) {
         return request({
             url: '/api/ask_ai',

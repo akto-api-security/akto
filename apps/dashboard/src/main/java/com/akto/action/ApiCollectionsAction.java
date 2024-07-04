@@ -609,6 +609,31 @@ public class ApiCollectionsAction extends UserAction {
         return Action.ERROR.toUpperCase();
     }
 
+    public List<Integer> userIdList = new ArrayList<>();
+
+    public String updateUserCollections() {
+        int accountId = Context.accountId.get();
+
+        List<Integer> apiCollectionsIdList = new ArrayList<>();
+        for(ApiCollection apiCollection : apiCollections) {
+            apiCollectionsIdList.add(apiCollection.getId());
+        }
+
+        for(int userId : userIdList) {
+            UsersDao.updateApiCollectionAccess(userId, accountId, apiCollectionsIdList);
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public List<Integer> getUserIdList() {
+        return userIdList;
+    }
+
+    public void setUserIdList(List<Integer> userIdList) {
+        this.userIdList = userIdList;
+    }
+
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
     }

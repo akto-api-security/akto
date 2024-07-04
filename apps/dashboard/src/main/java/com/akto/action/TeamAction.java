@@ -80,6 +80,17 @@ public class TeamAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    HashMap<Integer, List<Integer>> usersCollectionList;
+    public String getAllUsersCollections() {
+        this.usersCollectionList = UsersDao.instance.getAllUsersCollections();
+
+        if(usersCollectionList == null) {
+            return ERROR.toUpperCase();
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
     private enum ActionType {
         REMOVE_USER,
         UPDATE_USER_ROLE
@@ -215,4 +226,12 @@ public class TeamAction extends UserAction {
         return userRoleHierarchy;
     }
 
+
+    public HashMap<Integer, List<Integer>> getUsersCollectionList() {
+        return usersCollectionList;
+    }
+
+    public void setUsersCollectionList(HashMap<Integer, List<Integer>> usersCollectionList) {
+        this.usersCollectionList = usersCollectionList;
+    }
 }
