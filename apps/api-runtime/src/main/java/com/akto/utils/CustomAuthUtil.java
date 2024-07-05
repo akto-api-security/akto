@@ -1,70 +1,81 @@
 package com.akto.utils;
 
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.ArrayList;
+import java.util.Collections;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.ApiInfoDao;
+import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
+import com.akto.dto.HttpRequestParams;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.policies.AuthPolicy;
+import com.akto.util.Constants;
+import com.google.gson.Gson;
 
 import static com.akto.dto.ApiInfo.ALL_AUTH_TYPES_FOUND;
 
 public class CustomAuthUtil {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(CustomAuthUtil.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(CustomAuthUtil.class, LogDb.DASHBOARD);
 
-    public static Bson getFilters(ApiInfo apiInfo, Boolean isHeader, List<String> params){
+    public static Bson getFilters(ApiInfo apiInfo) {
         return Filters.and(
+                Filters.eq(SingleTypeInfo._URL, apiInfo.getId().getUrl()),
+                Filters.eq(SingleTypeInfo._METHOD, apiInfo.getId().getMethod().name()),
                 Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
-                Filters.eq(SingleTypeInfo._URL,apiInfo.getId().getUrl()),
-                Filters.eq(SingleTypeInfo._API_COLLECTION_ID,apiInfo.getId().getApiCollectionId()),
-                Filters.eq(SingleTypeInfo._METHOD,apiInfo.getId().getMethod().name()),
-                Filters.eq(SingleTypeInfo._IS_HEADER,isHeader),
-                Filters.in(SingleTypeInfo._PARAM,params)
-        );
+                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiInfo.getId().getApiCollectionId()));
     }
 
-    private static Set<ApiInfo.AuthType> customTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.CUSTOM));
     private static Set<ApiInfo.AuthType> unauthenticatedTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED));
 
-    private static Set<Set<ApiInfo.AuthType>> addCustomAuth(Set<Set<ApiInfo.AuthType>> authTypes) {
+    final static Gson gson = new Gson();
 
-        // remove unauthenticated and add custom auth type
-        authTypes.remove(unauthenticatedTypes);
-        
-        if(!authTypes.contains(customTypes)){
-            authTypes.add(customTypes);
+    private static HttpResponseParams createResponseParamsFromSTI(List<SingleTypeInfo> list) {
+
+        HttpResponseParams responseParams = new HttpResponseParams();
+        HttpRequestParams requestParams = new HttpRequestParams();
+        Map<String, List<String>> headers = new HashMap<>();
+        Map<String, String> payloadKeys = new HashMap<>();
+        for(SingleTypeInfo sti: list){
+            if(sti.isIsHeader()){
+                List<String> values = new ArrayList<>();
+                if(sti.getValues()!=null && sti.getValues().getElements()!=null){
+                    values = new ArrayList<>(sti.getValues().getElements());
+                }
+                headers.put(sti.getParam(), values);
+            } else if(!sti.getIsUrlParam()) {
+                payloadKeys.put(sti.getParam(), "");
+            }
         }
-
-        return authTypes;
+        String payloadJsonString = "{}";
+        try {
+            payloadJsonString = gson.toJson(payloadKeys);
+        } catch(Exception e){
+            payloadJsonString = "{}";
+        }
+        requestParams.setHeaders(headers);
+        requestParams.setPayload(payloadJsonString);
+        responseParams.requestParams = requestParams;
+        return responseParams;
     }
 
-    private static Set<Set<ApiInfo.AuthType>> addUnauthenticatedIfNoAuth(Set<Set<ApiInfo.AuthType>> authTypes) {
-
-        if(authTypes.isEmpty()){
-            authTypes.add(unauthenticatedTypes);
-        }
-
-        return authTypes;
-    }
-
-    public static void customAuthTypeUtil(List<CustomAuthType> customAuthTypes){
-
-
-        List<String> COOKIE_LIST = Collections.singletonList("cookie");
+    public static void customAuthTypeUtil(List<CustomAuthType> customAuthTypes) {
 
         List<WriteModel<ApiInfo>> apiInfosUpdates = new ArrayList<>();
 
@@ -74,7 +85,7 @@ public class CustomAuthUtil {
         do {
             fetchMore = false;
             List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(new BasicDBObject(), skip, limit,
-                    Sorts.descending("_id"));
+                    Sorts.descending(Constants.ID));
 
             loggerMaker.infoAndAddToDb("Read " + (apiInfos.size() + skip) + " api infos for custom auth type",
                     LogDb.DASHBOARD);
@@ -83,63 +94,39 @@ public class CustomAuthUtil {
 
             Set<Set<ApiInfo.AuthType>> authTypes = apiInfo.getAllAuthTypesFound();
             authTypes.remove(new HashSet<>());
+            authTypes.remove(unauthenticatedTypes);
 
-            boolean foundCustomAuthType = false;
-
-            for (CustomAuthType customAuthType : customAuthTypes) {
-
-                Set<String> headerAndCookieKeys = new HashSet<>();
-                List<SingleTypeInfo> headerSTIs = SingleTypeInfoDao.instance.findAll(getFilters(apiInfo, true, customAuthType.getHeaderKeys()));
-                if(headerSTIs!=null){
-                    for(SingleTypeInfo sti:headerSTIs){
-                        headerAndCookieKeys.add(sti.getParam());
+            SampleData sampleData = SampleDataDao.instance.fetchAllSampleDataForApi(
+                    apiInfo.getId().getApiCollectionId(),
+                    apiInfo.getId().getUrl(), apiInfo.getId().getMethod());
+            boolean sampleProcessed = false;
+            if (sampleData != null && sampleData.getSamples() != null && !sampleData.getSamples().isEmpty()) {
+                for (String sample : sampleData.getSamples()) {
+                    try {
+                        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                        AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+                        sampleProcessed = true;
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Unable to parse sample data for custom auth setup job");
                     }
                 }
-                SingleTypeInfo cookieSTI = SingleTypeInfoDao.instance.findOne(getFilters(apiInfo, true, COOKIE_LIST));
-                if(cookieSTI!=null){
-                    Map<String,String> cookieMap = AuthPolicy.parseCookie(new ArrayList<>(cookieSTI.getValues().getElements()));
-                    headerAndCookieKeys.addAll(cookieMap.keySet());
-                }
-
-                // checking headerAuthKeys in header and cookie in any unauthenticated API
-                if (!headerAndCookieKeys.isEmpty() && !customAuthType.getHeaderKeys().isEmpty() && headerAndCookieKeys.containsAll(customAuthType.getHeaderKeys())) {
-                    UpdateOneModel<ApiInfo> update = new UpdateOneModel<>(
-                            ApiInfoDao.getFilter(apiInfo.getId()),
-                            Updates.set(ALL_AUTH_TYPES_FOUND, addCustomAuth(authTypes)),
-                            new UpdateOptions().upsert(false)
-                    );
-                    apiInfosUpdates.add(update);
-                    foundCustomAuthType = true;
-                    break;
-                }
-
-                if (customAuthType.getPayloadKeys().isEmpty()) {
-                    continue;
-                }
-
-                // checking if all payload keys occur in any unauthenticated API
-                List<SingleTypeInfo> payloadSTIs = SingleTypeInfoDao.instance.findAll(getFilters(apiInfo, false, customAuthType.getPayloadKeys()));
-                if (payloadSTIs!=null && payloadSTIs.size()==customAuthType.getPayloadKeys().size()) {
-
-                    UpdateOneModel<ApiInfo> update = new UpdateOneModel<>(
-                            ApiInfoDao.getFilter(apiInfo.getId()),
-                            Updates.set(ALL_AUTH_TYPES_FOUND, addCustomAuth(authTypes)),
-                            new UpdateOptions().upsert(false)
-                    );
-                    apiInfosUpdates.add(update);
-                    foundCustomAuthType = true;
-                    break;
+            }
+                
+            if (!sampleProcessed) {
+                List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(getFilters(apiInfo));
+                try {
+                    HttpResponseParams httpResponseParams = createResponseParamsFromSTI(list);
+                    AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Unable to parse STIs for custom auth setup job");
                 }
             }
 
-            if(!foundCustomAuthType){
-                UpdateOneModel<ApiInfo> update = new UpdateOneModel<>(
-                        ApiInfoDao.getFilter(apiInfo.getId()),
-                        Updates.set(ALL_AUTH_TYPES_FOUND, addUnauthenticatedIfNoAuth(authTypes)),
-                        new UpdateOptions().upsert(false)
-                );
-                apiInfosUpdates.add(update);
-            }
+            UpdateOneModel<ApiInfo> update = new UpdateOneModel<>(
+                    ApiInfoDao.getFilter(apiInfo.getId()),
+                    Updates.set(ALL_AUTH_TYPES_FOUND, apiInfo.getAllAuthTypesFound()),
+                    new UpdateOptions().upsert(false));
+            apiInfosUpdates.add(update);
 
         }
 
