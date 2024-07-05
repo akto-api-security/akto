@@ -45,6 +45,8 @@ import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.custom_groups.AllAPIsGroup;
+import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
@@ -83,8 +85,6 @@ import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.*;
 import com.akto.util.DashboardMode;
-import com.akto.utils.GithubSync;
-import com.akto.utils.RedactSampleData;
 import com.akto.utils.scripts.FixMultiSTIs;
 import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
@@ -247,6 +247,14 @@ public class InitializerListener implements ServletContextListener {
                 }, "akto-mixpanel-endpoints-scheduler");
             }
         }, 0, 4, TimeUnit.HOURS);
+    }
+
+    public void updateApiGroupsForAccounts() {
+        List<Integer> accounts = new ArrayList<>(Arrays.asList(1_000_000, 1718042191, 1664578207, 1693004074, 1685916748));
+        for (int account : accounts) {
+            Context.accountId.set(account);
+            createFirstUnauthenticatedApiGroup();
+        }
     }
 
     private static void raiseMixpanelEvent() {
@@ -1170,6 +1178,49 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void createUnauthenticatedApiGroup() {
+
+        if (ApiCollectionsDao.instance.findOne(
+                Filters.eq("_id", UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID)) == null) {
+            loggerMaker.infoAndAddToDb("AccountId: " + Context.accountId.get() + " Creating unauthenticated api group.", LogDb.DASHBOARD);
+            ApiCollection unauthenticatedApisGroup = new ApiCollection(UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID,
+                    "Unauthenticated Apis", Context.now(), new HashSet<>(), null, 0, false, false);
+
+            unauthenticatedApisGroup.setAutomated(true);
+            unauthenticatedApisGroup.setType(ApiCollection.Type.API_GROUP);
+            List<TestingEndpoints> conditions = new ArrayList<>();
+            conditions.add(new UnauthenticatedEndpoint());
+            unauthenticatedApisGroup.setConditions(conditions);
+
+            ApiCollectionsDao.instance.insertOne(unauthenticatedApisGroup);
+        }
+
+    }
+
+    public static void createAllApisGroup() {
+        if (ApiCollectionsDao.instance
+                .findOne(Filters.eq("_id", 111111121)) == null) {
+            loggerMaker.infoAndAddToDb("AccountId: " + Context.accountId.get() + " Creating all apis group.", LogDb.DASHBOARD);
+            ApiCollection allApisGroup = new ApiCollection(111_111_121, "All Apis", Context.now(), new HashSet<>(),
+                    null, 0, false, false);
+
+            allApisGroup.setAutomated(true);
+            allApisGroup.setType(ApiCollection.Type.API_GROUP);
+            List<TestingEndpoints> conditions = new ArrayList<>();
+            conditions.add(new AllAPIsGroup());
+            allApisGroup.setConditions(conditions);
+
+            ApiCollectionsDao.instance.insertOne(allApisGroup);
+        }
+
+    }
+    
+
+    public static void createFirstUnauthenticatedApiGroup(){
+        createUnauthenticatedApiGroup();
+        createAllApisGroup();
+    }
+
     public static void createRiskScoreApiGroup(int id, String name, RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType) {
         loggerMaker.infoAndAddToDb("Creating risk score group: " + name, LogDb.DASHBOARD);
         
@@ -1227,7 +1278,7 @@ public class InitializerListener implements ServletContextListener {
     public static void createAutomatedAPIGroups(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getAutomatedApiGroups() == 0) {
             // Fetch automated API groups csv records
-            List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups(false);
+            List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups();
 
             if (apiGroupRecords != null) {
                 AutomatedApiGroupsUtils.processAutomatedGroups(apiGroupRecords);
@@ -1832,7 +1883,7 @@ public class InitializerListener implements ServletContextListener {
                         loggerMaker.errorAndAddToDb("Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
                     }
                 }
-
+                updateApiGroupsForAccounts();
                 setUpUpdateCustomCollections();
                 setUpFillCollectionIdArrayJob();
                 setupAutomatedApiGroupsScheduler();
@@ -2166,7 +2217,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void runInitializerFunctions() {
-        DaoInit.createIndices();
+        // DaoInit.createIndices();
 
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
@@ -2178,7 +2229,9 @@ public class InitializerListener implements ServletContextListener {
         // backward compatibility
         try {
             setBackwardCompatibilities(backwardCompatibility);
+            loggerMaker.infoAndAddToDb("Backward compatibilities set for " + Context.accountId.get(), LogDb.DASHBOARD);
             insertPiiSources();
+            loggerMaker.infoAndAddToDb("PII sources inserted set for " + Context.accountId.get(), LogDb.DASHBOARD);
 
 //            setUpPiiCleanerScheduler();
 //            setUpDailyScheduler();
@@ -2192,7 +2245,7 @@ public class InitializerListener implements ServletContextListener {
         }
 
         try {
-            loggerMaker.infoAndAddToDb("Updating account version", LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Updating account version for " + Context.accountId.get(), LogDb.DASHBOARD);
             AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
@@ -2483,7 +2536,7 @@ public class InitializerListener implements ServletContextListener {
         return files;
     }
 
-    private static String convertStreamToString(InputStream in) throws Exception {
+    public static String convertStreamToString(InputStream in) throws Exception {
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(in));
         StringBuilder stringbuilder = new StringBuilder();
@@ -2596,7 +2649,7 @@ public class InitializerListener implements ServletContextListener {
                 loggerMaker.infoAndAddToDb("Cron for updating automated API groups picked up.", LogDb.DASHBOARD);
 
                 // Fetch automated API groups csv records
-                List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups(true);
+                List<CSVRecord> apiGroupRecords = AutomatedApiGroupsUtils.fetchGroups();
 
                 if (apiGroupRecords == null) {
                     return;

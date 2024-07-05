@@ -67,6 +67,7 @@ import PageCheckInbox from "../signup/pages/PageCheckInbox"
 import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
 import TokenValidator from "./TokenValidator"
 import { TableContextProvider } from "@/apps/dashboard/components/tables/TableContext";
+import VulnerabilityReport from "../dashboard/pages/testing/vulnerability_report/VulnerabilityReport";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -295,11 +296,11 @@ const router = createBrowserRouter([
       },
       {
         path: "testing/summary/:summaryId",
-        element: <ExportHtml />
+        element: <VulnerabilityReport />
       },
       {
         path: "issues/summary/:issuesFilter",
-        element: <ExportHtml />
+        element: <VulnerabilityReport />
       }
     ],
     errorElement: <ErrorComponent/>

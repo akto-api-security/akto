@@ -9,7 +9,7 @@ import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest }) {
 
     const initialState = {
         categories: [],
@@ -121,7 +121,12 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
     }, [apiCollectionName,runTestFromOutside])
 
-    const toggleRunTest = () => setActive(prev => !prev)
+    const toggleRunTest = () => {
+        setActive(prev => !prev)
+        if(active){
+            closeRunTest()
+        }
+    }
 
     function populateMapCategoryToSubcategory(businessLogicSubcategories) {
         let ret = {}

@@ -4,7 +4,6 @@ import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
 import Dropdown from '../../../components/layouts/Dropdown'
 import {produce} from "immer"
 import func from '@/util/func'
-import Store from "../../../store"
 import "../settings.css"
 import settingFunctions from '../module'
 import GraphMetric from '../../../components/GraphMetric'
@@ -36,9 +35,13 @@ function Metrics() {
 
     const [menuItems,setMenuItems] =  useState(initialItems)
     const [groupBy, setGroupBy] = useState("ALL")
+    const hasAccess = func.checkUserValidForIntegrations()
 
     const getMetricsList = async() =>{
-        let arr = await settingFunctions.fetchMetricData()
+        let arr = []
+        if(hasAccess){
+            arr =  await settingFunctions.fetchMetricData()
+        }
         setMetricList(arr)
     }
     const names = ['INCOMING_PACKETS_MIRRORING','OUTGOING_PACKETS_MIRRORING','OUTGOING_REQUESTS_MIRRORING','TOTAL_REQUESTS_RUNTIME','FILTERED_REQUESTS_RUNTIME']
@@ -47,7 +50,7 @@ function Metrics() {
         
 
     const getGraphData = async(startTime,endTime) =>{
-        const metricData = await settingFunctions.fetchGraphData(groupBy,startTime,endTime,names,currentHost)
+        const metricData = hasAccess ? await settingFunctions.fetchGraphData(groupBy,startTime,endTime,names,currentHost) : []
         let result = {}
         for (const [key, countMap] of Object.entries(metricData)) {
             let val = func.convertTrafficMetricsToTrend(countMap)
