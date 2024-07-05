@@ -1,52 +1,41 @@
 package com.akto.dto.testing;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.akto.dao.MCollection;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.util.Constants;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 
 public class SensitiveDataEndpoints extends TestingEndpoints {
 
     public static final int LIMIT = 50;
-
-    @BsonIgnore
-    int skip = 0;
-
-    @BsonIgnore
-    int apiCollectionId = 0;
-
-    public int getApiCollectionId() {
-        return apiCollectionId;
-    }
-
-    public void setApiCollectionId(int apiCollectionId) {
-        this.apiCollectionId = apiCollectionId;
-    }
-
-    public int getSkip() {
-        return skip;
-    }
-
-    public void setSkip(int skip) {
-        this.skip = skip;
-    }
+    private static final Logger logger = LoggerFactory.getLogger(SensitiveDataEndpoints.class);
 
     public SensitiveDataEndpoints() {
         super(Type.SENSITIVE_DATA);
@@ -69,58 +58,114 @@ public class SensitiveDataEndpoints extends TestingEndpoints {
 
     @Override
     public List<ApiInfoKey> returnApis() {
-        urls = new ArrayList<>();
-        if (skip == 0) {
-            // User manually set sensitive
-            List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(
-                    Filters.and(
-                            Filters.eq("sensitive", true),
-                            Filters.eq("apiCollectionId", apiCollectionId)));
-            for (SensitiveParamInfo sensitiveParamInfo : customSensitiveList) {
-                urls.add(new ApiInfoKey(sensitiveParamInfo.getApiCollectionId(), sensitiveParamInfo.getUrl(),
-                        Method.valueOf(sensitiveParamInfo.getMethod())));
-            }
-        }
-        urls.addAll(SingleTypeInfoDao.instance.fetchSensitiveEndpoints(apiCollectionId, skip, LIMIT));
         return urls;
     }
 
-    final static int API_GROUP_ID = 111_111_999;
+    public final static int API_GROUP_ID = 111_111_999;
 
-    public static void updateCollections(){
+    public static void updateCollections() {
         ApiCollectionUsers.reset(API_GROUP_ID);
-
-        Set<Integer> responseCodes = SingleTypeInfoDao.instance.findDistinctFields(SingleTypeInfo._RESPONSE_CODE, Integer.class, Filters.exists(SingleTypeInfo._RESPONSE_CODE));
-        Set<String> subTypes = SingleTypeInfoDao.instance.findDistinctFields(SingleTypeInfo.SUB_TYPE, String.class, Filters.exists(SingleTypeInfo.SUB_TYPE));
+        SingleTypeInfo.fetchCustomDataTypes(1000000);
+        Set<Integer> responseCodes = SingleTypeInfoDao.instance.findDistinctFields(SingleTypeInfo._RESPONSE_CODE,
+                Integer.class, Filters.exists(SingleTypeInfo._RESPONSE_CODE));
+        Set<String> subTypes = SingleTypeInfoDao.instance.findDistinctFields(SingleTypeInfo.SUB_TYPE, String.class,
+                Filters.exists(SingleTypeInfo.SUB_TYPE));
 
         Set<String> sensitiveInResponse = new HashSet<>(SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames());
         Set<String> sensitiveInRequest = new HashSet<>(SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames());
 
-        for(int responseCode : responseCodes){
-            for(String subType : subTypes){
+        List<ApiInfoKey> localUrls = new ArrayList<>();
+        List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(
+                Filters.eq("sensitive", true));
+        for (SensitiveParamInfo sensitiveParamInfo : customSensitiveList) {
+            localUrls.add(new ApiInfoKey(sensitiveParamInfo.getApiCollectionId(), sensitiveParamInfo.getUrl(),
+                    Method.valueOf(sensitiveParamInfo.getMethod())));
+        }
+
+        SensitiveDataEndpoints sensitiveDataEndpoints = new SensitiveDataEndpoints();
+        if (localUrls != null && !localUrls.isEmpty()) {
+            sensitiveDataEndpoints.setUrls(new ArrayList<>(localUrls));
+            ApiCollectionUsers.addToCollectionsForCollectionId(
+                    Collections.singletonList(sensitiveDataEndpoints), API_GROUP_ID);
+        }
+
+        final String LAST_TIMESTAMP = "lastTimestamp";
+
+        for (int responseCode : responseCodes) {
+            for (String subType : subTypes) {
 
                 Bson responseCodeFilter = Filters.eq(SingleTypeInfo._RESPONSE_CODE, responseCode);
                 Bson subTypeFilter = Filters.eq(SingleTypeInfo.SUB_TYPE, subType);
 
                 if ((responseCode == -1 && sensitiveInRequest.contains(subType))
-                        || responseCode != -1 && sensitiveInResponse.contains(subType)) {
+                        || (responseCode != -1 && sensitiveInResponse.contains(subType))) {
 
-                            int timestamp = Context.now() + Constants.ONE_DAY_TIMESTAMP;
+                    int timestamp = Context.now() + Constants.ONE_DAY_TIMESTAMP;
 
-                            boolean hasMore = true;
+                    logger.info(String.format("AccountId: %d Starting update sensitive data collection for %d %s",
+                            Context.accountId.get(), responseCode, subType));
+                    int skip = 0;
+                    while (true) {
+                        List<Bson> pipeline = new ArrayList<>();
+                        pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
+                        pipeline.add(Aggregates.match(
+                                Filters.and(
+                                        responseCodeFilter, subTypeFilter,
+                                        Filters.lt(SingleTypeInfo._TIMESTAMP, timestamp))));
+                        pipeline.add(Aggregates.skip(skip));
+                        pipeline.add(Aggregates.limit(LIMIT));
+                        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID,
+                                "$apiCollectionId")
+                                .append(SingleTypeInfo._URL, "$url")
+                                .append(SingleTypeInfo._METHOD, "$method");
 
-                            while(hasMore){
-                                hasMore = false;
+                        Bson projections = Projections.fields(
+                                Projections.include(SingleTypeInfo._TIMESTAMP,
+                                        SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._URL,
+                                        SingleTypeInfo._METHOD));
 
+                        pipeline.add(Aggregates.project(projections));
+                        pipeline.add(Aggregates.group(groupedId,
+                                Accumulators.last(LAST_TIMESTAMP, "$timestamp")));
                                 
+                        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection()
+                                .aggregate(pipeline, BasicDBObject.class).cursor();
 
+                        Set<ApiInfo.ApiInfoKey> endpoints = new HashSet<>();
+                        while (endpointsCursor.hasNext()) {
+                            BasicDBObject v = endpointsCursor.next();
+                            try {
+                                BasicDBObject vv = (BasicDBObject) v.get("_id");
+                                ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(
+                                        (int) vv.get("apiCollectionId"),
+                                        (String) vv.get("url"),
+                                        URLMethods.Method.fromString((String) vv.get("method")));
+                                endpoints.add(apiInfoKey);
+                                int localTimestamp = v.getInt(LAST_TIMESTAMP);
+                                timestamp = Math.min(timestamp, localTimestamp);
+                            } catch (Exception e) {
+                                e.printStackTrace();
                             }
-                            
+                        }
 
+                        if (!endpoints.isEmpty()) {
+                            logger.info(String.format(
+                                    "AccountId: %d Running update sensitive data collection for %d %s with endpoints %d skip %d",
+                                    Context.accountId.get(), responseCode, subType, endpoints.size(), skip));
+                            timestamp = timestamp + 1;
+                            sensitiveDataEndpoints.setUrls(new ArrayList<>(endpoints));
+                            ApiCollectionUsers.addToCollectionsForCollectionId(
+                                    Collections.singletonList(sensitiveDataEndpoints), API_GROUP_ID);
+                            skip += LIMIT;
+                            continue;
+                        }
+                        logger.info(String.format("AccountId: %d Finished update sensitive data collection for %d %s",
+                                Context.accountId.get(), responseCode, subType));
+                        break;
+                    }
                 }
             }
         }
-
     }
 
     @Override
@@ -159,15 +204,5 @@ public class SensitiveDataEndpoints extends TestingEndpoints {
 
         return MCollection.noMatchFilter;
     }
-
-    // public static void main(String[] args) {
-    //     DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-    //     Context.accountId.set(1_000_000);
-
-    //     SensitiveDataEndpoints ep = new SensitiveDataEndpoints();
-    //     ep.setApiCollectionId(1719900296);
-    //     ep.returnApis();
-
-    // }
 
 }

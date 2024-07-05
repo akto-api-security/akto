@@ -249,18 +249,12 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 4, TimeUnit.HOURS);
     }
 
-    public void updateApiGroupsForAccounts(){
-
+    public void updateApiGroupsForAccounts() {
         List<Integer> accounts = new ArrayList<>(Arrays.asList(1_000_000, 1718042191, 1664578207, 1693004074, 1685916748));
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                for(int account : accounts){
-                    Context.accountId.set(account);
-                    createFirstUnauthenticatedApiGroup();
-                }
-
-            }
-        }, 0, 24, TimeUnit.HOURS);
+        for (int account : accounts) {
+            Context.accountId.set(account);
+            createFirstUnauthenticatedApiGroup();
+        }
     }
 
     private static void raiseMixpanelEvent() {
@@ -1188,7 +1182,7 @@ public class InitializerListener implements ServletContextListener {
 
         if (ApiCollectionsDao.instance.findOne(
                 Filters.eq("_id", UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID)) == null) {
-            loggerMaker.infoAndAddToDb("Creating unauthenticated api group.", LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("AccountId: " + Context.accountId.get() + " Creating unauthenticated api group.", LogDb.DASHBOARD);
             ApiCollection unauthenticatedApisGroup = new ApiCollection(UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID,
                     "Unauthenticated Apis", Context.now(), new HashSet<>(), null, 0, false, false);
 
@@ -1206,7 +1200,7 @@ public class InitializerListener implements ServletContextListener {
     public static void createAllApisGroup() {
         if (ApiCollectionsDao.instance
                 .findOne(Filters.eq("_id", 111111121)) == null) {
-            loggerMaker.infoAndAddToDb("Creating all apis group.", LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("AccountId: " + Context.accountId.get() + " Creating all apis group.", LogDb.DASHBOARD);
             ApiCollection allApisGroup = new ApiCollection(111_111_121, "All Apis", Context.now(), new HashSet<>(),
                     null, 0, false, false);
 
