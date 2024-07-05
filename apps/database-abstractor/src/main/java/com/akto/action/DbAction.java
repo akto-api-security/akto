@@ -30,9 +30,11 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.utils.CustomAuthUtil;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
+import com.akto.utils.SchedulerUtils;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
@@ -55,6 +57,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 public class DbAction extends ActionSupport {
 
@@ -297,7 +300,16 @@ public class DbAction extends ActionSupport {
                 ApiInfo apiInfo = objectMapper.readValue(obj.toJson(), ApiInfo.class);
                 apiInfos.add(apiInfo);
             }
-            DbLayer.bulkWriteApiInfo(apiInfos);
+            int accountId = Context.accountId.get();
+            SingleTypeInfo.fetchCustomAuthTypes(accountId);
+            SchedulerUtils.getService().schedule(new Runnable() {
+                public void run() {
+                    Context.accountId.set(accountId);
+                    List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(accountId);
+                    CustomAuthUtil.calcAuth(apiInfos, customAuthTypes);
+                    DbLayer.bulkWriteApiInfo(apiInfos);
+                }
+            }, 0, TimeUnit.SECONDS);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }

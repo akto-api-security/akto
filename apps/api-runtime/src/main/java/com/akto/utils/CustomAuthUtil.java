@@ -75,21 +75,8 @@ public class CustomAuthUtil {
         return responseParams;
     }
 
-    public static void customAuthTypeUtil(List<CustomAuthType> customAuthTypes) {
-
+    public static List<WriteModel<ApiInfo>> calcAuth(List<ApiInfo> apiInfos, List<CustomAuthType> customAuthTypes){
         List<WriteModel<ApiInfo>> apiInfosUpdates = new ArrayList<>();
-
-        int skip = 0;
-        int limit = 1000;
-        boolean fetchMore = false;
-        do {
-            fetchMore = false;
-            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(new BasicDBObject(), skip, limit,
-                    Sorts.descending(Constants.ID));
-
-            loggerMaker.infoAndAddToDb("Read " + (apiInfos.size() + skip) + " api infos for custom auth type",
-                    LogDb.DASHBOARD);
-
         for (ApiInfo apiInfo : apiInfos) {
 
             Set<Set<ApiInfo.AuthType>> authTypes = apiInfo.getAllAuthTypesFound();
@@ -129,6 +116,26 @@ public class CustomAuthUtil {
             apiInfosUpdates.add(update);
 
         }
+        return apiInfosUpdates;
+
+    }
+
+    public static void customAuthTypeUtil(List<CustomAuthType> customAuthTypes) {
+
+        List<WriteModel<ApiInfo>> apiInfosUpdates = new ArrayList<>();
+
+        int skip = 0;
+        int limit = 1000;
+        boolean fetchMore = false;
+        do {
+            fetchMore = false;
+            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(new BasicDBObject(), skip, limit,
+                    Sorts.descending(Constants.ID));
+
+            loggerMaker.infoAndAddToDb("Read " + (apiInfos.size() + skip) + " api infos for custom auth type",
+                    LogDb.DASHBOARD);
+
+            apiInfosUpdates.addAll(calcAuth(apiInfos, customAuthTypes));
 
         if (apiInfos.size() == limit) {
             skip += limit;
