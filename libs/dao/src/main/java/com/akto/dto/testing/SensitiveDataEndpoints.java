@@ -8,7 +8,6 @@ import java.util.Set;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.conversions.Bson;
 
-import com.akto.DaoInit;
 import com.akto.dao.MCollection;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;

@@ -2,10 +2,8 @@ package com.akto.dto;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -16,7 +14,6 @@ import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.FilterSampleDataDao;
@@ -29,14 +26,13 @@ import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
-import com.akto.dto.testing.SensitiveDataEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.testing.custom_groups.AllAPIsGroup;
+import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
@@ -148,6 +144,16 @@ public class ApiCollectionUsers {
     }
 
     public static void computeCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
+
+        if(UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID == apiCollectionId){
+            UnauthenticatedEndpoint.updateCollections();
+            return;
+        }
+        if(AllAPIsGroup.ALL_APIS_GROUP_ID == apiCollectionId){
+            AllAPIsGroup.updateCollections();
+            return;
+        }
+
         addToCollectionsForCollectionId(conditions, apiCollectionId);
         removeFromCollectionsForCollectionId(conditions, apiCollectionId);
         updateApiCollection(conditions, apiCollectionId);
@@ -233,56 +239,5 @@ public class ApiCollectionUsers {
         CustomTestingEndpoints ep = new CustomTestingEndpoints(new ArrayList<>());
         removeFromCollectionsForCollectionId(Collections.singletonList(ep), apiCollectionId);
     }
-
-    private static void updateBatchedEndpointsCollections(int apiGroupId) {
-        reset(apiGroupId);
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.fetchNonApiGroupsIds();
-        SensitiveDataEndpoints endpoints = new SensitiveDataEndpoints();
-
-        for (ApiCollection apiCollection : apiCollections) {
-            int id = apiCollection.getId();
-            endpoints.setApiCollectionId(id);
-            int skip = 0;
-            endpoints.setSkip(skip);
-            boolean hasMore = true;
-            while (hasMore) {
-                hasMore = false;
-                addToCollectionsForCollectionId(Collections.singletonList(endpoints), apiGroupId);
-                if (!endpoints.getUrls().isEmpty()) {
-                    skip += SensitiveDataEndpoints.LIMIT;
-                    endpoints.setSkip(skip);
-                    hasMore = true;
-                }
-            }
-        }
-    }
-
-    public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
-
-        SensitiveDataEndpoints ep = new SensitiveDataEndpoints();
-        int id = 111_111_007;
-
-        ApiCollection collection = new ApiCollection(id, "Sensitive APIs", Collections.singletonList(ep));
-        // ApiCollectionsDao.instance.insertOne(collection);
-
-        updateBatchedEndpointsCollections(id);
-
-        // ep.setApiCollectionId(1719900296);
-        // ep.returnApis();
-
-    }
-
-    // private static TestingEndpoints getApiGroup(int apiCollectionId){
-    //     switch (apiCollectionId) {
-    //         case 111_111_007:
-    //             break;
-    //         case 111_111_008:
-    //         default:
-    //             break;
-    //     }
-    // }
-
 
 }

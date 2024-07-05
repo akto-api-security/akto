@@ -66,12 +66,6 @@ public class AuthPolicy {
         Map<String,String> cookieMap = parseCookie(cookieList);
         Set<ApiInfo.AuthType> authTypes = new HashSet<>();
 
-        BasicDBObject flattenedPayload = null;
-        try{
-            BasicDBObject basicDBObject =  BasicDBObject.parse(httpResponseParams.getRequestParams().getPayload());
-            flattenedPayload = JSONUtils.flattenWithDots(basicDBObject);
-        } catch (Exception e){
-        }
         for (CustomAuthType customAuthType : customAuthTypes) {
 
             Set<String> headerAndCookieKeys = new HashSet<>();
@@ -87,9 +81,17 @@ public class AuthPolicy {
 
             // Find custom auth type in payload
             List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
-            if(flattenedPayload != null && !flattenedPayload.isEmpty() && !customAuthTypePayloadKeys.isEmpty() && flattenedPayload.keySet().containsAll(customAuthTypePayloadKeys)){
-                authTypes.add(ApiInfo.AuthType.CUSTOM);
-                break;
+            if(!customAuthTypePayloadKeys.isEmpty() ){
+                BasicDBObject flattenedPayload = null;
+                try{
+                    BasicDBObject basicDBObject = BasicDBObject.parse(httpResponseParams.getRequestParams().getPayload());
+                    flattenedPayload = JSONUtils.flattenWithDots(basicDBObject);
+                } catch (Exception e){
+                }
+                if(flattenedPayload != null && !flattenedPayload.isEmpty() && flattenedPayload.keySet().containsAll(customAuthTypePayloadKeys)){
+                    authTypes.add(ApiInfo.AuthType.CUSTOM);
+                    break;
+                }
             }
         }
 

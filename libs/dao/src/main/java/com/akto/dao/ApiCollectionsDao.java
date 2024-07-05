@@ -169,8 +169,11 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
         pipeline.add(Aggregates.project(projections));
         pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp"), Accumulators.sum("changesCount", 1)));
-        pipeline.add(Aggregates.skip(skip));
-        pipeline.add(Aggregates.limit(limit));
+        if(limit != -1){
+            pipeline.add(Aggregates.skip(skip));
+            pipeline.add(Aggregates.limit(limit));
+        }
+        
         pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
 
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -183,9 +186,11 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         return endpoints;
     }
 
+    public static final int STIS_LIMIT = 10_000;
+
     public static List<SingleTypeInfo> fetchHostSTI(int apiCollectionId, int skip) {
         Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
-        return SingleTypeInfoDao.instance.findAll(filterQ, skip,10_000, null);
+        return SingleTypeInfoDao.instance.findAll(filterQ, skip, STIS_LIMIT, null);
     }
 
     public static List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int limit, int deltaPeriodValue) {
@@ -199,7 +204,17 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         if (apiCollection.getHostName() == null || apiCollection.getHostName().length() == 0 ) {
             return fetchEndpointsInCollection(apiCollectionId, skip, limit, deltaPeriodValue);
         } else {
-            List<SingleTypeInfo> allUrlsInCollection = fetchHostSTI(apiCollectionId, skip);
+            List<SingleTypeInfo> allUrlsInCollection = new ArrayList<>();
+            int localSkip = 0;
+            while(true){
+                List<SingleTypeInfo> stis = fetchHostSTI(apiCollectionId, localSkip);
+                allUrlsInCollection.addAll(stis);
+                if(stis.size() < STIS_LIMIT){
+                    break;
+                }
+
+                localSkip += STIS_LIMIT;
+            }
 
             List<BasicDBObject> endpoints = new ArrayList<>();
             for(SingleTypeInfo singleTypeInfo: allUrlsInCollection) {
