@@ -176,14 +176,21 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
     public List<String> sensitiveSubTypeInRequestNames() {
         List<String> sensitiveInRequest = new ArrayList<>();
-        for (SingleTypeInfo.SubType subType: SingleTypeInfo.subTypeMap.values()) {
-            if (subType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_HEADER) || subType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD)) {
+        for (SingleTypeInfo.SubType subType : SingleTypeInfo.subTypeMap.values()) {
+            if (subType.isSensitiveAlways() ||
+                    subType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_HEADER)
+                    || subType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD)) {
                 sensitiveInRequest.add(subType.getName());
             }
         }
 
-        for (CustomDataType customDataType: SingleTypeInfo.getCustomDataTypeMap(Context.accountId.get()).values()) {
-            if (customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_HEADER) || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD)) {
+        for (CustomDataType customDataType : SingleTypeInfo.getCustomDataTypeMap(Context.accountId.get()).values()) {
+            if(!customDataType.isActive()){
+                continue;
+            }
+            if (customDataType.isSensitiveAlways() ||
+                    customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_HEADER)
+                    || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD)) {
                 sensitiveInRequest.add(customDataType.getName());
             }
         }
@@ -192,13 +199,20 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
     public List<String> sensitiveSubTypeInResponseNames() {
         List<String> sensitiveInResponse = new ArrayList<>();
-        for (SingleTypeInfo.SubType subType: SingleTypeInfo.subTypeMap.values()) {
-            if (subType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) || subType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD)) {
+        for (SingleTypeInfo.SubType subType : SingleTypeInfo.subTypeMap.values()) {
+            if (subType.isSensitiveAlways() ||
+                    subType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) ||
+                    subType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD)) {
                 sensitiveInResponse.add(subType.getName());
             }
         }
-        for (CustomDataType customDataType: SingleTypeInfo.getCustomDataTypeMap(Context.accountId.get()).values()) {
-            if (customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD)) {
+        for (CustomDataType customDataType : SingleTypeInfo.getCustomDataTypeMap(Context.accountId.get()).values()) {
+            if(!customDataType.isActive()){
+                continue;
+            }
+            if (customDataType.isSensitiveAlways() ||
+                    customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) ||
+                    customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD)) {
                 sensitiveInResponse.add(customDataType.getName());
             }
         }

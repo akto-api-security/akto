@@ -190,7 +190,6 @@ public class ApiCollectionUsers {
     private static void updateCollections(MCollection<?>[] collections, Bson filter, Bson update) {
         for (MCollection<?> collection : collections) {
             long now = System.currentTimeMillis();
-            logger.info(String.format("acc: %d Updating collection for API group %s update: %s", Context.accountId.get(), collection.getCollName(), update.toString()));
             collection.getMCollection().updateMany(filter, update);
             long diff = System.currentTimeMillis() - now;
             logger.info(String.format("acc: %d Updated collection for API group %s update: %s in %d ms", Context.accountId.get(), collection.getCollName(), update.toString(), diff));
