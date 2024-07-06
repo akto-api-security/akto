@@ -29,7 +29,7 @@ import com.mongodb.client.model.Sorts;
 
 public class UnauthenticatedEndpoint extends TestingEndpoints {
 
-    private static int limit = 50;
+    private static int limit = 1000;
     private static final Logger logger = LoggerFactory.getLogger(UnauthenticatedEndpoint.class);
 
     @BsonIgnore

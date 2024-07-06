@@ -34,7 +34,7 @@ import com.mongodb.client.model.Sorts;
 
 public class SensitiveDataEndpoints extends TestingEndpoints {
 
-    public static final int LIMIT = 50;
+    public static final int LIMIT = 1000;
     private static final Logger logger = LoggerFactory.getLogger(SensitiveDataEndpoints.class);
 
     public SensitiveDataEndpoints() {
