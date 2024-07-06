@@ -136,19 +136,14 @@ public class ProtoBufUtils {
         return byteArrayOutputStream.toByteArray();
     }
 
-    static int makeTag(final int fieldNumber, final int wireType) {
-        return (fieldNumber << TAG_TYPE_BITS) | wireType;
-    }
-
     private static void encodeMapToProto(Map<Object, Object> map, CodedOutputStream codedOutputStream) throws IOException {
         for (Map.Entry<Object, Object> entry : map.entrySet()) {
             Object key = entry.getKey();
             Object value = entry.getValue();
 
             int number = Integer.parseInt(key.toString().replace(KEY_PREFIX, "")); // Replacing key-prefix
-            int tag = makeTag(number, getWireType(value));
 
-            codedOutputStream.writeTag(tag, getWireType(value));
+            codedOutputStream.writeTag(number, getWireType(value));
 
             if (value instanceof Long) {
                 codedOutputStream.writeInt64NoTag((Long) value);
