@@ -162,28 +162,7 @@ function ApiCollections() {
     const [popover,setPopover] = useState(false)
     const [teamData, setTeamData] = useState([])
     const [usersCollection, setUsersCollection] = useState([])
-    const [sharePopupLoading, setSharePopupLoading] = useState(false)
     const [selectedItems, setSelectedItems] = useState([])
-
-    const fetchTeamData = async () => {
-        setSharePopupLoading(true)
-        try {
-            const userList = await settingRequests.getTeamData()
-            if(userRole === 'ADMIN') {
-                const usersCollectionList = await settingRequests.getAllUsersCollections()
-                setUsersCollection(usersCollectionList)
-            }
-            setTeamData(userList)
-        } catch(err) {
-            func.setToast(true, true, "Something went wrong!")
-        } finally {
-            setSharePopupLoading(false)
-        }
-    }
-
-    useEffect(() => {
-        fetchTeamData()
-    }, [])
 
     const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom']
 
@@ -259,6 +238,13 @@ function ApiCollections() {
             ]
         }
 
+        if(userRole === 'ADMIN') {
+            apiPromises = [
+                ...apiPromises,
+                ...[api.getAllUsersCollections(), settingRequests.getTeamData()]
+            ]
+        }
+
         let results = await Promise.allSettled(apiPromises);
 
         apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
@@ -299,6 +285,26 @@ function ApiCollections() {
             setLastFetchedSensitiveResp(sensitiveInfo)
 
         }
+
+        let usersCollectionList = []
+        let userList = []
+
+        const index = !shouldCallHeavyApis ? 4 : 7
+
+        if(userRole === 'ADMIN') {
+            if(results[index]?.status === "fulfilled") {
+                const res = results[index].value
+                usersCollectionList = res
+            }
+            
+            if(results[index+1]?.status === "fulfilled") {
+                const res = results[index+1].value
+                userList = res
+            }
+        }
+
+        setUsersCollection(usersCollectionList)
+        setTeamData(userList)
 
         setHasUsageEndpoints(hasUserEndpoints)
         setCoverageMap(coverageInfo)
@@ -347,20 +353,18 @@ function ApiCollections() {
         fetchData()
         func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
     }
-    async function handleShareCollectionsAction(collectionIdList, userIdList, apiFunction, toastContent){
-        const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }));
+    async function handleShareCollectionsAction(collectionIdList, userIdList, apiFunction){
+        const collectionIdSet = new Set(collectionIdList);
 
         for(const userId of userIdList) {
             const userCollections = usersCollection[userId] || [];
-            for(const collectionId of userCollections) {
-                if (!collectionIdListObj.some(item => item.id === collectionId.toString())) {
-                    collectionIdListObj.push({ id: collectionId.toString() });
-                }
-            }
+            userCollections.forEach(collectionId => collectionIdSet.add(collectionId));
         }
 
+        const collectionIdListObj = Array.from(collectionIdSet);
+
         await apiFunction(collectionIdListObj, userIdList)
-        func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
+        func.setToast(true, false, `${userIdList.length} Member${func.addPlurality(userIdList.length)}'s collection${func.addPlurality(collectionIdList.length)} has been updated successfully`)
     }
 
     const exportCsv = () =>{
@@ -446,7 +450,7 @@ function ApiCollections() {
 
         const shareCollectionHandler = () => {
             if (selectedItems.length > 0) {
-                handleShareCollectionsAction(selectedResources, selectedItems, api.updateUserCollections, "members updated");
+                handleShareCollectionsAction(selectedResources, selectedItems, api.updateUserCollections);
                 return true
             } else {
                 func.setToast(true, true, "No member is selected!");
@@ -463,18 +467,14 @@ function ApiCollections() {
                 <Box padding={5} background="bg-subdued-hover">
                     <Text fontWeight="medium">{`${selectedResources.length} collection${func.addPlurality(selectedResources.length)} selected`}</Text>
                 </Box>
-                {
-                    sharePopupLoading ? <SpinnerCentered key={"loading"}/> :
                     <SearchableResourceList
                         resourceName={'user'}
                         items={teamData}
                         renderItem={apiCollectionShareRenderItem}
-                        loading={sharePopupLoading}
                         isFilterControlEnabale={true}
                         selectable={true}
                         onSelectedItemsChange={handleSelectedItemsChange}
                     />
-                }
             </Box>
         )
 

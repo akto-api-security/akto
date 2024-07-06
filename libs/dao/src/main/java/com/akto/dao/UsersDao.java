@@ -189,7 +189,7 @@ public class UsersDao extends CommonContextDao<User> {
 
             if(accounts != null) {
                 for(UserAccountEntry account : accounts.values()) {
-                    List<Integer> apiCollections = account.getApiCollections();
+                    List<Integer> apiCollections = account.getApiCollectionsId();
 
                     if(apiCollections != null) {
                         userApiCollections.addAll(apiCollections);
@@ -205,7 +205,7 @@ public class UsersDao extends CommonContextDao<User> {
 
     public static void updateApiCollectionAccess(int userId, int accountId, List<Integer> apiCollectionList) {
         UsersDao.instance.getMCollection()
-            .updateOne(eq("_id", userId), set("accounts." + accountId + ".apiCollections", apiCollectionList));
+            .updateOne(eq("_id", userId), set("accounts." + accountId + ".apiCollectionsId", apiCollectionList));
     }
 
     @Override

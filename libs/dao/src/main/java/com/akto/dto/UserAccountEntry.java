@@ -7,7 +7,7 @@ public class UserAccountEntry {
     private int accountId;
     private String name;
     private boolean isDefault = false;
-    private List<Integer> apiCollections;
+    private List<Integer> apiCollectionsId = new ArrayList<>();
 
     public UserAccountEntry() {}
 
@@ -18,7 +18,7 @@ public class UserAccountEntry {
     public UserAccountEntry(int accountId, String name) {
         this.accountId = accountId;
         this.name = name;
-        this.apiCollections = new ArrayList<>();
+        this.apiCollectionsId = new ArrayList<>();
     }
 
     public int getAccountId() {
@@ -45,10 +45,10 @@ public class UserAccountEntry {
         this.name = name;
     }
 
-    public List<Integer> getApiCollections() {
-        return apiCollections;
+    public List<Integer> getApiCollectionsId() {
+        return apiCollectionsId;
     }
-    public void setApiCollections(List<Integer> apiCollections) {
-        this.apiCollections = apiCollections;
+    public void setApiCollectionsId(List<Integer> apiCollectionsId) {
+        this.apiCollectionsId = apiCollectionsId;
     }
 }

@@ -609,29 +609,40 @@ public class ApiCollectionsAction extends UserAction {
         return Action.ERROR.toUpperCase();
     }
 
+    public List<Integer> apiCollectionsList = new ArrayList<>();
     public List<Integer> userIdList = new ArrayList<>();
 
     public String updateUserCollections() {
         int accountId = Context.accountId.get();
 
-        List<Integer> apiCollectionsIdList = new ArrayList<>();
-        for(ApiCollection apiCollection : apiCollections) {
-            apiCollectionsIdList.add(apiCollection.getId());
-        }
-
         for(int userId : userIdList) {
-            UsersDao.updateApiCollectionAccess(userId, accountId, apiCollectionsIdList);
+            UsersDao.updateApiCollectionAccess(userId, accountId, apiCollectionsList);
         }
 
         return SUCCESS.toUpperCase();
     }
 
-    public List<Integer> getUserIdList() {
-        return userIdList;
+
+    HashMap<Integer, List<Integer>> usersCollectionList;
+    public String getAllUsersCollections() {
+        this.usersCollectionList = UsersDao.instance.getAllUsersCollections();
+
+        if(usersCollectionList == null) {
+            return ERROR.toUpperCase();
+        }
+
+        return SUCCESS.toUpperCase();
     }
 
+    public void setApiCollectionsList(List<Integer> apiCollectionsList) {
+        this.apiCollectionsList = apiCollectionsList;
+    }
     public void setUserIdList(List<Integer> userIdList) {
         this.userIdList = userIdList;
+    }
+
+    public HashMap<Integer, List<Integer>> getUsersCollectionList() {
+        return this.usersCollectionList;
     }
 
     public List<ApiCollection> getApiCollections() {
