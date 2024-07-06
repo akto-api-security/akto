@@ -20,13 +20,6 @@ const settingRequests = {
             data: {}
         })
     },
-     getAllUsersCollections() {
-        return request({
-            url: '/api/getAllUsersCollections',
-            method: 'post',
-            data: {}
-        })
-    },
     removeUser(email) {
         return request({
             url: '/api/removeUser',

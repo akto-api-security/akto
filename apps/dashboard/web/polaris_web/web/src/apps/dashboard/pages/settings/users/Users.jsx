@@ -153,7 +153,7 @@ const Users = () => {
         setLoading(true);
         const usersResponse = await settingRequests.getTeamData()
         if(userRole === 'ADMIN') {
-            const usersCollectionList = await settingRequests.getAllUsersCollections()
+            const usersCollectionList = await observeApi.getAllUsersCollections()
             setUsersCollection(usersCollectionList)
         }
         setUsers(usersResponse)
@@ -237,8 +237,7 @@ const Users = () => {
 
                             const updateUsersCollection = async () => {
                                 const collectionIdList = selectedItems[id];
-                                const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
-                                await observeApi.updateUserCollections(collectionIdListObj, [id])
+                                await observeApi.updateUserCollections(collectionIdList, [id])
                                 func.setToast(true, false, `User's ${selectedItems[id].length} collection${func.addPlurality(selectedItems[id].length)} have been updated!`)
                                 await getTeamData()
                             }

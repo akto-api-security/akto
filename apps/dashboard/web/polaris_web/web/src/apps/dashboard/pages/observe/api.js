@@ -159,9 +159,17 @@ export default {
             url: '/api/updateUserCollections',
             method: 'post',
             data: {
-                apiCollections: apiCollectionsList,
+                apiCollectionsList: apiCollectionsList,
                 userIdList: userIdList
             }
+        })
+    },
+
+    async getAllUsersCollections() {
+        return await request({
+            url: '/api/getAllUsersCollections',
+            method: 'post',
+            data: {}
         })
     },
 
