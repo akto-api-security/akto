@@ -27,6 +27,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.testing.CustomTestingEndpoints;
+import com.akto.dto.testing.SensitiveDataEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
@@ -149,6 +150,12 @@ public class ApiCollectionUsers {
             UnauthenticatedEndpoint.updateCollections();
             return;
         }
+
+        if(SensitiveDataEndpoints.API_GROUP_ID == apiCollectionId){
+            SensitiveDataEndpoints.updateCollections();
+            return;
+        }
+
         if(AllAPIsGroup.ALL_APIS_GROUP_ID == apiCollectionId){
             AllAPIsGroup.updateCollections();
             return;
@@ -182,7 +189,10 @@ public class ApiCollectionUsers {
 
     private static void updateCollections(MCollection<?>[] collections, Bson filter, Bson update) {
         for (MCollection<?> collection : collections) {
+            long now = System.currentTimeMillis();
             collection.getMCollection().updateMany(filter, update);
+            long diff = System.currentTimeMillis() - now;
+            logger.info(String.format("acc: %d Updated collection for API group %s update: %s in %d ms", Context.accountId.get(), collection.getCollName(), update.toString(), diff));
         }
     }
 

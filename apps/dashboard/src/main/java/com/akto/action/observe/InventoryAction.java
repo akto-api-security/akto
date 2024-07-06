@@ -61,13 +61,14 @@ public class InventoryAction extends UserAction {
     // }
 
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(InventoryAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InventoryAction.class, LogDb.DASHBOARD);
 
     private String subType;
+    private static final int LIMIT = 10_000;
     public List<SingleTypeInfo> fetchSensitiveParams() {
         Bson filterStandardSensitiveParams = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method, subType);
 
-        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterStandardSensitiveParams, 0, 1_000, null, Projections.exclude("values"));
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterStandardSensitiveParams, 0, LIMIT, null, Projections.exclude("values"));
         return list;        
     }
 

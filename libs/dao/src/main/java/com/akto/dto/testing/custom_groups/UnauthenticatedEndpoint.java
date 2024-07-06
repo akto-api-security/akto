@@ -8,6 +8,8 @@ import java.util.Set;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
@@ -18,6 +20,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.ApiInfo.AuthType;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.model.Filters;
@@ -26,7 +29,8 @@ import com.mongodb.client.model.Sorts;
 
 public class UnauthenticatedEndpoint extends TestingEndpoints {
 
-    private static int limit = 50;
+    private static int limit = 1000;
+    private static final Logger logger = LoggerFactory.getLogger(UnauthenticatedEndpoint.class);
 
     @BsonIgnore
     private List<ApiInfoKey> apiInfos;
@@ -50,7 +54,22 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
 
     @Override
     public boolean containsApi(ApiInfoKey key) {
-        throw new UnsupportedOperationException("Not implemented");
+        ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(key));
+        if (apiInfo == null) {
+            return false;
+        }
+        apiInfo.calculateActualAuth();
+        if (apiInfo.getActualAuthType() == null || apiInfo.getActualAuthType().isEmpty()) {
+            return false;
+        }
+        Set<AuthType> authTypes = new HashSet<>(apiInfo.getActualAuthType());
+        if (authTypes == null || authTypes.isEmpty()) {
+            return false;
+        }
+        if (authTypes.contains(AuthType.UNAUTHENTICATED)) {
+            return true;
+        }
+        return false;
     }
 
     private static Bson createApiFilters(CollectionType type, ApiInfoKey api) {
@@ -86,6 +105,9 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
 
             // create instance of the conditions class
             UnauthenticatedEndpoint unauthenticatedEndpoint = new UnauthenticatedEndpoint();
+            logger.info(String.format("AccountId: %d Starting update unauthenticated data collection for %d ",
+                    Context.accountId.get(), apiCollectionId));
+
             while (true) {
                 Bson filterQ = Filters.and(
                     Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
@@ -104,12 +126,16 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
                     lastTimeStampRecorded = Math.min(lastTimeStampRecorded, apiInfo.getLastSeen());
                 }
                 lastTimeStampRecorded += 2;
-
+                logger.info(String.format(
+                        "AccountId: %d Running update unauthenticated data collection for %d endpoints: %d skip: %d",
+                        Context.accountId.get(), apiCollectionId, apiInfoKeysTemp.size(), skip));
                 unauthenticatedEndpoint.setApiInfos(apiInfoKeysTemp);
                 ApiCollectionUsers.addToCollectionsForCollectionId(Collections.singletonList(unauthenticatedEndpoint), UNAUTHENTICATED_GROUP_ID);
                 skip += limit;
 
                 if(apiInfosBatched.size() < limit){
+                    logger.info(String.format("AccountId: %d Finished update unauthenticated data collection for %d ",
+                            Context.accountId.get(), apiCollectionId));
                     break;
                 }
             }
