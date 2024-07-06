@@ -77,6 +77,10 @@ public class CustomAuthUtil {
 
     public static List<WriteModel<ApiInfo>> calcAuth(List<ApiInfo> apiInfos, List<CustomAuthType> customAuthTypes){
         List<WriteModel<ApiInfo>> apiInfosUpdates = new ArrayList<>();
+        if (customAuthTypes == null) {
+            customAuthTypes = new ArrayList<>();
+        }
+        loggerMaker.infoAndAddToDb("Read " + apiInfos.size() + " api infos for custom auth types " + customAuthTypes.size(), LogDb.DASHBOARD);
         for (ApiInfo apiInfo : apiInfos) {
 
             Set<Set<ApiInfo.AuthType>> authTypes = apiInfo.getAllAuthTypesFound();
@@ -102,8 +106,10 @@ public class CustomAuthUtil {
             if (!sampleProcessed) {
                 List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(getFilters(apiInfo));
                 try {
-                    HttpResponseParams httpResponseParams = createResponseParamsFromSTI(list);
-                    AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+                    if(list!=null && !list.isEmpty()){
+                        HttpResponseParams httpResponseParams = createResponseParamsFromSTI(list);
+                        AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+                    }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Unable to parse STIs for custom auth setup job");
                 }
@@ -116,6 +122,7 @@ public class CustomAuthUtil {
             apiInfosUpdates.add(update);
 
         }
+        loggerMaker.infoAndAddToDb("Finished processing " + apiInfos.size() + " api infos for custom auth type", LogDb.DASHBOARD);
         return apiInfosUpdates;
 
     }
@@ -131,9 +138,6 @@ public class CustomAuthUtil {
             fetchMore = false;
             List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(new BasicDBObject(), skip, limit,
                     Sorts.descending(Constants.ID));
-
-            loggerMaker.infoAndAddToDb("Read " + (apiInfos.size() + skip) + " api infos for custom auth type",
-                    LogDb.DASHBOARD);
 
             apiInfosUpdates.addAll(calcAuth(apiInfos, customAuthTypes));
 
