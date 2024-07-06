@@ -71,8 +71,14 @@ public class SensitiveDataEndpoints extends TestingEndpoints {
         Set<String> subTypes = SingleTypeInfoDao.instance.findDistinctFields(SingleTypeInfo.SUB_TYPE, String.class,
                 Filters.exists(SingleTypeInfo.SUB_TYPE));
 
+        logger.info(String.format("acc: %d found response codes: %s", Context.accountId.get(), responseCodes.toString()));
+        logger.info(String.format("acc: %d found subTypes: %s", Context.accountId.get(), subTypes.toString()));
+
         Set<String> sensitiveInResponse = new HashSet<>(SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames());
         Set<String> sensitiveInRequest = new HashSet<>(SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames());
+
+        logger.info(String.format("acc: %d Using sensitive in req: %s", Context.accountId.get(), sensitiveInRequest.toString()));
+        logger.info(String.format("acc: %d Using sensitive in res: %s", Context.accountId.get(), sensitiveInResponse.toString()));
 
         List<ApiInfoKey> localUrls = new ArrayList<>();
         List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(
