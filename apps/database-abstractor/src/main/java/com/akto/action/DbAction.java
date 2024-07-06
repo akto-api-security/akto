@@ -34,7 +34,6 @@ import com.akto.utils.CustomAuthUtil;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
-import com.akto.utils.SchedulerUtils;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
@@ -57,10 +56,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class DbAction extends ActionSupport {
-
+    static final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
     long count;
     List<CustomDataTypeMapper> customDataTypes;
     List<AktoDataType> aktoDataTypes;
@@ -302,7 +303,7 @@ public class DbAction extends ActionSupport {
             }
             int accountId = Context.accountId.get();
             SingleTypeInfo.fetchCustomAuthTypes(accountId);
-            SchedulerUtils.getService().schedule(new Runnable() {
+            service.schedule(new Runnable() {
                 public void run() {
                     Context.accountId.set(accountId);
                     List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(accountId);
