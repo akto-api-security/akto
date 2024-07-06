@@ -15,7 +15,6 @@ public class ProtoBufUtils {
     public static final String RAW_QUERY = "raw_query";
     public static final String DECODED_QUERY = "query";
     public static final String KEY_PREFIX = "param_";
-    static final int TAG_TYPE_BITS = 3;
     private final ObjectMapper mapper = new ObjectMapper();
     //Generic protobuf bytes
     private static final byte[] FIRST_BYTES = new byte[]{ 0, 0, 0, 0, 7};//Generic protobuf bytes
