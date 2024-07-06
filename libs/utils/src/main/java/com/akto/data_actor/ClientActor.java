@@ -43,6 +43,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -79,7 +80,7 @@ public class ClientActor extends DataActor {
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
     private static AccountSettings accSettings;
 
-    ObjectMapper objectMapper = new ObjectMapper();
+    ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     public static String buildDbAbstractorUrl() {
         String dbAbsHost = "https://cyborg.akto.io";
@@ -410,7 +411,7 @@ public class ClientActor extends DataActor {
         boolean objectIdRequired = false;
         String objId = null;
         BasicDBObject obj = new BasicDBObject();
-        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         for (int i = 0; i < batchCount; i++) {
 
             obj.put("lastFetchTimestamp", lastStiFetchTs);
