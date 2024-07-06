@@ -23,7 +23,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.parsers.HttpCallParser;
+import com.akto.parser.SampleParser;
 import com.akto.runtime.policies.AuthPolicy;
 import com.akto.util.Constants;
 import com.google.gson.Gson;
@@ -75,21 +75,12 @@ public class CustomAuthUtil {
         return responseParams;
     }
 
-    public static void customAuthTypeUtil(List<CustomAuthType> customAuthTypes) {
-
+    public static List<WriteModel<ApiInfo>> calcAuth(List<ApiInfo> apiInfos, List<CustomAuthType> customAuthTypes){
         List<WriteModel<ApiInfo>> apiInfosUpdates = new ArrayList<>();
-
-        int skip = 0;
-        int limit = 1000;
-        boolean fetchMore = false;
-        do {
-            fetchMore = false;
-            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(new BasicDBObject(), skip, limit,
-                    Sorts.descending(Constants.ID));
-
-            loggerMaker.infoAndAddToDb("Read " + (apiInfos.size() + skip) + " api infos for custom auth type",
-                    LogDb.DASHBOARD);
-
+        if (customAuthTypes == null) {
+            customAuthTypes = new ArrayList<>();
+        }
+        loggerMaker.infoAndAddToDb("Read " + apiInfos.size() + " api infos for custom auth types " + customAuthTypes.size(), LogDb.DASHBOARD);
         for (ApiInfo apiInfo : apiInfos) {
 
             Set<Set<ApiInfo.AuthType>> authTypes = apiInfo.getAllAuthTypesFound();
@@ -103,7 +94,7 @@ public class CustomAuthUtil {
             if (sampleData != null && sampleData.getSamples() != null && !sampleData.getSamples().isEmpty()) {
                 for (String sample : sampleData.getSamples()) {
                     try {
-                        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                        HttpResponseParams httpResponseParams = SampleParser.parseSampleMessage(sample);
                         AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
                         sampleProcessed = true;
                     } catch (Exception e) {
@@ -115,8 +106,10 @@ public class CustomAuthUtil {
             if (!sampleProcessed) {
                 List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(getFilters(apiInfo));
                 try {
-                    HttpResponseParams httpResponseParams = createResponseParamsFromSTI(list);
-                    AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+                    if(list!=null && !list.isEmpty()){
+                        HttpResponseParams httpResponseParams = createResponseParamsFromSTI(list);
+                        AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+                    }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Unable to parse STIs for custom auth setup job");
                 }
@@ -129,6 +122,24 @@ public class CustomAuthUtil {
             apiInfosUpdates.add(update);
 
         }
+        loggerMaker.infoAndAddToDb("Finished processing " + apiInfos.size() + " api infos for custom auth type", LogDb.DASHBOARD);
+        return apiInfosUpdates;
+
+    }
+
+    public static void customAuthTypeUtil(List<CustomAuthType> customAuthTypes) {
+
+        List<WriteModel<ApiInfo>> apiInfosUpdates = new ArrayList<>();
+
+        int skip = 0;
+        int limit = 1000;
+        boolean fetchMore = false;
+        do {
+            fetchMore = false;
+            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(new BasicDBObject(), skip, limit,
+                    Sorts.descending(Constants.ID));
+
+            apiInfosUpdates.addAll(calcAuth(apiInfos, customAuthTypes));
 
         if (apiInfos.size() == limit) {
             skip += limit;
