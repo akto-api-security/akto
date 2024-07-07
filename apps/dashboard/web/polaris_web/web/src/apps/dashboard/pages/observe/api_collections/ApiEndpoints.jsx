@@ -163,7 +163,8 @@ function ApiEndpoints() {
     const selectedUrl = queryParams.get('selected_url')
     const selectedMethod = queryParams.get('selected_method')
 
-    const definedTableTabs = ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow']
+    // the values used here are defined at the server.
+    const definedTableTabs = apiCollectionId == 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId == 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow'] )
 
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
@@ -182,7 +183,7 @@ function ApiEndpoints() {
 
         let sensitiveParamsMap = {}
         sensitiveParams.forEach(p => {
-            let key = p.method + " " + p.url
+            let key = p.method + " " + p.url + " " + p.apiCollectionId
             if (!sensitiveParamsMap[key]) sensitiveParamsMap[key] = new Set()
 
             if (!p.subType) {
@@ -193,7 +194,7 @@ function ApiEndpoints() {
         })
 
         apiEndpointsInCollection.forEach(apiEndpoint => {
-            apiEndpoint.sensitive = sensitiveParamsMap[apiEndpoint.method + " " + apiEndpoint.url] || new Set()
+            apiEndpoint.sensitive = sensitiveParamsMap[apiEndpoint.method + " " + apiEndpoint.url + " " +apiEndpoint.apiCollectionId] || new Set()
         })
 
         let data = {}

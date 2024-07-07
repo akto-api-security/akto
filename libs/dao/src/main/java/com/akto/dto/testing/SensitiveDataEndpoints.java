@@ -155,13 +155,23 @@ public class SensitiveDataEndpoints extends TestingEndpoints {
                         }
 
                         if (!endpoints.isEmpty()) {
-                            logger.info(String.format(
-                                    "AccountId: %d Running update sensitive data collection for %d %s with endpoints %d skip %d",
-                                    Context.accountId.get(), responseCode, subType, endpoints.size(), skip));
+                            List<ApiInfoKey> endpointList = new ArrayList<>();
+                            for (ApiInfoKey apiInfoKey : endpoints) {
+                                // skip unknown methods
+                                if (!apiInfoKey.getMethod().equals(Method.OTHER)) {
+                                    endpointList.add(apiInfoKey);
+                                }
+                            }
+
+                            if (!endpointList.isEmpty()) {
+                                logger.info(String.format(
+                                        "AccountId: %d Running update sensitive data collection for %d %s with endpoints %d skip %d",
+                                        Context.accountId.get(), responseCode, subType, endpointList.size(), skip));
+                                sensitiveDataEndpoints.setUrls(endpointList);
+                                ApiCollectionUsers.addToCollectionsForCollectionId(
+                                        Collections.singletonList(sensitiveDataEndpoints), API_GROUP_ID);
+                            }
                             timestamp = timestamp + 1;
-                            sensitiveDataEndpoints.setUrls(new ArrayList<>(endpoints));
-                            ApiCollectionUsers.addToCollectionsForCollectionId(
-                                    Collections.singletonList(sensitiveDataEndpoints), API_GROUP_ID);
                             skip += LIMIT;
                             continue;
                         }
