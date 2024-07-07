@@ -1628,8 +1628,11 @@ public class InitializerListener implements ServletContextListener {
                 loggerMaker.errorAndAddToDb("Admin is still missing in DB, making first user as admin", LogDb.DASHBOARD);
                 User firstUser = UsersDao.instance.getFirstUser(accountId);
                 if(firstUser != null){
-                    rbac = new RBAC(firstUser.getId(), Role.ADMIN, accountId);
-                    RBACDao.instance.insertOne(rbac);
+                    RBACDao.instance.updateOne(
+                        Filters.and(
+                            Filters.eq(RBAC.ACCOUNT_ID,Context.accountId.get()),
+                            Filters.eq(RBAC.USER_ID, firstUser.getId())
+                        ),Updates.set(RBAC.ROLE, RBAC.Role.ADMIN.name()));
                 } else {
                     loggerMaker.errorAndAddToDb("First user is also missing in DB, unable to make org.", LogDb.DASHBOARD);
                     return;
@@ -2168,6 +2171,29 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void makeFirstUserAdmin(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getAddAdminRoleIfAbsent() == 0){
+           
+            User firstUser = UsersDao.instance.getFirstUser(Context.accountId.get());
+
+            RBAC firstUserAdminRbac = RBACDao.instance.findOne(Filters.and(
+                Filters.eq(RBAC.USER_ID, firstUser.getId()),
+                Filters.eq(RBAC.ROLE, Role.ADMIN.name())
+            ));
+            if(firstUserAdminRbac != null){
+                RBACDao.instance.deleteAll(Filters.and(
+                    Filters.eq(RBAC.USER_ID, firstUser.getId()),
+                    Filters.eq(RBAC.ROLE, Role.MEMBER.name())
+                ));
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+                        Filters.eq("_id", backwardCompatibility.getId()),
+                        Updates.set(BackwardCompatibility.ADD_ADMIN_ROLE, Context.now())
+                );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         initializeOrganizationAccountBelongsTo(backwardCompatibility);
         if (DashboardMode.isMetered()) {
@@ -2194,6 +2220,7 @@ public class InitializerListener implements ServletContextListener {
         enableNewMerging(backwardCompatibility);
         setDefaultTelemetrySettings(backwardCompatibility);
         disableAwsSecretPiiType(backwardCompatibility);
+        makeFirstUserAdmin(backwardCompatibility);
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
         }
