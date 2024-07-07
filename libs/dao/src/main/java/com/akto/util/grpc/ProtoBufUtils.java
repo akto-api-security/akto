@@ -5,6 +5,7 @@ import com.google.protobuf.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashMap;
@@ -17,7 +18,6 @@ public class ProtoBufUtils {
     public static final String KEY_PREFIX = "param_";
     private final ObjectMapper mapper = new ObjectMapper();
     //Generic protobuf bytes
-    private static final byte[] FIRST_BYTES = new byte[]{ 0, 0, 0, 0, 7};//Generic protobuf bytes
     private ProtoBufUtils() {
     }
 
@@ -114,7 +114,15 @@ public class ProtoBufUtils {
     }
     public static String base64EncodedJsonToProtobuf(Map<Object, Object> jsonMap) throws IOException{
         byte[] protobufArray = encodeJsonToProtobuf(jsonMap);
+        byte[] FIRST_BYTES = new byte[5];
         byte[] finalArray = new byte[FIRST_BYTES.length + protobufArray.length];
+        byte[] bytes = ByteBuffer.allocate(4).putInt(protobufArray.length).array();
+        FIRST_BYTES[0] = 0;//Compression logic
+        int byteIndex = 1;// length of message
+        for (byte byte1 : bytes) {
+            FIRST_BYTES[byteIndex] = byte1;
+            byteIndex++;
+        }
         for (int index = 0; index < finalArray.length; index++) {
             if (index < FIRST_BYTES.length) {
                 finalArray[index] = FIRST_BYTES[index];
