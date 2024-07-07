@@ -2,7 +2,6 @@ package com.akto.util.grpc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.*;
-import org.bson.types.Binary;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -11,7 +10,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.BinaryOperator;
 
 public class ProtoBufUtils {
 
