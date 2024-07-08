@@ -2180,7 +2180,9 @@ public class InitializerListener implements ServletContextListener {
                 Filters.eq(RBAC.USER_ID, firstUser.getId()),
                 Filters.eq(RBAC.ROLE, Role.ADMIN.name())
             ));
+
             if(firstUserAdminRbac != null){
+                loggerMaker.infoAndAddToDb("Found admin rbac for first user: " + firstUser.getLogin() + " , thus deleting it's member role RBAC", LogDb.DASHBOARD);
                 RBACDao.instance.deleteAll(Filters.and(
                     Filters.eq(RBAC.USER_ID, firstUser.getId()),
                     Filters.eq(RBAC.ROLE, Role.MEMBER.name())
@@ -2195,8 +2197,8 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
-        initializeOrganizationAccountBelongsTo(backwardCompatibility);
         if (DashboardMode.isMetered()) {
+            initializeOrganizationAccountBelongsTo(backwardCompatibility);
             setOrganizationsInBilling(backwardCompatibility);
         }
         setAktoDefaultNewUI(backwardCompatibility);
@@ -2221,9 +2223,6 @@ public class InitializerListener implements ServletContextListener {
         setDefaultTelemetrySettings(backwardCompatibility);
         disableAwsSecretPiiType(backwardCompatibility);
         makeFirstUserAdmin(backwardCompatibility);
-        if (DashboardMode.isMetered()) {
-            initializeOrganizationAccountBelongsTo(backwardCompatibility);
-        }
     }
 
     public static void printMultipleHosts(int apiCollectionId) {
