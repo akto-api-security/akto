@@ -142,7 +142,7 @@ public class SampleDataAltDb {
 
     public static String findLatestSampleByApiInfoKey(ApiInfo.ApiInfoKey key) throws Exception{
         String result = null;
-        String query = "SELECT * FROM sampledata where api_collection_id=? and method=? and url=? order by timestamp desc limit 1;";
+        String query = "SELECT * FROM sampledata02 where api_collection_id=? and method=? and url=? order by timestamp desc limit 1;";
         try (Connection conn = Main.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
 
@@ -165,7 +165,7 @@ public class SampleDataAltDb {
 
     public static List<String> findSamplesByApiInfoKey(ApiInfo.ApiInfoKey key) throws Exception{
         List<String> result = new ArrayList<>();
-        String query = "SELECT * FROM sampledata where api_collection_id=? and method=? and url=? order by timestamp desc limit 10;";
+        String query = "SELECT * FROM sampledata02 where api_collection_id=? and method=? and url=? order by timestamp desc limit 10;";
         try (Connection conn = Main.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
 
@@ -184,7 +184,7 @@ public class SampleDataAltDb {
 
         return result;
     }
-    final static String ITERATE_QUERY_ALL = "SELECT id, api_collection_id, method, url FROM sampledata where api_collection_id=? ORDER BY id limit ? offset ?";
+    final static String ITERATE_QUERY_ALL = "SELECT id, api_collection_id, method, url FROM sampledata02 where api_collection_id=? ORDER BY id limit ? offset ?";
 
     public static List<SampleDataAlt> iterateAndGetAll(int apiCollectionId, int limit, int offset) throws Exception {
         List<SampleDataAlt> data = new ArrayList<>();
@@ -215,7 +215,7 @@ public class SampleDataAltDb {
         return data;
     }
 
-    final static String DELETE_OLD_QUERY = "DELETE FROM sampledata\n" + //
+    final static String DELETE_OLD_QUERY = "DELETE FROM sampledata02\n" + //
             "WHERE id IN (\n" + //
             "    SELECT id\n" + //
             "    FROM (\n" + //
@@ -224,7 +224,7 @@ public class SampleDataAltDb {
             "            ROW_NUMBER() OVER (PARTITION BY api_collection_id, method, url ORDER BY timestamp DESC) AS row_num\n"
             + //
             "        FROM \n" + //
-            "            sampledata\n" + //
+            "            sampledata02\n" + //
             "    ) ranked\n" + //
             "    WHERE ranked.row_num > 10\n" + //
             ")\n" + //
@@ -248,7 +248,7 @@ public class SampleDataAltDb {
     public static int totalNumberOfRecords() throws Exception {
         int count = 0;
         try (Connection conn = Main.getConnection();
-                PreparedStatement stmt = conn.prepareStatement("SELECT COUNT(1) FROM sampledata", Statement.RETURN_GENERATED_KEYS)) {
+                PreparedStatement stmt = conn.prepareStatement("SELECT COUNT(1) FROM sampledata02", Statement.RETURN_GENERATED_KEYS)) {
 
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) {
@@ -261,7 +261,7 @@ public class SampleDataAltDb {
         return count;
     }
 
-    final static String CREATE_INDEX_QUERY = "CREATE INDEX IF NOT EXISTS idx_sampledata_composite ON sampledata(api_collection_id, method, url, timestamp DESC)";
+    final static String CREATE_INDEX_QUERY = "CREATE INDEX IF NOT EXISTS idx_sampledata_composite ON sampledata02(api_collection_id, method, url, timestamp DESC)";
 
     public static void createIndex() throws Exception {
         try (Connection conn = Main.getConnection();
@@ -274,7 +274,7 @@ public class SampleDataAltDb {
         }
     }
 
-    final static String UPDATE_URL_QUERY = "update sampledata set url=? where id in (?";
+    final static String UPDATE_URL_QUERY = "update sampledata02 set url=? where id in (?";
 
     public static void updateUrl(List<String> uuidList, String newUrl) throws Exception {
 
