@@ -220,5 +220,5 @@ public abstract class DataActor {
 
     public abstract EndpointLogicalGroup fetchEndpointLogicalGroupById(String endpointLogicalGroupId);
 
-    public abstract DataControlSettings fetchDataControlSettings(String prevResult);
+    public abstract DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand);
 }

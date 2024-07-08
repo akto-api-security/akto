@@ -210,7 +210,13 @@ public class DbAction extends ActionSupport {
     DataControlSettings dataControlSettings;
     public String fetchDataControlSettings() {
         try {
-            dataControlSettings = DbLayer.fetchDataControlSettings(dataControlSettings == null? null : dataControlSettings.getPostgresResult());
+            String prevCommand = "";
+            String prevResult = "";
+            if (dataControlSettings != null) {
+                prevResult = dataControlSettings.getPostgresResult();
+                prevCommand = dataControlSettings.getOldPostgresCommand();
+            }
+            dataControlSettings = DbLayer.fetchDataControlSettings(prevResult, prevCommand);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
