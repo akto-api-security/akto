@@ -173,6 +173,8 @@ public class Main {
             System.exit(0);
         }
 
+        DataControlFetcher.init(dataActor);
+
         aSettings = dataActor.fetchAccountSettings();
 
         //DaoInit.init(new ConnectionString(mongoURI));
@@ -266,6 +268,9 @@ public class Main {
                          
                         printL(r.value());
                         lastSyncOffset++;
+                        if (DataControlFetcher.stopIngestionFromKafka()) {
+                            continue;
+                        }
 
                         if (lastSyncOffset % 100 == 0) {
                             logger.info("Committing offset at position: " + lastSyncOffset);

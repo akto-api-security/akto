@@ -2,6 +2,7 @@ package com.akto.action;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -10,6 +11,7 @@ import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -204,6 +206,16 @@ public class DbAction extends ActionSupport {
     ObjectMapper objectMapper = new ObjectMapper();
     KafkaUtils kafkaUtils = new KafkaUtils();
     String endpointLogicalGroupId;
+
+    DataControlSettings dataControlSettings;
+    public String fetchDataControlSettings() {
+        try {
+            dataControlSettings = DbLayer.fetchDataControlSettings(dataControlSettings == null? null : dataControlSettings.getPostgresResult());
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
 
     public String fetchCustomDataTypes() {
         try {
@@ -2384,5 +2396,12 @@ public class DbAction extends ActionSupport {
     public void setEndpointLogicalGroupId(String endpointLogicalGroupId) {
         this.endpointLogicalGroupId = endpointLogicalGroupId;
     }
-    
+
+    public void setDataControlSettings(DataControlSettings dataControlSettings) {
+        this.dataControlSettings = dataControlSettings;
+    }
+
+    public DataControlSettings getDataControlSettings() {
+        return this.dataControlSettings;
+    }
 }
