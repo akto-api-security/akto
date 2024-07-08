@@ -49,8 +49,8 @@ public class AllMetrics {
         kafkaRecordsConsumedRate = new SumMetric("KAFKA_RECORDS_CONSUMED_RATE", 60, accountId, orgId);
         kafkaFetchAvgLatency = new SumMetric("KAFKA_FETCH_AVG_LATENCY", 60, accountId, orgId);
         kafkaBytesConsumedRate = new SumMetric("KAFKA_BYTES_CONSUMED_RATE", 60, accountId, orgId);
-        cyborgNewApiCount = new SumMetric("DELTA_CATALOG_NEW_COUNT", 60, accountId, orgId);
-        cyborgTotalApiCount = new SumMetric("DELTA_CATALOG_TOTAL_COUNT", 60, accountId, orgId);
+        cyborgNewApiCount = new SumMetric("CYBORG_NEW_API_COUNT", 60, accountId, orgId);
+        cyborgTotalApiCount = new SumMetric("CYBORG_TOTAL_API_COUNT", 60, accountId, orgId);
         deltaCatalogTotalCount = new SumMetric("DELTA_CATALOG_TOTAL_COUNT", 60, accountId, orgId);
         deltaCatalogNewCount = new SumMetric("DELTA_CATALOG_NEW_COUNT", 60, accountId, orgId);
         cyborgApiPayloadSize = new SumMetric("CYBORG_API_PAYLOAD_SIZE", 60, accountId, orgId);
