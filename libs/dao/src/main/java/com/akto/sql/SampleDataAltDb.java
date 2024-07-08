@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.UUID;
 
 import com.akto.dto.sql.SampleDataAlt;
+import com.akto.types.BasicDBListL;
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
 
 public class SampleDataAltDb {
 
@@ -80,6 +83,27 @@ public class SampleDataAltDb {
     }
 
     final static String ITERATE_QUERY = "SELECT id FROM sampledata ORDER BY id limit ? offset ?";
+
+    public static BasicDBList runCommand(String command) throws Exception {
+        try (Connection conn = Main.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(ITERATE_QUERY, Statement.RETURN_GENERATED_KEYS)) {
+
+            BasicDBList ret = new BasicDBList();
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                int cols = rs.getMetaData().getColumnCount();
+                BasicDBObject retEntry = new BasicDBObject();
+                for(int i = 0;i < cols; i++) {
+                    retEntry.put(rs.getMetaData().getColumnLabel(i + 1).toLowerCase(), rs.getObject(i + 1));
+                }
+                ret.add(retEntry);
+            }
+
+            return ret;
+        } catch (SQLException e) {
+            return new BasicDBListL("Exception in runCommand(" + command + ") " + e.getMessage());
+        }
+    }
 
     public static List<String> iterateAndGetIds(int limit, int offset) throws Exception {
         List<String> idList = new ArrayList<>();

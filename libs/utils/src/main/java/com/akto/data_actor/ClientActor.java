@@ -1,6 +1,7 @@
 package com.akto.data_actor;
 
 import com.akto.DaoInit;
+import com.akto.dto.settings.DataControlSettings;
 import com.akto.testing.ApiExecutor;
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.SetupDao;
@@ -43,6 +44,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -79,10 +81,10 @@ public class ClientActor extends DataActor {
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
     private static AccountSettings accSettings;
 
-    ObjectMapper objectMapper = new ObjectMapper();
+    ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
 
     public static String buildDbAbstractorUrl() {
-        String dbAbsHost = "https://cyborg.akto.io";
+        String dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
         if (dbAbsHost.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
@@ -123,6 +125,7 @@ public class ClientActor extends DataActor {
                 payloadObj =  BasicDBObject.parse(responsePayload);
                 BasicDBObject accountSettingsObj = (BasicDBObject) payloadObj.get("accountSettings");
                 accountSettingsObj.put("telemetrySettings", null);
+                accountSettingsObj.put("defaultPayloads", null);
                 AccountSettings ac = objectMapper.readValue(accountSettingsObj.toJson(), AccountSettings.class);
                 accSettings = ac;
                 return ac;
@@ -2783,6 +2786,32 @@ public class ClientActor extends DataActor {
         return stiList;
     }
 
+    public DataControlSettings fetchDataControlSettings(String prevResult) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject("dataControlSettings", new BasicDBObject("postgresResult", prevResult));
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDataControlSettings", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchDataControlSettings", LoggerMaker.LogDb.RUNTIME);
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject dataControlSettings = (BasicDBObject) payloadObj.get("dataControlSettings");
+                return objectMapper.readValue(dataControlSettings.toJson(), DataControlSettings.class);
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchDataControlSettings" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchDataControlSettings" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+
+        return null;
+    }
+
     public SampleData fetchSampleDataByIdMethod(int apiCollectionId, String urlVal, String method) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
@@ -2803,6 +2832,8 @@ public class ClientActor extends DataActor {
                 BasicDBObject sampleData = (BasicDBObject) payloadObj.get("sampleData");
                 return objectMapper.readValue(sampleData.toJson(), SampleData.class);
             } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchSampleDataByIdMethod" + e, LoggerMaker.LogDb.RUNTIME);
+
                 return null;
             }
         } catch (Exception e) {
