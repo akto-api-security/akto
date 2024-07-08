@@ -86,7 +86,6 @@ public class MergeLogicLocal {
                     loggerMaker.infoAndAddToDb(String.format("data size: %d template urls: %d", data.size(), templateUrls.size()));
                     for (SampleDataAlt sampleDataAlt : data) {
                         for (URLTemplate urlTemplate : templateUrls) {
-                            loggerMaker.infoAndAddToDb("template urls: " + urlTemplate.getTemplateString());
                             String templateUrl = urlTemplate.getTemplateString();
                             if (!sampleDataAlt.getUrl().equals(templateUrl) &&
                                     urlTemplate.match(sampleDataAlt.getUrl(), Method.valueOf(sampleDataAlt.getMethod()))) {

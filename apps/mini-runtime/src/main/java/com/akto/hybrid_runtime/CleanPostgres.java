@@ -15,13 +15,21 @@ public class CleanPostgres {
     final static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public static void cleanPostgresCron() {
+
+        String timeStr = System.getenv("PG_CLEAN_INTERVAL");
+        int time = 8;
+        try {
+            time = Integer.parseInt(timeStr);
+        } catch (Exception e) {
+        }
+
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 long start = System.currentTimeMillis();
                 cleanPostgresJob();
                 AllMetrics.instance.setStaleSampleDataCleanupJobLatency(System.currentTimeMillis() - start);
             }
-        }, 0, 15, TimeUnit.MINUTES);
+        }, 0, time, TimeUnit.MINUTES);
     }
 
     private static void cleanPostgresJob() {
