@@ -139,7 +139,6 @@ public class Main {
             }
         }
     }
-    static boolean schedulerStarted = false;
 
     public static String getTopicName(){
         String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
@@ -287,16 +286,6 @@ public class Main {
 
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
 
-        try {
-            String accountId = Context.accountId.get() + "";
-            if (httpCallParserMap.containsKey(accountId)) {
-                HttpCallParser parser = httpCallParserMap.get(accountId + "");
-                MergeLogicLocal.sendTestSampleDataCron(parser.apiCatalogSync.dbState);
-            }
-        } catch (Exception e) {
-            logger.error("Unable to send data from postgres", e);
-        }
-
         // sync infra metrics thread
         // ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
         // KafkaHealthMetricSyncTask task = new KafkaHealthMetricSyncTask(main.consumer);
@@ -400,15 +389,6 @@ public class Main {
                     }
 
                     HttpCallParser parser = httpCallParserMap.get(accountId);
-                    try {
-                        if (!schedulerStarted) {
-                            loggerMaker.infoAndAddToDb(String.format("Starting merging sql scheduler for accountId %s", accountId));
-                            MergeLogicLocal.sendTestSampleDataCron(parser.apiCatalogSync.dbState);
-                            schedulerStarted=true;
-                        }
-                    } catch (Exception e) {
-                        logger.error("Unable to send data from postgres", e);
-                    }
 
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
