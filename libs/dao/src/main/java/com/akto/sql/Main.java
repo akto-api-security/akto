@@ -78,6 +78,18 @@ public class Main {
 
     }
 
+    public static String extractDatabaseName() {
+        String regex = "jdbc:postgresql://[^/]+:\\d+/(\\w+)";
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(regex);
+        java.util.regex.Matcher matcher = pattern.matcher(connectionUri);
+
+        if (matcher.find()) {
+            return matcher.group(1);
+        } else {
+            throw new IllegalArgumentException("Database name not found in the connection URL.");
+        }
+    }
+
     private static DataSource createDataSource() {
         final String url = connectionUri;
         final PGSimpleDataSource dataSource = new PGSimpleDataSource();
