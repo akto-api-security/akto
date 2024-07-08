@@ -20,6 +20,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.sql.SampleDataAltDb;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
@@ -636,7 +637,9 @@ public class TestExecutor {
 
         String message = messages.get(messages.size() - 1);
         try {
+            long start = System.currentTimeMillis();
             message = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey);
+            AllMetrics.instance.setSampleDataFetchLatency(System.currentTimeMillis() - start);
         } catch (Exception e) {
             e.printStackTrace();
         }

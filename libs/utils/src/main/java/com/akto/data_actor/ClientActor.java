@@ -76,14 +76,15 @@ public class ClientActor extends DataActor {
     private static final Gson gson = new Gson();
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     private static final Logger logger = LoggerFactory.getLogger(ClientActor.class);
+    public static final String CYBORG_URL = "https://cyborg.akto.io";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
     private static AccountSettings accSettings;
 
     ObjectMapper objectMapper = new ObjectMapper();
 
     public static String buildDbAbstractorUrl() {
-        String dbAbsHost = "https://cyborg.akto.io";
-        if (dbAbsHost.endsWith("/")) {
+        String dbAbsHost = CYBORG_URL;
+        if (CYBORG_URL.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
         return dbAbsHost + "/api";

@@ -9,6 +9,7 @@ import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.util.Constants;
 
 import kotlin.Pair;
@@ -71,6 +72,8 @@ public class ApiExecutor {
         if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
         }
+        boolean isCyborgCall = request.url().toString().contains("cyborg.akto.io");
+        long start = System.currentTimeMillis();
 
         Call call = client.newCall(request);
         Response response = null;
@@ -90,6 +93,11 @@ public class ApiExecutor {
                     System.out.println("Error while parsing response body: " + e);
                 }
                 body = "{}";
+            }
+            if(isCyborgCall){
+                AllMetrics.instance.setCyborgCallLatency(System.currentTimeMillis() - start);
+                AllMetrics.instance.setCyborgCallCount(1);
+                AllMetrics.instance.setCyborgDataSize(request.body() == null ? 0 : request.body().contentLength());
             }
         } catch (IOException e) {
             if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
