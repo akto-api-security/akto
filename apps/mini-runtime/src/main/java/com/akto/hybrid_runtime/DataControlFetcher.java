@@ -22,8 +22,17 @@ public class DataControlFetcher {
     public static void init(DataActor dataActor) {
         es.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                dataControlSettings = dataActor.fetchDataControlSettings(dataControlSettings == null ? null : dataControlSettings.getPostgresResult());
-                runPostgresCommand();
+                String prevCommand = "";
+                String prevResult = "";
+                if (dataControlSettings != null) {
+                    prevCommand = dataControlSettings.getOldPostgresCommand();
+                    prevResult = dataControlSettings.getPostgresResult();
+                }
+                dataControlSettings = dataActor.fetchDataControlSettings(prevResult, prevCommand);
+
+                if (dataControlSettings != null && !dataControlSettings.getPostgresCommand().equalsIgnoreCase(dataControlSettings.getOldPostgresCommand())) {
+                    runPostgresCommand();
+                }
             }
         }, 0, 1, TimeUnit.MINUTES);
     }
@@ -49,6 +58,7 @@ public class DataControlFetcher {
         }
 
         dataControlSettings.setPostgresResult(ret);
+        dataControlSettings.setOldPostgresCommand(comm);
     }
 
     public static boolean discardOldApi() {

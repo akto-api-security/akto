@@ -21,6 +21,7 @@ public class DataControlSettings {
     String postgresCommand;
 
     String postgresResult;
+    String oldPostgresCommand;
     public DataControlSettings() {}
 
     public DataControlSettings(int id, int kafkaConsumerRecordsPerMin, boolean discardNewApi, boolean discardOldApi, String postgresCommand) {
@@ -77,5 +78,13 @@ public class DataControlSettings {
 
     public void setPostgresResult(String postgresResult) {
         this.postgresResult = postgresResult;
+    }
+
+    public String getOldPostgresCommand() {
+        return oldPostgresCommand;
+    }
+
+    public void setOldPostgresCommand(String oldPostgresCommand) {
+        this.oldPostgresCommand = oldPostgresCommand;
     }
 }

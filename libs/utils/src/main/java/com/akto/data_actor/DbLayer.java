@@ -854,8 +854,9 @@ public class DbLayer {
     }
 
 
-    public static DataControlSettings fetchDataControlSettings(String prevResult) {
+    public static DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand) {
         Integer accountId = Context.accountId.get();
-        return DataControlSettingsDao.instance.getMCollection().findOneAndUpdate(Filters.eq("_id", accountId), Updates.set("postgresResult", prevResult));
+        Bson updates = Updates.combine(Updates.set("postgresResult", prevResult), Updates.set("oldPostgresCommand", prevCommand));
+        return DataControlSettingsDao.instance.getMCollection().findOneAndUpdate(Filters.eq("_id", accountId), updates);
     }
 }

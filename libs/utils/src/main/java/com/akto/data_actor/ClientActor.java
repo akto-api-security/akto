@@ -2786,9 +2786,9 @@ public class ClientActor extends DataActor {
         return stiList;
     }
 
-    public DataControlSettings fetchDataControlSettings(String prevResult) {
+    public DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand) {
         Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject("dataControlSettings", new BasicDBObject("postgresResult", prevResult));
+        BasicDBObject obj = new BasicDBObject("dataControlSettings", new BasicDBObject("postgresResult", prevResult).append("oldPostgresCommand", prevCommand));
 
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDataControlSettings", "", "POST", obj.toString(), headers, "");
         try {

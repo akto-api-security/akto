@@ -264,8 +264,8 @@ public class DbActor extends DataActor {
         return DbLayer.fetchEndpointLogicalGroup(logicalGroupName);
     }
 
-    public DataControlSettings fetchDataControlSettings(String prevResult) {
-        return DbLayer.fetchDataControlSettings(prevResult);
+    public DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand) {
+        return DbLayer.fetchDataControlSettings(prevResult, prevCommand);
     }
     public EndpointLogicalGroup fetchEndpointLogicalGroupById(String endpointLogicalGroupId) {
         return DbLayer.fetchEndpointLogicalGroupById(endpointLogicalGroupId);
