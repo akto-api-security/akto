@@ -20,6 +20,7 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.sql.SampleDataAltDb;
 import com.mongodb.ConnectionString;
 
@@ -69,7 +70,7 @@ public class MergeLogicLocal {
     }
         
     public static void mergingJob(Map<Integer, APICatalog> dbState) {
-
+        long start = System.currentTimeMillis();
         for (int apiCollectionId : dbState.keySet()) {
             APICatalog apiCatalog = dbState.get(apiCollectionId);
 
@@ -86,8 +87,9 @@ public class MergeLogicLocal {
                     for (SampleDataAlt sampleDataAlt : data) {
                         for (URLTemplate urlTemplate : templateUrls) {
                             loggerMaker.infoAndAddToDb("template urls: " + urlTemplate.getTemplateString());
-                            if (urlTemplate.match(sampleDataAlt.getUrl(), Method.valueOf(sampleDataAlt.getMethod()))) {
-                                String templateUrl = urlTemplate.getTemplateString();
+                            String templateUrl = urlTemplate.getTemplateString();
+                            if (!sampleDataAlt.getUrl().equals(templateUrl) &&
+                                    urlTemplate.match(sampleDataAlt.getUrl(), Method.valueOf(sampleDataAlt.getMethod()))) {
                                 List<String> ids = new ArrayList<>();
                                 if (updates.containsKey(templateUrl)) {
                                     ids = updates.get(templateUrl);
@@ -107,8 +109,11 @@ public class MergeLogicLocal {
                     if(updates!=null && !updates.isEmpty()){
                         loggerMaker.infoAndAddToDb(String.format("%d updates found, updating sql db", updates.size()));
                         for (String url : updates.keySet()) {
+                            long updateStart = System.currentTimeMillis();
                             SampleDataAltDb.updateUrl(updates.get(url), url);
+                            AllMetrics.instance.setMergingJobUrlUpdateLatency(System.currentTimeMillis() - updateStart);
                         }
+                        AllMetrics.instance.setMergingJobUrlsUpdatedCount(updates.size());
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "ERROR in update data in postgres");
@@ -121,5 +126,6 @@ public class MergeLogicLocal {
                 skip += LIMIT;
             }
         }
+        AllMetrics.instance.setMergingJobLatency(System.currentTimeMillis() - start);
     }
 }

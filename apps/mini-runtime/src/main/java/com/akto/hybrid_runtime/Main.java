@@ -16,6 +16,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.sql.SampleDataAltDb;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
@@ -23,6 +24,8 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
 import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.common.Metric;
+import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
@@ -138,11 +141,19 @@ public class Main {
     }
     static boolean schedulerStarted = false;
 
+    public static String getTopicName(){
+        String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+        if (topicName == null) {
+            topicName = "akto.api.logs";
+        }
+        return topicName;
+    }
+
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
-        String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+        String topicName = getTopicName();
         String kafkaBrokerUrl = "kafka1:19092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
@@ -161,8 +172,6 @@ public class Main {
             fetchAllSTI = false;
         }
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
-
-        if (topicName == null) topicName = "akto.api.logs";
 
         AccountSettings aSettings = dataActor.fetchAccountSettings();
         if (aSettings == null) {
@@ -234,6 +243,48 @@ public class Main {
             }
         });
 
+
+        scheduler.scheduleAtFixedRate(()-> {
+            try {
+
+                Map<MetricName, ? extends Metric> metrics = main.consumer.metrics();
+
+                for (Map.Entry<MetricName, ? extends Metric> entry : metrics.entrySet()) {
+                    MetricName key = entry.getKey();
+                    Metric value = entry.getValue();
+
+                    if(key.name().equals("records-lag-max")){
+                        double val = value.metricValue().equals(Double.NaN) ? 0d: (double) value.metricValue();
+                        AllMetrics.instance.setKafkaRecordsLagMax((float) val);
+                    }
+                    if(key.name().equals("records-consumed-rate")){
+                        double val = value.metricValue().equals(Double.NaN) ? 0d: (double) value.metricValue();
+                        AllMetrics.instance.setKafkaRecordsConsumedRate((float) val);
+                    }
+
+                    if(key.name().equals("fetch-latency-avg")){
+                        double val = value.metricValue().equals(Double.NaN) ? 0d: (double) value.metricValue();
+                        AllMetrics.instance.setKafkaFetchAvgLatency((float) val);
+                    }
+
+                    if(key.name().equals("bytes-consumed-rate")){
+                        double val = value.metricValue().equals(Double.NaN) ? 0d: (double) value.metricValue();
+                        AllMetrics.instance.setKafkaBytesConsumedRate((float) val);
+                    }
+                }
+
+
+                AllMetrics.instance.setTotalSampleDataCount(SampleDataAltDb.totalNumberOfRecords());
+                loggerMaker.infoAndAddToDb("Total number of records in postgres: " + SampleDataAltDb.totalNumberOfRecords(), LogDb.RUNTIME);
+                long dbSizeInMb = SampleDataAltDb.getDbSizeInMb();
+                AllMetrics.instance.setPgDataSizeInMb(dbSizeInMb);
+                loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB", LogDb.RUNTIME);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed to get total number of records from postgres");
+            }
+
+        }, 0, 1, TimeUnit.MINUTES);
+
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
 
         try {
@@ -265,7 +316,7 @@ public class Main {
                 } catch (Exception e) {
                     throw e;
                 }
-                
+                long start = System.currentTimeMillis();
                 // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String,String> r: records) {
@@ -273,6 +324,9 @@ public class Main {
                     try {
                          
                         printL(r.value());
+                        AllMetrics.instance.setRuntimeKafkaRecordCount(1);
+                        AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
+
                         lastSyncOffset++;
 
                         if (lastSyncOffset % 100 == 0) {
@@ -385,6 +439,7 @@ public class Main {
                         loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
                     }
                 }
+                AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
             }
 
         } catch (WakeupException ignored) {
@@ -480,6 +535,9 @@ public class Main {
 
         Account account = dataActor.fetchActiveAccount();
         Context.accountId.set(account.getId());
+
+        AllMetrics.instance.init();
+        loggerMaker.infoAndAddToDb("All metrics initialized", LogDb.RUNTIME);
 
         Setup setup = dataActor.fetchSetup();
 

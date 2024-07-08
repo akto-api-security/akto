@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.sql.SampleDataAltDb;
 
 public class CleanPostgres {
@@ -16,7 +17,9 @@ public class CleanPostgres {
     public static void cleanPostgresCron() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                long start = System.currentTimeMillis();
                 cleanPostgresJob();
+                AllMetrics.instance.setStaleSampleDataCleanupJobLatency(System.currentTimeMillis() - start);
             }
         }, 0, 15, TimeUnit.MINUTES);
     }
@@ -24,7 +27,8 @@ public class CleanPostgres {
     private static void cleanPostgresJob() {
 
         try {
-            SampleDataAltDb.deleteOld();
+            int deleteCount = SampleDataAltDb.deleteOld();
+            AllMetrics.instance.setStaleSampleDataDeletedCount(deleteCount);
         } catch (Exception ex) {
             loggerMaker.errorAndAddToDb(ex,
                     String.format("Failed to delete from postgres %s", ex.getMessage()));

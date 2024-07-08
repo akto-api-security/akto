@@ -1,10 +1,6 @@
 package com.akto.sql;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -127,6 +123,23 @@ public class SampleDataAltDb {
         return result;
     }
 
+    public static long getDbSizeInMb() throws Exception{
+        String query = "SELECT pg_database_size('" + Main.extractDatabaseName() +  "')/1024/1024 AS size;";
+        long size = 0;
+        try (Connection conn = Main.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                size = rs.getLong(1);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return size;
+    }
+
     public static String findLatestSampleByApiInfoKey(ApiInfo.ApiInfoKey key) throws Exception{
         String result = null;
         String query = "SELECT * FROM sampledata where api_collection_id=? and method=? and url=? order by timestamp desc limit 1;";
@@ -141,6 +154,28 @@ public class SampleDataAltDb {
             while (rs.next()) {
                 result = rs.getString(2);
                 // System.out.println(result);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return result;
+    }
+
+    public static List<String> findSamplesByApiInfoKey(ApiInfo.ApiInfoKey key) throws Exception{
+        List<String> result = new ArrayList<>();
+        String query = "SELECT * FROM sampledata where api_collection_id=? and method=? and url=? order by timestamp desc limit 10;";
+        try (Connection conn = Main.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+
+            stmt.setObject(1, key.getApiCollectionId());
+            stmt.setObject(2, key.getMethod().toString());
+            stmt.setObject(3, key.getUrl());
+
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                result.add(rs.getString(2));
             }
 
         } catch (SQLException e) {
@@ -195,17 +230,35 @@ public class SampleDataAltDb {
             ")\n" + //
             "";
 
-    public static void deleteOld() throws Exception {
+    public static int deleteOld() throws Exception {
 
         try (Connection conn = Main.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(DELETE_OLD_QUERY, Statement.RETURN_GENERATED_KEYS)) {
 
             int count = stmt.executeUpdate();
             System.out.println("Deleted " + count);
+            return count;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0;
+        }
+
+    }
+
+    public static int totalNumberOfRecords() throws Exception {
+        int count = 0;
+        try (Connection conn = Main.getConnection();
+                PreparedStatement stmt = conn.prepareStatement("SELECT COUNT(1) FROM sampledata", Statement.RETURN_GENERATED_KEYS)) {
+
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                count = rs.getInt(1);
+            }
 
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        return count;
     }
 
     final static String CREATE_INDEX_QUERY = "CREATE INDEX IF NOT EXISTS idx_sampledata_composite ON sampledata(api_collection_id, method, url, timestamp DESC)";

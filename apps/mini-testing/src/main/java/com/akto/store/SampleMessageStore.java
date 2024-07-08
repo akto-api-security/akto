@@ -10,6 +10,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.sql.SampleDataAltDb;
 
 import java.util.*;
@@ -64,23 +65,17 @@ public class SampleMessageStore {
 
     public List<RawApi> fetchAllOriginalMessages(ApiInfoKey apiInfoKey) {
         List<RawApi> messages = new ArrayList<>();
-
-        List<String> samples = sampleDataMap.get(apiInfoKey);
-        if (samples == null || samples.isEmpty()) return messages;
-
-        for (String message: samples) {
-            try {
-                String uuid = OriginalHttpRequest.extractAktoUUid(message);
-                if (uuid != null) {
-                    message = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey);
-                }
+        try {
+            long start = System.currentTimeMillis();
+            List<String> samples = SampleDataAltDb.findSamplesByApiInfoKey(apiInfoKey);
+            AllMetrics.instance.setMultipleSampleDataFetchLatency(System.currentTimeMillis() - start);
+            for(String message: samples){
                 messages.add(RawApi.buildFromMessage(message));
-            } catch(Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error while building RawAPI for "+ apiInfoKey +" : " + e, LogDb.TESTING);
             }
-
+            return messages;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error while fetching all original messages for "+ apiInfoKey +" : " + e, LogDb.TESTING);
         }
-
         return messages;
     }
 
