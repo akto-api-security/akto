@@ -63,6 +63,7 @@ import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.Main;
 import com.akto.task.Cluster;
 import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
@@ -137,6 +138,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static com.akto.dto.AccountSettings.defaultTrafficAlertThresholdSeconds;
+import static com.akto.listener.RuntimeListener.JUICE_SHOP_DEMO_COLLECTION_NAME;
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 import static com.akto.task.Cluster.callDibs;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
@@ -1850,46 +1852,21 @@ public class InitializerListener implements ServletContextListener {
                 setDashboardMode();
                 updateGlobalAktoVersion();
 
-                AccountTask.instance.executeTask(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account account) {
-                        AccountSettingsDao.instance.getStats();
-                        runInitializerFunctions();
-                    }
-                }, "context-initializer");
 
-                if (DashboardMode.isMetered()) {
-                    setupUsageScheduler();
-                    setupUsageSyncScheduler();
-                }
-                trimCappedCollections();
-                setUpPiiAndTestSourcesScheduler();
-                setUpTrafficAlertScheduler();
-                // setUpAktoMixpanelEndpointsScheduler();
-                SingleTypeInfo.init();
-                setUpDailyScheduler();
-                setUpWebhookScheduler();
-                setUpDefaultPayloadRemover();
-                setUpTestEditorTemplatesScheduler();
-                setUpDependencyFlowScheduler();
-                tokenGeneratorCron.tokenGeneratorScheduler();
-                crons.deleteTestRunsScheduler();
-                updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                syncCronInfo.setUpUpdateCronScheduler();
-                // setUpAktoMixpanelEndpointsScheduler();
-                //fetchGithubZip();
-                if(isSaas){
-                    try {
-                        Auth0.getInstance();
-                        loggerMaker.infoAndAddToDb("Auth0 initialized", LogDb.DASHBOARD);
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
+                scheduler.scheduleAtFixedRate(new Runnable() {
+                    public void run() {
+                        AccountTask.instance.executeTask(new Consumer<Account>() {
+                            @Override
+                            public void accept(Account account) {
+                                try {
+                                    fillDefaultData();
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        }, "fillDefaultData");
                     }
-                }
-                updateApiGroupsForAccounts();
-                setUpUpdateCustomCollections();
-                setUpFillCollectionIdArrayJob();
-                setupAutomatedApiGroupsScheduler();
+                }, 0, 1, TimeUnit.HOURS);
             }
         }, 0, TimeUnit.SECONDS);
 
@@ -2171,7 +2148,7 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    private static void makeFirstUserAdmin(BackwardCompatibility backwardCompatibility){
+    public static void makeFirstUserAdmin(BackwardCompatibility backwardCompatibility){
         if(backwardCompatibility.getAddAdminRoleIfAbsent() == 0){
            
             User firstUser = UsersDao.instance.getFirstUser(Context.accountId.get());
@@ -2240,6 +2217,58 @@ public class InitializerListener implements ServletContextListener {
             String val = singleTypeInfo.getApiCollectionId() + " " + singleTypeInfo.getUrl() + " " + URLMethods.Method.valueOf(singleTypeInfo.getMethod());
             loggerMaker.infoAndAddToDb(val + " - " + count, LoggerMaker.LogDb.DASHBOARD);
         }
+    }
+
+    public void fillDefaultData() {
+        long l = YamlTemplateDao.instance.getMCollection().estimatedDocumentCount();
+        if (l > 0) {
+            loggerMaker.infoAndAddToDb("Skipping fillDefaultData for account : " + Context.accountId.get(), LoggerMaker.LogDb.DASHBOARD);
+            return;
+        }
+
+        loggerMaker.infoAndAddToDb("inside intializeCollectionsForTheAccount for " + Context.accountId.get(), LoggerMaker.LogDb.DASHBOARD);
+        try {
+            ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>(), null, 0, false, true));
+            loggerMaker.infoAndAddToDb("Inserted default collection", LoggerMaker.LogDb.DASHBOARD);
+        } catch (Exception e) {}
+
+        BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
+        if (backwardCompatibility == null) {
+            backwardCompatibility = new BackwardCompatibility();
+            BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
+        }
+
+        InitializerListener.setBackwardCompatibilities(backwardCompatibility);
+
+        loggerMaker.infoAndAddToDb("Started Creating indices for " + Context.accountId.get(), LoggerMaker.LogDb.DASHBOARD);
+        DaoInit.createIndices();
+        loggerMaker.infoAndAddToDb("Started Creating runtime filters for " + Context.accountId.get(), LoggerMaker.LogDb.DASHBOARD);
+        Main.insertRuntimeFilters();
+        loggerMaker.infoAndAddToDb("Started initialiseDemoCollections filters for " + Context.accountId.get(), LoggerMaker.LogDb.DASHBOARD);
+        RuntimeListener.initialiseDemoCollections();
+        loggerMaker.infoAndAddToDb("addSampleData for " +Context.accountId.get(), LogDb.DASHBOARD);
+        RuntimeListener.addSampleData();
+        AccountSettingsDao.instance.updateOnboardingFlag(true);
+        InitializerListener.insertPiiSources();
+
+        try {
+            InitializerListener.executePIISourceFetch();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        try {
+            byte[] testingTemplates = TestTemplateUtils.getTestingTemplates();
+            if(testingTemplates == null){
+                loggerMaker.errorAndAddToDb("Failed to load test templates", LogDb.DASHBOARD);
+                return;
+            }
+            loggerMaker.infoAndAddToDb(String.format("Updating akto test templates for new account: %d", Context.accountId.get()), LogDb.DASHBOARD);
+            InitializerListener.processTemplateFilesZip(testingTemplates, InitializerListener._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e,String.format("Error while adding test editor templates for new account %d, Error: %s", Context.accountId.get(), e.getMessage()), LogDb.DASHBOARD);
+        }
+        loggerMaker.infoAndAddToDb("Finished fillDefaultData" +Context.accountId.get(), LogDb.DASHBOARD);
     }
 
     public void runInitializerFunctions() {

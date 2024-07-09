@@ -10,6 +10,7 @@ import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
@@ -122,7 +123,7 @@ public class AccountTask {
                 Filters.eq(Account.INACTIVE_STR, false)
         );
 
-        List<Account> activeAccounts = AccountsDao.instance.findAll(activeFilter);
+        List<Account> activeAccounts = AccountsDao.instance.findAll(activeFilter,0,100_000, Sorts.descending("_id"));
         for(Account account: activeAccounts) {
             if (inactiveAccountsSet.contains(account.getId())) {
                 continue;
