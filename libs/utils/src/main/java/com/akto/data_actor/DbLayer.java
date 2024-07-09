@@ -217,9 +217,12 @@ public class DbLayer {
 //        return SingleTypeInfoDao.instance.findAll(filters, 0, 20000, sort, Projections.exclude(SingleTypeInfo._VALUES));
 //    }
 
-    public static List<SingleTypeInfo> fetchStiBasedOnHostHeaders() {
+    public static List<SingleTypeInfo> fetchStiBasedOnHostHeaders(ObjectId objectId) {
         Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1,false);
-        return SingleTypeInfoDao.instance.findAll(filterForHostHeader, Projections.exclude(SingleTypeInfo._VALUES));
+        Bson filterForSkip = Filters.gt("_id", objectId);
+        Bson finalFilter = objectId == null ? filterForHostHeader : Filters.and(filterForHostHeader, filterForSkip);
+        int limit = 1000;
+        return SingleTypeInfoDao.instance.findAll(finalFilter, 0, limit, Sorts.ascending("_id"), Projections.exclude(SingleTypeInfo._VALUES));
     }
 
     public static List<Integer> fetchApiCollectionIds() {
