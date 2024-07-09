@@ -625,6 +625,17 @@ public class TestExecutor {
         // }
 
         List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
+        if (messages == null) {
+            messages = new ArrayList<String>();
+        }
+
+        try {
+            messages.addAll(SampleDataAltDb.findSamplesByApiInfoKey(apiInfoKey));
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
         if (messages == null || messages.isEmpty()){
             List<GenericTestResult> testResults = new ArrayList<>();
             testResults.add(new TestResult(null, null, Collections.singletonList(TestError.NO_PATH.getMessage()),0, false, Confidence.HIGH, null));
