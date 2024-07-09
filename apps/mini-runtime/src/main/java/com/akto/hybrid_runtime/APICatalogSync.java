@@ -222,6 +222,9 @@ public class APICatalogSync {
             tryMergingWithKnownStrictURLs(pendingRequests, dbCatalog, deltaCatalog);
             logger.info("tryMergingWithKnownStrictURLs: " + (System.currentTimeMillis() - start));
         } else {
+            if (DataControlFetcher.discardNewApi()) {
+                pendingRequests.clear();
+            }
             AllMetrics.instance.setDeltaCatalogNewCount(pendingRequests.size());
             AllMetrics.instance.setDeltaCatalogTotalCount(pendingRequests.size());
             for (URLStatic pending: pendingRequests.keySet()) {
@@ -252,7 +255,7 @@ public class APICatalogSync {
                     }
                 }
 
-                
+
             }
         }
 
@@ -630,21 +633,26 @@ public class APICatalogSync {
 
                 for (URLTemplate  urlTemplate: dbCatalog.getTemplateURLToMethods().keySet()) {
                     if (urlTemplate.match(newUrl)) {
-                        AllMetrics.instance.setDeltaCatalogTotalCount(1);
-                        RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
-
-                        if (alreadyInDelta != null) {
-                            alreadyInDelta.fillUrlParams(tokenize(newUrl.getUrl()), urlTemplate, apiCollectionId);
-                            alreadyInDelta.mergeFrom(newRequestTemplate);
+                        if (DataControlFetcher.discardOldApi()) {
+                            iterator.remove();
+                            break;
                         } else {
-                            RequestTemplate dbTemplate = dbCatalog.getTemplateURLToMethods().get(urlTemplate);
-                            RequestTemplate dbCopy = dbTemplate.copy();
-                            dbCopy.mergeFrom(newRequestTemplate);
-                            dbCopy.fillUrlParams(tokenize(newUrl.getUrl()), urlTemplate, apiCollectionId);
-                            deltaCatalog.getTemplateURLToMethods().put(urlTemplate, dbCopy);
+                            AllMetrics.instance.setDeltaCatalogTotalCount(1);
+                            RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
+
+                            if (alreadyInDelta != null) {
+                                alreadyInDelta.fillUrlParams(tokenize(newUrl.getUrl()), urlTemplate, apiCollectionId);
+                                alreadyInDelta.mergeFrom(newRequestTemplate);
+                            } else {
+                                RequestTemplate dbTemplate = dbCatalog.getTemplateURLToMethods().get(urlTemplate);
+                                RequestTemplate dbCopy = dbTemplate.copy();
+                                dbCopy.mergeFrom(newRequestTemplate);
+                                dbCopy.fillUrlParams(tokenize(newUrl.getUrl()), urlTemplate, apiCollectionId);
+                                deltaCatalog.getTemplateURLToMethods().put(urlTemplate, dbCopy);
+                            }
+                            iterator.remove();
+                            break;
                         }
-                        iterator.remove();
-                        break;
                     }
                 }
             }
@@ -692,14 +700,18 @@ public class APICatalogSync {
                     AllMetrics.instance.setDeltaCatalogTotalCount(1);
                     Map<URLStatic, RequestTemplate> deltaCatalogStrictURLToMethods = deltaCatalog.getStrictURLToMethods();
                     RequestTemplate requestTemplate = deltaCatalogStrictURLToMethods.get(url);
-                    if (requestTemplate == null) {
-                        requestTemplate = strictMatch.copy(); // to further process the requestTemplate
-                        deltaCatalogStrictURLToMethods.put(url, requestTemplate) ;
-                        strictMatch.mergeFrom(requestTemplate); // to update the existing requestTemplate in db with new data
-                    }
+                    if (DataControlFetcher.discardOldApi()) {
+                        iterator.remove();
+                    } else {
+                        if (requestTemplate == null) {
+                            requestTemplate = strictMatch.copy(); // to further process the requestTemplate
+                            deltaCatalogStrictURLToMethods.put(url, requestTemplate);
+                            strictMatch.mergeFrom(requestTemplate); // to update the existing requestTemplate in db with new data
+                        }
 
-                    processResponse(requestTemplate, responseParamsList, deletedInfo);
-                    iterator.remove();
+                        processResponse(requestTemplate, responseParamsList, deletedInfo);
+                        iterator.remove();
+                    }
                 }
 
             }

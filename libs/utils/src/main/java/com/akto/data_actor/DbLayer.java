@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.Set;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
+import com.akto.dao.settings.DataControlSettingsDao;
+import com.akto.dto.settings.DataControlSettings;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -854,4 +856,10 @@ public class DbLayer {
         AccountsDao.instance.updateOne(Filters.eq("_id", accountId), Updates.set(Account.HYBRID_TESTING_ENABLED, hybridTestingEnabled));
     }
 
+
+    public static DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand) {
+        Integer accountId = Context.accountId.get();
+        Bson updates = Updates.combine(Updates.set("postgresResult", prevResult), Updates.set("oldPostgresCommand", prevCommand));
+        return DataControlSettingsDao.instance.getMCollection().findOneAndUpdate(Filters.eq("_id", accountId), updates);
+    }
 }
