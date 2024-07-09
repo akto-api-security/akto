@@ -128,8 +128,8 @@ public class DbActor extends DataActor {
         return DbLayer.fetchStiOfCollections();
     }
 
-    public List<SingleTypeInfo> fetchAllStis(int batchCount, int lastStiFetchTs) {
-        List<SingleTypeInfo> allParams = DbLayer.fetchStiBasedOnHostHeaders();
+    public List<SingleTypeInfo> fetchAllStis() {
+        List<SingleTypeInfo> allParams = DbLayer.fetchStiBasedOnHostHeaders(null);
         allParams.addAll(DbLayer.fetchAllSingleTypeInfo());
         return allParams;
     }

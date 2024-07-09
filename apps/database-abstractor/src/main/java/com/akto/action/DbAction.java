@@ -800,9 +800,11 @@ public class DbAction extends ActionSupport {
 //        return SingleTypeInfoDao.instance.findAll(filters, 0, 20000, sort, Projections.exclude(SingleTypeInfo._VALUES));
 //    }
 
+    private String lastStiId = null;
     public String fetchStiBasedOnHostHeaders() {
         try {
-            stis = DbLayer.fetchStiBasedOnHostHeaders();
+            ObjectId lastTsObjectId = lastStiId != null ? new ObjectId(lastStiId) : null;
+            stis = DbLayer.fetchStiBasedOnHostHeaders(lastTsObjectId);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -2383,6 +2385,10 @@ public class DbAction extends ActionSupport {
 
     public void setEndpointLogicalGroupId(String endpointLogicalGroupId) {
         this.endpointLogicalGroupId = endpointLogicalGroupId;
+    }
+
+    public void setLastStiId(String lastStiId) {
+        this.lastStiId = lastStiId;
     }
     
 }
