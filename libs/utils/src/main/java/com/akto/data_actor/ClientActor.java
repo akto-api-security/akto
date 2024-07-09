@@ -364,7 +364,7 @@ public class ClientActor extends DataActor {
         List<SingleTypeInfo> allStis = new ArrayList<>();
         String lastStiId = null;
 
-        for (int i =0; i<20; i++) {
+        for (int i =0; i<80; i++) {
             BasicDBObject obj = new BasicDBObject();
             obj.put("lastStiId", lastStiId);
             OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStiBasedOnHostHeaders", "", "POST",  obj.toString(), headers, "");
