@@ -9,6 +9,7 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
+import com.akto.dao.traffic_metrics.TrafficAlertsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.*;
@@ -38,6 +39,7 @@ import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
+import com.akto.dto.traffic_metrics.TrafficAlerts;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetricsAlert;
 import com.akto.dto.type.SingleTypeInfo;
@@ -321,7 +323,8 @@ public class DaoInit {
                 new EnumCodec<>(FileUpload.UploadStatus.class),
                 new EnumCodec<>(FileUploadLog.UploadLogStatus.class),
                 new EnumCodec<>(TestCollectionProperty.Id.class),
-                new EnumCodec<>(CustomAuthType.TypeOfToken.class)
+                new EnumCodec<>(CustomAuthType.TypeOfToken.class),
+                new EnumCodec<>(TrafficAlerts.ALERT_TYPE.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
@@ -378,6 +381,7 @@ public class DaoInit {
         CodeAnalysisCollectionDao.instance.createIndicesIfAbsent();
         CodeAnalysisApiInfoDao.instance.createIndicesIfAbsent();
         RuntimeMetricsDao.instance.createIndicesIfAbsent();
+        TrafficAlertsDao.instance.createIndicesIfAbsent();
     }
 
 }

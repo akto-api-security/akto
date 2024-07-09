@@ -10,6 +10,7 @@ import func from '@/util/func';
 import SemiCircleProgress from '../../shared/SemiCircleProgress';
 import testingApi from "../../../pages/testing/api"
 import TestingStore from '../../../pages/testing/testingStore';
+import homeRequests from '../../../pages/home/api';
 
 export default function Header() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -35,29 +36,20 @@ export default function Header() {
     const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
     const searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections)
+    const setTrafficAlerts = PersistStore((state) => state.setTrafficAlerts)
 
     const setCurrentTestingRuns = TestingStore(state => state.setCurrentTestingRuns)
-    
-    const fetchTestingStatus = () => {
-        setInterval(()=> {
-            testingApi.fetchTestingRunStatus().then((resp) => {
-                setCurrentTestingRuns(resp.currentRunningTestsStatus)
-                setCurrentTestsObj({
-                    totalTestsInitiated: resp?.testRunsScheduled || 0,
-                    totalTestsCompleted: resp?.totalTestsCompleted || 0,
-                    totalTestsQueued: resp?.testRunsQueued || 0,
-                    testRunsArr: resp?.currentRunningTestsStatus || []
-                })
-            })
-        },2000)
-    }
+    const [intervalId, setIntervalId] = useState(null);
+    const [intervalId2, setIntervalId2] = useState(null);
 
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
         [],
     );
 
-    const handleLogOut = async () => {        
+    const handleLogOut = async () => { 
+        clearInterval(intervalId)
+        clearInterval(intervalId2)
         api.logout().then(res => {
             resetAll();
             storeAccessToken(null)
@@ -250,8 +242,39 @@ export default function Header() {
     );
 
     useEffect(() => {
-        fetchTestingStatus()
-    },[])
+        const fetchTestingStatus = () => {
+            const id = setInterval(() => {
+                testingApi.fetchTestingRunStatus().then((resp) => {
+                    setCurrentTestingRuns(resp.currentRunningTestsStatus);
+                    setCurrentTestsObj({
+                        totalTestsInitiated: resp?.testRunsScheduled || 0,
+                        totalTestsCompleted: resp?.totalTestsCompleted || 0,
+                        totalTestsQueued: resp?.testRunsQueued || 0,
+                        testRunsArr: resp?.currentRunningTestsStatus || []
+                    });
+                });
+            }, 2000);
+            setIntervalId(id); 
+        };
+
+        const fetchAlerts = () => {
+            const id2 = setInterval(() => {
+                homeRequests.getTrafficAlerts().then((resp) => {
+                    setTrafficAlerts(resp)
+                });
+            }, (5000 * 60));
+            setIntervalId2(id2); 
+        };
+
+        fetchAlerts();
+        fetchTestingStatus();
+
+        return () => {
+            clearInterval(intervalId);
+            clearInterval(intervalId2)
+        };
+    }, []);
+
 
     return (
         topBarMarkup
