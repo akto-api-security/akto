@@ -4,14 +4,22 @@ import com.akto.RuntimeMode;
 
 public class DataActorFactory {
 
-    public static DataActor fetchInstance() {
+    private DataActorFactory(){
+    }
 
+    private static DataActor INSTANCE = null;
+
+    public static DataActor fetchInstance() {
+        if(INSTANCE != null){
+            return INSTANCE;
+        }
         boolean hybridSaas = RuntimeMode.isHybridDeployment();
         if (hybridSaas) {
-            return new ClientActor();
+            INSTANCE = new ClientActor();
         } else {
-            return new DbActor();
+            INSTANCE = new DbActor();
         }
+        return INSTANCE;
 
     }
 
