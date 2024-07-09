@@ -57,7 +57,7 @@ public abstract class DataActor {
 
     public abstract List<SingleTypeInfo> fetchStiOfCollections(int batchCount, int lastStiFetchTs);
 
-    public abstract List<SingleTypeInfo> fetchAllStis(int batchCount, int lastStiFetchTs);
+    public abstract List<SingleTypeInfo> fetchAllStis();
 
     public abstract List<SensitiveParamInfo> getUnsavedSensitiveParamInfos();
 
