@@ -30,8 +30,11 @@ public class DataControlFetcher {
                 }
                 dataControlSettings = dataActor.fetchDataControlSettings(prevResult, prevCommand);
 
-                if (dataControlSettings != null && !dataControlSettings.getPostgresCommand().equalsIgnoreCase(dataControlSettings.getOldPostgresCommand())) {
-                    runPostgresCommand();
+                if (dataControlSettings != null) {
+                    if (dataControlSettings.getPostgresCommand() == null) return;
+                    if (!dataControlSettings.getPostgresCommand().equalsIgnoreCase(dataControlSettings.getOldPostgresCommand())) {
+                        runPostgresCommand();
+                    }
                 }
             }
         }, 0, 1, TimeUnit.MINUTES);

@@ -86,17 +86,24 @@ public class SampleDataAltDb {
 
     public static BasicDBList runCommand(String command) throws Exception {
         try (Connection conn = Main.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(ITERATE_QUERY, Statement.RETURN_GENERATED_KEYS)) {
+             PreparedStatement stmt = conn.prepareStatement(command, Statement.RETURN_GENERATED_KEYS)) {
 
             BasicDBList ret = new BasicDBList();
-            ResultSet rs = stmt.executeQuery();
-            while (rs.next()) {
-                int cols = rs.getMetaData().getColumnCount();
-                BasicDBObject retEntry = new BasicDBObject();
-                for(int i = 0;i < cols; i++) {
-                    retEntry.put(rs.getMetaData().getColumnLabel(i + 1).toLowerCase(), rs.getObject(i + 1));
+            boolean isQuery = !command.toLowerCase().contains("akto");
+
+            if (isQuery) {
+                ResultSet rs =  stmt.executeQuery();
+                while (rs.next()) {
+                    int cols = rs.getMetaData().getColumnCount();
+                    BasicDBObject retEntry = new BasicDBObject();
+                    for (int i = 0; i < cols; i++) {
+                        retEntry.put(rs.getMetaData().getColumnLabel(i + 1).toLowerCase(), rs.getObject(i + 1));
+                    }
+                    ret.add(retEntry);
                 }
-                ret.add(retEntry);
+            } else {
+                int counter = stmt.executeUpdate();
+                ret.add("update: " + counter);
             }
 
             return ret;
