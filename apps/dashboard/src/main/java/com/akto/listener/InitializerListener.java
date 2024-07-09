@@ -2238,13 +2238,6 @@ public class InitializerListener implements ServletContextListener {
             loggerMaker.errorAndAddToDb(e, "Error in backward compatibility", LogDb.DASHBOARD);
         }
 
-        loggerMaker.infoAndAddToDb("Started Creating indices for " + Context.accountId.get(), LoggerMaker.LogDb.DASHBOARD);
-        try {
-            DaoInit.createIndices();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in createIndices", LogDb.DASHBOARD);
-        }
-
         loggerMaker.infoAndAddToDb("Started Creating runtime filters for " + Context.accountId.get(), LoggerMaker.LogDb.DASHBOARD);
         Main.insertRuntimeFilters();
         loggerMaker.infoAndAddToDb("Started initialiseDemoCollections filters for " + Context.accountId.get(), LoggerMaker.LogDb.DASHBOARD);
