@@ -8,7 +8,21 @@ const homeRequests = {
             data: {}
         })
         return resp
-    }
+    },
+    getTrafficAlerts(){
+        return request({
+            url: '/api/getAllTrafficAlerts',
+            method: 'post',
+            data: {}
+        })
+    },
+    markAlertAsDismissed(trafficAlert){
+        return request({
+            url: '/api/markAlertAsDismissed',
+            method: 'post',
+            data: {trafficAlert}
+        })
+    },
 }
 
 export default homeRequests

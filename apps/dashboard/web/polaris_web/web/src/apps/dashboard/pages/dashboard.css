@@ -28,6 +28,23 @@
     border-bottom: 1px solid #E1E3E5;
 }
 
+.alerts-banner {
+    width: 400px;
+    position: fixed;
+    right: 24px;
+    z-index: 100;
+    bottom: 80px;
+}
+
+.alerts-banner .Polaris-Banner--withinPage{
+    padding: 8px !important;
+    margin-top: unset !important;
+}
+
+.alerts-banner .Polaris-Banner__Dismiss{
+    top: 12px !important;
+}
+
 :root {
     --akto-primary: #6200EA;
    --color-post: #49cc90 ;

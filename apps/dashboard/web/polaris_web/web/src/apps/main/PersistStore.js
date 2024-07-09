@@ -25,6 +25,7 @@ const initialState = {
     coverageMap:{},
     filtersMap:{},
     tableInitialState: {},
+    trafficAlerts: null
 };
 
 let persistStore = (set) => ({
@@ -48,6 +49,7 @@ let persistStore = (set) => ({
     setCoverageMap:(coverageMap)=>{set({coverageMap: coverageMap})},
     setFiltersMap: (filtersMap) => set({ filtersMap }),
     setTableInitialState: (tableInitialState) => set({ tableInitialState }),
+    setTrafficAlerts: (trafficAlerts) =>set ({trafficAlerts}),
 
     resetAll: () => set(initialState), // Reset function
 })
