@@ -1484,6 +1484,33 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return true;
     }
     return false;
+  },
+  checkUserValidForIntegrations(){
+    const userRole = window.USER_ROLE
+    return !(userRole === "GUEST" || userRole === "MEMBER")
+  },
+  capitalizeFirstLetter(str) {
+    if (!str) return str;
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  },
+  getDaySuffix(day) {
+    if (day > 3 && day < 21) return 'th';
+    switch (day % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+    }
+  },
+  formatReportDate(date) {
+    const day = date.getDate();
+    const month = date.toLocaleString('default', { month: 'long' });
+    const year = date.getFullYear();
+    const daySuffix = func.getDaySuffix(day);
+    return `${day}${daySuffix} ${month}, ${year}`;
+  },
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 
