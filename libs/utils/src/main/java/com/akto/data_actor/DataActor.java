@@ -4,6 +4,7 @@ import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -57,7 +58,7 @@ public abstract class DataActor {
 
     public abstract List<SingleTypeInfo> fetchStiOfCollections(int batchCount, int lastStiFetchTs);
 
-    public abstract List<SingleTypeInfo> fetchAllStis(int batchCount, int lastStiFetchTs);
+    public abstract List<SingleTypeInfo> fetchAllStis();
 
     public abstract List<SensitiveParamInfo> getUnsavedSensitiveParamInfos();
 
@@ -219,4 +220,5 @@ public abstract class DataActor {
 
     public abstract EndpointLogicalGroup fetchEndpointLogicalGroupById(String endpointLogicalGroupId);
 
+    public abstract DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand);
 }

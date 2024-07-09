@@ -1,6 +1,7 @@
 package com.akto.data_actor;
 
 import com.akto.DaoInit;
+import com.akto.dto.settings.DataControlSettings;
 import com.akto.testing.ApiExecutor;
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.SetupDao;
@@ -43,6 +44,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -76,14 +78,15 @@ public class ClientActor extends DataActor {
     private static final Gson gson = new Gson();
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     private static final Logger logger = LoggerFactory.getLogger(ClientActor.class);
+    public static final String CYBORG_URL = "https://cyborg.akto.io";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
     private static AccountSettings accSettings;
 
-    ObjectMapper objectMapper = new ObjectMapper();
+    ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
 
     public static String buildDbAbstractorUrl() {
-        String dbAbsHost = "https://cyborg.akto.io";
-        if (dbAbsHost.endsWith("/")) {
+        String dbAbsHost = CYBORG_URL;
+        if (CYBORG_URL.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
         return dbAbsHost + "/api";
@@ -123,6 +126,7 @@ public class ClientActor extends DataActor {
                 payloadObj =  BasicDBObject.parse(responsePayload);
                 BasicDBObject accountSettingsObj = (BasicDBObject) payloadObj.get("accountSettings");
                 accountSettingsObj.put("telemetrySettings", null);
+                accountSettingsObj.put("defaultPayloads", null);
                 AccountSettings ac = objectMapper.readValue(accountSettingsObj.toJson(), AccountSettings.class);
                 accSettings = ac;
                 return ac;
@@ -357,51 +361,49 @@ public class ClientActor extends DataActor {
         // }
     }
 
-    public List<SingleTypeInfo> fetchAllStis(int batchCount, int lastStiFetchTs) {
+    public List<SingleTypeInfo> fetchAllStis() {
         Map<String, List<String>> headers = buildHeaders();
         List<SingleTypeInfo> allStis = new ArrayList<>();
-        List<SingleTypeInfo> uniqueStis = new ArrayList<>();
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStiBasedOnHostHeaders", "", "GET", null, headers, "");
-        try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("invalid response in getUnsavedSensitiveParamInfos", LoggerMaker.LogDb.RUNTIME);
-                return allStis;
-            }
-            BasicDBObject payloadObj;
+        String lastStiId = null;
+
+        for (int i =0; i<80; i++) {
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("lastStiId", lastStiId);
+            OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStiBasedOnHostHeaders", "", "POST",  obj.toString(), headers, "");
             try {
-                payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBList stiList = (BasicDBList) payloadObj.get("stis");
-                for (Object stiObj: stiList) {
-                    BasicDBObject obj2 = (BasicDBObject) stiObj;
-                    obj2.put("id", obj2.get("strId"));
-                    BasicDBObject subType = (BasicDBObject) obj2.get("subType");
-                    obj2.remove("subType");
-                    SingleTypeInfo s = objectMapper.readValue(obj2.toJson(), SingleTypeInfo.class);
-                    s.setSubType(SingleTypeInfo.subTypeMap.get(subType.get("name")));
-                    allStis.add(s);
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+                String responsePayload = response.getBody();
+                if (response.getStatusCode() != 200 || responsePayload == null) {
+                    loggerMaker.errorAndAddToDb("invalid response in getUnsavedSensitiveParamInfos", LoggerMaker.LogDb.RUNTIME);
+                    return allStis;
                 }
-            } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in getUnsavedSensitiveParamInfos" + e, LoggerMaker.LogDb.RUNTIME);
+                BasicDBObject payloadObj;
+                try {
+                    payloadObj =  BasicDBObject.parse(responsePayload);
+                    BasicDBList stiList = (BasicDBList) payloadObj.get("stis");
+                    if (stiList.isEmpty()) break;
+
+                    for (Object stiObj: stiList) {
+                        BasicDBObject obj2 = (BasicDBObject) stiObj;
+                        obj2.put("id", obj2.get("strId"));
+                        BasicDBObject subType = (BasicDBObject) obj2.get("subType");
+                        obj2.remove("subType");
+                        SingleTypeInfo s = objectMapper.readValue(obj2.toJson(), SingleTypeInfo.class);
+                        s.setSubType(SingleTypeInfo.subTypeMap.get(subType.get("name")));
+                        allStis.add(s);
+                        lastStiId = s.getId().toHexString();
+                    }
+                } catch(Exception e) {
+                    loggerMaker.errorAndAddToDb("error extracting response in getUnsavedSensitiveParamInfos" + e, LoggerMaker.LogDb.RUNTIME);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error in getUnsavedSensitiveParamInfos" + e, LoggerMaker.LogDb.RUNTIME);
             }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in getUnsavedSensitiveParamInfos" + e, LoggerMaker.LogDb.RUNTIME);
         }
 
-        Set<String> stiObjIds = new HashSet<>();
 
-        for (SingleTypeInfo sti: allStis) {
-            if (stiObjIds.contains(sti.getId().toString())) {
-                continue;
-            }
-            uniqueStis.add(sti);
-            stiObjIds.add(sti.getId().toString());
-        }
-
-        return uniqueStis;
+        return allStis;
     }
-
     public List<SingleTypeInfo> fetchStiInBatches(int batchCount, int lastStiFetchTs) {
         Map<String, List<String>> headers = buildHeaders();
         List<SingleTypeInfo> allStis = new ArrayList<>();
@@ -410,7 +412,7 @@ public class ClientActor extends DataActor {
         boolean objectIdRequired = false;
         String objId = null;
         BasicDBObject obj = new BasicDBObject();
-        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         for (int i = 0; i < batchCount; i++) {
 
             obj.put("lastFetchTimestamp", lastStiFetchTs);
@@ -1037,25 +1039,25 @@ public class ClientActor extends DataActor {
     }
 
     public void insertRuntimeLog(Log log) {
-        // Map<String, List<String>> headers = buildHeaders();
-        // BasicDBObject obj = new BasicDBObject();
-        // BasicDBObject logObj = new BasicDBObject();
-        // logObj.put("key", log.getKey());
-        // logObj.put("log", log.getLog());
-        // logObj.put("timestamp", log.getTimestamp());
-        // obj.put("log", logObj);
-        // OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertRuntimeLog", "", "POST", obj.toString(), headers, "");
-        // try {
-        //     OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-        //     String responsePayload = response.getBody();
-        //     if (response.getStatusCode() != 200 || responsePayload == null) {
-        //         loggerMaker.errorAndAddToDb("non 2xx response in insertRuntimeLog", LoggerMaker.LogDb.RUNTIME);
-        //         return;
-        //     }
-        // } catch (Exception e) {
-        //     loggerMaker.errorAndAddToDb("error in insertRuntimeLog" + e, LoggerMaker.LogDb.RUNTIME);
-        //     return;
-        // }
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertRuntimeLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                System.out.println("non 2xx response in insertRuntimeLog");
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("error in insertRuntimeLog" + e);
+            return;
+        }
     }
 
     public void insertAnalyserLog(Log log) {
@@ -2783,6 +2785,32 @@ public class ClientActor extends DataActor {
         return stiList;
     }
 
+    public DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject("dataControlSettings", new BasicDBObject("postgresResult", prevResult).append("oldPostgresCommand", prevCommand));
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDataControlSettings", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchDataControlSettings", LoggerMaker.LogDb.RUNTIME);
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject dataControlSettings = (BasicDBObject) payloadObj.get("dataControlSettings");
+                return objectMapper.readValue(dataControlSettings.toJson(), DataControlSettings.class);
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchDataControlSettings" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchDataControlSettings" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+
+        return null;
+    }
+
     public SampleData fetchSampleDataByIdMethod(int apiCollectionId, String urlVal, String method) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
@@ -2803,6 +2831,8 @@ public class ClientActor extends DataActor {
                 BasicDBObject sampleData = (BasicDBObject) payloadObj.get("sampleData");
                 return objectMapper.readValue(sampleData.toJson(), SampleData.class);
             } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchSampleDataByIdMethod" + e, LoggerMaker.LogDb.RUNTIME);
+
                 return null;
             }
         } catch (Exception e) {
@@ -2830,25 +2860,25 @@ public class ClientActor extends DataActor {
     }
 
     public void insertTestingLog(Log log) {
-        // Map<String, List<String>> headers = buildHeaders();
-        // BasicDBObject obj = new BasicDBObject();
-        // BasicDBObject logObj = new BasicDBObject();
-        // logObj.put("key", log.getKey());
-        // logObj.put("log", log.getLog());
-        // logObj.put("timestamp", log.getTimestamp());
-        // obj.put("log", logObj);
-        // OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingLog", "", "POST", obj.toString(), headers, "");
-        // try {
-        //     OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-        //     String responsePayload = response.getBody();
-        //     if (response.getStatusCode() != 200 || responsePayload == null) {
-        //         loggerMaker.errorAndAddToDb("non 2xx response in insertTestingLog", LoggerMaker.LogDb.RUNTIME);
-        //         return;
-        //     }
-        // } catch (Exception e) {
-        //     loggerMaker.errorAndAddToDb("error in insertTestingLog" + e, LoggerMaker.LogDb.RUNTIME);
-        //     return;
-        // }
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                System.out.println("non 2xx response in insertTestingLog");
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("error in insertTestingLog" + e);
+            return;
+        }
     }
 
     public Map<String, List<String>> buildHeaders() {

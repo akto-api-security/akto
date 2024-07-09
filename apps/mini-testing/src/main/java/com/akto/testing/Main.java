@@ -18,6 +18,7 @@ import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
@@ -152,6 +153,7 @@ public class Main {
         while (true) {
             int accountId = accountSettings.getId();
             int start = Context.now();
+            long startDetailed = System.currentTimeMillis();
             int delta = start - 20*60;
 
             TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta);
@@ -270,6 +272,7 @@ public class Main {
                     }
                 }
                 testExecutor.init(testingRun, summaryId);
+                AllMetrics.instance.setTestingRunCount(1);
                 //raiseMixpanelEvent(summaryId, testingRun, accountId);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in init " + e);
@@ -287,6 +290,7 @@ public class Main {
             }
 
             loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds for account: " + accountId, LogDb.TESTING);
+            AllMetrics.instance.setTestingRunLatency(System.currentTimeMillis() - startDetailed);
 
             Organization organization = dataActor.fetchOrganization(accountId);
 
