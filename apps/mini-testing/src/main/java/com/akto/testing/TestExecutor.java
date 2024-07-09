@@ -18,9 +18,9 @@ import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
-import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.sql.SampleDataAltDb;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
@@ -29,7 +29,6 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
-import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
@@ -638,10 +637,9 @@ public class TestExecutor {
 
         String message = messages.get(messages.size() - 1);
         try {
-            String uuid = OriginalHttpRequest.extractAktoUUid(message);
-            if (uuid != null) {
-                message = SampleDataAltDb.find(uuid);
-            }
+            long start = System.currentTimeMillis();
+            message = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey);
+            AllMetrics.instance.setSampleDataFetchLatency(System.currentTimeMillis() - start);
         } catch (Exception e) {
             e.printStackTrace();
         }

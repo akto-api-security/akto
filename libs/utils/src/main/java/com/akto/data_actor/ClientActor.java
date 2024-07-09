@@ -78,14 +78,15 @@ public class ClientActor extends DataActor {
     private static final Gson gson = new Gson();
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     private static final Logger logger = LoggerFactory.getLogger(ClientActor.class);
+    public static final String CYBORG_URL = "https://cyborg.akto.io";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
     private static AccountSettings accSettings;
 
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
 
     public static String buildDbAbstractorUrl() {
-        String dbAbsHost = "https://cyborg.akto.io";
-        if (dbAbsHost.endsWith("/")) {
+        String dbAbsHost = CYBORG_URL;
+        if (CYBORG_URL.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
         return dbAbsHost + "/api";
@@ -365,7 +366,7 @@ public class ClientActor extends DataActor {
         List<SingleTypeInfo> allStis = new ArrayList<>();
         String lastStiId = null;
 
-        for (int i =0; i<200000; i++) {
+        for (int i =0; i<80; i++) {
             BasicDBObject obj = new BasicDBObject();
             obj.put("lastStiId", lastStiId);
             OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStiBasedOnHostHeaders", "", "POST",  obj.toString(), headers, "");
@@ -380,6 +381,7 @@ public class ClientActor extends DataActor {
                 try {
                     payloadObj =  BasicDBObject.parse(responsePayload);
                     BasicDBList stiList = (BasicDBList) payloadObj.get("stis");
+                    if (stiList.isEmpty()) break;
 
                     for (Object stiObj: stiList) {
                         BasicDBObject obj2 = (BasicDBObject) stiObj;
@@ -391,8 +393,6 @@ public class ClientActor extends DataActor {
                         allStis.add(s);
                         lastStiId = s.getId().toHexString();
                     }
-                    if (stiList.isEmpty() || stiList.size() < 1000) break;
-
                 } catch(Exception e) {
                     loggerMaker.errorAndAddToDb("error extracting response in getUnsavedSensitiveParamInfos" + e, LoggerMaker.LogDb.RUNTIME);
                 }
@@ -412,7 +412,7 @@ public class ClientActor extends DataActor {
         boolean objectIdRequired = false;
         String objId = null;
         BasicDBObject obj = new BasicDBObject();
-        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         for (int i = 0; i < batchCount; i++) {
 
             obj.put("lastFetchTimestamp", lastStiFetchTs);
@@ -1039,25 +1039,25 @@ public class ClientActor extends DataActor {
     }
 
     public void insertRuntimeLog(Log log) {
-        // Map<String, List<String>> headers = buildHeaders();
-        // BasicDBObject obj = new BasicDBObject();
-        // BasicDBObject logObj = new BasicDBObject();
-        // logObj.put("key", log.getKey());
-        // logObj.put("log", log.getLog());
-        // logObj.put("timestamp", log.getTimestamp());
-        // obj.put("log", logObj);
-        // OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertRuntimeLog", "", "POST", obj.toString(), headers, "");
-        // try {
-        //     OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-        //     String responsePayload = response.getBody();
-        //     if (response.getStatusCode() != 200 || responsePayload == null) {
-        //         loggerMaker.errorAndAddToDb("non 2xx response in insertRuntimeLog", LoggerMaker.LogDb.RUNTIME);
-        //         return;
-        //     }
-        // } catch (Exception e) {
-        //     loggerMaker.errorAndAddToDb("error in insertRuntimeLog" + e, LoggerMaker.LogDb.RUNTIME);
-        //     return;
-        // }
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertRuntimeLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                System.out.println("non 2xx response in insertRuntimeLog");
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("error in insertRuntimeLog" + e);
+            return;
+        }
     }
 
     public void insertAnalyserLog(Log log) {
@@ -2860,25 +2860,25 @@ public class ClientActor extends DataActor {
     }
 
     public void insertTestingLog(Log log) {
-        // Map<String, List<String>> headers = buildHeaders();
-        // BasicDBObject obj = new BasicDBObject();
-        // BasicDBObject logObj = new BasicDBObject();
-        // logObj.put("key", log.getKey());
-        // logObj.put("log", log.getLog());
-        // logObj.put("timestamp", log.getTimestamp());
-        // obj.put("log", logObj);
-        // OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingLog", "", "POST", obj.toString(), headers, "");
-        // try {
-        //     OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-        //     String responsePayload = response.getBody();
-        //     if (response.getStatusCode() != 200 || responsePayload == null) {
-        //         loggerMaker.errorAndAddToDb("non 2xx response in insertTestingLog", LoggerMaker.LogDb.RUNTIME);
-        //         return;
-        //     }
-        // } catch (Exception e) {
-        //     loggerMaker.errorAndAddToDb("error in insertTestingLog" + e, LoggerMaker.LogDb.RUNTIME);
-        //     return;
-        // }
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                System.out.println("non 2xx response in insertTestingLog");
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("error in insertTestingLog" + e);
+            return;
+        }
     }
 
     public Map<String, List<String>> buildHeaders() {

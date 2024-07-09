@@ -45,14 +45,14 @@ public class Main {
         // System.out.println("Opened database successfully");
 
         // createSampleDataTable();
-        // try {
-        //     // SampleDataAlt s1 = new SampleDataAlt(UUID.randomUUID(), "sample 2", 123, "GET", "/api/shivansh", -1, Context.now(), 1);
-        //     // SampleDataAlt s2 = new SampleDataAlt(UUID.randomUUID(), "sample 1", 123, "GET", "/api/shivansh", -1, Context.now(), 1);
+        try {
+            // SampleDataAlt s1 = new SampleDataAlt(UUID.randomUUID(), "sample 2", 123, "GET", "https://qapi.mpl.live:443/12312/pending-invites", -1, Context.now(), 1);
+            // SampleDataAlt s2 = new SampleDataAlt(UUID.randomUUID(), "sample 1", 123, "POST", "https://qapi.mpl.live:443/abc/pending-invites", -1, Context.now(), 1);
 
-        //     // List<SampleDataAlt> list = new ArrayList<>();
-        //     // list.add(s1);
-        //     // list.add(s2);
-        //     // SampleDataAltDb.bulkInsert(list);
+            // List<SampleDataAlt> list = new ArrayList<>();
+            // list.add(s1);
+            // list.add(s2);
+            // SampleDataAltDb.bulkInsert(list);
         // int limit = 5;
         // int skip = 0;
         // List<String> ids = SampleDataAltDb.iterateAndGetIds(limit, skip);
@@ -67,14 +67,27 @@ public class Main {
         // ids.add("0e83a826-369c-4a34-99ee-0c6bce494e1c");
 
         // SampleDataAltDb.delete(ids, 1718426392);
-
-        // } catch (Exception e) {
-        //     // TODO Auto-generated catch block
-        //     e.printStackTrace();
-        // }
+            // SampleDataAltDb.deleteOld();
+            
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
 
         
 
+    }
+
+    public static String extractDatabaseName() {
+        String regex = "jdbc:postgresql://[^/]+:\\d+/(\\w+)";
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(regex);
+        java.util.regex.Matcher matcher = pattern.matcher(connectionUri);
+
+        if (matcher.find()) {
+            return matcher.group(1);
+        } else {
+            throw new IllegalArgumentException("Database name not found in the connection URL.");
+        }
     }
 
     private static DataSource createDataSource() {
@@ -100,7 +113,7 @@ public class Main {
         try {
             Connection conn = ds.getConnection();
             PreparedStatement stmt = conn.prepareStatement(
-                    "CREATE TABLE IF NOT EXISTS SAMPLEDATA " +
+                    "CREATE TABLE IF NOT EXISTS SAMPLEDATA02 " +
                             "(ID UUID PRIMARY KEY NOT NULL," +
                             "SAMPLE TEXT NOT NULL," +
                             "API_COLLECTION_ID INT NOT NULL," +

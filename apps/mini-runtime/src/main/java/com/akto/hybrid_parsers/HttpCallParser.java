@@ -18,6 +18,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
+import com.akto.hybrid_runtime.MergeLogicLocal;
 import com.akto.hybrid_runtime.URLAggregator;
 import com.akto.util.JSONUtils;
 import com.akto.util.Constants;
@@ -208,6 +209,7 @@ public class HttpCallParser {
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
+            MergeLogicLocal.mergingJob(apiCatalogSync.dbState);
         }
 
     }

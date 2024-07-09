@@ -45,5 +45,9 @@ public class UpdatePayload {
     public String toString() {
         return gson.toJson(this);
     }
+
+    public long getSize(){
+        return this.toString().length();
+    }
     
 }
