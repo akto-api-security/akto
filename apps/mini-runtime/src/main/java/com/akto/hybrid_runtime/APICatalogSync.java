@@ -4,11 +4,9 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
-import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
-import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.sql.SampleDataAlt;
@@ -20,34 +18,25 @@ import com.akto.dto.type.SingleTypeInfo.Domain;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
-import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.sql.SampleDataAltDb;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
-import com.akto.hybrid_runtime.merge.MergeOnHostOnly;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
-import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
-import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.UpdateResult;
 import org.apache.commons.lang3.math.NumberUtils;
-import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 
@@ -233,6 +222,8 @@ public class APICatalogSync {
             tryMergingWithKnownStrictURLs(pendingRequests, dbCatalog, deltaCatalog);
             logger.info("tryMergingWithKnownStrictURLs: " + (System.currentTimeMillis() - start));
         } else {
+            AllMetrics.instance.setDeltaCatalogNewCount(pendingRequests.size());
+            AllMetrics.instance.setDeltaCatalogTotalCount(pendingRequests.size());
             for (URLStatic pending: pendingRequests.keySet()) {
                 RequestTemplate pendingTemplate = pendingRequests.get(pending);
 
@@ -639,6 +630,7 @@ public class APICatalogSync {
 
                 for (URLTemplate  urlTemplate: dbCatalog.getTemplateURLToMethods().keySet()) {
                     if (urlTemplate.match(newUrl)) {
+                        AllMetrics.instance.setDeltaCatalogTotalCount(1);
                         RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
 
                         if (alreadyInDelta != null) {
@@ -697,6 +689,7 @@ public class APICatalogSync {
 
                 RequestTemplate strictMatch = dbCatalog.getStrictURLToMethods().get(url);
                 if (strictMatch != null) {
+                    AllMetrics.instance.setDeltaCatalogTotalCount(1);
                     Map<URLStatic, RequestTemplate> deltaCatalogStrictURLToMethods = deltaCatalog.getStrictURLToMethods();
                     RequestTemplate requestTemplate = deltaCatalogStrictURLToMethods.get(url);
                     if (requestTemplate == null) {
@@ -1233,7 +1226,7 @@ public class APICatalogSync {
     int counter = 0;
     
     static int lastBuildFromDb = 0;
-    final static int DB_REFRESH_CYCLE = 15 * 60 * 60; // 15 minutes
+    final static int DB_REFRESH_CYCLE = 15 * 60; // 15 minutes
 
     List<String> partnerIpList = new ArrayList<>();
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {
@@ -1252,6 +1245,8 @@ public class APICatalogSync {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         if (accountSettings != null) {
             partnerIpList = accountSettings.getPartnerIpList();
+            int acc = accountSettings.getId();
+            Context.accountId.set(acc);
         }
         
         int accountId = Context.accountId.get();
@@ -1402,7 +1397,11 @@ public class APICatalogSync {
         }
 
         try {
+            long start = System.currentTimeMillis();
             SampleDataAltDb.bulkInsert(unfilteredSamples);
+            AllMetrics.instance.setPostgreSampleDataInsertedCount(unfilteredSamples.size());
+            AllMetrics.instance.setPostgreSampleDataInsertLatency(System.currentTimeMillis() - start);
+
         } catch(Exception e) {
             loggerMaker.errorAndAddToDb(e, "unable to insert sample data in postgres", LogDb.RUNTIME);
         }
@@ -1422,6 +1421,13 @@ public class APICatalogSync {
 
             SingleTypeInfo dbInfo = dbInfoMap.get(key);
             SingleTypeInfo deltaInfo = deltaInfoMap.get(key);
+
+            if (deltaInfo.getParam().equalsIgnoreCase("host")) {
+                if (dbInfo == null) {
+                    AllMetrics.instance.setCyborgNewApiCount(1);
+                }
+                AllMetrics.instance.setCyborgTotalApiCount(1);
+            }
 
             int inc = deltaInfo.getCount() - (dbInfo == null ? 0 : dbInfo.getCount());
             long lastSeenDiff = deltaInfo.getLastSeen() - (dbInfo == null ? 0 : dbInfo.getLastSeen());
@@ -1458,6 +1464,7 @@ public class APICatalogSync {
             if (!redactSampleData && deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
                 ArrayList<String> sampleDataUpdates = new ArrayList<>();
                 updatePayload = new UpdatePayload(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), "pushEach");
+                AllMetrics.instance.setCyborgApiPayloadSize(updatePayload.getSize());
                 sampleDataUpdates.add(updatePayload.toString());
                 updatePayload = new UpdatePayload(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(deltaInfo.getApiCollectionId()), "setOnInsert");
                 sampleDataUpdates.add(updatePayload.toString());
