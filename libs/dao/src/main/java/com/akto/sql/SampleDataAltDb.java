@@ -8,6 +8,9 @@ import java.util.UUID;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.sql.SampleDataAlt;
+import com.akto.types.BasicDBListL;
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
 import org.apache.commons.lang3.function.FailableFunction;
 
 public class SampleDataAltDb {
@@ -92,6 +95,35 @@ public class SampleDataAltDb {
                     e.printStackTrace();
                 }
             }
+        }
+    }
+
+    public static BasicDBList runCommand(String command) throws Exception {
+        try (Connection conn = Main.getConnection();
+             Statement stmt = conn.createStatement()) {
+
+            BasicDBList ret = new BasicDBList();
+            boolean hasResultSet = stmt.execute(command);
+
+
+            if (hasResultSet) {
+                ResultSet rs =  stmt.getResultSet();
+                while (rs.next()) {
+                    int cols = rs.getMetaData().getColumnCount();
+                    BasicDBObject retEntry = new BasicDBObject();
+                    for (int i = 0; i < cols; i++) {
+                        retEntry.put(rs.getMetaData().getColumnLabel(i + 1).toLowerCase(), rs.getObject(i + 1));
+                    }
+                    ret.add(retEntry);
+                }
+            } else {
+                int counter = stmt.getUpdateCount();
+                ret.add("update: " + counter);
+            }
+
+            return ret;
+        } catch (SQLException e) {
+            return new BasicDBListL("Exception in runCommand(" + command + ") " + e.getMessage());
         }
     }
 
