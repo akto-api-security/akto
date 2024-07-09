@@ -84,7 +84,7 @@ public class ClientActor extends DataActor {
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
 
     public static String buildDbAbstractorUrl() {
-        String dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        String dbAbsHost = "https://cyborg.akto.io";
         if (dbAbsHost.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
@@ -360,51 +360,50 @@ public class ClientActor extends DataActor {
         // }
     }
 
-    public List<SingleTypeInfo> fetchAllStis(int batchCount, int lastStiFetchTs) {
+    public List<SingleTypeInfo> fetchAllStis() {
         Map<String, List<String>> headers = buildHeaders();
         List<SingleTypeInfo> allStis = new ArrayList<>();
-        List<SingleTypeInfo> uniqueStis = new ArrayList<>();
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStiBasedOnHostHeaders", "", "GET", null, headers, "");
-        try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("invalid response in getUnsavedSensitiveParamInfos", LoggerMaker.LogDb.RUNTIME);
-                return allStis;
-            }
-            BasicDBObject payloadObj;
+        String lastStiId = null;
+
+        for (int i =0; i<200000; i++) {
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("lastStiId", lastStiId);
+            OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStiBasedOnHostHeaders", "", "POST",  obj.toString(), headers, "");
             try {
-                payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBList stiList = (BasicDBList) payloadObj.get("stis");
-                for (Object stiObj: stiList) {
-                    BasicDBObject obj2 = (BasicDBObject) stiObj;
-                    obj2.put("id", obj2.get("strId"));
-                    BasicDBObject subType = (BasicDBObject) obj2.get("subType");
-                    obj2.remove("subType");
-                    SingleTypeInfo s = objectMapper.readValue(obj2.toJson(), SingleTypeInfo.class);
-                    s.setSubType(SingleTypeInfo.subTypeMap.get(subType.get("name")));
-                    allStis.add(s);
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+                String responsePayload = response.getBody();
+                if (response.getStatusCode() != 200 || responsePayload == null) {
+                    loggerMaker.errorAndAddToDb("invalid response in getUnsavedSensitiveParamInfos", LoggerMaker.LogDb.RUNTIME);
+                    return allStis;
                 }
-            } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in getUnsavedSensitiveParamInfos" + e, LoggerMaker.LogDb.RUNTIME);
+                BasicDBObject payloadObj;
+                try {
+                    payloadObj =  BasicDBObject.parse(responsePayload);
+                    BasicDBList stiList = (BasicDBList) payloadObj.get("stis");
+
+                    for (Object stiObj: stiList) {
+                        BasicDBObject obj2 = (BasicDBObject) stiObj;
+                        obj2.put("id", obj2.get("strId"));
+                        BasicDBObject subType = (BasicDBObject) obj2.get("subType");
+                        obj2.remove("subType");
+                        SingleTypeInfo s = objectMapper.readValue(obj2.toJson(), SingleTypeInfo.class);
+                        s.setSubType(SingleTypeInfo.subTypeMap.get(subType.get("name")));
+                        allStis.add(s);
+                        lastStiId = s.getId().toHexString();
+                    }
+                    if (stiList.isEmpty() || stiList.size() < 1000) break;
+
+                } catch(Exception e) {
+                    loggerMaker.errorAndAddToDb("error extracting response in getUnsavedSensitiveParamInfos" + e, LoggerMaker.LogDb.RUNTIME);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error in getUnsavedSensitiveParamInfos" + e, LoggerMaker.LogDb.RUNTIME);
             }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in getUnsavedSensitiveParamInfos" + e, LoggerMaker.LogDb.RUNTIME);
         }
 
-        Set<String> stiObjIds = new HashSet<>();
 
-        for (SingleTypeInfo sti: allStis) {
-            if (stiObjIds.contains(sti.getId().toString())) {
-                continue;
-            }
-            uniqueStis.add(sti);
-            stiObjIds.add(sti.getId().toString());
-        }
-
-        return uniqueStis;
+        return allStis;
     }
-
     public List<SingleTypeInfo> fetchStiInBatches(int batchCount, int lastStiFetchTs) {
         Map<String, List<String>> headers = buildHeaders();
         List<SingleTypeInfo> allStis = new ArrayList<>();
