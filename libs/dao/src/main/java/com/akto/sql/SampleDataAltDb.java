@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.sql.SampleDataAlt;
+import org.apache.commons.lang3.function.FailableFunction;
 
 public class SampleDataAltDb {
 
@@ -28,7 +29,7 @@ public class SampleDataAltDb {
     public static void bulkInsert(List<SampleDataAlt> list) throws Exception {
 
         try (Connection conn = Main.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(INSERT_QUERY, Statement.RETURN_GENERATED_KEYS)) {
+             PreparedStatement stmt = conn.prepareStatement(INSERT_QUERY, Statement.RETURN_GENERATED_KEYS)) {
 
             // bind the values
             for (SampleDataAlt data : list) {
@@ -46,6 +47,54 @@ public class SampleDataAltDb {
 
     final static String DELETE_QUERY = "DELETE from sampledata02 WHERE timestamp < ? AND id IN (?";
 
+    public static<T> T executeQuery(FailableFunction<Connection, PreparedStatement, SQLException> prepareQueryFunc, FailableFunction<ResultSet, T, SQLException> extractResultFunc) {
+
+        Connection conn = null;
+        try {
+            conn = Main.getConnection();
+            PreparedStatement stmt = prepareQueryFunc.apply(conn);
+            boolean hasResultSet = stmt.execute();
+
+            if (hasResultSet) {
+                ResultSet rs = stmt.getResultSet();
+                return extractResultFunc.apply(rs);
+            } else {
+                return null;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return null;
+    }
+
+    public static int executeUpdateQuery(FailableFunction<Connection, PreparedStatement, SQLException> prepareQueryFunc) {
+        Connection conn = null;
+        try {
+            conn = Main.getConnection();
+            PreparedStatement stmt = prepareQueryFunc.apply(conn);
+            return stmt.executeUpdate();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0;
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
     public static void delete(List<String> uuidList, int timestamp) throws Exception {
 
         if (uuidList == null || uuidList.isEmpty()) {
@@ -59,7 +108,7 @@ public class SampleDataAltDb {
         query += ")";
 
         try (Connection conn = Main.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+             PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
 
             stmt.setInt(1, timestamp);
             // bind the values
@@ -78,141 +127,111 @@ public class SampleDataAltDb {
 
     final static String ITERATE_QUERY = "SELECT id FROM sampledata02 ORDER BY id limit ? offset ?";
 
-    public static List<String> iterateAndGetIds(int limit, int offset) throws Exception {
-        List<String> idList = new ArrayList<>();
-
-        try (Connection conn = Main.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(ITERATE_QUERY, Statement.RETURN_GENERATED_KEYS)) {
-
-            // bind the values
-            stmt.setInt(1, limit);
-            stmt.setInt(2, offset);
-
-            ResultSet rs = stmt.executeQuery();
-            while (rs.next()) {
-                idList.add(rs.getString(1));
-            }
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        return idList;
-    }
-
     final static String FIND_QUERY = "SELECT * FROM sampledata02 where id=?";
 
     public static String find(String id) throws Exception {
-        String result = null;
+        FailableFunction<Connection, PreparedStatement, SQLException> prepareStmt = (conn) -> {
+            PreparedStatement stmt = conn.prepareStatement(FIND_QUERY, Statement.RETURN_GENERATED_KEYS);
+            stmt.setObject(1, UUID.fromString(id));
+            return stmt;
+        };
 
-        try (Connection conn = Main.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(FIND_QUERY, Statement.RETURN_GENERATED_KEYS)) {
-
-                    stmt.setObject(1, UUID.fromString(id));
-
-            ResultSet rs = stmt.executeQuery();
+        FailableFunction<ResultSet, String, SQLException> extractResultFunc = (rs) -> {
+            String result = null;
             while (rs.next()) {
                 result = rs.getString(2);
-                // System.out.println(result);
             }
+            return result;
+        };
 
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        return result;
+        return executeQuery(prepareStmt, extractResultFunc);
     }
 
     public static long getDbSizeInMb() throws Exception{
         String query = "SELECT pg_database_size('" + Main.extractDatabaseName() +  "')/1024/1024 AS size;";
-        long size = 0;
-        try (Connection conn = Main.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
 
-            ResultSet rs = stmt.executeQuery();
+        FailableFunction<Connection, PreparedStatement, SQLException> prepareStmt = (conn) -> conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
+
+        FailableFunction<ResultSet, Long, SQLException> extractResultFunc = (rs) -> {
+            long size = 0;
             while (rs.next()) {
                 size = rs.getLong(1);
             }
+            return size;
+        };
 
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return size;
+        return executeQuery(prepareStmt, extractResultFunc);
     }
 
     public static String findLatestSampleByApiInfoKey(ApiInfo.ApiInfoKey key) throws Exception{
-        String result = null;
         String query = "SELECT * FROM sampledata02 where api_collection_id=? and method=? and url=? order by timestamp desc limit 1;";
-        try (Connection conn = Main.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
-
+        FailableFunction<Connection, PreparedStatement, SQLException> preparedStmt = (conn) -> {
+            PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
             stmt.setObject(1, key.getApiCollectionId());
             stmt.setObject(2, key.getMethod().toString());
             stmt.setObject(3, key.getUrl());
+            return stmt;
+        };
 
-            ResultSet rs = stmt.executeQuery();
+        FailableFunction<ResultSet, String, SQLException> extractResultFunc = (rs) -> {
+            String result = null;
             while (rs.next()) {
                 result = rs.getString(2);
-                // System.out.println(result);
             }
+            return result;
+        };
 
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        return result;
+        return executeQuery(preparedStmt, extractResultFunc);
     }
 
     public static List<String> findSamplesByApiInfoKey(ApiInfo.ApiInfoKey key) throws Exception{
-        List<String> result = new ArrayList<>();
-        String query = "SELECT * FROM sampledata02 where api_collection_id=? and method=? and url=? order by timestamp desc limit 10;";
-        try (Connection conn = Main.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
 
+        String query = "SELECT * FROM sampledata02 where api_collection_id=? and method=? and url=? order by timestamp desc limit 10;";
+        FailableFunction<Connection, PreparedStatement, SQLException> preparedStmt = (conn) -> {
+            PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
             stmt.setObject(1, key.getApiCollectionId());
             stmt.setObject(2, key.getMethod().toString());
             stmt.setObject(3, key.getUrl());
+            return stmt;
+        };
 
-            ResultSet rs = stmt.executeQuery();
+        FailableFunction<ResultSet, List<String>, SQLException> extractResultFunc = (rs) -> {
+            List<String> result = new ArrayList<>();
             while (rs.next()) {
                 result.add(rs.getString(2));
             }
+            return result;
+        };
 
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        return result;
+        return executeQuery(preparedStmt, extractResultFunc);
     }
+
     final static String ITERATE_QUERY_ALL = "SELECT id, api_collection_id, method, url FROM sampledata02 where api_collection_id=? ORDER BY id limit ? offset ?";
 
     public static List<SampleDataAlt> iterateAndGetAll(int apiCollectionId, int limit, int offset) throws Exception {
-        List<SampleDataAlt> data = new ArrayList<>();
-
-        try (Connection conn = Main.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(ITERATE_QUERY_ALL, Statement.RETURN_GENERATED_KEYS)) {
-
-            // bind the values
+        FailableFunction<Connection, PreparedStatement, SQLException> prepareStmt = (conn) -> {
+            PreparedStatement stmt = conn.prepareStatement(ITERATE_QUERY_ALL, Statement.RETURN_GENERATED_KEYS);
             stmt.setInt(1, apiCollectionId);
             stmt.setInt(2, limit);
             stmt.setInt(3, offset);
+            return stmt;
+        };
 
-            ResultSet rs = stmt.executeQuery();
+        FailableFunction<ResultSet, List<SampleDataAlt>, SQLException> extractResultFunc = (rs) -> {
+            List<SampleDataAlt> data = new ArrayList<>();
             while (rs.next()) {
                 String id = rs.getString(1);
-                apiCollectionId = rs.getInt(2);
+                int collectionId = rs.getInt(2);
                 String method = rs.getString(3);
                 String url = rs.getString(4);
                 UUID uuid = UUID.fromString(id);
-                SampleDataAlt sampleDataAlt = new SampleDataAlt(uuid, "", apiCollectionId, method, url, 0, 0, 0);
+                SampleDataAlt sampleDataAlt = new SampleDataAlt(uuid, "", collectionId, method, url, 0, 0, 0);
                 data.add(sampleDataAlt);
             }
+            return data;
+        };
 
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        return data;
+        return executeQuery(prepareStmt, extractResultFunc);
     }
 
     final static String DELETE_OLD_QUERY = "DELETE FROM sampledata02\n" + //
@@ -231,47 +250,36 @@ public class SampleDataAltDb {
             "";
 
     public static int deleteOld() throws Exception {
-
-        try (Connection conn = Main.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(DELETE_OLD_QUERY, Statement.RETURN_GENERATED_KEYS)) {
-
-            int count = stmt.executeUpdate();
-            System.out.println("Deleted " + count);
-            return count;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return 0;
-        }
-
+        FailableFunction<Connection, PreparedStatement, SQLException> prepareStmt = (conn) -> {
+            return conn.prepareStatement(DELETE_OLD_QUERY, Statement.RETURN_GENERATED_KEYS);
+        };
+        return executeUpdateQuery(prepareStmt);
     }
 
     public static int totalNumberOfRecords() throws Exception {
-        int count = 0;
-        try (Connection conn = Main.getConnection();
-                PreparedStatement stmt = conn.prepareStatement("SELECT COUNT(1) FROM sampledata02", Statement.RETURN_GENERATED_KEYS)) {
+        FailableFunction<Connection, PreparedStatement, SQLException> prepareStmt = (conn) -> {
+            return conn.prepareStatement("SELECT COUNT(1) FROM sampledata02", Statement.RETURN_GENERATED_KEYS);
+        };
 
-            ResultSet rs = stmt.executeQuery();
+        FailableFunction<ResultSet, Integer, SQLException> extractResultFunc = (rs) -> {
+            int count = 0;
             while (rs.next()) {
                 count = rs.getInt(1);
             }
+            return count;
+        };
 
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return count;
+        return executeQuery(prepareStmt, extractResultFunc);
     }
 
     final static String CREATE_INDEX_QUERY = "CREATE INDEX IF NOT EXISTS idx_sampledata_composite ON sampledata02(api_collection_id, method, url, timestamp DESC)";
 
     public static void createIndex() throws Exception {
-        try (Connection conn = Main.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(CREATE_INDEX_QUERY, Statement.RETURN_GENERATED_KEYS)) {
+        FailableFunction<Connection, PreparedStatement, SQLException> prepareStmt = (conn) -> {
+            return conn.prepareStatement(CREATE_INDEX_QUERY, Statement.RETURN_GENERATED_KEYS);
+        };
 
-            stmt.execute();
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        executeQuery(prepareStmt, (rs) -> null);
     }
 
     final static String UPDATE_URL_QUERY = "update sampledata02 set url=? where id in (?";
@@ -288,21 +296,17 @@ public class SampleDataAltDb {
         }
         query += ")";
 
-        try (Connection conn = Main.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
-
+        String finalQuery = query;
+        FailableFunction<Connection, PreparedStatement, SQLException> prepareStmt = (conn) -> {
+            PreparedStatement stmt = conn.prepareStatement(finalQuery, Statement.RETURN_GENERATED_KEYS);
             stmt.setString(1, newUrl);
-            // bind the values
             for (int i = 0; i < uuidList.size(); i++) {
                 stmt.setObject(i + 2, UUID.fromString(uuidList.get(i)));
             }
+            return stmt;
+        };
 
-            int count = stmt.executeUpdate();
-            System.out.println("Updated " + count);
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        executeQuery(prepareStmt, (rs) -> null);
     }
 
     // TODO: close all connections or create some connections for different use cases, and use them.
