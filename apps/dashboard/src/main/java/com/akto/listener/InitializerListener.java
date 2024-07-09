@@ -2182,14 +2182,8 @@ public class InitializerListener implements ServletContextListener {
         dropLastCronRunInfoField(backwardCompatibility);
         fetchIntegratedConnections(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
-        dropApiDependencies(backwardCompatibility);
-        resetSingleTypeInfoCount(backwardCompatibility);
-        dropWorkflowTestResultCollection(backwardCompatibility);
-        readyForNewTestingFramework(backwardCompatibility);
         addAktoDataTypes(backwardCompatibility);
         updateDeploymentStatus(backwardCompatibility);
-        dropAuthMechanismData(backwardCompatibility);
-        moveAuthMechanismDataToRole(backwardCompatibility);
         createLoginSignupGroups(backwardCompatibility);
         createRiskScoreGroups(backwardCompatibility);
         setApiCollectionAutomatedField(backwardCompatibility);
@@ -2238,10 +2232,19 @@ public class InitializerListener implements ServletContextListener {
             BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
         }
 
-        InitializerListener.setBackwardCompatibilities(backwardCompatibility);
+        try {
+            InitializerListener.setBackwardCompatibilities(backwardCompatibility);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in backward compatibility", LogDb.DASHBOARD);
+        }
 
         loggerMaker.infoAndAddToDb("Started Creating indices for " + Context.accountId.get(), LoggerMaker.LogDb.DASHBOARD);
-        DaoInit.createIndices();
+        try {
+            DaoInit.createIndices();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in createIndices", LogDb.DASHBOARD);
+        }
+
         loggerMaker.infoAndAddToDb("Started Creating runtime filters for " + Context.accountId.get(), LoggerMaker.LogDb.DASHBOARD);
         Main.insertRuntimeFilters();
         loggerMaker.infoAndAddToDb("Started initialiseDemoCollections filters for " + Context.accountId.get(), LoggerMaker.LogDb.DASHBOARD);
