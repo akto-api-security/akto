@@ -11,6 +11,7 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.settings.DefaultPayload;
+import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
@@ -232,6 +233,7 @@ public class HttpCallParser {
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
+            ApiCollectionUsers.computeCollectionsForCollectionId(Arrays.asList(new AllAPIsGroup()),AllAPIsGroup.ALL_APIS_GROUP_ID);
         }
 
     }

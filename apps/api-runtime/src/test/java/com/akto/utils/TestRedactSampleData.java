@@ -239,7 +239,7 @@ public class TestRedactSampleData {
         reqPayloadMap.put("req-email", "avneesh@akto.io");
         reqPayloadMap.put("req-id", 12345);
         reqPayloadMap.put("req-teams", Arrays.asList("A", "B", "C"));
-        reqPayloadMap.put("req-privateJet", null);
+        reqPayloadMap.put("req-privateJet", "null");
         reqPayloadMap.put("req-bikes", Collections.emptyList());
 
         BasicDBObject friend1 = new BasicDBObject();
@@ -262,7 +262,7 @@ public class TestRedactSampleData {
         respPayloadMap.put("success", true);
         respPayloadMap.put("id", 12345);
         respPayloadMap.put("teams", Arrays.asList("A", "B", "C"));
-        respPayloadMap.put("privateJet", null);
+        respPayloadMap.put("privateJet", "null");
         respPayloadMap.put("bikes", Collections.emptyList());
         respPayloadMap.put("friends", Arrays.asList(friend1, friend2));
 

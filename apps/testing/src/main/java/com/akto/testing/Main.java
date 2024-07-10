@@ -395,7 +395,9 @@ public class Main {
                             Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds())
                     );
                 }
+
                 if(GetRunningTestsStatus.getRunningTests().isTestRunning(testingRun.getId())){
+                    loggerMaker.infoAndAddToDb("Updating status of running test to Completed.");
                     TestingRunDao.instance.getMCollection().findOneAndUpdate(
                             Filters.eq("_id", testingRun.getId()),  completedUpdate
                     );

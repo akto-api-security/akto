@@ -10,7 +10,7 @@ import {
   Key,
   ChoiceList,
   Tabs} from '@shopify/polaris';
-import {GithubRow} from './rows/GithubRow';
+import {CellType, GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect } from 'react';
 import "./style.css"
 import transform from '../../pages/observe/transform';
@@ -231,10 +231,6 @@ function GithubServerTable(props) {
                   appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
                     appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
                 }
-                value={
-                  appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
-                    appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
-                }
               />
           ),
           // shortcut: true,
@@ -343,7 +339,7 @@ function GithubServerTable(props) {
                 loading={props.loading || false}
                 selected={props?.selected}
                 onSelect={(x) => handleTabChange(x)}
-              />
+              ></IndexFilters>
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
               <div className={tableHeightClass}>
               <IndexTable

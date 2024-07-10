@@ -112,7 +112,7 @@ function HomeDashboard() {
             variant: 'headingLg'
         },
         {
-            title: 'Sensitive data',
+            title: 'Sensitive in response',
             data: observeFunc.formatNumberWithCommas(sensitiveCount),
             variant: 'headingLg'
         }
