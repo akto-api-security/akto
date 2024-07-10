@@ -103,7 +103,7 @@ jobs:
           AKTO_DASHBOARD_URL: https://flash.staging.akto.io
           GITHUB_COMMIT_ID: ${{github.event.pull_request.head.sha}}
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY_FLASH}}
-          AKTO_TEST_ID: ${{vars.FLASH_TEST_ID}}
+          AKTO_TEST_ID: ${{secrets.FLASH_TEST_ID}}
 
   deploy:
     needs: build
