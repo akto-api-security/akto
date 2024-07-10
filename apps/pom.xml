@@ -114,6 +114,17 @@
                 <module>testing-cli</module>
             </modules>
         </profile>
+        <profile>
+            <id>data-ingestion-service</id>
+            <activation>
+                <file>
+                    <exists>data-ingestion-service/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>data-ingestion-service</module>
+            </modules>
+        </profile>
     </profiles>
 </project>
 
