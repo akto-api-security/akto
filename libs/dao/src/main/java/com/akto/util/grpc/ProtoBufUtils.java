@@ -1,11 +1,11 @@
 package com.akto.util.grpc;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.CodedInputStream;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.WireFormat;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.*;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashMap;
@@ -16,8 +16,13 @@ public class ProtoBufUtils {
     public static final String RAW_QUERY = "raw_query";
     public static final String DECODED_QUERY = "query";
     public static final String KEY_PREFIX = "param_";
-    private ProtoBufUtils() {}
+    private final ObjectMapper mapper = new ObjectMapper();
+    //Generic protobuf bytes
+    private ProtoBufUtils() {
+    }
+
     private static final ProtoBufUtils instance = new ProtoBufUtils();
+
     public static ProtoBufUtils getInstance() {
         return instance;
     }
@@ -78,7 +83,7 @@ public class ProtoBufUtils {
                         }
                         if (probablyString) {
                             map.put(keyPrefix, str);
-                        } else if (!subMessage.isEmpty()){
+                        } else if (!subMessage.isEmpty()) {
                             map.put(keyPrefix, subMessage);
                         } else {
                             new String(data.toByteArray());
@@ -96,5 +101,88 @@ public class ProtoBufUtils {
             }
         }
         return map;
+    }
+
+    public static String base64EncodedJsonToProtobuf(String payload) throws IOException{
+        Map<Object, Object> map = null;
+        try {
+            map = ProtoBufUtils.getInstance().mapper.readValue(payload, Map.class);
+        } catch (Exception e) {
+            map = new HashMap<>();
+        }
+        return base64EncodedJsonToProtobuf(map);
+    }
+    public static String base64EncodedJsonToProtobuf(Map<Object, Object> jsonMap) throws IOException{
+        byte[] protobufArray = encodeJsonToProtobuf(jsonMap);
+        byte[] FIRST_BYTES = new byte[5];
+        byte[] finalArray = new byte[FIRST_BYTES.length + protobufArray.length];
+        byte[] bytes = ByteBuffer.allocate(4).putInt(protobufArray.length).array();
+        FIRST_BYTES[0] = 0;//Compression logic
+        int byteIndex = 1;// length of message
+        for (byte byte1 : bytes) {
+            FIRST_BYTES[byteIndex] = byte1;
+            byteIndex++;
+        }
+        for (int index = 0; index < finalArray.length; index++) {
+            if (index < FIRST_BYTES.length) {
+                finalArray[index] = FIRST_BYTES[index];
+            } else {
+                finalArray[index] = protobufArray[index - FIRST_BYTES.length];
+            }
+        }
+        return Base64.getEncoder().encodeToString(finalArray);
+    }
+
+    public static byte[] encodeJsonToProtobuf(Map<Object, Object> jsonMap) throws IOException {
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        CodedOutputStream codedOutputStream = CodedOutputStream.newInstance(byteArrayOutputStream);
+
+        encodeMapToProto(jsonMap, codedOutputStream);
+
+        codedOutputStream.flush();
+        return byteArrayOutputStream.toByteArray();
+    }
+
+    private static void encodeMapToProto(Map<Object, Object> map, CodedOutputStream codedOutputStream) throws IOException {
+        for (Map.Entry<Object, Object> entry : map.entrySet()) {
+            Object key = entry.getKey();
+            Object value = entry.getValue();
+
+            int number = Integer.parseInt(key.toString().replace(KEY_PREFIX, "")); // Replacing key-prefix
+
+            codedOutputStream.writeTag(number, getWireType(value));
+
+            if (value instanceof Long) {
+                codedOutputStream.writeInt64NoTag((Long) value);
+            } else if (value instanceof Double) {
+                codedOutputStream.writeFixed64NoTag(Double.doubleToRawLongBits((Double) value));
+            } else if (value instanceof String) {
+                ByteString byteString = ByteString.copyFromUtf8((String) value);
+                codedOutputStream.writeBytesNoTag(byteString);
+            } else if (value instanceof Map) {
+                byte[] nestedMessage = encodeJsonToProtobuf((Map<Object, Object>) value);
+                codedOutputStream.writeBytesNoTag(ByteString.copyFrom(nestedMessage));
+            } else if (value instanceof Float) {
+                codedOutputStream.writeFixed32NoTag(Float.floatToIntBits((Float) value));
+            } else {
+                throw new IOException("Unsupported type: " + value.getClass().getName());
+            }
+        }
+    }
+
+    private static int getWireType(Object value) {
+        if (value instanceof Long) {
+            return WireFormat.WIRETYPE_VARINT;
+        } else if (value instanceof Double) {
+            return WireFormat.WIRETYPE_FIXED64;
+        } else if (value instanceof String) {
+            return WireFormat.WIRETYPE_LENGTH_DELIMITED;
+        } else if (value instanceof Map) {
+            return WireFormat.WIRETYPE_LENGTH_DELIMITED;
+        } else if (value instanceof Float) {
+            return WireFormat.WIRETYPE_FIXED32;
+        } else {
+            throw new IllegalArgumentException("Unsupported type: " + value.getClass().getName());
+        }
     }
 }

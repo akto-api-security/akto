@@ -39,6 +39,7 @@ function GithubSimpleTable(props) {
         bannerComp={props?.bannerComp}
         initSelectedResources={props?.initSelectedResources}
         initAlllResourcesSelected={props?.initAlllResourcesSelected}
+        csvFileName={props?.csvFileName}
     />
 
 }
