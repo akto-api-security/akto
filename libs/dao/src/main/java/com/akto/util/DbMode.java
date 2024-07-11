@@ -1,7 +1,10 @@
 package com.akto.util;
 
+import com.mongodb.ConnectionString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.List;
 
 public class DbMode {
     private static final Logger logger = LoggerFactory.getLogger(DbMode.class);
@@ -9,7 +12,17 @@ public class DbMode {
         MONGO_DB, COSMOS_DB, DOCUMENT_DB;
     }
 
+    public enum SetupType {
+        STANDALONE, CLUSTER
+    }
+
     public static DbType dbType = DbType.MONGO_DB;
+    public static SetupType setupType = SetupType.STANDALONE;
+
+    public static void refreshSetupType(ConnectionString connectionString) {
+        List<String> hosts = connectionString.getHosts();
+        setupType = hosts.size() > 1 ? SetupType.CLUSTER : SetupType.STANDALONE;
+    }
 
     public static void refreshDbType(String connectionString)  {
         String dbTypeEnv = System.getenv("DB_TYPE");

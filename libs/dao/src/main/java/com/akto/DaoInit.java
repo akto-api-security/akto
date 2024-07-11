@@ -334,6 +334,7 @@ public class DaoInit {
 
     public static void init(ConnectionString connectionString, ReadPreference readPreference) {
         DbMode.refreshDbType(connectionString.getConnectionString());
+        DbMode.refreshSetupType(connectionString);
 
         CodecRegistry codecRegistry = createCodecRegistry();
 
