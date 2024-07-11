@@ -21,6 +21,7 @@ import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
 import com.akto.runtime.URLAggregator;
 import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.DbMode;
 import com.akto.util.JSONUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.Constants;
@@ -226,9 +227,11 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-          for (HttpResponseParams responseParam: filteredResponseParams) {
-              dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
-          }
+        if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
+            for (HttpResponseParams responseParam: filteredResponseParams) {
+                dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+            }
+        }
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
@@ -239,8 +242,10 @@ public class HttpCallParser {
 
             numberOfSyncs++;
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
-            dependencyAnalyser.dbState = apiCatalogSync.dbState;
-            dependencyAnalyser.syncWithDb();
+            if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
+                dependencyAnalyser.dbState = apiCatalogSync.dbState;
+                dependencyAnalyser.syncWithDb();
+            }
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
