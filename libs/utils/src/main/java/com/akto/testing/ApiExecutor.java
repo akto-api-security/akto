@@ -337,6 +337,7 @@ public class ApiExecutor {
             try {
                 payload = ProtoBufUtils.base64EncodedJsonToProtobuf(payload);
             } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Unable to encode payload:" + payload, LogDb.RUNTIME);
                 payload = request.getBody();
             }
         }
