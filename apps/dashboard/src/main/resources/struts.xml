@@ -5993,7 +5993,7 @@
             </result>
         </action>
 
-        <action name="api/getMissingConfigsForTestCategory" class="com.akto.action.TestEditorAction" method="getMissingConfigsForTestCategory">
+        <action name="api/getMissingConfigsForTestCategory" class="com.akto.action.test_editor.TestEditorAction" method="getMissingConfigsForTestCategory">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
