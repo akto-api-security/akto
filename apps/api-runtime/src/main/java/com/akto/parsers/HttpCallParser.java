@@ -43,6 +43,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
+import static com.akto.util.HttpRequestResponseUtils.GRPC_CONTENT_TYPE;
 
 public class HttpCallParser {
     private final int sync_threshold_count;
@@ -88,7 +89,8 @@ public class HttpCallParser {
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
         this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
     }
-    
+    private static int GRPC_DEBUG_COUNTER = 50;
+
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
 
         //convert java object to JSON format
@@ -102,7 +104,16 @@ public class HttpCallParser {
         String rawRequestPayload = (String) json.get("requestPayload");
         String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
 
-
+        if (GRPC_DEBUG_COUNTER > 0) {
+            String acceptableContentType = HttpRequestResponseUtils.getAcceptableContentType(requestHeaders);
+            if (acceptableContentType != null && rawRequestPayload.length() > 0) {
+                // only if request payload is of FORM_URL_ENCODED_CONTENT_TYPE we convert it to json
+                if (acceptableContentType.equals(GRPC_CONTENT_TYPE)) {
+                    loggerMaker.infoAndAddToDb("grpc kafka payload:" + message,LogDb.RUNTIME);
+                    GRPC_DEBUG_COUNTER--;
+                }
+            }
+        }
 
         String apiCollectionIdStr = json.getOrDefault("akto_vxlan_id", "0").toString();
         int apiCollectionId = 0;
