@@ -212,7 +212,7 @@ public class ApiExecutor {
         request.setUrl(url);
 
         Request.Builder builder = new Request.Builder();
-        String type = request.getType();
+        String type = request.findContentType();
         // add headers
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         Map<String, List<String>> headersMap = request.getHeaders();
