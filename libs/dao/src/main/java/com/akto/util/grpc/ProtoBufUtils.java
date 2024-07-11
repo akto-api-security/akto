@@ -5,6 +5,7 @@ import com.google.protobuf.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InvalidObjectException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -103,12 +104,12 @@ public class ProtoBufUtils {
         return map;
     }
 
-    public static String base64EncodedJsonToProtobuf(String payload) throws IOException{
+    public static String base64EncodedJsonToProtobuf(String payload) throws Exception{
         Map<Object, Object> map = null;
         try {
             map = ProtoBufUtils.getInstance().mapper.readValue(payload, Map.class);
         } catch (Exception e) {
-            map = new HashMap<>();
+            throw new InvalidObjectException("Unable to parse payload");
         }
         return base64EncodedJsonToProtobuf(map);
     }
