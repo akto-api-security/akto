@@ -350,7 +350,7 @@ public class ApiExecutor {
         }
 
         if (payload == null) payload = "";
-        if (body != null) {// already created by GRPC
+        if (body == null) {// body not created by GRPC block yet
             body = RequestBody.create(payload, MediaType.parse(contentType));
         }
         builder = builder.method(request.getMethod(), body);
