@@ -64,7 +64,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             int accountId = Integer.parseInt(accountIdStr);
             return accountId;
         } catch (Exception e) {
-            throw new Exception("unable to parse account id");
+            throw new Exception("unable to parse account id: " + e.getMessage());
         }
     }
 
