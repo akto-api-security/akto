@@ -196,7 +196,7 @@ jobs:
           GITHUB_COMMIT_ID: ${{github.event.pull_request.head.sha}}
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY_FLASH}}
           AKTO_TEST_ID: ${{vars.FLASH_TEST_ID}}
-          OVERRIDDEN_TEST_APP_URL: ${{needs.deploy.outputs.lb_name}}
+          #OVERRIDDEN_TEST_APP_URL: ${{needs.deploy.outputs.lb_name}}
 
       - name: Check Vulnerable API's
         working-directory: ./.github/scripts
