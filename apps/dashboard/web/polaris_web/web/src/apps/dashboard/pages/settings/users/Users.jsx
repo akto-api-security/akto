@@ -131,7 +131,7 @@ const Users = () => {
         setLoading(false)
     };
 
-    const isLocalDeploy = false;
+    const isLocalDeploy = func.checkLocal();
 
     const toggleInviteUserModal = () => {
         setInviteUser({
