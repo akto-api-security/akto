@@ -47,7 +47,7 @@ public class InviteUserAction extends UserAction{
         String domain = loginArr[1];
         String inviteeEmailDomain = inviteeEmailArr[1];
 
-        if (!domain.equals(inviteeEmailDomain) && !domain.equals(AKTO_DOMAIN))  {
+        if (!inviteeEmailDomain.equals(domain) && !inviteeEmailDomain.equals(AKTO_DOMAIN))  {
             return DIFFERENT_ORG_EMAIL_ERROR;
         }
 

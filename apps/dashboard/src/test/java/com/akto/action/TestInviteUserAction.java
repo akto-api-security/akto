@@ -24,5 +24,8 @@ public class TestInviteUserAction {
 
         code = InviteUserAction.validateEmail("jim@akto", "avneesh@gmail.io");
         assertEquals(code, InviteUserAction.DIFFERENT_ORG_EMAIL_ERROR);
+
+        code = InviteUserAction.validateEmail("avneesh@akto.io", "aryan@bigcorp.com");
+        assertNull(code);
     }
 }
