@@ -532,7 +532,7 @@ public class StartTestAction extends UserAction {
                             Filters.exists(WorkflowTestingEndpoints._WORK_FLOW_TEST),
                             Filters.and(
                                 Filters.nin(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()),
-                                Filters.eq(TestingRunResult.REQUIRES_CONFIG, false)
+                                Filters.ne(TestingRunResult.REQUIRES_CONFIG, true)
                             )
                         )
                     );
