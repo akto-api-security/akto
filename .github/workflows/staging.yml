@@ -93,18 +93,6 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
-  test-flash:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Run CI/CD tests on flash
-        if: ${{ github.event_name == 'pull_request' }}
-        uses: akto-api-security/run-scan@v1.0.12
-        with:
-          AKTO_DASHBOARD_URL: ${{vars.AKTO_DASHBOARD_URL}}
-          GITHUB_COMMIT_ID: ${{github.event.pull_request.head.sha}}
-          AKTO_API_KEY: ${{secrets.AKTO_API_KEY_FLASH}}
-          AKTO_TEST_ID: ${{vars.FLASH_TEST_ID}}
-
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -199,6 +187,16 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: '17'
+
+      - name: Run CI/CD tests on flash
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: akto-api-security/run-scan@v1.0.12
+        with:
+          AKTO_DASHBOARD_URL: ${{vars.AKTO_DASHBOARD_URL}}
+          GITHUB_COMMIT_ID: ${{github.event.pull_request.head.sha}}
+          AKTO_API_KEY: ${{secrets.AKTO_API_KEY_FLASH}}
+          AKTO_TEST_ID: ${{vars.FLASH_TEST_ID}}
+          OVERRIDDEN_TEST_APP_URL: ${{needs.deploy.outputs.lb_name}}
 
       - name: Check Vulnerable API's
         working-directory: ./.github/scripts
