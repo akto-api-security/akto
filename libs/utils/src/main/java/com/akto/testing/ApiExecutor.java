@@ -328,6 +328,7 @@ public class ApiExecutor {
 
         String contentType = request.findContentType();
         String payload = request.getBody();
+        RequestBody body = null;
         if (contentType == null ) {
             contentType = "application/json; charset=utf-8";
             if (payload == null) payload = "{}";
@@ -340,10 +341,18 @@ public class ApiExecutor {
                 loggerMaker.errorAndAddToDb("Unable to encode payload:" + payload, LogDb.RUNTIME);
                 payload = request.getBody();
             }
+            try {// trying decoding payload
+                byte[] payloadByteArray = Base64.getDecoder().decode(payload);
+                body = RequestBody.create(payloadByteArray, MediaType.parse(contentType));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Unable to decode payload:" + payload, LogDb.RUNTIME);
+            }
         }
 
         if (payload == null) payload = "";
-        RequestBody body = RequestBody.create(payload, MediaType.parse(contentType));
+        if (body == null) {// body not created by GRPC block yet
+            body = RequestBody.create(payload, MediaType.parse(contentType));
+        }
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
         return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol);
