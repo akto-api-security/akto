@@ -33,6 +33,8 @@ public class InviteUserAction extends UserAction{
     public static final String NOT_ALLOWED_TO_INVITE = "you're not authorised to invite for this role";
     public static final String AKTO_DOMAIN = "akto.io";
 
+    public static Map<String, String> commonOrganisationsMap = new HashMap<>();
+
     public static String validateEmail(String email, String adminLogin) {
         if (email == null) return INVALID_EMAIL_ERROR;
 
@@ -47,11 +49,24 @@ public class InviteUserAction extends UserAction{
         String domain = loginArr[1];
         String inviteeEmailDomain = inviteeEmailArr[1];
 
-        if (!inviteeEmailDomain.equals(domain) && !inviteeEmailDomain.equals(AKTO_DOMAIN))  {
+        if (!isSameDomain(inviteeEmailDomain, domain) && !inviteeEmailDomain.equals(AKTO_DOMAIN))  {
             return DIFFERENT_ORG_EMAIL_ERROR;
         }
 
         return null;
+    }
+
+    private static boolean isSameDomain(String inviteeDomain, String adminDomain) {
+        if (inviteeDomain == null || adminDomain == null) return false;
+
+        String inviteeOrg = commonOrganisationsMap.get(inviteeDomain);
+        String adminOrg = commonOrganisationsMap.get(adminDomain);
+
+        if (inviteeOrg == null || adminOrg == null) return false;
+
+        if (inviteeOrg.equalsIgnoreCase(adminOrg)) return true;
+
+        return inviteeDomain.equalsIgnoreCase(adminDomain);
     }
 
     private String finalInviteCode;
