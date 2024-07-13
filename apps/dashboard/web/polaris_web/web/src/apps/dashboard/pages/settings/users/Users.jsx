@@ -65,7 +65,7 @@ const Users = () => {
 
     const getRoleHierarchy = async() => {
         let roleHierarchyResp = await settingRequests.getRoleHierarchy(window.USER_ROLE)
-        if(roleHierarchyResp.contains("MEMBER")){
+        if(roleHierarchyResp.includes("MEMBER")){
             roleHierarchyResp.push("SECURITY ENGINEER")
         }
         if(window.USER_ROLE === 'ADMIN'){
