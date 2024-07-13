@@ -192,7 +192,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         uses: akto-api-security/run-scan@v1.0.12
         with:
-          AKTO_DASHBOARD_URL: ${{vars.AKTO_DASHBOARD_URL}}
+          AKTO_DASHBOARD_URL: https://flash.staging.akto.io
           GITHUB_COMMIT_ID: ${{github.event.pull_request.head.sha}}
           AKTO_API_KEY: ${{secrets.AKTO_API_KEY_FLASH}}
           AKTO_TEST_ID: ${{vars.FLASH_TEST_ID}}
