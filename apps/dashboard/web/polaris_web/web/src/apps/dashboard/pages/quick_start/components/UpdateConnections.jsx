@@ -49,7 +49,7 @@ function UpdateConnections(props) {
         >
             <div style={{margin: '24px 0 16px 0'}}>
             <HorizontalStack gap={"3"}>
-                <Text variant="headingMd" as="h6" color='subdued'> Explore other connections </Text>
+                <Text variant="headingMd" as="h6" color='subdued'> Explore connections </Text>
                 <Tag>{obj.length.toString()}</Tag>
             </HorizontalStack>
             </div>
