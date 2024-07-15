@@ -5,6 +5,7 @@ import com.google.protobuf.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InvalidObjectException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -103,12 +104,12 @@ public class ProtoBufUtils {
         return map;
     }
 
-    public static String base64EncodedJsonToProtobuf(String payload) throws IOException{
+    public static String base64EncodedJsonToProtobuf(String payload) throws Exception{
         Map<Object, Object> map = null;
         try {
             map = ProtoBufUtils.getInstance().mapper.readValue(payload, Map.class);
         } catch (Exception e) {
-            map = new HashMap<>();
+            throw new InvalidObjectException("Unable to parse payload");
         }
         return base64EncodedJsonToProtobuf(map);
     }
@@ -152,7 +153,9 @@ public class ProtoBufUtils {
 
             codedOutputStream.writeTag(number, getWireType(value));
 
-            if (value instanceof Long) {
+            if (value instanceof Integer) {
+                codedOutputStream.writeInt64NoTag((int) value);
+            } else if (value instanceof Long) {
                 codedOutputStream.writeInt64NoTag((Long) value);
             } else if (value instanceof Double) {
                 codedOutputStream.writeFixed64NoTag(Double.doubleToRawLongBits((Double) value));
@@ -171,7 +174,7 @@ public class ProtoBufUtils {
     }
 
     private static int getWireType(Object value) {
-        if (value instanceof Long) {
+        if (value instanceof Long || value instanceof Integer) {
             return WireFormat.WIRETYPE_VARINT;
         } else if (value instanceof Double) {
             return WireFormat.WIRETYPE_FIXED64;

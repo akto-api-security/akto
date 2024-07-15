@@ -259,7 +259,13 @@ const transform = {
 
     let apiCollectionId = -1
     if(Object.keys(data).length > 0){
-      apiCollectionId = data?.testingEndpoints?.apiCollectionId ||  data?.testingEndpoints?.workflowTest?.apiCollectionId || data?.testingEndpoints?.apisList[0]?.apiCollectionId
+      if(data?.testingEndpoints?.apiCollectionId !== undefined){
+        apiCollectionId = data?.testingEndpoints?.apiCollectionId
+      }else if(data?.testingEndpoints?.workflowTest?.apiCollectionId !== undefined){
+        apiCollectionId = data?.testingEndpoints?.workflowTest?.apiCollectionId 
+      }else{
+        apiCollectionId = data?.testingEndpoints?.apisList[0]?.apiCollectionId
+      }
     }
     const iconObj = func.getTestingRunIconObj(state)
 

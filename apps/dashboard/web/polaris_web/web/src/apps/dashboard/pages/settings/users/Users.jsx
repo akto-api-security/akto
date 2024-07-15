@@ -4,12 +4,10 @@ import { useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
-import Store from "../../../store";
-import PersistStore from '../../../../main/PersistStore';
 
 const Users = () => {
-    const username = Store(state => state.username)
-    const userRole = PersistStore(state => state.userRole)
+    const username = window.USER_NAME
+    const userRole = window.USER_ROLE
 
     const [inviteUser, setInviteUser] = useState({
         isActive: false,
@@ -67,6 +65,9 @@ const Users = () => {
 
     const getRoleHierarchy = async() => {
         let roleHierarchyResp = await settingRequests.getRoleHierarchy(window.USER_ROLE)
+        if(roleHierarchyResp.includes("MEMBER")){
+            roleHierarchyResp.push("SECURITY ENGINEER")
+        }
         if(window.USER_ROLE === 'ADMIN'){
             roleHierarchyResp.push('REMOVE')
         }
@@ -131,7 +132,7 @@ const Users = () => {
         setLoading(false)
     };
 
-    const isLocalDeploy = false;
+    const isLocalDeploy = func.checkLocal();
 
     const toggleInviteUserModal = () => {
         setInviteUser({

@@ -21,6 +21,7 @@ import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
 import com.akto.runtime.URLAggregator;
 import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.DbMode;
 import com.akto.util.JSONUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.Constants;
@@ -43,6 +44,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
+import static com.akto.util.HttpRequestResponseUtils.GRPC_CONTENT_TYPE;
 
 public class HttpCallParser {
     private final int sync_threshold_count;
@@ -88,7 +90,8 @@ public class HttpCallParser {
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
         this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
     }
-    
+    private static int GRPC_DEBUG_COUNTER = 50;
+
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
 
         //convert java object to JSON format
@@ -102,7 +105,16 @@ public class HttpCallParser {
         String rawRequestPayload = (String) json.get("requestPayload");
         String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
 
-
+        if (GRPC_DEBUG_COUNTER > 0) {
+            String acceptableContentType = HttpRequestResponseUtils.getAcceptableContentType(requestHeaders);
+            if (acceptableContentType != null && rawRequestPayload.length() > 0) {
+                // only if request payload is of FORM_URL_ENCODED_CONTENT_TYPE we convert it to json
+                if (acceptableContentType.equals(GRPC_CONTENT_TYPE)) {
+                    loggerMaker.infoAndAddToDb("grpc kafka payload:" + message,LogDb.RUNTIME);
+                    GRPC_DEBUG_COUNTER--;
+                }
+            }
+        }
 
         String apiCollectionIdStr = json.getOrDefault("akto_vxlan_id", "0").toString();
         int apiCollectionId = 0;
@@ -215,9 +227,11 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-          for (HttpResponseParams responseParam: filteredResponseParams) {
-              dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
-          }
+        if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
+            for (HttpResponseParams responseParam: filteredResponseParams) {
+                dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+            }
+        }
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
@@ -228,8 +242,10 @@ public class HttpCallParser {
 
             numberOfSyncs++;
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
-            dependencyAnalyser.dbState = apiCatalogSync.dbState;
-            dependencyAnalyser.syncWithDb();
+            if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
+                dependencyAnalyser.dbState = apiCatalogSync.dbState;
+                dependencyAnalyser.syncWithDb();
+            }
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
