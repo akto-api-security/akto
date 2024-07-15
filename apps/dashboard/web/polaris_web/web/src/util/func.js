@@ -547,8 +547,18 @@ prettifyEpoch(epoch) {
 sortFunc: (data, sortKey, sortOrder) => {
   if(sortKey === 'displayName'){
     let finalArr = data.sort((a, b) => {
-        const nameA = a?.displayName.toLowerCase() ||  a?.name.toLowerCase();
-        const nameB = b?.displayName.toLowerCase() || b?.name.toLowerCase();
+        let nameA = ""
+        if(a?.displayName?.length > 0){
+          nameA = a?.displayName.toLowerCase() ;
+        }else if(a?.name.length > 0){
+          nameA = a?.name.toLowerCase();
+        }
+        let nameB = ""
+        if(b?.displayName?.length > 0){
+          nameB = b?.displayName.toLowerCase() ;
+        }else if(b?.name.length > 0){
+          nameB = b?.name.toLowerCase();
+        }
     
         // Define a regex to check if the name starts with a digit
         const startsWithDigitA = /^\d/.test(nameA);
