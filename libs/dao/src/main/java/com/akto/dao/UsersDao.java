@@ -13,8 +13,7 @@ import java.util.regex.Pattern;
 
 import org.bson.conversions.Bson;
 
-import static com.mongodb.client.model.Filters.eq;
-import static com.mongodb.client.model.Filters.in;
+import static com.mongodb.client.model.Filters.*;
 import static com.mongodb.client.model.Projections.include;
 import static com.mongodb.client.model.Updates.combine;
 import static com.mongodb.client.model.Updates.set;
@@ -203,9 +202,37 @@ public class UsersDao extends CommonContextDao<User> {
         return collectionList;
     }
 
+    public List<Integer> getUserCollectionsById(int userId, int accountId) {
+        User user = UsersDao.instance.findOne(
+                Filters.and(
+                    exists("accounts."+accountId),
+                    eq(User.ID, userId)
+                ),
+                Projections.include(User.ID,User.ACCOUNTS));
+
+        if(user == null) {
+            return null;
+        }
+
+        Map<String, UserAccountEntry> accounts = user.getAccounts();
+        List<Integer> userApiCollections = new ArrayList<>();
+
+        if(accounts != null) {
+            for(UserAccountEntry account : accounts.values()) {
+                List<Integer> apiCollections = account.getApiCollectionsId();
+
+                if(apiCollections != null) {
+                    userApiCollections.addAll(apiCollections);
+                }
+            }
+        }
+
+        return userApiCollections;
+    }
+
     public static void updateApiCollectionAccess(int userId, int accountId, List<Integer> apiCollectionList) {
         UsersDao.instance.getMCollection()
-            .updateOne(eq("_id", userId), set("accounts." + accountId + ".apiCollectionsId", apiCollectionList));
+            .updateOne(eq(User.ID, userId), set("accounts." + accountId + ".apiCollectionsId", apiCollectionList));
     }
 
     @Override
