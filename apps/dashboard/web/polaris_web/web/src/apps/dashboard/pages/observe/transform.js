@@ -282,6 +282,9 @@ const transform = {
         }
     },
     formatNumberWithCommas(number) {
+        if(number === undefined){
+            return 0;
+        }
         const numberString = number.toString();
         return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     },
