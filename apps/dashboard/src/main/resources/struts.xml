@@ -291,7 +291,9 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="root">users</param>
+            </result>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
             </result>
@@ -2133,6 +2135,45 @@
                <param name="status">401</param>
            </result>
        </action>
+
+        <action name="api/updateUserCollections" class="com.akto.action.ApiCollectionsAction" method="updateUserCollections">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/getAllUsersCollections" class="com.akto.action.ApiCollectionsAction" method="getAllUsersCollections">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">usersCollectionList</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
 
         <action name="api/fetchApiInfoList" class="com.akto.action.ApiInfoAction" method="fetchApiInfoList">
             <interceptor-ref name="json"/>

@@ -609,6 +609,43 @@ public class ApiCollectionsAction extends UserAction {
         return Action.ERROR.toUpperCase();
     }
 
+    public Map<String, List<Integer>> userCollectionMap = new HashMap<>();
+
+    public String updateUserCollections() {
+        int accountId = Context.accountId.get();
+
+        for(Map.Entry<String, List<Integer>> entry : userCollectionMap.entrySet()) {
+            int userId = Integer.parseInt(entry.getKey());
+            List<Integer> apiCollections = entry.getValue();
+
+            RBACDao.updateApiCollectionAccess(userId, accountId, apiCollections);
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
+
+    HashMap<Integer, List<Integer>> usersCollectionList;
+    public String getAllUsersCollections() {
+        int accountId = Context.accountId.get();
+
+        this.usersCollectionList = RBACDao.instance.getAllUsersCollections(accountId);
+
+        if(usersCollectionList == null) {
+            return ERROR.toUpperCase();
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public void setUserCollectionMap(Map<String, List<Integer>> userCollectionMap) {
+        this.userCollectionMap = userCollectionMap;
+    }
+
+    public HashMap<Integer, List<Integer>> getUsersCollectionList() {
+        return this.usersCollectionList;
+    }
+
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
     }

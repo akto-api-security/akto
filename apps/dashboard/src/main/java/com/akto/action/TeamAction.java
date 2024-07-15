@@ -79,7 +79,6 @@ public class TeamAction extends UserAction {
         }
         return SUCCESS.toUpperCase();
     }
-
     private enum ActionType {
         REMOVE_USER,
         UPDATE_USER_ROLE

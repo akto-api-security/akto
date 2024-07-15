@@ -1,6 +1,7 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList} from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, Link, Tooltip, Modal, Checkbox, LegacyCard, ResourceList, ResourceItem, Avatar, Filters, Card } from "@shopify/polaris"
 import api from "../api"
+import settingRequests from "../../settings/api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -18,6 +19,8 @@ import CollectionsPageBanner from "./component/CollectionsPageBanner"
 import useTable from "@/apps/dashboard/components/tables/TableContext"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
+import SearchableResourceList from "../../../components/shared/SearchableResourceList"
+import ResourceListModal from "../../../components/shared/ResourceListModal"
 import { saveAs } from 'file-saver'
 
 const headers = [
@@ -145,6 +148,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 }
 
 function ApiCollections() {
+    const userRole = window.USER_ROLE
 
     const [data, setData] = useState({'all':[]})
     const [active, setActive] = useState(false);
@@ -156,6 +160,9 @@ function ApiCollections() {
     const [envTypeMap, setEnvTypeMap] = useState({})
     const [refreshData, setRefreshData] = useState(false)
     const [popover,setPopover] = useState(false)
+    const [teamData, setTeamData] = useState([])
+    const [usersCollection, setUsersCollection] = useState([])
+    const [selectedItems, setSelectedItems] = useState([])
 
     const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom']
 
@@ -230,7 +237,14 @@ function ApiCollections() {
                 ...[api.getRiskScoreInfo(), api.getSensitiveInfoForCollections(), api.getSeverityInfoForCollections()]
             ]
         }
-        
+
+        if(userRole === 'ADMIN') {
+            apiPromises = [
+                ...apiPromises,
+                ...[api.getAllUsersCollections(), settingRequests.getTeamData()]
+            ]
+        }
+
         let results = await Promise.allSettled(apiPromises);
 
         apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
@@ -248,12 +262,12 @@ function ApiCollections() {
                 riskScoreObj = {
                     criticalUrls: res.criticalEndpointsCount,
                     riskScoreMap: res.riskScoreOfCollectionsMap
-                } 
+                }
             }
 
             if(results[5]?.status === "fulfilled"){
                 const res = results[5].value
-                sensitiveInfo ={ 
+                sensitiveInfo ={
                     sensitiveUrls: res.sensitiveUrlsInResponse,
                     sensitiveInfoMap: res.sensitiveSubtypesInCollection
                 }
@@ -271,6 +285,26 @@ function ApiCollections() {
             setLastFetchedSensitiveResp(sensitiveInfo)
 
         }
+
+        let usersCollectionList = []
+        let userList = []
+
+        const index = !shouldCallHeavyApis ? 4 : 7
+
+        if(userRole === 'ADMIN') {
+            if(results[index]?.status === "fulfilled") {
+                const res = results[index].value
+                usersCollectionList = res
+            }
+            
+            if(results[index+1]?.status === "fulfilled") {
+                const res = results[index+1].value
+                userList = res
+            }
+        }
+
+        setUsersCollection(usersCollectionList)
+        setTeamData(userList)
 
         setHasUsageEndpoints(hasUserEndpoints)
         setCoverageMap(coverageInfo)
@@ -318,6 +352,18 @@ function ApiCollections() {
         await apiFunction(collectionIdListObj)
         fetchData()
         func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
+    }
+    async function handleShareCollectionsAction(collectionIdList, userIdList, apiFunction){
+        const userCollectionMap = {};
+
+        for(const userId of userIdList) {
+            const intUserId = parseInt(userId, 10);
+            const userCollections = usersCollection[intUserId] || [];
+            userCollectionMap[intUserId] = [...new Set([...userCollections, ...collectionIdList])];
+        }
+
+        await apiFunction(userCollectionMap);
+        func.setToast(true, false, `${userIdList.length} Member${func.addPlurality(userIdList.length)}'s collections have been updated successfully`);
     }
 
     const exportCsv = () =>{
@@ -368,6 +414,83 @@ function ApiCollections() {
                         const message = "Please sync the usage data via Settings > billing after reactivating a collection to resume data ingestion and testing."
                         func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
                     }
+                }
+            )
+        }
+
+        const apiCollectionShareRenderItem = (item) => {
+            const { id, name, login, role } = item;
+            const initials = func.initials(login)
+            const media = <Avatar user size="medium" name={login} initials={initials} />
+            const shortcutActions = [
+                {
+                    content: <Text color="subdued">{role}</Text>,
+                    url: '#',
+                    onAction: ((event) => event.preventDefault())
+                }
+            ]
+
+            return (
+                <ResourceItem
+                    id={id}
+                    media={media}
+                    shortcutActions={shortcutActions}
+                    persistActions
+                >
+                    <Text variant="bodyMd" fontWeight="bold" as="h3">
+                        {name}
+                    </Text>
+                    <Text variant="bodyMd">
+                        {login}
+                    </Text>
+                </ResourceItem>
+            );
+        }
+
+        const shareCollectionHandler = () => {
+            if (selectedItems.length > 0) {
+                handleShareCollectionsAction(selectedResources, selectedItems, api.updateUserCollections);
+                return true
+            } else {
+                func.setToast(true, true, "No member is selected!");
+                return false
+            }
+        };
+
+        const handleSelectedItemsChange = (items) => {
+            setSelectedItems(items);
+        };
+
+        const shareComponentChildrens = (
+            <Box>
+                <Box padding={5} background="bg-subdued-hover">
+                    <Text fontWeight="medium">{`${selectedResources.length} collection${func.addPlurality(selectedResources.length)} selected`}</Text>
+                </Box>
+                    <SearchableResourceList
+                        resourceName={'user'}
+                        items={teamData}
+                        renderItem={apiCollectionShareRenderItem}
+                        isFilterControlEnabale={true}
+                        selectable={true}
+                        onSelectedItemsChange={handleSelectedItemsChange}
+                    />
+            </Box>
+        )
+
+        const shareContent = (
+            <ResourceListModal
+                isLarge={true}
+                activatorPlaceaholder={"Share"}
+                title={"Share collections"}
+                primaryAction={shareCollectionHandler}
+                component={shareComponentChildrens}
+            />
+        )
+
+        if(userRole === 'ADMIN') {
+            actions.push(
+                {
+                    content: shareContent,
                 }
             )
         }
