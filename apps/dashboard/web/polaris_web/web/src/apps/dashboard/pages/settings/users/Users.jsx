@@ -237,7 +237,10 @@ const Users = () => {
 
                             const updateUsersCollection = async () => {
                                 const collectionIdList = selectedItems[id];
-                                await observeApi.updateUserCollections(collectionIdList, [id])
+                                const userCollectionMap = {
+                                    [id]: collectionIdList
+                                };
+                                await observeApi.updateUserCollections(userCollectionMap)
                                 func.setToast(true, false, `User's ${selectedItems[id].length} collection${func.addPlurality(selectedItems[id].length)} have been updated!`)
                                 await getTeamData()
                             }

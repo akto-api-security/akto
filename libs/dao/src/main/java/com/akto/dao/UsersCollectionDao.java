@@ -21,7 +21,7 @@ public class UsersCollectionDao {
         Pair<List<Integer>, Integer> collectionIdEntry = usersCollectionMap.get(key);
         List<Integer> collectionIds;
         if(collectionIdEntry == null || (Context.now() - collectionIdEntry.getSecond() > EXPIRY_TIME)) {
-            List<Integer> collectionList = UsersDao.instance.getUserCollectionsById(userId, accountId);
+            List<Integer> collectionList = RBACDao.instance.getUserCollectionsById(userId, accountId);
 
             if(collectionList != null) {
                 collectionIds = collectionList;

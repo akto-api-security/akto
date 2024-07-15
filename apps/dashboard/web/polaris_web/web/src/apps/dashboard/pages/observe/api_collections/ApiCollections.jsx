@@ -354,17 +354,16 @@ function ApiCollections() {
         func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
     }
     async function handleShareCollectionsAction(collectionIdList, userIdList, apiFunction){
-        const collectionIdSet = new Set(collectionIdList);
+        const userCollectionMap = {};
 
         for(const userId of userIdList) {
-            const userCollections = usersCollection[userId] || [];
-            userCollections.forEach(collectionId => collectionIdSet.add(collectionId));
+            const intUserId = parseInt(userId, 10);
+            const userCollections = usersCollection[intUserId] || [];
+            userCollectionMap[intUserId] = [...new Set([...userCollections, ...collectionIdList])];
         }
 
-        const collectionIdListObj = Array.from(collectionIdSet);
-
-        await apiFunction(collectionIdListObj, userIdList)
-        func.setToast(true, false, `${userIdList.length} Member${func.addPlurality(userIdList.length)}'s collection${func.addPlurality(collectionIdList.length)} has been updated successfully`)
+        await apiFunction(userCollectionMap);
+        func.setToast(true, false, `${userIdList.length} Member${func.addPlurality(userIdList.length)}'s collections have been updated successfully`);
     }
 
     const exportCsv = () =>{

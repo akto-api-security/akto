@@ -154,13 +154,12 @@ export default {
         })
     },
     
-    async updateUserCollections(apiCollectionsList, userIdList) {
+    async updateUserCollections(userCollectionMap) {
         return await request({
             url: '/api/updateUserCollections',
             method: 'post',
             data: {
-                apiCollectionsList: apiCollectionsList,
-                userIdList: userIdList
+                userCollectionMap: userCollectionMap,
             }
         })
     },

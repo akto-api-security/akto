@@ -609,14 +609,16 @@ public class ApiCollectionsAction extends UserAction {
         return Action.ERROR.toUpperCase();
     }
 
-    public List<Integer> apiCollectionsList = new ArrayList<>();
-    public List<Integer> userIdList = new ArrayList<>();
+    public Map<String, List<Integer>> userCollectionMap = new HashMap<>();
 
     public String updateUserCollections() {
         int accountId = Context.accountId.get();
 
-        for(int userId : userIdList) {
-            UsersDao.updateApiCollectionAccess(userId, accountId, apiCollectionsList);
+        for(Map.Entry<String, List<Integer>> entry : userCollectionMap.entrySet()) {
+            int userId = Integer.parseInt(entry.getKey());
+            List<Integer> apiCollections = entry.getValue();
+
+            RBACDao.updateApiCollectionAccess(userId, accountId, apiCollections);
         }
 
         return SUCCESS.toUpperCase();
@@ -625,7 +627,9 @@ public class ApiCollectionsAction extends UserAction {
 
     HashMap<Integer, List<Integer>> usersCollectionList;
     public String getAllUsersCollections() {
-        this.usersCollectionList = UsersDao.instance.getAllUsersCollections();
+        int accountId = Context.accountId.get();
+
+        this.usersCollectionList = RBACDao.instance.getAllUsersCollections(accountId);
 
         if(usersCollectionList == null) {
             return ERROR.toUpperCase();
@@ -634,11 +638,8 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public void setApiCollectionsList(List<Integer> apiCollectionsList) {
-        this.apiCollectionsList = apiCollectionsList;
-    }
-    public void setUserIdList(List<Integer> userIdList) {
-        this.userIdList = userIdList;
+    public void setUserCollectionMap(Map<String, List<Integer>> userCollectionMap) {
+        this.userCollectionMap = userCollectionMap;
     }
 
     public HashMap<Integer, List<Integer>> getUsersCollectionList() {

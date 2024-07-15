@@ -5,7 +5,6 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 
 import java.util.*;
@@ -174,65 +173,6 @@ public class UsersDao extends CommonContextDao<User> {
         if (user == null) return null;
 
         return user.getLastLoginTs();
-    }
-
-    public HashMap<Integer, List<Integer>> getAllUsersCollections() {
-        HashMap<Integer, List<Integer>> collectionList = new HashMap<>();
-        List<User> usersList = UsersDao.instance.findAll(Filters.empty(), Projections.include(User.ID,User.ACCOUNTS));
-
-        for(User user : usersList) {
-            int userId = user.getId();
-
-            Map<String, UserAccountEntry> accounts = user.getAccounts();
-            List<Integer> userApiCollections = new ArrayList<>();
-
-            if(accounts != null) {
-                for(UserAccountEntry account : accounts.values()) {
-                    List<Integer> apiCollections = account.getApiCollectionsId();
-
-                    if(apiCollections != null) {
-                        userApiCollections.addAll(apiCollections);
-                    }
-                }
-            }
-
-            collectionList.put(userId, userApiCollections);
-        }
-
-        return collectionList;
-    }
-
-    public List<Integer> getUserCollectionsById(int userId, int accountId) {
-        User user = UsersDao.instance.findOne(
-                Filters.and(
-                    exists("accounts."+accountId),
-                    eq(User.ID, userId)
-                ),
-                Projections.include(User.ID,User.ACCOUNTS));
-
-        if(user == null) {
-            return null;
-        }
-
-        Map<String, UserAccountEntry> accounts = user.getAccounts();
-        List<Integer> userApiCollections = new ArrayList<>();
-
-        if(accounts != null) {
-            for(UserAccountEntry account : accounts.values()) {
-                List<Integer> apiCollections = account.getApiCollectionsId();
-
-                if(apiCollections != null) {
-                    userApiCollections.addAll(apiCollections);
-                }
-            }
-        }
-
-        return userApiCollections;
-    }
-
-    public static void updateApiCollectionAccess(int userId, int accountId, List<Integer> apiCollectionList) {
-        UsersDao.instance.getMCollection()
-            .updateOne(eq(User.ID, userId), set("accounts." + accountId + ".apiCollectionsId", apiCollectionList));
     }
 
     @Override

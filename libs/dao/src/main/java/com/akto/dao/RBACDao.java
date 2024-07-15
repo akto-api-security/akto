@@ -1,7 +1,10 @@
 package com.akto.dao;
 
 
+import com.akto.dto.User;
+import com.akto.dto.UserAccountEntry;
 import com.akto.util.Pair;
+import com.mongodb.client.model.Projections;
 import io.swagger.models.auth.In;
 import org.bson.conversions.Bson;
 
@@ -10,7 +13,14 @@ import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.mongodb.client.model.Filters;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static com.mongodb.client.model.Filters.*;
+import static com.mongodb.client.model.Updates.set;
 
 public class RBACDao extends CommonContextDao<RBAC> {
     public static final RBACDao instance = new RBACDao();
@@ -81,6 +91,40 @@ public class RBACDao extends CommonContextDao<RBAC> {
         }
         return currentRole;
     }
+
+    public List<Integer> getUserCollectionsById(int userId, int accountId) {
+        RBAC rbac = RBACDao.instance.findOne(
+                Filters.and(
+                        eq(RBAC.ACCOUNT_ID, accountId),
+                        eq(RBAC.USER_ID, userId)
+                ),
+                Projections.include("apiCollectionsId"));
+
+        if(rbac == null) {
+            return null;
+        }
+
+        return rbac.getApiCollectionsId();
+    }
+
+    public HashMap<Integer, List<Integer>> getAllUsersCollections(int accountId) {
+        HashMap<Integer, List<Integer>> collectionList = new HashMap<>();
+        List<RBAC> rbacList = RBACDao.instance.findAll(Filters.eq(RBAC.ACCOUNT_ID, accountId), Projections.include(RBAC.USER_ID, RBAC.API_COLLECTIONS_ID));
+
+        for(RBAC rbac : rbacList) {
+            int userId = rbac.getUserId();
+            
+            collectionList.put(userId, rbac.getApiCollectionsId());
+        }
+
+        return collectionList;
+    }
+
+    public static void updateApiCollectionAccess(int userId, int accountId, List<Integer> apiCollectionList) {
+        RBACDao.instance.getMCollection()
+                .updateOne(and(eq(RBAC.USER_ID, userId), eq(RBAC.ACCOUNT_ID, accountId)), set(RBAC.API_COLLECTIONS_ID, apiCollectionList));
+    }
+
     @Override
     public String getCollName() {
         return "rbac";
