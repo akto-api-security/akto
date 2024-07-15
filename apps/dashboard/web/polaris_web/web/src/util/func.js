@@ -545,6 +545,27 @@ prettifyEpoch(epoch) {
   },
   
 sortFunc: (data, sortKey, sortOrder) => {
+  if(sortKey === 'displayName'){
+    let finalArr = data.sort((a, b) => {
+        const nameA = a?.displayName.toLowerCase() ||  a?.name.toLowerCase();
+        const nameB = b?.displayName.toLowerCase() || b?.name.toLowerCase();
+    
+        // Define a regex to check if the name starts with a digit
+        const startsWithDigitA = /^\d/.test(nameA);
+        const startsWithDigitB = /^\d/.test(nameB);
+    
+        // Alphabetical names should come first
+        if (startsWithDigitA && !startsWithDigitB) return 1;
+        if (!startsWithDigitA && startsWithDigitB) return -1;
+    
+        // If both names either start with a digit or both don't, compare them directly
+        return nameA.localeCompare(nameB);
+    });
+    if(sortOrder > 0){
+      finalArr.reverse()
+    }
+    return finalArr
+  }
   return data.sort((a, b) => {
     if(typeof a[sortKey] ==='number')
     return (sortOrder) * (a[sortKey] - b[sortKey]);
