@@ -96,14 +96,19 @@ public class UsersDao extends CommonContextDao<User> {
 
     final public static UsersDao instance = new UsersDao();
 
+    // this returns the first non akto user
+    // if non akto user not found then we will return the first akto user
     public User getFirstUser(int accountId) {
         Bson findQ = Filters.exists("accounts."+accountId);
-        MongoCursor<User> cursor = instance.getMCollection().find(findQ).sort(Sorts.ascending("_id")).limit(1).cursor();
-        if (cursor.hasNext()) {
-            return cursor.next();
+        MongoCursor<User> cursor = instance.getMCollection().find(findQ).sort(Sorts.ascending("_id")).limit(10).cursor();
+        User aktoUser = null;
+        while (cursor.hasNext()) {
+            User user = cursor.next();
+            if (!user.getLogin().contains("@akto.io")) return user;
+            if (aktoUser == null) aktoUser = user;
         }
 
-        return null;
+        return aktoUser;
     }
 
     public Map<Integer, String> getUsernames(Collection<Integer> userIds) {
