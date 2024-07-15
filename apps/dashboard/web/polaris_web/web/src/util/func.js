@@ -550,13 +550,13 @@ sortFunc: (data, sortKey, sortOrder) => {
         let nameA = ""
         if(a?.displayName?.length > 0){
           nameA = a?.displayName.toLowerCase() ;
-        }else if(a?.name.length > 0){
+        }else if(a?.name?.length > 0){
           nameA = a?.name.toLowerCase();
         }
         let nameB = ""
         if(b?.displayName?.length > 0){
           nameB = b?.displayName.toLowerCase() ;
-        }else if(b?.name.length > 0){
+        }else if(b?.name?.length > 0){
           nameB = b?.name.toLowerCase();
         }
     
