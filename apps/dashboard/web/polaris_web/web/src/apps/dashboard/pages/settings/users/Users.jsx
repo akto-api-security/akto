@@ -1,4 +1,4 @@
-import { ActionList, Avatar, Banner, Box, Button, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text } from "@shopify/polaris"
+import { ActionList, Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text } from "@shopify/polaris"
 import { DeleteMajor, TickMinor } from "@shopify/polaris-icons"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
