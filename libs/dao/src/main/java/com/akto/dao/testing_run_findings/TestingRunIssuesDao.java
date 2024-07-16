@@ -5,15 +5,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.xml.crypto.dsig.spec.XPathType.Filter;
-
-import org.bson.Document;
 import org.bson.conversions.Bson;
 
-import com.akto.dao.AccountsContextDao;
+import com.akto.dao.AccountsContextDaoWithRbac;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollectionUsers;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.TestingEndpoints;
 import com.akto.util.enums.MongoDBEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -23,7 +23,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UnwindOptions;
 
-public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
+public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIssues> {
 
     public static final TestingRunIssuesDao instance = new TestingRunIssuesDao();
 
@@ -148,5 +148,10 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
     @Override
     public Class<TestingRunIssues> getClassT() {
         return TestingRunIssues.class;
+    }
+
+    @Override
+    public String getFilterKeyString(){
+        return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.Id_ApiInfoKey_ApiCollectionId) + ApiInfoKey.API_COLLECTION_ID;
     }
 }

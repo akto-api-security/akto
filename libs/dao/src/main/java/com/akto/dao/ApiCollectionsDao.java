@@ -36,7 +36,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
 
     @Override
     public String getFilterKeyString(){
-        return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.ApiCollectionId);
+        return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.ApiCollectionId) + ApiCollection.ID;
     }
 
     public void createIndicesIfAbsent() {
