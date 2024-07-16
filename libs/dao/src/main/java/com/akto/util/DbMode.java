@@ -26,6 +26,7 @@ public class DbMode {
 
     public static void refreshDbType(String connectionString)  {
         String dbTypeEnv = System.getenv("DB_TYPE");
+        logger.info("dbTypeEnv: {}", dbTypeEnv);
         if (dbTypeEnv != null && dbTypeEnv.trim().length() > 0) {
             try {
                 dbType = DbType.valueOf(dbTypeEnv);
