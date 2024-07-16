@@ -10,13 +10,11 @@ import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
-
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.grpc.ProtoBufUtils;
 import kotlin.Pair;
 import okhttp3.*;
 import okio.BufferedSink;
-
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
@@ -94,8 +92,14 @@ public class ApiExecutor {
         Headers headers = response.headers();
 
         Map<String, List<String>> responseHeaders = generateHeadersMapFromHeadersObject(headers);
-
-        return new OriginalHttpResponse(body, responseHeaders, statusCode);
+        OriginalHttpResponse originalHttpResponse = new OriginalHttpResponse(body, responseHeaders, statusCode);
+        if (requestProtocol != null && requestProtocol.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {//GRPC request
+            //body will be binary,
+            String responseBase64Encoded = Base64.getEncoder().encodeToString(body.getBytes());
+            loggerMaker.infoAndAddToDb("grpc response base64 encoded:" + responseBase64Encoded, LogDb.TESTING);
+            originalHttpResponse.setBody(HttpRequestResponseUtils.convertGRPCEncodedToJson(responseBase64Encoded));
+        }
+        return originalHttpResponse;
     }
 
     public static Map<String, List<String>> generateHeadersMapFromHeadersObject(Headers headers) {
@@ -212,7 +216,7 @@ public class ApiExecutor {
         request.setUrl(url);
 
         Request.Builder builder = new Request.Builder();
-        String type = request.getType();
+        String type = request.findContentType();
         // add headers
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         Map<String, List<String>> headersMap = request.getHeaders();
@@ -328,6 +332,7 @@ public class ApiExecutor {
 
         String contentType = request.findContentType();
         String payload = request.getBody();
+        RequestBody body = null;
         if (contentType == null ) {
             contentType = "application/json; charset=utf-8";
             if (payload == null) payload = "{}";
@@ -335,15 +340,25 @@ public class ApiExecutor {
             if (!payload.startsWith("[") && !payload.startsWith("{")) payload = "{}";
         } else if (contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
             try {
+                loggerMaker.infoAndAddToDb("encoding to grpc payload:" + payload, LogDb.TESTING);
                 payload = ProtoBufUtils.base64EncodedJsonToProtobuf(payload);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Unable to encode payload:" + payload, LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("Unable to encode grpc payload:" + payload, LogDb.TESTING);
                 payload = request.getBody();
+            }
+            try {// trying decoding payload
+                byte[] payloadByteArray = Base64.getDecoder().decode(payload);
+                loggerMaker.infoAndAddToDb("Final base64 encoded payload:"+ payload, LogDb.TESTING);
+                body = RequestBody.create(payloadByteArray, MediaType.parse(contentType));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Unable to decode grpc payload:" + payload, LogDb.TESTING);
             }
         }
 
         if (payload == null) payload = "";
-        RequestBody body = RequestBody.create(payload, MediaType.parse(contentType));
+        if (body == null) {// body not created by GRPC block yet
+            body = RequestBody.create(payload, MediaType.parse(contentType));
+        }
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
         return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol);

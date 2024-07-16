@@ -153,7 +153,9 @@ public class ProtoBufUtils {
 
             codedOutputStream.writeTag(number, getWireType(value));
 
-            if (value instanceof Long) {
+            if (value instanceof Integer) {
+                codedOutputStream.writeInt64NoTag((int) value);
+            } else if (value instanceof Long) {
                 codedOutputStream.writeInt64NoTag((Long) value);
             } else if (value instanceof Double) {
                 codedOutputStream.writeFixed64NoTag(Double.doubleToRawLongBits((Double) value));
@@ -172,7 +174,7 @@ public class ProtoBufUtils {
     }
 
     private static int getWireType(Object value) {
-        if (value instanceof Long) {
+        if (value instanceof Long || value instanceof Integer) {
             return WireFormat.WIRETYPE_VARINT;
         } else if (value instanceof Double) {
             return WireFormat.WIRETYPE_FIXED64;
