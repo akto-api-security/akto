@@ -77,9 +77,15 @@ public class ApiExecutor {
             try {
                 if (requestProtocol != null && requestProtocol.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {//GRPC request
                     grpcBody = responseBody.bytes();
+                    StringBuilder builder = new StringBuilder();
+                    builder.append("grpc response binary array: ");
+                    for (byte b : grpcBody) {
+                        builder.append(b).append(",");
+                    }
+                    loggerMaker.infoAndAddToDb(builder.toString(), LogDb.TESTING);
                     String responseBase64Encoded = Base64.getEncoder().encodeToString(grpcBody);
                     loggerMaker.infoAndAddToDb("grpc response base64 encoded:" + responseBase64Encoded, LogDb.TESTING);
-                    body = HttpRequestResponseUtils.convertGRPCEncodedToJson(responseBase64Encoded);
+                    body = HttpRequestResponseUtils.convertGRPCEncodedToJson(grpcBody);
                 } else {
                     body = responseBody.string();
                 }
