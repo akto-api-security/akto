@@ -29,17 +29,16 @@ public class ProtoBufUtils {
     }
 
     public Map<Object, Object> decodeProto(String encodedString) {
-        byte[] originalByteArray = Base64.getDecoder().decode(encodedString);
-        //Remove initial 5 bytes for unnecessary proto headers
-        byte[] truncatedByteArray = new byte[originalByteArray.length - 5];
-        for (int index = 5; index < originalByteArray.length; index++) {
-            truncatedByteArray[index - 5] = originalByteArray[index];
-        }
-        return decodeProto(truncatedByteArray);
+        return decodeProto(Base64.getDecoder().decode(encodedString));
     }
 
     public Map<Object, Object> decodeProto(byte[] data) {
-        return decodeProto(ByteString.copyFrom(data), 0);
+        //Remove initial 5 bytes for unnecessary proto headers
+        byte[] truncatedByteArray = new byte[data.length - 5];
+        for (int index = 5; index < data.length; index++) {
+            truncatedByteArray[index - 5] = data[index];
+        }
+        return decodeProto(ByteString.copyFrom(truncatedByteArray), 0);
     }
 
     public static Map<Object, Object> decodeProto(ByteString data, int depth) {
