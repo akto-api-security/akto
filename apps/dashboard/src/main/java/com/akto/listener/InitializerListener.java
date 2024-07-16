@@ -1847,53 +1847,21 @@ public class InitializerListener implements ServletContextListener {
                     }
                 } while (!connectedToMongo);
 
-                setDashboardMode();
-                updateGlobalAktoVersion();
-
-                AccountTask.instance.executeTask(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account account) {
-                        AccountSettingsDao.instance.getStats();
-                        runInitializerFunctions();
-                    }
-                }, "context-initializer");
-
-                if (DashboardMode.isMetered()) {
-                    setupUsageScheduler();
-                    setupUsageSyncScheduler();
+                Integer initial = Context.accountId.get();
+                String testAccountIdStr = System.getenv("test_account_id");
+                System.out.println("testAccountIdStr: " + testAccountIdStr);
+                int testAccountId = Integer.parseInt(testAccountIdStr);
+                Context.accountId.set(testAccountId);
+                System.out.println("start account: " + Context.accountId.get());
+                try {
+                    DaoInit.createIndices();
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
-                trimCappedCollections();
-                setUpPiiAndTestSourcesScheduler();
-                setUpTrafficAlertScheduler();
-                // setUpAktoMixpanelEndpointsScheduler();
-                SingleTypeInfo.init();
-                setUpDailyScheduler();
-                setUpWebhookScheduler();
-                setUpDefaultPayloadRemover();
-                setUpTestEditorTemplatesScheduler();
-                setUpDependencyFlowScheduler();
-                tokenGeneratorCron.tokenGeneratorScheduler();
-                crons.deleteTestRunsScheduler();
-                updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                syncCronInfo.setUpUpdateCronScheduler();
-                // setUpAktoMixpanelEndpointsScheduler();
-                //fetchGithubZip();
-                if(isSaas){
-                    try {
-                        Auth0.getInstance();
-                        loggerMaker.infoAndAddToDb("Auth0 initialized", LogDb.DASHBOARD);
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
-                    }
-                }
-                updateApiGroupsForAccounts();
-                setUpUpdateCustomCollections();
-                setUpFillCollectionIdArrayJob();
-                setupAutomatedApiGroupsScheduler();
+                System.out.println("done account: " + Context.accountId.get());
+                Context.accountId.set(initial);
             }
         }, 0, TimeUnit.SECONDS);
-
-
     }
 
 

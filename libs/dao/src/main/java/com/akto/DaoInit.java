@@ -353,17 +353,24 @@ public class DaoInit {
     }
 
     public static void createIndices() {
+        System.out.println("start");
         try {
             TestingRunResultDao.instance.convertToCappedCollection();
         } catch (Exception e) {
                 logger.error("Error while converting TestingRunResults to capped collection: " + e.getMessage());
         }
+        System.out.println("checkpoint 1");
 
         OrganizationsDao.createIndexIfAbsent();
+        System.out.println("checkpoint 2");
         UsageMetricsDao.createIndexIfAbsent();
+        System.out.println("checkpoint 3");
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
+        System.out.println("checkpoint 4");
         TrafficMetricsDao.instance.createIndicesIfAbsent();
+        System.out.println("checkpoint 5");
         TestRolesDao.instance.createIndicesIfAbsent();
+        System.out.println("checkpoint 6");
         UsersDao.instance.createIndicesIfAbsent();
         AccountsDao.instance.createIndexIfAbsent();
 
