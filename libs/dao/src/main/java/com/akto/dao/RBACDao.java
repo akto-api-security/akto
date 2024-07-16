@@ -1,11 +1,7 @@
 package com.akto.dao;
 
-
-import com.akto.dto.User;
-import com.akto.dto.UserAccountEntry;
 import com.akto.util.Pair;
 import com.mongodb.client.model.Projections;
-import io.swagger.models.auth.In;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.context.Context;
@@ -13,10 +9,8 @@ import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.mongodb.client.model.Filters;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static com.mongodb.client.model.Filters.*;
@@ -95,10 +89,10 @@ public class RBACDao extends CommonContextDao<RBAC> {
     public List<Integer> getUserCollectionsById(int userId, int accountId) {
         RBAC rbac = RBACDao.instance.findOne(
                 Filters.and(
-                        eq(RBAC.ACCOUNT_ID, accountId),
-                        eq(RBAC.USER_ID, userId)
+                    eq(RBAC.USER_ID, userId),
+                    eq(RBAC.ACCOUNT_ID, accountId)
                 ),
-                Projections.include("apiCollectionsId"));
+                Projections.include(RBAC.API_COLLECTIONS_ID));
 
         if(rbac == null) {
             return null;
@@ -121,8 +115,8 @@ public class RBACDao extends CommonContextDao<RBAC> {
     }
 
     public static void updateApiCollectionAccess(int userId, int accountId, List<Integer> apiCollectionList) {
-        RBACDao.instance.getMCollection()
-                .updateOne(and(eq(RBAC.USER_ID, userId), eq(RBAC.ACCOUNT_ID, accountId)), set(RBAC.API_COLLECTIONS_ID, apiCollectionList));
+        RBACDao.instance.updateOne(Filters.and(eq(RBAC.USER_ID, userId), eq(RBAC.ACCOUNT_ID, accountId)),
+                set(RBAC.API_COLLECTIONS_ID, apiCollectionList));
     }
 
     @Override

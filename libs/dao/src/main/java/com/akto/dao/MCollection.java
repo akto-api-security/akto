@@ -163,14 +163,7 @@ public abstract class MCollection<T> {
     }
 
     public T findOne(Bson q) {
-        MongoCursor<T> cursor = this.getMCollection().find(q).cursor();
-
-        while(cursor.hasNext()) {
-            T elem = cursor.next();
-            return elem;
-        }
-
-        return null;
+        return this.findOne(q, null);
     }
 
     public T findOne(Bson q, Bson projection) {

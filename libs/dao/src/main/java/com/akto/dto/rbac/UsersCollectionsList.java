@@ -1,13 +1,13 @@
-package com.akto.dao;
+package com.akto.dto.rbac;
 
+import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.util.Pair;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class UsersCollectionDao {
+public class UsersCollectionsList {
     private static final ConcurrentHashMap<Pair<Integer, Integer>, Pair<List<Integer>, Integer>> usersCollectionMap = new ConcurrentHashMap<>();
     private static final int EXPIRY_TIME = 30 * 60;
 
@@ -19,22 +19,15 @@ public class UsersCollectionDao {
     public List<Integer> getCollectionsIdForUser(int userId, int accountId) {
         Pair<Integer, Integer> key = new Pair<>(userId, accountId);
         Pair<List<Integer>, Integer> collectionIdEntry = usersCollectionMap.get(key);
-        List<Integer> collectionIds;
+        List<Integer> collectionList;
         if(collectionIdEntry == null || (Context.now() - collectionIdEntry.getSecond() > EXPIRY_TIME)) {
-            List<Integer> collectionList = RBACDao.instance.getUserCollectionsById(userId, accountId);
-
-            if(collectionList != null) {
-                collectionIds = collectionList;
-            } else {
-                collectionIds = new ArrayList<>();
-            }
-
-            usersCollectionMap.put(key, new Pair<>(collectionIds, Context.now()));
+            collectionList = RBACDao.instance.getUserCollectionsById(userId, accountId);
+            usersCollectionMap.put(key, new Pair<>(collectionList, Context.now()));
         } else {
-            collectionIds = collectionIdEntry.getFirst();
+            collectionList = collectionIdEntry.getFirst();
         }
 
-        return collectionIds;
+        return collectionList;
     }
 
 }

@@ -2,11 +2,11 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
-import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.testing.TestingEndpoints;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
@@ -18,7 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
+public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection> {
 
     public static final ApiCollectionsDao instance = new ApiCollectionsDao();
 
@@ -32,6 +32,11 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
     @Override
     public Class<ApiCollection> getClassT() {
         return ApiCollection.class;
+    }
+
+    @Override
+    public String getFilterKeyString(){
+        return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.ApiCollectionId);
     }
 
     public void createIndicesIfAbsent() {

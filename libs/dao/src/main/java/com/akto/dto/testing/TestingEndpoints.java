@@ -88,7 +88,7 @@ public abstract class TestingEndpoints {
         return condition;
     }
 
-    protected static String getFilterPrefix(CollectionType type) {
+    public static String getFilterPrefix(CollectionType type) {
         String prefix = "";
         switch (type) {
             case Id_ApiCollectionId:

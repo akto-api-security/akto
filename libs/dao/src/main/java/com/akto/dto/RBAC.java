@@ -21,7 +21,7 @@ public class RBAC {
     public static final String ROLE = "role";
     private int accountId;
     public static final String ACCOUNT_ID = "accountId";
-    private List<Integer> apiCollectionsId = new ArrayList<>();
+    private List<Integer> apiCollectionsId;
     public static final String API_COLLECTIONS_ID = "apiCollectionsId";
 
     public enum Role {

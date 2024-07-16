@@ -628,12 +628,7 @@ public class ApiCollectionsAction extends UserAction {
     HashMap<Integer, List<Integer>> usersCollectionList;
     public String getAllUsersCollections() {
         int accountId = Context.accountId.get();
-
         this.usersCollectionList = RBACDao.instance.getAllUsersCollections(accountId);
-
-        if(usersCollectionList == null) {
-            return ERROR.toUpperCase();
-        }
 
         return SUCCESS.toUpperCase();
     }
