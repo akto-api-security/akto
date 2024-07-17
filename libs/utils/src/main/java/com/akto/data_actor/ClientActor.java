@@ -6,6 +6,7 @@ import com.akto.testing.ApiExecutor;
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.SetupDao;
 import com.akto.dao.context.Context;
+import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
@@ -48,6 +49,10 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
+
 import org.bson.BsonReader;
 import org.bson.Document;
 import org.bson.codecs.Codec;
@@ -86,7 +91,10 @@ public class ClientActor extends DataActor {
 
     public static String buildDbAbstractorUrl() {
         String dbAbsHost = CYBORG_URL;
-        if (CYBORG_URL.endsWith("/")) {
+        if (checkAccount()) {
+            dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        }
+        if (dbAbsHost.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
         return dbAbsHost + "/api";
@@ -2891,6 +2899,17 @@ public class ClientActor extends DataActor {
 
     public static String getAuthToken() {
         return System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+    }
+
+    public static boolean checkAccount() {
+        try {
+            Jws<Claims> claims = JwtAuthenticator.authenticate(getAuthToken());
+            int accountId = (int) claims.getBody().get("accountId");
+            return accountId == 1000000;
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
+        return false;
     }
 
 }
