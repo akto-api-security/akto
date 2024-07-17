@@ -209,7 +209,7 @@ public class APICatalogSync {
             Set<HttpResponseParams> value = entry.getValue();
             for (HttpResponseParams responseParams: value) {
                 try {
-                    aktoPolicyNew.process(responseParams);
+                    aktoPolicyNew.process(responseParams, partnerIpsList);
                 } catch (Exception e) {
                     e.printStackTrace();
                     throw new RuntimeException(e);
@@ -1709,6 +1709,7 @@ public class APICatalogSync {
     }
 
     int counter = 0;
+    List<String> partnerIpsList = new ArrayList<>();
     
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit syncLimit) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
@@ -1728,6 +1729,9 @@ public class APICatalogSync {
         boolean redact = false;
         if (accountSettings != null) {
             redact =  accountSettings.isRedactPayload();
+            if (accountSettings.getPartnerIpList() != null) {
+                partnerIpsList = accountSettings.getPartnerIpList();
+            }
         }
 
         counter++;
