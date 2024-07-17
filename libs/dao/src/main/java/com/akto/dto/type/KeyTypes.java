@@ -303,7 +303,7 @@ public class KeyTypes {
     public static boolean isIP(String s) {
         // for edge cases look at test cases of this function
         boolean canBeIpv4 = s.length() > 6 && s.length() <= 15 && s.contains(".");
-        boolean canBeIpv6 = (s.length() < 45 && s.contains(":"));
+        boolean canBeIpv6 = (s.length() <= 45 && s.contains(":"));
         if (!(canBeIpv4 || canBeIpv6)) return false;
         return ipAddressValidator.isValid(s);
     }
