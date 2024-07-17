@@ -3,6 +3,8 @@ package com.akto.data_actor;
 import com.akto.DaoInit;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.testing.ApiExecutor;
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.SetupDao;
 import com.akto.dao.context.Context;
@@ -64,6 +66,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -94,6 +97,7 @@ public class ClientActor extends DataActor {
         if (checkAccount()) {
             dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
         }
+        System.out.println("dbHost value " + dbAbsHost);
         if (dbAbsHost.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
@@ -2903,11 +2907,17 @@ public class ClientActor extends DataActor {
 
     public static boolean checkAccount() {
         try {
-            Jws<Claims> claims = JwtAuthenticator.authenticate(getAuthToken());
-            int accountId = (int) claims.getBody().get("accountId");
-            return accountId == 1000000;
+            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+            DecodedJWT jwt = JWT.decode(token);
+            String payload = jwt.getPayload();
+            byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
+            String decodedPayload = new String(decodedBytes);
+            BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
+            int accId = (int) basicDBObject.getInt("accountId");
+            System.out.println("checkaccount accountId log " + accId);
+            return accId == 1000000;
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            System.out.println("checkaccount error" + e.getStackTrace());
         }
         return false;
     }
