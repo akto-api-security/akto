@@ -26,6 +26,8 @@ import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.Trie;
 import com.akto.util.Trie.Node;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -125,20 +127,17 @@ public class RequestTemplate {
 
     public static long insertTime = 0, processTime = 0, deleteTime = 0;
 
-    public List<SingleTypeInfo> process2(BasicDBObject payload, String url, String method, int responseCode, String userId,
+    public List<SingleTypeInfo> process2(Map<String, Set<Object>> flattened, String url, String method, int responseCode, String userId,
                                          int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap, int timestamp) {
             List<SingleTypeInfo> deleted = new ArrayList<>();
         
             if(userIds.size() < 10) userIds.add(userId);
-
-            Trie.Node<String, Pair<KeyTypes, Set<String>>> root = this.keyTrie.getRoot();
 
             long s = System.currentTimeMillis();
             // insert(payload, userId, root, url, method, responseCode, "", apiCollectionId);
             insertTime += (System.currentTimeMillis() - s);
             int now = Context.now();
 
-            Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
             s = System.currentTimeMillis();
             for(String param: flattened.keySet()) {
                 if (parameters.size() > 1000) {
@@ -645,6 +644,29 @@ public class RequestTemplate {
         String reqPayload = requestParams.getPayload();
 
         return parseRequestPayload(reqPayload, urlWithParams);
+    }
+    public static JSONObject parseRequestPayloadToJsonObject(String reqPayload, String urlWithParams) {
+        BasicDBObject queryParams = getQueryJSON(urlWithParams);
+
+        if (reqPayload == null || reqPayload.isEmpty()) {
+            reqPayload = "{}";
+        }
+
+        if(reqPayload.startsWith("[")) {
+            reqPayload = "{\"json\": "+reqPayload+"}";
+        }
+
+
+        JSONObject payload = null;
+        try {
+            payload = JSON.parseObject(reqPayload);
+        } catch (Exception e) {
+            payload = JSON.parseObject("{}");
+        }
+
+        payload.putAll(queryParams.toMap());
+
+        return payload;
     }
 
     public static BasicDBObject parseRequestPayload(String reqPayload, String urlWithParams) {
