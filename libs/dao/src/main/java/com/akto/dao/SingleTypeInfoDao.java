@@ -5,11 +5,13 @@ import java.net.URISyntaxException;
 import java.util.*;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.util.Util;
@@ -20,7 +22,7 @@ import com.mongodb.client.model.*;
 
 import org.bson.conversions.Bson;
 
-public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
+public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo> {
 
     public static final SingleTypeInfoDao instance = new SingleTypeInfoDao();
 
@@ -599,4 +601,8 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return hosts;
     }
 
+    @Override
+    public String getFilterKeyString() {
+        return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.ApiCollectionId);
+    }
 }

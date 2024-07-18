@@ -1,9 +1,11 @@
 package com.akto.dao;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.testing.TestingEndpoints;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.akto.dto.type.SingleTypeInfo;
@@ -24,7 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
+public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
     public static ApiInfoDao instance = new ApiInfoDao();
 
@@ -179,4 +181,8 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         );
     }
 
+    @Override
+    public String getFilterKeyString() {
+        return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.Id_ApiCollectionId) + ApiInfo.ApiInfoKey.API_COLLECTION_ID;
+    }
 }
