@@ -73,6 +73,7 @@ public class StartTestAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
     private TestingRunType testingRunType;
     private String searchString;
+    private boolean continuousTesting;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
@@ -1206,4 +1207,13 @@ public class StartTestAction extends UserAction {
     public Map<TestError, String> getErrorEnums() {
         return errorEnums;
     }
+
+    public boolean getContinuousTesting() {
+        return continuousTesting;
+    }
+
+    public void setContinuousTesting(boolean continuousTesting) {
+        this.continuousTesting = continuousTesting;
+    }
+
 }

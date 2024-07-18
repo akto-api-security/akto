@@ -410,7 +410,7 @@ public class Main {
                 Organization organization = OrganizationsDao.instance.findOne(
                         Filters.in(Organization.ACCOUNTS, Context.accountId.get()));
 
-                if(organization.getTestTelemetryEnabled()){
+                if(organization != null && organization.getTestTelemetryEnabled()){
                     loggerMaker.infoAndAddToDb("Test telemetry enabled for account: " + accountId + ", sending results", LogDb.TESTING);
                     ObjectId finalSummaryId = summaryId;
                     testTelemetryScheduler.execute(() -> {
