@@ -199,7 +199,15 @@ public class OriginalHttpRequest {
     }
 
     public String findHostFromHeader() {
-        return findHeaderValue("host");
+        String host;
+        host = findHeaderValue("host");
+        if (host == null) {
+            host = findHeaderValue(":authority");//http2 header for host
+            if (host == null) {
+                host = findHeaderValue("authority");
+            }
+        }
+        return host;
     }
 
     public String findProtocolFromHeader() {

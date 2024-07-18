@@ -30,7 +30,7 @@ function QuickStart() {
         loading ? <SpinnerCentered/> :
             myConnections.length > 0 ?
             <div className='update-connections'>
-                <UpdateConnections myConnections={myConnections}/>
+                <UpdateConnections myConnections={[]}/>
             </div> : <NewConnection/>
     )
 

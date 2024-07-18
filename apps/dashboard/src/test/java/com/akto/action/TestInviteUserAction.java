@@ -42,6 +42,9 @@ public class TestInviteUserAction {
         code = InviteUserAction.validateEmail("avneesh@akto.io", "aryan@child2.com");
         assertNull(code);
 
+        code = InviteUserAction.validateEmail("avneesh@bigcorp.com", "ankush@bigcorp.com");
+        assertNull(code);
+
         InviteUserAction.commonOrganisationsMap = new HashMap<>();
     }
 }
