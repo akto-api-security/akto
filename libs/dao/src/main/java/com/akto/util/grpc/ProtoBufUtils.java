@@ -73,7 +73,7 @@ public class ProtoBufUtils {
                     boolean probablyString = true;
                     String str = new String(data.toByteArray(), StandardCharsets.UTF_8);
                     for (char c : str.toCharArray()) {
-                        if (c < '\u001B') {
+                        if (c <= '\u001B') {
                             probablyString = false;
                             break;
                         }
