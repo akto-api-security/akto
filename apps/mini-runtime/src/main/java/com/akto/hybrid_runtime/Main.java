@@ -173,7 +173,7 @@ public class Main {
 
         APIConfig apiConfig = null;
         try {
-            apiConfig = APIConfigsDao.instance.findOne(Filters.eq("name", configName));
+            apiConfig = dataActor.fetchApiConfig(configName);;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error while fetching api config " + e.getMessage(), LogDb.RUNTIME);
         }
