@@ -16,6 +16,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         tests: {},
         selectedCategory: "",
         recurringDaily: false,
+        continuousTesting: false,
         overriddenTestAppUrl: "",
         hasOverriddenTestAppUrl: false,
         startTimestamp: func.timeNow(),
@@ -273,6 +274,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         if (testRun.hourlyLabel === "Now") {
             if (testRun.recurringDaily) {
                 return <div data-testid="schedule_run_button">Run daily at this time</div>
+            } else if (testRun.continuousTesting) {
+                return <div data-testid="schedule_run_button">Run continuous testing</div>
             } else {
                 return <div data-testid="schedule_run_button">Run once now</div>
             }
@@ -313,7 +316,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId } = testRun
+        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting } = testRun
         const collectionId = parseInt(apiCollectionId)
 
         const tests = testRun.tests
@@ -332,9 +335,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }))
 
         if (filtered) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting)
         }
 
         setActive(false)
@@ -487,9 +490,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
                         <HorizontalGrid columns="2">
                             <Box>
-                                <ButtonGroup>
-                                    <Text>Select time:</Text>
-                                    <Dropdown
+                                <Button disabled={testRun.continuousTesting} plain monochrome removeUnderline>
+                                    <HorizontalStack gap={"1"}>
+                                        <Text>Select Time:</Text>
+                                        <Dropdown
                                         menuItems={hourlyTimes}
                                         initial={testRun.hourlyLabel}
                                         selected={(hour) => {
@@ -508,7 +512,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                                 hourlyLabel: hourlyTime ? hourlyTime.label : ""
                                             }))
                                         }} />
-                                </ButtonGroup>
+                                    </HorizontalStack>
+                                </Button>
                                 <br />
 
                                 <ButtonGroup>
@@ -516,6 +521,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         label="Run daily"
                                         checked={testRun.recurringDaily}
                                         onChange={() => setTestRun(prev => ({ ...prev, recurringDaily: !prev.recurringDaily }))}
+                                    />
+                                    <Checkbox
+                                        label="Continuous Testing"
+                                        checked={testRun.continuousTesting}
+                                        onChange={() => setTestRun(prev => ({ ...prev, continuousTesting: !prev.continuousTesting }))}
                                     />
                                     <Checkbox
                                         label="Use different target for testing"
