@@ -616,7 +616,7 @@ public class ApiCollectionsAction extends UserAction {
 
         for(Map.Entry<String, List<Integer>> entry : userCollectionMap.entrySet()) {
             int userId = Integer.parseInt(entry.getKey());
-            List<Integer> apiCollections = entry.getValue();
+            Set<Integer> apiCollections = new HashSet<>(entry.getValue());
 
             RBACDao.updateApiCollectionAccess(userId, accountId, apiCollections);
         }
