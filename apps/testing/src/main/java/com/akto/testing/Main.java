@@ -298,17 +298,20 @@ public class Main {
 
                 try {
                     fillTestingEndpoints(testingRun);
-                    CustomTestingEndpoints eps = (CustomTestingEndpoints) testingRun.getTestingEndpoints();
-                    if (eps.getApisList().size() == 0) {
-                        Bson completedUpdate = Updates.combine(
-                            Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                            Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
-                            Updates.set(TestingRun.SCHEDULE_TIMESTAMP, Context.now() + 5 * 60)
-                        );
-                        TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                            Filters.eq("_id", testingRun.getId()),  completedUpdate
-                        );
-                        return;
+                    // continuous testing condition
+                    if (testingRun.getPeriodInSeconds() == -1) {
+                        CustomTestingEndpoints eps = (CustomTestingEndpoints) testingRun.getTestingEndpoints();
+                        if (eps.getApisList().size() == 0) {
+                            Bson completedUpdate = Updates.combine(
+                                Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                                Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
+                                Updates.set(TestingRun.SCHEDULE_TIMESTAMP, Context.now() + 5 * 60)
+                            );
+                            TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                                Filters.eq("_id", testingRun.getId()),  completedUpdate
+                            );
+                            return;
+                        }
                     }
                     setTestingRunConfig(testingRun, trrs);
 
@@ -433,7 +436,7 @@ public class Main {
                 Organization organization = OrganizationsDao.instance.findOne(
                         Filters.in(Organization.ACCOUNTS, Context.accountId.get()));
 
-                if(organization.getTestTelemetryEnabled()){
+                if(organization != null && organization.getTestTelemetryEnabled()){
                     loggerMaker.infoAndAddToDb("Test telemetry enabled for account: " + accountId + ", sending results", LogDb.TESTING);
                     ObjectId finalSummaryId = summaryId;
                     testTelemetryScheduler.execute(() -> {
