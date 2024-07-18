@@ -73,6 +73,7 @@ public class StartTestAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
     private TestingRunType testingRunType;
     private String searchString;
+    private boolean continuousTesting;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
@@ -186,6 +187,10 @@ public class StartTestAction extends UserAction {
         if (localTestingRun == null) {
             try {
                 localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
+                // pass boolean from ui, which will tell if testing is coniinuous on new endpoints
+                if (this.continuousTesting) {
+                    localTestingRun.setPeriodInSeconds(-1);
+                }
                 if (triggeredBy != null && !triggeredBy.isEmpty()) {
                     localTestingRun.setTriggeredBy(triggeredBy);
                 }
@@ -1213,4 +1218,13 @@ public class StartTestAction extends UserAction {
     public Map<TestError, String> getErrorEnums() {
         return errorEnums;
     }
+
+    public boolean getContinuousTesting() {
+        return continuousTesting;
+    }
+
+    public void setContinuousTesting(boolean continuousTesting) {
+        this.continuousTesting = continuousTesting;
+    }
+
 }
