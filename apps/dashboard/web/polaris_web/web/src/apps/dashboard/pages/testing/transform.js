@@ -80,7 +80,7 @@ function getTestingRunType(testingRun, testingRunResultSummary, cicd) {
   if (testingRunResultSummary.metadata != null || cicd) {
     return 'CI/CD';
   }
-  if (testingRun.scheduleTimestamp >= func.timeNow() && testingRun.scheduleTimestamp < func.timeNow() + 86400) {
+  if (testingRun.state === "SCHEDULED" && testingRun.periodInSeconds !== 0) {
     return 'Recurring';
   }
   return 'One-time'
@@ -259,7 +259,13 @@ const transform = {
 
     let apiCollectionId = -1
     if(Object.keys(data).length > 0){
-      apiCollectionId = data?.testingEndpoints?.apiCollectionId ||  data?.testingEndpoints?.workflowTest?.apiCollectionId || data?.testingEndpoints?.apisList[0]?.apiCollectionId
+      if(data?.testingEndpoints?.apiCollectionId !== undefined){
+        apiCollectionId = data?.testingEndpoints?.apiCollectionId
+      }else if(data?.testingEndpoints?.workflowTest?.apiCollectionId !== undefined){
+        apiCollectionId = data?.testingEndpoints?.workflowTest?.apiCollectionId 
+      }else{
+        apiCollectionId = data?.testingEndpoints?.apisList[0]?.apiCollectionId
+      }
     }
     const iconObj = func.getTestingRunIconObj(state)
 
@@ -594,8 +600,13 @@ const transform = {
     resp.testSourceConfigs.forEach((x_1) => {
       subCategoryFromSourceConfigMap[x_1.id] = x_1;
     });
+    let categoryMap = {};
+    resp.categories.forEach((category) => {
+      categoryMap[category.name] = category;
+    });
     PersistStore.getState().setSubCategoryMap(subCategoryMap);
     PersistStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap);
+    PersistStore.getState().setCategoryMap(categoryMap);
   },
   prettifySummaryTable(summaries) {
     summaries = summaries.map((obj) => {

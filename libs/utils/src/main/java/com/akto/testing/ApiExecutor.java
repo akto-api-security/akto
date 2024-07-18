@@ -11,11 +11,11 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.util.Constants;
-
+import com.akto.util.HttpRequestResponseUtils;
+import com.akto.util.grpc.ProtoBufUtils;
 import kotlin.Pair;
 import okhttp3.*;
 import okio.BufferedSink;
-
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
@@ -31,7 +31,7 @@ public class ApiExecutor {
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
     
-    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
@@ -66,8 +66,8 @@ public class ApiExecutor {
         }
 
         OkHttpClient client = debug ?
-                HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs) :
-                HTTPClientHandler.instance.getHTTPClient(followRedirects);
+                HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs, requestProtocol) :
+                HTTPClientHandler.instance.getHTTPClient(followRedirects, requestProtocol);
 
         if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
@@ -78,6 +78,7 @@ public class ApiExecutor {
         Call call = client.newCall(request);
         Response response = null;
         String body;
+        byte[] grpcBody = null;
         try {
             response = call.execute();
             ResponseBody responseBody = response.peekBody(MAX_RESPONSE_SIZE);
@@ -85,7 +86,20 @@ public class ApiExecutor {
                 throw new Exception("Couldn't read response body");
             }
             try {
-                body = responseBody.string();
+                if (requestProtocol != null && requestProtocol.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {//GRPC request
+                    grpcBody = responseBody.bytes();
+                    StringBuilder builder = new StringBuilder();
+                    builder.append("grpc response binary array: ");
+                    for (byte b : grpcBody) {
+                        builder.append(b).append(",");
+                    }
+                    loggerMaker.infoAndAddToDb(builder.toString(), LogDb.TESTING);
+                    String responseBase64Encoded = Base64.getEncoder().encodeToString(grpcBody);
+                    loggerMaker.infoAndAddToDb("grpc response base64 encoded:" + responseBase64Encoded, LogDb.TESTING);
+                    body = HttpRequestResponseUtils.convertGRPCEncodedToJson(grpcBody);
+                } else {
+                    body = responseBody.string();
+                }
             } catch (IOException e) {
                 if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
                     loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
@@ -116,7 +130,6 @@ public class ApiExecutor {
         Headers headers = response.headers();
 
         Map<String, List<String>> responseHeaders = generateHeadersMapFromHeadersObject(headers);
-
         return new OriginalHttpResponse(body, responseHeaders, statusCode);
     }
 
@@ -236,7 +249,7 @@ public class ApiExecutor {
         request.setUrl(url);
 
         Request.Builder builder = new Request.Builder();
-
+        String type = request.findContentType();
         // add headers
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         Map<String, List<String>> headersMap = request.getHeaders();
@@ -252,7 +265,6 @@ public class ApiExecutor {
                 builder.addHeader(headerName, headerValue);
             }
         }
-
         URLMethods.Method method = URLMethods.Method.fromString(request.getMethod());
 
         builder = builder.url(request.getFullUrlWithParams());
@@ -261,7 +273,7 @@ public class ApiExecutor {
         switch (method) {
             case GET:
             case HEAD:
-                response = getRequest(request, builder, followRedirects, debug, testLogs, skipSSRFCheck);
+                response = getRequest(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, type);
                 break;
             case POST:
             case PUT:
@@ -270,7 +282,7 @@ public class ApiExecutor {
             case PATCH:
             case TRACK:
             case TRACE:
-                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs, skipSSRFCheck);
+                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, type);
                 break;
             case OTHER:
                 throw new Exception("Invalid method name");
@@ -284,9 +296,9 @@ public class ApiExecutor {
     }
 
 
-    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck)  throws Exception{
+    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String type)  throws Exception{
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, type);
     }
 
     public static RequestBody getFileRequestBody(String fileUrl){
@@ -331,7 +343,7 @@ public class ApiExecutor {
 
 
 
-    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
         if (headers == null) {
             headers = new HashMap<>();
@@ -348,22 +360,40 @@ public class ApiExecutor {
             Request updatedRequest = builder.build();
 
 
-            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck);
+            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol);
         }
 
         String contentType = request.findContentType();
         String payload = request.getBody();
+        RequestBody body = null;
         if (contentType == null ) {
             contentType = "application/json; charset=utf-8";
             if (payload == null) payload = "{}";
             payload = payload.trim();
             if (!payload.startsWith("[") && !payload.startsWith("{")) payload = "{}";
+        } else if (contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
+            try {
+                loggerMaker.infoAndAddToDb("encoding to grpc payload:" + payload, LogDb.TESTING);
+                payload = ProtoBufUtils.base64EncodedJsonToProtobuf(payload);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Unable to encode grpc payload:" + payload, LogDb.TESTING);
+                payload = request.getBody();
+            }
+            try {// trying decoding payload
+                byte[] payloadByteArray = Base64.getDecoder().decode(payload);
+                loggerMaker.infoAndAddToDb("Final base64 encoded payload:"+ payload, LogDb.TESTING);
+                body = RequestBody.create(payloadByteArray, MediaType.parse(contentType));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Unable to decode grpc payload:" + payload, LogDb.TESTING);
+            }
         }
 
         if (payload == null) payload = "";
-        RequestBody body = RequestBody.create(payload, MediaType.parse(contentType));
+        if (body == null) {// body not created by GRPC block yet
+            body = RequestBody.create(payload, MediaType.parse(contentType));
+        }
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol);
     }
 }

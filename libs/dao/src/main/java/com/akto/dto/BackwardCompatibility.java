@@ -81,6 +81,9 @@ public class BackwardCompatibility {
     public static final String DROP_API_DEPENDENCIES = "dropApiDependencies";
     private int dropApiDependencies;
 
+    public static final String ADD_ADMIN_ROLE = "addAdminRoleIfAbsent";
+    private int addAdminRoleIfAbsent;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -89,7 +92,7 @@ public class BackwardCompatibility {
                                  int computeIntegratedConnections, int deleteLastCronRunInfo, int moveAuthMechanismToRole,
                                  int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
-                                 int automatedApiGroups) {
+                                 int automatedApiGroups, int addAdminRoleIfAbsent) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -116,6 +119,7 @@ public class BackwardCompatibility {
         this.disableAwsSecretPii = disableAwsSecretPii;
         this.apiCollectionAutomatedField = apiCollectionAutomatedField;
         this.automatedApiGroups = automatedApiGroups;
+        this.addAdminRoleIfAbsent = addAdminRoleIfAbsent;
     }
 
     public BackwardCompatibility() {
@@ -351,5 +355,13 @@ public class BackwardCompatibility {
 
     public void setDropApiDependencies(int dropApiDependencies) {
         this.dropApiDependencies = dropApiDependencies;
+    }
+
+    public int getAddAdminRoleIfAbsent() {
+        return addAdminRoleIfAbsent;
+    }
+
+    public void setAddAdminRoleIfAbsent(int addAdminRoleIfAbsent) {
+        this.addAdminRoleIfAbsent = addAdminRoleIfAbsent;
     }
 }

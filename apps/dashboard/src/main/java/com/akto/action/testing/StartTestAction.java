@@ -527,8 +527,15 @@ public class StartTestAction extends UserAction {
                     break;
                 case SECURED:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
-                    testingRunResultFilters.add(Filters.nin(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
-                    testingRunResultFilters.add(Filters.eq(TestingRunResult.REQUIRES_CONFIG, false));
+                    testingRunResultFilters.add(
+                        Filters.or(
+                            Filters.exists(WorkflowTestingEndpoints._WORK_FLOW_TEST),
+                            Filters.and(
+                                Filters.nin(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()),
+                                Filters.ne(TestingRunResult.REQUIRES_CONFIG, true)
+                            )
+                        )
+                    );
                     break;
                 case SKIPPED_EXEC_NEED_CONFIG:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
@@ -606,7 +613,7 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private String getNodeResultLastMessage(String message) {
+    public static String getNodeResultLastMessage(String message) {
         if (StringUtils.isEmpty(message) || "[]".equals(message)) {
             return null;
         }

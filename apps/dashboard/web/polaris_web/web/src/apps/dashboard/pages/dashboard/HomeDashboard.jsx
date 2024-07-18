@@ -112,7 +112,7 @@ function HomeDashboard() {
             variant: 'headingLg'
         },
         {
-            title: 'Sensitive data',
+            title: 'Sensitive in response',
             data: observeFunc.formatNumberWithCommas(sensitiveCount),
             variant: 'headingLg'
         }
@@ -181,7 +181,7 @@ function HomeDashboard() {
                     docsUrl={"https://docs.akto.io/api-inventory/concepts/sensitive-data"}
                 />
                 <HorizontalGrid gap={5} columns={2}>
-                    <ChartypeComponent navUrl={"/dashboard/observe/sensitive/"} data={sensitiveData.request} title={"Request"} isNormal={true} boxHeight={'100px'}/>
+                    <ChartypeComponent navUrl={"/dashboard/observe/sensitive/"} isRequest={true} data={sensitiveData.request} title={"Request"} isNormal={true} boxHeight={'100px'}/>
                     <ChartypeComponent navUrl={"/dashboard/observe/sensitive/"} data={sensitiveData.response} title={"Response"} isNormal={true} boxHeight={'100px'}/>
                 </HorizontalGrid>
             </VerticalStack>

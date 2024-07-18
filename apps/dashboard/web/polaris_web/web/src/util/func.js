@@ -545,6 +545,37 @@ prettifyEpoch(epoch) {
   },
   
 sortFunc: (data, sortKey, sortOrder) => {
+  if(sortKey === 'displayName'){
+    let finalArr = data.sort((a, b) => {
+        let nameA = ""
+        if(a?.displayName?.length > 0){
+          nameA = a?.displayName.toLowerCase() ;
+        }else if(a?.name?.length > 0){
+          nameA = a?.name.toLowerCase();
+        }
+        let nameB = ""
+        if(b?.displayName?.length > 0){
+          nameB = b?.displayName.toLowerCase() ;
+        }else if(b?.name?.length > 0){
+          nameB = b?.name.toLowerCase();
+        }
+    
+        // Define a regex to check if the name starts with a digit
+        const startsWithDigitA = /^\d/.test(nameA);
+        const startsWithDigitB = /^\d/.test(nameB);
+    
+        // Alphabetical names should come first
+        if (startsWithDigitA && !startsWithDigitB) return 1;
+        if (!startsWithDigitA && startsWithDigitB) return -1;
+    
+        // If both names either start with a digit or both don't, compare them directly
+        return nameA.localeCompare(nameB);
+    });
+    if(sortOrder > 0){
+      finalArr.reverse()
+    }
+    return finalArr
+  }
   return data.sort((a, b) => {
     if(typeof a[sortKey] ==='number')
     return (sortOrder) * (a[sortKey] - b[sortKey]);
@@ -1227,8 +1258,8 @@ mapCollectionIdToHostName(apiCollections){
     }
   },
 
-  getSensitiveIcons(data){
-    const key = data.toUpperCase();
+  getSensitiveIcons(data) {
+    const key = data.toUpperCase().replace(/ /g, '_');
     switch (key) {
         case "DATABASE":
           return DynamicSourceMinor;
@@ -1244,41 +1275,41 @@ mapCollectionIdToHostName(apiCollections){
           return KeyMajor;
         case "EMAIL":
           return InviteMinor;
-        case "CREDIT CARD":
+        case "CREDIT_CARD":
           return CreditCardMajor;
         case "SSN":
           return IdentityCardMajor;
         case "ADDRESS":
           return LocationsMinor;
-        case "IP ADDRESS":
+        case "IP_ADDRESS":
           return LocationsMinor;
-        case "PHONE NUMBER":
+        case "PHONE_NUMBER":
           return PhoneMajor;
         case "UUID":
           return IdentityCardMajor;
-        case "DATA FILE":
+        case "DATA_FILE":
           return FileMinor;
         case "IMAGE":
           return ImageMajor;
-        case "US ADDRESS":
-          return LocationsMinor
-        case "IBAN EUROPE":
+        case "US_ADDRESS":
+          return LocationsMinor;
+        case "IBAN_EUROPE":
           return BankMajor;
-        case "JAPANESE SOCIAL INSURANCE NUMBER":
+        case "JAPANESE_SOCIAL_INSURANCE_NUMBER":
           return HashtagMinor;
-        case "GERMAN INSURANCE IDENTITY NUMBER":
+        case "GERMAN_INSURANCE_IDENTITY_NUMBER":
           return IdentityCardMajor;
-        case "CANADIAN SOCIAL IDENTITY NUMBER":
+        case "CANADIAN_SOCIAL_IDENTITY_NUMBER":
           return IdentityCardMajor;
-        case "FINNISH PERSONAL IDENTITY NUMBER":
+        case "FINNISH_PERSONAL_IDENTITY_NUMBER":
           return IdentityCardMajor;
-        case "UK NATIONAL INSURANCE NUMBER":
+        case "UK_NATIONAL_INSURANCE_NUMBER":
           return HashtagMinor;
-        case "INDIAN UNIQUE HEALTH IDENTIFICATION":
+        case "INDIAN_UNIQUE_HEALTH_IDENTIFICATION":
           return IdentityCardMajor;
-        case "US MEDICARE HEALTH INSURANCE CLAIM NUMBER":
+        case "US_MEDICARE_HEALTH_INSURANCE_CLAIM_NUMBER":
           return HashtagMinor;
-        case "PAN CARD":
+        case "PAN_CARD":
           return IdentityCardMajor;
         case "ENCRYPT":
           return LockMinor;
@@ -1307,9 +1338,9 @@ mapCollectionIdToHostName(apiCollections){
         case "DOB":
           return CalendarMinor;
         case "BIRTH":
-          return CalendarTimeMinor
+          return CalendarTimeMinor;
         default: 
-            return KeyMajor;
+          return KeyMajor;
     }
   },
   getCollectionFilters(filters) {
@@ -1431,7 +1462,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       const tabId = this.getKeyFromName(tab)
       return {
           content: tab,
-          badge: selectedTab === tabId ? currentCount.toString() : countObj[tabId].toString(),
+          badge: selectedTab === (tabId && currentCount !==0) ? currentCount.toString() : countObj[tabId].toString(),
           onAction: () => { setSelectedTab(tabId) },
           id: this.getKeyFromName(tabId),
           index: ind 
@@ -1484,6 +1515,33 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return true;
     }
     return false;
+  },
+  checkUserValidForIntegrations(){
+    const userRole = window.USER_ROLE
+    return !(userRole === "GUEST" || userRole === "MEMBER")
+  },
+  capitalizeFirstLetter(str) {
+    if (!str) return str;
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  },
+  getDaySuffix(day) {
+    if (day > 3 && day < 21) return 'th';
+    switch (day % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+    }
+  },
+  formatReportDate(date) {
+    const day = date.getDate();
+    const month = date.toLocaleString('default', { month: 'long' });
+    const year = date.getFullYear();
+    const daySuffix = func.getDaySuffix(day);
+    return `${day}${daySuffix} ${month}, ${year}`;
+  },
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 
