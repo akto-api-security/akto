@@ -136,6 +136,9 @@ public class DbAction extends ActionSupport {
     List<String> urls;
     ApiInfo.ApiInfoKey apiInfoKey;
     int apiCollectionId;
+    int startTimestamp;
+    int endTimestamp;
+    List<ApiInfo.ApiInfoKey> newEps;
     String logicalGroupName;
     BasicDBList issuesIds;
 
@@ -1571,6 +1574,15 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchLatestEndpointsForTesting() {
+        try {
+            newEps = DbLayer.fetchLatestEndpointsForTesting(startTimestamp, endTimestamp, apiCollectionId);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -2415,6 +2427,30 @@ public class DbAction extends ActionSupport {
 
     public void setLastStiId(String lastStiId) {
         this.lastStiId = lastStiId;
+    }
+
+    public int getStartTimestamp() {
+        return startTimestamp;
+    }
+
+    public void setStartTimestamp(int startTimestamp) {
+        this.startTimestamp = startTimestamp;
+    }
+
+    public int getEndTimestamp() {
+        return endTimestamp;
+    }
+
+    public void setEndTimestamp(int endTimestamp) {
+        this.endTimestamp = endTimestamp;
+    }
+
+    public List<ApiInfo.ApiInfoKey> getNewEps() {
+        return newEps;
+    }
+
+    public void setNewEps(List<ApiInfo.ApiInfoKey> newEps) {
+        this.newEps = newEps;
     }
 
 }
