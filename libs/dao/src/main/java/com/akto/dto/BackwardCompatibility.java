@@ -84,6 +84,9 @@ public class BackwardCompatibility {
     public static final String ADD_ADMIN_ROLE = "addAdminRoleIfAbsent";
     private int addAdminRoleIfAbsent;
 
+    public static final String FILL_RISK_SCORE_IN_COLLECTIONS = "fillRiskScoreInCollections";
+    private int fillRiskScoreInCollections;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -92,7 +95,7 @@ public class BackwardCompatibility {
                                  int computeIntegratedConnections, int deleteLastCronRunInfo, int moveAuthMechanismToRole,
                                  int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
-                                 int automatedApiGroups, int addAdminRoleIfAbsent) {
+                                 int automatedApiGroups, int addAdminRoleIfAbsent, int fillRiskScoreInCollections) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -120,6 +123,7 @@ public class BackwardCompatibility {
         this.apiCollectionAutomatedField = apiCollectionAutomatedField;
         this.automatedApiGroups = automatedApiGroups;
         this.addAdminRoleIfAbsent = addAdminRoleIfAbsent;
+        this.fillRiskScoreInCollections = fillRiskScoreInCollections;
     }
 
     public BackwardCompatibility() {
@@ -363,5 +367,13 @@ public class BackwardCompatibility {
 
     public void setAddAdminRoleIfAbsent(int addAdminRoleIfAbsent) {
         this.addAdminRoleIfAbsent = addAdminRoleIfAbsent;
+    }
+
+    public int getFillRiskScoreInCollections() {
+        return fillRiskScoreInCollections;
+    }
+
+    public void setFillRiskScoreInCollections(int fillRiskScoreInCollections) {
+        this.fillRiskScoreInCollections = fillRiskScoreInCollections;
     }
 }

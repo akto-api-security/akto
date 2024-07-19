@@ -62,7 +62,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         fieldNames = new String[]{ApiInfo.LAST_TESTED};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
-        fieldNames = new String[]{ApiInfo.LAST_CALCULATED_TIME};
+        fieldNames = new String[]{ApiInfo.LAST_CALCULATED_TIME, ApiInfo.ID_API_COLLECTION_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),

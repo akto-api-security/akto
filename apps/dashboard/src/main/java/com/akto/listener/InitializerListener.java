@@ -2196,6 +2196,16 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void fillRiskScoreInCollections(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getFillRiskScoreInCollections() == 0){
+            RiskScoreOfCollections.fillInitialRiskScoreInCollections();
+            BackwardCompatibilityDao.instance.updateOne(
+                        Filters.eq("_id", backwardCompatibility.getId()),
+                        Updates.set(BackwardCompatibility.FILL_RISK_SCORE_IN_COLLECTIONS, Context.now())
+                );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
@@ -2223,6 +2233,7 @@ public class InitializerListener implements ServletContextListener {
         setDefaultTelemetrySettings(backwardCompatibility);
         disableAwsSecretPiiType(backwardCompatibility);
         makeFirstUserAdmin(backwardCompatibility);
+        fillRiskScoreInCollections(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {

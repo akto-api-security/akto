@@ -2,13 +2,16 @@ package com.akto.utils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.List;
 
 import org.bson.conversions.Bson;
 
+import com.akto.action.ApiCollectionsAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AktoDataTypeDao;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomDataTypeDao;
 import com.akto.dao.SingleTypeInfoDao;
@@ -17,19 +20,16 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.AktoDataType;
-import com.akto.dto.ApiCollectionUsers;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.RiskScoreTestingEndpoints;
-import com.akto.dto.testing.TestingEndpoints;
-import com.akto.dto.testing.RiskScoreTestingEndpoints.RiskScoreGroupType;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.LastCronRunInfo;
-import com.google.protobuf.Api;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
@@ -42,6 +42,7 @@ import com.mongodb.client.model.UpdateManyModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
+import com.opensymphony.xwork2.Action;
 
 import static com.akto.utils.Utils.calculateRiskValueForSeverity;
 public class RiskScoreOfCollections {
@@ -73,6 +74,40 @@ public class RiskScoreOfCollections {
         }
 
         return updatedApiInfoKeys;
+    }
+
+    private static void updateRiskScoreInCollections(Map<Integer,Float> collectionRiskScoreMap){
+        if(!collectionRiskScoreMap.isEmpty()){
+            List<Integer> apiCollectionIds = new ArrayList<>(collectionRiskScoreMap.keySet());
+            List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
+                Filters.in(ApiCollection.ID, apiCollectionIds),Projections.include(ApiCollection.ID, ApiCollection.RISK_SCORE)
+            );
+
+            ArrayList<WriteModel<ApiCollection>> bulkUpdatesForApiCollections = new ArrayList<>();
+
+            for(ApiCollection collection: apiCollections){
+                float riskScore = Math.max(collection.getRiskScore(), collectionRiskScoreMap.get(collection.getId()));
+                bulkUpdatesForApiCollections.add(new UpdateManyModel<>(
+                    Filters.eq(ApiCollection.ID, collection.getId()), 
+                    Updates.set(ApiCollection.RISK_SCORE, riskScore),
+                    new UpdateOptions().upsert(false)));
+            }
+
+            ApiCollectionsDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiCollections,  new BulkWriteOptions().ordered(false));
+
+        }
+    }
+
+    private static void fillRiskScoreInCollections(Map<Integer,Double> collectionRiskScoreMap){
+        ArrayList<WriteModel<ApiCollection>> bulkUpdatesForApiCollections = new ArrayList<>();
+        for(Integer collectionId: collectionRiskScoreMap.keySet()){
+            bulkUpdatesForApiCollections.add(new UpdateManyModel<>(
+                    Filters.eq(ApiCollection.ID, collectionId), 
+                    Updates.set(ApiCollection.RISK_SCORE, collectionRiskScoreMap.get(collectionId)),
+                    new UpdateOptions().upsert(false)));
+        }
+        ApiCollectionsDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiCollections,  new BulkWriteOptions().ordered(false));
+        
     }
 
     private Map<ApiInfoKey, Float> getSeverityScoreMap(List<TestingRunIssues> issues){
@@ -148,6 +183,7 @@ public class RiskScoreOfCollections {
         Map<ApiInfoKey, Float> severityScoreMap = getSeverityScoreMap(updatedIssues);  
 
         RiskScoreTestingEndpointsUtils riskScoreTestingEndpointsUtils = new RiskScoreTestingEndpointsUtils();
+        Map<Integer, Float> collectionRiskScoreMap = new HashMap<>();
 
         // after getting the severityScoreMap, we write that in DB
         if(severityScoreMap != null){
@@ -156,6 +192,16 @@ public class RiskScoreOfCollections {
                 ApiInfo apiInfo = ApiInfoDao.instance.findOne(filter);
                 boolean isSensitive = apiInfo != null ? apiInfo.getIsSensitive() : false;
                 float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, Utils.getRiskScoreValueFromSeverityScore(severityScore));
+
+                if(apiInfo.getCollectionIds() != null){
+                    for(int collectionId: apiInfo.getCollectionIds()){
+                        float storedRiskScore = collectionRiskScoreMap.getOrDefault(collectionId, (float) 0);
+                        collectionRiskScoreMap.put(collectionId, Math.max(riskScore, storedRiskScore));
+                    }   
+                }else{
+                    float storedRiskScore = collectionRiskScoreMap.getOrDefault(apiInfo.getId().getApiCollectionId(), (float) 0);
+                    collectionRiskScoreMap.put(apiInfo.getId().getApiCollectionId(), Math.max(riskScore, storedRiskScore));
+                }
 
                 if (apiInfo != null) {
                     if (apiInfo.getRiskScore() != riskScore) {
@@ -167,13 +213,16 @@ public class RiskScoreOfCollections {
                     Updates.set(ApiInfo.SEVERITY_SCORE, severityScore),
                     Updates.set(ApiInfo.RISK_SCORE, riskScore)
                 );
-                bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filter, update,new UpdateOptions()));
+
+                bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filter, update,new UpdateOptions().upsert(false)));
             });
         }
 
         if (bulkUpdatesForApiInfo.size() > 0) {
             ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
         }
+
+        updateRiskScoreInCollections(collectionRiskScoreMap);
 
         riskScoreTestingEndpointsUtils.syncRiskScoreGroupApis();  
     }
@@ -194,6 +243,7 @@ public class RiskScoreOfCollections {
         pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("subTypes", "$subType")));
 
         MongoCursor<BasicDBObject> stiCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        Map<Integer, Float> collectionRiskScoreMap = new HashMap<>();
         while(stiCursor.hasNext()){
             try {
                 BasicDBObject basicDBObject = stiCursor.next();
@@ -212,7 +262,17 @@ public class RiskScoreOfCollections {
                     Updates.set(ApiInfo.IS_SENSITIVE, isSensitive),
                     Updates.set(ApiInfo.RISK_SCORE, riskScore)
                 );
-                bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filterQSampleData, update, new UpdateOptions()));
+
+                if(apiInfo.getCollectionIds() != null){
+                    for(int collectionId: apiInfo.getCollectionIds()){
+                        float storedRiskScore = collectionRiskScoreMap.getOrDefault(collectionId, (float) 0);
+                        collectionRiskScoreMap.put(collectionId, Math.max(riskScore, storedRiskScore));
+                    }   
+                }else{
+                    float storedRiskScore = collectionRiskScoreMap.getOrDefault(apiInfo.getId().getApiCollectionId(), (float) 0);
+                    collectionRiskScoreMap.put(apiInfo.getId().getApiCollectionId(), Math.max(riskScore, storedRiskScore));
+                }
+                bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filterQSampleData, update, new UpdateOptions().upsert(false)));
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -220,6 +280,7 @@ public class RiskScoreOfCollections {
 
         if (bulkUpdatesForApiInfo.size() > 0) {
             ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
+            updateRiskScoreInCollections(collectionRiskScoreMap);
         }
 
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -263,20 +324,30 @@ public class RiskScoreOfCollections {
 
     public void calculateRiskScoreForAllApis() {
         int timeStamp = Context.now() - 24*60*60;
-        int limit = 1000;
-        int count = 0; 
+        int limit = 10_000;
 
         List<WriteModel<ApiInfo>> bulkUpdates = new ArrayList<>();
-        Bson filter = Filters.or(
-            Filters.exists(ApiInfo.LAST_CALCULATED_TIME, false),
-            Filters.lte(ApiInfo.LAST_CALCULATED_TIME, timeStamp)
-        );
         Bson projection = Projections.include("_id", ApiInfo.API_ACCESS_TYPES, ApiInfo.LAST_SEEN, ApiInfo.SEVERITY_SCORE, ApiInfo.IS_SENSITIVE, ApiInfo.COLLECTION_IDS, ApiInfo.RISK_SCORE);
 
         RiskScoreTestingEndpointsUtils riskScoreTestingEndpointsUtils = new RiskScoreTestingEndpointsUtils();
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
+            Filters.empty(),Projections.include(ApiCollection.ID, ApiCollection.RISK_SCORE)
+        );
 
-        while(count < 100){
+        Map<Integer,Double> collectionRiskScoreMap = new HashMap<>();
+
+        for(ApiCollection apiCollection: apiCollections){
+            Bson filter = Filters.and(
+                    Filters.or(
+                            Filters.exists(ApiInfo.LAST_CALCULATED_TIME, false),
+                            Filters.lte(ApiInfo.LAST_CALCULATED_TIME, timeStamp)),
+                    Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollection.getId())
+            );
+
             List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter,0, limit, Sorts.descending(ApiInfo.LAST_CALCULATED_TIME), projection);
+            double maxRiskScore = 0;
+            HashSet<Integer> collectionIdsSet = new HashSet<>();
+            collectionIdsSet.add(apiCollection.getId());
             for(ApiInfo apiInfo: apiInfos){
                 float riskScore = ApiInfoDao.getRiskScore(apiInfo, apiInfo.getIsSensitive(), Utils.getRiskScoreValueFromSeverityScore(apiInfo.getSeverityScore()));
                 Bson update = Updates.combine(
@@ -284,10 +355,16 @@ public class RiskScoreOfCollections {
                     Updates.set(ApiInfo.LAST_CALCULATED_TIME, Context.now())
                 );
                 Bson filterQ = ApiInfoDao.getFilter(apiInfo.getId());
+
+                maxRiskScore = Math.max(riskScore, maxRiskScore);
                 
                 bulkUpdates.add(new UpdateManyModel<>(filterQ, update, new UpdateOptions().upsert(false)));
                 
                 List<Integer> collectionIds = apiInfo.getCollectionIds();
+                if(collectionIds != null && collectionIds.size() > 1){
+                    collectionIdsSet.addAll(collectionIds);
+                }
+                
                 float oldRiskScore = apiInfo.getRiskScore();
                 RiskScoreTestingEndpoints.RiskScoreGroupType oldRiskScoreGroupType = RiskScoreTestingEndpoints.calculateRiskScoreGroup(oldRiskScore);
                 int oldRiskScoreGroupCollectionId = RiskScoreTestingEndpoints.getApiCollectionId(oldRiskScoreGroupType);
@@ -304,12 +381,23 @@ public class RiskScoreOfCollections {
                 ApiInfoDao.instance.bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
             }
             bulkUpdates.clear();
-            count++;
-            if(apiInfos.size() < limit){
-                break;
+
+            for(Integer id: collectionIdsSet){
+                collectionRiskScoreMap.put(id, maxRiskScore);
             }
         }
 
+        fillRiskScoreInCollections(collectionRiskScoreMap);
+
         riskScoreTestingEndpointsUtils.syncRiskScoreGroupApis();
+    }
+
+    public static void fillInitialRiskScoreInCollections(){
+        ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+        String actionString = apiCollectionsAction.fetchRiskScoreInfo();
+        if(actionString.equalsIgnoreCase(Action.SUCCESS)){
+            Map<Integer,Double> riskScoreMap = apiCollectionsAction.getRiskScoreOfCollectionsMap();
+            fillRiskScoreInCollections(riskScoreMap);
+        }
     }
 }

@@ -65,6 +65,12 @@ public class ApiCollection {
     List<TestingEndpoints> conditions;
     public static final String CONDITIONS_STRING = "conditions";
 
+    public static final String LAST_SEEN = "lastTrafficSeen";
+    private int lastTrafficSeen;
+
+    public static final String RISK_SCORE = "riskScore";
+    private float riskScore;
+
     public ApiCollection() {
     }
 
@@ -284,6 +290,22 @@ public class ApiCollection {
 
     public void setAutomated(boolean automated) {
         this.automated = automated;
+    }
+
+    public int getLastTrafficSeen() {
+        return lastTrafficSeen;
+    }
+
+    public void setLastTrafficSeen(int lastTrafficSeen) {
+        this.lastTrafficSeen = lastTrafficSeen;
+    }
+
+    public float getRiskScore() {
+        return riskScore;
+    }
+
+    public void setRiskScore(float riskScore) {
+        this.riskScore = riskScore;
     }
     
 }
