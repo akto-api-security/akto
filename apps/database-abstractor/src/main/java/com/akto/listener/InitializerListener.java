@@ -19,6 +19,7 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.merging.Cron;
+import com.akto.scripts.InsertRecordsInKafka;
 import com.akto.util.AccountTask;
 import com.mongodb.ConnectionString;
 
@@ -31,35 +32,18 @@ public class InitializerListener implements ServletContextListener {
 
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
-
-        String mongoURI = System.getenv("AKTO_MONGO_CONN");
-
+        String kafkaUrl = "10.100.131.197:9092";
         executorService.schedule(new Runnable() {
             public void run() {
-                boolean calledOnce = false;
-                do {
-                    try {
-
-                        if (!calledOnce) {
-                            DaoInit.init(new ConnectionString(mongoURI));
-                            calledOnce = true;
-                        }
-                        checkMongoConnection();
-
-                        Cron cron = new Cron();
-                        logger.info("triggering merging cron for db abstractor " + Context.now());
-                        cron.cron(true);
-
-                    } catch (Exception e) {
-                        logger.error("error running initializer method for db abstractor", e);
-                    } finally {
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
+                try {
+                    for (int i = 0; i < 500_000; i+=10) {
+                        logger.info("starting kafka insert " + i);
+                        InsertRecordsInKafka.insertRandomRecords(i, kafkaUrl);
                     }
-                } while (!connectedToMongo);
+                    logger.info("finished kafka insert");
+                } catch (Exception e) {
+                    logger.error("error in inserting records in kafka " + e.getMessage());
+                }
             }
         }, 0, TimeUnit.SECONDS);
     }

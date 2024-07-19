@@ -326,6 +326,7 @@ public class AktoPolicyNew {
             ApiInfoKey apiInfoKey = apiInfo.getId();
             for(ApiCollection apiGroup: apiGroups) {
                 int id = apiGroup.getId();
+                
                 List<TestingEndpoints> andList = idToAndList.get(id);
                 List<TestingEndpoints> orList = idToOrList.get(id);
 

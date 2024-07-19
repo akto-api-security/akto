@@ -12,6 +12,9 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.scripts.InsertRecordsInKafka;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -25,6 +28,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class DbAction extends ActionSupport {
 
@@ -669,6 +675,45 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    String kafkaUrl;
+
+    public String getKafkaUrl() {
+        return kafkaUrl;
+    }
+
+    public void setKafkaUrl(String kafkaUrl) {
+        this.kafkaUrl = kafkaUrl;
+    }
+
+    int x;
+
+    public int getX() {
+        return x;
+    }
+
+    public void setX(int x) {
+        this.x = x;
+    }
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DASHBOARD);
+
+    public String addData() {
+        executorService.schedule(new Runnable() {
+            public void run() {
+                try {
+                    loggerMaker.infoAndAddToDb("starting kafka insert");
+                    InsertRecordsInKafka.insertRandomRecords(x, kafkaUrl);
+                    loggerMaker.infoAndAddToDb("finished kafka insert");
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "error in inserting records in kafka");
+                }
+            }
+        }, 0, TimeUnit.SECONDS);
+
+        return SUCCESS.toUpperCase();
     }
 
     public List<CustomDataTypeMapper> getCustomDataTypes() {
