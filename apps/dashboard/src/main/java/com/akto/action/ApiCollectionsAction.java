@@ -117,8 +117,8 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setUrlsCount(count);
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
                 if (count == null) {
-                    count = 0;
-//                    count = SingleTypeInfoDao.instance.countEndpoints(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
+//                    count = 0;
+                    count = SingleTypeInfoDao.instance.countEndpoints(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
                 }
                 apiCollection.setUrlsCount(count);
             } else {
