@@ -1184,7 +1184,7 @@ public class InitializerListener implements ServletContextListener {
                 Filters.eq("_id", UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID)) == null) {
             loggerMaker.infoAndAddToDb("AccountId: " + Context.accountId.get() + " Creating unauthenticated api group.", LogDb.DASHBOARD);
             ApiCollection unauthenticatedApisGroup = new ApiCollection(UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID,
-                    "Unauthenticated Apis", Context.now(), new HashSet<>(), null, 0, false, false);
+                    "Unauthenticated APIs", Context.now(), new HashSet<>(), null, 0, false, false);
 
             unauthenticatedApisGroup.setAutomated(true);
             unauthenticatedApisGroup.setType(ApiCollection.Type.API_GROUP);

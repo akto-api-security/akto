@@ -122,11 +122,9 @@ public class ApiCollectionsAction extends UserAction {
             if (count != null && (apiCollection.getHostName() != null)) {
                 apiCollection.setUrlsCount(count);
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
-		loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount API_GROUP started: " + apiCollectionId + " " + tsRandom, LoggerMaker.LogDb.DASHBOARD);    
-
-                count = SingleTypeInfoDao.instance.countEndpoints(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
-		loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount API_GROUP ended: " + apiCollectionId + " " + tsRandom, LoggerMaker.LogDb.DASHBOARD);    
-		    
+                if (count == null) {
+                    count = SingleTypeInfoDao.instance.countEndpoints(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
+                }
                 apiCollection.setUrlsCount(count);
             } else {
                 apiCollection.setUrlsCount(fallbackCount);
