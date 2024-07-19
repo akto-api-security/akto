@@ -88,8 +88,12 @@ public class ApiCollectionsAction extends UserAction {
     boolean redacted;
     
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections) {
+	int tsRandom = Context.now();
+	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);    
         this.apiCollectionTestStatus = new ArrayList<>();
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
+	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);    
+	    
         Map<Integer, Pair<String,Integer>> map = new HashMap<>();
         try (MongoCursor<BasicDBObject> cursor = TestingRunDao.instance.getMCollection().aggregate(
                 Arrays.asList(
@@ -108,16 +112,17 @@ public class ApiCollectionsAction extends UserAction {
                 map.put(collectionId, Pair.of(state, endTimestamp));
             }
         }
+	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount tests status done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);    
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
             Integer count = countMap.get(apiCollectionId);
             int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : 0;
+		
             if (count != null && (apiCollection.getHostName() != null)) {
                 apiCollection.setUrlsCount(count);
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
                 if (count == null) {
-//                    count = 0;
                     count = SingleTypeInfoDao.instance.countEndpoints(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
                 }
                 apiCollection.setUrlsCount(count);
