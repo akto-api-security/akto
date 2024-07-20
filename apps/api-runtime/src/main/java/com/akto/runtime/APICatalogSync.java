@@ -85,6 +85,10 @@ public class APICatalogSync {
         this.aktoPolicyNew = new AktoPolicyNew();
         if (buildFromDb) {
             buildFromDB(false, fetchAllSTI);
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            if (accountSettings != null && accountSettings.getPartnerIpList() != null) {
+                partnerIpsList = accountSettings.getPartnerIpList();
+            }
         }
     }
 
