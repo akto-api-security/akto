@@ -293,7 +293,7 @@ public class KeyTypes {
     }
 
     public static boolean isCreditCard(String s) {
-        if (s.length() < 12 || s.length() > 30) return false;
+        if (s.length() < 12 || s.length() > 23) return false;
         char firstChar = s.charAt(0);
         if (!Character.isDigit(firstChar)) return false;
         if (!s.toLowerCase().equals(s.toUpperCase())) return false; // only numbers
