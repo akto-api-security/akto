@@ -1,31 +1,26 @@
 package com.akto.parsers;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.*;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import com.akto.MongoBasedTest;
+import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dto.*;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.IgnoreData;
-import com.akto.dto.AktoDataType;
-import com.akto.dto.HttpRequestParams;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
+import com.akto.types.CappedSet;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
+import com.mongodb.client.model.Filters;
 import org.junit.Test;
 
 public class TestDump2 extends MongoBasedTest {
@@ -176,6 +171,112 @@ public class TestDump2 extends MongoBasedTest {
         assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(1), sync.getDbState(1),false, false).bulkUpdatesForSingleTypeInfo.size());
         assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(2), sync.getDbState(2),false, false).bulkUpdatesForSingleTypeInfo.size());
     }
+
+    @Test
+    public void testEndToEnd() throws Exception {
+        ApiCollectionsDao.instance.getMCollection().drop();
+        ApiInfoDao.instance.getMCollection().drop();
+        SampleDataDao.instance.getMCollection().drop();
+        SensitiveSampleDataDao.instance.getMCollection().drop();
+        TrafficInfoDao.instance.getMCollection().drop();
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        // requestHeaders: 2
+        // responseHeaders: 1
+        // requestPayload: 6
+        // responsePayload: 6
+        // total: 15
+        String host = "company.io";
+        int apiCollectionId = host.hashCode();
+        String url = "/api/books";
+        String method = "POST";
+
+        String message = "{\n" +
+                "  \"akto_account_id\": \"" + Context.accountId.get() + "\",\n" +
+                "  \"path\": \"" + url + "\",\n" +
+                "  \"requestHeaders\": \"{'host': '" + host + "', 'user-agent': 'chrome' }\",\n" +
+                "  \"responseHeaders\": \"{'token': 'token'}\",\n" +
+                "  \"method\": \"" + method + "\",\n" +
+                "  \"requestPayload\": \"{'user_req': 'user1_req', 'friends_req': [{'name_req':'friend1_req'},{'name_req':'friend2_req'}], 'role_req': {'name_req': 'admin_req', 'accesses_req': [{'billing_req': true, 'user_req' : 'true'}] }, 'gifts_req': [1,2,3] }\",\n" +
+                "  \"responsePayload\": \"{'user_resp': 'user1_resp', 'friends_resp': [{'name_resp':'friend1_resp'},{'name_resp':'friend2_resp'}], 'role_resp': {'name_resp': 'admin_resp', 'accesses_resp': [{'billing_resp': true, 'user_resp' : 'true'}] }, 'gifts_resp': [1,2,3] }\",\n" +
+                "  \"ip\": \"0.0.0.0\",\n" +
+                "  \"time\": \"1721382413\",\n" +
+                "  \"statusCode\": \"200\",\n" +
+                "  \"type\": \"type\",\n" +
+                "  \"status\": \"status\",\n" +
+                "  \"contentType\": \"contentType\",\n" +
+                "  \"source\": \"MIRRORING\",\n" +
+                "  \"akto_vxlan_id\": \"0\"\n" +
+                "}\n";
+
+        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(message);
+        HttpCallParser httpCallParser = new HttpCallParser("",0,0, 0, true);
+        httpCallParser.syncFunction(Collections.singletonList(httpResponseParams), true, true, new AccountSettings());
+
+        List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(new BasicDBObject());
+        assertEquals(15, singleTypeInfos.size());
+
+        SingleTypeInfo singleTypeInfo = generateSTI(apiCollectionId, url, method, SingleTypeInfo.GENERIC, "user_req", -1, false);
+        SingleTypeInfo info = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(singleTypeInfo));
+        assertNotNull(info);
+
+        singleTypeInfo = generateSTI(apiCollectionId, url, method, SingleTypeInfo.GENERIC, "friends_req#$#name_req", -1, false);
+        info = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(singleTypeInfo));
+        assertNotNull(info);
+
+        singleTypeInfo = generateSTI(apiCollectionId, url, method, SingleTypeInfo.GENERIC, "role_req#name_req", -1, false);
+        info = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(singleTypeInfo));
+        assertNotNull(info);
+
+        singleTypeInfo = generateSTI(apiCollectionId, url, method, SingleTypeInfo.TRUE, "role_req#accesses_req#$#billing_req", -1, false);
+        info = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(singleTypeInfo));
+        assertNotNull(info);
+
+        singleTypeInfo = generateSTI(apiCollectionId, url, method, SingleTypeInfo.GENERIC, "role_req#accesses_req#$#user_req", -1, false);
+        info = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(singleTypeInfo));
+        assertNotNull(info);
+
+        singleTypeInfo = generateSTI(apiCollectionId, url, method, SingleTypeInfo.INTEGER_32, "gifts_req#$", -1, false);
+        info = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(singleTypeInfo));
+        assertNotNull(info);
+
+        singleTypeInfo = generateSTI(apiCollectionId, url, method, SingleTypeInfo.TRUE, "role_resp#accesses_resp#$#billing_resp", 200, false);
+        info = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(singleTypeInfo));
+        assertNotNull(info);
+
+        // sample data
+        long sampleDataCount = SampleDataDao.instance.getMCollection().estimatedDocumentCount();
+        assertEquals(1, sampleDataCount);
+        SampleData sampleData = SampleDataDao.instance.findOne(Filters.and(
+                Filters.eq("_id.apiCollectionId", apiCollectionId),
+                Filters.eq("_id.url", url),
+                Filters.eq("_id.method", method)
+        ));
+        assertEquals(1, sampleData.getSamples().size());
+
+        // api info
+        long apiInfoCount = ApiInfoDao.instance.getMCollection().estimatedDocumentCount();
+        assertEquals(1, apiInfoCount);
+        ApiInfo apiInfo = ApiInfoDao.instance.findOne(Filters.and(
+                Filters.eq("_id.apiCollectionId", apiCollectionId),
+                Filters.eq("_id.url", url),
+                Filters.eq("_id.method", method)
+        ));
+        assertTrue(apiInfo.getLastSeen() > 0);
+
+        // api collection
+        long apiCollectionsCount = ApiCollectionsDao.instance.getMCollection().estimatedDocumentCount();
+        assertEquals(1, apiCollectionsCount);
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id", apiCollectionId));
+        assertEquals(host, apiCollection.getHostName());
+
+    }
+
+    static SingleTypeInfo generateSTI(int apiCollectionId, String url, String method, SubType subType, String param, int responseCode, boolean isHeader) {
+        SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(url, method, responseCode, isHeader, param, subType, apiCollectionId, false);
+        return new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0, 0,0, new CappedSet<>(), null, 0,0);
+    }
+
 
     @Test
     public void getParamsTest() {

@@ -128,13 +128,14 @@ public class KeyTypes {
             }
         }
 
-        if (checkForSubtypes && isCreditCard(o.toString())) {
+        String oString = o.toString();
+        if (checkForSubtypes && isCreditCard(oString)) {
             return SingleTypeInfo.CREDIT_CARD;
         }
 
-        if (NumberUtils.isDigits(o.toString())) {
-            if (o.toString().length() < 19) {
-                o = Long.parseLong(o.toString());
+        if (NumberUtils.isDigits(oString)) {
+            if (oString.length() < 19) {
+                o = Long.parseLong(oString);
             }
         }
 
@@ -152,8 +153,8 @@ public class KeyTypes {
             return SingleTypeInfo.INTEGER_32;
         }
 
-        if (NumberUtils.isParsable(o.toString())) {
-            o = Float.parseFloat(o.toString());
+        if (NumberUtils.isParsable(oString)) {
+            o = Float.parseFloat(oString);
         }
 
         if (o instanceof Float || o instanceof Double) {
@@ -161,23 +162,22 @@ public class KeyTypes {
         }
 
         if (o instanceof String) {
-            String str = o.toString();
             for(Map.Entry<SubType, Pattern> entry: patternToSubType.entrySet()) {
                 Pattern pattern = entry.getValue();
                 SubType subType = entry.getKey();
-                if( ( checkForSubtypes || subType.getName().equals("URL") ) && pattern.matcher(str).matches()) {
+                if( ( checkForSubtypes || subType.getName().equals("URL") ) && pattern.matcher(oString).matches()) {
                     return subType;
                 }
             }
-            if (checkForSubtypes && isJWT(str)) {
+            if (checkForSubtypes && isJWT(oString)) {
                 return SingleTypeInfo.JWT;
             }
 
-            if (checkForSubtypes && isPhoneNumber(str)) {
+            if (checkForSubtypes && isPhoneNumber(oString)) {
                 return SingleTypeInfo.PHONE_NUMBER;
             }
 
-            if (checkForSubtypes && isIP(str)) {
+            if (checkForSubtypes && isIP(oString)) {
                 return SingleTypeInfo.IP_ADDRESS;
             }
 
@@ -250,11 +250,10 @@ public class KeyTypes {
 
     public static boolean isPhoneNumber(String mobileNumber) {
         boolean lengthCondition = mobileNumber.length() < 8 || mobileNumber.length() > 16;
+        if (lengthCondition) return false;
         boolean alphabetsCondition = mobileNumber.toLowerCase() != mobileNumber.toUpperCase(); // contains alphabets
 
-        if (lengthCondition || alphabetsCondition) {
-            return false;
-        }
+        if (alphabetsCondition) return false;
 
         PhoneNumberUtil phoneNumberUtil = PhoneNumberUtil.getInstance();
 
@@ -294,17 +293,17 @@ public class KeyTypes {
     }
 
     public static boolean isCreditCard(String s) {
-        if (s.length() < 12) return false;
+        if (s.length() < 12 || s.length() > 23) return false;
+        char firstChar = s.charAt(0);
+        if (!Character.isDigit(firstChar)) return false;
+        if (!s.toLowerCase().equals(s.toUpperCase())) return false; // only numbers
         String cc = s.replaceAll(" ", "").replaceAll("-", "");
-        if (cc.length() > 23) return false;
-        if (!cc.toLowerCase().equals(cc.toUpperCase())) return false; // only numbers
-        return creditCardValidator.isValid(cc);
-    }
+        return creditCardValidator.isValid(cc);    }
 
     public static boolean isIP(String s) {
         // for edge cases look at test cases of this function
-        boolean canBeIpv4 = (s.length() > 6) || (s.length() <= 15) && (s.split(".").length == 4);
-        boolean canBeIpv6 = (s.length() < 45 && s.split(":").length > 6);
+        boolean canBeIpv4 = s.length() > 6 && s.length() <= 15 && s.contains(".");
+        boolean canBeIpv6 = (s.length() <= 45 && s.contains(":"));
         if (!(canBeIpv4 || canBeIpv6)) return false;
         return ipAddressValidator.isValid(s);
     }
