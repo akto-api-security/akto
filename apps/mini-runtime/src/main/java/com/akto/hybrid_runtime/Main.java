@@ -238,10 +238,6 @@ public class Main {
                             logger.info("Committing offset at position: " + lastSyncOffset);
                         }
 
-                        if (tryForCollectionName(r.value())) {
-                            continue;
-                        }
-
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e, LogDb.RUNTIME);
