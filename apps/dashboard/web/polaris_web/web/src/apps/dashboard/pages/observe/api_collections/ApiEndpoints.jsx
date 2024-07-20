@@ -29,6 +29,7 @@ import GetPrettifyEndpoint from "../GetPrettifyEndpoint"
 import SourceLocation from "./component/SourceLocation"
 import useTable from "../../../components/tables/TableContext"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
+import EndpointTreeView from "@/apps/dashboard/components/shared/treeView/EndpointTreeView"
 
 const headings = [
     {
@@ -164,6 +165,7 @@ function ApiEndpoints() {
     const [isGptActive, setIsGptActive] = useState(false)
     const [redacted, setIsRedacted] = useState(false)
     const [showRedactModal, setShowRedactModal] = useState(false)
+    const [displayTreeView, setDisplayTreeView] = useState(true)
     const [tableLoading, setTableLoading] = useState(false)
 
     const queryParams = new URLSearchParams(location.search);
@@ -555,6 +557,11 @@ function ApiEndpoints() {
                                     checked={redacted}
                                     onChange={() => redactCheckBoxClicked()}
                                 />
+                                <Checkbox
+                                    label='Display tree view'
+                                    checked={displayTreeView}
+                                    onChange={() => setDisplayTreeView((prev) => !prev)}
+                                />
                             </VerticalStack>
                         </VerticalStack>
                     </Popover.Section>
@@ -665,6 +672,11 @@ function ApiEndpoints() {
                             docsUrl={ENDPOINTS_PAGE_DOCS_URL}
                 />] :[
                     (coverageInfo[apiCollectionId] === 0  || !(coverageInfo.hasOwnProperty(apiCollectionId))? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true} /> : null),
+                displayTreeView ? 
+                <div>
+                    <EndpointTreeView treeList={transform.produceApisRATFormattedTree(endpointData)}/>
+                    <EndpointTreeView treeList={transform.produceHostnamesRATFormattedTree()}/>
+                </div> :
                 <div className="apiEndpointsTable" key="table">
                       <GithubSimpleTable
                           key="table"
