@@ -2,6 +2,7 @@ package com.akto.testing;
 
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 
 import okhttp3.*;
@@ -43,12 +44,12 @@ public class HTTPClientHandler {
         clientWithFollowRedirect = builder(true, readTimeout).build();
     }
 
-    public OkHttpClient getNewDebugClient(boolean isSaas, boolean followRedirects, List<TestingRunResult.TestLog> testLogs, String requestProtocol) {
+    public OkHttpClient getNewDebugClient(boolean isSaas, boolean followRedirects, List<TestingRunResult.TestLog> testLogs, String contentType) {
         if(isSaas) readTimeout = 60;
         OkHttpClient.Builder builder = builder(followRedirects, readTimeout)
                 .addInterceptor(new NormalResponseInterceptor(testLogs))
                 .addNetworkInterceptor(new NetworkResponseInterceptor(testLogs));
-        if ("HTTP/2".equalsIgnoreCase(requestProtocol)) {
+        if (contentType != null && contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
             builder.protocols(Collections.singletonList(Protocol.H2_PRIOR_KNOWLEDGE));
         }
         return builder.build();
@@ -142,8 +143,8 @@ public class HTTPClientHandler {
         }
     }
 
-    public OkHttpClient getHTTPClient (boolean followRedirect, String requestProtocol) {
-        if ("HTTP/2".equalsIgnoreCase(requestProtocol)) {
+    public OkHttpClient getHTTPClient (boolean followRedirect, String contentType) {
+        if (contentType != null && contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
             if (followRedirect) {
                 return http2ClientWithFollowRedirect;
             }
