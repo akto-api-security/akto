@@ -104,8 +104,6 @@ public class ClientActor extends DataActor {
         return dbAbsHost + "/api";
     }
 
-    
-
     public AccountSettings fetchAccountSettings() {
         AccountSettings acc = null;
         for (int i=0; i < 5; i++) {
