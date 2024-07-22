@@ -6,6 +6,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Predicate;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -757,7 +758,12 @@ public class CustomDataTypeAction extends UserAction{
         List<SingleTypeInfo.ParamId> idsToDelete = new ArrayList<>();
         do {
             idsToDelete = new ArrayList<>();
-            cursor = SensitiveSampleDataDao.instance.getMCollection().find(filterSsdQ).projection(Projections.exclude(SensitiveSampleData.SAMPLE_DATA)).skip(currMarker).limit(BATCH_SIZE).cursor();
+            Bson collectionFilter = Filters.empty();
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null && !collectionIds.isEmpty()) {
+                collectionFilter = Filters.in("collectionIds", collectionIds);
+            }
+            cursor = SensitiveSampleDataDao.instance.getMCollection().find(Filters.and(filterSsdQ, collectionFilter)).projection(Projections.exclude(SensitiveSampleData.SAMPLE_DATA)).skip(currMarker).limit(BATCH_SIZE).cursor();
             currMarker += BATCH_SIZE;
             dataPoints = 0;
             loggerMaker.infoAndAddToDb("processing batch: " + currMarker, LogDb.DASHBOARD);

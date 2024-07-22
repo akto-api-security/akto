@@ -12,6 +12,7 @@ import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.util.enums.MongoDBEnums;
@@ -66,6 +67,11 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         unwindOptions.preserveNullAndEmptyArrays(false);  
         pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
 
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null && !collectionIds.isEmpty()) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
+
         BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$collectionIds")
                                                 .append("severity", "$severity") ;
 
@@ -103,6 +109,12 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
                 Filters.gte(TestingRunIssues.LAST_SEEN, startTimeStamp)
             )
         ));
+
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null && !collectionIds.isEmpty()) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
+
         BasicDBObject groupedId = new BasicDBObject("subCategory", "$_id.testSubCategory");
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
 
