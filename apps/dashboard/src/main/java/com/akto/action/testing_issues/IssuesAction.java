@@ -13,6 +13,7 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -112,7 +113,12 @@ public class IssuesAction extends UserAction {
         Bson sort = Sorts.orderBy(Sorts.descending(TestingRunIssues.TEST_RUN_ISSUES_STATUS),
                 Sorts.descending(TestingRunIssues.CREATION_TIME));
         Bson filters = createFilters();
-        totalIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(filters);
+        Bson collectionFilter = Filters.empty();
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null && !collectionIds.isEmpty()) {
+            collectionFilter = Filters.in("collectionIds", collectionIds);
+        }
+        totalIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(Filters.and(filters, collectionFilter));
         issues = TestingRunIssuesDao.instance.findAll(filters, skip,limit, sort);
 
         for (TestingRunIssues runIssue : issues) {

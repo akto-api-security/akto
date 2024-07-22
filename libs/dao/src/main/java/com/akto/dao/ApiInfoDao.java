@@ -5,6 +5,7 @@ import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
@@ -98,6 +99,11 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         unwindOptions.preserveNullAndEmptyArrays(false);  
         pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
 
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null && !collectionIds.isEmpty()) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
+
         BasicDBObject groupedId2 = new BasicDBObject("apiCollectionId", "$collectionIds");
         pipeline.add(Aggregates.group(groupedId2, Accumulators.sum("count",1)));
         pipeline.add(Aggregates.project(
@@ -126,6 +132,11 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         UnwindOptions unwindOptions = new UnwindOptions();
         unwindOptions.preserveNullAndEmptyArrays(false);  
         pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null && !collectionIds.isEmpty()) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
 
         BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$collectionIds");
         pipeline.add(Aggregates.sort(Sorts.orderBy(Sorts.descending(ApiInfo.ID_API_COLLECTION_ID), Sorts.descending(ApiInfo.LAST_SEEN))));

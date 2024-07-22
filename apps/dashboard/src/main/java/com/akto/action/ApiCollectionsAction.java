@@ -25,6 +25,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
@@ -159,7 +160,7 @@ public class ApiCollectionsAction extends UserAction {
     private String collectionName;
 
     private boolean isValidApiCollectionName(){
-        if (this.collectionName == null) {
+        if (this.collectionName == null || collectionName.trim().isEmpty()) {
             addActionError("Invalid collection name");
             return false;
         }
@@ -203,6 +204,19 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
 
+        int userId = Context.userId.get();
+        int accountId = Context.accountId.get();
+
+        RBACDao.instance.updateOne(
+                Filters.and(
+                        Filters.eq("userId", userId),
+                        Filters.eq("accountId", accountId)
+                ),
+                Updates.addToSet("apiCollectionsId", apiCollection.getId())
+        );
+
+        UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
+        
         ActivitiesDao.instance.insertActivity("Collection created", "new Collection " + this.collectionName + " created");
 
         return Action.SUCCESS.toUpperCase();
@@ -460,6 +474,11 @@ public class ApiCollectionsAction extends UserAction {
         unwindOptions.preserveNullAndEmptyArrays(false);  
         pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
 
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null && !collectionIds.isEmpty()) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
+
         BasicDBObject groupId = new BasicDBObject("apiCollectionId", "$collectionIds");
         pipeline.add(Aggregates.sort(
             Sorts.descending(ApiInfo.RISK_SCORE)
@@ -596,7 +615,13 @@ public class ApiCollectionsAction extends UserAction {
             FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
             updateOptions.upsert(false);
 
-            UpdateResult result = ApiCollectionsDao.instance.getMCollection().updateMany(filter,
+            Bson collectionFilter = Filters.empty();
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null && !collectionIds.isEmpty()) {
+                collectionFilter = Filters.in("collectionIds", collectionIds);
+            }
+
+            UpdateResult result = ApiCollectionsDao.instance.getMCollection().updateMany(Filters.and(filter, collectionFilter),
                                             Updates.set(ApiCollection.USER_ENV_TYPE,envType)
                                     );;
             if(result == null){

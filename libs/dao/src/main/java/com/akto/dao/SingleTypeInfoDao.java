@@ -8,6 +8,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CollectionConditions.MethodCondition;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -436,6 +437,11 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
 
         pipeline.add(Aggregates.match(Filters.and(filterList)));
 
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null && !collectionIds.isEmpty()) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
+
         BasicDBObject groupedId = new BasicDBObject("subType", "$subType");
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count",1)));
 
@@ -460,6 +466,10 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         Bson filterOnResponse = Filters.gte(SingleTypeInfo._RESPONSE_CODE, codeValue);
         Bson sensitiveSubTypeFilter = Filters.and(Filters.in(SingleTypeInfo.SUB_TYPE,sensitiveParameters), filterOnResponse);
         pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null && !collectionIds.isEmpty()) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
         pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("subTypes", "$subType")));
         return pipeline;
     }
@@ -467,6 +477,10 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
     public Map<Integer,List<String>> getSensitiveSubtypesDetectedForCollection(List<String> sensitiveParameters){
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId");
         List<Bson> pipeline = generateFilterForSubtypes(sensitiveParameters, groupedId, false);
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null && !collectionIds.isEmpty()) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
         MongoCursor<BasicDBObject> collectionsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         Map<Integer,List<String>> result = new HashMap<>();
         while(collectionsCursor.hasNext()){
@@ -483,7 +497,7 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
     }
 
     public Integer getSensitiveApisCount(List<String> sensitiveParameters){
-       
+
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
                                         .append(SingleTypeInfo._URL, "$url")
                                         .append(SingleTypeInfo._METHOD, "$method");
@@ -543,6 +557,11 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
 
         pipeline.add(Aggregates.match(Filters.or(filters)));
 
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null && !collectionIds.isEmpty()) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
+
         BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId")
                         .append("url", "$url")
                         .append("method", "$method");
@@ -579,6 +598,11 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
 
         pipeline.add(Aggregates.match(filter));
         pipeline.add(Aggregates.project(Projections.include(SingleTypeInfo._URL)));
+
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null && !collectionIds.isEmpty()) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
 
         BasicDBObject groupedId =  new BasicDBObject("url", "$"+SingleTypeInfo._URL);
         pipeline.add(Aggregates.group(groupedId));

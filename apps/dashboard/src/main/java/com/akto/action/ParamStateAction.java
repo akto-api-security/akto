@@ -1,6 +1,8 @@
 package com.akto.action;
 
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.context.Context;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.mongodb.client.MongoCursor;
@@ -51,6 +53,11 @@ public class ParamStateAction extends UserAction {
         pipeline.add(Aggregates.match(Filters.lte(computedFieldName,SingleTypeInfo.THRESHOLD)));
 
         pipeline.add(Aggregates.limit(3000));
+
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null && !collectionIds.isEmpty()) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
 
         MongoCursor<SingleTypeInfo> cursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, SingleTypeInfo.class).cursor();
 
