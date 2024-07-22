@@ -51,7 +51,7 @@ const treeViewFunc = {
     },
     convertToRATFormat(node, name="", leafNodeNameField) {
         // Convert the tree to the format required by react-accessible-treeview
-        const result = { name, children: [] };
+        const result = { name, children: [], isTerminal: false};
 
         for (const key in node) {
             const currentNode = node[key];
@@ -59,13 +59,19 @@ const treeViewFunc = {
                 currentNode.items.forEach(item => {
                     result.children.push({
                         name: item[leafNodeNameField],
-                        metadata: { ...item }
+                        metadata: { ...item },
+                        isTerminal: true,
                     });
                 });
             } else {
                 result.children.push(this.convertToRATFormat(currentNode.children, key, leafNodeNameField));
             }
         }
+
+        // Make sure leaf nodes are at the end
+        result.children = result.children
+                            .filter(child => !child.isTerminal)
+                            .concat(result.children.filter(child => child.isTerminal));
 
         return result
     }
