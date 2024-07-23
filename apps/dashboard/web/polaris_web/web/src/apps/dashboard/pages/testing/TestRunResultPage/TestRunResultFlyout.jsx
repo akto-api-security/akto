@@ -10,6 +10,7 @@ import issuesApi from "../../issues/api"
 import GridRows from '../../../components/shared/GridRows'
 import { useNavigate } from 'react-router-dom'
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
+import "./style.css"
 
 function TestRunResultFlyout(props) {
 
@@ -249,7 +250,7 @@ function TestRunResultFlyout(props) {
             {
             selectedTestRunResult?.errors?.map((error, i) => {
               return (
-                <Text key={i}>{error}</Text>
+                <p className="p-class" key={i}>{error}</p>
               )
             })
           }
