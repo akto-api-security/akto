@@ -28,5 +28,17 @@ public class TestUsersDao extends MongoBasedTest {
         UsersDao.instance.insertOne(secondUser);
         firstUser = UsersDao.instance.getFirstUser(ACCOUNT_ID);
         assertEquals(firstUser.getLogin(), "avneesh@akto.io");
+
+        User thirdUser = new User("aryan", "aryan@bigcorp.com", accounts,null);
+        thirdUser.setId(Context.now()+2000);
+        UsersDao.instance.insertOne(thirdUser);
+        firstUser = UsersDao.instance.getFirstUser(ACCOUNT_ID);
+        assertEquals(firstUser.getLogin(), thirdUser.getLogin());
+
+        User fourthUser = new User("ankita", "ankita@bigcorp.com", accounts,null);
+        fourthUser.setId(Context.now()+3000);
+        UsersDao.instance.insertOne(fourthUser);
+        firstUser = UsersDao.instance.getFirstUser(ACCOUNT_ID);
+        assertEquals(firstUser.getLogin(), thirdUser.getLogin());
     }
 }

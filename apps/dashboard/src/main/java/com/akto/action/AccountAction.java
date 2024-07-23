@@ -268,23 +268,25 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
             }
         }
    
-        User user = initializeAccount(email, newAccountId, newAccountName,true);
+        User user = initializeAccount(email, newAccountId, newAccountName,true, RBAC.Role.ADMIN);
         getSession().put("user", user);
         getSession().put("accountId", newAccountId);
         return Action.SUCCESS.toUpperCase();
     }
 
-    public static User initializeAccount(String email, int newAccountId,String newAccountName,  boolean isNew) {
+    public static User initializeAccount(String email, int newAccountId, String newAccountName, boolean isNew, RBAC.Role role) {
         UsersDao.addAccount(email, newAccountId, newAccountName);
         User user = UsersDao.instance.findOne(eq(User.LOGIN, email));
-        RBAC.Role role = isNew ? RBAC.Role.ADMIN : RBAC.Role.MEMBER;
         RBACDao.instance.insertOne(new RBAC(user.getId(), role, newAccountId));
         Context.accountId.set(newAccountId);
         try {
+            loggerMaker.infoAndAddToDb("Updated dashboard version");
             AccountSettingsDao.instance.updateVersion(DASHBOARD_VERSION);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,"Error while updating account version", LogDb.DASHBOARD);
         }
+
+        loggerMaker.infoAndAddToDb("isNew " + isNew);
         if (isNew) intializeCollectionsForTheAccount(newAccountId);
         return user;
     }
@@ -298,10 +300,13 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
     }
 
     private static void intializeCollectionsForTheAccount(int newAccountId) {
+        loggerMaker.infoAndAddToDb("running intializeCollectionsForTheAccount for " + newAccountId);
         executorService.schedule(new Runnable() {
             public void run() {
                 Context.accountId.set(newAccountId);
+                loggerMaker.infoAndAddToDb("inside intializeCollectionsForTheAccount for " + Context.accountId.get());
                 ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>(), null, 0, false, true));
+                loggerMaker.infoAndAddToDb("Inserted default collection");
                 BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
                 if (backwardCompatibility == null) {
                     backwardCompatibility = new BackwardCompatibility();

@@ -777,21 +777,6 @@ const quickStartFunc = {
         return arr
     },
 
-    getConnectionsObject: function(configuredItems, allItems){
-        let moreConnections = []
-        let myConnections = []
-
-        allItems.forEach(element => {
-            if(element.key && configuredItems.includes(element.key)){
-                myConnections.push(element)
-            }else{
-                moreConnections.push(element)
-            }
-        });
-
-        return {moreConnections,myConnections}
-    },
-
     getPolicyLines: function(key){
         switch(key) {
             case "AWS":

@@ -98,6 +98,13 @@ const headings = [
         textValue: "sourceLocation",
         title: "Source location",
         tooltipContent: "Exact location of the URL in case detected from the source code."    
+    },
+    {
+        text: "Collection",
+        value: "apiCollectionName",
+        title: "Collection",
+        showFilter: true,
+        filterKey: "apiCollectionName",
     }
 ]
 
@@ -163,7 +170,12 @@ function ApiEndpoints() {
     const selectedUrl = queryParams.get('selected_url')
     const selectedMethod = queryParams.get('selected_method')
 
-    const definedTableTabs = ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow']
+    // the values used here are defined at the server.
+    const definedTableTabs = apiCollectionId == 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId == 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow'] )
+
+    const isApiGroup = allCollections.filter(x => {
+        return x.id == apiCollectionId && x.type == "API_GROUP"
+    }).length > 0
 
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
@@ -182,7 +194,7 @@ function ApiEndpoints() {
 
         let sensitiveParamsMap = {}
         sensitiveParams.forEach(p => {
-            let key = p.method + " " + p.url
+            let key = p.method + " " + p.url + " " + p.apiCollectionId
             if (!sensitiveParamsMap[key]) sensitiveParamsMap[key] = new Set()
 
             if (!p.subType) {
@@ -193,7 +205,7 @@ function ApiEndpoints() {
         })
 
         apiEndpointsInCollection.forEach(apiEndpoint => {
-            apiEndpoint.sensitive = sensitiveParamsMap[apiEndpoint.method + " " + apiEndpoint.url] || new Set()
+            apiEndpoint.sensitive = sensitiveParamsMap[apiEndpoint.method + " " + apiEndpoint.url + " " +apiEndpoint.apiCollectionId] || new Set()
         })
 
         let data = {}
@@ -565,6 +577,7 @@ function ApiEndpoints() {
                 endpoints={filteredEndpoints}
                 filtered={loading ? false : filteredEndpoints.length !== endpointData["all"].length}
                 runTestFromOutside={runTests}
+                closeRunTest={() => setRunTests(false)}
                 disabled={showEmptyScreen}
             />
         </HorizontalStack>
@@ -661,14 +674,24 @@ function ApiEndpoints() {
                           resourceName={resourceName}
                           filters={[]}
                           disambiguateLabel={disambiguateLabel}
-                          headers={headers}
+                          headers={headers.filter(x => {
+                            if(!isApiGroup && x.text==='Collection'){
+                                return false;
+                            }
+                            return true;
+                          })}
                           getStatus={() => { return "warning" }}
                           selected={selected}
                           onRowClick={handleRowClick}
                           onSelect={handleSelectedTab}
                           getFilteredItems={getFilteredItems}
                           mode={IndexFiltersMode.Default}
-                          headings={headings}
+                          headings={headings.filter(x => {
+                            if(!isApiGroup && x.text==='Collection'){
+                                return false;
+                            }
+                            return true;
+                          })}
                           useNewRow={true}
                           condensedHeight={true}
                           tableTabs={tableTabs}
