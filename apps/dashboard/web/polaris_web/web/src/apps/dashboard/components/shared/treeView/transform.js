@@ -1,5 +1,47 @@
 
 const treeViewFunc = {
+    pruneTree(tree, branchFieldSplitter, reverse) {
+        // Prune the tree by collapsing nodes with single children
+        const keys = Object.keys(tree);
+
+        keys.forEach(key => {
+            let nodeCollapsed = false
+            let newKey = ""
+            let node =  tree[key]
+            
+            do {
+                // Collapse nodes (greeedy approach)
+                nodeCollapsed = false
+
+                if (!node.isTerminal) {
+                    if (Object.keys(node.children).length === 1) {
+                        const childNodeKey = Object.keys(node.children)[0]
+                        const childNode = node.children[childNodeKey]
+    
+                        if (!childNode.isTerminal) {
+                            // If parent contains single child and both parent and child are terminal, collapse the node
+                            if (reverse) {
+                                newKey = `${childNodeKey}${branchFieldSplitter}${key}`
+                            } else {
+                                newKey = `${key}${branchFieldSplitter}${childNodeKey}`
+                            }
+                            
+                            // Delete the old node and create a new node with the combined key
+                            delete tree[key]
+                            tree[newKey] = { isTerminal: false, children: childNode.children, items: [] }
+                            nodeCollapsed = true
+
+                            key = newKey
+                            node = tree[newKey]
+
+                        }
+                    }
+                }
+            } while (nodeCollapsed)
+            
+            this.pruneTree(tree[key].children, branchFieldSplitter, reverse)
+        })
+    },
     buildTree(items, branchField, branchFieldSplitter, reverse=false, secondaryBranch=false, secondaryBranchFieldSplitter) {
         const itemsTree = {}
 
@@ -47,6 +89,8 @@ const treeViewFunc = {
             })
         })
 
+        this.pruneTree(itemsTree, branchFieldSplitter, reverse)
+
         return itemsTree
     },
     convertToRATFormat(node, name="", leafNodeNameField) {
@@ -68,10 +112,16 @@ const treeViewFunc = {
             }
         }
 
+        const nonTerminalChildren = result.children
+                                    .filter(child => !child.isTerminal)
+                                    .sort((a, b) => a.name.localeCompare(b.name));
+
+        const terminalChildren = result.children
+                                    .filter(child => child.isTerminal)
+                                    .sort((a, b) => a.name.localeCompare(b.name));
+
         // Make sure leaf nodes are at the end
-        result.children = result.children
-                            .filter(child => !child.isTerminal)
-                            .concat(result.children.filter(child => child.isTerminal));
+        result.children = [ ...nonTerminalChildren, ...terminalChildren ]
 
         return result
     }
