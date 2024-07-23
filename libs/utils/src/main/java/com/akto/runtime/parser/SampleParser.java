@@ -1,4 +1,4 @@
-package com.akto.parser;
+package com.akto.runtime.parser;
 
 import java.util.List;
 import java.util.Map;
@@ -51,6 +51,7 @@ public class SampleParser {
         String accountId = (String) json.get("akto_account_id");
         String sourceIP = (String) json.get("ip");
         String destIP = (String) json.getOrDefault("destIp", "");
+        String direction = (String) json.getOrDefault("direction", "");
 
         String isPendingStr = (String) json.getOrDefault("is_pending", "false");
         boolean isPending = !isPendingStr.toLowerCase().equals("false");
@@ -58,7 +59,7 @@ public class SampleParser {
         HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
         
         return new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction
         );
 
     }
