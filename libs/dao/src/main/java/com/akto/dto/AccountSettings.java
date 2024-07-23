@@ -98,6 +98,9 @@ public class AccountSettings {
     public static final String ALLOW_REDUNDANT_ENDPOINTS_LIST = "allowRedundantEndpointsList";
     private List<String> allowRedundantEndpointsList;
 
+    public static final String ALLOW_SENDING_EVENTS_TO_INTERCOM = "allowSendingEventsToIntercom";
+    private boolean allowSendingEventsToIntercom;
+
     public AccountSettings() {
     }
 
@@ -382,5 +385,13 @@ public class AccountSettings {
 
     public void setAllowRedundantEndpointsList(List<String> allowRedundantEndpointsList) {
         this.allowRedundantEndpointsList = allowRedundantEndpointsList;
+    }
+
+    public boolean getAllowSendingEventsToIntercom() {
+        return allowSendingEventsToIntercom;
+    }
+
+    public void setAllowSendingEventsToIntercom(boolean allowSendingEventsToIntercom) {
+        this.allowSendingEventsToIntercom = allowSendingEventsToIntercom;
     }
 }

@@ -4,6 +4,7 @@ import com.akto.DaoInit;
 import com.akto.action.AdminSettingsAction;
 import com.akto.action.ApiCollectionsAction;
 import com.akto.action.CustomDataTypeAction;
+import com.akto.action.EventMetricsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.action.testing.StartTestAction;
 import com.akto.dao.*;
@@ -12,6 +13,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.CustomWebhooksResultDao;
+import com.akto.dao.notifications.EventsMetricsDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.pii.PIISourceDao;
 import com.akto.dao.test_editor.TestConfigYamlParser;
@@ -34,6 +36,8 @@ import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
 import com.akto.dto.data_types.RegexPredicate;
 import com.akto.dto.dependency_flow.DependencyFlow;
+import com.akto.dto.events.EventsExample;
+import com.akto.dto.events.EventsMetrics;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.notifications.CustomWebhook.WebhookOptions;
@@ -107,6 +111,7 @@ import com.slack.api.Slack;
 import com.slack.api.util.http.SlackHttpClient;
 import com.slack.api.webhook.WebhookResponse;
 
+import io.intercom.api.Intercom;
 import okhttp3.OkHttpClient;
 
 import org.apache.commons.csv.CSVRecord;
@@ -1732,6 +1737,34 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void sendEventsToIntercom () throws Exception {
+        EventsMetrics lastEventsMetrics = EventsMetricsDao.instance.findLatestOne(Filters.empty());
+        EventsMetrics currentEventsMetrics = new EventsMetrics(
+            false, new EventsExample(0, new ArrayList<>()), new HashMap<>(), new HashMap<>(), new HashMap<>(), 0, Context.now());
+            
+        int lastSentEpoch = 0;
+        if(lastEventsMetrics != null){
+            lastSentEpoch = lastEventsMetrics.getCreatedAt();
+        }
+        if(Context.now() - lastSentEpoch >= (24 * 60 * 60)){
+            ApiInfoDao.instance.insertMetricsForIntercomEvent(lastEventsMetrics, currentEventsMetrics);
+            ApiInfoDao.instance.sendPostureMapToIntercom(lastEventsMetrics, currentEventsMetrics);
+            int businessLogicTests = YamlTemplateDao.instance.getNewCustomTemplates(lastSentEpoch);
+            if(businessLogicTests > 0){
+                currentEventsMetrics.setCustomTemplatesCount(businessLogicTests);
+            }
+
+            Map<String, Integer> issuesMap = TestingRunIssuesDao.instance.countIssuesMapForPrivilegeEscalations(lastSentEpoch);
+            if(!issuesMap.isEmpty()){
+                currentEventsMetrics.setSecurityTestFindings(issuesMap);
+            }
+            EventsMetricsDao.instance.insertOne(currentEventsMetrics);
+        }
+
+        EventMetricsAction eventMetricsAction = new EventMetricsAction();
+        eventMetricsAction.sendEventsToAllUsersInAccount(currentEventsMetrics);
+    }
+
     public void setUpUpdateCustomCollections() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -1742,6 +1775,17 @@ public class InitializerListener implements ServletContextListener {
                             updateCustomCollections();
                         } catch (Exception e){
                             loggerMaker.errorAndAddToDb(e, "Error while updating custom collections: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+
+                        try {
+                            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                                AccountSettingsDao.generateFilter()
+                            );
+                            if(accountSettings != null && accountSettings.getAllowSendingEventsToIntercom()){
+                                sendEventsToIntercom() ;
+                            }
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, "Error while reporting event to Intercom: " + e.getMessage(), LogDb.DASHBOARD);
                         }
                     }
                 }, "update-custom-collections");
@@ -1809,7 +1853,7 @@ public class InitializerListener implements ServletContextListener {
 
     public static boolean isNotKubernetes() {
         return !DashboardMode.isKubernetes();
-    }
+    } 
 
 
     @Override
@@ -1854,6 +1898,7 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account account) {
                         AccountSettingsDao.instance.getStats();
+                        Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
                         runInitializerFunctions();
                     }
                 }, "context-initializer");

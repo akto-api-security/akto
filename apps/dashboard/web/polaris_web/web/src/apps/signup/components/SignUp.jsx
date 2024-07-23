@@ -7,6 +7,7 @@ import api from '../api'
 import func from '@/util/func'
 import "../styles.css"
 import Store from '../../dashboard/store'
+import homeRequests from '../../dashboard/pages/home/api'
 
 function SignUp() {
 
@@ -82,11 +83,17 @@ function SignUp() {
       </VerticalStack>
   )
 
+  const getEventForIntercom = async() => {
+    let resp = await homeRequests.getEventForIntercom();
+}
+
   const loginFunc = async() => {
     setLoading(true)
     if(loginActive){
       try {
-        await api.login(email, password)
+        api.login(email, password).then((resp)=> {
+          getEventForIntercom()
+        })
       } catch {
         func.setToast(true, true, "Email or password incorrect. Please login again.")
       }
