@@ -133,6 +133,19 @@ public class AktoPolicyNew {
 
     }
 
+    public void main(List<HttpResponseParams> httpResponseParamsList, List<String> partnerIpsList) throws Exception {
+        if (httpResponseParamsList == null) httpResponseParamsList = new ArrayList<>();
+        loggerMaker.infoAndAddToDb("AktoPolicy main: httpResponseParamsList size: " + httpResponseParamsList.size(), LogDb.RUNTIME);
+        for (HttpResponseParams httpResponseParams: httpResponseParamsList) {
+            try {
+                process(httpResponseParams, partnerIpsList);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
+                ;
+            }
+        }
+    }
+
     public static ApiInfoKey generateFromHttpResponseParams(HttpResponseParams httpResponseParams) {
         int apiCollectionId = httpResponseParams.getRequestParams().getApiCollectionId();
         String url = httpResponseParams.getRequestParams().getURL();

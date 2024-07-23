@@ -2,6 +2,8 @@ package com.akto.dto;
 
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.HttpRequestResponseUtils;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -236,7 +238,7 @@ public class OriginalHttpRequest {
     }
 
     public static Map<String,List<String>> buildHeadersMap(String headersString) {
-        Map headersFromRequest = gson.fromJson(headersString, Map.class);
+        JSONObject headersFromRequest = JSON.parseObject(headersString);
         Map<String,List<String>> headers = new HashMap<>();
         if (headersFromRequest == null) return headers;
         for (Object k: headersFromRequest.keySet()) {

@@ -26,8 +26,11 @@ import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
 import com.akto.types.CappedSet;
+import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
 import com.google.gson.Gson;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.UpdateResult;
@@ -72,6 +75,10 @@ public class APICatalogSync {
         this.aktoPolicyNew = new AktoPolicyNew();
         if (buildFromDb) {
             buildFromDB(false, fetchAllSTI);
+            AccountSettings accountSettings = dataActor.fetchAccountSettings();
+            if (accountSettings != null && accountSettings.getPartnerIpList() != null) {
+                partnerIpsList = accountSettings.getPartnerIpList();
+            }
         }
     }
 
@@ -111,10 +118,9 @@ public class APICatalogSync {
         }
 
         requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp);
-        BasicDBObject requestPayload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams);
-        if (requestPayload != null) {
-            deletedInfo.addAll(requestTemplate.process2(requestPayload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
-        }
+        JSONObject jsonObject = RequestTemplate.parseRequestPayloadToJsonObject(requestParams.getPayload(), urlWithParams);
+        Map<String, Set<Object>> flattened = JSONUtils.flattenJSONObject(jsonObject);
+        deletedInfo.addAll(requestTemplate.process2(flattened, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
         requestTemplate.recordMessage(responseParams.getOrig());
 
         Map<Integer, RequestTemplate> responseTemplates = requestTemplate.getResponseTemplates();
@@ -136,15 +142,15 @@ public class APICatalogSync {
                 respPayload = "{\"json\": "+respPayload+"}";
             }
 
-
-            BasicDBObject payload;
+            JSONObject payload;
             try {
-                payload = BasicDBObject.parse(respPayload);
+                payload = JSON.parseObject(respPayload);
             } catch (Exception e) {
-                payload = BasicDBObject.parse("{}");
+                payload = JSON.parseObject("{}");
             }
 
-            deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
+            flattened = JSONUtils.flattenJSONObject(payload);
+            deletedInfo.addAll(responseTemplate.process2(flattened, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
             responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp);
             if (!responseParams.getIsPending()) {
                 responseTemplate.processTraffic(responseParams.getTime());
@@ -197,7 +203,7 @@ public class APICatalogSync {
             Set<HttpResponseParams> value = entry.getValue();
             for (HttpResponseParams responseParams: value) {
                 try {
-                    aktoPolicyNew.process(responseParams, partnerIpList);
+                    aktoPolicyNew.process(responseParams, partnerIpsList);
                 } catch (Exception e) {
                     e.printStackTrace();
                     throw new RuntimeException(e);
@@ -1240,7 +1246,8 @@ public class APICatalogSync {
     static int lastBuildFromDb = 0;
     final static int DB_REFRESH_CYCLE = 15 * 60; // 15 minutes
 
-    List<String> partnerIpList = new ArrayList<>();
+    List<String> partnerIpsList = new ArrayList<>();
+
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
         List<Object> writesForParams = new ArrayList<>();
@@ -1256,7 +1263,6 @@ public class APICatalogSync {
 
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         if (accountSettings != null) {
-            partnerIpList = accountSettings.getPartnerIpList();
             int acc = accountSettings.getId();
             Context.accountId.set(acc);
         }
@@ -1265,6 +1271,9 @@ public class APICatalogSync {
         boolean redact = accountId == 1718042191;
         if (accountSettings != null) {
             redact =  accountSettings.isRedactPayload();
+            if (accountSettings.getPartnerIpList() != null) {
+                partnerIpsList = accountSettings.getPartnerIpList();
+            }
         }
 
         counter++;
