@@ -1,12 +1,9 @@
-package com.akto.hybrid_runtime.policies;
+package com.akto.runtime.policies;
 
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.runtime_filters.RuntimeFilter;
-import com.akto.hybrid_parsers.HttpCallParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
@@ -43,8 +40,21 @@ public class ApiAccessTypePolicy {
         if (sourceIP != null && !sourceIP.isEmpty() && !sourceIP.equals("null")) {
             ipList.add(sourceIP);
         }
+        
+        String destIP = httpResponseParams.getDestIP();
+
+        if (destIP != null && !destIP.isEmpty() && !destIP.equals("null")) {
+            ipList.add(destIP);
+        }
 
         if (ipList.isEmpty() ) return;
+
+        String direction = httpResponseParams.getDirection();
+        int directionInt = 1;
+        try {
+            directionInt = Integer.parseInt(direction);
+        } catch (Exception e) {
+        }
 
         boolean isAccessTypePartner = false;
 
