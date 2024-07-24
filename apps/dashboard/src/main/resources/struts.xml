@@ -6005,7 +6005,7 @@
             </result>
         </action>
 
-        <action name="intercom/send_event" class="com.akto.action.EventMetricsAction" method="sendEventToIntercomFromUI">
+        <action name="api/send_event" class="com.akto.action.EventMetricsAction" method="sendEventToIntercomFromUI">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">

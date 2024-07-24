@@ -71,11 +71,15 @@ public class EventMetricsAction extends UserAction {
         }
     }
 
-    private EventsMetrics eventsMetrics;
+    private Map<String, Object> eventsMetrics;
+
     public String sendEventToIntercomFromUI(){
         try {
+            Event event = new Event();
             EventsMetrics lastEventMetrics = EventsMetricsDao.instance.findLatestOne(Filters.empty());
-            this.eventsMetrics = lastEventMetrics;
+            boolean value = EventsMetricsDao.createAndSendMetaDataForEvent(event, lastEventMetrics);
+
+            this.eventsMetrics = event.getMetadata();
         } catch (Exception e) {
             addActionError("Error in retrieving latest event metric " + e.getMessage());
             e.printStackTrace();
@@ -84,9 +88,7 @@ public class EventMetricsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public EventsMetrics getEventsMetrics() {
+    public Map<String, Object> getEventsMetrics() {
         return eventsMetrics;
     }
-
-
 }

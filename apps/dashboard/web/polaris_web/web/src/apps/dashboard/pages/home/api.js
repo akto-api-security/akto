@@ -11,7 +11,7 @@ const homeRequests = {
     },
     getEventForIntercom : async() => {
         return await request({
-            url: '/intercom/send_event',
+            url: '/api/send_event',
             method: 'post',
             data: {}
         })
