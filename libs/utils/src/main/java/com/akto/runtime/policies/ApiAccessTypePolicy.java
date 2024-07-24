@@ -77,7 +77,6 @@ public class ApiAccessTypePolicy {
                 if (!result) {
                     if(isPartnerIp(ip, partnerIpList)){
                         isAccessTypePartner = true;
-                        break;
                     }
                     else{
                         if(directionInt == 1){
