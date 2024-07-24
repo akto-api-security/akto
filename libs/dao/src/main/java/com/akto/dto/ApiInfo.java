@@ -53,7 +53,7 @@ public class ApiInfo {
     }
 
     public enum ApiAccessType {
-        PUBLIC, PRIVATE, PARTNER, INTERNAL, EXTERNAL, THIRD_PARTY
+        PUBLIC, PRIVATE, PARTNER, THIRD_PARTY
     }
 
     public static class ApiInfoKey {
