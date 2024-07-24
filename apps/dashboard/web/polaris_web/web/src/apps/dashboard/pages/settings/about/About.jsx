@@ -440,7 +440,7 @@ function About() {
     }
 
     const components = [accountInfoComponent, 
-                        window.IS_SAAS !== "true" ? <UpdateIpsComponent 
+                        !func.checkLocal() ? <UpdateIpsComponent 
                             key={"cidr"} 
                             description={"We use these CIDRs to mark the endpoints as PRIVATE"} 
                             title={"Private CIDRs list"}
@@ -450,7 +450,7 @@ function About() {
                             onRemove={(val) => handleIpsChange(val, false, "cidr")}
                             type={"cidr"}
                         /> : null,
-                        window.IS_SAAS !== "true" ? <UpdateIpsComponent
+                        !func.checkLocal() ? <UpdateIpsComponent
                             key={"partner"}
                             description={"We use these IPS to mark the endpoints as PARTNER"} 
                             title={"Third parties Ips list"}

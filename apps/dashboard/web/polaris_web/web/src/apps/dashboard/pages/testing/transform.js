@@ -860,9 +860,13 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
   let access_type = null
   let access_types = apiInfo["apiAccessTypes"]
   if (!access_types || access_types.length == 0) {
-      access_type = "none"
+      access_type = "No access type"
   } else if (access_types.indexOf("PUBLIC") !== -1) {
       access_type = "Public"
+  } else if (access_types.indexOf("PARTNER") !== -1) {
+      access_type = "Partner"
+  } else if (access_types.indexOf("THIRD_PARTY") !== -1) {
+      access_type = "Third-party"
   } else {
       access_type = "Private"
   }
