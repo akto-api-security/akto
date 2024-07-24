@@ -452,8 +452,8 @@ function About() {
                         /> : null,
                         !func.checkLocal() ? <UpdateIpsComponent
                             key={"partner"}
-                            description={"We use these IPS to mark the endpoints as PARTNER"} 
-                            title={"Third parties Ips list"}
+                            description={"We use these IPs to mark the endpoints as PARTNER"} 
+                            title={"Third parties IPs list"}
                             labelText="Add IP"
                             ipsList={partnerIpsList}
                             onSubmit={(val) => handleIpsChange(val,true,"partner")}
