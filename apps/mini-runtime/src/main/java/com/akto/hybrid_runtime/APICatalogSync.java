@@ -197,7 +197,7 @@ public class APICatalogSync {
             Set<HttpResponseParams> value = entry.getValue();
             for (HttpResponseParams responseParams: value) {
                 try {
-                    aktoPolicyNew.process(responseParams, partnerIpList);
+                    aktoPolicyNew.process(responseParams);
                 } catch (Exception e) {
                     e.printStackTrace();
                     throw new RuntimeException(e);
@@ -1240,7 +1240,6 @@ public class APICatalogSync {
     static int lastBuildFromDb = 0;
     final static int DB_REFRESH_CYCLE = 15 * 60; // 15 minutes
 
-    List<String> partnerIpList = new ArrayList<>();
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
         List<Object> writesForParams = new ArrayList<>();
@@ -1336,7 +1335,6 @@ public class APICatalogSync {
         }
     }
 
-    private static final Gson gson = new Gson();
     private static final String AKTO_UUID = "akto_uuid";
 
     public List<BulkUpdates> getDBUpdatesForSampleDataHybrid(int apiCollectionId, APICatalog currentDelta, APICatalog dbCatalog, boolean forceUpdate, boolean accountLevelRedact, boolean apiCollectionLevelRedact) {
@@ -1374,10 +1372,10 @@ public class APICatalogSync {
                 try {
                     String redactedSample = RedactSampleData.redactIfRequired(s, accountLevelRedact, apiCollectionLevelRedact);
                     if (accountLevelRedact || apiCollectionLevelRedact) {
-                        Map<String, Object> json = gson.fromJson(redactedSample, Map.class);
+                        JSONObject jsonObject = JSON.parseObject(redactedSample);
                         UUID uuid = UUID.randomUUID();
-                        json.put(AKTO_UUID, uuid);
-                        redactedSample = gson.toJson(json);
+                        jsonObject.put(AKTO_UUID, uuid);
+                        redactedSample = JSONObject.toJSONString(jsonObject);
                         int now = Context.now();
                         Key id = sample.getId();
                         int accountId = Context.accountId.get();
