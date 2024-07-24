@@ -186,7 +186,7 @@ public class HttpCallParser {
              * submit a job only if it is not running.
              */
             loggerMaker.infoAndAddToDb("Current pg merging status " + pgMerging);
-            if (!pgMerging) {
+            if (!pgMerging && (accountSettings!=null && accountSettings.isRedactPayload())) {
                 int accountId = Context.accountId.get();
                 pgMerging = true;
                 service.submit(() -> {
