@@ -1255,7 +1255,6 @@ public class APICatalogSync {
 
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         if (accountSettings != null) {
-            partnerIpList = accountSettings.getPartnerIpList();
             int acc = accountSettings.getId();
             Context.accountId.set(acc);
         }
@@ -1335,6 +1334,7 @@ public class APICatalogSync {
         }
     }
 
+    private static final Gson gson = new Gson();
     private static final String AKTO_UUID = "akto_uuid";
 
     public List<BulkUpdates> getDBUpdatesForSampleDataHybrid(int apiCollectionId, APICatalog currentDelta, APICatalog dbCatalog, boolean forceUpdate, boolean accountLevelRedact, boolean apiCollectionLevelRedact) {
@@ -1372,10 +1372,10 @@ public class APICatalogSync {
                 try {
                     String redactedSample = RedactSampleData.redactIfRequired(s, accountLevelRedact, apiCollectionLevelRedact);
                     if (accountLevelRedact || apiCollectionLevelRedact) {
-                        JSONObject jsonObject = JSON.parseObject(redactedSample);
+                        Map<String, Object> json = gson.fromJson(redactedSample, Map.class);
                         UUID uuid = UUID.randomUUID();
-                        jsonObject.put(AKTO_UUID, uuid);
-                        redactedSample = JSONObject.toJSONString(jsonObject);
+                        json.put(AKTO_UUID, uuid);
+                        redactedSample = gson.toJson(json);
                         int now = Context.now();
                         Key id = sample.getId();
                         int accountId = Context.accountId.get();
@@ -1383,6 +1383,7 @@ public class APICatalogSync {
                                 id.getMethod().name(), id.getUrl(), id.getResponseCode(), now, accountId);
                         unfilteredSamples.add(sampleDataAlt);
                         sampleIds.add(uuid.toString());
+
                     }
                     finalSamples.add(redactedSample);
                 } catch (Exception e) {
