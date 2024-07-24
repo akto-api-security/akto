@@ -28,7 +28,6 @@ import com.akto.hybrid_runtime.policies.AktoPolicyNew;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
-import com.google.gson.Gson;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.mongodb.BasicDBObject;
@@ -75,10 +74,6 @@ public class APICatalogSync {
         this.aktoPolicyNew = new AktoPolicyNew();
         if (buildFromDb) {
             buildFromDB(false, fetchAllSTI);
-            AccountSettings accountSettings = dataActor.fetchAccountSettings();
-            if (accountSettings != null && accountSettings.getPartnerIpList() != null) {
-                partnerIpsList = accountSettings.getPartnerIpList();
-            }
         }
     }
 
@@ -203,7 +198,7 @@ public class APICatalogSync {
             Set<HttpResponseParams> value = entry.getValue();
             for (HttpResponseParams responseParams: value) {
                 try {
-                    aktoPolicyNew.process(responseParams, partnerIpsList);
+                    aktoPolicyNew.process(responseParams);
                 } catch (Exception e) {
                     e.printStackTrace();
                     throw new RuntimeException(e);
@@ -1246,8 +1241,6 @@ public class APICatalogSync {
     static int lastBuildFromDb = 0;
     final static int DB_REFRESH_CYCLE = 15 * 60; // 15 minutes
 
-    List<String> partnerIpsList = new ArrayList<>();
-
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
         List<Object> writesForParams = new ArrayList<>();
@@ -1271,9 +1264,6 @@ public class APICatalogSync {
         boolean redact = accountId == 1718042191;
         if (accountSettings != null) {
             redact =  accountSettings.isRedactPayload();
-            if (accountSettings.getPartnerIpList() != null) {
-                partnerIpsList = accountSettings.getPartnerIpList();
-            }
         }
 
         counter++;
@@ -1345,7 +1335,6 @@ public class APICatalogSync {
         }
     }
 
-    private static final Gson gson = new Gson();
     private static final String AKTO_UUID = "akto_uuid";
 
     public List<BulkUpdates> getDBUpdatesForSampleDataHybrid(int apiCollectionId, APICatalog currentDelta, APICatalog dbCatalog, boolean forceUpdate, boolean accountLevelRedact, boolean apiCollectionLevelRedact) {
@@ -1383,10 +1372,10 @@ public class APICatalogSync {
                 try {
                     String redactedSample = RedactSampleData.redactIfRequired(s, accountLevelRedact, apiCollectionLevelRedact);
                     if (accountLevelRedact || apiCollectionLevelRedact) {
-                        Map<String, Object> json = gson.fromJson(redactedSample, Map.class);
+                        JSONObject jsonObject = JSON.parseObject(redactedSample);
                         UUID uuid = UUID.randomUUID();
-                        json.put(AKTO_UUID, uuid);
-                        redactedSample = gson.toJson(json);
+                        jsonObject.put(AKTO_UUID, uuid);
+                        redactedSample = JSONObject.toJSONString(jsonObject);
                         int now = Context.now();
                         Key id = sample.getId();
                         int accountId = Context.accountId.get();

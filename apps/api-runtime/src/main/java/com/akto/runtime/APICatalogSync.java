@@ -85,10 +85,6 @@ public class APICatalogSync {
         this.aktoPolicyNew = new AktoPolicyNew();
         if (buildFromDb) {
             buildFromDB(false, fetchAllSTI);
-            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-            if (accountSettings != null && accountSettings.getPartnerIpList() != null) {
-                partnerIpsList = accountSettings.getPartnerIpList();
-            }
         }
     }
 
@@ -213,7 +209,7 @@ public class APICatalogSync {
             Set<HttpResponseParams> value = entry.getValue();
             for (HttpResponseParams responseParams: value) {
                 try {
-                    aktoPolicyNew.process(responseParams, partnerIpsList);
+                    aktoPolicyNew.process(responseParams);
                 } catch (Exception e) {
                     e.printStackTrace();
                     throw new RuntimeException(e);
@@ -1713,7 +1709,6 @@ public class APICatalogSync {
     }
 
     int counter = 0;
-    List<String> partnerIpsList = new ArrayList<>();
     
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit syncLimit) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
@@ -1733,9 +1728,6 @@ public class APICatalogSync {
         boolean redact = false;
         if (accountSettings != null) {
             redact =  accountSettings.isRedactPayload();
-            if (accountSettings.getPartnerIpList() != null) {
-                partnerIpsList = accountSettings.getPartnerIpList();
-            }
         }
 
         counter++;

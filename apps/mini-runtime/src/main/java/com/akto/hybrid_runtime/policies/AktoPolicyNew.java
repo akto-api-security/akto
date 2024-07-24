@@ -32,7 +32,7 @@ public class AktoPolicyNew {
     private List<RuntimeFilter> filters = new ArrayList<>();
     private Map<Integer, ApiInfoCatalog> apiInfoCatalogMap = new HashMap<>();
     boolean processCalledAtLeastOnce = false;
-    ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(null);
+    ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(null, null);
     boolean redact = false;
 
     private DataActor dataActor = DataActorFactory.fetchInstance();
@@ -59,6 +59,11 @@ public class AktoPolicyNew {
             if ( cidrList != null && !cidrList.isEmpty()) {
                 apiAccessTypePolicy.setPrivateCidrList(cidrList);
             }
+            List<String> partnerIpsList = new ArrayList<>();
+            if (accountSettings.getPartnerIpList() != null) {
+                partnerIpsList = accountSettings.getPartnerIpList();
+            }
+            apiAccessTypePolicy.setPartnerIpList(partnerIpsList);
             accountId = accountSettings.getId();
             Context.accountId.set(accountId);
             redact = accountId == 1718042191 || accountSettings.isRedactPayload();
@@ -138,7 +143,7 @@ public class AktoPolicyNew {
         loggerMaker.infoAndAddToDb("AktoPolicy main: httpResponseParamsList size: " + httpResponseParamsList.size(), LogDb.RUNTIME);
         for (HttpResponseParams httpResponseParams: httpResponseParamsList) {
             try {
-                process(httpResponseParams, partnerIpsList);
+                process(httpResponseParams);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
                 ;
@@ -160,7 +165,7 @@ public class AktoPolicyNew {
         return new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
     }
 
-    public void process(HttpResponseParams httpResponseParams, List<String> partnerIpsList) throws Exception {
+    public void process(HttpResponseParams httpResponseParams) throws Exception {
         List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(Integer.parseInt(httpResponseParams.getAccountId()));
         ApiInfo.ApiInfoKey apiInfoKey = generateFromHttpResponseParams(httpResponseParams);
         PolicyCatalog policyCatalog = getApiInfoFromMap(apiInfoKey);
@@ -193,7 +198,7 @@ public class AktoPolicyNew {
                     break;
                 case DETERMINE_API_ACCESS_TYPE:
                     try {
-                        apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo, filter, partnerIpsList);
+                        apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo);
                     } catch (Exception ignored) {}
                     break;
                 default:
