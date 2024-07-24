@@ -10,7 +10,7 @@ import org.junit.Test;
 import java.util.*;
 
 public class ApiAccessTypePolicyTest {
-    ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(Collections.singletonList("172.31.0.0/16"), Collections.singletonList("172.31.0.0/16"));
+    ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(Collections.singletonList("172.31.0.0/16"), Collections.singletonList("171.31.0.0/16"));
 
     public static HttpResponseParams generateHttpResponseParams(List<String> ipList) {
         Map<String, List<String>> headers = new HashMap<>();
