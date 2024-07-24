@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.IngestDataBatch;
 import com.akto.kafka.Kafka;
 import com.mongodb.BasicDBObject;
 
@@ -20,26 +21,24 @@ public class KafkaUtils {
         logger.info("Kafka Producer Init " + Context.now());
     }
 
-    public static void insertData(String path, String requestHeaders, String responseHeaders, String method, 
-    String requestPayload, String responsePayload, String ip, String time, String statusCode, String type,
-    String status, String akto_account_id, String akto_vxlan_id, String is_pending, String source) {
+    public static void insertData(IngestDataBatch payload) {
         String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         BasicDBObject obj = new BasicDBObject();
-        obj.put("path", path);
-        obj.put("requestHeaders", requestHeaders);
-        obj.put("responseHeaders", responseHeaders);
-        obj.put("method", method);
-        obj.put("requestPayload", requestPayload);
-        obj.put("responsePayload", responsePayload);
-        obj.put("ip", ip);
-        obj.put("time", time);
-        obj.put("statusCode", statusCode);
-        obj.put("type", type);
-        obj.put("status", status);
-        obj.put("akto_account_id", akto_account_id);
-        obj.put("akto_vxlan_id", akto_vxlan_id);
-        obj.put("is_pending", is_pending);
-        obj.put("source", source);
+        obj.put("path", payload.getPath());
+        obj.put("requestHeaders", payload.getRequestHeaders());
+        obj.put("responseHeaders", payload.getResponseHeaders());
+        obj.put("method", payload.getMethod());
+        obj.put("requestPayload", payload.getRequestPayload());
+        obj.put("responsePayload", payload.getResponsePayload());
+        obj.put("ip", payload.getIp());
+        obj.put("time", payload.getTime());
+        obj.put("statusCode", payload.getStatusCode());
+        obj.put("type", payload.getType());
+        obj.put("status", payload.getStatus());
+        obj.put("akto_account_id", payload.getAkto_account_id());
+        obj.put("akto_vxlan_id", payload.getAkto_vxlan_id());
+        obj.put("is_pending", payload.getIs_pending());
+        obj.put("source", payload.getSource());
         kafkaProducer.send(obj.toString(), topicName);
     }
 
