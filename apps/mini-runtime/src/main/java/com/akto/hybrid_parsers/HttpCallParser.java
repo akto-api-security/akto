@@ -166,7 +166,9 @@ public class HttpCallParser {
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
-            MergeLogicLocal.mergingJob(apiCatalogSync.dbState);
+            if(accountSettings!=null && accountSettings.isRedactPayload()){
+                MergeLogicLocal.mergingJob(apiCatalogSync.dbState);
+            }
         }
 
     }
