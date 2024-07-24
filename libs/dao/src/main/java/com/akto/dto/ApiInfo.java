@@ -54,9 +54,6 @@ public class ApiInfo {
         PUBLIC, PRIVATE, PARTNER
     }
 
-    public static final String FIRST_DETECTED_TS = "discoveredTs";
-    private int discoveredTs;
-
     public static class ApiInfoKey {
         public static final String API_COLLECTION_ID = "apiCollectionId";
         int apiCollectionId;
@@ -142,7 +139,6 @@ public class ApiInfo {
         this.severityScore = 0;
         this.riskScore = 0 ;
         this.lastCalculatedTime = 0;
-        this.discoveredTs = Context.now();
         if(apiInfoKey != null){
             this.collectionIds = Arrays.asList(apiInfoKey.getApiCollectionId());
         }
@@ -181,10 +177,6 @@ public class ApiInfo {
 
         if (that.lastCalculatedTime > this.lastCalculatedTime) {
             this.lastCalculatedTime = that.lastCalculatedTime;
-        }
-
-        if (that.discoveredTs > this.discoveredTs) {
-            this.discoveredTs = that.discoveredTs;
         }
         
 
@@ -255,7 +247,6 @@ public class ApiInfo {
                 ", severityScore='" + getSeverityScore() + "'" +
                 ", riskScore='" + getRiskScore() + "'" +
                 ", lastCalculatedTime='" + getLastCalculatedTime() + "'" +
-                ", discoveredTime='" + getDiscoveredTs() + "'" +
                 "}";
     }
 
@@ -348,14 +339,6 @@ public class ApiInfo {
 
     public void setLastCalculatedTime(int lastCalculatedTime) {
         this.lastCalculatedTime = lastCalculatedTime;
-    }
-
-    public int getDiscoveredTs() {
-        return discoveredTs;
-    }
-
-    public void setDiscoveredTs(int discoveredTs) {
-        this.discoveredTs = discoveredTs;
     }
 
 }

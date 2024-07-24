@@ -1748,7 +1748,7 @@ public class InitializerListener implements ServletContextListener {
         }
         if(Context.now() - lastSentEpoch >= (24 * 60 * 60)){
             ApiInfoDao.instance.insertMetricsForIntercomEvent(lastEventsMetrics, currentEventsMetrics);
-            ApiInfoDao.instance.sendPostureMapToIntercom(lastEventsMetrics, currentEventsMetrics);
+            EventsMetricsDao.instance.sendPostureMapToIntercom(lastEventsMetrics, currentEventsMetrics);
             int businessLogicTests = YamlTemplateDao.instance.getNewCustomTemplates(lastSentEpoch);
             if(businessLogicTests > 0){
                 currentEventsMetrics.setCustomTemplatesCount(businessLogicTests);

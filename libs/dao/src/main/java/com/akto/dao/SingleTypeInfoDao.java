@@ -619,4 +619,49 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return finalArrList;
     }
 
+    public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections){
+        List<BasicDBObject> endpoints = new ArrayList<>();
+        List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
+        nonHostApiCollectionIds.addAll(deactivatedCollections);
+
+        Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
+        Bson filterQWithTs = Filters.and(
+                Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
+                Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
+                Filters.nin(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
+                hostFilterQ
+        );
+        List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 1_000, Sorts.descending("timestamp"), Projections.exclude("values"));
+        for(SingleTypeInfo sti: latestHosts) {
+            BasicDBObject id = 
+                new BasicDBObject("apiCollectionId", sti.getApiCollectionId())
+                .append("url", sti.getUrl())
+                .append("method", sti.getMethod());
+            BasicDBObject endpoint = 
+                new BasicDBObject("_id", id).append("startTs", sti.getTimestamp()).append("count", 1);
+            endpoints.add(endpoint);
+        }
+        
+        nonHostApiCollectionIds.removeAll(deactivatedCollections);
+
+        if (nonHostApiCollectionIds != null && nonHostApiCollectionIds.size() > 0){
+            List<Bson> pipeline = new ArrayList<>();
+
+            pipeline.add(Aggregates.match(Filters.in("apiCollectionId", nonHostApiCollectionIds)));
+            BasicDBObject groupedId = 
+                new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                .append("url", "$url")
+                .append("method", "$method");
+            pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp"),Accumulators.sum("countTs",1)));
+            pipeline.add(Aggregates.match(Filters.gte("startTs", startTimestamp)));
+            pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
+            pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+            MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+            while(endpointsCursor.hasNext()) {
+                endpoints.add(endpointsCursor.next());
+            }
+        }
+        return endpoints;
+    }
+
 }
