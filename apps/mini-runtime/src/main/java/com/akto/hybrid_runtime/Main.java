@@ -201,19 +201,22 @@ public class Main {
             }
         }, 5, 5, TimeUnit.MINUTES);
 
-        try {
-            com.akto.sql.Main.createSampleDataTable();
-            SampleDataAltDb.createIndex();
-        } catch(Exception e){
-            logger.error("Unable to connect to postgres sql db", e);
-        }
+        final boolean checkPg = aSettings != null && aSettings.isRedactPayload();
 
-        try {
-            CleanPostgres.cleanPostgresCron();
-        } catch(Exception e){
-            logger.error("Unable to clean postgres", e);
-        }
+        if (checkPg) {
+            try {
+                com.akto.sql.Main.createSampleDataTable();
+                SampleDataAltDb.createIndex();
+            } catch(Exception e){
+                logger.error("Unable to connect to postgres sql db", e);
+            }
 
+            try {
+                CleanPostgres.cleanPostgresCron();
+            } catch(Exception e){
+                logger.error("Unable to clean postgres", e);
+            }
+        }
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
@@ -275,11 +278,13 @@ public class Main {
                 }
 
 
-                AllMetrics.instance.setTotalSampleDataCount(SampleDataAltDb.totalNumberOfRecords());
-                loggerMaker.infoAndAddToDb("Total number of records in postgres: " + SampleDataAltDb.totalNumberOfRecords(), LogDb.RUNTIME);
-                long dbSizeInMb = SampleDataAltDb.getDbSizeInMb();
-                AllMetrics.instance.setPgDataSizeInMb(dbSizeInMb);
-                loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB", LogDb.RUNTIME);
+                if (checkPg) {
+                    AllMetrics.instance.setTotalSampleDataCount(SampleDataAltDb.totalNumberOfRecords());
+                    loggerMaker.infoAndAddToDb("Total number of records in postgres: " + SampleDataAltDb.totalNumberOfRecords(), LogDb.RUNTIME);
+                    long dbSizeInMb = SampleDataAltDb.getDbSizeInMb();
+                    AllMetrics.instance.setPgDataSizeInMb(dbSizeInMb);
+                    loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB", LogDb.RUNTIME);
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Failed to get total number of records from postgres");
             }
