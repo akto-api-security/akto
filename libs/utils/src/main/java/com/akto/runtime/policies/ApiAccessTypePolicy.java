@@ -23,7 +23,8 @@ public class ApiAccessTypePolicy {
         this.partnerIpList = partnerIpList;
     }
 
-    static final private List<String> standardPrivateIpRanges = Arrays.asList(
+    // RFC standard list. To be used later.
+    static final private List<String> STANDARD_PRIVATE_IP_RANGES = Arrays.asList(
             "10.0.0.0/8",
             "100.64.0.0/10",
             "172.16.0.0/12",
@@ -31,13 +32,27 @@ public class ApiAccessTypePolicy {
             "198.18.0.0/15",
             "192.168.0.0/16");
 
-    public void findApiAccessType(HttpResponseParams httpResponseParams, ApiInfo apiInfo) {
-        List<String> xForwardedForValues = httpResponseParams.getRequestParams().getHeaders().get(X_FORWARDED_FOR);
-        if (xForwardedForValues == null) xForwardedForValues = new ArrayList<>();
+    static final private List<String> CLIENT_IP_HEADERS = Arrays.asList(
+            "x-forwarded-for",
+            "x-real-ip",
+            "x-cluster-client-ip",
+            "true-client-ip",
+            "x-original-forwarded-for",
+            "x-client-ip",
+            "client-ip");
 
+    public void findApiAccessType(HttpResponseParams httpResponseParams, ApiInfo apiInfo) {
+        if (privateCidrList == null || privateCidrList.isEmpty()) return ;
+        List<String> clientIps = new ArrayList<>();
+        for (String header : CLIENT_IP_HEADERS) {
+            List<String> headerValues = httpResponseParams.getRequestParams().getHeaders().get(header);
+            if (headerValues != null) {
+                clientIps.addAll(headerValues);
+            }
+        }
 
         List<String> ipList = new ArrayList<>();
-        for (String ip: xForwardedForValues) {
+        for (String ip: clientIps) {
             String[] parts = ip.trim().split("\\s*,\\s*"); // This approach splits the string by commas and also trims any whitespaces around the individual elements. 
             ipList.addAll(Arrays.asList(parts));
         }
@@ -102,7 +117,8 @@ public class ApiAccessTypePolicy {
 
     public boolean ipInCidr(String ip) {
         IpAddressMatcher ipAddressMatcher;
-        List<String> checkList = new ArrayList<>(standardPrivateIpRanges);
+        // todo: add standard private IP list
+        List<String> checkList = new ArrayList<>();
         if (privateCidrList != null && !privateCidrList.isEmpty()) {
             checkList.addAll(privateCidrList);
         }
@@ -117,7 +133,7 @@ public class ApiAccessTypePolicy {
     }
 
     private boolean isPartnerIp(String ip, List<String> partnerIpList){
-        if(partnerIpList == null){
+        if(partnerIpList == null || partnerIpList.isEmpty()){
             return false;
         }
         for(String partnerIp: partnerIpList){

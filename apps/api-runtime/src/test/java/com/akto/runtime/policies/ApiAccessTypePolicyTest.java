@@ -105,20 +105,4 @@ public class ApiAccessTypePolicyTest {
         Assertions.assertTrue(apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.PUBLIC));
     }
 
-    @Test 
-    public void testStandardIpListAccessType(){
-        List<String> ipList = Arrays.asList("10.2.3.4");
-        HttpResponseParams httpResponseParams = generateHttpResponseParams(ipList);
-        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo);
-        Assertions.assertEquals(apiInfo.getApiAccessTypes().size(), 1);
-        Assertions.assertTrue(apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.PRIVATE));
-        ipList = Arrays.asList("100.2.3.4");
-        httpResponseParams = generateHttpResponseParams(ipList);
-        apiInfo = new ApiInfo(httpResponseParams);
-        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo);
-        Assertions.assertEquals(apiInfo.getApiAccessTypes().size(), 1);
-        Assertions.assertTrue(apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.PUBLIC));
-    }
-
 }
