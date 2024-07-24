@@ -12,7 +12,7 @@ import ApiDetails from "./ApiDetails";
 import PersistStore from "../../../../main/PersistStore";
 import ApiChangesTable from "./component/ApiChangesTable";
 import SummaryCardInfo from "../../../components/shared/SummaryCardInfo";
-import StackedChart from "../../../components/charts/StackedChart";
+import LineChart from "../../../components/charts/LineChart";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import { useLocation } from "react-router-dom";
 
@@ -145,19 +145,19 @@ function ApiChanges() {
         return [
             {
                 data: endpointsTrend,
-                color: "#AEE9D1",
+                color: "#61affe",
                 name: "New endpoints"
             },
             {
                 data: parametersTrend,
-                color: "#A4E8F2",
+                color: "#fca130",
                 name: "New parameters"
             }
         ]
     }
     const defaultChartOptions = {
         "legend": {
-            enabled: false
+            enabled: true
         },
     }
 
@@ -169,21 +169,9 @@ function ApiChanges() {
                     <Divider />
                 </VerticalStack>
                 <VerticalStack gap={2}>
-                    <HorizontalStack align="end">
-                        <HorizontalStack gap={3}>
-                            <HorizontalStack gap={2}>
-                                <div style={{background: "#A4E8F2", borderRadius: '50%', height:'8px', width: '8px'}} />
-                                <Text variant="bodyMd">Sensitive params</Text>
-                            </HorizontalStack>
-                            <HorizontalStack gap={2}>
-                                <div style={{background: "#AEE9D1", borderRadius: '50%', height:'8px', width: '8px'}} />
-                                <Text variant="bodyMd">New endpoints</Text>
-                            </HorizontalStack>
-                        </HorizontalStack>
-                    </HorizontalStack>
-                    <StackedChart
+                    <LineChart
                         key={`trend-chart`}
-                        type='column'
+                        type='line'
                         color='#6200EA'
                         areaFillHex="true"
                         height="280"

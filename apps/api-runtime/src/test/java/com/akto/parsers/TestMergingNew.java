@@ -275,17 +275,17 @@ public class TestMergingNew extends MongoBasedTest {
 
         parser.syncFunction(responseParams.subList(10,25), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
-        APICatalogSync.mergeUrlsAndSave(0,true, false, parser.apiCatalogSync.existingAPIsInDb);
+        APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
         parser.syncFunction(responseParams.subList(25,30), false, true, null);
 
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
-        APICatalogSync.mergeUrlsAndSave(0,true, false, parser.apiCatalogSync.existingAPIsInDb);
+        APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
 
 
-        Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDbState(0).getTemplateURLToMethods();
-        Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDbState(0).getStrictURLToMethods();
+        Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods();
 
         assertEquals(urlTemplateMap.size(), 1);
         assertEquals(urlStaticMap.size(), 0);
@@ -318,12 +318,12 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
         parser.syncFunction(responseParams.subList(25,30), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
-        APICatalogSync.mergeUrlsAndSave(0,true, false, parser.apiCatalogSync.existingAPIsInDb);
+        APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
 
 
-        Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDbState(0).getTemplateURLToMethods();
-        Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDbState(0).getStrictURLToMethods();
+        Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods();
 
         assertEquals(urlTemplateMap.size(), 30);
         assertEquals(urlStaticMap.size(), 0);

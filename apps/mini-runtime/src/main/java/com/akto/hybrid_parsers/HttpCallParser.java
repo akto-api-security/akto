@@ -29,6 +29,7 @@ import com.mongodb.client.model.*;
 import okhttp3.*;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
+import com.alibaba.fastjson2.*;
 
 import java.io.IOException;
 import java.util.*;
@@ -87,19 +88,19 @@ public class HttpCallParser {
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
 
         //convert java object to JSON format
-        Map<String, Object> json = gson.fromJson(message, Map.class);
+        JSONObject jsonObject = JSON.parseObject(message);
 
-        String method = (String) json.get("method");
-        String url = (String) json.get("path");
-        String type = (String) json.get("type");
-        Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(json, "requestHeaders");
+        String method = jsonObject.getString("method");
+        String url = jsonObject.getString("path");
+        String type = jsonObject.getString("type");
+        Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(jsonObject, "requestHeaders");
 
-        String rawRequestPayload = (String) json.get("requestPayload");
+        String rawRequestPayload = jsonObject.getString("requestPayload");
         String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
 
 
 
-        String apiCollectionIdStr = json.getOrDefault("akto_vxlan_id", "0").toString();
+        String apiCollectionIdStr = jsonObject.getOrDefault("akto_vxlan_id", "0").toString();
         int apiCollectionId = 0;
         if (NumberUtils.isDigits(apiCollectionIdStr)) {
             apiCollectionId = NumberUtils.toInt(apiCollectionIdStr, 0);
@@ -109,19 +110,19 @@ public class HttpCallParser {
                 method,url,type, requestHeaders, requestPayload, apiCollectionId
         );
 
-        int statusCode = Integer.parseInt(json.get("statusCode").toString());
-        String status = (String) json.get("status");
-        Map<String,List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
-        String payload = (String) json.get("responsePayload");
+        int statusCode = jsonObject.getInteger("statusCode");
+        String status = jsonObject.getString("status");
+        Map<String,List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(jsonObject, "responseHeaders");
+        String payload = jsonObject.getString("responsePayload");
         payload = HttpRequestResponseUtils.rawToJsonString(payload, responseHeaders);
         payload = JSONUtils.parseIfJsonP(payload);
-        int time = Integer.parseInt(json.get("time").toString());
-        String accountId = (String) json.get("akto_account_id");
-        String sourceIP = (String) json.get("ip");
+        int time = jsonObject.getInteger("time");
+        String accountId = jsonObject.getString("akto_account_id");
+        String sourceIP = jsonObject.getString("ip");
 
-        String isPendingStr = (String) json.getOrDefault("is_pending", "false");
+        String isPendingStr = (String) jsonObject.getOrDefault("is_pending", "false");
         boolean isPending = !isPendingStr.toLowerCase().equals("false");
-        String sourceStr = (String) json.getOrDefault("source", HttpResponseParams.Source.OTHER.name());
+        String sourceStr = (String) jsonObject.getOrDefault("source", HttpResponseParams.Source.OTHER.name());
         HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
         
         return new HttpResponseParams(
