@@ -53,8 +53,8 @@ RUN yum install -y librdkafka1 librdkafka-devel pcre pcre-devel && \
     cp objs/ngx_http_kafka_log_module.so /etc/nginx/modules/
 
 # Add the Akto njs code to the nginx njs directory
-RUN mkdir -p /etc/nginx/njs && \
-    curl -o /etc/nginx/njs/api_log.js https://raw.githubusercontent.com/akto-api-security/nginx-middleware/master/api_log.js
+RUN mkdir -p /etc/nginx/njs
+COPY api_log.js /etc/nginx/njs/api_log.js
 
 # Expose ports (optional)
 EXPOSE 80 443
