@@ -53,7 +53,6 @@ public class ApiCollectionsAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class);
 
     List<ApiCollection> apiCollections = new ArrayList<>();
-    List<ApiCollectionTestStatus> apiCollectionTestStatus = new ArrayList<>();
     Map<Integer,Integer> testedEndpointsMaps = new HashMap<>();
     Map<Integer,Integer> lastTrafficSeenMap = new HashMap<>();
     Map<Integer,Double> riskScoreOfCollectionsMap = new HashMap<>();
@@ -80,8 +79,7 @@ public class ApiCollectionsAction extends UserAction {
     
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections) {
 	int tsRandom = Context.now();
-	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);    
-        this.apiCollectionTestStatus = new ArrayList<>();
+	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD); 
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
 	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);     
 
@@ -115,7 +113,7 @@ public class ApiCollectionsAction extends UserAction {
     public String fetchAllCollectionsBasic() {
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.project(Projections.fields(
-            Projections.computed("urlsCount", new BasicDBObject("$size", "$urls")),
+            Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", "$urls")),
             Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE)
         )));
         MongoCursor<BasicDBObject> cursor = ApiCollectionsDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
@@ -123,8 +121,8 @@ public class ApiCollectionsAction extends UserAction {
             try {
                 BasicDBObject collection = cursor.next();
                 ApiCollection apiCollection = new ApiCollection();
-                apiCollection.setId(collection.getInt("_id"));
-                apiCollection.setUrlsCount(collection.getInt("urlsCount")); 
+                apiCollection.setId(collection.getInt(ApiCollection.ID));
+                apiCollection.setUrlsCount(collection.getInt(ApiCollection.URLS_COUNT)); 
                 apiCollection.setName(collection.getString(ApiCollection.NAME));
                 apiCollection.setHostName(collection.getString(ApiCollection.HOST_NAME));
                 
@@ -659,14 +657,6 @@ public class ApiCollectionsAction extends UserAction {
 
     public LastCronRunInfo getTimerInfo() {
         return timerInfo;
-    }
-
-    public List<ApiCollectionTestStatus> getApiCollectionTestStatus() {
-        return apiCollectionTestStatus;
-    }
-
-    public void setApiCollectionTestStatus(List<ApiCollectionTestStatus> apiCollectionTestStatus) {
-        this.apiCollectionTestStatus = apiCollectionTestStatus;
     }
 
     public List<ConditionUtils> getConditions() {

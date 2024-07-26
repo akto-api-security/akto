@@ -36,6 +36,7 @@ public class ApiCollection {
 
     public static final String SAMPLE_COLLECTIONS_DROPPED = "sampleCollectionsDropped";
 
+    public static final String URLS_COUNT = "urlsCount";
     @BsonIgnore
     int urlsCount;
 
