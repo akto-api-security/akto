@@ -11,7 +11,6 @@ import com.akto.dao.*;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.usage.MetricTypes;
@@ -35,9 +34,6 @@ import com.akto.usage.UsageMetricHandler;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.ApiCollection.ENV_TYPE;
-import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.URLMethods;
-import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
 import com.mongodb.client.model.Accumulators;
@@ -46,16 +42,11 @@ import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
-import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UnwindOptions;
 import com.opensymphony.xwork2.Action;
-import org.apache.commons.lang3.tuple.Pair;
-import org.bson.Document;
-import com.mongodb.client.result.UpdateResult;
 
 public class ApiCollectionsAction extends UserAction {
 
@@ -92,32 +83,12 @@ public class ApiCollectionsAction extends UserAction {
 	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);    
         this.apiCollectionTestStatus = new ArrayList<>();
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
-	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);    
-	    
-        Map<Integer, Pair<String,Integer>> map = new HashMap<>();
-        try (MongoCursor<BasicDBObject> cursor = TestingRunDao.instance.getMCollection().aggregate(
-                Arrays.asList(
-                        Aggregates.match(Filters.eq("testingEndpoints.type", TestingEndpoints.Type.COLLECTION_WISE.name())),
-                        Aggregates.sort(Sorts.descending(Arrays.asList("testingEndpoints.apiCollectionId", "endTimestamp"))),
-                        new Document("$group", new Document("_id", "$testingEndpoints.apiCollectionId")
-                                .append("latestRun", new Document("$first", "$$ROOT")))
-                ), BasicDBObject.class
-        ).cursor()) {
-            while (cursor.hasNext()) {
-                BasicDBObject basicDBObject = cursor.next();
-                BasicDBObject latestRun = (BasicDBObject) basicDBObject.get("latestRun");
-                String state = latestRun.getString("state");
-                int endTimestamp = latestRun.getInt("endTimestamp", -1);
-                int collectionId = ((BasicDBObject)latestRun.get("testingEndpoints")).getInt("apiCollectionId");
-                map.put(collectionId, Pair.of(state, endTimestamp));
-            }
-        }
-	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount tests status done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);    
+	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);     
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
             Integer count = countMap.get(apiCollectionId);
-            int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : 0;
+            int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : apiCollection.getUrlsCount();
 		
             if (count != null && (apiCollection.getHostName() != null)) {
                 apiCollection.setUrlsCount(count);
@@ -129,12 +100,6 @@ public class ApiCollectionsAction extends UserAction {
             } else {
                 apiCollection.setUrlsCount(fallbackCount);
             }
-            if(map.containsKey(apiCollectionId)) {
-                Pair<String, Integer> pair = map.get(apiCollectionId);
-                apiCollectionTestStatus.add(new ApiCollectionTestStatus(apiCollection.getId(), pair.getRight(), pair.getLeft()));
-            } else {
-                apiCollectionTestStatus.add(new ApiCollectionTestStatus(apiCollection.getId(), -1, null));
-            }
 
             apiCollection.setUrls(new HashSet<>());
         }
@@ -142,18 +107,49 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchAllCollections() {
-
         this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
-
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String fetchAllCollectionsBasic(){
-        this.apiCollections = ApiCollectionsDao.instance.findAll(
-            new BasicDBObject(), 
-            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME)
-        );
+    public String fetchAllCollectionsBasic() {
+        List<Bson> pipeLine = new ArrayList<>();
+        pipeLine.add(Aggregates.project(Projections.fields(
+            Projections.computed("urlsCount", new BasicDBObject("$size", "$urls")),
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE)
+        )));
+        MongoCursor<BasicDBObject> cursor = ApiCollectionsDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
+        while(cursor.hasNext()){
+            try {
+                BasicDBObject collection = cursor.next();
+                ApiCollection apiCollection = new ApiCollection();
+                apiCollection.setId(collection.getInt("_id"));
+                apiCollection.setUrlsCount(collection.getInt("urlsCount")); 
+                apiCollection.setName(collection.getString(ApiCollection.NAME));
+                apiCollection.setHostName(collection.getString(ApiCollection.HOST_NAME));
+                
+                String type = collection.getString(ApiCollection._TYPE);
+                String userEnvType = collection.getString(ApiCollection.USER_ENV_TYPE);
+                if(type != null && type.length() > 0){
+                    apiCollection.setType(ApiCollection.Type.API_GROUP);
+                }
+
+                if(userEnvType != null && userEnvType.length() > 0){
+                    if(userEnvType.equals("STAGING")){
+                        apiCollection.setUserSetEnvType(ApiCollection.ENV_TYPE.STAGING);
+                    }else{
+                        apiCollection.setUserSetEnvType(ApiCollection.ENV_TYPE.PRODUCTION);
+                    }
+                }
+
+                this.apiCollections.add(apiCollection);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }   
+        }
+
+        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
+
         return Action.SUCCESS.toUpperCase();
     }
 

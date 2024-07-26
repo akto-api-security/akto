@@ -73,10 +73,10 @@ const headings = [
         tooltipContent: "Authentication type of the API."
     },
     {
-        text: 'Sensitive Params',
+        text: 'Sensitive params in response',
         title: 'Sensitive params',
         value: 'sensitiveTagsComp',
-        filterKey: 'sensitiveTags',
+        filterKey: 'sensitiveInResp',
         showFilter: true,
         textValue: "sensitiveDataTags"
     },
@@ -115,6 +115,13 @@ headers.push({
     showFilter: true,
     textValue: 'method',
     sortActive: true
+})
+
+headers.push({
+    text: 'Sensitive params in request',
+    value: 'sensitiveInReq',
+    filterKey: 'sensitiveInReq',
+    showFilter: true,
 })
 
 
@@ -194,6 +201,7 @@ function ApiEndpoints() {
 
         let sensitiveParamsMap = {}
         sensitiveParams.forEach(p => {
+            let position = p.responseCode > -1 ? "response" : "request";
             let key = p.method + " " + p.url + " " + p.apiCollectionId
             if (!sensitiveParamsMap[key]) sensitiveParamsMap[key] = new Set()
 
@@ -201,11 +209,23 @@ function ApiEndpoints() {
                 p.subType = { name: "CUSTOM" }
             }
 
-            sensitiveParamsMap[key].add(p.subType)
+            sensitiveParamsMap[key].add({ name: p.subType, position: position})
         })
 
         apiEndpointsInCollection.forEach(apiEndpoint => {
-            apiEndpoint.sensitive = sensitiveParamsMap[apiEndpoint.method + " " + apiEndpoint.url + " " +apiEndpoint.apiCollectionId] || new Set()
+            const key = apiEndpoint.method + " " + apiEndpoint.url + " " + apiEndpoint.apiCollectionId;
+            const allSensitive = new Set(), sensitiveInResp = [], sensitiveInReq = [];
+
+            sensitiveParamsMap[key]?.forEach(({ name, position }) => {
+                allSensitive.add(name);
+                (position === 'response' ? sensitiveInResp : sensitiveInReq).push(name);
+            });
+
+            Object.assign(apiEndpoint, {
+                sensitive: allSensitive,
+                sensitiveInReq,
+                sensitiveInResp
+            });
         })
 
         let data = {}

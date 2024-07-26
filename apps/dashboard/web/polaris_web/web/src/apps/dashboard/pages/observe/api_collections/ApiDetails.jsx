@@ -119,7 +119,6 @@ function ApiDetails(props) {
 
     const isDemergingActive = isDeMergeAllowed() ;
 
-
     const SchemaTab = {
         id: 'schema',
         content: "Schema",
@@ -128,6 +127,13 @@ function ApiDetails(props) {
             data={paramList} 
             badgeActive={badgeActive}
             setBadgeActive={setBadgeActive}
+            apiInfo={
+                {
+                    apiCollectionId: apiDetail.apiCollectionId,
+                    url: apiDetail.endpoint,
+                    method: apiDetail.method
+                }
+            }
         />
         </Box>
     }
