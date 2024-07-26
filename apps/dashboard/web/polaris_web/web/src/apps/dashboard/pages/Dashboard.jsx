@@ -2,13 +2,16 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { history } from "@/util/history";
 import Store from "../store";
 import homeFunctions from "./home/module";
-import { useEffect } from "react";
-import { Frame, Toast } from "@shopify/polaris";
+import { useEffect, useState } from "react";
+import { Frame, Toast, VerticalStack } from "@shopify/polaris";
 import "./dashboard.css"
 import func from "@/util/func"
 import transform from "./testing/transform";
 import PersistStore from "../../main/PersistStore";
 import ConfirmationModal from "../components/shared/ConfirmationModal";
+import AlertsBanner from "./AlertsBanner";
+import dashboardFunc from "./transform";
+import homeRequests from "./home/api";
 
 function Dashboard() {
 
@@ -32,6 +35,9 @@ function Dashboard() {
         setCollectionsMap(allCollectionsMap)
         setAllCollections(apiCollections)
     }
+    const trafficAlerts = PersistStore(state => state.trafficAlerts)
+    const setTrafficAlerts = PersistStore(state => state.setTrafficAlerts)
+    const [displayItems, setDisplayItems] = useState([])
 
     const fetchMetadata = async () => {
         await transform.setTestMetadata();
@@ -46,6 +52,14 @@ function Dashboard() {
         }
         if(window.Beamer){
             window.Beamer.init();
+        }
+        if(trafficAlerts == null){
+            homeRequests.getTrafficAlerts().then((resp) => {
+                setDisplayItems(dashboardFunc.sortAndFilterAlerts(resp))
+                setTrafficAlerts(resp)
+            })
+        }else{
+            setDisplayItems(dashboardFunc.sortAndFilterAlerts(trafficAlerts))
         }
     }, [])
 
@@ -71,6 +85,20 @@ function Dashboard() {
         primaryActionContent={confirmationModalConfig.primaryActionContent}
         primaryAction={confirmationModalConfig.primaryAction}
     />
+    const handleOnDismiss = async(index) => {
+        let alert = displayItems[index];
+        let newTrafficFilters = []
+        trafficAlerts.forEach((a) => {
+            if(func.deepComparison(a, alert)){
+                a.lastDismissed = func.timeNow()
+            }
+            newTrafficFilters.push(a);
+        })
+        setDisplayItems(dashboardFunc.sortAndFilterAlerts(newTrafficFilters));
+        setTrafficAlerts(newTrafficFilters)
+        alert.lastDismissed = func.timeNow();
+        await homeRequests.markAlertAsDismissed(alert);
+    }
 
     return (
         <div className="dashboard">
@@ -78,6 +106,21 @@ function Dashboard() {
             <Outlet />
             {toastMarkup}
             {ConfirmationModalMarkup}
+            {displayItems.length > 0 ? <div className="alerts-banner">
+                    <VerticalStack gap={"2"}>
+                        {displayItems.map((alert, index) => {
+                            return(
+                                <AlertsBanner key={index} 
+                                    type={dashboardFunc.getAlertMessageFromType(alert.alertType)} 
+                                    content={alert.content}
+                                    severity={dashboardFunc.getBannerStatus(alert.severity)} 
+                                    onDismiss= {handleOnDismiss}
+                                    index={index}
+                                />
+                            )
+                        })}
+                    </VerticalStack>
+            </div> : null}
         </Frame>
         </div>
     )

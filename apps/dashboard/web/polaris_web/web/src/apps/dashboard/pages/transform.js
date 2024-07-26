@@ -1,5 +1,5 @@
 import { DynamicSourceMinor , MagicMinor, PasskeyMinor } from "@shopify/polaris-icons"
-import PersistStore from "../../main/PersistStore"
+import func from "@/util/func"
 
 const dataTypesPrompt = [
     {
@@ -179,6 +179,39 @@ const dashboardFunc = {
             default :
                 return []
         }
+    },
+
+    getAlertMessageFromType(alertType){
+        switch (alertType){
+            case "TRAFFIC_STOPPED":
+                return "Can't capture traffic";
+            case "TRAFFIC_OVERLOADED":
+                return "Latency captured, traffic rate high";
+            default:
+                return "Unknown error occurred"
+        }
+    },
+    getBannerStatus(key){
+        switch(key.toUpperCase()){
+            case "HIGH" : return "critical";
+            case "MEDIUM": return "warning";
+            case "LOW": return "info";
+            default:
+                return "bg";
+        }
+    },
+    sortAndFilterAlerts(alerts) {
+        const severityOrder = { 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
+        const dismissLimit =  60 * 60;
+        const currentTime = func.timeNow()
+    
+        const filteredAlerts = alerts.filter(alert => 
+            currentTime - (alert?.lastDismissed || 0) > dismissLimit
+        );
+    
+        filteredAlerts.sort((a, b) => severityOrder[b.severity] - severityOrder[a.severity]);
+    
+        return filteredAlerts.slice(0, Math.min(3, filteredAlerts.length));
     }
 }
 
