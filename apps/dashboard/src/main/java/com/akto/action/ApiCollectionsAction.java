@@ -129,19 +129,15 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setHostName(collection.getString(ApiCollection.HOST_NAME));
                 
                 String type = collection.getString(ApiCollection._TYPE);
-                String userEnvType = collection.getString(ApiCollection.USER_ENV_TYPE);
                 if(type != null && type.length() > 0){
-                    apiCollection.setType(ApiCollection.Type.API_GROUP);
+                    ApiCollection.Type typeEnum = ApiCollection.Type.valueOf(type);
+                    apiCollection.setType(typeEnum);
                 }
-
+                String userEnvType = collection.getString(ApiCollection.USER_ENV_TYPE);
                 if(userEnvType != null && userEnvType.length() > 0){
-                    if(userEnvType.equals("STAGING")){
-                        apiCollection.setUserSetEnvType(ApiCollection.ENV_TYPE.STAGING);
-                    }else{
-                        apiCollection.setUserSetEnvType(ApiCollection.ENV_TYPE.PRODUCTION);
-                    }
+                    ApiCollection.ENV_TYPE envEnum = ApiCollection.ENV_TYPE.valueOf(userEnvType);
+                    apiCollection.setUserSetEnvType(envEnum);
                 }
-
                 this.apiCollections.add(apiCollection);
             } catch (Exception e) {
                 e.printStackTrace();
