@@ -227,7 +227,8 @@ const transform = {
         let currDate = twoMonthsAgo
         let ret = []
         let dateToCount = resp.reduce((m, e) => {
-            let detectDate = func.toYMD(new Date(e._id * 86400 * 1000))
+
+            let detectDate = func.toYMD(new Date((e._id+1) * 86400 * 1000))
             m[detectDate] = (m[detectDate] || 0) + e.count
             newParametersCount += e.count
             return m
@@ -282,6 +283,9 @@ const transform = {
         }
     },
     formatNumberWithCommas(number) {
+        if(number === undefined){
+            return 0;
+        }
         const numberString = number.toString();
         return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     },

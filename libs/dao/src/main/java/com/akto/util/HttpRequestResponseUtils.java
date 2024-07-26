@@ -50,6 +50,19 @@ public class HttpRequestResponseUtils {
         return rawRequest;
     }
 
+    public static String convertGRPCEncodedToJson(byte[] rawRequest) {
+        String base64 = Base64.getEncoder().encodeToString(rawRequest);
+        try {
+            Map<Object, Object> map = ProtoBufUtils.getInstance().decodeProto(rawRequest);
+            if (map.isEmpty()) {
+                return base64;
+            }
+            return mapper.writeValueAsString(map);
+        } catch (Exception e) {
+            return base64;
+        }
+    }
+
     public static String convertGRPCEncodedToJson(String rawRequest) {
         try {
             Map<Object, Object> map = ProtoBufUtils.getInstance().decodeProto(rawRequest);
