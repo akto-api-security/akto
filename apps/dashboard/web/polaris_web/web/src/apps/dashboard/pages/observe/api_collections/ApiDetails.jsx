@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Avatar, Box, Button, Popover, Modal, Tooltip } from "@shopify/polaris"
+import { Avatar, Box, Button, Popover, Modal, Tooltip, Text} from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -11,6 +11,8 @@ import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
 import func from "@/util/func"
 import transform from "../transform";
 import ApiDependency from "./ApiDependency";
+import RunTest from "./RunTest";
+import PersistStore from "../../../../main/PersistStore";
 
 import { HorizontalDotsMinor } from "@shopify/polaris-icons"
 
@@ -26,6 +28,7 @@ function ApiDetails(props) {
     const [loading, setLoading] = useState(false)
     const [badgeActive, setBadgeActive] = useState(false)
     const [showDemerge, setShowDemerge] = useState(false)
+    const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
 
     const ref = useRef(null)
 
@@ -117,6 +120,20 @@ function ApiDetails(props) {
         return (endpoint.includes("STRING") || endpoint.includes("INTEGER") || endpoint.includes("OBJECT_ID"))
     }
 
+    const openTest = () => {
+        const apiKeyInfo = {
+            apiCollectionId: apiDetail["apiCollectionId"],
+            url: selectedUrl.url,
+            method: {
+                "_name": selectedUrl.method
+            }
+            
+        }
+        setSelectedSampleApi(apiKeyInfo)
+        const navUrl = window.location.origin + "/dashboard/test-editor/REMOVE_TOKENS"
+        window.open(navUrl, "_blank")
+    }
+
     const isDemergingActive = isDeMergeAllowed() ;
 
 
@@ -186,24 +203,34 @@ function ApiDetails(props) {
     }
     const headingComp = (
         <div style={{display: "flex", justifyContent: "space-between"}}  key="heading">
-            <GithubCell
-                width="40vw"
-                data={apiDetail}
-                headers={headers}
-                getStatus={getStatus}
-                isBadgeClickable={true}
-                badgeClicked={badgeClicked}
+            <div>
+                <GithubCell
+                    width="40vw"
+                    data={apiDetail}
+                    headers={headers}
+                    getStatus={getStatus}
+                    isBadgeClickable={true}
+                    badgeClicked={badgeClicked}
+                />
+                <Box paddingBlockStart={"05"}>
+                    <Button plain onClick={() => func.copyToClipboard(apiDetail['method']+ " " + apiDetail['endpoint'], ref, "URL copied")}>
+                        <Tooltip content="Copy endpoint" dismissOnMouseOut>
+                            <div className="reduce-size">
+                                <Avatar size="extraSmall" source="/public/copy_icon.svg" />
+                            </div>
+                        </Tooltip>
+                        <Box ref={ref} />
+                    </Button>
+                </Box>
+            </div>
+            <RunTest
+                apiCollectionId={apiDetail["apiCollectionId"]}
+                endpoints={[apiDetail]}
+                filtered={true}
             />
-            <Box paddingBlockStart={"05"}>
-                <Button plain onClick={() => func.copyToClipboard(apiDetail['method']+ " " + apiDetail['endpoint'], ref, "URL copied")}>
-                    <Tooltip content="Copy endpoint" dismissOnMouseOut>
-                        <div className="reduce-size">
-                            <Avatar size="extraSmall" source="/public/copy_icon.svg" />
-                        </div>
-                    </Tooltip>
-                    <Box ref={ref} />
-                </Button>
-            </Box>
+            <Button removeUnderline plain monochrome onClick={() => openTest()}>
+                <Text variant="headingSm" alignment="start" breakWord>Open test editor</Text>
+            </Button>
         </div>
     )
 
