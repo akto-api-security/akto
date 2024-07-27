@@ -78,6 +78,7 @@ import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.util.AccountTask;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.EmailAccountName;
+import com.akto.util.IntercomEventsUtil;
 import com.akto.util.Constants;
 import com.akto.util.DbMode;
 import com.akto.util.JSONUtils;
@@ -1743,12 +1744,17 @@ public class InitializerListener implements ServletContextListener {
             false, new EventsExample(0, new ArrayList<>()), new HashMap<>(), new HashMap<>(), new HashMap<>(), 0, Context.now());
             
         int lastSentEpoch = 0;
+        int lastApisCount = 0;
         if(lastEventsMetrics != null){
             lastSentEpoch = lastEventsMetrics.getCreatedAt();
+            if(lastEventsMetrics.getMilestones() != null){
+                lastApisCount = lastEventsMetrics.getMilestones().get(EventsMetrics.APIS_INFO_COUNT);
+            }
         }
-        if(Context.now() - lastSentEpoch >= (24 * 60 * 60)){
-            ApiInfoDao.instance.insertMetricsForIntercomEvent(lastEventsMetrics, currentEventsMetrics);
-            EventsMetricsDao.instance.sendPostureMapToIntercom(lastEventsMetrics, currentEventsMetrics);
+        int timeNow = Context.now();
+        if(timeNow - lastSentEpoch >= (24 * 60 * 60)){
+            IntercomEventsUtil.fillMetaDataForIntercomEvent(lastApisCount, currentEventsMetrics);
+            IntercomEventsUtil.sendPostureMapToIntercom(lastSentEpoch, currentEventsMetrics);
             int businessLogicTests = YamlTemplateDao.instance.getNewCustomTemplates(lastSentEpoch);
             if(businessLogicTests > 0){
                 currentEventsMetrics.setCustomTemplatesCount(businessLogicTests);
@@ -1758,6 +1764,7 @@ public class InitializerListener implements ServletContextListener {
             if(!issuesMap.isEmpty()){
                 currentEventsMetrics.setSecurityTestFindings(issuesMap);
             }
+            currentEventsMetrics.setCreatedAt(timeNow);
             EventsMetricsDao.instance.insertOne(currentEventsMetrics);
         }
 

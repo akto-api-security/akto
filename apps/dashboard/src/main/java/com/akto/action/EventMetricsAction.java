@@ -7,6 +7,7 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.notifications.EventsMetricsDao;
 import com.akto.dto.events.EventsMetrics;
+import com.akto.util.IntercomEventsUtil;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
@@ -43,7 +44,7 @@ public class EventMetricsAction extends UserAction {
                             .setCreatedAt(timeNow)
                             .setEventName("account-metrics");
 
-        boolean shouldSendEvent = EventsMetricsDao.createAndSendMetaDataForEvent(event, currentEventsMetrics);
+        boolean shouldSendEvent = IntercomEventsUtil.createAndSendMetaDataForEvent(event, currentEventsMetrics);
         // get all users for this account id
         if(shouldSendEvent){
             try {
@@ -54,7 +55,6 @@ public class EventMetricsAction extends UserAction {
                     String name = userObj.getString("name");
                     event.setEmail(userEmail);
                     Event.create(event);
-                    currentEventsMetrics.setCreatedAt(timeNow);
 
                     User intercomUser = findUserInIntercom(userEmail);
 
@@ -77,7 +77,7 @@ public class EventMetricsAction extends UserAction {
         try {
             Event event = new Event();
             EventsMetrics lastEventMetrics = EventsMetricsDao.instance.findLatestOne(Filters.empty());
-            boolean value = EventsMetricsDao.createAndSendMetaDataForEvent(event, lastEventMetrics);
+            boolean value = IntercomEventsUtil.createAndSendMetaDataForEvent(event, lastEventMetrics);
 
             this.eventsMetrics = event.getMetadata();
         } catch (Exception e) {

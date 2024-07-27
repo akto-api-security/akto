@@ -4,7 +4,6 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.events.EventsMetrics;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.akto.dto.type.SingleTypeInfo;
@@ -33,7 +32,6 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
     public static ApiInfoDao instance = new ApiInfoDao();
 
     public static final String ID = "_id.";
-    public static final int MILESTONES_LIMIT = 500;
     public static final int AKTO_DISCOVERED_APIS_COLLECTION_ID = 1333333333;
 
     public void createIndicesIfAbsent() {
@@ -199,22 +197,6 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
             } 
         }
         return apiInfoList;
-    }
-
-    public void insertMetricsForIntercomEvent(EventsMetrics lastEventSent, EventsMetrics currentEvent){
-        long count = instance.getMCollection().estimatedDocumentCount();
-        if(count % MILESTONES_LIMIT == 0){
-            Map<String,Integer> localMilestonesMap = new HashMap<>();
-            if(lastEventSent == null || lastEventSent.getMilestones() == null || lastEventSent.getMilestones().get(EventsMetrics.APIS_INFO_COUNT) == null){
-                localMilestonesMap.put(EventsMetrics.APIS_INFO_COUNT, (int) count);
-            }else if(lastEventSent.getMilestones().get(EventsMetrics.APIS_INFO_COUNT) < count){
-                localMilestonesMap.put(EventsMetrics.APIS_INFO_COUNT, (int) count);
-            }
-
-            if(!localMilestonesMap.isEmpty()){
-                currentEvent.setMilestones(localMilestonesMap);
-            }
-        }
     }
 
     @Override
