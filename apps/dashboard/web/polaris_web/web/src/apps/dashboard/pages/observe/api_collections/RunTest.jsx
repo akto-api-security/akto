@@ -1,4 +1,4 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, ButtonGroup, Badge, Banner,HorizontalGrid, HorizontalStack, Link } from "@shopify/polaris";
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, ButtonGroup, Badge, Banner,HorizontalGrid, HorizontalStack, Link, VerticalStack } from "@shopify/polaris";
 import { TickMinor, CancelMajor } from "@shopify/polaris-icons"
 import { useEffect, useRef, useState } from "react";
 import { default as observeApi } from "../api";
@@ -493,12 +493,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
                         <br />
 
-                        <HorizontalGrid columns="2">
-                            <Box>
-                                <Button disabled={testRun.continuousTesting} plain monochrome removeUnderline>
-                                    <HorizontalStack gap={"1"}>
-                                        <Text>Select Time:</Text>
-                                        <Dropdown
+                        <VerticalStack gap={"4"}>
+                            <HorizontalGrid gap={"4"} columns={"3"}>
+                                <div style={{marginTop: '-10px'}}>
+                                    <Text>Select Time:</Text>
+                                    <Dropdown
                                         menuItems={hourlyTimes}
                                         initial={testRun.hourlyLabel}
                                         selected={(hour) => {
@@ -517,37 +516,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                                 hourlyLabel: hourlyTime ? hourlyTime.label : ""
                                             }))
                                         }} />
-                                    </HorizontalStack>
-                                </Button>
-                                <br />
+                                </div>
 
-                                <ButtonGroup>
-                                    <Checkbox
-                                        label="Run daily"
-                                        checked={testRun.recurringDaily}
-                                        onChange={() => setTestRun(prev => ({ ...prev, recurringDaily: !prev.recurringDaily }))}
-                                    />
-                                    <Checkbox
-                                        label="Continuous Testing"
-                                        checked={testRun.continuousTesting}
-                                        onChange={() => setTestRun(prev => ({ ...prev, continuousTesting: !prev.continuousTesting }))}
-                                    />
-                                    <Checkbox
-                                        label="Use different target for testing"
-                                        checked={testRun.hasOverriddenTestAppUrl}
-                                        onChange={() => setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl }))}
-                                    />
-                                    {testRun.hasOverriddenTestAppUrl &&
-                                        <TextField
-                                            placeholder="Override test app host"
-                                            value={testRun.overriddenTestAppUrl}
-                                            onChange={(overriddenTestAppUrl) => setTestRun(prev => ({ ...prev, overriddenTestAppUrl: overriddenTestAppUrl }))}
-                                        />
-                                    }
-                                </ButtonGroup>
-                                </Box>
-                            <Box>
-                                <ButtonGroup>
+                                <div style={{marginTop: '-10px'}}>
                                     <Text>Test run time:</Text>
                                     <Dropdown
                                         menuItems={testRunTimeOptions}
@@ -565,33 +536,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                                 testRunTimeLabel: testRunTimeOption.label
                                             }))
                                         }} />
-                                </ButtonGroup>
-
-                                <br />
-                                <ButtonGroup>
-                                    <Text>Max concurrent requests:</Text>
-                                    <Dropdown
-                                        menuItems={maxConcurrentRequestsOptions}
-                                        initial={"Default"}
-                                        selected={(requests) => {
-                                            let maxConcurrentRequests
-                                            if (requests === "Default") maxConcurrentRequests = -1
-                                            else maxConcurrentRequests = requests
-
-                                            const maxConcurrentRequestsOption = getLabel(maxConcurrentRequestsOptions, requests)
-
-                                            setTestRun(prev => ({
-                                                ...prev,
-                                                maxConcurrentRequests: maxConcurrentRequests,
-                                                maxConcurrentRequestsLabel: maxConcurrentRequestsOption.label
-                                            }))
-                                        }} />
-                                </ButtonGroup>
-                                
-                            </Box>
-                            <Box>
-                            <ButtonGroup>
-                                    <Text>Select test role:</Text>
+                                </div>
+                            </HorizontalGrid>
+                            <HorizontalGrid gap={"4"} columns={"2"}>
+                                <div style={{marginTop: '-10px'}}>
+                                    <Text>Select Test Role</Text>
                                     <Dropdown
                                         menuItems={testRolesArr}
                                         initial={"No test role selected"}
@@ -606,9 +555,162 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                                 testRoleLabel: testRoleOption.label
                                             }))
                                         }} />
-                                </ButtonGroup>
-                                </Box>
-                        </HorizontalGrid>
+                                </div>
+                                        
+                                <div style={{marginTop: '-10px'}}>
+                                <Text>Max Concurrent Requests</Text>
+                                <Dropdown
+                                    menuItems={maxConcurrentRequestsOptions}
+                                    initial={"Default"}
+                                    selected={(requests) => {
+                                        let maxConcurrentRequests
+                                        if (requests === "Default") maxConcurrentRequests = -1
+                                        else maxConcurrentRequests = requests
+
+                                        const maxConcurrentRequestsOption = getLabel(maxConcurrentRequestsOptions, requests)
+
+                                        setTestRun(prev => ({
+                                            ...prev,
+                                            maxConcurrentRequests: maxConcurrentRequests,
+                                            maxConcurrentRequestsLabel: maxConcurrentRequestsOption.label
+                                        }))
+                                    }} />
+                            </div>
+
+                            </HorizontalGrid>
+
+                            <Checkbox
+                                label="Use different target for testing"
+                                checked={testRun.hasOverriddenTestAppUrl}
+                                onChange={() => setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl }))}
+                            />
+                            {testRun.hasOverriddenTestAppUrl &&
+                                <div style={{ width: '400px'}}> 
+                                    <TextField
+                                        placeholder="Override test app host"
+                                        value={testRun.overriddenTestAppUrl}
+                                        onChange={(overriddenTestAppUrl) => setTestRun(prev => ({ ...prev, overriddenTestAppUrl: overriddenTestAppUrl }))}
+                                    />
+                                </div>
+                            }
+                        </VerticalStack>
+
+{/*                         <HorizontalGrid columns="2"> */}
+{/*                             <Box> */}
+{/*                                 <Button disabled={testRun.continuousTesting} plain monochrome removeUnderline> */}
+{/*                                     <HorizontalStack gap={"1"}> */}
+{/*                                         <Text>Select Time:</Text> */}
+{/*                                         <Dropdown */}
+{/*                                         menuItems={hourlyTimes} */}
+{/*                                         initial={testRun.hourlyLabel} */}
+{/*                                         selected={(hour) => { */}
+{/*                                             let startTimestamp */}
+
+{/*                                             if (hour === "Now") startTimestamp = func.timeNow() */}
+{/*                                             else { */}
+{/*                                                 const dayStart = +func.dayStart(+new Date()); */}
+{/*                                                 startTimestamp = parseInt(dayStart / 1000) + parseInt(hour) * 60 * 60 */}
+{/*                                             } */}
+
+{/*                                             const hourlyTime = getLabel(hourlyTimes, hour) */}
+{/*                                             setTestRun(prev => ({ */}
+{/*                                                 ...prev, */}
+{/*                                                 startTimestamp, */}
+{/*                                                 hourlyLabel: hourlyTime ? hourlyTime.label : "" */}
+{/*                                             })) */}
+{/*                                         }} /> */}
+{/*                                     </HorizontalStack> */}
+{/*                                 </Button> */}
+{/*                                 <br /> */}
+
+{/*                                 <ButtonGroup> */}
+{/*                                     <Checkbox */}
+{/*                                         label="Run daily" */}
+{/*                                         checked={testRun.recurringDaily} */}
+{/*                                         onChange={() => setTestRun(prev => ({ ...prev, recurringDaily: !prev.recurringDaily }))} */}
+{/*                                     /> */}
+{/*                                     <Checkbox */}
+{/*                                         label="Continuous Testing" */}
+{/*                                         checked={testRun.continuousTesting} */}
+{/*                                         onChange={() => setTestRun(prev => ({ ...prev, continuousTesting: !prev.continuousTesting }))} */}
+{/*                                     /> */}
+{/*                                     <Checkbox */}
+{/*                                         label="Use different target for testing" */}
+{/*                                         checked={testRun.hasOverriddenTestAppUrl} */}
+{/*                                         onChange={() => setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl }))} */}
+{/*                                     /> */}
+{/*                                     {testRun.hasOverriddenTestAppUrl && */}
+{/*                                         <TextField */}
+{/*                                             placeholder="Override test app host" */}
+{/*                                             value={testRun.overriddenTestAppUrl} */}
+{/*                                             onChange={(overriddenTestAppUrl) => setTestRun(prev => ({ ...prev, overriddenTestAppUrl: overriddenTestAppUrl }))} */}
+{/*                                         /> */}
+{/*                                     } */}
+{/*                                 </ButtonGroup> */}
+{/*                                 </Box> */}
+{/*                             <Box> */}
+{/*                                 <ButtonGroup> */}
+{/*                                     <Text>Test run time:</Text> */}
+{/*                                     <Dropdown */}
+{/*                                         menuItems={testRunTimeOptions} */}
+{/*                                         initial={testRun.testRunTimeLabel} */}
+{/*                                         selected={(timeInSeconds) => { */}
+{/*                                             let testRunTime */}
+{/*                                             if (timeInSeconds === "Till complete") testRunTime = -1 */}
+{/*                                             else testRunTime = timeInSeconds */}
+
+{/*                                             const testRunTimeOption = getLabel(testRunTimeOptions, timeInSeconds) */}
+
+{/*                                             setTestRun(prev => ({ */}
+{/*                                                 ...prev, */}
+{/*                                                 testRunTime: testRunTime, */}
+{/*                                                 testRunTimeLabel: testRunTimeOption.label */}
+{/*                                             })) */}
+{/*                                         }} /> */}
+{/*                                 </ButtonGroup> */}
+
+{/*                                 <br /> */}
+{/*                                 <ButtonGroup> */}
+{/*                                     <Text>Max concurrent requests:</Text> */}
+{/*                                     <Dropdown */}
+{/*                                         menuItems={maxConcurrentRequestsOptions} */}
+{/*                                         initial={"Default"} */}
+{/*                                         selected={(requests) => { */}
+{/*                                             let maxConcurrentRequests */}
+{/*                                             if (requests === "Default") maxConcurrentRequests = -1 */}
+{/*                                             else maxConcurrentRequests = requests */}
+
+{/*                                             const maxConcurrentRequestsOption = getLabel(maxConcurrentRequestsOptions, requests) */}
+
+{/*                                             setTestRun(prev => ({ */}
+{/*                                                 ...prev, */}
+{/*                                                 maxConcurrentRequests: maxConcurrentRequests, */}
+{/*                                                 maxConcurrentRequestsLabel: maxConcurrentRequestsOption.label */}
+{/*                                             })) */}
+{/*                                         }} /> */}
+{/*                                 </ButtonGroup> */}
+{/*                                  */}
+{/*                             </Box> */}
+{/*                             <Box> */}
+{/*                             <ButtonGroup> */}
+{/*                                     <Text>Select test role:</Text> */}
+{/*                                     <Dropdown */}
+{/*                                         menuItems={testRolesArr} */}
+{/*                                         initial={"No test role selected"} */}
+{/*                                         selected={(requests) => { */}
+{/*                                             let testRole */}
+{/*                                             if (!(requests === "No test role selected")){testRole = requests} */}
+{/*                                             const testRoleOption = getLabel(testRolesArr, requests) */}
+
+{/*                                             setTestRun(prev => ({ */}
+{/*                                                 ...prev, */}
+{/*                                                 testRoleId: testRole, */}
+{/*                                                 testRoleLabel: testRoleOption.label */}
+{/*                                             })) */}
+{/*                                         }} /> */}
+{/*                                 </ButtonGroup> */}
+{/*                                 </Box> */}
+{/*                         </HorizontalGrid> */}
                     </Modal.Section>
                 }
             </Modal>

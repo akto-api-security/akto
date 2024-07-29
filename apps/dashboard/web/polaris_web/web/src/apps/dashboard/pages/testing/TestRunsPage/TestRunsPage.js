@@ -188,6 +188,14 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
           total = testingRunsCount;
         });
         break;
+      case "continuous_testing":
+        await api.fetchTestingDetails(
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CONTINUOUS_TESTING",queryValue
+        ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
+          ret = processData(testingRuns, latestTestingRunResultSummaries);
+          total = testingRunsCount;
+        });
+        break;
       default:
         await api.fetchTestingDetails(
           startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, null,queryValue
@@ -232,8 +240,8 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     })
   }
 
-  const definedTableTabs = ['All', 'One time', 'Scheduled', 'CI/CD']
-  const initialCount = [countMap['allTestRuns'], countMap['oneTime'], countMap['scheduled'], countMap['cicd']]
+  const definedTableTabs = ['All', 'One time', 'Scheduled', 'CI/CD', 'Continuous Testing']
+  const initialCount = [countMap['allTestRuns'], countMap['oneTime'], countMap['scheduled'], countMap['cicd'], countMap['continuous']]
 
   const { tabsInfo } = useTable()
   const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
