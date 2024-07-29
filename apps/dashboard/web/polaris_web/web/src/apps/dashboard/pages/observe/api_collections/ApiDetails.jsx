@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Avatar, Box, Button, Popover, Modal, Tooltip, Text} from "@shopify/polaris"
+import { Avatar, Box, Button, Popover, Modal, Tooltip, Text } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -22,7 +22,7 @@ function ApiDetails(props) {
 
     const [sampleData, setSampleData] = useState([])
     const [paramList, setParamList] = useState([])
-    const [selectedUrl,setSelectedUrl] = useState({})
+    const [selectedUrl, setSelectedUrl] = useState({})
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -32,69 +32,70 @@ function ApiDetails(props) {
 
     const ref = useRef(null)
 
-    const fetchData = async() => {
-        if(showDetails){
-        setLoading(true)
-        const { apiCollectionId, endpoint, method } = apiDetail
-        setSelectedUrl({url: endpoint, method: method})
-        let commonMessages = []
-        await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
-            api.fetchSensitiveSampleData(endpoint, apiCollectionId, method).then(async (resp) => {
-                if (resp.sensitiveSampleData && Object.keys(resp.sensitiveSampleData).length > 0) {
-                    if (res.sampleDataList.length > 0) {
-                        commonMessages = transform.getCommonSamples(res.sampleDataList[0].samples, resp)
-                    } else {
-                        commonMessages = transform.prepareSampleData(resp, '')
-                    }
-                } else {
-                    let sensitiveData = []
-                    await api.loadSensitiveParameters(apiCollectionId, endpoint, method).then((res3) => {
-                        sensitiveData = res3.data.endpoints;
-                    })
-                    let samples = res.sampleDataList.map(x => x.samples)
-                    samples = samples.flat()
-                    let newResp = transform.convertSampleDataToSensitiveSampleData(samples, sensitiveData)
-                    commonMessages = transform.prepareSampleData(newResp, '')
-                } 
-                setSampleData(commonMessages)
-            })
-        })
-        setTimeout(()=>{
-            setLoading(false)
-        },100)
-        await api.loadParamsOfEndpoint(apiCollectionId, endpoint, method).then(resp => {
-            api.loadSensitiveParameters(apiCollectionId, endpoint, method).then(allSensitiveFields => {
-                allSensitiveFields.data.endpoints.filter(x => x.sensitive).forEach(sensitive => {
-                    let index = resp.data.params.findIndex(x =>
-                        x.param === sensitive.param &&
-                        x.isHeader === sensitive.isHeader &&
-                        x.responseCode === sensitive.responseCode
-                    )
-
-                    if (index > -1 && !sensitive.subType) {
-                        resp.data.params[index].savedAsSensitive = true
-                        if (!resp.data.params[index].subType) {
-                            resp.data.params[index].subType = { "name": "CUSTOM" }
+    const fetchData = async () => {
+        if (showDetails) {
+            setLoading(true)
+            const { apiCollectionId, endpoint, method } = apiDetail
+            setSelectedUrl({ url: endpoint, method: method })
+            let commonMessages = []
+            await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
+                api.fetchSensitiveSampleData(endpoint, apiCollectionId, method).then(async (resp) => {
+                    if (resp.sensitiveSampleData && Object.keys(resp.sensitiveSampleData).length > 0) {
+                        if (res.sampleDataList.length > 0) {
+                            commonMessages = transform.getCommonSamples(res.sampleDataList[0].samples, resp)
                         } else {
-                            resp.data.params[index].subType = JSON.parse(JSON.stringify(resp.data.params[index].subType))
+                            commonMessages = transform.prepareSampleData(resp, '')
                         }
+                    } else {
+                        let sensitiveData = []
+                        await api.loadSensitiveParameters(apiCollectionId, endpoint, method).then((res3) => {
+                            sensitiveData = res3.data.endpoints;
+                        })
+                        let samples = res.sampleDataList.map(x => x.samples)
+                        samples = samples.flat()
+                        let newResp = transform.convertSampleDataToSensitiveSampleData(samples, sensitiveData)
+                        commonMessages = transform.prepareSampleData(newResp, '')
                     }
-
+                    setSampleData(commonMessages)
                 })
-                setParamList(resp.data.params)
             })
-        })
-    }}
+            setTimeout(() => {
+                setLoading(false)
+            }, 100)
+            await api.loadParamsOfEndpoint(apiCollectionId, endpoint, method).then(resp => {
+                api.loadSensitiveParameters(apiCollectionId, endpoint, method).then(allSensitiveFields => {
+                    allSensitiveFields.data.endpoints.filter(x => x.sensitive).forEach(sensitive => {
+                        let index = resp.data.params.findIndex(x =>
+                            x.param === sensitive.param &&
+                            x.isHeader === sensitive.isHeader &&
+                            x.responseCode === sensitive.responseCode
+                        )
 
-    const runTests = async(testsList) => {
+                        if (index > -1 && !sensitive.subType) {
+                            resp.data.params[index].savedAsSensitive = true
+                            if (!resp.data.params[index].subType) {
+                                resp.data.params[index].subType = { "name": "CUSTOM" }
+                            } else {
+                                resp.data.params[index].subType = JSON.parse(JSON.stringify(resp.data.params[index].subType))
+                            }
+                        }
+
+                    })
+                    setParamList(resp.data.params)
+                })
+            })
+        }
+    }
+
+    const runTests = async (testsList) => {
         setIsGptScreenActive(false)
-        const apiKeyInfo={
+        const apiKeyInfo = {
             apiCollectionId: apiDetail.apiCollectionId,
             url: selectedUrl.url,
             method: selectedUrl.method
         }
-        await api.scheduleTestForCustomEndpoints(apiKeyInfo,func.timNow(),false,testsList,"akto_gpt_test",-1,-1)
-        func.setToast(true,false,"Triggered tests successfully!")
+        await api.scheduleTestForCustomEndpoints(apiKeyInfo, func.timNow(), false, testsList, "akto_gpt_test", -1, -1)
+        func.setToast(true, false, "Triggered tests successfully!")
     }
 
     const badgeClicked = () => {
@@ -105,16 +106,16 @@ function ApiDetails(props) {
         fetchData();
     }, [apiDetail])
 
-    function displayGPT(){
+    function displayGPT() {
         setIsGptScreenActive(true)
-        let requestObj = {key: "PARAMETER",jsonStr: sampleData[0]?.message,apiCollectionId: Number(apiDetail.apiCollectionId)}
+        let requestObj = { key: "PARAMETER", jsonStr: sampleData[0]?.message, apiCollectionId: Number(apiDetail.apiCollectionId) }
         const activePrompts = dashboardFunc.getPrompts(requestObj)
         setPrompts(activePrompts)
     }
 
-    function isDeMergeAllowed(){
+    function isDeMergeAllowed() {
         const { endpoint } = apiDetail
-        if(!endpoint || endpoint === undefined){
+        if (!endpoint || endpoint === undefined) {
             return false;
         }
         return (endpoint.includes("STRING") || endpoint.includes("INTEGER") || endpoint.includes("OBJECT_ID"))
@@ -127,25 +128,25 @@ function ApiDetails(props) {
             method: {
                 "_name": selectedUrl.method
             }
-            
+
         }
         setSelectedSampleApi(apiKeyInfo)
         const navUrl = window.location.origin + "/dashboard/test-editor/REMOVE_TOKENS"
         window.open(navUrl, "_blank")
     }
 
-    const isDemergingActive = isDeMergeAllowed() ;
+    const isDemergingActive = isDeMergeAllowed();
 
 
     const SchemaTab = {
         id: 'schema',
         content: "Schema",
-        component: paramList.length > 0 && <Box paddingBlockStart={"4"}> 
-        <ApiSchema
-            data={paramList} 
-            badgeActive={badgeActive}
-            setBadgeActive={setBadgeActive}
-        />
+        component: paramList.length > 0 && <Box paddingBlockStart={"4"}>
+            <ApiSchema
+                data={paramList}
+                badgeActive={badgeActive}
+                setBadgeActive={setBadgeActive}
+            />
         </Box>
     }
     const ValuesTab = {
@@ -182,9 +183,9 @@ function ApiDetails(props) {
     }
 
     const DeMergeButton = () => {
-        return(
-            <div className="button-fixed" style={{right: '12px', top: "64px"}}>
-                <Popover 
+        return (
+            <div className="button-fixed" style={{ right: '12px', top: "64px" }}>
+                <Popover
                     active={showDemerge}
                     activator={
                         <Tooltip content="More actions" dismissOnMouseOut ><Button plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowDemerge(!showDemerge)} /></Tooltip>
@@ -202,8 +203,8 @@ function ApiDetails(props) {
         )
     }
     const headingComp = (
-        <div style={{display: "flex", justifyContent: "space-between"}}  key="heading">
-            <div>
+        <div style={{ display: "flex", justifyContent: "space-between" }} key="heading">
+            <div key="api-details">
                 <GithubCell
                     width="40vw"
                     data={apiDetail}
@@ -212,8 +213,18 @@ function ApiDetails(props) {
                     isBadgeClickable={true}
                     badgeClicked={badgeClicked}
                 />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }} key="api-run-options">
+                <RunTest
+                    apiCollectionId={apiDetail["apiCollectionId"]}
+                    endpoints={[apiDetail]}
+                    filtered={true}
+                />
+                <Button removeUnderline plain monochrome onClick={() => openTest()}>
+                    <Text variant="headingSm" alignment="start" breakWord>Open test editor</Text>
+                </Button>
                 <Box paddingBlockStart={"05"}>
-                    <Button plain onClick={() => func.copyToClipboard(apiDetail['method']+ " " + apiDetail['endpoint'], ref, "URL copied")}>
+                    <Button plain onClick={() => func.copyToClipboard(apiDetail['method'] + " " + apiDetail['endpoint'], ref, "URL copied")}>
                         <Tooltip content="Copy endpoint" dismissOnMouseOut>
                             <div className="reduce-size">
                                 <Avatar size="extraSmall" source="/public/copy_icon.svg" />
@@ -223,20 +234,12 @@ function ApiDetails(props) {
                     </Button>
                 </Box>
             </div>
-            <RunTest
-                apiCollectionId={apiDetail["apiCollectionId"]}
-                endpoints={[apiDetail]}
-                filtered={true}
-            />
-            <Button removeUnderline plain monochrome onClick={() => openTest()}>
-                <Text variant="headingSm" alignment="start" breakWord>Open test editor</Text>
-            </Button>
         </div>
     )
 
     const components = [
         headingComp
-            ,
+        ,
         <LayoutWithTabs
             key="tabs"
             tabs={[SchemaTab, ValuesTab, DependencyTab]}
@@ -245,20 +248,20 @@ function ApiDetails(props) {
     ]
 
     const componentsArr = isDemergingActive ? [...components, <DeMergeButton key={"demerge"} />] : components
- 
+
     const aktoGptButton = (
-        <div 
+        <div
             className={"button-fixed"}
             key="akto-gpt"
-            style={{right: isDemergingActive ? "48px" : '24px'}}
+            style={{ right: isDemergingActive ? "48px" : '24px' }}
         >
-            <Button onClick={displayGPT} size="slim">Ask AktoGPT</Button> 
+            <Button onClick={displayGPT} size="slim">Ask AktoGPT</Button>
         </div>
     )
 
     const currentComponents = isGptActive ? [...componentsArr, aktoGptButton] : componentsArr
 
-    return ( 
+    return (
         <div>
             <FlyLayout
                 title="API details"
@@ -267,9 +270,9 @@ function ApiDetails(props) {
                 components={currentComponents}
                 loading={loading}
             />
-            <Modal large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
+            <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                 <Modal.Section flush>
-                    <AktoGptLayout prompts={prompts} closeModal={()=> setIsGptScreenActive(false)} runCustomTests={(tests)=> runTests(tests)}/>
+                    <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} runCustomTests={(tests) => runTests(tests)} />
                 </Modal.Section>
             </Modal>
         </div>
