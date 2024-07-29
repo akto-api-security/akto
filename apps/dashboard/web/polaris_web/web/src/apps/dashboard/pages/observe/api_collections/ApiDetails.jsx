@@ -1,9 +1,9 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Avatar, Box, Button, Popover, Modal, Tooltip, Text } from "@shopify/polaris"
+import { Box, Button, Popover, Modal, Tooltip, VerticalStack } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../api";
 import ApiSchema from "./ApiSchema";
 import dashboardFunc from "../../transform";
@@ -14,7 +14,7 @@ import ApiDependency from "./ApiDependency";
 import RunTest from "./RunTest";
 import PersistStore from "../../../../main/PersistStore";
 
-import { HorizontalDotsMinor } from "@shopify/polaris-icons"
+import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 
 function ApiDetails(props) {
 
@@ -27,10 +27,8 @@ function ApiDetails(props) {
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [loading, setLoading] = useState(false)
     const [badgeActive, setBadgeActive] = useState(false)
-    const [showDemerge, setShowDemerge] = useState(false)
+    const [showMoreActions, setShowMoreActions] = useState(false)
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
-
-    const ref = useRef(null)
 
     const fetchData = async () => {
         if (showDetails) {
@@ -181,58 +179,51 @@ function ApiDetails(props) {
             window.location.reload()
         })
     }
-
-    const DeMergeButton = () => {
-        return (
-            <div className="button-fixed" style={{ right: '12px', top: "64px" }}>
-                <Popover
-                    active={showDemerge}
-                    activator={
-                        <Tooltip content="More actions" dismissOnMouseOut ><Button plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowDemerge(!showDemerge)} /></Tooltip>
-                    }
-                    autofocusTarget="first-node"
-                    onClose={() => setShowDemerge(false)}
-                >
-                    <Popover.Pane fixed>
-                        <Popover.Section>
-                            <Button plain monochrome removeUnderline size="slim" onClick={deMergeApis}>De merge</Button>
-                        </Popover.Section>
-                    </Popover.Pane>
-                </Popover>
-            </div>
-        )
-    }
+    let newData= apiDetail
+    newData['copyEndpoint'] =  {
+        method: apiDetail.method,
+        endpoint: apiDetail.endpoint
+    } 
     const headingComp = (
         <div style={{ display: "flex", justifyContent: "space-between" }} key="heading">
-            <div key="api-details">
+            <div style={{ display: "flex", gap: '8px'}}>
                 <GithubCell
-                    width="40vw"
-                    data={apiDetail}
+                    width="35vw"
+                    data={newData}
                     headers={headers}
                     getStatus={getStatus}
                     isBadgeClickable={true}
                     badgeClicked={badgeClicked}
                 />
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between" }} key="api-run-options">
+            <div style={{ display: "flex", gap: '8px'}}>
                 <RunTest
                     apiCollectionId={apiDetail["apiCollectionId"]}
                     endpoints={[apiDetail]}
                     filtered={true}
                 />
-                <Button removeUnderline plain monochrome onClick={() => openTest()}>
-                    <Text variant="headingSm" alignment="start" breakWord>Open test editor</Text>
-                </Button>
-                <Box paddingBlockStart={"05"}>
-                    <Button plain onClick={() => func.copyToClipboard(apiDetail['method'] + " " + apiDetail['endpoint'], ref, "URL copied")}>
-                        <Tooltip content="Copy endpoint" dismissOnMouseOut>
-                            <div className="reduce-size">
-                                <Avatar size="extraSmall" source="/public/copy_icon.svg" />
-                            </div>
-                        </Tooltip>
-                        <Box ref={ref} />
-                    </Button>
+                <Box>
+                    <Tooltip content="Open URL in test editor" dismissOnMouseOut>
+                        <Button monochrome onClick={() => openTest()} icon={FileMinor} />
+                    </Tooltip>
                 </Box>
+                <Popover 
+                    active={showMoreActions}
+                    activator={
+                        <Tooltip content="More actions" dismissOnMouseOut ><Button plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowMoreActions(!showMoreActions)} /></Tooltip>
+                    }
+                    autofocusTarget="first-node"
+                    onClose={() => setShowMoreActions(false)}
+                    >
+                    <Popover.Pane fixed>
+                        <Popover.Section>
+                            <VerticalStack gap={"2"}>
+                                {isGptActive ? <Button plain monochrome removeUnderline onClick={displayGPT} size="slim">Ask AktoGPT</Button>: null} 
+                                {isDemergingActive ? <Button plain monochrome removeUnderline size="slim" onClick={deMergeApis}>De merge</Button> : null}
+                            </VerticalStack>
+                        </Popover.Section>
+                    </Popover.Pane>
+                </Popover>
             </div>
         </div>
     )
@@ -247,27 +238,13 @@ function ApiDetails(props) {
         />
     ]
 
-    const componentsArr = isDemergingActive ? [...components, <DeMergeButton key={"demerge"} />] : components
-
-    const aktoGptButton = (
-        <div
-            className={"button-fixed"}
-            key="akto-gpt"
-            style={{ right: isDemergingActive ? "48px" : '24px' }}
-        >
-            <Button onClick={displayGPT} size="slim">Ask AktoGPT</Button>
-        </div>
-    )
-
-    const currentComponents = isGptActive ? [...componentsArr, aktoGptButton] : componentsArr
-
     return (
         <div>
             <FlyLayout
                 title="API details"
                 show={showDetails}
                 setShow={setShowDetails}
-                components={currentComponents}
+                components={components}
                 loading={loading}
             />
             <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
