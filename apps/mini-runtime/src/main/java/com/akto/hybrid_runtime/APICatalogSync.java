@@ -697,12 +697,12 @@ public class APICatalogSync {
 
                 RequestTemplate strictMatch = dbCatalog.getStrictURLToMethods().get(url);
                 if (strictMatch != null) {
-                    AllMetrics.instance.setDeltaCatalogTotalCount(1);
                     Map<URLStatic, RequestTemplate> deltaCatalogStrictURLToMethods = deltaCatalog.getStrictURLToMethods();
                     RequestTemplate requestTemplate = deltaCatalogStrictURLToMethods.get(url);
                     if (DataControlFetcher.discardOldApi()) {
                         iterator.remove();
                     } else {
+                        AllMetrics.instance.setDeltaCatalogTotalCount(1);
                         if (requestTemplate == null) {
                             requestTemplate = strictMatch.copy(); // to further process the requestTemplate
                             deltaCatalogStrictURLToMethods.put(url, requestTemplate);

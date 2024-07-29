@@ -3,9 +3,12 @@ package com.akto.data_actor;
 import com.akto.DaoInit;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.testing.ApiExecutor;
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.SetupDao;
 import com.akto.dao.context.Context;
+import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
@@ -48,6 +51,10 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
+
 import org.bson.BsonReader;
 import org.bson.Document;
 import org.bson.codecs.Codec;
@@ -59,6 +66,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -86,13 +94,15 @@ public class ClientActor extends DataActor {
 
     public static String buildDbAbstractorUrl() {
         String dbAbsHost = CYBORG_URL;
-        if (CYBORG_URL.endsWith("/")) {
+        if (checkAccount()) {
+            dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        }
+        System.out.println("dbHost value " + dbAbsHost);
+        if (dbAbsHost.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
         return dbAbsHost + "/api";
     }
-
-    
 
     public AccountSettings fetchAccountSettings() {
         AccountSettings acc = null;
@@ -2891,6 +2901,23 @@ public class ClientActor extends DataActor {
 
     public static String getAuthToken() {
         return System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+    }
+
+    public static boolean checkAccount() {
+        try {
+            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+            DecodedJWT jwt = JWT.decode(token);
+            String payload = jwt.getPayload();
+            byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
+            String decodedPayload = new String(decodedBytes);
+            BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
+            int accId = (int) basicDBObject.getInt("accountId");
+            System.out.println("checkaccount accountId log " + accId);
+            return accId == 1000000;
+        } catch (Exception e) {
+            System.out.println("checkaccount error" + e.getStackTrace());
+        }
+        return false;
     }
 
 }

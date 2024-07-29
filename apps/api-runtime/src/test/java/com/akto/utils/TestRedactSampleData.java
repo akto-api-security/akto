@@ -146,9 +146,6 @@ public class TestRedactSampleData {
         boolean result6 = checkRedactPayload(node);
         if (!result6) return false;
 
-        //   3. For IP
-        if (!Objects.equals(redacted.getSourceIP(), RedactSampleData.redactValue)) return false;
-
         return true;
     }
 

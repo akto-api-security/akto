@@ -53,7 +53,26 @@ jobs:
           mask-password: 'true'
           registry-type: public
 
-      - name: Build, tag, and push docker image to Amazon ECR
+      - name: Build, tag, and push mini-runtime image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: akto-api-security
+          REGISTRY_ALIAS: p7q3h0z2
+          IMAGE_TAG: latest
+          IMAGE_TAG1: testruntime
+          IMAGE_TAG2: local
+          IMAGE_TAG3: 1.41.12_local
+        run: |
+          docker buildx create --use
+          # Build a docker container and push it to DockerHub 
+          cd apps/mini-runtime
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG3 . --push
+          echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-runtime:$IMAGE_TAG"
+          cd ../mini-testing
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG3 . --push
+          echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-testing:$IMAGE_TAG3"
+      
+      - name: Build, tag, and push database-abstractor image to Amazon ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: akto-api-security
@@ -73,7 +92,25 @@ jobs:
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
 
-      - name: Build, tag, and push the image to DockerHub
+      - name: Build, tag, and push mini-runtime image to DockerHub
+        id: build-image-dockerhub
+        env:
+          ECR_REGISTRY: aktosecurity
+          ECR_REPOSITORY: akto-api-security
+          IMAGE_TAG: latest
+          IMAGE_TAG1: testruntime
+          IMAGE_TAG2: local
+          IMAGE_TAG3: 1.41.12_local
+        run: |
+          docker buildx create --use
+          # Build a docker container and push it to DockerHub 
+          cd apps/mini-runtime
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG3 . --push
+          cd ../mini-testing
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG3 . --push
+
+
+      - name: Build, tag, and push database-abstractor image to DockerHub
         id: build-image-dockerhub
         env:
           ECR_REGISTRY: aktosecurity
@@ -84,3 +121,4 @@ jobs:
           # Build a docker container and push it to DockerHub 
           cd apps/database-abstractor
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG . --push
+
