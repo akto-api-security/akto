@@ -2891,6 +2891,24 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("dependencyNodeList", dependencyNodeList);
+
+        String objString = gson.toJson(obj);
+
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkWriteDependencyNodes", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in bulkWriteDependencyNodes", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in bulkWriteDependencyNodes" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
     public Map<String, List<String>> buildHeaders() {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put(AUTHORIZATION, Collections.singletonList(getAuthToken()));

@@ -11,30 +11,15 @@ import java.util.Map;
 import java.util.Set;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
+import com.akto.dao.*;
 import com.akto.dao.settings.DataControlSettingsDao;
+import com.akto.dependency_analyser.DependencyAnalyserUtils;
+import com.akto.dto.*;
 import com.akto.dto.settings.DataControlSettings;
+import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import com.akto.dao.APIConfigsDao;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AccountsDao;
-import com.akto.dao.ActivitiesDao;
-import com.akto.dao.AktoDataTypeDao;
-import com.akto.dao.AnalyserLogsDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ApiInfoDao;
-import com.akto.dao.CustomAuthTypeDao;
-import com.akto.dao.CustomDataTypeDao;
-import com.akto.dao.LogsDao;
-import com.akto.dao.RuntimeFilterDao;
-import com.akto.dao.RuntimeLogsDao;
-import com.akto.dao.SampleDataDao;
-import com.akto.dao.SensitiveParamInfoDao;
-import com.akto.dao.SensitiveSampleDataDao;
-import com.akto.dao.SetupDao;
-import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
@@ -52,19 +37,7 @@ import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
-import com.akto.dto.APIConfig;
-import com.akto.dto.Account;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.AktoDataType;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.CustomAuthType;
-import com.akto.dto.CustomDataType;
-import com.akto.dto.Log;
-import com.akto.dto.SensitiveParamInfo;
-import com.akto.dto.SensitiveSampleData;
-import com.akto.dto.Setup;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.runtime_filters.RuntimeFilter;
@@ -94,16 +67,6 @@ import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.BulkWriteOptions;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.ReturnDocument;
-import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
-import com.mongodb.client.model.WriteModel;
 
 public class DbLayer {
 
@@ -862,4 +825,9 @@ public class DbLayer {
         Bson updates = Updates.combine(Updates.set("postgresResult", prevResult), Updates.set("oldPostgresCommand", prevCommand));
         return DataControlSettingsDao.instance.getMCollection().findOneAndUpdate(Filters.eq("_id", accountId), updates);
     }
+
+    public static void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
+        DependencyAnalyserUtils.syncWithDb(dependencyNodeList);
+    }
+
 }

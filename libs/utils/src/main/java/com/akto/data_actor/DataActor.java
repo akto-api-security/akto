@@ -221,4 +221,6 @@ public abstract class DataActor {
     public abstract EndpointLogicalGroup fetchEndpointLogicalGroupById(String endpointLogicalGroupId);
 
     public abstract DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand);
+
+    public abstract void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList);
 }
