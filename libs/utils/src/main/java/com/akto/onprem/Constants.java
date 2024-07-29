@@ -100,6 +100,8 @@ public class Constants {
 
     private static Config.SlackAlertUsageConfig slackAlertUsageConfig;
     private static int lastSlackAlertUsageRefreshTs = 0;
+    private static Config.SlackAlertCyborgConfig slackAlertCyborgConfig;
+    private static int lastSlackAlertCyborgRefreshTs = 0;
 
     public static Config.SlackAlertUsageConfig getSlackAlertUsageConfig() {
         slackAlertUsageConfig = getConfig(slackAlertUsageConfig, lastSlackAlertUsageRefreshTs,
@@ -107,6 +109,14 @@ public class Constants {
                 Config.SlackAlertUsageConfig.class, Config.SlackAlertUsageConfig::new,
                 config -> config.setSlackWebhookUrl(Constants.SLACK_ALERT_USAGE_URL));
         return slackAlertUsageConfig;
+    }
+
+    public static Config.SlackAlertCyborgConfig getSlackAlertCyborgConfig() {
+        slackAlertCyborgConfig = getConfig(slackAlertCyborgConfig, lastSlackAlertCyborgRefreshTs,
+                Config.SlackAlertCyborgConfig.CONFIG_ID,
+                Config.SlackAlertCyborgConfig.class, Config.SlackAlertCyborgConfig::new,
+                config -> config.setSlackWebhookUrl(""));
+        return slackAlertCyborgConfig;
     }
 
     private static <T extends Config> T getConfig(T config, int lastRefreshTs, String configId, Class<T> type,

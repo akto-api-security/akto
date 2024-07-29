@@ -25,12 +25,20 @@ public class HttpResponseParams {
     Source source = Source.OTHER;
     String orig;
     String sourceIP;
+    String destIP;
 
     public HttpResponseParams() {}
 
     public HttpResponseParams(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
                               HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source, 
                               String orig, String sourceIP) {
+        this(type, statusCode, status, headers, payload, requestParams, time, accountId, isPending, source, orig,
+                sourceIP, "");
+    }
+
+    public HttpResponseParams(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
+                              HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source,
+                              String orig, String sourceIP, String destIP) {
         this.type = type;
         this.statusCode = statusCode;
         this.status = status;
@@ -43,6 +51,7 @@ public class HttpResponseParams {
         this.source = source;
         this.orig = orig;
         this.sourceIP = sourceIP;
+        this.destIP = destIP;
     }
 
     public static boolean validHttpResponseCode(int statusCode)  {
@@ -129,5 +138,13 @@ public class HttpResponseParams {
 
     public void setSourceIP(String sourceIP) {
         this.sourceIP = sourceIP;
+    }
+
+    public String getDestIP() {
+        return destIP;
+    }
+
+    public void setDestIP(String destIP) {
+        this.destIP = destIP;
     }
 }

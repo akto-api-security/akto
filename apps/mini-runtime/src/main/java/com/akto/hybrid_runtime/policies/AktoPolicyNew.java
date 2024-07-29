@@ -51,12 +51,16 @@ public class AktoPolicyNew {
         fetchFilters();
 
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
+        int accountId = Context.accountId.get();
+        redact = accountId == 1718042191;
         if (accountSettings != null) {
             List<String> cidrList = accountSettings.getPrivateCidrList();
             if ( cidrList != null && !cidrList.isEmpty()) {
                 apiAccessTypePolicy.setPrivateCidrList(cidrList);
             }
-            redact = accountSettings.isRedactPayload();
+            accountId = accountSettings.getId();
+            Context.accountId.set(accountId);
+            redact = accountId == 1718042191 || accountSettings.isRedactPayload();
         }
 
         apiInfoCatalogMap = new HashMap<>();
@@ -126,19 +130,6 @@ public class AktoPolicyNew {
             strictURLToMethods.putIfAbsent(urlStatic, policyCatalog);
         }
 
-    }
-
-    public void main(List<HttpResponseParams> httpResponseParamsList, List<String> partnerIpsList) throws Exception {
-        if (httpResponseParamsList == null) httpResponseParamsList = new ArrayList<>();
-        loggerMaker.infoAndAddToDb("AktoPolicy main: httpResponseParamsList size: " + httpResponseParamsList.size(), LogDb.RUNTIME);
-        for (HttpResponseParams httpResponseParams: httpResponseParamsList) {
-            try {
-                process(httpResponseParams, partnerIpsList);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
-                ;
-            }
-        }
     }
 
     public static ApiInfoKey generateFromHttpResponseParams(HttpResponseParams httpResponseParams) {

@@ -33,8 +33,8 @@ public class Kafka {
     }
 
     public void close() {
-        this.producerReady = false;
-        producer.close(Duration.ofMillis(0)); // close immediately
+        //this.producerReady = false;
+        //producer.close(Duration.ofMillis(0)); // close immediately
     }
 
     private void setProducer(String brokerIP, int lingerMS, int batchSize) {

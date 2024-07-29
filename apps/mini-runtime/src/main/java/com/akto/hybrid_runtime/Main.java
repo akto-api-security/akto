@@ -7,7 +7,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-import com.akto.DaoInit;
 import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
@@ -17,10 +16,11 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
+import com.akto.sql.SampleDataAltDb;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
-import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
@@ -28,6 +28,8 @@ import com.mongodb.client.model.Filters;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.common.Metric;
+import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
@@ -43,7 +45,7 @@ public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
 
-    private static final DataActor dataActor = DataActorFactory.fetchInstance();
+    public static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
@@ -78,10 +80,6 @@ public class Main {
                 if (json.containsKey(VPC_CIDR)) {
                     List<String> cidrList = (List<String>) json.get(VPC_CIDR);
                     logger.info("cidrList: " + cidrList);
-                    // For old deployments, we won't receive ACCOUNT_ID. If absent, we assume 1_000_000.
-                    String accountIdStr = (String) (json.get(ACCOUNT_ID));
-                    int accountId = StringUtils.isNumeric(accountIdStr) ? Integer.parseInt(accountIdStr) : 1_000_000;
-                    Context.accountId.set(accountId);
                     dataActor.updateCidrList(cidrList);
                 }
             }
@@ -131,11 +129,19 @@ public class Main {
         }
     }
 
+    public static String getTopicName(){
+        String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+        if (topicName == null) {
+            topicName = "akto.api.logs";
+        }
+        return topicName;
+    }
+
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
-        String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+        String topicName = getTopicName();
         String kafkaBrokerUrl = "kafka1:19092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
@@ -148,14 +154,22 @@ public class Main {
         boolean fetchAllSTI = true;
         Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
 
-        boolean isDashboardInstance = instanceType != null && instanceType.equals("DASHBOARD");
+        boolean isDashboardInstance = false;
         if (isDashboardInstance) {
             syncImmediately = true;
             fetchAllSTI = false;
         }
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
 
-        if (topicName == null) topicName = "akto.api.logs";
+        AccountSettings aSettings = dataActor.fetchAccountSettings();
+        if (aSettings == null) {
+            loggerMaker.errorAndAddToDb("error fetch account settings, exiting process");
+            System.exit(0);
+        }
+
+        DataControlFetcher.init(dataActor);
+
+        aSettings = dataActor.fetchAccountSettings();
 
         //DaoInit.init(new ConnectionString(mongoURI));
 
@@ -168,6 +182,20 @@ public class Main {
         } catch (Exception e){
             loggerMaker.errorAndAddToDb(e, "Error in initializeRuntime " + e.getMessage(), LogDb.RUNTIME);
         }
+
+        try {
+            com.akto.sql.Main.createSampleDataTable();
+            SampleDataAltDb.createIndex();
+        } catch(Exception e){
+            logger.error("Unable to connect to postgres sql db", e);
+        }
+
+        try {
+            CleanPostgres.cleanPostgresCron();
+        } catch(Exception e){
+            logger.error("Unable to clean postgres", e);
+        }
+
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
@@ -203,6 +231,48 @@ public class Main {
             }
         });
 
+
+        scheduler.scheduleAtFixedRate(()-> {
+            try {
+
+                Map<MetricName, ? extends Metric> metrics = main.consumer.metrics();
+
+                for (Map.Entry<MetricName, ? extends Metric> entry : metrics.entrySet()) {
+                    MetricName key = entry.getKey();
+                    Metric value = entry.getValue();
+
+                    if(key.name().equals("records-lag-max")){
+                        double val = value.metricValue().equals(Double.NaN) ? 0d: (double) value.metricValue();
+                        AllMetrics.instance.setKafkaRecordsLagMax((float) val);
+                    }
+                    if(key.name().equals("records-consumed-rate")){
+                        double val = value.metricValue().equals(Double.NaN) ? 0d: (double) value.metricValue();
+                        AllMetrics.instance.setKafkaRecordsConsumedRate((float) val);
+                    }
+
+                    if(key.name().equals("fetch-latency-avg")){
+                        double val = value.metricValue().equals(Double.NaN) ? 0d: (double) value.metricValue();
+                        AllMetrics.instance.setKafkaFetchAvgLatency((float) val);
+                    }
+
+                    if(key.name().equals("bytes-consumed-rate")){
+                        double val = value.metricValue().equals(Double.NaN) ? 0d: (double) value.metricValue();
+                        AllMetrics.instance.setKafkaBytesConsumedRate((float) val);
+                    }
+                }
+
+
+                AllMetrics.instance.setTotalSampleDataCount(SampleDataAltDb.totalNumberOfRecords());
+                loggerMaker.infoAndAddToDb("Total number of records in postgres: " + SampleDataAltDb.totalNumberOfRecords(), LogDb.RUNTIME);
+                long dbSizeInMb = SampleDataAltDb.getDbSizeInMb();
+                AllMetrics.instance.setPgDataSizeInMb(dbSizeInMb);
+                loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB", LogDb.RUNTIME);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed to get total number of records from postgres");
+            }
+
+        }, 0, 1, TimeUnit.MINUTES);
+
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
 
         // sync infra metrics thread
@@ -224,7 +294,7 @@ public class Main {
                 } catch (Exception e) {
                     throw e;
                 }
-                
+                long start = System.currentTimeMillis();
                 // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String,String> r: records) {
@@ -232,7 +302,13 @@ public class Main {
                     try {
                          
                         printL(r.value());
+                        AllMetrics.instance.setRuntimeKafkaRecordCount(1);
+                        AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
+
                         lastSyncOffset++;
+                        if (DataControlFetcher.stopIngestionFromKafka()) {
+                            continue;
+                        }
 
                         if (lastSyncOffset % 100 == 0) {
                             logger.info("Committing offset at position: " + lastSyncOffset);
@@ -314,6 +390,7 @@ public class Main {
                         loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
                     }
                 }
+                AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
             }
 
         } catch (WakeupException ignored) {
@@ -410,6 +487,9 @@ public class Main {
         Account account = dataActor.fetchActiveAccount();
         Context.accountId.set(account.getId());
 
+        AllMetrics.instance.init();
+        loggerMaker.infoAndAddToDb("All metrics initialized", LogDb.RUNTIME);
+
         Setup setup = dataActor.fetchSetup();
 
         String dashboardMode = "saas";
@@ -418,10 +498,6 @@ public class Main {
         }
 
         isOnprem = dashboardMode.equalsIgnoreCase(DashboardMode.ON_PREM.name());
-
-        List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
-        List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
-        List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
         
         RuntimeVersion runtimeVersion = new RuntimeVersion();
         try {
@@ -430,8 +506,22 @@ public class Main {
             loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.getMessage(), LogDb.RUNTIME);
         }
 
-        SingleTypeInfo.initFromRuntime(customDataTypes, aktoDataTypes, customAuthTypes, account.getId());
+        initFromRuntime(account.getId());
         
+    }
+
+    public static void initFromRuntime(int accountId) {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
+                System.out.println("customdata type " + customDataTypes.size());
+                List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
+                List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
+                SingleTypeInfo.fetchCustomDataTypes(accountId, customDataTypes, aktoDataTypes);
+                SingleTypeInfo.fetchCustomAuthTypes(accountId, customAuthTypes);
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+
     }
 
     public static void initializeRuntimeHelper() {

@@ -9,6 +9,7 @@ import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.grpc.ProtoBufUtils;
@@ -38,14 +39,22 @@ public class ApiExecutor {
             boolean rateLimitHit = true;
             while (RateLimitHandler.getInstance(accountId).shouldWait(request)) {
                 if(rateLimitHit){
-                    loggerMaker.infoAndAddToDb("Rate limit hit, sleeping", LogDb.TESTING);
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
+                        loggerMaker.infoAndAddToDb("Rate limit hit, sleeping", LogDb.TESTING);
+                    }else {
+                        System.out.println("Rate limit hit, sleeping");
+                    }
                 }
                 rateLimitHit = false;
                 Thread.sleep(1000);
                 i++;
 
                 if (i%30 == 0) {
-                    loggerMaker.infoAndAddToDb("waiting for rate limit availability", LogDb.TESTING);
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
+                        loggerMaker.infoAndAddToDb("waiting for rate limit availability", LogDb.TESTING);
+                    }else{
+                        System.out.println("waiting for rate limit availability");
+                    }
                 }
             }
         }
@@ -63,6 +72,8 @@ public class ApiExecutor {
         if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
         }
+        boolean isCyborgCall = request.url().toString().contains("cyborg.akto.io");
+        long start = System.currentTimeMillis();
 
         Call call = client.newCall(request);
         Response response = null;
@@ -90,11 +101,24 @@ public class ApiExecutor {
                     body = responseBody.string();
                 }
             } catch (IOException e) {
-                loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
+                if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
+                    loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
+                } else {
+                    System.out.println("Error while parsing response body: " + e);
+                }
                 body = "{}";
             }
+            if(isCyborgCall){
+                AllMetrics.instance.setCyborgCallLatency(System.currentTimeMillis() - start);
+                AllMetrics.instance.setCyborgCallCount(1);
+                AllMetrics.instance.setCyborgDataSize(request.body() == null ? 0 : request.body().contentLength());
+            }
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
+            if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
+                loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
+            } else {
+                System.out.println("Error while executing request " + request.url() + ": " + e);
+            }
             throw new Exception("Api Call failed");
         } finally {
             if (response != null) {
@@ -219,7 +243,9 @@ public class ApiExecutor {
 
         String url = prepareUrl(request, testingRunConfig);
 
-        loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
+        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog"))) {
+            loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
+        }
         request.setUrl(url);
 
         Request.Builder builder = new Request.Builder();
@@ -261,7 +287,7 @@ public class ApiExecutor {
             case OTHER:
                 throw new Exception("Invalid method name");
         }
-        loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
+        //loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
 
         return response;
     }

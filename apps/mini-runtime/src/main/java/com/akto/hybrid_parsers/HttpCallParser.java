@@ -16,8 +16,10 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.parser.SampleParser;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
+import com.akto.hybrid_runtime.MergeLogicLocal;
 import com.akto.hybrid_runtime.URLAggregator;
 import com.akto.util.JSONUtils;
 import com.akto.util.Constants;
@@ -37,6 +39,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 
@@ -86,51 +90,8 @@ public class HttpCallParser {
     }
     
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
-
-        //convert java object to JSON format
-        JSONObject jsonObject = JSON.parseObject(message);
-
-        String method = jsonObject.getString("method");
-        String url = jsonObject.getString("path");
-        String type = jsonObject.getString("type");
-        Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(jsonObject, "requestHeaders");
-
-        String rawRequestPayload = jsonObject.getString("requestPayload");
-        String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
-
-
-
-        String apiCollectionIdStr = jsonObject.getOrDefault("akto_vxlan_id", "0").toString();
-        int apiCollectionId = 0;
-        if (NumberUtils.isDigits(apiCollectionIdStr)) {
-            apiCollectionId = NumberUtils.toInt(apiCollectionIdStr, 0);
-        }
-
-        HttpRequestParams requestParams = new HttpRequestParams(
-                method,url,type, requestHeaders, requestPayload, apiCollectionId
-        );
-
-        int statusCode = jsonObject.getInteger("statusCode");
-        String status = jsonObject.getString("status");
-        Map<String,List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(jsonObject, "responseHeaders");
-        String payload = jsonObject.getString("responsePayload");
-        payload = HttpRequestResponseUtils.rawToJsonString(payload, responseHeaders);
-        payload = JSONUtils.parseIfJsonP(payload);
-        int time = jsonObject.getInteger("time");
-        String accountId = jsonObject.getString("akto_account_id");
-        String sourceIP = jsonObject.getString("ip");
-
-        String isPendingStr = (String) jsonObject.getOrDefault("is_pending", "false");
-        boolean isPending = !isPendingStr.toLowerCase().equals("false");
-        String sourceStr = (String) jsonObject.getOrDefault("source", HttpResponseParams.Source.OTHER.name());
-        HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
-        
-        return new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP
-        );
+        return SampleParser.parseSampleMessage(message);
     }
-
-    private static final Gson gson = new Gson();
 
     public static String getHeaderValue(Map<String,List<String>> headers, String headerKey) {
         if (headers == null) return null;
@@ -207,6 +168,7 @@ public class HttpCallParser {
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
+            MergeLogicLocal.mergingJob(apiCatalogSync.dbState);
         }
 
     }
@@ -365,6 +327,10 @@ public class HttpCallParser {
             
             String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(),Constants.AKTO_IGNORE_FLAG);
             if (ignoreAktoFlag != null) continue;
+
+            if (httpResponseParam.getRequestParams().getURL().toLowerCase().contains("/health")) {
+                continue;
+            }
 
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 

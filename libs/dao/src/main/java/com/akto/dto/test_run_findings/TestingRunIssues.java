@@ -20,6 +20,8 @@ public class TestingRunIssues {
     private GlobalEnums.Severity severity;
     public static final String LATEST_TESTING_RUN_SUMMARY_ID = "latestTestingRunSummaryId";
     private ObjectId latestTestingRunSummaryId;
+    public static final String LATEST_TESTING_RUN_SUMMARY_HEX_ID = "latestTestingRunSummaryHexId";
+    private String latestTestingRunSummaryHexId;
     public static final String IGNORE_REASON = "ignoreReason";
     private String ignoreReason;
     private String jiraIssueUrl;
@@ -27,6 +29,7 @@ public class TestingRunIssues {
     private int lastUpdated;
     public static final String UNREAD = "unread";
     private boolean unread;
+    public static final String COLLECTION_IDS = "collectionIds";
     private List<Integer> collectionIds;
 
     public TestingRunIssues(TestingIssuesId id, GlobalEnums.Severity severity, GlobalEnums.TestRunIssueStatus status,
@@ -134,6 +137,14 @@ public class TestingRunIssues {
 
     public void setLastUpdated(int lastUpdated) {
         this.lastUpdated = lastUpdated;
+    }
+
+    public String getLatestTestingRunSummaryHexId() {
+        return latestTestingRunSummaryHexId;
+    }
+
+    public void setLatestTestingRunSummaryHexId(String latestTestingRunSummaryHexId) {
+        this.latestTestingRunSummaryHexId = latestTestingRunSummaryHexId;
     }
 
     @Override

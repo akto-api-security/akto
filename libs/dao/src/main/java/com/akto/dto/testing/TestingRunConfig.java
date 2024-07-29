@@ -2,6 +2,7 @@ package com.akto.dto.testing;
 
 import com.akto.dto.ApiInfo;
 import org.bson.codecs.pojo.annotations.BsonId;
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import java.util.List;
@@ -15,6 +16,8 @@ public class TestingRunConfig {
     private Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey;
     private List<String> testSubCategoryList;
     private ObjectId authMechanismId;
+    @BsonIgnore
+    String strAuthMechanismId;
 
     private String testRoleId;
     private String overriddenTestAppUrl;
@@ -103,4 +106,15 @@ public class TestingRunConfig {
     public void setTestRoleId(String testRoleId) {
         this.testRoleId = testRoleId;
     }
+
+    public String getStrAuthMechanismId() {
+        if (strAuthMechanismId == null && this.authMechanismId!=null) {
+            return this.authMechanismId.toHexString();
+        }
+        return strAuthMechanismId;
+    }
+    public void setStrAuthMechanismId(String strAuthMechanismId) {
+        this.strAuthMechanismId = strAuthMechanismId;
+    }
+
 }

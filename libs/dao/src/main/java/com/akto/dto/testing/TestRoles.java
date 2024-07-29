@@ -21,6 +21,9 @@ public class TestRoles {
     private List<AuthWithCond> authWithCondList;
     @BsonIgnore
     private EndpointLogicalGroup endpointLogicalGroup;
+    
+    @BsonIgnore
+    private String endpointLogicalGroupIdHexId;
 
     private String createdBy;
     private int createdTs;
@@ -134,5 +137,14 @@ public class TestRoles {
             }
         }
         return null;
+    }
+
+    public String getEndpointLogicalGroupIdHexId() {
+        if (endpointLogicalGroupIdHexId == null) return this.endpointLogicalGroupId.toHexString();
+        return this.endpointLogicalGroupIdHexId;
+    }
+
+    public void setEndpointLogicalGroupIdHexId(String endpointLogicalGroupIdHexId) {
+        this.endpointLogicalGroupIdHexId = endpointLogicalGroupIdHexId;
     }
 }
