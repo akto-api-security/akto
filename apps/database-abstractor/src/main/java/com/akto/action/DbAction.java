@@ -313,19 +313,23 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteApiInfo() {
+        int accountId = Context.accountId.get();
         try {
             List<ApiInfo> apiInfos = new ArrayList<>();
             for (BasicDBObject obj: apiInfoList) {
                 ApiInfo apiInfo = objectMapper.readValue(obj.toJson(), ApiInfo.class);
+                ApiInfoKey id = apiInfo.getId();
+                if (accountId == 1721887185 && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)  && !id.getMethod().equals(Method.OPTIONS))  {
+                    System.out.println("auth types for endpoint from runtime " + id.getUrl() + " " + id.getMethod() + " : " + apiInfo.getAllAuthTypesFound());
+                }
                 apiInfos.add(apiInfo);
             }
-            int accountId = Context.accountId.get();
             SingleTypeInfo.fetchCustomAuthTypes(accountId);
             service.schedule(new Runnable() {
                 public void run() {
                     Context.accountId.set(accountId);
                     List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(accountId);
-                    CustomAuthUtil.calcAuth(apiInfos, customAuthTypes);
+                    CustomAuthUtil.calcAuth(apiInfos, customAuthTypes, accountId == 1721887185);
                     DbLayer.bulkWriteApiInfo(apiInfos);
                 }
             }, 0, TimeUnit.SECONDS);
