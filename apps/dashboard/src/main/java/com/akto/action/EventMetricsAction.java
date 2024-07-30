@@ -77,9 +77,14 @@ public class EventMetricsAction extends UserAction {
         try {
             Event event = new Event();
             EventsMetrics lastEventMetrics = EventsMetricsDao.instance.findLatestOne(Filters.empty());
-            boolean value = IntercomEventsUtil.createAndSendMetaDataForEvent(event, lastEventMetrics);
-
-            this.eventsMetrics = event.getMetadata();
+            boolean value = false;
+            if(lastEventMetrics != null){
+                value = IntercomEventsUtil.createAndSendMetaDataForEvent(event, lastEventMetrics);
+            }
+            if(value){
+                this.eventsMetrics = event.getMetadata();
+            }
+            
         } catch (Exception e) {
             addActionError("Error in retrieving latest event metric " + e.getMessage());
             e.printStackTrace();
