@@ -75,7 +75,7 @@ public class CustomAuthUtil {
         return responseParams;
     }
 
-    public static List<WriteModel<ApiInfo>> calcAuth(List<ApiInfo> apiInfos, List<CustomAuthType> customAuthTypes){
+    public static List<WriteModel<ApiInfo>> calcAuth(List<ApiInfo> apiInfos, List<CustomAuthType> customAuthTypes, boolean printLogs){
         List<WriteModel<ApiInfo>> apiInfosUpdates = new ArrayList<>();
         if (customAuthTypes == null) {
             customAuthTypes = new ArrayList<>();
@@ -91,7 +91,11 @@ public class CustomAuthUtil {
                     apiInfo.getId().getApiCollectionId(),
                     apiInfo.getId().getUrl(), apiInfo.getId().getMethod());
             boolean sampleProcessed = false;
+            ApiInfo.ApiInfoKey id = apiInfo.getId();
             if (sampleData != null && sampleData.getSamples() != null && !sampleData.getSamples().isEmpty()) {
+                if (printLogs && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)) {
+                    loggerMaker.infoAndAddToDb("Found sample data for " + sampleData.getId().toString() ,LogDb.DASHBOARD);
+                }
                 for (String sample : sampleData.getSamples()) {
                     try {
                         HttpResponseParams httpResponseParams = SampleParser.parseSampleMessage(sample);
@@ -108,11 +112,18 @@ public class CustomAuthUtil {
                 try {
                     if(list!=null && !list.isEmpty()){
                         HttpResponseParams httpResponseParams = createResponseParamsFromSTI(list);
+                        if (printLogs && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)) {
+                            loggerMaker.infoAndAddToDb("Headers for " + apiInfo.getId().toString() + ": " + httpResponseParams.requestParams.getHeaders() ,LogDb.DASHBOARD);
+                        }
                         AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Unable to parse STIs for custom auth setup job");
                 }
+            }
+
+            if (printLogs && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)) {
+                loggerMaker.infoAndAddToDb("auth types for endpoint post processing " + apiInfo.getId().getUrl() + " " + apiInfo.getId().getMethod() + " : " + apiInfo.getAllAuthTypesFound());
             }
 
             UpdateOneModel<ApiInfo> update = new UpdateOneModel<>(
@@ -139,7 +150,7 @@ public class CustomAuthUtil {
             List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(new BasicDBObject(), skip, limit,
                     Sorts.descending(Constants.ID));
 
-            apiInfosUpdates.addAll(calcAuth(apiInfos, customAuthTypes));
+            apiInfosUpdates.addAll(calcAuth(apiInfos, customAuthTypes, false));
 
         if (apiInfos.size() == limit) {
             skip += limit;
