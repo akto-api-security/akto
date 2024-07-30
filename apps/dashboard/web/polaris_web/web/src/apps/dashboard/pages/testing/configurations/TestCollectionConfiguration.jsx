@@ -1,20 +1,16 @@
 import { Box, Badge, Link } from "@shopify/polaris";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import api from "../api"
 import func from "@/util/func"
 import { useEffect } from "react";
 import PersistStore from '@/apps/main/PersistStore';
-import DropdownSearch from "@/apps/dashboard/components/shared/DropdownSearch";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
 
 function TestCollectionConfiguration() {
-    const navigate = useNavigate()
     const allCollections = PersistStore(state => state.allCollections)
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
     const subCategoryMap = PersistStore(state => state.subCategoryMap)
-    const allCollectionsExceptApiGroups = allCollections.filter(x => x.type !== "API_GROUP")
     const [testCollectionProperties, setTestCollectionProperties] = useState([])
     const [apiCollectionId, setApiCollectionId] = useState(0)
     const [possibleTestCollectionProperties, setPossibleTestCollectionProperties] = useState([])
@@ -51,6 +47,9 @@ function TestCollectionConfiguration() {
                        return <Link onClick={(e) => e.stopPropagation()} monochrome target="_blank" url={window.location.origin+"/dashboard/testing/roles/details?name="+v}>{v}</Link>
                    })}</div>
                break;
+            
+            default:
+                break;
 
             }
             return ret
@@ -74,6 +73,8 @@ function TestCollectionConfiguration() {
                </Link>
 
                break;
+            default:
+                break;
         }
 
         return ret
@@ -127,13 +128,6 @@ function TestCollectionConfiguration() {
     useEffect(() => {
         fetchTestCollectionConfiguration(0)
     }, [])
-
-    const apiCollectionItems =  allCollectionsExceptApiGroups.map(x => {
-        return {
-            label: x.displayName,
-            value: x.id
-        }
-    })
 
     const resourceName = {
         singular: 'configuration',
