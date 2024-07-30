@@ -3,6 +3,7 @@ import { Badge, Box, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polar
 import PersistStore from "../../../main/PersistStore";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
+import CopyEndpoint from "./api_collections/component/CopyEndpoint"
 import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor } from "@shopify/polaris-icons"
 import api from "./api";
 import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
@@ -105,6 +106,12 @@ const apiDetailsHeaders = [
         icon: InfoMinor,
         itemOrder: 3,
         iconTooltip: "Changes in API"
+    },
+    {
+        text: "",
+        value: "parameterisedEndpoint",
+        itemOrder: 1,
+        component: (data) => CopyEndpoint(data)
     }
 ]
 
