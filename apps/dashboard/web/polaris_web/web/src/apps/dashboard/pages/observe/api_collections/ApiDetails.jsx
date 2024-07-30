@@ -179,14 +179,14 @@ function ApiDetails(props) {
             window.location.reload()
         })
     }
-    let newData= apiDetail
-    newData['copyEndpoint'] =  {
+    let newData = apiDetail
+    newData['copyEndpoint'] = {
         method: apiDetail.method,
         endpoint: apiDetail.endpoint
-    } 
+    }
     const headingComp = (
         <div style={{ display: "flex", justifyContent: "space-between" }} key="heading">
-            <div style={{ display: "flex", gap: '8px'}}>
+            <div style={{ display: "flex", gap: '8px' }}>
                 <GithubCell
                     width="35vw"
                     data={newData}
@@ -196,7 +196,7 @@ function ApiDetails(props) {
                     badgeClicked={badgeClicked}
                 />
             </div>
-            <div style={{ display: "flex", gap: '8px'}}>
+            <div style={{ display: "flex", gap: '8px' }}>
                 <RunTest
                     apiCollectionId={apiDetail["apiCollectionId"]}
                     endpoints={[apiDetail]}
@@ -207,23 +207,26 @@ function ApiDetails(props) {
                         <Button monochrome onClick={() => openTest()} icon={FileMinor} />
                     </Tooltip>
                 </Box>
-                <Popover 
-                    active={showMoreActions}
-                    activator={
-                        <Tooltip content="More actions" dismissOnMouseOut ><Button plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowMoreActions(!showMoreActions)} /></Tooltip>
-                    }
-                    autofocusTarget="first-node"
-                    onClose={() => setShowMoreActions(false)}
+                {
+                    isGptActive || isDemergingActive ? <Popover
+                        active={showMoreActions}
+                        activator={
+                            <Tooltip content="More actions" dismissOnMouseOut ><Button plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowMoreActions(!showMoreActions)} /></Tooltip>
+                        }
+                        autofocusTarget="first-node"
+                        onClose={() => setShowMoreActions(false)}
                     >
-                    <Popover.Pane fixed>
-                        <Popover.Section>
-                            <VerticalStack gap={"2"}>
-                                {isGptActive ? <Button plain monochrome removeUnderline onClick={displayGPT} size="slim">Ask AktoGPT</Button>: null} 
-                                {isDemergingActive ? <Button plain monochrome removeUnderline size="slim" onClick={deMergeApis}>De merge</Button> : null}
-                            </VerticalStack>
-                        </Popover.Section>
-                    </Popover.Pane>
-                </Popover>
+                        <Popover.Pane fixed>
+                            <Popover.Section>
+                                <VerticalStack gap={"2"}>
+                                    {isGptActive ? <Button plain monochrome removeUnderline onClick={displayGPT} size="slim">Ask AktoGPT</Button> : null}
+                                    {isDemergingActive ? <Button plain monochrome removeUnderline size="slim" onClick={deMergeApis}>De merge</Button> : null}
+                                </VerticalStack>
+                            </Popover.Section>
+                        </Popover.Pane>
+                    </Popover> : null
+                }
+
             </div>
         </div>
     )
