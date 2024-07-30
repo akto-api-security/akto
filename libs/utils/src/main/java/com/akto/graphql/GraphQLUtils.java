@@ -28,6 +28,7 @@ public class GraphQLUtils {//Singleton class
 
     static {
         allowedPath.add("graphql");
+        allowedPath.add("graph");
     }
 
     private GraphQLUtils() {
