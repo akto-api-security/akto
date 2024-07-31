@@ -241,7 +241,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
   }
 
   const definedTableTabs = ['All', 'One time', 'Continuous Testing', 'Scheduled', 'CI/CD']
-  const initialCount = [countMap['allTestRuns'], countMap['oneTime'], countMap['scheduled'], countMap['cicd'], countMap['continuous']]
+  const initialCount = [countMap['allTestRuns'], countMap['oneTime'], countMap['continuous'], countMap['scheduled'], countMap['cicd']]
 
   const { tabsInfo } = useTable()
   const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
