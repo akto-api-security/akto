@@ -150,8 +150,9 @@ public class InviteUserAction extends UserAction{
         try {
             SendgridEmail.getInstance().send(email);
         } catch (IOException e) {
+            loggerMaker.errorAndAddToDb("invite email sending failed" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
-            return ERROR.toUpperCase();
+//            return ERROR.toUpperCase();
         }
 
         return Action.SUCCESS.toUpperCase();

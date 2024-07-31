@@ -131,6 +131,9 @@ public class TestCollectionPropertiesDao extends AccountsContextDao<TestCollecti
                 case LOCKED_ACCOUNT_SYSTEM_ROLE:
                 case ATTACKER_TOKEN:
                 case LOGGED_OUT_SYSTEM_ROLE:
+                case ADMIN:
+                case MEMBER:
+                case LOGIN_2FA_INCOMPLETE_SYSTEM_ROLE:
                     prop = createTestRole(apiCollectionId, propId);
                     break;
 //                case SESSION_TOKEN_HEADER_KEY:

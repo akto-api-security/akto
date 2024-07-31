@@ -792,6 +792,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
                   access_type = "Public"
               } else if (access_types.indexOf("PARTNER") !== -1){
                   access_type = "Partner"
+              } else if (access_types.indexOf("THIRD_PARTY") !== -1){
+                  access_type = "Third-party"
               }else{
                   access_type = "Private"
               }
