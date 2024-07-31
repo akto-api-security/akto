@@ -77,7 +77,7 @@ public class APICatalogSync {
             buildFromDB(false, fetchAllSTI);
             AccountSettings accountSettings = dataActor.fetchAccountSettings();
             if (accountSettings != null && accountSettings.getPartnerIpList() != null) {
-                partnerIpsList = accountSettings.getPartnerIpList();
+                partnerIpList = accountSettings.getPartnerIpList();
             }
         }
     }
