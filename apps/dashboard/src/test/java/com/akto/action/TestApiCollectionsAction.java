@@ -2,10 +2,11 @@ package com.akto.action;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.type.SingleTypeInfo;
-import com.akto.types.CappedSet;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
 import org.junit.Test;
 
@@ -95,24 +96,21 @@ public class TestApiCollectionsAction extends MongoBasedTest {
         apiCollectionList.add(new ApiCollection(3000, "three", 3000, urls3, null,0, false, true));
 
         ApiCollectionsDao.instance.insertMany(apiCollectionList);
+        Method method = Method.GET;
 
-        List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
+        List<ApiInfo> apiInfos = new ArrayList<>();
         for (int c=1; c<4; c++) {
-            for (int j = 0; j < 100; j++) {
-                for (int i = 0; i < 100; i++) {
-                    int apiCollectionId = c*1000;
-                    int responseCode = i % 2 == 0 ? -1 : 200;
-                    String param = i == 0 ? "host" : "param_" + i;
-                    boolean isHeader = i == 0;
-                    String url = "url_" + j;
-                    SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(url, "GET", responseCode, isHeader, param, SingleTypeInfo.GENERIC, apiCollectionId, false);
-                    SingleTypeInfo sti = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0, 0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
-                    singleTypeInfos.add(sti);
-                }
+            int apiCollectionId = c*1000;
+            for (int i = 0; i < 100; i++) {
+                String url = "/api/v1" + i;
+                ApiInfo apiInfo= new ApiInfo(
+                    new ApiInfoKey(apiCollectionId, url, method)
+                );
+                apiInfos.add(apiInfo);
             }
         }
 
-        SingleTypeInfoDao.instance.insertMany(singleTypeInfos);
+        ApiInfoDao.instance.insertMany(apiInfos);
 
         ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
         apiCollectionsAction.fetchAllCollections();
