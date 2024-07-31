@@ -240,7 +240,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     })
   }
 
-  const definedTableTabs = ['All', 'One time', 'Scheduled', 'CI/CD', 'Continuous Testing']
+  const definedTableTabs = ['All', 'One time', 'Continuous Testing', 'Scheduled', 'CI/CD']
   const initialCount = [countMap['allTestRuns'], countMap['oneTime'], countMap['scheduled'], countMap['cicd'], countMap['continuous']]
 
   const { tabsInfo } = useTable()
