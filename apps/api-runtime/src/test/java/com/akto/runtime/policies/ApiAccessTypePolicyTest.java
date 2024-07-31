@@ -10,7 +10,7 @@ import org.junit.Test;
 import java.util.*;
 
 public class ApiAccessTypePolicyTest {
-    ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(Collections.singletonList("172.31.0.0/16"));
+    ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(Collections.singletonList("172.31.0.0/16"), Collections.singletonList("171.31.0.0/16"));
 
     public static HttpResponseParams generateHttpResponseParams(List<String> ipList) {
         Map<String, List<String>> headers = new HashMap<>();
@@ -26,7 +26,7 @@ public class ApiAccessTypePolicyTest {
         List<String> ipList = Arrays.asList("3.109.56.64", "118.185.162.194");
         HttpResponseParams httpResponseParams = generateHttpResponseParams(ipList);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo, null, new ArrayList<>());
+        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo);
         Assertions.assertEquals(apiInfo.getApiAccessTypes().size(),1);
         Assertions.assertTrue(apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.PUBLIC));
     }
@@ -39,7 +39,7 @@ public class ApiAccessTypePolicyTest {
         HttpResponseParams httpResponseParams = generateHttpResponseParams(ipList);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         apiInfo.getApiAccessTypes().add(ApiInfo.ApiAccessType.PRIVATE);
-        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo, null, new ArrayList<>());
+        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo);
         Assertions.assertEquals(apiInfo.getApiAccessTypes().size(), 2);
     }
 
@@ -51,7 +51,7 @@ public class ApiAccessTypePolicyTest {
         HttpResponseParams httpResponseParams = generateHttpResponseParams(ipList);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         apiInfo.getApiAccessTypes().add(ApiInfo.ApiAccessType.PUBLIC);
-        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo, null, new ArrayList<>());
+        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo);
         Assertions.assertEquals(apiInfo.getApiAccessTypes().size(), 2);
     }
 
@@ -62,7 +62,7 @@ public class ApiAccessTypePolicyTest {
         List<String> ipList = Arrays.asList("172.31.8.188", "172.31.255.255");
         HttpResponseParams httpResponseParams = generateHttpResponseParams(ipList);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo, null, new ArrayList<>());
+        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo);
         Assertions.assertTrue(apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.PRIVATE));
     }
 
@@ -73,7 +73,7 @@ public class ApiAccessTypePolicyTest {
         List<String> ipList = Arrays.asList("172.31.255.255", "118.185.162.194");
         HttpResponseParams httpResponseParams = generateHttpResponseParams(ipList);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo, null, new ArrayList<>());
+        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo);
         Assertions.assertEquals(apiInfo.getApiAccessTypes().size(), 1);
         Assertions.assertTrue(apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.PUBLIC));
     }
@@ -83,8 +83,26 @@ public class ApiAccessTypePolicyTest {
         List<String> ipList = Arrays.asList("106.222.203.142");
         HttpResponseParams httpResponseParams = generateHttpResponseParams(ipList);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo, null, Arrays.asList("14.143.179.162", "106.222.203.142"));
+        apiAccessTypePolicy.setPartnerIpList(Arrays.asList("14.143.179.162", "106.222.203.142"));
+        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo);
         Assertions.assertEquals(apiInfo.getApiAccessTypes().size(), 1);
         Assertions.assertTrue(apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.PARTNER));
     }
+
+    @Test 
+    public void testThirdPartyAccessType(){
+        List<String> ipList = Arrays.asList("106.222.203.142");
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(ipList);
+        httpResponseParams.setDirection("2");
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo);
+        Assertions.assertEquals(apiInfo.getApiAccessTypes().size(), 1);
+        Assertions.assertTrue(apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.THIRD_PARTY));
+        httpResponseParams.setDirection("1");
+        apiInfo = new ApiInfo(httpResponseParams);
+        apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo);
+        Assertions.assertEquals(apiInfo.getApiAccessTypes().size(), 1);
+        Assertions.assertTrue(apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.PUBLIC));
+    }
+
 }
