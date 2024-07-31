@@ -55,6 +55,7 @@ function Dropdown(props) {
     const textField = (
         <Autocomplete.TextField
             id={id}
+            disabled={props?.disabled || false}
             value={inputValue}
             autoComplete="off"
             {...props.label ? {label : props.label} : null}
