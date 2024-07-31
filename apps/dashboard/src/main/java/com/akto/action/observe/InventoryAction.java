@@ -465,9 +465,9 @@ public class InventoryAction extends UserAction {
 
     public String fetchNewParametersTrend() {
         List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.limit(100_000));
         pipeline.add(Aggregates.match(Filters.gte("timestamp", startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte("timestamp", endTimestamp)));
+        pipeline.add(Aggregates.limit(100_000));
         pipeline.add(Aggregates.match(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}))));
 
