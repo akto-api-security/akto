@@ -85,7 +85,6 @@ const TestEditor = () => {
                 <Button onClick={handleExit} icon={ExitMajor} plain/>
                 <HorizontalStack gap={"2"}>
                     <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={"Test Editor"} />
-                    <Badge status="success">Beta</Badge>
                 </HorizontalStack>
             </HorizontalStack>
 

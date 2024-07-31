@@ -194,7 +194,7 @@ function ApiDetails(props) {
         <div style={{ display: "flex", justifyContent: "space-between" }} key="heading">
             <div style={{ display: "flex", gap: '8px' }}>
                 <GithubCell
-                    width="35vw"
+                    width="32vw"
                     data={newData}
                     headers={headers}
                     getStatus={getStatus}
