@@ -120,16 +120,17 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 new BasicDBObject("apiCollectionId", "$apiCollectionId")
                 .append("url", "$url")
                 .append("method", "$method");
-            pipeline.add(Aggregates.group(groupedId));
+            pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+            pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp"),Accumulators.sum("countTs",1)));
             pipeline.add(Aggregates.match(Filters.gte("startTs", startTimestamp)));
             pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
             MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
             while(endpointsCursor.hasNext()) {
                 BasicDBObject basicDBObject = endpointsCursor.next();
-                BasicDBObject sti = (BasicDBObject) basicDBObject.get("latestRun");
-                int collectionId = sti.getInt("apiCollectionId");
-                String url = sti.getString("url");
-                String method = sti.getString("method");
+                BasicDBObject id = (BasicDBObject) basicDBObject.get("_id");
+                int collectionId = id.getInt("apiCollectionId");
+                String url = id.getString("url");
+                String method = id.getString("method");
                 endpoints.add(new ApiInfoKey(collectionId, url, URLMethods.Method.valueOf(method)));
             }
         } else {
