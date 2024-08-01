@@ -22,6 +22,7 @@ import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.URLAggregator;
 import com.akto.hybrid_runtime.policies.AuthPolicy;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.HTTPHeadersExample;
 import com.akto.util.JSONUtils;
 import com.google.common.base.Charsets;
@@ -47,20 +48,28 @@ public class DependencyAnalyser {
     public Map<Integer, APICatalog> dbState = new HashMap<>();
     public Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
     private boolean isOnPrem = false;
+    private boolean isHybrid = false;
 
     private DataActor dataActor = DataActorFactory.fetchInstance();
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DependencyAnalyser.class, LogDb.RUNTIME);
 
-    public DependencyAnalyser(Map<Integer, APICatalog> dbState, boolean useMap, Map<Integer, ApiCollection> apiCollectionsMap) {
+    public DependencyAnalyser(Map<Integer, APICatalog> dbState, boolean isOnPrem, boolean isHybrid, Map<Integer, ApiCollection> apiCollectionsMap) {
         this.apiCollectionsMap = apiCollectionsMap;
-        if (useMap) {
+        this.isHybrid = isHybrid;
+        this.isOnPrem = isOnPrem;
+        loggerMaker.infoAndAddToDb("IsHybrid: " + isHybrid);
+        loggerMaker.infoAndAddToDb("IsOnPrem: " + isOnPrem);
+
+        if (!isOnPrem && !isHybrid) {
+            loggerMaker.infoAndAddToDb("Using HashMap");
             valueStore = new HashSetStore(10_000);
             urlValueStore= new HashSetStore(10_000);
             urlParamValueStore = new HashSetStore(10_000);
         } else {
+            loggerMaker.infoAndAddToDb("Using Bloofilter");
             valueStore = new BFStore(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100_000_000, 0.01));
             urlValueStore = new BFStore(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100_000_000, 0.01));
             urlParamValueStore = new BFStore(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100_000_000, 0.01));
-            this.isOnPrem = true;
         }
         this.dbState = dbState;
     }
@@ -79,7 +88,10 @@ public class DependencyAnalyser {
         ApiCollection apiCollection = apiCollectionsMap.get(finalApiCollectionId);
         // for on prem customers always run dependency graph
         // for saas customers, run if flag is set true
-        if (!isOnPrem && (apiCollection == null || !apiCollection.isRunDependencyAnalyser())) return;
+        boolean runDependencyAnalyser = apiCollection == null || apiCollection.isRunDependencyAnalyser();
+        if (!isOnPrem && (isHybrid && !runDependencyAnalyser)) {
+            return;
+        }
 
         boolean doInterCollectionMatch = apiCollection != null && apiCollection.isMatchDependencyWithOtherCollections();
 
@@ -373,7 +385,8 @@ public class DependencyAnalyser {
     }
 
     public void syncWithDb() {
-
+        loggerMaker.infoAndAddToDb("Syncing dependency analyser nodes");
+        loggerMaker.infoAndAddToDb("dependency analyser nodes size: " + nodes.size());
         mergeNodes();
         List<DependencyNode> nodeList = new ArrayList<>();
 
@@ -382,6 +395,7 @@ public class DependencyAnalyser {
             nodeList.add(dependencyNode);
             if (nodeList.size() % 100 == 0) {
                 dataActor.bulkWriteDependencyNodes(nodeList);
+                nodeList = new ArrayList<>();
             }
         }
 
