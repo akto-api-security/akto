@@ -169,6 +169,10 @@ public class HttpCallParser {
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
             numberOfSyncs++;
+            List<ApiCollection> apiCollections = dataActor.fetchApiCollections();
+            for (ApiCollection apiCollection: apiCollections) {
+                apiCollectionsMap.put(apiCollection.getId(), apiCollection);
+            }
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI);
             dependencyAnalyser.dbState = apiCatalogSync.dbState;
             dependencyAnalyser.syncWithDb();
