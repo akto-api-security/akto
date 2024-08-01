@@ -566,7 +566,7 @@ public final class FilterAction {
                 if (validationResult.getIsValid()) {
                     newMatchingKeys.add(key);
                 } else {
-                    validationErrorString.append("\n header-key:").append(key).append(": ").append(validationResult.getValidationReason());
+                    validationErrorString.append("\n").append(validationResult.getValidationReason());
                 }
                 
                 if (!res && (key.equals("cookie") || key.equals("set-cookie"))) {
@@ -581,7 +581,7 @@ public final class FilterAction {
                             result = Utils.evaluateResult(operation, result, res);
                             break;
                         } else {
-                            validationErrorString.append("\n header-cookie-key:").append(cookieKey).append(": ").append(validationResult.getValidationReason());
+                            validationErrorString.append("\n").append(validationResult.getValidationReason());
                         }
                     }
                 }
@@ -608,7 +608,7 @@ public final class FilterAction {
                         matchingValueKeySet.add(key);
                         break;
                     } else {
-                        validationErrorString.append("\n header-value:").append(val).append(": ").append(validationResult.getValidationReason());
+                        validationErrorString.append("\n").append(validationResult.getValidationReason());
                     }
                 }
 
@@ -624,7 +624,7 @@ public final class FilterAction {
                             result = Utils.evaluateResult(operation, result, res);
                             break;
                         } else {
-                            validationErrorString.append("\n header-cookie-value:").append(cookieKey).append(": ").append(validationResult.getValidationReason());
+                            validationErrorString.append("\n").append(validationResult.getValidationReason());
                         }
                     }
                 }
@@ -679,7 +679,7 @@ public final class FilterAction {
                 if (res) {
                     matchingKeys.add(key);
                 } else {
-                    validationErrorString.append("\n query-param-key:").append(key).append(": ").append(validationResult.getValidationReason());
+                    validationErrorString.append("\n").append(validationResult.getValidationReason());
                 }
             }
             // if (!result) {
@@ -701,7 +701,7 @@ public final class FilterAction {
                     matchingValueKeySet.add(key);
                     break;
                 } else {
-                    validationErrorString.append("\n query-param-value:").append(key).append(": ").append(validationResult.getValidationReason());
+                    validationErrorString.append("\n").append(validationResult.getValidationReason());
                 }
             }
             // if (!result) {
@@ -772,7 +772,7 @@ public final class FilterAction {
 
         DataOperandsImpl handler = this.filters.get(dataOperandFilterRequest.getOperand().toLowerCase());
         if (handler == null) {
-          return new ValidationResult(false, "operand:" + dataOperandFilterRequest.getOperand().toLowerCase()+ " not found in filters");
+          return new ValidationResult(false, "\noperand:" + dataOperandFilterRequest.getOperand().toLowerCase()+ " not found in filters");
         }
         return handler.isValid(dataOperandFilterRequest);
     }
@@ -921,7 +921,9 @@ public final class FilterAction {
             if (res) {
                 matchingValueKeySet.add(parentKey);
             } else {
-                validationReason.append("\n").append("querySet:").append(querySet).append(" - ").append(validationResult.getValidationReason());
+                if (!validationReason.toString().contains(validationResult.getValidationReason())) {
+                    validationReason.append("\n").append(validationResult.getValidationReason());
+                }
             }
             doAllSatisfy = Utils.evaluateResult("and", doAllSatisfy, res);
         }

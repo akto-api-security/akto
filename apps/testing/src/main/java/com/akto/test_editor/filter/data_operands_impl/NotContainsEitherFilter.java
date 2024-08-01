@@ -22,6 +22,7 @@ public class NotContainsEitherFilter extends DataOperandsImpl {
             return new ValidationResult(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
 
+
         for (String queryString: querySet) {
             try {
                 res = evaluateOnStringQuerySet(data.trim(), queryString.trim());
@@ -30,10 +31,8 @@ public class NotContainsEitherFilter extends DataOperandsImpl {
             }
             result = result || res;
         }
-        if (result) {
-
-        } else {
-            validationString = "";
+        if (!result) {
+            validationString = "not_contains_either filter failed due to '"+ data + "' not matching with : " + querySet;
         }
         return new ValidationResult(result, validationString);
     }

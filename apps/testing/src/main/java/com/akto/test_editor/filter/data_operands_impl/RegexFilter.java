@@ -31,9 +31,9 @@ public class RegexFilter extends DataOperandsImpl {
         }
         String validationString = null;
         if (result) {
-            validationString = "regex filter passed";
+            validationString = "'regex' filter passed";
         } else {
-            validationString = "regex filter failed because :data - " + data + ", queryset - " + querySet;;
+            validationString = "'regex' filter failed due to '" + data + "' not matching for - " + querySet;;
         }
         return new ValidationResult(result, validationString);
     }

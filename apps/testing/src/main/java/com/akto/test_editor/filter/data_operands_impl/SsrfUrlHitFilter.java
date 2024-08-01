@@ -27,11 +27,11 @@ public class SsrfUrlHitFilter extends DataOperandsImpl {
                 break;
             }
         }
-        String validationString = null;
+        String validationString;
         if (result) {
-            validationString = "ssrfUrl hit filter passed";
+            validationString = "ssrf_url_hit filter passed";
         } else {
-            validationString = "ssrfUrl hit filter failed because : queryset - " + querySet;;
+            validationString = "ssrf_url_hit filter failed due to - " + querySet;;
         }
         return new ValidationResult(result, validationString);
     }

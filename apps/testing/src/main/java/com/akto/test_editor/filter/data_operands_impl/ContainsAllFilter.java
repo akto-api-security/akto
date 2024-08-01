@@ -36,7 +36,7 @@ public class ContainsAllFilter extends DataOperandsImpl {
         if (result) {
             return new ValidationResult(result, "");
         }
-        return new ValidationResult(result, "ContainsAllFilter skipped due to following not matching with '"+data+"':" + notMatchedQuerySet);
+        return new ValidationResult(result, "contains_all failed due to '"+data+"' not matching with :" + notMatchedQuerySet);
     }
 
     public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {

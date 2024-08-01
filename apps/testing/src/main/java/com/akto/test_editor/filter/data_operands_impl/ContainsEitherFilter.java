@@ -19,7 +19,7 @@ public class ContainsEitherFilter extends DataOperandsImpl {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return new ValidationResult(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return new ValidationResult(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
         for (String queryString: querySet) {
             try {
@@ -35,7 +35,7 @@ public class ContainsEitherFilter extends DataOperandsImpl {
         if (result) {
             return new ValidationResult(result, "");
         }
-        return new ValidationResult(result, "ContainsEitherFilter skipped due to following not matching with '"+data+"':" + notMatchedQuerySet);
+        return new ValidationResult(result, "contains_either failed due to '"+data+"' not matching with :" + notMatchedQuerySet);
     }
 
     public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {

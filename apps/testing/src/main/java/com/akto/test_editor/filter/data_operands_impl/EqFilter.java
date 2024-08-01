@@ -19,7 +19,7 @@ public class EqFilter extends DataOperandsImpl {
             if (data instanceof String) {
                 List<String> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
-                    return new ValidationResult(false, "eq validation failed because of empty query");
+                    return new ValidationResult(false, "'eq' validation failed because of empty query");
                 }
                 result = data.toString().trim().toLowerCase().equals(queryList.get(0).trim().toLowerCase());
             }
@@ -27,7 +27,7 @@ public class EqFilter extends DataOperandsImpl {
             if (data instanceof Integer) {
                 List<Integer> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
-                    new ValidationResult(false, "eq validation failed because of empty query");
+                    new ValidationResult(false, "'eq' validation failed because of empty query");
                 }
                 Integer dataInt = (Integer) data;
 
@@ -39,16 +39,16 @@ public class EqFilter extends DataOperandsImpl {
                     result = ((int) dataInt == (int) queryList.get(0));
                 }
                 if (result) {
-                    return new ValidationResult(result, "eq validation passed ");
+                    return new ValidationResult(result, "'eq' validation passed ");
                 } else {
-                    return new ValidationResult(result, "eq validation failed because: "+ dataInt +" != " + query);
+                    return new ValidationResult(result, "'eq' validation failed because: "+ dataInt +" != " + query);
                 }
             }
             
             if (data instanceof Boolean ) {
                 List<Boolean> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
-                    new ValidationResult(false, "eq validation failed because of empty query");
+                    new ValidationResult(false, "'eq' validation failed because of empty query");
                 }
                 Boolean dataBool = (Boolean) data;
 
@@ -60,16 +60,16 @@ public class EqFilter extends DataOperandsImpl {
                     result = ((boolean) dataBool == (boolean) queryList.get(0));
                 }
                 if (result) {
-                    return new ValidationResult(result, "eq validation passed ");
+                    return new ValidationResult(result, "'eq' validation passed ");
                 } else {
-                    return new ValidationResult(result, "eq validation failed because: boolean query do not match");
+                    return new ValidationResult(result, "'eq' validation failed because: boolean query do not match");
                 }
             }
             
         } catch (Exception e) {
-            return new ValidationResult(false, "eq validation failed because of empty query");
+            return new ValidationResult(false, "'eq' validation failed because of empty query");
         }
-        return new ValidationResult(result, "eq validation failed because of empty query");
+        return new ValidationResult(result, "'eq' validation failed because of empty query");
     }
 
 }

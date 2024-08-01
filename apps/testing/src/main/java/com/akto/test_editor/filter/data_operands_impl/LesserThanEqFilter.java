@@ -15,9 +15,9 @@ public class LesserThanEqFilter extends DataOperandsImpl {
         result = Utils.applyIneqalityOperation(data, querySet, "lte");
         String validationReson = null;
         if (result) {
-            validationReson = "Less than eq filter passed";
+            validationReson = "'lte' filter passed";
         } else {
-            validationReson = "Less than eq filter failed: data:- "+ data +", querySet:- " + querySet;
+            validationReson = "'lte' filter failed: ''"+ data +"' > '" + querySet +"'";
         }
 
         return new ValidationResult(result, validationReson);

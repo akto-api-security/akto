@@ -14,9 +14,9 @@ public class GreaterThanFilter extends DataOperandsImpl {
         result = Utils.applyIneqalityOperation(data, querySet, "gt");
         String validationReson = null;
         if (result) {
-            validationReson = "Greater than filter passed";
+            validationReson = "'gt' filter passed";
         } else {
-            validationReson = "Greater than filter failed: data :- "+ data +", querySet:- " + querySet;
+            validationReson = "'gt' filter failed: '"+ data +"' <= '" + querySet +"'";
         }
 
         return new ValidationResult(result, validationReson);

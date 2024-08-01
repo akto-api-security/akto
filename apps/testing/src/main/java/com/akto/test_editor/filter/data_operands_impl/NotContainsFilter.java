@@ -21,19 +21,22 @@ public class NotContainsFilter extends DataOperandsImpl {
         } catch(Exception e) {
             return new ValidationResult(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
-
+        String failedQueryString = null;
         for (String queryString: querySet) {
             try {
                 res = evaluateOnStringQuerySet(data.trim(), queryString.trim());
             } catch (Exception e) {
                 res = false;
             }
+            if (!res) {
+                failedQueryString = queryString.trim();
+            }
             result = result && res;
         }
         if (result) {
-            validationString = "not contains filter passed";
+            validationString = "not_contains filter passed";
         } else {
-            validationString = "not contains filter failed because :data - " + data + ", queryset - " + querySet;
+            validationString = "not_contains filter failed due to '" + data + "' not matching with: " + failedQueryString;
         }
         return new ValidationResult(result, validationString);
     }
