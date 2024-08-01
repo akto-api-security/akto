@@ -187,6 +187,10 @@ public class StartTestAction extends UserAction {
         if (localTestingRun == null) {
             try {
                 localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
+                // pass boolean from ui, which will tell if testing is coniinuous on new endpoints
+                if (this.continuousTesting) {
+                    localTestingRun.setPeriodInSeconds(-1);
+                }
                 if (triggeredBy != null && !triggeredBy.isEmpty()) {
                     localTestingRun.setTriggeredBy(triggeredBy);
                 }
