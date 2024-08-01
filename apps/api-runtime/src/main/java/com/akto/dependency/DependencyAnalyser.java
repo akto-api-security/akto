@@ -10,6 +10,8 @@ import com.akto.dto.DependencyNode;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.*;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
@@ -39,11 +41,18 @@ public class DependencyAnalyser {
     public Map<Integer, APICatalog> dbState = new HashMap<>();
     public Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
     private boolean isOnPrem = false;
+    private boolean isHybrid = false;
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DependencyAnalyser.class, LogDb.RUNTIME);
 
 
-    public DependencyAnalyser(Map<Integer, APICatalog> dbState, boolean useMap, Map<Integer, ApiCollection> apiCollectionsMap) {
+    public DependencyAnalyser(Map<Integer, APICatalog> dbState, boolean isOnPrem, boolean isHybrid, Map<Integer, ApiCollection> apiCollectionsMap) {
         this.apiCollectionsMap = apiCollectionsMap;
-        if (useMap) {
+        this.isHybrid = isHybrid;
+        this.isOnPrem = isOnPrem;
+        loggerMaker.infoAndAddToDb("IsHybrid: " + isHybrid);
+        loggerMaker.infoAndAddToDb("IsOnPrem: " + isOnPrem);
+
+        if (!isOnPrem && !isHybrid) {
             valueStore = new HashSetStore(10_000);
             urlValueStore= new HashSetStore(10_000);
             urlParamValueStore = new HashSetStore(10_000);
@@ -51,7 +60,6 @@ public class DependencyAnalyser {
             valueStore = new BFStore(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100_000_000, 0.01));
             urlValueStore = new BFStore(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100_000_000, 0.01));
             urlParamValueStore = new BFStore(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100_000_000, 0.01));
-            this.isOnPrem = true;
         }
         this.dbState = dbState;
     }
@@ -70,7 +78,9 @@ public class DependencyAnalyser {
         ApiCollection apiCollection = apiCollectionsMap.get(finalApiCollectionId);
         // for on prem customers always run dependency graph
         // for saas customers, run if flag is set true
-        if (!isOnPrem && (apiCollection == null || !apiCollection.isRunDependencyAnalyser())) return;
+        boolean runDependencyAnalyser = apiCollection == null || apiCollection.isRunDependencyAnalyser();
+        if (!isOnPrem && (isHybrid && !runDependencyAnalyser)) {
+            return;
 
         boolean doInterCollectionMatch = apiCollection != null && apiCollection.isMatchDependencyWithOtherCollections();
 
@@ -364,10 +374,12 @@ public class DependencyAnalyser {
     }
 
     public void syncWithDb() {
+        loggerMaker.infoAndAddToDb("Syncing dependency analyser nodes");
         ArrayList<WriteModel<DependencyNode>> bulkUpdates1 = new ArrayList<>();
         ArrayList<WriteModel<DependencyNode>> bulkUpdates2 = new ArrayList<>();
         ArrayList<WriteModel<DependencyNode>> bulkUpdates3 = new ArrayList<>();
 
+        loggerMaker.infoAndAddToDb("dependency analyser nodes size: " + nodes.size());
         mergeNodes();
 
         for (DependencyNode dependencyNode: nodes.values()) {
@@ -458,6 +470,9 @@ public class DependencyAnalyser {
                 bulkUpdates3.add(updateOneModel3);
             }
         }
+        loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates1 size: " + bulkUpdates1.size());
+        loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates2 size: " + bulkUpdates2.size());
+        loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates3 size: " + bulkUpdates3.size());
 
         // ordered has to be true or else won't work
         if (bulkUpdates1.size() > 0) DependencyNodeDao.instance.getMCollection().bulkWrite(bulkUpdates1, new BulkWriteOptions().ordered(false));
