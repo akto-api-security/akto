@@ -81,6 +81,7 @@ public class DependencyAnalyser {
         boolean runDependencyAnalyser = apiCollection == null || apiCollection.isRunDependencyAnalyser();
         if (!isOnPrem && (isHybrid && !runDependencyAnalyser)) {
             return;
+        }
 
         boolean doInterCollectionMatch = apiCollection != null && apiCollection.isMatchDependencyWithOtherCollections();
 
