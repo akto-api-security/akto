@@ -134,7 +134,16 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
     }
 
     private static boolean checkIfAccessTokenExists(HttpServletRequest servletRequest, String accessToken) {
-        return accessToken != null || SessionUtils.get(servletRequest, "accessToken") != null;
+        String at = accessToken;
+        if (at == null) {
+            at = (String) SessionUtils.get(servletRequest, "accessToken");
+        }
+        try{
+            JWT.parseJwt(at, "");
+        } catch (Exception e){
+            return false;
+        }
+        return true;
     }
 
     public String error() {
