@@ -34,6 +34,7 @@ import com.mongodb.client.model.Updates;
 import io.micrometer.core.instrument.util.StringUtils;
 import org.apache.commons.codec.digest.HmacAlgorithms;
 import org.apache.commons.codec.digest.HmacUtils;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,6 +63,18 @@ public class ProfileAction extends UserAction {
     }
 
     public static void executeMeta1(Utility utility, User user, HttpServletRequest request, HttpServletResponse response) {
+
+        BasicDBObject userDetails = getBasicDBObject(utility, user, request, response);
+        if (userDetails == null) return;
+
+        for (String k: userDetails.keySet()) {
+            request.setAttribute(k, userDetails.get(k));
+        }
+
+        return;
+    }
+
+    public static @Nullable BasicDBObject getBasicDBObject(Utility utility, User user, HttpServletRequest request, HttpServletResponse response) {
         BasicDBObject userDetails = new BasicDBObject();
         BasicDBObject accounts = new BasicDBObject();
         Integer sessionAccId = Context.accountId.get();
@@ -82,8 +95,7 @@ public class ProfileAction extends UserAction {
             if (sessionAccId == 0) {
                 sessionAccId = acc.getId();
             }
-        };
-
+        }
         if (sessionAccId == 0) {
             throw new IllegalStateException("user has no accounts associated");
         } else {
@@ -100,11 +112,11 @@ public class ProfileAction extends UserAction {
 
         if (showOnboarding && request.getRequestURI().startsWith("/dashboard") && !request.getRequestURI().equals("/dashboard/onboarding")) {
             try {
-                response.sendRedirect("/dashboard/onboarding"); 
+                response.sendRedirect("/dashboard/onboarding");
             }  catch (Exception e) {
                 e.printStackTrace();
             }
-            return;
+            return null;
         }
         String username = user.getLogin();
 
@@ -214,12 +226,7 @@ public class ProfileAction extends UserAction {
                 userDetails.append("releaseVersion", versions[2]);
             }
         }
-
-        for (String k: userDetails.keySet()) {
-            request.setAttribute(k, userDetails.get(k));
-        }
-
-        return;
+        return userDetails;
     }
 
     private String type;

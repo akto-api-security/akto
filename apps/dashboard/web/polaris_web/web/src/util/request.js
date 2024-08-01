@@ -64,10 +64,47 @@ const err = async (error) => {
         break
       }
 
-      await service({
+      const data = await service({
         url: accessTokenUrl,
         method: 'get',
       })
+
+      console.log('Data received from accessTokenUrl:', response.data);
+
+      window.SIGNUP_INFO = JSON.parse(response.data.signupInfo || '{}');
+      window.AVATAR = response.data.avatar;
+      window.USER_NAME = response.data.username;
+      window.USERS = '{}';
+      window.DASHBOARDS = JSON.parse(atob(response.data.dashboards || '[]'));
+      window.ACCOUNTS = JSON.parse(response.data.accounts || '{}');
+      window.ACTIVE_ACCOUNT = +response.data.activeAccount;
+      window.DASHBOARD_MODE = response.data.dashboardMode;
+      window.CLOUD_TYPE = response.data.cloudType;
+      window.IS_SAAS = response.data.isSaas;
+      window.ACCESS_TOKEN = response.data.accessToken;
+      window.SIGNUP_INVITATION_CODE = response.data.signupInvitationCode;
+      window.SIGNUP_EMAIL_ID = response.data.signupEmailId;
+      window.ACCOUNT_NAME = response.data.accountName;
+      window.RELEASE_VERSION = response.data.releaseVersion;
+      window.RELEASE_VERSION_GLOBAL = response.data.AktoVersionGlobal;
+      window.AKTO_UI_MODE = response.data.aktoUIMode;
+      window.GITHUB_CLIENT_ID = atob(response.data.githubClientId);
+      window.GITHUB_URL = response.data.githubUrl;
+      window.STIGG_CUSTOMER_ID = response.data.stiggCustomerId;
+      window.STIGG_CUSTOMER_TOKEN = response.data.stiggCustomerToken;
+      window.STIGG_CLIENT_KEY = response.data.stiggClientKey;
+      window.JIRA_INTEGRATED = response.data.jiraIntegrated;
+      window.USER_ROLE = response.data.userRole;
+      window.STIGG_IS_OVERAGE = response.data.stiggIsOverage;
+      window.USAGE_PAUSED = JSON.parse(response.data.usagePaused || '{}');
+      window.STIGG_FEATURE_WISE_ALLOWED = JSON.parse(response.data.stiggFeatureWiseAllowed || '{}');
+
+      if (window.DASHBOARD_MODE === '' && window.IS_SAAS === '' && window.location.host.endsWith('akto.io')) {
+          window.DASHBOARD_MODE = 'LOCAL_DEPLOY';
+          window.IS_SAAS = 'true';
+      }
+
+      window.EXPIRED = response.data.expired;
 
       return service(originalRequest)
     case 500:

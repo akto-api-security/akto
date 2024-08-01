@@ -3,6 +3,7 @@ package com.akto.action;
 import com.akto.dao.UsersDao;
 import com.akto.dto.User;
 import com.akto.utils.Token;
+import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
@@ -23,6 +24,15 @@ import static com.akto.action.LoginAction.REFRESH_TOKEN_COOKIE_NAME;
 public class AccessTokenAction implements Action, ServletResponseAware, ServletRequestAware {
     public static final String ACCESS_TOKEN_HEADER_NAME = "access-token";
     private static final Logger logger = LoggerFactory.getLogger(AccessTokenAction.class);
+    BasicDBObject data;
+
+    public BasicDBObject getData() {
+        return data;
+    }
+
+    public void setData(BasicDBObject data) {
+        this.data = data;
+    }
 
     @Override
     public String execute() {
@@ -35,7 +45,8 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         String accessToken = token.getAccessToken();
 
         servletResponse.setHeader(ACCESS_TOKEN_HEADER_NAME, accessToken);
-
+        User user = UsersDao.instance.findOne("login", token.getUsername());
+        this.data = ProfileAction.getBasicDBObject(null, user, servletRequest, servletResponse);
         return Action.SUCCESS.toUpperCase();
     }
 
