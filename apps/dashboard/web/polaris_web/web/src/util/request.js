@@ -64,7 +64,7 @@ const err = async (error) => {
         break
       }
 
-      const data = await service({
+      const response = await service({
         url: accessTokenUrl,
         method: 'get',
       })
