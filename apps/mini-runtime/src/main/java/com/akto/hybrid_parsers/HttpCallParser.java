@@ -1,5 +1,6 @@
 package com.akto.hybrid_parsers;
 
+import com.akto.RuntimeMode;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
@@ -63,6 +64,7 @@ public class HttpCallParser {
 
     private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
     private DataActor dataActor = DataActorFactory.fetchInstance();
+    private Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
 
     public static void init() {
         trafficMetricsExecutor.scheduleAtFixedRate(new Runnable() {
@@ -85,7 +87,13 @@ public class HttpCallParser {
         this.sync_threshold_time = sync_threshold_time;
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
-        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
+        boolean useMap = !(Main.isOnprem || RuntimeMode.isHybridDeployment());
+        apiCollectionsMap = new HashMap<>();
+        List<ApiCollection> apiCollections = dataActor.fetchApiCollections();
+        for (ApiCollection apiCollection: apiCollections) {
+            apiCollectionsMap.put(apiCollection.getId(), apiCollection);
+        }
+        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, useMap, apiCollectionsMap);
     }
     
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {

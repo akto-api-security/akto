@@ -1,5 +1,6 @@
 package com.akto.parsers;
 
+import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.billing.OrganizationsDao;
@@ -24,6 +25,7 @@ import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.JSONUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.Constants;
+import com.akto.util.DbMode;
 import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -56,6 +58,7 @@ public class HttpCallParser {
     private Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap = new HashMap<>();
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
     private static final String trafficMetricsUrl = "https://logs.akto.io/traffic-metrics";
+    private Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
             .writeTimeout(1, TimeUnit.SECONDS)
             .readTimeout(1, TimeUnit.SECONDS)
@@ -86,7 +89,9 @@ public class HttpCallParser {
         this.sync_threshold_time = sync_threshold_time;
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
-        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
+        apiCollectionsMap = ApiCollectionsDao.instance.getApiCollectionsMetaMap();
+        boolean useMap = !(Main.isOnprem || RuntimeMode.isHybridDeployment());
+        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, useMap, apiCollectionsMap);
     }
     
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
@@ -184,9 +189,13 @@ public class HttpCallParser {
             SyncLimit syncLimit = featureAccess.fetchSyncLimit();
 
             numberOfSyncs++;
+            apiCollectionsMap = ApiCollectionsDao.instance.getApiCollectionsMetaMap();
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
-            dependencyAnalyser.dbState = apiCatalogSync.dbState;
-            dependencyAnalyser.syncWithDb();
+            if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
+                dependencyAnalyser.dbState = apiCatalogSync.dbState;
+                dependencyAnalyser.apiCollectionsMap = apiCollectionsMap;
+                dependencyAnalyser.syncWithDb();
+            }
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;

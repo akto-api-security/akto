@@ -5,6 +5,7 @@ import com.akto.dependency.store.BFStore;
 import com.akto.dependency.store.HashSetStore;
 import com.akto.dependency.store.Store;
 import com.akto.dao.DependencyNodeDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.DependencyNode;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
@@ -36,10 +37,12 @@ public class DependencyAnalyser {
 
     Map<Integer, DependencyNode> nodes = new HashMap<>();
     public Map<Integer, APICatalog> dbState = new HashMap<>();
+    public Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
+    private boolean isOnPrem = false;
 
 
-    public DependencyAnalyser(Map<Integer, APICatalog> dbState, boolean useMap) {
-
+    public DependencyAnalyser(Map<Integer, APICatalog> dbState, boolean useMap, Map<Integer, ApiCollection> apiCollectionsMap) {
+        this.apiCollectionsMap = apiCollectionsMap;
         if (useMap) {
             valueStore = new HashSetStore(10_000);
             urlValueStore= new HashSetStore(10_000);
@@ -48,6 +51,7 @@ public class DependencyAnalyser {
             valueStore = new BFStore(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100_000_000, 0.01));
             urlValueStore = new BFStore(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100_000_000, 0.01));
             urlParamValueStore = new BFStore(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100_000_000, 0.01));
+            this.isOnPrem = true;
         }
         this.dbState = dbState;
     }
@@ -62,6 +66,13 @@ public class DependencyAnalyser {
         } catch (Exception e) {
             return;
         }
+
+        ApiCollection apiCollection = apiCollectionsMap.get(finalApiCollectionId);
+        // for on prem customers always run dependency graph
+        // for saas customers, run if flag is set true
+        if (!isOnPrem && (apiCollection == null || !apiCollection.isRunDependencyAnalyser())) return;
+
+        boolean doInterCollectionMatch = apiCollection != null && apiCollection.isMatchDependencyWithOtherCollections();
 
         if (!HttpResponseParams.validHttpResponseCode(responseParams.statusCode)) return;
 
@@ -83,6 +94,7 @@ public class DependencyAnalyser {
 
         String combinedUrl = apiCollectionId + "#" + url + "#" + method;
         boolean isHar = url.startsWith("http");
+        doInterCollectionMatch = !isHar && doInterCollectionMatch;
 
         // different URL variables and corresponding examples. Use accordingly
         // urlWithParams : /api/books/2?user=User1
@@ -142,7 +154,7 @@ public class DependencyAnalyser {
         Map<String, Set<Object>> reqFlattened = JSONUtils.flatten(reqPayload);
 
         for (String requestParam: reqFlattened.keySet()) {
-            processRequestParam(requestParam, reqFlattened.get(requestParam), combinedUrl, false, false, isHar);
+            processRequestParam(requestParam, reqFlattened.get(requestParam), combinedUrl, false, false, doInterCollectionMatch);
         }
 
         if (APICatalog.isTemplateUrl(url)) {
@@ -159,7 +171,7 @@ public class DependencyAnalyser {
                 }
                 Set<Object> val = new HashSet<>();
                 val.add(s);
-                processRequestParam(i+"", val, combinedUrl, true, false, isHar);
+                processRequestParam(i+"", val, combinedUrl, true, false, doInterCollectionMatch);
             }
         }
 
@@ -172,7 +184,7 @@ public class DependencyAnalyser {
                 Map<String,String> cookieMap = AuthPolicy.parseCookie(values);
                 for (String cookieKey: cookieMap.keySet()) {
                     String cookieValue = cookieMap.get(cookieKey);
-                    processRequestParam(cookieKey, new HashSet<>(Collections.singletonList(cookieValue)), combinedUrl, false, true, isHar);
+                    processRequestParam(cookieKey, new HashSet<>(Collections.singletonList(cookieValue)), combinedUrl, false, true, doInterCollectionMatch);
                 }
             } else {
                 Set<Object> valuesSet = new HashSet<>();
@@ -184,23 +196,23 @@ public class DependencyAnalyser {
                         valuesSet.add(v);
                     }
                 }
-                processRequestParam(param, valuesSet, combinedUrl, false, true, isHar);
+                processRequestParam(param, valuesSet, combinedUrl, false, true, doInterCollectionMatch);
             }
 
         }
     }
 
-    private void processRequestParam(String requestParam, Set<Object> reqFlattenedValuesSet, String originalCombinedUrl, boolean isUrlParam, boolean isHeader, boolean isHar) {
+    private void processRequestParam(String requestParam, Set<Object> reqFlattenedValuesSet, String originalCombinedUrl, boolean isUrlParam, boolean isHeader, boolean doInterCollectionMatch) {
         for (Object val : reqFlattenedValuesSet) {
             if (filterValues(val) && valueSeen(val)) {
-                processValueForUrls(requestParam, val, originalCombinedUrl, isUrlParam, isHeader, isHar);
+                processValueForUrls(requestParam, val, originalCombinedUrl, isUrlParam, isHeader, doInterCollectionMatch);
             }
         }
     }
 
-    private void processValueForUrls(String requestParam, Object val, String originalCombinedUrl, boolean isUrlParam, boolean isHeader, boolean isHar) {
+    private void processValueForUrls(String requestParam, Object val, String originalCombinedUrl, boolean isUrlParam, boolean isHeader, boolean doInterCollectionMatch) {
         for (String url : urlsToResponseParam.keySet()) {
-            if (isHar) {
+            if (!doInterCollectionMatch) {
                 // har files should be matched with the endpoints in their collection only
                 String apiCollectionId = url.split("#")[0];
                 String originalApiCollectionId = originalCombinedUrl.split("#")[0];
