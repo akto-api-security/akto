@@ -66,6 +66,16 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         return ApiCollectionsDao.instance.findAll(Filters.in("_id", apiCollectionIds), Projections.exclude("urls"));
     }
 
+    public Map<Integer, ApiCollection> getApiCollectionsMetaMap() {
+        Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
+        List<ApiCollection> metaAll = getMetaAll();
+        for (ApiCollection apiCollection: metaAll) {
+            apiCollectionsMap.put(apiCollection.getId(), apiCollection);
+        }
+
+        return apiCollectionsMap;
+    }
+
     public List<ApiCollection> getMetaAll() {
         return ApiCollectionsDao.instance.findAll(new BasicDBObject(), Projections.exclude("urls"));
     }
