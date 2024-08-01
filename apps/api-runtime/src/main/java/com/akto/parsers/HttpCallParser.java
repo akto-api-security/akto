@@ -90,8 +90,7 @@ public class HttpCallParser {
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
         apiCollectionsMap = ApiCollectionsDao.instance.getApiCollectionsMetaMap();
-        boolean useMap = !(Main.isOnprem || RuntimeMode.isHybridDeployment());
-        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, useMap, apiCollectionsMap);
+        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
     }
     
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
