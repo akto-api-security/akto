@@ -144,14 +144,14 @@ function ApiSingleSchema(props) {
 
 function ApiSchema(props) {
 
-    const { data, badgeActive, setBadgeActive } = props
+    const { data, badgeActive, setBadgeActive, apiInfo } = props
     const navigate = useNavigate()
 
     let reqData = data.filter((item) => item.responseCode === -1)
     let resData = data.filter((item) => item.responseCode !== -1)
 
     const handleBadgeClick = (datatype, position) => {
-        const navUrl = "/dashboard/observe/sensitive/" + datatype.toUpperCase()
+        const navUrl = "/dashboard/observe/sensitive/" + datatype.toUpperCase() + "/" + apiInfo.apiCollectionId + "/" + btoa(apiInfo.url + " " + apiInfo.method)
         navigate(navUrl)
     }
 

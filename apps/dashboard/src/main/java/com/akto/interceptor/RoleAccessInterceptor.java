@@ -41,9 +41,6 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
     private final static String FEATURE_LABEL_STRING = "RBAC_FEATURE";
 
     private boolean checkForPaidFeature(int accountId){
-        if(!DashboardMode.isMetered()){
-            return false;
-        }
         Organization organization = OrganizationsDao.instance.findOne(Filters.in(Organization.ACCOUNTS, accountId));
         if(organization == null || organization.getFeatureWiseAllowed() == null || organization.getFeatureWiseAllowed().isEmpty()){
             return true;
@@ -87,6 +84,10 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 throw new Exception("User not found in session, returning from interceptor");
             }
             int sessionAccId = getUserAccountId(session);
+
+            if(!DashboardMode.isMetered()){
+                return invocation.invoke();
+            }
 
             if(!(checkForPaidFeature(sessionAccId) || featureLabel.equalsIgnoreCase(RbacEnums.Feature.ADMIN_ACTIONS.toString()))){
                 return invocation.invoke();

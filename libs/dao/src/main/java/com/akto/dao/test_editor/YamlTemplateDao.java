@@ -58,6 +58,16 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         return ret;
     }
 
+    public int getNewCustomTemplates(int timestamp){
+        int countOfTemplates = (int) YamlTemplateDao.instance.count(
+            Filters.and(
+                Filters.gt(YamlTemplate.CREATED_AT, timestamp),
+                Filters.ne(YamlTemplate.AUTHOR, "AKTO")
+            )
+        );
+        return countOfTemplates;
+    }
+
     @Override
     public String getCollName() {
         return "yaml_templates";

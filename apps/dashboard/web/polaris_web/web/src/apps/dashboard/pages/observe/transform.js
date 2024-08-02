@@ -416,11 +416,11 @@ const transform = {
     prettifyCollectionsData(newData, isLoading){
         const prettifyData = newData.map((c)=>{
             let calcCoverage = '0%';
-            if(c.endpoints > 0){
-                if(c.endpoints < c.testedEndpoints){
+            if(c.urlsCount > 0){
+                if(c.urlsCount < c.testedEndpoints){
                     calcCoverage= '100%'
                 }else{
-                    calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%'
+                    calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.urlsCount) + '%'
                 }
             }
             const loadingComp = <Text color="subdued" variant="bodyMd">...</Text>
@@ -430,7 +430,6 @@ const transform = {
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: c.displayName,
                 displayNameComp: c.displayNameComp,
-                endpoints: c.endpoints,
                 riskScoreComp: isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
                 coverage: isLoading ? '...' : calcCoverage,
                 issuesArr: isLoading ? loadingComp : this.getIssuesList(c.severityInfo),
@@ -459,7 +458,7 @@ const transform = {
                 return
             }
 
-            totalUrl += c.endpoints ;
+            totalUrl += c.urlsCount ;
             totalTested += c.testedEndpoints;
         })
 
