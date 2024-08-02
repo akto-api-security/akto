@@ -68,25 +68,21 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
             servletRequest.setAttribute("AktoVersionGlobal", InitializerListener.aktoVersion);
         }
         logger.info("in Home::execute: settings IS_SAAS to " + InitializerListener.isSaas);
-        if(accessToken != null) {
-            try {
-                Jws<Claims> jws = JWT.parseJwt(accessToken, "");
-                String username = jws.getBody().get("username").toString();
-                User user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, username));
-                if(user != null && user.getRefreshTokens() != null && !user.getRefreshTokens().isEmpty()){
-                    logger.info("User has refresh tokens, setting up window vars");
-                    ProfileAction.executeMeta1(null, user, servletRequest, servletResponse);
-                }
-            }catch (Exception e){
-                logger.error("Error in parsing access token", e);
-            }
-        }
         if(DashboardMode.isSaasDeployment()){
-            //Use Auth0
+            if(accessToken != null && servletRequest.getAttribute("username") == null) {
+                try {
+                    Jws<Claims> jws = JWT.parseJwt(accessToken, "");
+                    String username = jws.getBody().get("username").toString();
+                    User user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, username));
+                    if(user != null && user.getRefreshTokens() != null && !user.getRefreshTokens().isEmpty()){
+                        logger.info("User has refresh tokens, setting up window vars");
+                        ProfileAction.executeMeta1(null, user, servletRequest, servletResponse);
+                    }
+                }catch (Exception e){
+                    logger.info("Access token expired, unable to set window vars", e);
+                }
+            }
             return redirectToAuth0(servletRequest, servletResponse, accessToken, new BasicDBObject());
-//            if (SUCCESS1 != null) return SUCCESS1;
-//            logger.info("Executed home action for auth0");
-//            return "SUCCESS";
         }
         // Use existing flow
 
