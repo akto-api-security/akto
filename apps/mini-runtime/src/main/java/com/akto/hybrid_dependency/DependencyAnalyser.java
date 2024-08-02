@@ -88,10 +88,12 @@ public class DependencyAnalyser {
         ApiCollection apiCollection = apiCollectionsMap.get(finalApiCollectionId);
         // for on prem customers always run dependency graph
         // for saas customers, run if flag is set true
+        loggerMaker.infoAndAddToDb("checking " + responseParams.requestParams.url + " " + finalApiCollectionId);
         boolean runDependencyAnalyser = apiCollection == null || apiCollection.isRunDependencyAnalyser();
         if (!isOnPrem && (isHybrid && !runDependencyAnalyser)) {
             return;
         }
+        loggerMaker.infoAndAddToDb("Proceeding " + responseParams.requestParams.url);
 
         boolean doInterCollectionMatch = apiCollection != null && apiCollection.isMatchDependencyWithOtherCollections();
 
@@ -226,6 +228,7 @@ public class DependencyAnalyser {
     private void processRequestParam(String requestParam, Set<Object> reqFlattenedValuesSet, String originalCombinedUrl, boolean isUrlParam, boolean isHeader, boolean doInterCollectionMatch) {
         for (Object val : reqFlattenedValuesSet) {
             if (filterValues(val) && valueSeen(val)) {
+                loggerMaker.infoAndAddToDb("processRequestParam");
                 processValueForUrls(requestParam, val, originalCombinedUrl, isUrlParam, isHeader, doInterCollectionMatch);
             }
         }
@@ -244,6 +247,7 @@ public class DependencyAnalyser {
                 if (urlRespVal.startsWith("http")) continue;
             }
             if (!url.equals(originalCombinedUrl) && urlValSeen(url, val)) {
+                loggerMaker.infoAndAddToDb("processValueForUrls");
                 processUrlForParam(url, requestParam, val, originalCombinedUrl, isUrlParam, isHeader);
             }
         }
@@ -252,6 +256,7 @@ public class DependencyAnalyser {
     private void processUrlForParam(String url, String requestParam, Object val, String originalCombinedUrl, boolean isUrlParam, boolean isHeader) {
         for (String responseParam : urlsToResponseParam.get(url)) {
             if (urlParamValueSeen(url, responseParam, val)) {
+                loggerMaker.infoAndAddToDb("processUrlForParam");
                 updateNodesMap(url, responseParam, originalCombinedUrl, requestParam, isUrlParam, isHeader);
             }
         }
