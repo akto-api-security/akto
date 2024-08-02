@@ -89,7 +89,7 @@ public class HttpCallParser {
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
         boolean useMap = !(Main.isOnprem || RuntimeMode.isHybridDeployment());
         apiCollectionsMap = new HashMap<>();
-        List<ApiCollection> apiCollections = dataActor.fetchApiCollections();
+        List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
         for (ApiCollection apiCollection: apiCollections) {
             loggerMaker.infoAndAddToDb("apiCollection: " + apiCollection.getId());
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
@@ -170,7 +170,7 @@ public class HttpCallParser {
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
             numberOfSyncs++;
-            List<ApiCollection> apiCollections = dataActor.fetchApiCollections();
+            List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
             for (ApiCollection apiCollection: apiCollections) {
                 apiCollectionsMap.put(apiCollection.getId(), apiCollection);
             }
