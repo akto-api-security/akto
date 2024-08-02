@@ -175,8 +175,8 @@ public class HttpCallParser {
              */
             if (!pgMerging) {
                 int accountId = Context.accountId.get();
+                pgMerging = true;
                 service.submit(() -> {
-                    pgMerging = true;
                     Context.accountId.set(accountId);
                     try {
                         loggerMaker.infoAndAddToDb("Running merging job for sql");
