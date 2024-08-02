@@ -135,16 +135,22 @@ function ApiDetails(props) {
 
     const isDemergingActive = isDeMergeAllowed();
 
-
     const SchemaTab = {
         id: 'schema',
         content: "Schema",
-        component: paramList.length > 0 && <Box paddingBlockStart={"4"}>
-            <ApiSchema
-                data={paramList}
-                badgeActive={badgeActive}
-                setBadgeActive={setBadgeActive}
-            />
+        component: paramList.length > 0 && <Box paddingBlockStart={"4"}> 
+        <ApiSchema
+            data={paramList} 
+            badgeActive={badgeActive}
+            setBadgeActive={setBadgeActive}
+            apiInfo={
+                {
+                    apiCollectionId: apiDetail.apiCollectionId,
+                    url: apiDetail.endpoint,
+                    method: apiDetail.method
+                }
+            }
+        />
         </Box>
     }
     const ValuesTab = {

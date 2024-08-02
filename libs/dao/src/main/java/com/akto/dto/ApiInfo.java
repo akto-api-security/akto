@@ -2,8 +2,6 @@ package com.akto.dto;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.type.URLMethods;
-import com.akto.dto.type.URLStatic;
-import com.akto.dto.type.URLTemplate;
 import com.akto.util.Util;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;

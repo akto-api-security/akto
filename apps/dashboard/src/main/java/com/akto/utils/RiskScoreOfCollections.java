@@ -232,6 +232,7 @@ public class RiskScoreOfCollections {
     private static void updatesForNewEndpoints(int timeStampFilter){
         List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
         sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+        sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames());
         writeUpdatesForSensitiveInfoInApiInfo(sensitiveInResponse, timeStampFilter);
     }
 

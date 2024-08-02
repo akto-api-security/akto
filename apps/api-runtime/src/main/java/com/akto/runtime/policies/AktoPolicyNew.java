@@ -402,7 +402,7 @@ public class AktoPolicyNew {
             subUpdates.add(Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()));
 
             subUpdates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfo.getId().getApiCollectionId())));
-
+            
             updates.add(
                     new UpdateOneModel<>(
                             ApiInfoDao.getFilter(apiInfo.getId()),
