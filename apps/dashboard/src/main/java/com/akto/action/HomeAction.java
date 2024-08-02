@@ -126,7 +126,7 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
             System.err
                     .println("Couldn't create the AuthenticationController instance. Check the configuration.");
         }
-        return "SUCCESS";
+        return null;
     }
 
     private static boolean checkIfAccessTokenExists(HttpServletRequest servletRequest, String accessToken) {
