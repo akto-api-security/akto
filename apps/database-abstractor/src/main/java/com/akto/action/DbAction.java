@@ -45,6 +45,7 @@ import com.opensymphony.xwork2.ActionSupport;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -88,6 +89,7 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForTrafficInfo;
     List<BulkUpdates> writesForTrafficMetrics;
     List<BulkUpdates> writesForTestingRunIssues;
+    List<DependencyNode> dependencyNodeList;
 
     public List<BulkUpdates> getWritesForTestingRunIssues() {
         return writesForTestingRunIssues;
@@ -1605,6 +1607,25 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String bulkWriteDependencyNodes() {
+        try {
+            System.out.println("bulkWriteDependencyNodes called");
+            DbLayer.bulkWriteDependencyNodes(dependencyNodeList);
+        } catch (Exception e) {
+            String err = "Error bulkWriteDependencyNodes: ";
+            if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
+                StackTraceElement stackTraceElement = e.getStackTrace()[0];
+                err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
+            } else {
+                err = String.format("Err msg: %s\nStackTrace not available", err);
+                e.printStackTrace();
+            }
+            System.out.println(err);
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -2449,6 +2470,14 @@ public class DbAction extends ActionSupport {
 
     public void setLastStiId(String lastStiId) {
         this.lastStiId = lastStiId;
+    }
+
+    public List<DependencyNode> getDependencyNodeList() {
+        return dependencyNodeList;
+    }
+
+    public void setDependencyNodeList(List<DependencyNode> dependencyNodeList) {
+        this.dependencyNodeList = dependencyNodeList;
     }
 
 }

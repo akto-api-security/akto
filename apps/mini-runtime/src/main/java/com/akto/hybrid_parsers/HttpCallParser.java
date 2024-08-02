@@ -1,5 +1,6 @@
 package com.akto.hybrid_parsers;
 
+import com.akto.RuntimeMode;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
@@ -16,6 +17,7 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.parser.SampleParser;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
 import com.akto.hybrid_runtime.MergeLogicLocal;
@@ -24,7 +26,6 @@ import com.akto.util.JSONUtils;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.http_util.CoreHTTPClient;
-import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import okhttp3.*;
@@ -34,6 +35,7 @@ import org.bson.conversions.Bson;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -47,7 +49,7 @@ public class HttpCallParser {
     private final int sync_threshold_time;
     private int sync_count = 0;
     private int last_synced;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class, LogDb.RUNTIME);
     public APICatalogSync apiCatalogSync;
     public DependencyAnalyser dependencyAnalyser;
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
@@ -59,9 +61,13 @@ public class HttpCallParser {
             .readTimeout(1, TimeUnit.SECONDS)
             .callTimeout(1, TimeUnit.SECONDS)
             .build();
+    
+    private static final ExecutorService service = Executors.newFixedThreadPool(1);
+    private static boolean pgMerging = false;
 
     private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
     private DataActor dataActor = DataActorFactory.fetchInstance();
+    private Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
 
     public static void init() {
         trafficMetricsExecutor.scheduleAtFixedRate(new Runnable() {
@@ -84,55 +90,18 @@ public class HttpCallParser {
         this.sync_threshold_time = sync_threshold_time;
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
-        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
+        boolean useMap = !(Main.isOnprem || RuntimeMode.isHybridDeployment());
+        apiCollectionsMap = new HashMap<>();
+        List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
+        for (ApiCollection apiCollection: apiCollections) {
+            apiCollectionsMap.put(apiCollection.getId(), apiCollection);
+        }
+        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
     }
     
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
-
-        //convert java object to JSON format
-        Map<String, Object> json = gson.fromJson(message, Map.class);
-
-        String method = (String) json.get("method");
-        String url = (String) json.get("path");
-        String type = (String) json.get("type");
-        Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(json, "requestHeaders");
-
-        String rawRequestPayload = (String) json.get("requestPayload");
-        String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
-
-
-
-        String apiCollectionIdStr = json.getOrDefault("akto_vxlan_id", "0").toString();
-        int apiCollectionId = 0;
-        if (NumberUtils.isDigits(apiCollectionIdStr)) {
-            apiCollectionId = NumberUtils.toInt(apiCollectionIdStr, 0);
-        }
-
-        HttpRequestParams requestParams = new HttpRequestParams(
-                method,url,type, requestHeaders, requestPayload, apiCollectionId
-        );
-
-        int statusCode = Integer.parseInt(json.get("statusCode").toString());
-        String status = (String) json.get("status");
-        Map<String,List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
-        String payload = (String) json.get("responsePayload");
-        payload = HttpRequestResponseUtils.rawToJsonString(payload, responseHeaders);
-        payload = JSONUtils.parseIfJsonP(payload);
-        int time = Integer.parseInt(json.get("time").toString());
-        String accountId = Context.accountId.get() + "";
-        String sourceIP = (String) json.get("ip");
-
-        String isPendingStr = (String) json.getOrDefault("is_pending", "false");
-        boolean isPending = !isPendingStr.toLowerCase().equals("false");
-        String sourceStr = (String) json.getOrDefault("source", HttpResponseParams.Source.OTHER.name());
-        HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
-        
-        return new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP
-        );
+        return SampleParser.parseSampleMessage(message);
     }
-
-    private static final Gson gson = new Gson();
 
     public static String getHeaderValue(Map<String,List<String>> headers, String headerKey) {
         if (headers == null) return null;
@@ -195,21 +164,44 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-        //  for (HttpResponseParams responseParam: filteredResponseParams) {
-        //      dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
-        //  }
+         for (HttpResponseParams responseParam: filteredResponseParams) {
+             dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+         }
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
             numberOfSyncs++;
+            List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
+            for (ApiCollection apiCollection: apiCollections) {
+                apiCollectionsMap.put(apiCollection.getId(), apiCollection);
+            }
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI);
-            // dependencyAnalyser.dbState = apiCatalogSync.dbState;
-            // dependencyAnalyser.syncWithDb();
+            dependencyAnalyser.dbState = apiCatalogSync.dbState;
+            dependencyAnalyser.syncWithDb();
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
-            MergeLogicLocal.mergingJob(apiCatalogSync.dbState);
+            /*
+             * submit a job only if it is not running.
+             */
+            loggerMaker.infoAndAddToDb("Current pg merging status " + pgMerging);
+            if (!pgMerging) {
+                int accountId = Context.accountId.get();
+                pgMerging = true;
+                service.submit(() -> {
+                    Context.accountId.set(accountId);
+                    try {
+                        loggerMaker.infoAndAddToDb("Running merging job for sql");
+                        MergeLogicLocal.mergingJob(apiCatalogSync.dbState);
+                        loggerMaker.infoAndAddToDb("completed merging job for sql");
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "error in sql merge job");
+                    } finally {
+                        pgMerging = false;
+                    }
+                });
+            }
         }
 
     }
