@@ -30,7 +30,7 @@ public class Token {
                 "Akto",
                 "login",
                 Calendar.MINUTE,
-                2
+                15
         );
         
     }
