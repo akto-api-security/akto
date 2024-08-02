@@ -91,6 +91,7 @@ public class HttpCallParser {
         apiCollectionsMap = new HashMap<>();
         List<ApiCollection> apiCollections = dataActor.fetchApiCollections();
         for (ApiCollection apiCollection: apiCollections) {
+            loggerMaker.infoAndAddToDb("apiCollection: " + apiCollection.getId());
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
         }
         this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);

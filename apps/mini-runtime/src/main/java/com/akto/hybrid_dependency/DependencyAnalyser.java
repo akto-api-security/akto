@@ -90,6 +90,11 @@ public class DependencyAnalyser {
         // for saas customers, run if flag is set true
         loggerMaker.infoAndAddToDb("checking " + responseParams.requestParams.url + " " + finalApiCollectionId);
         boolean runDependencyAnalyser = apiCollection == null || apiCollection.isRunDependencyAnalyser();
+        if (apiCollection != null) {
+            loggerMaker.infoAndAddToDb(apiCollection.isRunDependencyAnalyser()+"");
+        } else {
+            loggerMaker.infoAndAddToDb("api collection null for " + finalApiCollectionId + " " + responseParams.requestParams.getApiCollectionId());
+        }
         if (!isOnPrem && (isHybrid && !runDependencyAnalyser)) {
             return;
         }
