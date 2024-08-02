@@ -173,6 +173,7 @@ public class HttpCallParser {
             /*
              * submit a job only if it is not running.
              */
+            loggerMaker.infoAndAddToDb("Current pg merging status " + pgMerging);
             if (!pgMerging) {
                 int accountId = Context.accountId.get();
                 pgMerging = true;
@@ -184,8 +185,9 @@ public class HttpCallParser {
                         loggerMaker.infoAndAddToDb("completed merging job for sql");
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "error in sql merge job");
+                    } finally {
+                        pgMerging = false;
                     }
-                    pgMerging = false;
                 });
             }
         }
