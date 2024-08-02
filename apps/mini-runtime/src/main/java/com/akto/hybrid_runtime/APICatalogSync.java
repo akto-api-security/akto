@@ -1248,7 +1248,7 @@ public class APICatalogSync {
         List<Object> writesForSampleData = new ArrayList<>();
         List<Object> writesForSensitiveParamInfo = new ArrayList<>();
         Map<Integer, Boolean> apiCollectionToRedactPayload = new HashMap<>();
-        List<ApiCollection> all = dataActor.fetchApiCollections();
+        List<ApiCollection> all = dataActor.fetchAllApiCollectionsMeta();
         for(ApiCollection apiCollection: all) {
             apiCollectionToRedactPayload.put(apiCollection.getId(), apiCollection.getRedact());
         }
