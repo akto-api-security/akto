@@ -99,7 +99,7 @@ public class AllMetrics {
 
     public static AllMetrics instance = new AllMetrics();
 
-    private static final String URL = "http://logs.akto.io/ingest-metrics";
+    private static final String URL = "https://logs.akto.io/ingest-metrics";
 
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
             .writeTimeout(1, TimeUnit.SECONDS)

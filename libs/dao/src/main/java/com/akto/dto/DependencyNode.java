@@ -253,6 +253,9 @@ public class DependencyNode {
 
 
     public String getHexId() {
+        if (this.id == null) {
+            return null;
+        }
         return this.id.toHexString();
     }
 

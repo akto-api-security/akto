@@ -197,7 +197,7 @@ public class APICatalogSync {
             Set<HttpResponseParams> value = entry.getValue();
             for (HttpResponseParams responseParams: value) {
                 try {
-                    aktoPolicyNew.process(responseParams, partnerIpList);
+                    aktoPolicyNew.process(responseParams);
                 } catch (Exception e) {
                     e.printStackTrace();
                     throw new RuntimeException(e);
@@ -697,12 +697,12 @@ public class APICatalogSync {
 
                 RequestTemplate strictMatch = dbCatalog.getStrictURLToMethods().get(url);
                 if (strictMatch != null) {
-                    AllMetrics.instance.setDeltaCatalogTotalCount(1);
                     Map<URLStatic, RequestTemplate> deltaCatalogStrictURLToMethods = deltaCatalog.getStrictURLToMethods();
                     RequestTemplate requestTemplate = deltaCatalogStrictURLToMethods.get(url);
                     if (DataControlFetcher.discardOldApi()) {
                         iterator.remove();
                     } else {
+                        AllMetrics.instance.setDeltaCatalogTotalCount(1);
                         if (requestTemplate == null) {
                             requestTemplate = strictMatch.copy(); // to further process the requestTemplate
                             deltaCatalogStrictURLToMethods.put(url, requestTemplate);
@@ -1240,7 +1240,6 @@ public class APICatalogSync {
     static int lastBuildFromDb = 0;
     final static int DB_REFRESH_CYCLE = 15 * 60; // 15 minutes
 
-    List<String> partnerIpList = new ArrayList<>();
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
         List<Object> writesForParams = new ArrayList<>();
@@ -1249,14 +1248,13 @@ public class APICatalogSync {
         List<Object> writesForSampleData = new ArrayList<>();
         List<Object> writesForSensitiveParamInfo = new ArrayList<>();
         Map<Integer, Boolean> apiCollectionToRedactPayload = new HashMap<>();
-        List<ApiCollection> all = dataActor.fetchApiCollections();
+        List<ApiCollection> all = dataActor.fetchAllApiCollectionsMeta();
         for(ApiCollection apiCollection: all) {
             apiCollectionToRedactPayload.put(apiCollection.getId(), apiCollection.getRedact());
         }
 
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         if (accountSettings != null) {
-            partnerIpList = accountSettings.getPartnerIpList();
             int acc = accountSettings.getId();
             Context.accountId.set(acc);
         }
@@ -1385,6 +1383,7 @@ public class APICatalogSync {
                                 id.getMethod().name(), id.getUrl(), id.getResponseCode(), now, accountId);
                         unfilteredSamples.add(sampleDataAlt);
                         sampleIds.add(uuid.toString());
+
                     }
                     finalSamples.add(redactedSample);
                 } catch (Exception e) {
