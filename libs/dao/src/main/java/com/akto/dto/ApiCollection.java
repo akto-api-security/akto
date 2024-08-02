@@ -303,6 +303,10 @@ public class ApiCollection {
         return runDependencyAnalyser;
     }
 
+    public boolean getRunDependencyAnalyser() {
+        return runDependencyAnalyser;
+    }
+
     public void setRunDependencyAnalyser(boolean runDependencyAnalyser) {
         this.runDependencyAnalyser = runDependencyAnalyser;
     }
