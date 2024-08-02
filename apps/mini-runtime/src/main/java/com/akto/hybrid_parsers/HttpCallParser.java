@@ -35,6 +35,7 @@ import org.bson.conversions.Bson;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -48,7 +49,7 @@ public class HttpCallParser {
     private final int sync_threshold_time;
     private int sync_count = 0;
     private int last_synced;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class, LogDb.RUNTIME);
     public APICatalogSync apiCatalogSync;
     public DependencyAnalyser dependencyAnalyser;
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
@@ -60,6 +61,9 @@ public class HttpCallParser {
             .readTimeout(1, TimeUnit.SECONDS)
             .callTimeout(1, TimeUnit.SECONDS)
             .build();
+    
+    private static final ExecutorService service = Executors.newFixedThreadPool(1);
+    private static boolean pgMerging = false;
 
     private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
     private DataActor dataActor = DataActorFactory.fetchInstance();
@@ -178,7 +182,26 @@ public class HttpCallParser {
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
-            MergeLogicLocal.mergingJob(apiCatalogSync.dbState);
+            /*
+             * submit a job only if it is not running.
+             */
+            loggerMaker.infoAndAddToDb("Current pg merging status " + pgMerging);
+            if (!pgMerging) {
+                int accountId = Context.accountId.get();
+                pgMerging = true;
+                service.submit(() -> {
+                    Context.accountId.set(accountId);
+                    try {
+                        loggerMaker.infoAndAddToDb("Running merging job for sql");
+                        MergeLogicLocal.mergingJob(apiCatalogSync.dbState);
+                        loggerMaker.infoAndAddToDb("completed merging job for sql");
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "error in sql merge job");
+                    } finally {
+                        pgMerging = false;
+                    }
+                });
+            }
         }
 
     }
