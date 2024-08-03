@@ -9,6 +9,7 @@ import com.akto.dto.test_editor.Strategy;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.test_editor.execution.Memory;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 
 import java.util.Collections;
 import java.util.ArrayList;
@@ -50,14 +51,18 @@ public abstract class SecurityTestTemplate {
     }
 
     private YamlTestResult getResultWithError(String errorMessage, boolean requiresConfig){
+        return getResultWithError(Collections.singletonList(errorMessage), requiresConfig);
+    }
+
+    private YamlTestResult getResultWithError(List<String> errorMessages, boolean requiresConfig){
         List<GenericTestResult> testResults = new ArrayList<>();
-        TestResult testResult = new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(errorMessage), 0, false, TestResult.Confidence.HIGH, null);
+        TestResult testResult = new TestResult(null, rawApi.getOriginalMessage(), errorMessages, 0, false, TestResult.Confidence.HIGH, null);
         testResult.setRequiresConfig(requiresConfig);
         testResults.add(testResult);
         return new YamlTestResult(testResults, null);
     }
 
-    public abstract boolean filter();
+    public abstract ValidationResult filter();
 
     public abstract Set<String> requireConfig();
 
@@ -78,9 +83,13 @@ public abstract class SecurityTestTemplate {
             return getResultWithError(missingConfigs + " " + ROLE_NOT_FOUND.getMessage(), true);
         }
         
-        boolean valid = filter();
+        ValidationResult validationResult = filter();
+        boolean valid = validationResult.getIsValid();
         if (!valid) {
-            return getResultWithError(SKIPPING_EXECUTION_BECAUSE_FILTERS.getMessage(), false);
+            List<String> errorList = new ArrayList<>();
+            errorList.add(SKIPPING_EXECUTION_BECAUSE_FILTERS.getMessage());
+            errorList.add(validationResult.getValidationReason().replaceFirst("and:", "detailed reason for skipping execution:\n").replaceAll("\n\t","\n"));
+            return getResultWithError(errorList, false);
         }
         valid = checkAuthBeforeExecution(debug, testLogs);
         if (!valid) {
