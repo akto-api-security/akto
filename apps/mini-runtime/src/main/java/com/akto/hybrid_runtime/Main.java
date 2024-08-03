@@ -159,7 +159,7 @@ public class Main {
             loggerMaker.infoAndAddToDb("is_kubernetes: true", LogDb.RUNTIME);
             kafkaBrokerUrl = "127.0.0.1:29092";
         }
-        String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
+        String groupIdConfig =  "akto.api.logs";
         String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
         boolean syncImmediately = false;
         boolean fetchAllSTI = true;
@@ -170,7 +170,7 @@ public class Main {
             syncImmediately = true;
             fetchAllSTI = false;
         }
-        int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
+        int maxPollRecordsConfig = 10;
 
         AccountSettings aSettings = dataActor.fetchAccountSettings();
         if (aSettings == null) {

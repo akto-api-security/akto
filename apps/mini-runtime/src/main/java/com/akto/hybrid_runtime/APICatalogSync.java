@@ -1,12 +1,14 @@
 package com.akto.hybrid_runtime;
 
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.sql.SampleDataAlt;
@@ -18,6 +20,7 @@ import com.akto.dto.type.SingleTypeInfo.Domain;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
@@ -26,7 +29,12 @@ import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
 import com.akto.types.CappedSet;
+import com.akto.usage.UsageMetricCalculator;
+import com.akto.usage.UsageMetricHandler;
 import com.akto.utils.RedactSampleData;
+import com.google.api.client.util.Charsets;
+import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
@@ -48,13 +56,14 @@ public class APICatalogSync {
     public int thresh;
     public String userIdentifier;
     private static final Logger logger = LoggerFactory.getLogger(APICatalogSync.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class, LogDb.RUNTIME);
     public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
     public AktoPolicyNew aktoPolicyNew;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
     public static boolean mergeAsyncOutside = true;
     public int lastStiFetchTs = 0;
+    public BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
 
     private DataActor dataActor = DataActorFactory.fetchInstance();
 
@@ -1073,13 +1082,18 @@ public class APICatalogSync {
         loggerMaker.infoAndAddToDb("Started building from dB with calcDiff " + calcDiff + " fetchAllSTI: " + fetchAllSTI, LogDb.RUNTIME);
         loggerMaker.infoAndAddToDb("Fetching STIs: " + fetchAllSTI, LogDb.RUNTIME);
         List<SingleTypeInfo> allParams;
+        existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
+        /*
+         * This fetches all STIs in batches of 100, filtered by host headers.
+         * Since they are filtered by host header, APIs in the default collection will not be present here.
+         */
         allParams = dataActor.fetchAllStis();
         if (allParams.size() > 0) {
             lastStiFetchTs = allParams.get(allParams.size() - 1).getTimestamp();
         }
         loggerMaker.infoAndAddToDb("Fetched STIs count: " + allParams.size(), LogDb.RUNTIME);
         loggerMaker.infoAndAddToDb("Starting building dbState", LogDb.RUNTIME);
-        this.dbState = build(allParams);
+        this.dbState = build(allParams, existingAPIsInDb);
         loggerMaker.infoAndAddToDb("Done building dbState", LogDb.RUNTIME);
 
         // todo: discuss
@@ -1219,13 +1233,13 @@ public class APICatalogSync {
         keyTypes.getOccurrences().put(param.getSubType(), param);
     }
 
-
-    private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams) {
+    private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams, BloomFilter<CharSequence> existingAPIsInDb) {
         Map<Integer, APICatalog> ret = new HashMap<>();
         
         for (SingleTypeInfo param: allParams) {
             try {
                 buildHelper(param, ret);
+                fillExistingAPIsInDb(param, existingAPIsInDb);
             } catch (Exception e) {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb("Error while building from db: " + e.getMessage(), LogDb.RUNTIME);
@@ -1235,12 +1249,25 @@ public class APICatalogSync {
         return ret;
     }
 
+    private static Set<Integer> demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
+
+    private static void fillExistingAPIsInDb(SingleTypeInfo sti, BloomFilter<CharSequence> existingAPIsInDb) {
+        demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
+        if (demosAndDeactivatedCollections.contains(sti.getApiCollectionId())) {
+            return;
+        }
+        String key = sti.composeApiInfoKey();
+        if (key != null) {
+            existingAPIsInDb.put(key);
+        }
+    }
+
     int counter = 0;
     
     static int lastBuildFromDb = 0;
     final static int DB_REFRESH_CYCLE = 15 * 60; // 15 minutes
 
-    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {
+    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit syncLimit) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
         List<Object> writesForParams = new ArrayList<>();
         List<Object> writesForSensitiveSampleData = new ArrayList<>();
@@ -1268,6 +1295,54 @@ public class APICatalogSync {
         counter++;
         for(int apiCollectionId: this.delta.keySet()) {
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
+
+            if (syncLimit.checkLimit && !demosAndDeactivatedCollections.contains(apiCollectionId)) {
+
+                int deltaUsage = 0;
+                Iterator<Entry<URLStatic, RequestTemplate>> staticUrlIterator = deltaCatalog.getStrictURLToMethods().entrySet().iterator();
+                while (staticUrlIterator.hasNext()) {
+                    Entry<URLStatic, RequestTemplate> entry = staticUrlIterator.next();
+                    URLStatic urlStatic = entry.getKey();
+                    String checkString = apiCollectionId + " " + urlStatic.getFullString();
+                    if (!existingAPIsInDb.mightContain(checkString)) {
+                        if (syncLimit.updateUsageLeftAndCheckSkip()) {
+                            staticUrlIterator.remove();
+                        } else {
+                            existingAPIsInDb.put(checkString);
+                            deltaUsage++;
+                        }
+                    }
+                }
+
+                Iterator<Entry<URLTemplate, RequestTemplate>> templateUrlIterator = deltaCatalog.getTemplateURLToMethods().entrySet().iterator();
+                while(templateUrlIterator.hasNext()) {
+                    Entry<URLTemplate, RequestTemplate> entry = templateUrlIterator.next();
+                    URLTemplate urlTemplate = entry.getKey();
+                    String checkString = apiCollectionId + " " + urlTemplate.getTemplateString() + " "
+                            + urlTemplate.getMethod().name();
+                    if (!existingAPIsInDb.mightContain(checkString)) {
+                        if (syncLimit.updateUsageLeftAndCheckSkip()) {
+                            templateUrlIterator.remove();
+                        } else {
+                            existingAPIsInDb.put(checkString);
+                            deltaUsage++;
+                        }
+                    }
+                }
+
+                UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get(), deltaUsage);
+            }
+
+            /*
+             * Note: Since multiple runtime-instances are running simultaneously, all of
+             * them would get the same limit (say 5) and insert up to 5 new APIs each. This
+             * would cause an overage of roughly (n-1)*(5) endpoints, where n is no. of
+             * runtime instances, after which no new endpoints would be inserted.
+             * We can mitigate this minimal overage using DB lock, at organization level (we
+             * currently have db lock at account level), but are holding as it may
+             * slow the runtime instance.
+             */
+
             APICatalog dbCatalog = this.dbState.getOrDefault(apiCollectionId, new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>()));
             boolean redactCollectionLevel = apiCollectionToRedactPayload.getOrDefault(apiCollectionId, false);
 

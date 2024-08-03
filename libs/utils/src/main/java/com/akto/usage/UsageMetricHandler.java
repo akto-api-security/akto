@@ -42,6 +42,8 @@ public class UsageMetricHandler {
                 Updates.set(Organization.FEATURE_WISE_ALLOWED, organization.getFeatureWiseAllowed()));
     }
 
+    // public static Organization recalcOrganization
+
     public static FeatureAccess calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes metricType, int accountId, int deltaUsage) {
         FeatureAccess featureAccess = FeatureAccess.fullAccess;
 

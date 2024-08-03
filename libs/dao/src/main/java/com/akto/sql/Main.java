@@ -16,14 +16,14 @@ import com.akto.dto.sql.SampleDataAlt;
 public class Main {
 
     final static String connectionUri = 
-    System.getenv("POSTGRES_URL");
-    // "jdbc:postgresql://localhost:5432/shivansh";
+    // System.getenv("POSTGRES_URL");
+    "jdbc:postgresql://192.168.1.6:5432/shivansh";
     final static String user = 
-    System.getenv("POSTGRES_USER");
-    // "shivansh";
+    // System.getenv("POSTGRES_USER");
+    "shivansh";
     final static String password = 
-    System.getenv("POSTGRES_PASSWORD");
-    // "example";
+    // System.getenv("POSTGRES_PASSWORD");
+    "example";
 
     public static void main(String args[]) {
 
@@ -66,7 +66,7 @@ public class Main {
         // ids.add("f475af40-b533-409c-8def-f7d818be880f");
         // ids.add("0e83a826-369c-4a34-99ee-0c6bce494e1c");
 
-        // SampleDataAltDb.delete(ids, 1718426392);
+        SampleDataAltDb.runCommand("SELECT COUNT(1) FROM sampledata02;");
             // SampleDataAltDb.deleteOld();
             
         } catch (Exception e) {

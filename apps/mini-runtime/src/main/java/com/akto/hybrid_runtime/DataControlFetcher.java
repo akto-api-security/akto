@@ -1,6 +1,7 @@
 package com.akto.hybrid_runtime;
 
 import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.sql.SampleDataAltDb;
 import org.apache.commons.lang3.StringUtils;
@@ -16,6 +17,11 @@ public class DataControlFetcher {
     public DataControlFetcher() {}
     public static DataControlSettings get() {
         return dataControlSettings;
+    }
+    
+    public static final DataActor dataActor = DataActorFactory.fetchInstance();
+    public static void main(String[] args) {
+        DataControlFetcher.init(dataActor);
     }
 
     public static final ScheduledExecutorService es = Executors.newScheduledThreadPool(1);

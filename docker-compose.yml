@@ -2,14 +2,14 @@ version: '3.3'
 
 services:
 
-  mongo:
-    container_name: mongo
-    image: mongo:6.0.1
-    restart: on-failure:10
-    volumes:
-      - mongodata:/data/db
-    ports:
-      - "27017:27017"
+  # mongo:
+  #   container_name: mongo
+  #   image: mongo:6.0.1
+  #   restart: on-failure:10
+  #   volumes:
+  #     - mongodata:/data/db
+  #   ports:
+  #     - "27017:27017"
 
   # akto-api-security-dashboard:
   #   image: coastaldemigod/dashboard
@@ -63,7 +63,7 @@ services:
       - "29092:29092"
       - "9999:9999"
     environment:
-      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_EXTERNAL_DIFFHOST://10.191.63.199:9092, LISTENER_DOCKER_INTERNAL://akto-kafka1-1:19092,LISTENER_DOCKER_EXTERNAL_LOCALHOST://localhost:29092
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_EXTERNAL_DIFFHOST://192.168.1.6:9092, LISTENER_DOCKER_INTERNAL://kafka1:19092,LISTENER_DOCKER_EXTERNAL_LOCALHOST://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_EXTERNAL_DIFFHOST:PLAINTEXT, LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL_LOCALHOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
       KAFKA_ZOOKEEPER_CONNECT: "zoo1:2181"
@@ -87,7 +87,7 @@ services:
       com.centurylinklabs.watchtower.enable: "false"
 
   akto-api-security-runtime:
-    image: aktosecurity/mini-runtime:feature_mini_runtime_improved
+    image: aktosecurity/mini-runtime:latest
     env_file: ./docker.env
     mem_limit: 8g    
     restart: always
@@ -111,8 +111,8 @@ services:
   #   ports: 
   #     - "9000:8080"
 
-volumes:
-  mongodata:
+# volumes:
+#   mongodata:
   
 
   # akto-hello-world:

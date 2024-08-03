@@ -5,11 +5,11 @@ public enum RuntimeMode {
     NORMAL, HYBRID;
 
     public static RuntimeMode getRuntimeMode(){
-        String runtimeMode = System.getenv("RUNTIME_MODE");
-        if("hybrid".equalsIgnoreCase(runtimeMode)){
+        // String runtimeMode = System.getenv("RUNTIME_MODE");
+        // if("hybrid".equalsIgnoreCase(runtimeMode)){
             return HYBRID;
-        }
-        return NORMAL;
+        // }
+        // return NORMAL;
     }
 
     public static boolean isHybridDeployment(){

@@ -2918,7 +2918,7 @@ public class ClientActor extends DataActor {
     public static final String AUTHORIZATION = "Authorization";
 
     public static String getAuthToken() {
-        return System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        return "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoiaW52aXRlX3VzZXIiLCJhY2NvdW50SWQiOjE2ODk3OTQ1MTYsImlhdCI6MTcyMjU4NjYzOCwiZXhwIjoxNzM4NDg0MjM4fQ.nNGyJ-OiqxnLxF9yFum4vRr-0_MthwwBv79OznQ6IXZWrh1nDN6Tk0J6hh9xZywmyzji3vJbqHzUpvjo-e7TLQ44NJtaxX49vPuyMqLcmpVVnYUDtan1qf5nXRB4eS4h26zWYkUjF0oE0IuxT4dh1661xYFHU3ZPKwpNR_UOrX8hjoe-EA-LaCcL0rNCtGDcounxdT27ucoHSTtH1o_dEkLPYfOhye6d0sLY-JK8JoFINZDZIWN4tYJJtikMXx5l54PnT_QypUiuMGDAxYC16iu_0MQoGOyElZf1oQ40J8G_EZ1uZOXVGEWAjyNptogkMbpxQP0jvyjDwzl_ko8ltA";
     }
 
     public static boolean checkAccount() {
