@@ -76,6 +76,11 @@ public class MergeLogicLocal {
 
             Set<URLTemplate> templateUrls = apiCatalog.getTemplateURLToMethods().keySet();
 
+            if(templateUrls == null || templateUrls.isEmpty()){
+                loggerMaker.infoAndAddToDb(String.format("Skipping for apiCollectionId %d no templates found", apiCollectionId));
+                continue;
+            }
+
             int skip = 0;
             while (true) {
                 loggerMaker.infoAndAddToDb(String.format("Running for apiCollectionId %d with skip %d", apiCollectionId, skip));
