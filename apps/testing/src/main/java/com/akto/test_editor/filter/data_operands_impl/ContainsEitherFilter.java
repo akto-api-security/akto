@@ -3,6 +3,7 @@ package com.akto.test_editor.filter.data_operands_impl;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 
 public class ContainsEitherFilter extends DataOperandsImpl {
@@ -35,7 +36,7 @@ public class ContainsEitherFilter extends DataOperandsImpl {
         if (result) {
             return new ValidationResult(result, "");
         }
-        return new ValidationResult(result, "contains_either failed due to '"+data+"' not matching with :" + notMatchedQuerySet);
+        return new ValidationResult(result, TestEditorEnums.DataOperands.CONTAINS_EITHER.name().toLowerCase() + " failed due to '"+data+"' not matching with :" + notMatchedQuerySet);
     }
 
     public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {

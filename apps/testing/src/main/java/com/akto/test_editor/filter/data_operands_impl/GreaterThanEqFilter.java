@@ -1,5 +1,6 @@
 package com.akto.test_editor.filter.data_operands_impl;
 
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.test_editor.Utils;
 
@@ -14,9 +15,9 @@ public class GreaterThanEqFilter extends DataOperandsImpl {
         result = Utils.applyIneqalityOperation(data, querySet, "gte");
         String validationReson = null;
         if (result) {
-            validationReson = "'gte' filter passed";
+            validationReson = TestEditorEnums.DataOperands.GTE.name().toLowerCase() + " filter passed";
         } else {
-            validationReson = "'gte' filter failed: '"+ data +"' < '" + querySet +"'";
+            validationReson = TestEditorEnums.DataOperands.GTE.name().toLowerCase() + " filter failed: '"+ data +"' < '" + querySet +"'";
         }
 
         return new ValidationResult(result, validationReson);

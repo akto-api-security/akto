@@ -3,6 +3,7 @@ package com.akto.test_editor.filter.data_operands_impl;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 
 public class ContainsAllFilter extends DataOperandsImpl {
@@ -36,7 +37,7 @@ public class ContainsAllFilter extends DataOperandsImpl {
         if (result) {
             return new ValidationResult(result, "");
         }
-        return new ValidationResult(result, "contains_all failed due to '"+data+"' not matching with :" + notMatchedQuerySet);
+        return new ValidationResult(result, TestEditorEnums.DataOperands.CONTAINS_ALL.name().toLowerCase() + " failed due to '"+data+"' not matching with :" + notMatchedQuerySet);
     }
 
     public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {

@@ -88,7 +88,7 @@ public abstract class SecurityTestTemplate {
         if (!valid) {
             List<String> errorList = new ArrayList<>();
             errorList.add(SKIPPING_EXECUTION_BECAUSE_FILTERS.getMessage());
-            errorList.add(validationResult.getValidationReason());
+            errorList.add(validationResult.getValidationReason().replace("and:", "detailed reason for skipping execution:\n").replaceAll("\n\t","\n"));
             return getResultWithError(errorList, false);
         }
         valid = checkAuthBeforeExecution(debug, testLogs);

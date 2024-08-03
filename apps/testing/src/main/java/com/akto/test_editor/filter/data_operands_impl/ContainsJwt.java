@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.dto.type.KeyTypes;
 
@@ -41,12 +42,12 @@ public class ContainsJwt extends DataOperandsImpl {
         }
         if (queryVal == result) {
             return new ValidationResult(true,
-                    queryVal? "contains_jwt: true passed because key:"+ jwtKeyType+" is jwt type":
-                            "contains_jwt: false passed because no jwt type found");
+                    queryVal? TestEditorEnums.DataOperands.CONTAINS_JWT.name().toLowerCase() + ": true passed because key:"+ jwtKeyType+" is jwt type":
+                            TestEditorEnums.DataOperands.CONTAINS_JWT.name().toLowerCase() + ": false passed because no jwt type found");
         }
         if (queryVal) {
-            return new ValidationResult(false, "contains_jwt: true failed because no jwt type found");
+            return new ValidationResult(false, TestEditorEnums.DataOperands.CONTAINS_JWT.name().toLowerCase() + ": true failed because no jwt type found");
         }
-        return new ValidationResult(false, "contains_jwt: false failed because key:"+ jwtKeyType+" is jwt type");
+        return new ValidationResult(false, TestEditorEnums.DataOperands.CONTAINS_JWT.name().toLowerCase() + ": false failed because key:"+ jwtKeyType+" is jwt type");
     }
 }

@@ -3,6 +3,7 @@ package com.akto.test_editor.filter.data_operands_impl;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.test_editor.Utils;
 
@@ -31,9 +32,9 @@ public class RegexFilter extends DataOperandsImpl {
         }
         String validationString = null;
         if (result) {
-            validationString = "'regex' filter passed";
+            validationString = TestEditorEnums.DataOperands.REGEX.name().toLowerCase() + " filter passed";
         } else {
-            validationString = "'regex' filter failed due to '" + data + "' not matching for - " + querySet;;
+            validationString = TestEditorEnums.DataOperands.REGEX.name().toLowerCase() + " filter failed due to '" + data + "' not matching for - " + querySet;;
         }
         return new ValidationResult(result, validationString);
     }

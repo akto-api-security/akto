@@ -3,6 +3,7 @@ package com.akto.test_editor.filter.data_operands_impl;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 
 public class NotContainsFilter extends DataOperandsImpl {
@@ -34,9 +35,9 @@ public class NotContainsFilter extends DataOperandsImpl {
             result = result && res;
         }
         if (result) {
-            validationString = "not_contains filter passed";
+            validationString = TestEditorEnums.DataOperands.NOT_CONTAINS.name().toLowerCase() + " filter passed";
         } else {
-            validationString = "not_contains filter failed due to '" + data + "' not matching with: " + failedQueryString;
+            validationString = TestEditorEnums.DataOperands.NOT_CONTAINS.name().toLowerCase() + " filter failed due to '" + data + "' not matching with: " + failedQueryString;
         }
         return new ValidationResult(result, validationString);
     }

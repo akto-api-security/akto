@@ -3,6 +3,7 @@ package com.akto.test_editor.filter.data_operands_impl;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.test_editor.Utils;
 
@@ -29,9 +30,9 @@ public class SsrfUrlHitFilter extends DataOperandsImpl {
         }
         String validationString;
         if (result) {
-            validationString = "ssrf_url_hit filter passed";
+            validationString = TestEditorEnums.PredicateOperator.SSRF_URL_HIT.name().toLowerCase() + " filter passed";
         } else {
-            validationString = "ssrf_url_hit filter failed due to - " + querySet;;
+            validationString = TestEditorEnums.PredicateOperator.SSRF_URL_HIT.name().toLowerCase() + " filter failed due to - " + querySet;;
         }
         return new ValidationResult(result, validationString);
     }
