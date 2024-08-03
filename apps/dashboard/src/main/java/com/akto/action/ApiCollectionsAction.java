@@ -96,6 +96,13 @@ public class ApiCollectionsAction extends UserAction {
                 }
                 apiCollection.setUrlsCount(count);
             } else {
+                /*
+                 * In case the default collection is filled by traffic-collector traffic, 
+                 * the count will not be null, but the fallbackCount would be zero
+                 */
+                if (apiCollectionId == 0 && count != null) {
+                    fallbackCount = count;
+                }
                 apiCollection.setUrlsCount(fallbackCount);
             }
 
