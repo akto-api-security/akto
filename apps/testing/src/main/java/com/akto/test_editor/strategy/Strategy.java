@@ -6,6 +6,7 @@ import java.util.List;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
@@ -54,10 +55,9 @@ public class Strategy {
             List<String> result = new ArrayList<>();
             result.add(harPayload);
     
-            ApiCollection sameNameCollection = ApiCollectionsDao.instance.findByName(AKTO_DISCOVERED_APIS_COLLECTION);
+            ApiCollection sameNameCollection = DataActorFactory.fetchInstance().findApiCollectionByName(AKTO_DISCOVERED_APIS_COLLECTION);
             if (sameNameCollection == null){
-                ApiCollection apiCollection = new ApiCollection(AKTO_DISCOVERED_APIS_COLLECTION_ID, AKTO_DISCOVERED_APIS_COLLECTION, Context.now(),new HashSet<>(), null, AKTO_DISCOVERED_APIS_COLLECTION_ID, false, true);
-                ApiCollectionsDao.instance.insertOne(apiCollection);
+                DataActorFactory.fetchInstance().insertApiCollection(AKTO_DISCOVERED_APIS_COLLECTION_ID, AKTO_DISCOVERED_APIS_COLLECTION);
             }
 
             InsertDataUtil.insertDataInApiCollection(AKTO_DISCOVERED_APIS_COLLECTION_ID, harPayload, result, result);    

@@ -25,6 +25,8 @@ public class Main {
     System.getenv("POSTGRES_PASSWORD");
     // "example";
 
+    public static boolean IS_PG_DB_USED = false;
+
     public static void main(String args[]) {
 
         // DataSource ds = createDataSource();
@@ -95,7 +97,8 @@ public class Main {
         final PGSimpleDataSource dataSource = new PGSimpleDataSource();
         if (connectionUri == null || user == null || password == null) {
             return dataSource;
-        }
+        } 
+        IS_PG_DB_USED = true;
         dataSource.setUrl(url);
         dataSource.setUser(user);
         dataSource.setPassword(password);

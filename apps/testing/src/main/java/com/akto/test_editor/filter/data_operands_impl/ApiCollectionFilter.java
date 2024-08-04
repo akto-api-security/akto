@@ -2,6 +2,7 @@ package com.akto.test_editor.filter.data_operands_impl;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
@@ -30,8 +31,7 @@ public class ApiCollectionFilter extends DataOperandsImpl {
             return result;
         }
 
-        Bson fQuery = Filters.in(ApiCollection.NAME, querySet);
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(fQuery);
+        List<ApiCollection> apiCollections = DataActorFactory.fetchInstance().findApiCollections(querySet);
         List<Integer> apiCollectionIds = new ArrayList<>();
         for(ApiCollection apiCollection: apiCollections) {
             apiCollectionIds.add(apiCollection.getId());
@@ -47,13 +47,8 @@ public class ApiCollectionFilter extends DataOperandsImpl {
             // eat it
         }
 
-        Bson urlInCollectionQuery = Filters.and(
-            Filters.in(ApiInfo.COLLECTION_IDS, apiCollectionIds),
-            Filters.in(ApiInfo.ID_URL, urls)
-        );
-
-
-        result = ApiInfoDao.instance.findOne(urlInCollectionQuery) != null;
+        
+        result = DataActorFactory.fetchInstance().apiInfoExists(apiCollectionIds, urls);
 
         return result;
     }

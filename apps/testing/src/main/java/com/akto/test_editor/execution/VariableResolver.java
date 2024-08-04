@@ -15,6 +15,7 @@ import org.bson.conversions.Bson;
 
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.HttpRequestParams;
@@ -489,28 +490,15 @@ public class VariableResolver {
                 continue;
             }
 
-            Bson filters = Filters.and(
-                Filters.eq("apiCollectionId", infoKey.getApiCollectionId()),
-                Filters.or(
-                    Filters.regex("param", key),
-                    Filters.regex("param", key.toLowerCase())
-                    )
-            );
-
-            List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filters, Projections.include("url", "method"));
+            List<SingleTypeInfo> singleTypeInfos = DataActorFactory.fetchInstance().fetchMatchParamSti(infoKey.getApiCollectionId(), key);
 
             for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
                 ApiInfo.ApiInfoKey infKey = new ApiInfo.ApiInfoKey(infoKey.getApiCollectionId(), singleTypeInfo.getUrl(), URLMethods.Method.fromString(singleTypeInfo.getMethod()));
                 if (infKey.equals(infoKey)) {
                     continue;
                 }
-                Bson sdfilters = Filters.and(
-                    Filters.eq("_id.apiCollectionId", infoKey.getApiCollectionId()),
-                    Filters.eq("_id.method", singleTypeInfo.getMethod()),
-                    Filters.in("_id.url", singleTypeInfo.getUrl())
-                );
 
-                SampleData sd = SampleDataDao.instance.findOne(sdfilters);
+                SampleData sd = DataActorFactory.fetchInstance().fetchSampleDataByIdMethod(infoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
                 newSampleDataMap.put(infKey, sd.getSamples());
 
             }
@@ -562,28 +550,15 @@ public class VariableResolver {
                     allApis = Objects.equals(m.get("all_apis"), true);
                 }
 
-                Bson filters = Filters.and(
-                    Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
-                    Filters.or(
-                        Filters.regex("param", key.toString()),
-                        Filters.regex("param", key.toString().toLowerCase())
-                        )
-                );
-
-                List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filters, Projections.include("url", "method"));
+                List<SingleTypeInfo> singleTypeInfos = DataActorFactory.fetchInstance().fetchMatchParamSti(apiInfoKey.getApiCollectionId(), key.toString());
 
                 for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
                     ApiInfo.ApiInfoKey infKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), singleTypeInfo.getUrl(), URLMethods.Method.fromString(singleTypeInfo.getMethod()));
                     if (!allApis && !infKey.equals(apiInfoKey)) {
                         continue;
                     }
-                    Bson sdfilters = Filters.and(
-                        Filters.eq("_id.apiCollectionId", apiInfoKey.getApiCollectionId()),
-                        Filters.eq("_id.method", singleTypeInfo.getMethod()),
-                        Filters.in("_id.url", singleTypeInfo.getUrl())
-                    );
 
-                    SampleData sd = SampleDataDao.instance.findOne(sdfilters);
+                    SampleData sd = DataActorFactory.fetchInstance().fetchSampleDataByIdMethod(apiInfoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
                     newSampleDataMap.put(infKey, sd.getSamples());
 
                 }

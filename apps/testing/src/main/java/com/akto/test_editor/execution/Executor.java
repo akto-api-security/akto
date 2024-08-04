@@ -1,5 +1,6 @@
 package com.akto.test_editor.execution;
 
+import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.TokensDao;
@@ -12,6 +13,8 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
@@ -35,7 +38,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
-import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.UsageUtils;
 import com.akto.util.enums.LoginFlowEnums;
@@ -117,9 +119,12 @@ public class Executor {
             return yamlTestResult;
         }
         if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
-            TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testingRunConfig.getTestRoleId())));
+            TestRoles role = DataActorFactory.fetchInstance().fetchTestRolesforId(testingRunConfig.getTestRoleId());
             if (role != null) {
-                EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
+                EndpointLogicalGroup endpointLogicalGroup = role.getEndpointLogicalGroup();
+                if (endpointLogicalGroup == null) {
+                    endpointLogicalGroup = DataActorFactory.fetchInstance().fetchEndpointLogicalGroupById(role.getEndpointLogicalGroupId().toHexString());
+                }
                 if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
                     if (role.getDefaultAuthMechanism() != null) {
                         loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
@@ -143,7 +148,9 @@ public class Executor {
             if (executionType.equals("graph")) {
                 List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
                 apiInfoKeys.add(apiInfoKey);
-                memory = new Memory(apiInfoKeys, new HashMap<>());
+                if (!RuntimeMode.isHybridDeployment()) {
+                    memory = new Memory(apiInfoKeys, new HashMap<>());
+                }
             }
             workflowTest = buildWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
             result.add(triggerMultiExecution(workflowTest, reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory));
@@ -541,20 +548,15 @@ public class Executor {
     private static BasicDBObject getBillingTokenForAuth() {
         BasicDBObject bDObject;
         int accountId = Context.accountId.get();
-        Organization organization = OrganizationsDao.instance.findOne(
-                Filters.in(Organization.ACCOUNTS, accountId)
-        );
+        Organization organization = DataActorFactory.fetchInstance().fetchOrganization(accountId);
         if (organization == null) {
             return new BasicDBObject("error", "organization not found");
         }
 
         Tokens tokens;
-        Bson filters = Filters.and(
-                Filters.eq(Tokens.ORG_ID, organization.getId()),
-                Filters.eq(Tokens.ACCOUNT_ID, accountId)
-        );
+
         String errMessage = "";
-        tokens = TokensDao.instance.findOne(filters);
+        tokens = DataActorFactory.fetchInstance().fetchToken(organization.getId(), accountId);
         if (tokens == null) {
             errMessage = "error extracting ${akto_header}, token is missing";
         }
@@ -648,7 +650,7 @@ public class Executor {
 
                     keyStr = keyStr.replace(ACCESS_ROLES_CONTEXT, "");
                     keyStr = keyStr.substring(0,keyStr.length()-1).trim();
-                    TestRoles testRole = TestRolesDao.instance.findOne(TestRoles.NAME, keyStr);
+                    TestRoles testRole = DataActorFactory.fetchInstance().fetchTestRole(keyStr);
                     if (testRole == null) {
                         return new ExecutorSingleOperationResp(false, "Test Role " + keyStr +  " Doesn't Exist ");
                     }

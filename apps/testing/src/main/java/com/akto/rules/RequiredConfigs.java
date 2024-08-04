@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.testing.TestRoles;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -24,12 +25,7 @@ public class RequiredConfigs {
 
     public static void initiate() {
         validRolesExist.clear();
-        testRolesList = TestRolesDao.instance.findAll(
-            Filters.empty(),
-            Projections.fields(
-                Projections.include(TestRoles.NAME)
-            )
-        );
+        testRolesList = DataActorFactory.fetchInstance().fetchTestRoles();
         for(TestRoles role: testRolesList){
             validRolesExist.put(role.getName(), true);
         }

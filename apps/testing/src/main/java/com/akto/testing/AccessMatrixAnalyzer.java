@@ -11,6 +11,8 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
@@ -34,16 +36,17 @@ import org.bson.conversions.Bson;
 
 public class AccessMatrixAnalyzer {
     private static final LoggerMaker loggerMaker = new LoggerMaker(AccessMatrixAnalyzer.class);
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();    
     private static final int LIMIT = 2000;
 
     private static final int DELTA_PERIOD_VALUE = 60 * 24 * 60 * 60;
     public List<ApiInfoKey> getEndpointsToAnalyze(AccessMatrixTaskInfo task) {
         EndpointLogicalGroup endpointLogicalGroup =
-                EndpointLogicalGroupDao.instance.findOne(EndpointLogicalGroup.GROUP_NAME, task.getEndpointLogicalGroupName());
+            dataActor.fetchEndpointLogicalGroup(task.getEndpointLogicalGroupName());
 
         if (endpointLogicalGroup == null) return new ArrayList<>();
         List<ApiInfoKey> ret = new ArrayList<>();
-        for(ApiCollection apiCollection: ApiCollectionsDao.instance.getMetaAll()) {
+        for(ApiCollection apiCollection: dataActor.fetchAllApiCollectionsMeta()) {
             int lastBatchSize = 0;
             int skip = 0;
             do {
@@ -76,16 +79,14 @@ public class AccessMatrixAnalyzer {
     }
 
     public void run() throws Exception {
-        Bson pendingTasks = Filters.lt(AccessMatrixTaskInfo.NEXT_SCHEDULED_TIMESTAMP, Context.now());
-        for(AccessMatrixTaskInfo task: AccessMatrixTaskInfosDao.instance.findAll(pendingTasks)) {
+
+        for(AccessMatrixTaskInfo task: dataActor.fetchPendingAccessMatrixInfo(Context.now())) {
             loggerMaker.infoAndAddToDb("Running task: " + task.toString(),LogDb.TESTING);
 
             List<ApiInfoKey> endpoints = getEndpointsToAnalyze(task);
             loggerMaker.infoAndAddToDb("Number of endpoints: " + (endpoints == null ? 0 : endpoints.size()),LogDb.TESTING);
             SampleMessageStore sampleMessageStore = SampleMessageStore.create();
             CustomTestingEndpoints tempTestingEndpoints = new CustomTestingEndpoints(endpoints);
-            sampleMessageStore.buildSingleTypeInfoMap(tempTestingEndpoints);
-            Map<String, SingleTypeInfo> singleTypeInfoMap = sampleMessageStore.getSingleTypeInfos();
         
 
             List<ApiInfo.ApiInfoKey> apiInfoKeyList = tempTestingEndpoints.returnApis();
@@ -97,11 +98,11 @@ public class AccessMatrixAnalyzer {
             sampleMessageStore.fetchSampleMessages(apiCollectionIds);
             String roleFromTask = task.getEndpointLogicalGroupName().substring(0, task.getEndpointLogicalGroupName().length()-EndpointLogicalGroup.GROUP_NAME_SUFFIX.length());
             loggerMaker.infoAndAddToDb("Role found: " + roleFromTask, LogDb.TESTING);
-            List<TestRoles> testRoles = TestRolesDao.instance.findAll(TestRoles.NAME, roleFromTask);
+            List<TestRoles> testRoles = dataActor.fetchTestRolesForRoleName(roleFromTask);
 
             AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
             AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
-            List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+            List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
             TestingUtil testingUtil = new TestingUtil(authMechanism,sampleMessageStore, testRoles,"", customAuthTypes);
 
             BFLATest bflaTest = new BFLATest();
@@ -120,12 +121,7 @@ public class AccessMatrixAnalyzer {
                     loggerMaker.infoAndAddToDb("Finished checking for " + task.getId() + " " + endpoint.getMethod() + " " + endpoint.getUrl(), LogDb.TESTING);
                 }
             }
-            Bson q = Filters.eq(Constants.ID, task.getId());
-            Bson update = Updates.combine(
-                Updates.set(AccessMatrixTaskInfo.LAST_COMPLETED_TIMESTAMP,Context.now()),
-                Updates.set(AccessMatrixTaskInfo.NEXT_SCHEDULED_TIMESTAMP, Context.now() + task.getFrequencyInSeconds())
-            );
-            AccessMatrixTaskInfosDao.instance.updateOne(q, update);
+            dataActor.updateAccessMatrixInfo(task.getId().toHexString(), task.getFrequencyInSeconds());
             loggerMaker.infoAndAddToDb("Matrix analyzer task " + task.getId() + "  completed successfully", LogDb.TESTING);
         }
     }

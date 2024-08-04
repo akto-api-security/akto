@@ -2,7 +2,9 @@ package com.akto.store;
 
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.TestRoles;
 import com.mongodb.BasicDBObject;
 
 public class AuthMechanismStore {
@@ -12,7 +14,8 @@ public class AuthMechanismStore {
 
     public static AuthMechanismStore create() {
         AuthMechanismStore ret = new AuthMechanismStore();
-        ret.authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
+        TestRoles testRoles = DataActorFactory.fetchInstance().fetchTestRole("ATTACKER_TOKEN_ALL");
+        ret.authMechanism = TestRolesDao.instance.fetchAttackerToken(0, testRoles);
         return ret;
     }
 

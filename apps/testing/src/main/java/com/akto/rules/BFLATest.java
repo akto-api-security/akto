@@ -1,6 +1,8 @@
 package com.akto.rules;
 
 import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
@@ -29,6 +31,8 @@ import static com.akto.rules.TestPlugin.isStatusGood;
 import static com.akto.rules.TestPlugin.loggerMaker;
 
 public class BFLATest {
+
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     public TestPlugin.ApiExecutionDetails executeApiAndReturnDetails(OriginalHttpRequest testRequest, boolean followRedirects, RawApi rawApi) throws Exception {
         OriginalHttpResponse testResponse = ApiExecutor.sendRequest(testRequest, followRedirects, null, false, new ArrayList<>());
@@ -98,10 +102,7 @@ public class BFLATest {
 
         }
 
-        Bson q = Filters.eq(Constants.ID, apiInfoKey);
-        Bson update = Updates.addEachToSet(AccessMatrixUrlToRole.ROLES, ret);
-        UpdateOptions opts = new UpdateOptions().upsert(true);
-        AccessMatrixUrlToRolesDao.instance.getMCollection().updateOne(q, update, opts);
+        dataActor.updateAccessMatrixUrlToRoles(apiInfoKey, ret);
         loggerMaker.infoAndAddToDb("updated for " + apiInfoKey.getUrl() + " role: " + StringUtils.join(ret, ","), LogDb.TESTING);
         return ret;        
     }

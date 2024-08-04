@@ -1,6 +1,7 @@
 package com.akto.rules;
 
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
@@ -218,19 +219,19 @@ public abstract class TestPlugin {
     }
 
     public static SingleTypeInfo findSti(String param, boolean isUrlParam,
-                                         ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader, int responseCode,
-                                         Map<String, SingleTypeInfo> singleTypeInfoMap) {
+                                         ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader, int responseCode) {
 
-        Bson filter = Filters.and(
-            Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
-            Filters.eq("url", apiInfoKey.url),
-            Filters.eq("method", apiInfoKey.method.name()),
-            Filters.eq("responseCode", responseCode),
-            Filters.eq("isHeader", isHeader),
-            Filters.eq("param", param),
-            Filters.eq("isUrlParam", isUrlParam)
-        );
-        SingleTypeInfo singleTypeInfo = SingleTypeInfoDao.instance.findOne(filter);
+        
+        SingleTypeInfo singleTypeInfo = 
+            DataActorFactory.fetchInstance().findStiWithUrlParamFilters(
+                apiInfoKey.getApiCollectionId(), 
+                apiInfoKey.getUrl(), 
+                apiInfoKey.getMethod().name(),
+                responseCode,
+                isHeader,
+                param,
+                isUrlParam
+            );
 
         if (singleTypeInfo == null) return null;
 
@@ -259,7 +260,7 @@ public abstract class TestPlugin {
             for (int i = 0;i < tokens.length; i++) {
                 if (tokens[i] == null) {
                     atLeastOneValueInRequest = true;
-                    SingleTypeInfo singleTypeInfo = findSti(i+"", true,apiInfoKey, false, -1, sampleMessageStore.getSingleTypeInfos());
+                    SingleTypeInfo singleTypeInfo = findSti(i+"", true,apiInfoKey, false, -1);
                     if (singleTypeInfo != null) {
                         String v = ogTokens[i];
                         Set<String> values = new HashSet<>();
@@ -277,7 +278,7 @@ public abstract class TestPlugin {
         Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
         for (String param: flattened.keySet()) {
             atLeastOneValueInRequest = true;
-            SingleTypeInfo singleTypeInfo = findSti(param,false,apiInfoKey, false, -1, sampleMessageStore.getSingleTypeInfos());
+            SingleTypeInfo singleTypeInfo = findSti(param,false,apiInfoKey, false, -1);
             if (singleTypeInfo != null) {
                 Set<Object> valSet = flattened.get(param);
                 Set<String> valStringSet = new HashSet<>();
@@ -454,7 +455,10 @@ public abstract class TestPlugin {
             this.enemies = new ArrayList<>();
 
             for (TestRoles testRoles: testRolesList) {
-                EndpointLogicalGroup endpointLogicalGroup = testRoles.fetchEndpointLogicalGroup();
+                EndpointLogicalGroup endpointLogicalGroup = testRoles.getEndpointLogicalGroup();
+                if (endpointLogicalGroup == null) {
+                    endpointLogicalGroup = DataActorFactory.fetchInstance().fetchEndpointLogicalGroupById(testRoles.getEndpointLogicalGroupId().toHexString());
+                }
                 if (endpointLogicalGroup == null) continue;
                 TestingEndpoints testingEndpoints = endpointLogicalGroup.getTestingEndpoints();
                 if (testingEndpoints == null) continue;

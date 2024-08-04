@@ -4,6 +4,7 @@ import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestingRunConfig;
@@ -125,7 +126,8 @@ public class StatusCodeAnalyser {
             return;
         }
         Map<Set<String>, Map<String,Integer>> frequencyMap = new HashMap<>();
-        Map<Integer, ApiCollection> apiCollectionMap = ApiCollectionsDao.instance.generateApiCollectionMap();
+        List<ApiCollection> apiCollections = DataActorFactory.fetchInstance().fetchAllApiCollectionsMeta();
+        Map<Integer, ApiCollection> apiCollectionMap = ApiCollectionsDao.instance.generateApiCollectionMap(apiCollections);
 
         int count = 0;
         int inc = 0;

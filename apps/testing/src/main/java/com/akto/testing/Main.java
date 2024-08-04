@@ -11,6 +11,8 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -26,6 +28,7 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.notifications.slack.APITestStatusAlert;
@@ -58,7 +61,8 @@ public class Main {
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
-
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
+    
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
@@ -68,42 +72,20 @@ public class Main {
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
 
-    private static TestingRunResultSummary createTRRSummaryIfAbsent(TestingRun testingRun, int start){
-        ObjectId testingRunId = new ObjectId(testingRun.getHexId());
-
-        return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
-                Filters.and(
-                        Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
-                        Filters.eq(TestingRunResultSummary.STATE,TestingRun.State.SCHEDULED)
-                ),
-                Updates.combine(
-                        Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
-                        Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start)
-                ),
-                new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER)
-        );
-    }
-
-
-    private static void setupRateLimitWatcher () {
+    private static void setupRateLimitWatcher (AccountSettings settings) {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                AccountTask.instance.executeTaskForNonHybridAccounts(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account t) {
-                        AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                        if (settings == null) {
-                            return;
-                        }
-                        int globalRateLimit = settings.getGlobalRateLimit();
-                        int accountId = t.getId();
-                        Map<ApiRateLimit, Integer> rateLimitMap =  RateLimitHandler.getInstance(accountId).getRateLimitsMap();
-                        rateLimitMap.clear();
-                        rateLimitMap.put(new GlobalApiRateLimit(globalRateLimit), globalRateLimit);
-                    }
-                }, "rate-limit-scheduler");
+                if (settings == null) {
+                    return;
+                }
+                int globalRateLimit = settings.getGlobalRateLimit();
+                int accountId = settings.getId();
+                Map<ApiRateLimit, Integer> rateLimitMap =  RateLimitHandler.getInstance(accountId).getRateLimitsMap();
+                rateLimitMap.clear();
+                rateLimitMap.put(new GlobalApiRateLimit(globalRateLimit), globalRateLimit);
             }
         }, 0, 1, TimeUnit.MINUTES);
+
     }
 
     public static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
@@ -116,51 +98,6 @@ public class Main {
     }
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
 
-    private static TestingRun findPendingTestingRun() {
-        int delta = Context.now() - 20*60;
-
-        Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
-        );
-        Bson filter2 = Filters.and(
-                Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-                Filters.lte(TestingRun.PICKED_UP_TIMESTAMP, delta)
-        );
-
-        Bson update = Updates.combine(
-                Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
-                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
-        );
-
-        // returns the previous state of testing run before the update
-        return TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                Filters.or(filter1,filter2), update);
-    }
-
-    private static TestingRunResultSummary findPendingTestingRunResultSummary() {
-
-        // if you change this delta, update this delta in method getCurrentRunningTestsSummaries
-        int now = Context.now();
-        int delta = now - 20*60;
-
-        Bson filter1 = Filters.and(
-            Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
-            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now),
-            Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
-        );
-
-        Bson filter2 = Filters.and(
-            Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5*60),
-            Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
-        );
-
-        Bson update = Updates.set(TestingRun.STATE, TestingRun.State.RUNNING);
-
-        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(Filters.or(filter1,filter2), update);
-
-        return trrs;
-    }
 
     private static void setTestingRunConfig(TestingRun testingRun, TestingRunResultSummary trrs) {
         long timestamp = testingRun.getId().getTimestamp();
@@ -171,12 +108,12 @@ public class Main {
         TestingRunConfig baseConfig = null;
 
         if (trrs != null && trrs.getTestIdConfig() > 1) {
-            configFromTrrs = TestingRunConfigDao.instance.findOne(Constants.ID, trrs.getTestIdConfig());
+            configFromTrrs = dataActor.findTestingRunConfig(trrs.getTestIdConfig());
             loggerMaker.infoAndAddToDb("Found testing run trrs config with id :" + configFromTrrs.getId(), LogDb.TESTING);
         }
 
         if (testingRun.getTestIdConfig() > 1) {
-            baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+            baseConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
             loggerMaker.infoAndAddToDb("Found testing run base config with id :" + baseConfig.getId(), LogDb.TESTING);
         }
 
@@ -194,23 +131,12 @@ public class Main {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        String mongoURI = System.getenv("AKTO_MONGO_CONN");
-        DaoInit.init(new ConnectionString(mongoURI));
 
-        boolean connectedToMongo = false;
-        do {
-            connectedToMongo = MCollection.checkConnection();
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        } while (!connectedToMongo);
-
-        setupRateLimitWatcher();
+        AccountSettings accountSettings = dataActor.fetchAccountSettings();
+        setupRateLimitWatcher(accountSettings);
 
         if (!SKIP_SSRF_CHECK) {
-            Setup setup = SetupDao.instance.findOne(new BasicDBObject());
+            Setup setup = dataActor.fetchSetup();
             String dashboardMode = setup.getDashboardMode();
             if (dashboardMode != null) {
                 boolean isSaas = dashboardMode.equalsIgnoreCase(DashboardMode.SAAS.name());
@@ -222,230 +148,191 @@ public class Main {
 
         schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
-                    AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
-                    try {
-                        matrixAnalyzer.run();
-                    } catch (Exception e) {
-                        loggerMaker.infoAndAddToDb("could not run matrixAnalyzer: " + e.getMessage(), LogDb.TESTING);
-                    }
-                },"matrix-analyser-task");
+                Context.accountId.set(accountSettings.getId());
+                AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
+                try {
+                    matrixAnalyzer.run();
+                } catch (Exception e) {
+                    loggerMaker.infoAndAddToDb("could not run matrixAnalyzer: " + e.getMessage(), LogDb.TESTING);
+                }
             }
         }, 0, 1, TimeUnit.MINUTES);
+
         GetRunningTestsStatus.getRunningTests().getStatusOfRunningTests();
 
         loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
 
+        Map<Integer, Integer> logSentMap = new HashMap<>();
+
+        Context.accountId.set(accountSettings.getId());
+
         while (true) {
-            AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
-                int accountId = account.getId();
+            int accountId = accountSettings.getId();
 
-                int start = Context.now();
-                TestingRunResultSummary trrs = findPendingTestingRunResultSummary();
-                boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
-                TestingRun testingRun;
-                ObjectId summaryId = null;
-                if (trrs == null) {
-                    testingRun = findPendingTestingRun();
-                } else {
-                    summaryId = trrs.getId();
-                    loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);
-                    testingRun = TestingRunDao.instance.findOne("_id", trrs.getTestingRunId());
+            int start = Context.now();
+            long startDetailed = System.currentTimeMillis();
+            int delta = start - 20*60;
+            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta);
+            boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
+            TestingRun testingRun;
+            ObjectId summaryId = null;
+            if (trrs == null) {
+                delta = Context.now() - 20*60;
+                testingRun = dataActor.findPendingTestingRun(delta);
+            } else {
+                summaryId = trrs.getId();
+                loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);
+                testingRun = dataActor.findTestingRun(trrs.getTestingRunId().toHexString());
+            }
+
+            if (testingRun == null) {
+                Thread.sleep(1000);
+                continue;
+            }
+
+            if (testingRun.getState().equals(State.STOPPED)) {
+                loggerMaker.infoAndAddToDb("Testing run stopped");
+                if (trrs != null) {
+                    loggerMaker.infoAndAddToDb("Stopping TRRS: " + trrs.getId());
+                    dataActor.updateTestRunResultSummaryNoUpsert(trrs.getId().toHexString());
+                    loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
                 }
+                return;
+            }
 
-                if (testingRun == null) {
-                    return;
+            loggerMaker.infoAndAddToDb("Starting test for accountID: " + accountId);
+
+            boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
+
+            if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
+                int lastSent = logSentMap.getOrDefault(accountId, 0);
+                if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
+                    logSentMap.put(accountId, start);
+                    loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
+                            + " . Failing test run : " + start, LogDb.TESTING);
                 }
+                dataActor.updateTestingRun(testingRun.getId().toHexString());
+                dataActor.updateTestRunResultSummary(summaryId.toHexString());
+                return;
+            }
 
-                if (testingRun.getState().equals(State.STOPPED)) {
-                    loggerMaker.infoAndAddToDb("Testing run stopped");
+            try {
+                setTestingRunConfig(testingRun, trrs);
+
+                if (isSummaryRunning || isTestingRunRunning) {
+                    loggerMaker.infoAndAddToDb("TRRS or TR is in running state, checking if it should run it or not");
+                    TestingRunResultSummary testingRunResultSummary;
                     if (trrs != null) {
-                        loggerMaker.infoAndAddToDb("Stopping TRRS: " + trrs.getId());
-                        TestingRunResultSummariesDao.instance.updateOneNoUpsert(
-                                Filters.eq(Constants.ID, trrs.getId()),
-                                Updates.set(TestingRunResultSummary.STATE, State.STOPPED)
-                        );
-                        loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
+                        testingRunResultSummary = trrs;
+                    } else {
+                        Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = dataActor.fetchTestingRunResultSummaryMap(testingRun.getId().toHexString());
+                        testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
                     }
-                    return;
-                }
 
-                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
-
-                loggerMaker.infoAndAddToDb("Starting test for accountID: " + accountId);
-
-                boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
-
-                if (featureAccess.checkInvalidAccess()) {
-                    loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId + ". Failing test run at " + start, LogDb.TESTING);
-                    TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                            Filters.eq(Constants.ID, testingRun.getId()),
-                            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
-
-                    TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
-                            Filters.eq(Constants.ID, summaryId),
-                            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
-                    return;
-                }
-
-                SyncLimit syncLimit = featureAccess.fetchSyncLimit();
-                // saving the initial usageLeft, to calc delta later.
-                int usageLeft = syncLimit.getUsageLeft();
-
-                try {
-                    setTestingRunConfig(testingRun, trrs);
-
-                    if (isSummaryRunning || isTestingRunRunning) {
-                        loggerMaker.infoAndAddToDb("TRRS or TR is in running state, checking if it should run it or not");
-                        TestingRunResultSummary testingRunResultSummary;
-                        if (trrs != null) {
-                            testingRunResultSummary = trrs;
-                        } else {
-                            Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRun.getId()));
-                            testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
-                        }
-
-                        if (testingRunResultSummary != null) {
-                            List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), 1);
-                            if (testingRunResults != null && !testingRunResults.isEmpty()) {
-                                TestingRunResult testingRunResult = testingRunResults.get(0);
-                                if (Context.now() - testingRunResult.getEndTimestamp() < LAST_TEST_RUN_EXECUTION_DELTA) {
-                                    loggerMaker.infoAndAddToDb("Skipping test run as it was executed recently, TRR_ID:"
-                                            + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                                    return;
-                                } else {
-                                    loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
-                                            + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                                    TestingRunResultSummary summary = TestingRunResultSummariesDao.instance.updateOneNoUpsert(
-                                            Filters.and(
-                                                    Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()),
-                                                    Filters.eq(TestingRunResultSummary.STATE, State.RUNNING)
-                                            ),
-                                            Updates.set(TestingRunResultSummary.STATE, State.FAILED)
-                                    );
-                                    if (summary == null) {
-                                        loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                                        return;
-                                    }
-
-                                    TestingRunResultSummary runResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()));
-                                    GithubUtils.publishGithubComments(runResultSummary);
-                                }
+                    if (testingRunResultSummary != null) {
+                        List<TestingRunResult> testingRunResults = dataActor.fetchLatestTestingRunResult(testingRunResultSummary.getId().toHexString());
+                        if (testingRunResults != null && !testingRunResults.isEmpty()) {
+                            TestingRunResult testingRunResult = testingRunResults.get(0);
+                            if (Context.now() - testingRunResult.getEndTimestamp() < LAST_TEST_RUN_EXECUTION_DELTA) {
+                                loggerMaker.infoAndAddToDb("Skipping test run as it was executed recently, TRR_ID:"
+                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                return;
                             } else {
-                                loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                                TestingRunResultSummary summary = TestingRunResultSummariesDao.instance.updateOneNoUpsert(
-                                        Filters.and(
-                                                Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()),
-                                                Filters.eq(TestingRunResultSummary.STATE, State.RUNNING)
-                                        ),
-                                        Updates.set(TestingRunResultSummary.STATE, State.FAILED)
-                                );
+                                loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
+                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                TestingRunResultSummary summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString());
                                 if (summary == null) {
                                     loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                     return;
                                 }
-                            }
 
-                            // insert new summary based on old summary
-                            if (summaryId != null) {
-                                trrs.setId(new ObjectId());
-                                trrs.setStartTimestamp(start);
-                                trrs.setState(State.RUNNING);
-                                TestingRunResultSummariesDao.instance.insertOne(trrs);
-                                summaryId = trrs.getId();
-                            } else {
-                                trrs = createTRRSummaryIfAbsent(testingRun, start);
-                                summaryId = trrs.getId();
+                                TestingRunResultSummary runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
+                                GithubUtils.publishGithubComments(runResultSummary);
                             }
                         } else {
-                            loggerMaker.infoAndAddToDb("No summary found. Let's run it as usual");
+                            loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                            TestingRunResultSummary summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString());
+                            if (summary == null) {
+                                loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                return;
+                            }
                         }
-                    }
 
-                    if (summaryId == null) {
-                        trrs = createTRRSummaryIfAbsent(testingRun, start);
-                        summaryId = trrs.getId();
-                    }
-
-                    TestExecutor testExecutor = new TestExecutor();
-                    if (trrs.getState() == State.SCHEDULED) {
-                        if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
-                            //case of github status push
-                            GithubUtils.publishGithubStatus(trrs);
-
+                        // insert new summary based on old summary
+                        if (summaryId != null) {
+                            trrs.setId(new ObjectId());
+                            trrs.setStartTimestamp(start);
+                            trrs.setState(State.RUNNING);
+                            dataActor.insertTestingRunResultSummary(trrs);
+                            summaryId = trrs.getId();
+                        } else {
+                            trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start);
+                            summaryId = trrs.getId();
                         }
+                    } else {
+                        loggerMaker.infoAndAddToDb("No summary found. Let's run it as usual");
                     }
-                    RequiredConfigs.initiate();
-                    testExecutor.init(testingRun, summaryId, syncLimit);
-                    raiseMixpanelEvent(summaryId, testingRun, accountId);
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error in init " + e);
-                }
-                Bson completedUpdate = Updates.combine(
-                        Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
-                        Updates.set(TestingRun.END_TIMESTAMP, Context.now())
-                );
-
-                if (testingRun.getPeriodInSeconds() > 0 ) {
-                    completedUpdate = Updates.combine(
-                            Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                            Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
-                            Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds())
-                    );
                 }
 
-                if(GetRunningTestsStatus.getRunningTests().isTestRunning(testingRun.getId())){
-                    loggerMaker.infoAndAddToDb("Updating status of running test to Completed.");
-                    TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                            Filters.eq("_id", testingRun.getId()),  completedUpdate
-                    );
+                if (summaryId == null) {
+                    trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start);
+                    summaryId = trrs.getId();
                 }
 
-                if(summaryId != null && testingRun.getTestIdConfig() != 1){
-                    TestExecutor.updateTestSummary(summaryId);
+                TestExecutor testExecutor = new TestExecutor();
+                if (trrs.getState() == State.SCHEDULED) {
+                    if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
+                        //case of github status push
+                        GithubUtils.publishGithubStatus(trrs);
+
+                    }
                 }
+                testExecutor.init(testingRun, summaryId);
+                AllMetrics.instance.setTestingRunCount(1);
+                //raiseMixpanelEvent(summaryId, testingRun, accountId);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in init " + e);
+            }
+            int scheduleTs = 0;
 
-                loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds for account: " + accountId, LogDb.TESTING);
+            if (testingRun.getPeriodInSeconds() > 0 ) {
+                scheduleTs = testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds();
+            }
 
-                Organization organization = OrganizationsDao.instance.findOne(
-                        Filters.in(Organization.ACCOUNTS, Context.accountId.get()));
+            dataActor.updateTestingRunAndMarkCompleted(testingRun.getId().toHexString(), scheduleTs);
 
-                if(organization.getTestTelemetryEnabled()){
-                    loggerMaker.infoAndAddToDb("Test telemetry enabled for account: " + accountId + ", sending results", LogDb.TESTING);
-                    ObjectId finalSummaryId = summaryId;
-                    testTelemetryScheduler.execute(() -> {
-                        Context.accountId.set(accountId);
-                        try {
-                            com.akto.onprem.Constants.sendTestResults(finalSummaryId, organization);
-                            loggerMaker.infoAndAddToDb("Test telemetry sent for account: " + accountId, LogDb.TESTING);
-                        } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e, "Error in sending test telemetry for account: " + accountId);
-                        }
-                    });
-                } else {
-                    loggerMaker.infoAndAddToDb("Test telemetry disabled for account: " + accountId, LogDb.TESTING);
-                }
+            if(summaryId != null && testingRun.getTestIdConfig() != 1){
+                TestExecutor.updateTestSummary(summaryId);
+            }
 
-                // update usage after test is completed.
-                 int deltaUsage = 0;
-                 if(syncLimit.checkLimit){
-                     deltaUsage = usageLeft - syncLimit.getUsageLeft();
-                 }
- 
-                 UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.TEST_RUNS, accountId, deltaUsage);
+            loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds for account: " + accountId, LogDb.TESTING);
+            AllMetrics.instance.setTestingRunLatency(System.currentTimeMillis() - startDetailed);
 
-            }, "testing");
-            Thread.sleep(1000);
+            Organization organization = dataActor.fetchOrganization(accountId);
+
+            if(organization.getTestTelemetryEnabled()){
+                loggerMaker.infoAndAddToDb("Test telemetry enabled for account: " + accountId + ", sending results", LogDb.TESTING);
+                ObjectId finalSummaryId = summaryId;
+                testTelemetryScheduler.execute(() -> {
+                    Context.accountId.set(accountId);
+                    try {
+                        com.akto.onprem.Constants.sendTestResults(finalSummaryId, organization);
+                        loggerMaker.infoAndAddToDb("Test telemetry sent for account: " + accountId, LogDb.TESTING);
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error in sending test telemetry for account: " + accountId);
+                    }
+                });
+
+            } else {
+                loggerMaker.infoAndAddToDb("Test telemetry disabled for account: " + accountId, LogDb.TESTING);
+            }
         }
     }
 
     private static void raiseMixpanelEvent(ObjectId summaryId, TestingRun testingRun, int accountId) {
-        TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne
-                (
-                        Filters.eq(TestingRunResultSummary.ID, summaryId)
-                );
+        TestingRunResultSummary testingRunResultSummary = dataActor.fetchTestingRunResultSummary(summaryId.toHexString());
         int totalApis = testingRunResultSummary.getTotalApis();
 
         String testType = "ONE_TIME";
@@ -457,7 +344,7 @@ public class Main {
             testType = "CI_CD";
         }
 
-        Setup setup = SetupDao.instance.findOne(new BasicDBObject());
+        Setup setup = dataActor.fetchSetup();
 
         String dashboardMode = "saas";
         if (setup != null) {
@@ -478,18 +365,14 @@ public class Main {
         props.put("Total APIs tested", totalApis);
 
         if (testingRun.getTestIdConfig() > 1) {
-            TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+            TestingRunConfig testingRunConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
             if (testingRunConfig != null && testingRunConfig.getTestSubCategoryList() != null) {
                 props.put("Total Tests", testingRunConfig.getTestSubCategoryList().size());
                 props.put("Tests Ran", testingRunConfig.getTestSubCategoryList());
             }
         }
 
-        Bson filters = Filters.and(
-            Filters.eq("latestTestingRunSummaryId", summaryId),
-            Filters.eq("testRunIssueStatus", "OPEN")
-        );
-        List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(filters);
+        List<TestingRunIssues> testingRunIssuesList = dataActor.fetchOpenIssues(summaryId.toHexString());
 
         Map<String, Integer> apisAffectedCount = new HashMap<>();
         int newIssues = 0;
@@ -528,7 +411,7 @@ public class Main {
                             Filters.eq(TestingRunResult.TEST_SUB_TYPE, testingRunIssues.getId().getTestSubCategory()),
                             Filters.eq(TestingRunResult.API_INFO_KEY, testingRunIssues.getId().getApiInfoKey())
                     );
-                    TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(filterForRunResult, Projections.include("_id"));
+                    TestingRunResult testingRunResult = dataActor.fetchTestingRunResults(filterForRunResult);
                     testRunResultId = testingRunResult.getHexId();
                 } else testRunResultId = "";
 
@@ -557,7 +440,7 @@ public class Main {
         if(testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE)) {
             CollectionWiseTestingEndpoints collectionWiseTestingEndpoints = (CollectionWiseTestingEndpoints) testingEndpoints;
             int apiCollectionId = collectionWiseTestingEndpoints.getApiCollectionId();
-            ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+            ApiCollection apiCollection =  dataActor.fetchApiCollectionMeta(apiCollectionId);
             collection = apiCollection.getName();
         }
 

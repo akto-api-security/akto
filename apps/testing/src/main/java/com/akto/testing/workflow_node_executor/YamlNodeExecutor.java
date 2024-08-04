@@ -17,6 +17,7 @@ import org.json.JSONObject;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ExecuteAlgoObj;
@@ -26,6 +27,7 @@ import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
@@ -255,7 +257,12 @@ public class YamlNodeExecutor extends NodeExecutor {
     public WorkflowTestResult.NodeResult processYamlNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, YamlNodeDetails yamlNodeDetails, boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
         String testSubCategory = yamlNodeDetails.getTestId();
-        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false);
+
+        List<YamlTemplate> yamlTemplates = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            yamlTemplates.addAll(DataActorFactory.fetchInstance().fetchYamlTemplates(false, i*50));
+        }
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates);
         TestConfig testConfig = testConfigMap.get(testSubCategory);
 
         ExecutorNode executorNode = yamlNodeDetails.getExecutorNode();
