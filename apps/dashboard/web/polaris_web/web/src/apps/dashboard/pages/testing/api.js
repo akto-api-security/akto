@@ -406,4 +406,25 @@ export default {
             data: {reportId, organizationName, reportDate, reportUrl}
         })
     },
+    fetchScript() {
+        return request({
+            url: '/api/fetchScript',
+            method: 'post',
+            data: {}
+        })
+    },
+    addScript({javascript}) {
+        return request({
+            url: '/api/addScript',
+            method: 'post',
+            data: {testScript:{javascript}}
+        })
+    },
+    updateScript(id) {
+        return request({
+            url: '/api/updateScript',
+            method: 'post',
+            data: {testScript:{id, javascript}}
+        })
+    }
 }
