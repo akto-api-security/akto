@@ -47,7 +47,6 @@ import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
 import Slack from "../dashboard/pages/settings/integrations/Slack";
 import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
-import ExportHtml from "../dashboard/pages/testing/ExportHtml/ExportHtml";
 
 import Store from "../dashboard/store";
 import { generateSearchData } from "@/util/searchItems"
@@ -68,6 +67,8 @@ import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
 import TokenValidator from "./TokenValidator"
 import { TableContextProvider } from "@/apps/dashboard/components/tables/TableContext";
 import VulnerabilityReport from "../dashboard/pages/testing/vulnerability_report/VulnerabilityReport";
+import TreeViewTable from "../dashboard/components/shared/treeView/TreeViewTable";
+
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -131,6 +132,10 @@ const router = createBrowserRouter([
               {
                 path: "sensitive",
                 element: <AllSensitiveData/>
+              },
+              {
+                path: "tree",
+                element: <TreeViewTable />
               },
               {
                 path: "inventory",

@@ -42,7 +42,7 @@ const treeViewFunc = {
             this.pruneTree(tree[key].children, branchFieldSplitter, reverse)
         })
     },
-    buildTree(items, branchField, branchFieldSplitter, reverse=false, secondaryBranch=false, secondaryBranchFieldSplitter) {
+    buildTree(items, branchField, branchFieldSplitter, reverse=false, secondaryBranch=false, secondaryBranchFieldSplitter, headers) {
         const itemsTree = {}
 
         items.forEach(item => {
@@ -90,40 +90,68 @@ const treeViewFunc = {
         })
 
         this.pruneTree(itemsTree, branchFieldSplitter, reverse)
-
-        return itemsTree
+        const result = this.flattenTree(itemsTree, headers)
+        return result ;
     },
-    convertToRATFormat(node, name="", leafNodeNameField) {
-        // Convert the tree to the format required by react-accessible-treeview
-        const result = { name, children: [], isTerminal: false};
 
-        for (const key in node) {
-            const currentNode = node[key];
+    getFinalKey(value, filterKey, numericValue){
+        let finalKey = value
+        if(filterKey !== null && filterKey !== undefined){
+            finalKey = filterKey
+        }else if(numericValue !==null && numericValue !== undefined){
+            finalKey = numericValue
+        }
+        return finalKey
+    },
+
+    mergeNodeData(children, headers) {
+        const mergedNode = {};
+    
+        headers.forEach(header => {
+            const { value, filterKey, numericValue, mergeType } = header
+            const finalKey = this.getFinalKey(value, filterKey, numericValue)
+            if(finalKey !== 'displayName'){
+                mergedNode[finalKey] = children.reduce((acc, child) => {
+                    return mergeType(acc, child[finalKey]);
+                }, children[0][finalKey]);
+            }
+        });
+    
+        return mergedNode;
+    },
+    
+    flattenTree(tree, headers, path = '') {
+        const result = [];
+    
+        Object.keys(tree).forEach(key => {
+            const currentNode = tree[key];
+            const currentPath = path ? `${path}#${key}` : key;
+    
             if (currentNode.isTerminal) {
                 currentNode.items.forEach(item => {
-                    result.children.push({
-                        name: item[leafNodeNameField],
-                        metadata: { ...item },
-                        isTerminal: true,
+                    result.push({
+                        ...item,
+                        level: currentPath,
+                        showInRow: false
                     });
                 });
             } else {
-                result.children.push(this.convertToRATFormat(currentNode.children, key, leafNodeNameField));
+                const childNodes = this.flattenTree(currentNode.children, headers, currentPath);
+                const childrenData = childNodes.filter(node => node.level.startsWith(currentPath));
+                const mergedData = this.mergeNodeData(childrenData, headers);
+    
+                result.push({
+                    ...mergedData,
+                    level: currentPath,
+                    isTerminal: false,
+                    showInRow: true
+                });
+    
+                result.push(...childNodes);
             }
-        }
-
-        const nonTerminalChildren = result.children
-                                    .filter(child => !child.isTerminal)
-                                    .sort((a, b) => a.name.localeCompare(b.name));
-
-        const terminalChildren = result.children
-                                    .filter(child => child.isTerminal)
-                                    .sort((a, b) => a.name.localeCompare(b.name));
-
-        // Make sure leaf nodes are at the end
-        result.children = [ ...nonTerminalChildren, ...terminalChildren ]
-
-        return result
+        });
+    
+        return result;
     }
 }
 

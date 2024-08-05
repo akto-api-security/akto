@@ -6,8 +6,6 @@ import StyledEndpoint from "./api_collections/component/StyledEndpoint"
 import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor } from "@shopify/polaris-icons"
 import api from "./api";
 import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
-import treeViewFunc from "../../components/shared/treeView/transform";
-import { flattenTree } from "react-accessible-treeview";
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -591,34 +589,6 @@ const transform = {
             
         }
         return tempSensitiveInfo; 
-    },
-    produceApisRATFormattedTree(endpointsTableData) {
-        const apis = endpointsTableData?.all
-        apis.forEach(api => {
-            api.truncatedEndpoint = this.getTruncatedUrl(api.endpoint)
-        })
-       
-        const apisTree = treeViewFunc.buildTree(apis, "truncatedEndpoint", "/", false, false, "")
-        const apisRATFormatTree = treeViewFunc.convertToRATFormat(apisTree, "", "truncatedEndpoint")
-        const flattenedApisRATFormatTree = flattenTree(apisRATFormatTree)
-
-        return flattenedApisRATFormatTree
-    },
-    produceHostnamesRATFormattedTree() {
-        const itemsNew = [
-            { hostName: "a.b.c.d.akto.io"},
-            { hostName: "flash.staging.akto.io"},
-            { hostName: "ironman.staging.akto.io"},
-            { hostName: "app.akto.io"},
-            { hostName: "localhost:8080"},
-            { hostName: "localhost:8000"},
-        ]
-
-        const itemsTree = treeViewFunc.buildTree(itemsNew, "hostName", ".", true, true, ":")
-        const RATFormatTree = treeViewFunc.convertToRATFormat(itemsTree, "", "hostName")
-        const flattenedRATFormatTree = flattenTree(RATFormatTree)
-
-        return flattenedRATFormatTree
     }
 }
 

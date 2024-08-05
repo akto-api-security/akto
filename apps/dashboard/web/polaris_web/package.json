@@ -32,7 +32,6 @@
     "lodash": "^4.17.21",
     "monaco-editor": "^0.40.0",
     "react": "^18.2.0",
-    "react-accessible-treeview": "^2.9.1",
     "react-dom": "^18.2.0",
     "react-flow-renderer": "^10.3.12",
     "react-router-dom": "^6.14.0",
