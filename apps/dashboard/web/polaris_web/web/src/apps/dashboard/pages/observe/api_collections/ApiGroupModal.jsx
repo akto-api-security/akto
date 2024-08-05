@@ -37,9 +37,10 @@ function ApiGroupModal(props){
         let ret = getApis();
 
         api.addApisToCustomCollection(ret, apiGroupName).then((resp)=>{
+            const apiCollections = resp?.apiCollections || []
             func.setToast(true, false, <div data-testid="api_added_to_group_message">APIs added to API group successfully</div>)
-            setCollectionsMap(func.mapCollectionIdToName(resp?.apiCollections))
-            setAllCollections(resp?.apiCollections)
+            setCollectionsMap(func.mapCollectionIdToName(apiCollections))
+            setAllCollections(func.reduceCollectionsResponse(apiCollections))
             toggleApiGroupModal()
         })
     }
@@ -48,9 +49,10 @@ function ApiGroupModal(props){
         let ret = getApis();
 
         api.removeApisFromCustomCollection(ret, apiGroupName).then((resp)=>{
+            const apiCollections = resp?.apiCollections || []
             func.setToast(true, false, "APIs removed from API group successfully")
             setCollectionsMap(func.mapCollectionIdToName(resp?.apiCollections))
-            setAllCollections(resp?.apiCollections)
+            setAllCollections(func.reduceCollectionsResponse(apiCollections))
             toggleApiGroupModal()
             fetchData()
         })

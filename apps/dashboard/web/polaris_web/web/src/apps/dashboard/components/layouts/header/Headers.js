@@ -1,6 +1,6 @@
 import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button } from '@shopify/polaris';
 import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor } from '@shopify/polaris-icons';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
 import PersistStore from '../../../../main/PersistStore';
@@ -8,8 +8,7 @@ import './Headers.css'
 import api from '../../../../signup/api';
 import func from '@/util/func';
 import SemiCircleProgress from '../../shared/SemiCircleProgress';
-import testingApi from "../../../pages/testing/api"
-import TestingStore from '../../../pages/testing/testingStore';
+import { usePolling } from '../../../../main/PollingProvider';
 
 export default function Header() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -17,13 +16,7 @@ export default function Header() {
     const [searchValue, setSearchValue] = useState('');
     const [newAccount, setNewAccount] = useState('')
     const [showCreateAccount, setShowCreateAccount] = useState(false)
-    const [currentTestsObj, setCurrentTestsObj] = useState({
-        totalTestsCompleted:0,
-        totalTestsInitiated:0,
-        totalTestsQueued: 0,
-        testRunsArr: [],
-    })
-
+    const { currentTestsObj, clearPollingInterval } = usePolling();
     const navigate = useNavigate()
 
     const username = Store((state) => state.username)
@@ -32,12 +25,7 @@ export default function Header() {
     const activeAccount = Store(state => state.activeAccount)
     const resetAll = PersistStore(state => state.resetAll)
 
-    const allRoutes = Store((state) => state.allRoutes)
-    const allCollections = PersistStore((state) => state.allCollections)
-    const searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections)
-
-    const setCurrentTestingRuns = TestingStore(state => state.setCurrentTestingRuns)
-    const [intervalId, setIntervalId] = useState(null);
+    const searchItemsArr = func.getSearchItemsArr()
 
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
@@ -45,7 +33,7 @@ export default function Header() {
     );
 
     const handleLogOut = async () => { 
-        clearInterval(intervalId)
+        clearPollingInterval()
         api.logout().then(res => {
             resetAll();
             storeAccessToken(null)
@@ -58,8 +46,6 @@ export default function Header() {
             navigate("/");
         })
     }
-
-    
     const accountsItems = Object.keys(accounts).map(accountId => {
         return {
             id: accountId,
@@ -171,7 +157,10 @@ export default function Header() {
         navigate(navUrl)
     }
 
-    const progress = currentTestsObj.totalTestsInitiated === 0 ? 0 : Math.floor((currentTestsObj.totalTestsCompleted * 100)/ currentTestsObj.totalTestsInitiated)
+    const progress = useMemo(() => {
+        return currentTestsObj.totalTestsInitiated === 0 ? 0 : Math.floor((currentTestsObj.totalTestsCompleted * 100) / currentTestsObj.totalTestsInitiated);
+    }, [currentTestsObj.totalTestsCompleted, currentTestsObj.totalTestsInitiated]);
+
 
     const secondaryMenuMarkup = (
         <HorizontalStack gap={"4"}>
@@ -236,30 +225,6 @@ export default function Header() {
             </Modal>
         </div>
     );
-
-    useEffect(() => {
-        const fetchTestingStatus = () => {
-            const id = setInterval(() => {
-                testingApi.fetchTestingRunStatus().then((resp) => {
-                    setCurrentTestingRuns(resp.currentRunningTestsStatus);
-                    setCurrentTestsObj({
-                        totalTestsInitiated: resp?.testRunsScheduled || 0,
-                        totalTestsCompleted: resp?.totalTestsCompleted || 0,
-                        totalTestsQueued: resp?.testRunsQueued || 0,
-                        testRunsArr: resp?.currentRunningTestsStatus || []
-                    });
-                });
-            }, 2000);
-            setIntervalId(id); 
-        };
-
-        fetchTestingStatus();
-
-        return () => {
-            clearInterval(intervalId);
-        };
-    }, []);
-
 
     return (
         topBarMarkup

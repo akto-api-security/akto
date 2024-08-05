@@ -37,7 +37,7 @@ function CollectionSelection() {
             let localCopy = []
             if(apiCollections.length <= 1 && localCopy.length <= 1){
                 await homeRequests.getCollections().then((resp)=> {
-                    setCollections(resp.apiCollections)
+                    setCollections(func.reduceCollectionsResponse(resp.apiCollections))
                     localCopy = JSON.parse(JSON.stringify(resp.apiCollections));
                 })
             }

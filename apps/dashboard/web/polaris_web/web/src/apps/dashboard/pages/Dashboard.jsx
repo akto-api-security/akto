@@ -34,7 +34,7 @@ function Dashboard() {
         const allHostNameMap = func.mapCollectionIdToHostName(apiCollections)
         setHostNameMap(allHostNameMap)
         setCollectionsMap(allCollectionsMap)
-        setAllCollections(apiCollections)
+        setAllCollections(func.reduceCollectionsResponse(apiCollections))
     }
 
     const fetchMetadata = async () => {

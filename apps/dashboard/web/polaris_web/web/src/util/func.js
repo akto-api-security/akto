@@ -537,13 +537,25 @@ prettifyEpoch(epoch) {
     })
     return collectionsObj
   },
-  reduceToCollectionName(collectionObj){
-    return Object.keys(collectionObj).reduce((acc, k) => {
-      acc[k] = collectionObj[k].displayName;
+  reduceCollectionsResponse(collections){
+    return collections.reduce((acc, coll) => {
+      acc[coll.id] = {
+        displayName: coll?.displayName || "",
+        name: coll?.name || "",
+        urlsCount: coll?.urlsCount || 0
+      };
       return acc;
     }, {});
   },
-  
+  reduceToCollectionArr(collectionObj){
+    let finalArr = []
+    Object.keys(collectionObj).forEach((key) => {
+      let obj = collectionObj[key]
+      obj['id'] = key
+      finalArr.push(key)
+    })
+    return finalArr
+  },
 sortFunc: (data, sortKey, sortOrder) => {
   if(sortKey === 'displayName'){
     let finalArr = data.sort((a, b) => {
@@ -913,13 +925,6 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
   }
   return ret
 }, 
- getCollectionName(collectionId) {
-    const collection = Store.getState().allCollections.find(x => x.id === collectionId)
-    if (collection) 
-      return collection.displayName
-    else 
-      return ""
- },
   getOption: (selectOptions, type) => {
     const option = selectOptions.filter((item) => {
       return item.value == type
@@ -1119,16 +1124,15 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
   return dateStr
  },
 
- getSearchItemsArr(allRoutes,allCollections){
-  let combinedArr = []
-
-  let initialStr = "/dashboard/observe/inventory/"
-
-  allCollections.forEach((item)=> {
-    combinedArr.push({content: item.displayName, url: initialStr + item.id, type:'collection'})
+ getSearchItemsArr(){
+  let finalArr = []
+  const initialStr = "/dashboard/observe/inventory/"
+  const allCollections = PersistStore.getState().allCollections
+  Object.keys(allCollections).forEach((item)=> {
+    finalArr.push({content: allCollections[item]?.displayName, url: initialStr + item, type:'collection'})
   })
 
-  return combinedArr
+  return []
  },
 
  convertToDisambiguateLabel(value, convertFunc, maxAllowed){
@@ -1379,13 +1383,6 @@ mapCollectionIdToHostName(apiCollections){
       funcToCall();
     }
   },
-  async refreshApiCollections() {
-    let apiCollections = await homeFunctions.getAllCollections()
-    const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
-
-    PersistStore.getState().setAllCollections(apiCollections);
-    PersistStore.getState().setCollectionsMap(allCollectionsMap);
-  },
 
   convertParamToDotNotation(str) {
     return str.replace(/[#\$]+/g, '.');;
@@ -1426,7 +1423,7 @@ mapCollectionIdToHostName(apiCollections){
     let apiCollections = await homeFunctions.getAllCollections()
     const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
 
-    PersistStore.getState().setAllCollections(apiCollections);
+    PersistStore.getState().setAllCollections(this.reduceCollectionsResponse(apiCollections));
     PersistStore.getState().setCollectionsMap(allCollectionsMap);
   },
   transformString(inputString) {

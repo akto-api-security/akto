@@ -1,4 +1,4 @@
-import { ButtonGroup, HorizontalStack, TextField } from '@shopify/polaris'
+import { TextField } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import Dropdown from './layouts/Dropdown';
 import DropdownSearch from './shared/DropdownSearch';
@@ -14,10 +14,10 @@ function ConditionComponent(props) {
         fetchApiEndpoints(condition)
     },[condition])
     const allCollections = PersistStore(state => state.allCollections);
-    const allCollectionsOptions = allCollections.map(collection => {
+    const allCollectionsOptions = Object.keys(allCollections).map(collection => {
         return {
-            label: collection.displayName,
-            value: collection.id
+            label: allCollections[collection].displayName,
+            value: collection
         }
     })
     const getApiEndpointsOptions = (data) => {
@@ -55,7 +55,6 @@ function ConditionComponent(props) {
             })
         }
     }
-    const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
     const [apiEndpoints, setApiEndpoints] = useState({})
 
     const handleTextChange = (value) => {
@@ -112,7 +111,7 @@ function ConditionComponent(props) {
                     optionsList={allCollectionsOptions}
                     setSelected={(collectionId) => handleCollectionSelected(collectionId)}
                     preSelected={[Number(getCollectionId(field))]}
-                    value={mapCollectionIdToName[getCollectionId(field)]}
+                    value={allCollections[getCollectionId(condition.data)]?.displayName}
                 />
                 </div>
                 <div style={{flexGrow:"1"}}>
