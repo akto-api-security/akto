@@ -1,10 +1,12 @@
 package com.akto.testing;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
@@ -22,7 +24,14 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
+
+import javax.script.Invocable;
+import javax.script.ScriptContext;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
 
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
@@ -243,6 +252,8 @@ public class ApiExecutor {
 
         builder = builder.url(request.getFullUrlWithParams());
 
+        calculateHash();
+
         OriginalHttpResponse response = null;
         switch (method) {
             case GET:
@@ -315,6 +326,27 @@ public class ApiExecutor {
         
     }
 
+    private static String calculateHash() {
+        try {
+            TestScript testScript = TestScriptsDao.instance.fetchTestScript();
+            if (testScript == null) {
+                return null;
+            }
+            ScriptEngineManager manager = new ScriptEngineManager();
+            ScriptEngine engine = manager.getEngineByName("nashorn");
+
+            String script = testScript.getJavascript();
+            engine.eval(script);
+
+            Invocable invocable = (Invocable) engine;
+            String hmac = (String) invocable.invokeFunction("calculateHMACSHA256");
+
+            return hmac;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
 
 
     private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
