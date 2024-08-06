@@ -1,5 +1,6 @@
 package com.akto.dao;
 
+import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
@@ -8,6 +9,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.*;
@@ -62,6 +64,16 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
     public List<ApiCollection> getMetaForIds(List<Integer> apiCollectionIds) {
         return ApiCollectionsDao.instance.findAll(Filters.in("_id", apiCollectionIds), Projections.exclude("urls"));
+    }
+
+    public Map<Integer, ApiCollection> getApiCollectionsMetaMap() {
+        Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
+        List<ApiCollection> metaAll = getMetaAll();
+        for (ApiCollection apiCollection: metaAll) {
+            apiCollectionsMap.put(apiCollection.getId(), apiCollection);
+        }
+
+        return apiCollectionsMap;
     }
 
     public List<ApiCollection> getMetaAll() {
@@ -131,7 +143,6 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         List<Bson> pipeline = new ArrayList<>();
 
         pipeline.add(Aggregates.match(SingleTypeInfoDao.filterForHostHeader(0, false)));
-
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, "$" + SingleTypeInfo._COLLECTION_IDS);
         pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count",1)));

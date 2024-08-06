@@ -1,6 +1,8 @@
 package com.akto.dao;
 
+import com.akto.util.DbMode;
 import com.mongodb.BasicDBObject;
+import com.mongodb.CreateIndexCommitQuorum;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.*;
 import com.mongodb.client.model.*;
@@ -21,6 +23,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import static com.mongodb.client.model.Filters.*;
+import static java.util.Collections.singletonList;
 
 public abstract class MCollection<T> {
     private Logger logger = LoggerFactory.getLogger(getClassT());
@@ -149,6 +152,10 @@ public abstract class MCollection<T> {
 
     public long count(Bson q) {
         return (int)this.getMCollection().countDocuments(q);
+    }
+
+    public long estimatedDocumentCount(){
+        return this.getMCollection().estimatedDocumentCount();
     }
 
     public T findLatestOne(Bson q) {
@@ -286,8 +293,15 @@ public abstract class MCollection<T> {
                 }
             }
 
-            db.getCollection(collName).createIndex(idx, options);
+            IndexModel indexModel = new IndexModel(idx, options);
 
+            CreateIndexOptions createIndexOptions = new CreateIndexOptions();
+            createIndexOptions.maxTime(5, TimeUnit.MINUTES);
+            if (DbMode.setupType.equals(DbMode.SetupType.CLUSTER)) {
+                createIndexOptions.commitQuorum(CreateIndexCommitQuorum.create(1));
+            }
+
+            db.getCollection(collName).createIndexes(singletonList(indexModel), createIndexOptions);
         } catch (Exception e){
             return false;
         }

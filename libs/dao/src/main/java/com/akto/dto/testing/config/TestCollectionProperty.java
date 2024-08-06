@@ -21,7 +21,11 @@ public class TestCollectionProperty {
         LOGGED_OUT_SYSTEM_ROLE("Logged out account role", Type.ROLE, Collections.singletonList(GlobalEnums.TestCategory.NO_AUTH)),
         ATTACKER_TOKEN("Attacker account role", Type.ROLE, Collections.singletonList(GlobalEnums.TestCategory.BOLA)),
 //        SESSION_TOKEN_HEADER_KEY("Session token header key", Type.CUSTOM_AUTH, Collections.singletonList(GlobalEnums.TestCategory.NO_AUTH)),
-        AUTH_TOKEN("Authentication token header key", Type.CUSTOM_AUTH, Collections.singletonList(GlobalEnums.TestCategory.NO_AUTH));
+        AUTH_TOKEN("Authentication token header key", Type.CUSTOM_AUTH, Collections.singletonList(GlobalEnums.TestCategory.NO_AUTH)),
+        ADMIN("Admin role token", Type.ROLE,Collections.singletonList(GlobalEnums.TestCategory.BFLA)),
+        MEMBER("Member role token", Type.ROLE,Collections.singletonList(GlobalEnums.TestCategory.BFLA)),
+        LOGIN_2FA_INCOMPLETE_SYSTEM_ROLE("Incomplete MFA user token", Type.ROLE,Collections.singletonList(GlobalEnums.TestCategory.BFLA));
+
 
         final String title;
         final Type type;

@@ -48,7 +48,7 @@ const tableFunc = {
             tempData = tempData.filter(value => singleFilterData.includes(value));
           })
           tempData = tempData.filter((value) => {
-            return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order']);
+            return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order', 'conditions']);
           })
           let dataSortKey = props?.sortOptions?.filter(value => {
             return (value.value.startsWith(sortKey))

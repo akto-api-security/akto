@@ -3,6 +3,7 @@ import FlyLayout from '../../../components/layouts/FlyLayout'
 import func from '@/util/func'
 import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
+import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
 import { Avatar, Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack } from '@shopify/polaris'
 import api from '../../observe/api'
@@ -10,6 +11,7 @@ import issuesApi from "../../issues/api"
 import GridRows from '../../../components/shared/GridRows'
 import { useNavigate } from 'react-router-dom'
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
+import "./style.css"
 
 function TestRunResultFlyout(props) {
 
@@ -248,9 +250,15 @@ function TestRunResultFlyout(props) {
         component:  ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) && <Box padding={"4"}>
             {
             selectedTestRunResult?.errors?.map((error, i) => {
-              return (
-                <Text key={i}>{error}</Text>
-              )
+                if (error) {
+                    let data = {
+                        original : error
+                    }
+                    return (
+                        <SampleData key={i} data={data} language="yaml" minHeight="450px" wordWrap={false}/>
+                        // <p className="p-class" key={i}>{error}</p>
+                      )
+                }
             })
           }
         </Box>

@@ -67,6 +67,7 @@ public class ApiExecutor {
         Call call = client.newCall(request);
         Response response = null;
         String body;
+        byte[] grpcBody = null;
         try {
             response = call.execute();
             ResponseBody responseBody = response.peekBody(MAX_RESPONSE_SIZE);
@@ -74,7 +75,20 @@ public class ApiExecutor {
                 throw new Exception("Couldn't read response body");
             }
             try {
-                body = responseBody.string();
+                if (requestProtocol != null && requestProtocol.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {//GRPC request
+                    grpcBody = responseBody.bytes();
+                    StringBuilder builder = new StringBuilder();
+                    builder.append("grpc response binary array: ");
+                    for (byte b : grpcBody) {
+                        builder.append(b).append(",");
+                    }
+                    loggerMaker.infoAndAddToDb(builder.toString(), LogDb.TESTING);
+                    String responseBase64Encoded = Base64.getEncoder().encodeToString(grpcBody);
+                    loggerMaker.infoAndAddToDb("grpc response base64 encoded:" + responseBase64Encoded, LogDb.TESTING);
+                    body = HttpRequestResponseUtils.convertGRPCEncodedToJson(grpcBody);
+                } else {
+                    body = responseBody.string();
+                }
             } catch (IOException e) {
                 loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
                 body = "{}";
@@ -92,14 +106,7 @@ public class ApiExecutor {
         Headers headers = response.headers();
 
         Map<String, List<String>> responseHeaders = generateHeadersMapFromHeadersObject(headers);
-        OriginalHttpResponse originalHttpResponse = new OriginalHttpResponse(body, responseHeaders, statusCode);
-        if (requestProtocol != null && requestProtocol.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {//GRPC request
-            //body will be binary,
-            String responseBase64Encoded = Base64.getEncoder().encodeToString(body.getBytes());
-            loggerMaker.infoAndAddToDb("grpc response base64 encoded:" + responseBase64Encoded, LogDb.TESTING);
-            originalHttpResponse.setBody(HttpRequestResponseUtils.convertGRPCEncodedToJson(responseBase64Encoded));
-        }
-        return originalHttpResponse;
+        return new OriginalHttpResponse(body, responseHeaders, statusCode);
     }
 
     public static Map<String, List<String>> generateHeadersMapFromHeadersObject(Headers headers) {

@@ -12,20 +12,20 @@ function ContextualLayout(props){
         url: '#',
         accessibilityLabel: 'Akto Icon',
       };
-    
+    const disabledActive = isDisabled()
     const contextualMarkup = (
     <ContextualSaveBar
             message="Unsaved changes"
             saveAction={{
             onAction: () => saveAction(),
             loading: false,
-            disabled: isDisabled(),
+            disabled: disabledActive,
             content: "Save"
             }}
             discardAction={{
             onAction: () => discardAction(),
             content: "Discard",
-            disabled: isDisabled(),
+            disabled: disabledActive,
             }}
         />
     )
@@ -33,7 +33,7 @@ function ContextualLayout(props){
     return (
         <div className='control-frame-padding'>
           <Frame logo={logo}>
-            {contextualMarkup}
+            {!disabledActive ? contextualMarkup : null}
             {pageMarkup}
           </Frame>
         </div>

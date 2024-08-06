@@ -7,6 +7,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
 import com.akto.dto.User;
+import com.akto.log.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
@@ -49,7 +50,13 @@ public class InviteUserAction extends UserAction{
         String domain = loginArr[1];
         String inviteeEmailDomain = inviteeEmailArr[1];
 
-        if (!isSameDomain(inviteeEmailDomain, domain) && !inviteeEmailDomain.equals(AKTO_DOMAIN))  {
+        loggerMaker.infoAndAddToDb("inviteeEmailDomain: " + inviteeEmailDomain);
+        loggerMaker.infoAndAddToDb("admin domain: " + domain);
+
+        boolean isSameDomainVal = isSameDomain(inviteeEmailDomain, domain);
+        loggerMaker.infoAndAddToDb("is same domain: " + isSameDomainVal);
+
+        if (!isSameDomainVal && !inviteeEmailDomain.equals(AKTO_DOMAIN))  {
             return DIFFERENT_ORG_EMAIL_ERROR;
         }
 
@@ -58,25 +65,38 @@ public class InviteUserAction extends UserAction{
 
     private static boolean isSameDomain(String inviteeDomain, String adminDomain) {
         if (inviteeDomain == null || adminDomain == null) return false;
+        if (inviteeDomain.equalsIgnoreCase(adminDomain)) return true;
 
         String inviteeOrg = commonOrganisationsMap.get(inviteeDomain);
         String adminOrg = commonOrganisationsMap.get(adminDomain);
 
+        loggerMaker.infoAndAddToDb("inviteeOrg: " + inviteeOrg);
+        loggerMaker.infoAndAddToDb("adminOrg: " + adminOrg);
         if (inviteeOrg == null || adminOrg == null) return false;
 
         if (inviteeOrg.equalsIgnoreCase(adminOrg)) return true;
 
-        return inviteeDomain.equalsIgnoreCase(adminDomain);
+        loggerMaker.infoAndAddToDb("inviteeOrg and adminOrg different");
+        return false;
     }
 
     private String finalInviteCode;
     private RBAC.Role inviteeRole;
 
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InviteUserAction.class, LoggerMaker.LogDb.DASHBOARD);
+
     @Override
     public String execute() {
         int user_id = getSUser().getId();
+        loggerMaker.infoAndAddToDb(user_id + " inviting " + inviteeEmail);
 
         User admin = UsersDao.instance.getFirstUser(Context.accountId.get());
+        if (admin == null) {
+            loggerMaker.infoAndAddToDb("admin is null");
+            return ERROR.toUpperCase();
+        }
+
+        loggerMaker.infoAndAddToDb("admin user: " + admin.getLogin());
         String code = validateEmail(this.inviteeEmail, admin.getLogin());
 
         if (code != null) {
@@ -130,8 +150,9 @@ public class InviteUserAction extends UserAction{
         try {
             SendgridEmail.getInstance().send(email);
         } catch (IOException e) {
+            loggerMaker.errorAndAddToDb("invite email sending failed" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
-            return ERROR.toUpperCase();
+//            return ERROR.toUpperCase();
         }
 
         return Action.SUCCESS.toUpperCase();
