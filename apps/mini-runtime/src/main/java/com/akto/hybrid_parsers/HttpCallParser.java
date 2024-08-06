@@ -182,25 +182,28 @@ public class HttpCallParser {
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
-            /*
-             * submit a job only if it is not running.
-             */
-            loggerMaker.infoAndAddToDb("Current pg merging status " + pgMerging);
-            if (!pgMerging && (accountSettings!=null && accountSettings.isRedactPayload())) {
-                int accountId = Context.accountId.get();
-                pgMerging = true;
-                service.submit(() -> {
-                    Context.accountId.set(accountId);
-                    try {
-                        loggerMaker.infoAndAddToDb("Running merging job for sql");
-                        MergeLogicLocal.mergingJob(apiCatalogSync.dbState);
-                        loggerMaker.infoAndAddToDb("completed merging job for sql");
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "error in sql merge job");
-                    } finally {
-                        pgMerging = false;
-                    }
-                });
+
+            if (accountSettings != null && accountSettings.isRedactPayload()) {
+                loggerMaker.infoAndAddToDb("Current pg merging status " + pgMerging);
+                /*
+                 * submit a job only if it is not running.
+                 */
+                if (!pgMerging) {
+                    int accountId = Context.accountId.get();
+                    pgMerging = true;
+                    service.submit(() -> {
+                        Context.accountId.set(accountId);
+                        try {
+                            loggerMaker.infoAndAddToDb("Running merging job for sql");
+                            MergeLogicLocal.mergingJob(apiCatalogSync.dbState);
+                            loggerMaker.infoAndAddToDb("completed merging job for sql");
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, "error in sql merge job");
+                        } finally {
+                            pgMerging = false;
+                        }
+                    });
+                }
             }
         }
 
