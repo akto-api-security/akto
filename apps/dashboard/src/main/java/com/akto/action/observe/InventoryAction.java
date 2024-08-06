@@ -382,7 +382,7 @@ public class InventoryAction extends UserAction {
 
     public String fetchNewParametersTrend() {
         List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Sorts.descending(SingleTypeInfo._TIMESTAMP));
+        pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
         pipeline.add(Aggregates.match(Filters.gte("timestamp", startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte("timestamp", endTimestamp)));
         pipeline.add(Aggregates.match(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)));
