@@ -118,13 +118,12 @@ const transform = {
         let coverageCount = 0 ;
         Object.keys(collectionsArr).forEach((key) =>{
             const x = collectionsArr[key]
-            if (x.hasOwnProperty('type') && x.type === 'API_GROUP') {
-                return
-            }
-
             urlsCount += x.urlsCount;
             coverageCount += coverageObject[key] || 0 ;
         })
+        if(collectionsArr[111111121] !== undefined){
+            urlsCount = collectionsArr[111111121]?.urlsCount
+        }
         return {
             totalUrls: urlsCount,
             coverage: urlsCount === 0 ? "0%" : Math.ceil((coverageCount * 100) / urlsCount) + '%'

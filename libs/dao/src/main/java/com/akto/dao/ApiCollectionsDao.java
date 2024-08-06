@@ -142,11 +142,12 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         Map<Integer, Integer> countMap = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
 
+        pipeline.add(Aggregates.match(SingleTypeInfoDao.filterForHostHeader(0, false)));
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, "$" + SingleTypeInfo._COLLECTION_IDS);
         pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count",1)));
 
-        MongoCursor<BasicDBObject> endpointsCursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while(endpointsCursor.hasNext()) {
             try {
                 BasicDBObject basicDBObject = endpointsCursor.next();
