@@ -9,10 +9,22 @@ import api from '../../../../signup/api';
 import func from '@/util/func';
 import SemiCircleProgress from '../../shared/SemiCircleProgress';
 import { usePolling } from '../../../../main/PollingProvider';
+import { debounce } from 'lodash';
+
+function ContentWithIcon({icon,text, isAvatar= false}) {
+    return(
+        <HorizontalStack gap={2}>
+            <Box width='20px'>
+                {isAvatar ? <div className='reduce-size'><Avatar size="extraSmall" source={icon} /> </div>:
+                <Icon source={icon} color="base" />}
+            </Box>
+            <Text>{text}</Text>
+        </HorizontalStack>
+    )
+}
 
 export default function Header() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-    const [isSearchActive, setIsSearchActive] = useState(false);
     const [searchValue, setSearchValue] = useState('');
     const [newAccount, setNewAccount] = useState('')
     const [showCreateAccount, setShowCreateAccount] = useState(false)
@@ -25,12 +37,21 @@ export default function Header() {
     const activeAccount = Store(state => state.activeAccount)
     const resetAll = PersistStore(state => state.resetAll)
 
-    const searchItemsArr = func.getSearchItemsArr()
+    const searchItemsArr = useMemo(() => func.getSearchItemsArr(),[])
+    const [filteredItemsArr, setFilteredItemsArr] = useState(searchItemsArr)
 
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
         [],
     );
+    const debouncedSearch = debounce((searchQuery) => {
+        if(searchQuery.length === 0){
+            setFilteredItemsArr(searchItemsArr)
+        }else{
+            const resultArr = searchItemsArr.filter((x) => x.content.toLowerCase().includes(searchQuery))
+            setFilteredItemsArr(resultArr)
+        }
+    }, 500);
 
     const handleLogOut = async () => { 
         clearPollingInterval()
@@ -67,18 +88,6 @@ export default function Header() {
           window.location.href="/dashboard/onboarding"
         })
     }
-    
-    function ContentWithIcon({icon,text, isAvatar= false}) {
-        return(
-            <HorizontalStack gap={2}>
-                <Box width='20px'>
-                    {isAvatar ? <div className='reduce-size'><Avatar size="extraSmall" source={icon} /> </div>:
-                    <Icon source={icon} color="base" />}
-                </Box>
-                <Text>{text}</Text>
-            </HorizontalStack>
-        )
-    }
 
     const userMenuMarkup = (
         <TopBar.UserMenu
@@ -110,23 +119,17 @@ export default function Header() {
         />
     );
 
-    const handleSearchResultsDismiss = useCallback(() => {
-        setIsSearchActive(false);
-        setSearchValue('');
-    }, []);
-
     const handleSearchChange = useCallback((value) => {
         setSearchValue(value);
-        setIsSearchActive(value.length > 0);
+        debouncedSearch(value.toLowerCase())
     }, []);
 
     const handleNavigateSearch = (url) => {
         navigate(url)
-        handleSearchResultsDismiss()
+        handleSearchChange('')
     }
-
-    const searchItems = searchItemsArr.map((item) => {
-        const icon = item.type === 'page' ? PageMajor : DynamicSourceMajor;
+    const searchItems = filteredItemsArr.slice(0,40).map((item) => {
+        const icon = DynamicSourceMajor;
         return {
             value: item.content,
             content: <ContentWithIcon text={item.content} icon={icon} />,
@@ -136,7 +139,7 @@ export default function Header() {
 
     const searchResultsMarkup = (
         <ActionList
-            items={searchItems.filter(x => x.value.toLowerCase().includes(searchValue.toLowerCase()))}
+            items={searchItems}
         />
     );
 
@@ -192,9 +195,9 @@ export default function Header() {
                 showNavigationToggle
                 userMenu={userMenuMarkup}
                 searchField={searchFieldMarkup}
-                searchResultsVisible={isSearchActive}
+                searchResultsVisible={searchValue.length > 0}
                 searchResults={searchResultsMarkup}
-                onSearchResultsDismiss={handleSearchResultsDismiss}
+                onSearchResultsDismiss={() => handleSearchChange('')}
                 secondaryMenu={secondaryMenuMarkup}
             />
             <Modal

@@ -1133,7 +1133,7 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
     finalArr.push({content: allCollections[item]?.displayName, url: initialStr + item, type:'collection'})
   })
 
-  return []
+  return finalArr
  },
 
  convertToDisambiguateLabel(value, convertFunc, maxAllowed){
