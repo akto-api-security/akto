@@ -252,7 +252,7 @@ public class ApiExecutor {
 
         builder = builder.url(request.getFullUrlWithParams());
 
-        calculateHash();
+        calculateHash(request);
 
         OriginalHttpResponse response = null;
         switch (method) {
@@ -326,12 +326,15 @@ public class ApiExecutor {
         
     }
 
-    private static String calculateHash() {
+    private static String calculateHash(OriginalHttpRequest originalHttpRequest) {
         try {
             TestScript testScript = TestScriptsDao.instance.fetchTestScript();
             if (testScript == null) {
                 return null;
             }
+            String req = originalHttpRequest.getBody();
+            String url = originalHttpRequest.getFullUrlWithParams();
+            String method = originalHttpRequest.getMethod();
             ScriptEngineManager manager = new ScriptEngineManager();
             ScriptEngine engine = manager.getEngineByName("nashorn");
 
@@ -339,7 +342,8 @@ public class ApiExecutor {
             engine.eval(script);
 
             Invocable invocable = (Invocable) engine;
-            String hmac = (String) invocable.invokeFunction("calculateHMACSHA256");
+            // todo: check what all fields should be going from request as message
+            String hmac = (String) invocable.invokeFunction("calculateHMACSHA256", req + url + method);
 
             return hmac;
         } catch (Exception e) {
