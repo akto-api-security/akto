@@ -40,7 +40,6 @@ function HomeDashboard() {
     const [showBannerComponent, setShowBannerComponent] = useState(false)
 
     const allCollections = PersistStore(state => state.allCollections)
-    const collectionsMap = PersistStore(state => state.collectionsMap)
 
     const fetchData = async() =>{
         setLoading(true)
@@ -263,9 +262,9 @@ function HomeDashboard() {
             <div style={{flex: 3}}>
                 <VerticalStack gap={5}>
                     <InitialSteps initialSteps={initialSteps}/>
-                    <ActivityTracker collections={collectionsMap} latestActivity={recentActivities} onLoadMore={handleLoadMore} showLoadMore={checkLoadMore}/>
-                    <CoverageCard coverageObj={coverageObj} collections={allCollections} collectionsMap={collectionsMap}/>
-                    <Pipeline riskScoreMap={riskScoreObj} collections={allCollections} collectionsMap={collectionsMap}/> 
+                    <ActivityTracker collections={allCollections} latestActivity={recentActivities} onLoadMore={handleLoadMore} showLoadMore={checkLoadMore}/>
+                    <CoverageCard coverageObj={coverageObj} collections={allCollections}/>
+                    <Pipeline riskScoreMap={riskScoreObj}  collections={allCollections}/> 
                 </VerticalStack>
             </div>
         </div>

@@ -1,23 +1,15 @@
-import { Card, DataTable, Scrollable, Text,HorizontalStack , VerticalStack,Modal,Button } from '@shopify/polaris'
+import { Card, DataTable, Scrollable, Text,HorizontalStack , VerticalStack,Modal } from '@shopify/polaris'
 import React , {useState} from 'react'
 import transform from '../transform'
 import { useNavigate, Link} from "react-router-dom"
 
 
-function Pipeline({riskScoreMap, collections, collectionsMap}) {
+function Pipeline({riskScoreMap, collections}) {
 
     const [active, setActive] = useState(false);
-
-    const handleShowModal = () => {
-        setActive(true);
-    };
-
     const navigate = useNavigate();
 
     function CicdModal({ active, setActive }) {
-
-        
-    
         const primaryAction = () => {
             navigate('/dashboard/settings/integrations/ci-cd');
         };
@@ -62,7 +54,7 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
 
 
 
-    const tableRows = transform.prepareTableData(riskScoreMap,collections, collectionsMap, setActive);
+    const tableRows = transform.prepareTableData(riskScoreMap,collections, setActive);
 
     return (
         <Card>

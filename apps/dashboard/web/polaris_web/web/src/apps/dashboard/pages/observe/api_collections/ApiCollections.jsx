@@ -178,6 +178,8 @@ function ApiCollections() {
         setActive(true)
     }
     const setAllCollectionsStore = PersistStore(state => state.setAllCollections)
+    const setAllCollectionsMapStore = PersistStore(state => state.setCollectionsMap)
+    const setHostNameMap = PersistStore(state => state.setHostNameMap)
     const [allCollections, setAllCollections] = useState([])
     const setCoverageMap = PersistStore(state => state.setCoverageMap)
 
@@ -217,7 +219,12 @@ function ApiCollections() {
         })
         setEnvTypeMap(envTypeObj)
         setAllCollections(apiCollectionsResp?.apiCollections)
+        const allCollectionsMap = func.mapCollectionIdToName(apiCollectionsResp?.apiCollections || [])
         setAllCollectionsStore(func.reduceCollectionsResponse(apiCollectionsResp?.apiCollections || []))
+        setAllCollectionsMapStore(allCollectionsMap)
+        const allHostNameMap = func.mapCollectionIdToHostName((apiCollectionsResp?.apiCollections || []))
+        setHostNameMap(allHostNameMap)
+        
 
         const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
 

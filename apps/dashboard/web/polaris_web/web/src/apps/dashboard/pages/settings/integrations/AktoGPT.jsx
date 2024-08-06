@@ -23,7 +23,7 @@ function AktoGPT() {
     }
 
     useEffect(()=> {
-        setDisplayItems(apiCollections)
+        setDisplayItems(func.reduceToCollectionArr(apiCollections))
     },[apiCollections])
 
     useEffect(()=>{

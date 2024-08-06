@@ -326,10 +326,10 @@ prettifyEpoch(epoch) {
 
   getListOfHosts(apiCollections) {
     let result = []
-    if (!apiCollections || apiCollections.length === 0) return []
-    apiCollections.forEach((x) => {
-      let hostName = x['hostName']
-      if (!hostName) return
+    if (!apiCollections || Object.keys(apiCollections.length )=== 0) return []
+    Object.keys(apiCollections).forEach((x) => {
+      let hostName = apiCollections[x]['hostName']
+      if (hostName.length === 0) return
       result.push(
         {
           "label": hostName,
@@ -542,7 +542,8 @@ prettifyEpoch(epoch) {
       acc[coll.id] = {
         displayName: coll?.displayName || "",
         name: coll?.name || "",
-        urlsCount: coll?.urlsCount || 0
+        urlsCount: coll?.urlsCount || 0,
+        hostName: coll?.hostName || ""
       };
       return acc;
     }, {});
@@ -550,7 +551,7 @@ prettifyEpoch(epoch) {
   reduceToCollectionArr(collectionObj){
     let finalArr = []
     Object.keys(collectionObj).forEach((key) => {
-      let obj = collectionObj[key]
+      let obj = {...collectionObj[key]}
       obj['id'] = key
       finalArr.push(key)
     })
@@ -775,9 +776,9 @@ parameterizeUrl(x) {
   });
   return newStr
 },
-mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
+mergeApiInfoAndApiCollection(listEndpoints, apiInfoList) {
   const allCollections = PersistStore.getState().allCollections
-  const apiGroupsMap = func.mapCollectionIdToName(allCollections.filter(x => x.type === "API_GROUP"))
+  const apiGroupsMap = Object.keys(allCollections).filter(x => allCollections[x].type === "API_GROUP")
 
   let ret = {}
   let apiInfoMap = {}
@@ -834,7 +835,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : 'No new changes',
               added: "Discovered " + this.prettifyEpoch(x.startTs),
               violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
-              apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
+              apiCollectionName: allCollections[x.apiCollectionId]?.displayName || "-" ,
               auth_type: (authType || "no auth type found").toLowerCase(),
               sensitiveTags: [...this.convertSensitiveTags(x.sensitive)],
               authTypeTag: (authTypeTag || "no auth").toLowerCase(),
@@ -1356,13 +1357,13 @@ mapCollectionIdToHostName(apiCollections){
       switch (x.key) {
         case "collectionIds":
           filters[i].choices = []
-          tmp = allCollections
-            .filter(x => x.type === 'API_GROUP')
+          tmp = Object.keys(allCollections)
+            .filter(x => allCollections[x]?.type === 'API_GROUP')
           break;
         case "apiCollectionId":
           filters[i].choices = []
-          tmp = allCollections
-            .filter(x => x.type !== 'API_GROUP')
+          tmp = Object.keys(allCollections)
+            .filter(x => allCollections[x]?.type !== 'API_GROUP')
           break;
         default:
           break;
@@ -1421,10 +1422,7 @@ mapCollectionIdToHostName(apiCollections){
   },
   async refreshApiCollections() {
     let apiCollections = await homeFunctions.getAllCollections()
-    const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
-
     PersistStore.getState().setAllCollections(this.reduceCollectionsResponse(apiCollections));
-    PersistStore.getState().setCollectionsMap(allCollectionsMap);
   },
   transformString(inputString) {
     let transformedString = inputString.replace(/^\//, '').replace(/\/$/, '').replace(/#$/, '');

@@ -2,7 +2,7 @@ import React from 'react'
 import transform from '../transform'
 import { Box, Card, Divider, HorizontalStack, ProgressBar, Scrollable, Text, VerticalStack } from '@shopify/polaris'
 
-function CoverageCard({coverageObj, collections, collectionsMap}) {
+function CoverageCard({coverageObj, collections}) {
 
     const sortedCollectionElements = transform.formatCoverageData(coverageObj,collections)
     return (
@@ -15,7 +15,7 @@ function CoverageCard({coverageObj, collections, collectionsMap}) {
                         <Box padding={2} key={collectionObj.id}>
                             <VerticalStack gap={2}>
                                 <Text variant="bodyMd">
-                                    {collectionsMap[collectionObj.id]}
+                                    {collectionObj?.displayName}
                                 </Text>
                                 <HorizontalStack gap={2}>
                                     <Box width='85%'>

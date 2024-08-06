@@ -15,9 +15,9 @@ function ApiCollectionsDropdown({ selectedCollections, setSelectedCollections })
     const allCollections = PersistStore(state => state.allCollections)
 
     const deselectedOptions = useMemo(
-        () => allCollections.map(collection => ({
-            value: collection.name,
-            label: collection.name
+        () => Object.keys(allCollections).map(collection => ({
+            value: allCollections[collection].displayName,
+            label: allCollections[collection].displayName
         })),
         [],
     );
