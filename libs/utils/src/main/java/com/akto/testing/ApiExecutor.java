@@ -8,17 +8,19 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
+import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.grpc.ProtoBufUtils;
+import com.mongodb.BasicDBObject;
+
 import kotlin.Pair;
 import okhttp3.*;
 import okio.BufferedSink;
 import org.apache.commons.lang3.StringUtils;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -38,6 +40,11 @@ public class ApiExecutor {
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
+
+    private static int lastTestScriptFetched = 0;
+    private static TestScript testScript = null;
+    private static ScriptEngineManager manager = new ScriptEngineManager();
+    private static ScriptEngine engine = manager.getEngineByName("nashorn");
     
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
 
@@ -252,7 +259,7 @@ public class ApiExecutor {
 
         builder = builder.url(request.getFullUrlWithParams());
 
-        calculateHash(request);
+        calculateHashAndAddAuth(request);
 
         OriginalHttpResponse response = null;
         switch (method) {
@@ -326,32 +333,116 @@ public class ApiExecutor {
         
     }
 
-    private static String calculateHash(OriginalHttpRequest originalHttpRequest) {
+    private static void calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest) {
+        String script;
         try {
-            TestScript testScript = TestScriptsDao.instance.fetchTestScript();
-            if (testScript == null) {
-                return null;
+            if (Context.now() - lastTestScriptFetched > 5 * 60) {
+                testScript = TestScriptsDao.instance.fetchTestScript();
+                lastTestScriptFetched = Context.now();
+                if (testScript != null && testScript.getJavascript() != null) {
+                    script = testScript.getJavascript();
+                    engine.eval(script);
+                }
             }
-            String req = originalHttpRequest.getBody();
-            String url = originalHttpRequest.getFullUrlWithParams();
-            String method = originalHttpRequest.getMethod();
-            ScriptEngineManager manager = new ScriptEngineManager();
-            ScriptEngine engine = manager.getEngineByName("nashorn");
+            if (testScript == null || testScript.getJavascript() == null) {
+                return;
+            }
+            String message = originalHttpRequest.getMethod();
+            String reqPayload = originalHttpRequest.getBody();
+            String urlPath = originalHttpRequest.getPath();
+            String queryParamStr = getQueryParam(originalHttpRequest);
+            String headerStr = getHeaderStr(originalHttpRequest);
 
-            String script = testScript.getJavascript();
-            engine.eval(script);
+            message = message + ":" + urlPath + ":" + queryParamStr + ":" + headerStr + ":" + reqPayload;
 
             Invocable invocable = (Invocable) engine;
-            // todo: check what all fields should be going from request as message
-            String hmac = (String) invocable.invokeFunction("calculateHMACSHA256", req + url + method);
+            String hmac = (String) invocable.invokeFunction("calculateHMACSHA256", message);
 
-            return hmac;
+            String hmacBase64 = Base64.getEncoder().encodeToString(hmac.getBytes());
+            addAuthHeaderWithHash(originalHttpRequest, hmacBase64);
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error calculating hash " + e.getMessage() + " payload " + originalHttpRequest.getUrl());
             e.printStackTrace();
-            return null;
+            return;
         }
     }
 
+    private static void addAuthHeaderWithHash(OriginalHttpRequest request, String authHashVal) {
+        Map<String, List<String>> m = request.getHeaders();
+        if (m.get("authorization") == null || m.get("authorization").size() == 0) {
+            return;
+        }
+        String existingVal = m.get("authorization").get(0);
+        if (!existingVal.contains("Signature")) {
+            return;
+        }
+        List<String> val = new ArrayList<>();
+        val.add(replaceSignature(existingVal, authHashVal));
+        m.put("authorization", val);
+        loggerMaker.infoAndAddToDb("modified auth header with hash for url " + request.getUrl());
+    }
+
+    public static String replaceSignature(String input, String newSignature) {
+        String signaturePrefix = "Signature=";
+        int startIndex = input.indexOf(signaturePrefix);
+        if (startIndex == -1) {
+            // If the "Signature=" part is not found, return the original string
+            return input;
+        }
+
+        int endIndex = input.indexOf(",", startIndex);
+        if (endIndex == -1) {
+            // If there is no comma after "Signature=", replace till the end of the string
+            endIndex = input.length();
+        }
+
+        StringBuilder result = new StringBuilder();
+        result.append(input.substring(0, startIndex + signaturePrefix.length()));
+        result.append(newSignature);
+        result.append(input.substring(endIndex));
+
+        return result.toString();
+    }
+
+    private static String getQueryParam(OriginalHttpRequest originalHttpRequest) {
+        String url = originalHttpRequest.getFullUrlWithParams();
+        BasicDBObject qpObj = RequestTemplate.getQueryJSON(url);
+        String qp = "";
+        TreeMap<String, String> m = new TreeMap<>();
+        for (String key: qpObj.keySet()) {
+            m.put(key, qpObj.getString(key).trim());
+        }
+
+        for (String key: m.keySet()) {
+            qp = qp + key + "=" + m.get(key) + "&";
+        }
+        if (qp.length() > 0) {
+            return qp.substring(0, qp.length() - 1);
+        }
+        return qp;
+    }
+
+    private static String getHeaderStr(OriginalHttpRequest request) {
+        String headerStr = "";
+        Map<String, List<String>> m = request.getHeaders();
+        for (String key: m.keySet()) {
+            if (!(key.equalsIgnoreCase("channel") || key.equalsIgnoreCase("client_key") || 
+                key.equalsIgnoreCase("idempotent_request_key") || key.equalsIgnoreCase("product") || 
+                key.equalsIgnoreCase("orbipay_payments") || key.equalsIgnoreCase("requestor") || 
+                key.equalsIgnoreCase("requestor_type") || key.equalsIgnoreCase("timestamp"))) {
+                continue;
+            }
+            List<String> val = m.get(key);
+            if (val == null || val.size() == 0) {
+                continue;
+            }
+            headerStr = headerStr + key + "=" + val.get(0) + "&";
+        }
+        if (headerStr.length() > 0) {
+            return headerStr.substring(0, headerStr.length() - 1);
+        }
+        return headerStr;
+    }
 
     private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
