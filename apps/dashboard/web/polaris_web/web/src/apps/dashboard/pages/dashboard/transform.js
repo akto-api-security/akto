@@ -116,19 +116,12 @@ const transform = {
     getCountInfo: (collectionsArr, coverageObject) => {
         let urlsCount = 0 ;
         let coverageCount = 0 ;
-        let allAPIsGroupActive = false;
         collectionsArr.forEach((x) =>{
             if (x.hasOwnProperty('type') && x.type === 'API_GROUP') {
-                if (x.id === 111111121) {
-                    urlsCount = x.urlsCount;
-                    allAPIsGroupActive = true;
-                }
                 return
             }
 
-            if(!allAPIsGroupActive){
-                urlsCount += x.urlsCount;
-            }
+            urlsCount += x.urlsCount;
             coverageCount += coverageObject[x.id] || 0 ;
         })
         return {
