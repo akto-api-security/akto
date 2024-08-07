@@ -141,7 +141,7 @@ const settingFunctions = {
       await settingRequests.fetchAktoGptConfig(-1).then((resp)=>{
         resp.currentState.forEach((collection) =>{
           if(collection.state === 'ENABLED'){
-            arr.push(collection.id)
+            arr.push(String(collection.id))
           }
         })
       })
@@ -150,7 +150,7 @@ const settingFunctions = {
     updateGptCollections: async function(selectedList,allCollections){
       let selectedSet = new Set(selectedList)
       const arr = Object.keys(allCollections).map(item => ({
-				id: item,
+				id: Number (item),
 				state: selectedSet.has(item) ? 'ENABLED' : 'DISABLED'
 			}));
 

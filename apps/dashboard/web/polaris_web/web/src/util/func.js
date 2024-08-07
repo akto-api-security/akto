@@ -554,7 +554,7 @@ prettifyEpoch(epoch) {
     Object.keys(collectionObj).forEach((key) => {
       let obj = {...collectionObj[key]}
       obj['id'] = key
-      finalArr.push(key)
+      finalArr.push(obj)
     })
     return finalArr
   },
