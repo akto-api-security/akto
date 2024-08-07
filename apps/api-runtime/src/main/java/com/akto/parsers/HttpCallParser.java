@@ -19,6 +19,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.URLAggregator;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.DbMode;
@@ -448,6 +449,10 @@ public class HttpCallParser {
 
             Map<String, List<String>> reqHeaders = httpResponseParam.getRequestParams().getHeaders();
             String hostName = getHeaderValue(reqHeaders, "host");
+
+            if (!hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
+                continue;
+            }
 
             if (StringUtils.isEmpty(hostName)) {
                 hostName = getHeaderValue(reqHeaders, "authority");

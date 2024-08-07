@@ -19,6 +19,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
 import com.akto.hybrid_runtime.URLAggregator;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.util.JSONUtils;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
@@ -368,6 +369,9 @@ public class HttpCallParser {
 
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
+            if (!hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
+                continue;
+            }
 
             int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
             int apiCollectionId ;
