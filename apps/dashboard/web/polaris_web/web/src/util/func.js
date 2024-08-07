@@ -543,7 +543,8 @@ prettifyEpoch(epoch) {
         displayName: coll?.displayName || "",
         name: coll?.name || "",
         urlsCount: coll?.urlsCount || 0,
-        hostName: coll?.hostName || ""
+        hostName: coll?.hostName || "",
+        type: coll?.type || ""
       };
       return acc;
     }, {});

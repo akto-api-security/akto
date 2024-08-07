@@ -111,7 +111,7 @@ function ConditionComponent(props) {
                     optionsList={allCollectionsOptions}
                     setSelected={(collectionId) => handleCollectionSelected(collectionId)}
                     preSelected={[Number(getCollectionId(field))]}
-                    value={allCollections[getCollectionId(condition.data)]?.displayName}
+                    value={allCollections[getCollectionId(field)]?.displayName}
                 />
                 </div>
                 <div style={{flexGrow:"1"}}>

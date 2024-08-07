@@ -128,7 +128,7 @@ export default function Header() {
         navigate(url)
         handleSearchChange('')
     }
-    const searchItems = filteredItemsArr.slice(0,40).map((item) => {
+    const searchItems = filteredItemsArr.slice(0,20).map((item) => {
         const icon = DynamicSourceMajor;
         return {
             value: item.content,
