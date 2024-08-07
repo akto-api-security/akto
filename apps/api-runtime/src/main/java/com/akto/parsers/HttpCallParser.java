@@ -52,7 +52,7 @@ public class HttpCallParser {
     private final int sync_threshold_time;
     private int sync_count = 0;
     private int last_synced;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class, LogDb.RUNTIME);
     public APICatalogSync apiCatalogSync;
     public DependencyAnalyser dependencyAnalyser;
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
@@ -230,7 +230,11 @@ public class HttpCallParser {
 
         if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
             for (HttpResponseParams responseParam: filteredResponseParams) {
-                dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+                try{
+                    dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+                } catch (Exception e){
+                    loggerMaker.errorAndAddToDb(e, "error in analyzing dependency");
+                }
             }
         }
 

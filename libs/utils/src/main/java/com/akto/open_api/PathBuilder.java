@@ -18,7 +18,7 @@ import java.util.Map;
 
 public class PathBuilder {
 
-    public static void addPathItem(Paths paths, String url, String method , int responseCode, Schema<?> schema,List<Parameter> headerParameters, boolean includeHeaders) throws Exception {
+    public static void addPathItem(Paths paths, String url, String method , int responseCode, Schema<?> schema,List<Parameter> headerParameters, List<Parameter> queryParameters, boolean includeHeaders) throws Exception {
         PathItem pathItem = paths.getOrDefault(url, new PathItem());
         pathItem.setDescription("description");
         Operation operation = getOperation(pathItem,method);
@@ -39,9 +39,12 @@ public class PathBuilder {
 
             requestBody.setContent(requestBodyContent);
             operation.setRequestBody(requestBody);
+            List<Parameter> parameters = new ArrayList<>();
             if (includeHeaders) {
-                operation.setParameters(headerParameters);
+                parameters.addAll(headerParameters);
             }
+            parameters.addAll(queryParameters);
+            operation.setParameters(parameters);
             setOperation(pathItem, method, operation);
             paths.addPathItem(url, pathItem);
             return ;
