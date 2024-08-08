@@ -1407,14 +1407,16 @@ public class APICatalogSync {
             bulkUpdates.add(new BulkUpdates(filterMap, updates));
         }
 
-        try {
-            long start = System.currentTimeMillis();
-            SampleDataAltDb.bulkInsert(unfilteredSamples);
-            AllMetrics.instance.setPostgreSampleDataInsertedCount(unfilteredSamples.size());
-            AllMetrics.instance.setPostgreSampleDataInsertLatency(System.currentTimeMillis() - start);
+        if (accountLevelRedact || apiCollectionLevelRedact) {
+            try {
+                long start = System.currentTimeMillis();
+                SampleDataAltDb.bulkInsert(unfilteredSamples);
+                AllMetrics.instance.setPostgreSampleDataInsertedCount(unfilteredSamples.size());
+                AllMetrics.instance.setPostgreSampleDataInsertLatency(System.currentTimeMillis() - start);
 
-        } catch(Exception e) {
-            loggerMaker.errorAndAddToDb(e, "unable to insert sample data in postgres", LogDb.RUNTIME);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "unable to insert sample data in postgres", LogDb.RUNTIME);
+            }
         }
 
         return bulkUpdates;
