@@ -43,8 +43,4 @@ public class CleanPostgres {
         }
     }
 
-    public static void main(String[] args) {
-        cleanPostgresCron();
-    }
-
 }
