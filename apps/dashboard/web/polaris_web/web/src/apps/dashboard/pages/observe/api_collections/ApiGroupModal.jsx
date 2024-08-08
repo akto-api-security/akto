@@ -15,8 +15,6 @@ const Operation = {
 function ApiGroupModal(props){
 
     const {showApiGroupModal, toggleApiGroupModal, apis, operation, currentApiGroupName, fetchData } = props;
-
-    const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const allCollections = PersistStore(state => state.allCollections);
     const setAllCollections = PersistStore(state => state.setAllCollections)
 
@@ -37,9 +35,9 @@ function ApiGroupModal(props){
         let ret = getApis();
 
         api.addApisToCustomCollection(ret, apiGroupName).then((resp)=>{
+            const apiCollections = resp?.apiCollections || []
             func.setToast(true, false, <div data-testid="api_added_to_group_message">APIs added to API group successfully</div>)
-            setCollectionsMap(func.mapCollectionIdToName(resp?.apiCollections))
-            setAllCollections(resp?.apiCollections)
+            setAllCollections(func.reduceCollectionsResponse(apiCollections))
             toggleApiGroupModal()
         })
     }
@@ -48,9 +46,9 @@ function ApiGroupModal(props){
         let ret = getApis();
 
         api.removeApisFromCustomCollection(ret, apiGroupName).then((resp)=>{
+            const apiCollections = resp?.apiCollections || []
             func.setToast(true, false, "APIs removed from API group successfully")
-            setCollectionsMap(func.mapCollectionIdToName(resp?.apiCollections))
-            setAllCollections(resp?.apiCollections)
+            setAllCollections(func.reduceCollectionsResponse(apiCollections))
             toggleApiGroupModal()
             fetchData()
         })
@@ -65,10 +63,10 @@ function ApiGroupModal(props){
                     id={"select-api-group"}
                     label="Select API group"
                     placeholder="Select API group"
-                    optionsList={allCollections.filter((x) => { return x.type === 'API_GROUP' }).map((x) => {
+                    optionsList={Object.keys(allCollections).filter(x => allCollections[x].type === "API_GROUP").map((x) => {
                         return {
-                            label: x.displayName,
-                            value: x.displayName
+                            label: allCollections[x]?.displayName,
+                            value: allCollections[x]?.displayName
                         }
                     })
                     }

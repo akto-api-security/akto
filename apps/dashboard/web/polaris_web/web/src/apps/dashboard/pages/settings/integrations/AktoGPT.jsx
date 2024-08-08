@@ -6,6 +6,7 @@ import "../settings.css"
 import settingFunctions from '../module'
 import func from "@/util/func"
 import PersistStore from '../../../../main/PersistStore'
+import { debounce } from 'lodash'
 
 function AktoGPT() {
 
@@ -23,7 +24,7 @@ function AktoGPT() {
     }
 
     useEffect(()=> {
-        setDisplayItems(apiCollections)
+        setDisplayItems(func.reduceToCollectionArr(apiCollections).slice(0,50))
     },[apiCollections])
 
     useEffect(()=>{
@@ -69,7 +70,7 @@ function AktoGPT() {
             arr.reverse()
         }
         setSortOrder(!sortOrder)
-        setDisplayItems(arr)
+        setDisplayItems(arr.slice(0,50))
         setTimeout(() => {
             setSelectedItems(clonedItems);
         }, 0)
@@ -78,18 +79,23 @@ function AktoGPT() {
         <Button icon={SortMinor} onClick={sortItems}>Sort</Button>
     )
 
+    const debouncedSearch = debounce((searchQuery) => {
+        let localVar = selectedItems
+        setSelectedItems([])
+        if(searchQuery.length === 0){
+            setDisplayItems(func.reduceToCollectionArr(apiCollections).slice(0,50))
+        }else{
+            const resultArr = displayItems.filter((x) => x?.displayName.toLowerCase().includes(searchQuery))
+            setDisplayItems(resultArr.slice(0,50))
+            setTimeout(() => {
+                setSelectedItems(localVar)
+            },0)
+        }
+    }, 500);
+
     const searchResult = (item) =>{
         setSearchValue(item)
-        let localVar = selectedItems;
-        setSelectedItems([])
-        const filterRegex = new RegExp(item, 'i');
-        const resultOptions = apiCollections.filter((option) =>
-            option.displayName.match(filterRegex)
-        );
-        setDisplayItems(resultOptions)
-        setTimeout(() => {
-            setSelectedItems(localVar);
-        }, 0)
+        debouncedSearch(item)
     }
 
     const SearchIcon =  (

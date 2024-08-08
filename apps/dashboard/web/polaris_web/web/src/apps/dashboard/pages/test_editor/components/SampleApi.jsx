@@ -39,7 +39,6 @@ const SampleApi = () => {
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
 
     const tabs = [{ id: 'request', content: 'Request' }, { id: 'response', content: 'Response'}];
-    const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
 
     useEffect(()=>{
         let testId = selectedTest.value
@@ -101,10 +100,10 @@ const SampleApi = () => {
     }
 
 
-    const allCollectionsOptions = allCollections.map(collection => {
+    const allCollectionsOptions = Object.keys(allCollections).map(collection => {
         return {
-            label: collection.displayName,
-            value: collection.id
+            label: allCollections[collection].displayName,
+            value: collection
         }
     })
 
@@ -294,7 +293,7 @@ const SampleApi = () => {
                         placeholder="Select API collection"
                         optionsList={allCollectionsOptions}
                         setSelected={setCopyCollectionId}
-                        value={mapCollectionIdToName?.[copyCollectionId]}
+                        value={allCollections[copyCollectionId]?.displayName}
                         preSelected={[copyCollectionId]}
                     />
 

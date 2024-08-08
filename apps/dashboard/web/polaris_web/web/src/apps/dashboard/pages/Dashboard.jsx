@@ -21,7 +21,6 @@ function Dashboard() {
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
 
     const allCollections = PersistStore(state => state.allCollections)
-    const collectionsMap = PersistStore(state => state.collectionsMap)
 
     const subCategoryMap = PersistStore(state => state.subCategoryMap)
     const [eventForUser, setEventForUser] = useState({})
@@ -34,7 +33,7 @@ function Dashboard() {
         const allHostNameMap = func.mapCollectionIdToHostName(apiCollections)
         setHostNameMap(allHostNameMap)
         setCollectionsMap(allCollectionsMap)
-        setAllCollections(apiCollections)
+        setAllCollections(func.reduceCollectionsResponse(apiCollections))
     }
 
     const fetchMetadata = async () => {
@@ -48,7 +47,7 @@ function Dashboard() {
     }
 
     useEffect(() => {
-        if((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)){
+        if((!allCollections || Object.keys(allCollections).length === 0)){
             fetchAllCollections()
         }
         if (!subCategoryMap || (Object.keys(subCategoryMap).length === 0)) {

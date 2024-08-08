@@ -1,9 +1,4 @@
-import { Box, Card, HorizontalStack, Icon, Text, VerticalStack } from '@shopify/polaris';
-import React, { useState, useEffect, useRef, useCallback } from 'react'
-import ReactFlow, {
-    Background,
-    getRectOfNodes
-} from 'react-flow-renderer';
+import { Box, Card, HorizontalStack, Icon, VerticalStack } from '@shopify/polaris';
 import { Handle, Position } from 'react-flow-renderer';
 import PersistStore from '../../../../main/PersistStore';
 import TooltipText from '../../../components/shared/TooltipText';

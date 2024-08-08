@@ -1,7 +1,6 @@
 import { Box, Badge, Link } from "@shopify/polaris";
 import { useState } from "react";
 import api from "../api"
-import func from "@/util/func"
 import { useEffect } from "react";
 import PersistStore from '@/apps/main/PersistStore';
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -9,7 +8,6 @@ import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
 
 function TestCollectionConfiguration() {
     const allCollections = PersistStore(state => state.allCollections)
-    const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
     const subCategoryMap = PersistStore(state => state.subCategoryMap)
     const [testCollectionProperties, setTestCollectionProperties] = useState([])
     const [apiCollectionId, setApiCollectionId] = useState(0)
@@ -35,7 +33,7 @@ function TestCollectionConfiguration() {
                ret =
                 (propsFromConfig.values?.length) ?
                 <div>{propsFromConfig.values.map(v => {
-                    return <span style={{marginRight: "8px"}}><Link onClick={(e) => e.stopPropagation()} monochrome target="_blank" url={window.location.origin+"/dashboard/observe/inventory/"+v}>{mapCollectionIdToName[v]}</Link></span>
+                    return <span style={{marginRight: "8px"}}><Link onClick={(e) => e.stopPropagation()} monochrome target="_blank" url={window.location.origin+"/dashboard/observe/inventory/"+v}>{allCollections[v]?.displayName}</Link></span>
                 })}</div>
                 :<div>Not Implemented</div>
 

@@ -1,4 +1,4 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, ButtonGroup, Badge, Banner,HorizontalGrid, HorizontalStack, Link, VerticalStack } from "@shopify/polaris";
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,HorizontalGrid, HorizontalStack, Link, VerticalStack } from "@shopify/polaris";
 import { TickMinor, CancelMajor } from "@shopify/polaris-icons"
 import { useEffect, useRef, useState } from "react";
 import { default as observeApi } from "../api";
@@ -36,7 +36,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [testRun, setTestRun] = useState({
         ...initialState
     })
-    const collectionsMap = PersistStore(state => state.collectionsMap)
+    const collectionsMap = PersistStore(state => state.allCollections)
     const [loading, setLoading] = useState(true)
     const [testRolesArr, setTestRolesArr] = useState([])
     const [active, setActive] = useState(runTestFromOutside || false);
@@ -61,7 +61,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             return ""
         return inputString?.toLowerCase()?.replace(/\s+/g, '_')
     }
-    const apiCollectionName = collectionsMap[apiCollectionId]
+    const apiCollectionName = collectionsMap[apiCollectionId]?.displayName
 
     async function fetchData() {
         setLoading(true)

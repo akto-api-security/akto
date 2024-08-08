@@ -2,61 +2,34 @@ import React, { useEffect, useState } from 'react'
 import homeRequests from '../../home/api'
 import OnboardingStore from '../OnboardingStore'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
-import func from '../../../../../util/func'
+import func from '@/util/func'
 import { Spinner } from '@shopify/polaris'
-import PersistStore from '../../../../main/PersistStore'
 
 function CollectionSelection() {
-    const apiCollections = PersistStore(state => state.allCollections)
-    const setCollections = PersistStore(state => state.setAllCollections)
+    const [apiCollections, setApiCollections] = useState([])
     const setSelectedCollection = OnboardingStore(state => state.setSelectedCollection)
     const collection = OnboardingStore(state => state.selectedCollection)
     
     const [loading, setLoading] = useState(true)
-    const [dummyCollections, setDummyCollections] = useState([])
-
-    const checkCollections = (apiCollections) => {
-        const localCopy = apiCollections.filter((x) => x.displayName.toLowerCase() !== "default")
-        setDummyCollections(localCopy)
-        if(localCopy.length > 0){
-            if(!collection){
-                setSelectedCollection(localCopy[0].id)
-            } 
-            return true
-        }
-        return false
-    }
-
-    const stopFunc = (interval) => {
-        setLoading(false)
-        clearInterval(interval)
-    }
 
     const getCollections = async()=> {
-        let interval = setInterval(async () => {
-            let localCopy = []
-            if(apiCollections.length <= 1 && localCopy.length <= 1){
-                await homeRequests.getCollections().then((resp)=> {
-                    setCollections(resp.apiCollections)
-                    localCopy = JSON.parse(JSON.stringify(resp.apiCollections));
-                })
-            }
-
-            const useCollections = apiCollections.length > 0 ? apiCollections : localCopy
-
-            if(checkCollections(useCollections)){
-                stopFunc(interval)
-            }
-        },1000)
+        if(collection === -1){
+            setLoading(true)
+            await homeRequests.getCollections().then((resp)=> {
+                setApiCollections(resp?.apiCollections.filter(x => x.id !== 0))
+            })
+            setLoading(false)
+        }
+        
     }
 
-    const mapCollectionIdToName = func.mapCollectionIdToName(dummyCollections)
+    const mapCollectionIdToName = func.mapCollectionIdToName(apiCollections || [])
 
     useEffect(()=> {
         getCollections()
     },[])
 
-    const allCollectionsOptions = dummyCollections.map(collection => {
+    const allCollectionsOptions = apiCollections.length > 0 && apiCollections.map(collection => {
         return {
             label: collection.displayName,
             value: collection.id

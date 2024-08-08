@@ -177,12 +177,10 @@ function ApiCollections() {
     const showCreateNewCollectionPopup = () => {
         setActive(true)
     }
-
-    const allCollections = PersistStore(state => state.allCollections)
-    const setAllCollections = PersistStore(state => state.setAllCollections)
-    const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
+    const setAllCollectionsStore = PersistStore(state => state.setAllCollections)
+    const setAllCollectionsMapStore = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
-
+    const [allCollections, setAllCollections] = useState([])
     const setCoverageMap = PersistStore(state => state.setCoverageMap)
 
     const lastFetchedInfo = PersistStore.getState().lastFetchedInfo
@@ -220,7 +218,13 @@ function ApiCollections() {
             envTypeObj[c.id] = c.envType
         })
         setEnvTypeMap(envTypeObj)
-        setAllCollections(apiCollectionsResp.apiCollections || [])
+        setAllCollections(apiCollectionsResp?.apiCollections)
+        const allCollectionsMap = func.mapCollectionIdToName(apiCollectionsResp?.apiCollections || [])
+        setAllCollectionsStore(func.reduceCollectionsResponse(apiCollectionsResp?.apiCollections || []))
+        setAllCollectionsMapStore(allCollectionsMap)
+        const allHostNameMap = func.mapCollectionIdToHostName((apiCollectionsResp?.apiCollections || []))
+        setHostNameMap(allHostNameMap)
+        
 
         const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
 
@@ -284,11 +288,6 @@ function ApiCollections() {
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
         summary.totalSensitiveEndpoints = sensitiveInfo.sensitiveUrls
         setSummaryData(summary)
-
-        
-        setCollectionsMap(func.mapCollectionIdToName(tmp))
-        const allHostNameMap = func.mapCollectionIdToHostName(tmp)
-        setHostNameMap(allHostNameMap)
         
         tmp = {}
         tmp.all = dataObj.prettify

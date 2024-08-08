@@ -9,13 +9,12 @@ import SetConfig from './SetConfig'
 import ResultsSummary from './ResultsSummary'
 import { useNavigate } from "react-router-dom"
 import api from '../api'
-import PersistStore from '../../../../main/PersistStore'
 
 function OnboardingBuilder() {
 
     const [loading, setLoading] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
-    const apiCollections = PersistStore(state => state.allCollections)
+    const selectedCollection = OnboardingStore(state => state.selectedCollection)
     const selectedTestSuite = OnboardingStore(state => state.selectedTestSuite)
     const authObj = OnboardingStore(state => state.authObject)
     const hexId = OnboardingStore(state => state.testingRunHexId)
@@ -24,7 +23,7 @@ function OnboardingBuilder() {
 
     const canNext = () => {
         if(currentStep === 1){
-            return apiCollections.length > 1
+            return selectedCollection !== -1
         }else if(currentStep === 2){
             return selectedTestSuite ? true : false
         }else{
