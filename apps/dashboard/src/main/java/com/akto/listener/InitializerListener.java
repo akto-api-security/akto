@@ -67,6 +67,7 @@ import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.task.Cluster;
 import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
@@ -1117,6 +1118,31 @@ public class InitializerListener implements ServletContextListener {
                 Filters.eq("_id", backwardCompatibility.getId()),
                 Updates.set(BackwardCompatibility.DROP_FILTER_SAMPLE_DATA, Context.now())
         );
+    }
+
+    public static void dropSpecialCharacterApiCollections(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDropSpecialCharacterApiCollections() == 0) {
+            ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+            List<ApiCollection> collections = new ArrayList<>();
+            try {
+                List<ApiCollection> apiCollections = ApiCollectionsDao.fetchAllHosts();
+                for (ApiCollection apiCollection: apiCollections) {
+                    if (RuntimeUtil.hasSpecialCharacters(apiCollection.getHostName())) {
+                        collections.add(new ApiCollection(apiCollection.getId(), null, 0, null, null, 0, false, true));
+                    }
+                }
+                apiCollectionsAction.setApiCollections(collections);
+                apiCollectionsAction.deleteMultipleCollections();
+                BackwardCompatibilityDao.instance.updateOne(
+                        Filters.eq("_id", backwardCompatibility.getId()),
+                        Updates.set(BackwardCompatibility.DROP_SPECIAL_CHARACTER_API_COLLECTIONS, Context.now())
+                );
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error dropping special character collections " + e.getStackTrace());
+            }
+
+        }
+
     }
 
     public static void dropAuthMechanismData(BackwardCompatibility authMechanismData) {
@@ -2275,6 +2301,7 @@ public class InitializerListener implements ServletContextListener {
         setDefaultTelemetrySettings(backwardCompatibility);
         disableAwsSecretPiiType(backwardCompatibility);
         makeFirstUserAdmin(backwardCompatibility);
+        dropSpecialCharacterApiCollections(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {

@@ -38,7 +38,7 @@ function Pipeline({riskScoreMap, collections}) {
                 <Modal.Section>
                     <VerticalStack gap={2}>
                         <HorizontalStack gap={2} align="start">
-                            <Text>
+                            <Text breakWord truncate>
                             Akto's integration with GitHub enterprise and Github.com allows you to maintain API security through GitHub pull requests itself. &nbsp;
 
                             <Link to='https://docs.akto.io/api-security-testing/how-to/setup-github-integration-for-ci-cd' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>

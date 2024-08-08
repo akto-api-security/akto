@@ -14,14 +14,14 @@ function CoverageCard({coverageObj, collections}) {
                     {sortedCollectionElements.map((collectionObj,index)=> (
                         <Box padding={2} key={collectionObj.id}>
                             <VerticalStack gap={2}>
-                                <Text variant="bodyMd">
+                                <Text breakWord truncate variant="bodyMd">
                                     {collectionObj?.displayName}
                                 </Text>
                                 <HorizontalStack gap={2}>
                                     <Box width='85%'>
                                         <ProgressBar size="small" color={collectionObj.status} progress={collectionObj.coverage} />
                                     </Box>
-                                    <Text color="subdued" variant="bodyMd">{collectionObj.coverage}%</Text>
+                                    <Text breakWord color="subdued" variant="bodyMd">{collectionObj.coverage}%</Text>
                                 </HorizontalStack>
                                 {index < (collections.length - 1) ? <Divider/> : null }
                             </VerticalStack>

@@ -244,7 +244,7 @@ const transform = {
                 <Button onClick={()=>setActive(true)} plain monochrome removeUnderline  >
                   <Box width='250px'> 
                     <HorizontalStack align="space-between" gap="2">
-                        <Text>{c.displayName}</Text>          
+                        <Text truncate breakWord>{c.displayName}</Text>          
                         <Badge status={c.status} size="small">{c.score.toString()}</Badge>
                     </HorizontalStack>   
                   </Box>
