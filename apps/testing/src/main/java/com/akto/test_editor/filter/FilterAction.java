@@ -1490,7 +1490,7 @@ public final class FilterAction {
             Filters.eq("method", apiInfoKey.method.name()),
             Filters.eq("responseCode", responseCode),
             Filters.eq("isHeader", isHeader),
-            Filters.regex("param", param),
+            Filters.regex("param", Utils.escapeSpecialCharacters(param)),
             urlParamFilters
         );
         

@@ -7,6 +7,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.upload.FileUploadError;
 import com.akto.dto.upload.SwaggerUploadLog;
 import com.akto.log.LoggerMaker;
@@ -323,7 +324,8 @@ public class Parser {
                     messageObject.put(mKeys.ip, "null");
                     messageObject.put(mKeys.time, Context.now() + "");
                     messageObject.put(mKeys.type, "HTTP");
-                    messageObject.put(mKeys.source, "OTHER");
+                    // swagger uploads are treated as HAR files.
+                    messageObject.put(mKeys.source, Source.HAR.name());
 
                     if (responseObjectList.isEmpty()) {
                         responseObjectList.add(emptyResponseObject);
