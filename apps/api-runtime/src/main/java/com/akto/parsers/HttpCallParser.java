@@ -451,7 +451,7 @@ public class HttpCallParser {
             String hostName = getHeaderValue(reqHeaders, "host");
 
             if (!hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
-                continue;
+                hostName = "Special_Char_Host";
             }
 
             if (StringUtils.isEmpty(hostName)) {

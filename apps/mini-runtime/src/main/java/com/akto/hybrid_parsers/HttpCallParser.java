@@ -370,7 +370,7 @@ public class HttpCallParser {
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
             if (!hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
-                continue;
+                hostName = "Special_Char_Host";
             }
 
             int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
