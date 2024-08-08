@@ -2301,6 +2301,7 @@ public class InitializerListener implements ServletContextListener {
         setDefaultTelemetrySettings(backwardCompatibility);
         disableAwsSecretPiiType(backwardCompatibility);
         makeFirstUserAdmin(backwardCompatibility);
+        dropSpecialCharacterApiCollections(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {
