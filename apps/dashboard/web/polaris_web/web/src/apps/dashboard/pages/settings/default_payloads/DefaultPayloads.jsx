@@ -9,7 +9,7 @@ import {useState, useEffect} from 'react'
 function DefaultPayloads() {
 
     const allCollections = PersistStore(state => state.allCollections)
-    const allHostnames = func.reduceToCollectionArr(allCollections).map(x => x.hostName).filter(x => x!=null)
+    const allHostnames = func.reduceToCollectionArr(allCollections).map(x => x.hostName).filter(x => (x!=null && x.length > 0))
     const [selectedDomain, setSelectedDomain] = useState('')
     const [selectedDDefaultPayload, setSelectedDDefaultPayload] = useState('')
     const [patternText, setPatternText] = useState('')

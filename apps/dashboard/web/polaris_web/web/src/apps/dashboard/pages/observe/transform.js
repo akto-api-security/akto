@@ -452,20 +452,11 @@ const transform = {
         let totalUrl = 0;
         let sensitiveInRes = 0;
         let totalTested = 0 ;
-
-        let allAPIsGroupActive = false;
         collectionsData?.forEach((c) =>{
             if (c.hasOwnProperty('type') && c.type === 'API_GROUP') {
-                if(c.id===111111121){
-                    totalUrl = c.urlsCount;
-                    allAPIsGroupActive = true;
-                }
-                return
+                return;
             }
-
-            if(!allAPIsGroupActive){
             totalUrl += c.urlsCount ;
-            }
             totalTested += c.testedEndpoints;
         })
 

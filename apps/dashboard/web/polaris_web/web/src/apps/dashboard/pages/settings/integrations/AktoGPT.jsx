@@ -80,11 +80,16 @@ function AktoGPT() {
     )
 
     const debouncedSearch = debounce((searchQuery) => {
+        let localVar = selectedItems
+        setSelectedItems([])
         if(searchQuery.length === 0){
             setDisplayItems(func.reduceToCollectionArr(apiCollections).slice(0,50))
         }else{
             const resultArr = displayItems.filter((x) => x?.displayName.toLowerCase().includes(searchQuery))
             setDisplayItems(resultArr.slice(0,50))
+            setTimeout(() => {
+                setSelectedItems(localVar)
+            },0)
         }
     }, 500);
 
