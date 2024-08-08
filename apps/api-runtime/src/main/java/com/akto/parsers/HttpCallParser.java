@@ -450,7 +450,7 @@ public class HttpCallParser {
             Map<String, List<String>> reqHeaders = httpResponseParam.getRequestParams().getHeaders();
             String hostName = getHeaderValue(reqHeaders, "host");
 
-            if (!hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
+            if (hostName != null && !hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
                 hostName = "Special_Char_Host";
             }
 

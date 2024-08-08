@@ -369,7 +369,7 @@ public class HttpCallParser {
 
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
-            if (!hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
+            if (hostName != null && !hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
                 hostName = "Special_Char_Host";
             }
 
