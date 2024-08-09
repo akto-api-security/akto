@@ -2,7 +2,7 @@ package com.akto.action;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dao.settings.DataControlSettingsDao;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -38,6 +38,8 @@ import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.testing.TestExecutor;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
@@ -45,10 +47,8 @@ import com.opensymphony.xwork2.ActionSupport;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
-import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
@@ -748,10 +748,6 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteTestingRunIssues() {
-        if (kafkaUtils.isWriteEnabled()) {
-            int accId = Context.accountId.get();
-            kafkaUtils.insertData(writesForTestingRunIssues, "bulkWriteTestingRunIssues", accId);
-        } else {
             try {
                 ArrayList<WriteModel<TestingRunIssues>> writes = new ArrayList<>();
                 for (BulkUpdates bulkUpdate: writesForTestingRunIssues) {
@@ -796,6 +792,28 @@ public class DbAction extends ActionSupport {
                             int dVal = val.intValue();
                             UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
                             updates.add(Updates.set(updatePayload.getField(), dVal));
+                        } else if (field.equals(TestingRunIssues.KEY_SEVERITY)) {
+
+                            /*
+                             * Fixing severity temp. here, 
+                             * cause the info. from mini-testing always contains HIGH.
+                             * To be fixed in mini-testing.
+                             */
+                            String testSubCategory = idd.getTestSubCategory();
+                            YamlTemplate template = YamlTemplateDao.instance
+                                    .findOne(Filters.eq(Constants.ID, testSubCategory));
+                            String dVal = (String) json.get("val");
+
+                            if (template != null) {
+                                String severity = template.getInfo().getSeverity();
+                                if (severity != null) {
+                                    dVal = severity;
+                                }
+                            }
+
+                            UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal,
+                                    (String) json.get("op"));
+                            updates.add(Updates.set(updatePayload.getField(), dVal));
                         } else {
                             String dVal = (String) json.get("val");
                             UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
@@ -819,7 +837,6 @@ public class DbAction extends ActionSupport {
                 }
                 System.out.println(err);
                 return Action.ERROR.toUpperCase();
-            }
         }
         return Action.SUCCESS.toUpperCase();
     }
@@ -1499,6 +1516,10 @@ public class DbAction extends ActionSupport {
 
     public String updateIssueCountInSummary() {
         try {
+            if (summaryId != null) {
+                ObjectId summaryObjectId = new ObjectId(summaryId);
+                totalCountIssues = TestExecutor.calcTotalCountIssues(summaryObjectId);
+            }
             trrs = DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues);
             trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
         } catch (Exception e) {

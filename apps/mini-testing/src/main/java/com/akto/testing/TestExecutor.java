@@ -247,9 +247,7 @@ public class TestExecutor {
 
     }
 
-    public static void updateTestSummary(ObjectId summaryId){
-        loggerMaker.infoAndAddToDb("Finished updating results count", LogDb.TESTING);
-
+    public static Map<String, Integer> calcTotalCountIssues(ObjectId summaryId) {
         Map<String, Integer> totalCountIssues = new HashMap<>();
         totalCountIssues.put(Severity.HIGH.toString(), 0);
         totalCountIssues.put(Severity.MEDIUM.toString(), 0);
@@ -276,6 +274,13 @@ public class TestExecutor {
             }
 
         } while (fetchMore);
+
+        return totalCountIssues;
+    }
+
+    public static void updateTestSummary(ObjectId summaryId){
+        loggerMaker.infoAndAddToDb("Finished updating results count", LogDb.TESTING);
+        Map<String, Integer> totalCountIssues = calcTotalCountIssues(summaryId);
 
         TestingRunResultSummary testingRunResultSummary = dataActor.updateIssueCountInSummary(summaryId.toHexString(), totalCountIssues);
         // GithubUtils.publishGithubComments(testingRunResultSummary);
