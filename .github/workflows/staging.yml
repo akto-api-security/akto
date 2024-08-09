@@ -188,6 +188,17 @@ jobs:
         with:
           node-version: '17'
 
+      - name: Run CI/CD tests on flash
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: akto-api-security/run-scan@v1.0.12
+        with:
+          AKTO_DASHBOARD_URL: https://flash.staging.akto.io
+          GITHUB_COMMIT_ID: ${{github.event.pull_request.head.sha}}
+          AKTO_API_KEY: ${{secrets.AKTO_API_KEY_FLASH}}
+          AKTO_TEST_ID: ${{vars.FLASH_TEST_ID}}
+          WAIT_TIME_FOR_RESULT: 3600
+          OVERRIDDEN_TEST_APP_URL: ${{needs.deploy.outputs.lb_name}}
+
       - name: Check Vulnerable API's
         working-directory: ./.github/scripts
         env:
