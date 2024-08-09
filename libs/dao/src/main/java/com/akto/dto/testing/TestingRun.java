@@ -37,7 +37,7 @@ public class TestingRun {
     private String name;
 
     public enum TestingRunType{
-        ONE_TIME, RECURRING, CI_CD
+        ONE_TIME, RECURRING, CI_CD, CONTINUOUS_TESTING
     }
 
     public TestingRun() { }

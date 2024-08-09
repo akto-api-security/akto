@@ -102,6 +102,46 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return Filters.and(filters);
     }
 
+    public static List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {
+        List<ApiInfo.ApiInfoKey> endpoints = new ArrayList<>();
+        Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
+        Bson filterQWithTs = Filters.and(
+                Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
+                Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
+                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                hostFilterQ
+        );
+
+        List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 10000, Sorts.descending("timestamp"), Projections.exclude("values"));
+        if (latestHosts.size() == 0) {
+            List<Bson> pipeline = new ArrayList<>();
+
+            BasicDBObject groupedId = 
+                new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                .append("url", "$url")
+                .append("method", "$method");
+            pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+            pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp"),Accumulators.sum("countTs",1)));
+            pipeline.add(Aggregates.match(Filters.gte("startTs", startTimestamp)));
+            pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
+            MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+            while(endpointsCursor.hasNext()) {
+                BasicDBObject basicDBObject = endpointsCursor.next();
+                BasicDBObject id = (BasicDBObject) basicDBObject.get("_id");
+                int collectionId = id.getInt("apiCollectionId");
+                String url = id.getString("url");
+                String method = id.getString("method");
+                endpoints.add(new ApiInfoKey(collectionId, url, URLMethods.Method.valueOf(method)));
+            }
+        } else {
+            for (SingleTypeInfo sti: latestHosts) {
+                endpoints.add(new ApiInfoKey(sti.getApiCollectionId(), sti.getUrl(), URLMethods.Method.valueOf(sti.getMethod())));
+            }
+        }
+
+        return endpoints;
+    }
+
     public List<SingleTypeInfo> fetchAll() {
         return this.findAll(new BasicDBObject());
     }

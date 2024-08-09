@@ -1,16 +1,15 @@
 package com.akto.testing;
 
-import com.akto.DaoInit;
 import com.akto.billing.UsageMetricUtils;
-import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
-import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.TestingEndpoints.Operator;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
@@ -201,6 +200,15 @@ public class Main {
             }
 
             try {
+                fillTestingEndpoints(testingRun);
+                // continuous testing condition
+                if (testingRun.getPeriodInSeconds() == -1) {
+                    CustomTestingEndpoints eps = (CustomTestingEndpoints) testingRun.getTestingEndpoints();
+                    if (eps == null || eps.getApisList().size() == 0) {
+                        dataActor.updateTestingRunAndMarkCompleted(testingRun.getId().toHexString(), Context.now() + 5 * 60);
+                        continue;
+                    }
+                }
                 setTestingRunConfig(testingRun, trrs);
 
                 if (isSummaryRunning || isTestingRunRunning) {
@@ -281,6 +289,8 @@ public class Main {
 
             if (testingRun.getPeriodInSeconds() > 0 ) {
                 scheduleTs = testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds();
+            } else if (testingRun.getPeriodInSeconds() == -1) {
+                scheduleTs = testingRun.getScheduleTimestamp() + 5 * 60;
             }
 
             dataActor.updateTestingRunAndMarkCompleted(testingRun.getId().toHexString(), scheduleTs);
@@ -294,7 +304,7 @@ public class Main {
 
             Organization organization = dataActor.fetchOrganization(accountId);
 
-            if(organization.getTestTelemetryEnabled()){
+            if(organization != null && organization.getTestTelemetryEnabled()){
                 loggerMaker.infoAndAddToDb("Test telemetry enabled for account: " + accountId + ", sending results", LogDb.TESTING);
                 ObjectId finalSummaryId = summaryId;
                 testTelemetryScheduler.execute(() -> {
@@ -313,6 +323,36 @@ public class Main {
 
             Thread.sleep(1000);
         }
+    }
+
+    private static void fillTestingEndpoints(TestingRun tr) {
+        if (tr.getPeriodInSeconds() != -1) {
+            return;
+        }
+
+        int apiCollectionId;
+        if (tr.getTestingEndpoints() instanceof CollectionWiseTestingEndpoints) {
+            CollectionWiseTestingEndpoints eps = (CollectionWiseTestingEndpoints) tr.getTestingEndpoints();
+            apiCollectionId = eps.getApiCollectionId();
+        } else if (tr.getTestingEndpoints() instanceof CustomTestingEndpoints) {
+            CustomTestingEndpoints eps = (CustomTestingEndpoints) tr.getTestingEndpoints();
+            apiCollectionId = eps.getApisList().get(0).getApiCollectionId();
+        } else {
+            return;
+        }
+
+        int st = tr.getEndTimestamp();
+        int et = 0;
+        if (st == -1) {
+            st = 0;
+            et = Context.now() + 20 * 60;
+        } else {
+            et = st + 20 * 60;
+        }
+
+        List<ApiInfo.ApiInfoKey> endpoints = dataActor.fetchLatestEndpointsForTesting(st, et, apiCollectionId);
+        CustomTestingEndpoints newEps = new CustomTestingEndpoints(endpoints, Operator.AND);
+        tr.setTestingEndpoints(newEps);
     }
 
     private static void raiseMixpanelEvent(ObjectId summaryId, TestingRun testingRun, int accountId) {
