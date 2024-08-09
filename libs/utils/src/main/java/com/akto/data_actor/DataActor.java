@@ -223,4 +223,5 @@ public abstract class DataActor {
     public abstract DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand);
 
     public abstract void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList);
+    public abstract List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId);
 }

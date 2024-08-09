@@ -830,4 +830,7 @@ public class DbLayer {
         DependencyAnalyserUtils.syncWithDb(dependencyNodeList);
     }
 
+    public static List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {
+        return SingleTypeInfoDao.fetchLatestEndpointsForTesting(startTimestamp, endTimestamp, apiCollectionId);
+    }
 }
