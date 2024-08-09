@@ -42,6 +42,11 @@
             <artifactId>utils</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.akto.apps.mini-testing</groupId>
+            <artifactId>mini-testing</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         
         <dependency>
             <groupId>org.apache.struts</groupId>
