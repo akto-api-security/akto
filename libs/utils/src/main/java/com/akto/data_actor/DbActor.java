@@ -453,4 +453,8 @@ public class DbActor extends DataActor {
         DbLayer.bulkWriteDependencyNodes(dependencyNodeList);
     }
 
+    public List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {
+        return DbLayer.fetchLatestEndpointsForTesting(startTimestamp, endTimestamp, apiCollectionId);
+    }
+
 }

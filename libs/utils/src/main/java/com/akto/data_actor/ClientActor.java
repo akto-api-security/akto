@@ -2938,4 +2938,40 @@ public class ClientActor extends DataActor {
         return false;
     }
 
+    public List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        List<ApiInfo.ApiInfoKey> respList = new ArrayList<>();
+
+        obj.put("startTimestamp", startTimestamp);
+        obj.put("endTimestamp", endTimestamp);
+        obj.put("apiCollectionId", apiCollectionId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchLatestEndpointsForTesting", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchLatestEndpointsForTesting", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList newEps = (BasicDBList) payloadObj.get("newEps");
+                for (Object endpoint: newEps) {
+                    BasicDBObject epObj = (BasicDBObject) endpoint;
+                    ApiInfo.ApiInfoKey s = objectMapper.readValue(epObj.toJson(), ApiInfo.ApiInfoKey.class);
+                    respList.add(s);
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchLatestEndpointsForTesting" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchLatestEndpointsForTesting" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+        return respList;
+    }
+
 }
