@@ -654,7 +654,10 @@ public class TestExecutor {
         String message = messages.get(messages.size() - 1);
         try {
             long start = System.currentTimeMillis();
-            message = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey);
+            String msg = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey);
+            if (msg != null) {
+                message = msg;
+            }
             AllMetrics.instance.setSampleDataFetchLatency(System.currentTimeMillis() - start);
         } catch (Exception e) {
             e.printStackTrace();

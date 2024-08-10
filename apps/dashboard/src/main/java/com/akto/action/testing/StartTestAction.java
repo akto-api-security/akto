@@ -73,6 +73,7 @@ public class StartTestAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
     private TestingRunType testingRunType;
     private String searchString;
+    private boolean continuousTesting;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
@@ -186,6 +187,10 @@ public class StartTestAction extends UserAction {
         if (localTestingRun == null) {
             try {
                 localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
+                // pass boolean from ui, which will tell if testing is coniinuous on new endpoints
+                if (this.continuousTesting) {
+                    localTestingRun.setPeriodInSeconds(-1);
+                }
                 if (triggeredBy != null && !triggeredBy.isEmpty()) {
                     localTestingRun.setTriggeredBy(triggeredBy);
                 }
@@ -343,7 +348,12 @@ public class StartTestAction extends UserAction {
             case RECURRING:
                 return Filters.and(
                     Filters.nin(Constants.ID, getCicdTests()),
-                    Filters.ne(TestingRun.PERIOD_IN_SECONDS,0
+                    Filters.ne(TestingRun.PERIOD_IN_SECONDS,0),
+                    Filters.ne(TestingRun.PERIOD_IN_SECONDS, -1));
+            case CONTINUOUS_TESTING:
+                return Filters.and(
+                    Filters.nin(Constants.ID, getCicdTests()),
+                    Filters.eq(TestingRun.PERIOD_IN_SECONDS,-1
                 ));
             default:
                 return Filters.empty();
@@ -748,13 +758,22 @@ public class StartTestAction extends UserAction {
 
         long oneTimeCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filters));
 
-        long scheduleCount = totalCount - oneTimeCount - cicdCount;
+        ArrayList<Bson> continuousTestsFilter = new ArrayList<>(); // Create a copy of filters
+        continuousTestsFilter.add(getTestingRunTypeFilter(TestingRunType.CONTINUOUS_TESTING));
+        continuousTestsFilter.add(Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTimestamp));
+
+        long continuousTestsCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(continuousTestsFilter));
+
+        System.out.println("cont count" + continuousTestsCount);
+
+        long scheduleCount = totalCount - oneTimeCount - cicdCount - continuousTestsCount;
 
         
         result.put("allTestRuns", totalCount);
         result.put("oneTime", oneTimeCount);
         result.put("scheduled", scheduleCount);
         result.put("cicd", cicdCount);
+        result.put("continuous", continuousTestsCount);
 
         this.allTestsCountMap = result;
         return SUCCESS.toUpperCase();
@@ -1206,4 +1225,13 @@ public class StartTestAction extends UserAction {
     public Map<TestError, String> getErrorEnums() {
         return errorEnums;
     }
+
+    public boolean getContinuousTesting() {
+        return continuousTesting;
+    }
+
+    public void setContinuousTesting(boolean continuousTesting) {
+        this.continuousTesting = continuousTesting;
+    }
+
 }
