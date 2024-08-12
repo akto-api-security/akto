@@ -20,10 +20,9 @@ import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
-import com.mongodb.client.model.WriteModel;
+import com.akto.dto.usage.MetricTypes;
 
 import java.util.List;
 import java.util.Map;
@@ -186,7 +185,9 @@ public abstract class DataActor {
 
     public abstract List<TestingRunIssues> fetchIssuesByIds(Set<TestingIssuesId> issuesIds);
 
-    // public abstract List<Testing
+    public abstract List<Integer> fetchDeactivatedCollections();
+
+    public abstract void updateUsage(MetricTypes metricType, int deltaUsage);
 
     public abstract List<SingleTypeInfo> findStiByParam(int apiCollectionId, String param);
 
