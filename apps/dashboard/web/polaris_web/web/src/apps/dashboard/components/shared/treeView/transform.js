@@ -1,8 +1,8 @@
-import { Badge, Box, Checkbox, DataTable, HorizontalStack, Icon } from "@shopify/polaris";
-import TooltipText from "../TooltipText";
-import { ChevronRightMinor, ChevronDownMinor } from "@shopify/polaris-icons"
+import { Badge, DataTable } from "@shopify/polaris";
+
 import func from "@/util/func";
 import transform from "../../../pages/observe/transform";
+import PrettifyDisplayName from "./PrettifyDisplayName";
 
 const treeViewFunc = {
     pruneTree(tree, branchFieldSplitter, reverse) {
@@ -192,34 +192,7 @@ const treeViewFunc = {
     
         return result;
     },
-    handleChange(selectedItems, collectionIds, selectItems){
-        console.log("called change", selectedItems, collectionIds)
-        selectItems([...new Set([...selectedItems, ...collectionIds])])
-    }, 
-    prettifyDisplayName(name, level, isTerminal, isOpen, selectItems, selectedItems, collectionIds){
-        const len = level.split("#").length - 1
-        const spacingWidth = (len - 1) * 16;
-
-        console.log("hii", selectedItems)
-
-        let displayName = name
-        if(displayName === undefined || displayName.length === 0){
-            displayName = level.split("#")[len];
-        }
-        const icon = isOpen ? ChevronDownMinor : ChevronRightMinor
-        return(
-            <div style={{width: '300px'}} className="styled-name">
-                <HorizontalStack gap={"2"} wrap={false}>
-                    {spacingWidth > 0 ? <Box width={`${spacingWidth}px`} /> : null}
-                    {len !== 0 ? <Checkbox onChange={() => this.handleChange(selectedItems, collectionIds, selectItems)}/> : null}
-                    {!isTerminal ? <Box><Icon source={icon} /></Box> : null}
-                    <TooltipText text={displayName} tooltip={displayName} textProps={{variant: 'headingSm'}} />
-                </HorizontalStack>
-            </div>
-        )
-    },
-
-    prettifyChildrenData(childrenNodes, headers, selectItems, selectedItems){
+    prettifyChildrenData(childrenNodes, headers, selectItems){
         let dataRows = []
         childrenNodes.forEach((c) => {
             let ids = []
@@ -231,7 +204,14 @@ const treeViewFunc = {
             let collectionObj = transform.convertToPrettifyData(c)
             collectionObj.endpoints = c.endpoints
             collectionObj.envTypeComp = c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null
-            collectionObj.displayNameComp = this.prettifyDisplayName(c.displayName, c.level, c.isTerminal, false, selectItems, selectedItems, ids)
+            collectionObj.displayNameComp = 
+                <PrettifyDisplayName name={c.displayName} 
+                    level={c.level} 
+                    isTerminal={c.isTerminal} 
+                    isOpen={false} 
+                    selectItems={selectItems} 
+                    collectionIds={ids} 
+                />
             let tempRow = [<div/>]
             headers.forEach((x) => {
                 tempRow.push(collectionObj[x.value])
@@ -250,7 +230,7 @@ const treeViewFunc = {
             </td>
         )
     },
-    prettifyTreeViewData(normalData, headers, selectItems, selectedItems){
+    prettifyTreeViewData(normalData, headers, selectItems){
         return normalData.map((c) => {
             return{
                 ...c,
@@ -261,7 +241,7 @@ const treeViewFunc = {
                     )
                 }),
                 ...transform.convertToPrettifyData(c),
-                collapsibleRow: this.prettifyChildrenData(c.children, headers, selectItems, selectedItems)
+                collapsibleRow: this.prettifyChildrenData(c.children, headers, selectItems)
             }
         })
     }

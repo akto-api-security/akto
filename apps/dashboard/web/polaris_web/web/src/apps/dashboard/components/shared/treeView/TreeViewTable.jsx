@@ -21,7 +21,7 @@ function TreeViewTable() {
 
     const convertToNewData = (collectionsArr, isLoading) => {
         const normalData = treeViewFunc.buildTree(collectionsArr, "displayName", ".", false, true, ":", headers)
-        const prettifyData = treeViewFunc.prettifyTreeViewData(normalData, headers, selectItems, selectedItems)
+        const prettifyData = treeViewFunc.prettifyTreeViewData(normalData, headers, selectItems)
         return { prettify: prettifyData, normal: normalData }
     }
 
@@ -33,6 +33,7 @@ function TreeViewTable() {
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
     return (
         <GithubSimpleTable
+            key={JSON.stringify(selectItems)}
             data={data[selectedTab]} 
             sortOptions={sortOptions} 
             resourceName={resourceName} 

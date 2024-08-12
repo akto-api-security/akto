@@ -1,13 +1,14 @@
 import PersistStore from "../../../main/PersistStore";
+import TableStore from "./TableStore";
 const tableInitialState = PersistStore.getState().tableInitialState[window.location.pathname + "/" + window.location.hash] || 0
+const selectedItems = TableStore.getState().selectedItems
 export const initialState = {
     tabsInfo : tableInitialState,
-    selectedItems: []
+    selectedItems: selectedItems
 }
 
 const tableReducer = (state, action) =>{
     const { type, payload } = action;
-    console.log("reducer", payload)
     switch (type) {
         case "APPLY_FILTER":
             return {
