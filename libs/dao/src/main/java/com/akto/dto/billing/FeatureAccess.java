@@ -94,6 +94,10 @@ public class FeatureAccess {
             return false;
         }
 
+        return checkOverageAfterGrace();
+    }
+
+    private boolean checkOverageAfterGrace() {
         if (usage >= usageLimit) {
             if (overageFirstDetected == -1) {
                 overageFirstDetected = Context.now();
@@ -114,6 +118,16 @@ public class FeatureAccess {
 
         int usageLeft = Math.max(this.getUsageLimit() - this.getUsage(), 0);
         boolean checkLimit = !this.checkBooleanOrUnlimited();
+        boolean overageAfterGrace = this.checkOverageAfterGrace();
+
+        /*
+         * If no usage left, 
+         * but user in grace period, 
+         * then do not check limit.
+         */
+        if(checkLimit && (usageLeft <=0 && !overageAfterGrace)){
+            checkLimit = false;
+        }
 
         return new SyncLimit(checkLimit, usageLeft);
     }

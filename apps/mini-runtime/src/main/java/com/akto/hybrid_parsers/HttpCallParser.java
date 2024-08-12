@@ -3,17 +3,21 @@ package com.akto.hybrid_parsers;
 import com.akto.RuntimeMode;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.hybrid_dependency.DependencyAnalyser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -176,7 +180,12 @@ public class HttpCallParser {
             for (ApiCollection apiCollection: apiCollections) {
                 apiCollectionsMap.put(apiCollection.getId(), apiCollection);
             }
-            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI);
+
+            int accountId = Context.accountId.get();
+            Organization organization = dataActor.fetchOrganization(accountId);
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
+            SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
             dependencyAnalyser.dbState = apiCatalogSync.dbState;
             dependencyAnalyser.syncWithDb();
             syncTrafficMetricsWithDB();
@@ -189,7 +198,6 @@ public class HttpCallParser {
                  * submit a job only if it is not running.
                  */
                 if (!pgMerging) {
-                    int accountId = Context.accountId.get();
                     pgMerging = true;
                     service.submit(() -> {
                         Context.accountId.set(accountId);
