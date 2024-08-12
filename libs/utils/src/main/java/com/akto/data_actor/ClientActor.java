@@ -45,6 +45,7 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -296,6 +297,53 @@ public class ClientActor extends DataActor {
     public void bulkWriteTestingRunIssues(List<Object> writesForTestingRunIssues) {
         bulkWrite(writesForTestingRunIssues, "/bulkWriteTestingRunIssues", "writesForTestingRunIssues");
     }
+
+    public List<Integer> fetchDeactivatedCollections(){
+        List<Integer> ids = new ArrayList<>();
+
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDeactivatedCollections", "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in fetchDeactivatedCollections", LoggerMaker.LogDb.RUNTIME);
+                return ids;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList objList = (BasicDBList) payloadObj.get("apiCollectionIds");
+                for (Object obj: objList) {
+                    int obj2 = (Integer) obj;
+                    ids.add(obj2);
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchDeactivatedCollections" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchDeactivatedCollections" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return ids;
+    };
+
+    public void updateUsage(MetricTypes metricType, int deltaUsage){
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("metricType", metricType.name());
+        obj.put("deltaUsage", deltaUsage);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateUsage", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in updateUsage", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateUsage" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return;
+    };
 
     public TestSourceConfig findTestSourceConfig(String subType) {
         Map<String, List<String>> headers = buildHeaders();

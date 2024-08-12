@@ -40,6 +40,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
@@ -217,6 +218,26 @@ public class DbAction extends ActionSupport {
     ObjectMapper objectMapper = new ObjectMapper();
     KafkaUtils kafkaUtils = new KafkaUtils();
     String endpointLogicalGroupId;
+
+    String metricType;
+
+    public String getMetricType() {
+        return metricType;
+    }
+
+    public void setMetricType(String metricType) {
+        this.metricType = metricType;
+    }
+
+    int deltaUsage;
+
+    public int getDeltaUsage() {
+        return deltaUsage;
+    }
+
+    public void setDeltaUsage(int deltaUsage) {
+        this.deltaUsage = deltaUsage;
+    }
 
     DataControlSettings dataControlSettings;
     public String fetchDataControlSettings() {
@@ -879,6 +900,25 @@ public class DbAction extends ActionSupport {
         try {
             ObjectId lastTsObjectId = lastStiId != null ? new ObjectId(lastStiId) : null;
             stis = DbLayer.fetchStiBasedOnHostHeaders(lastTsObjectId);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchDeactivatedCollections() {
+        try {
+            apiCollectionIds = DbLayer.fetchDeactivatedCollections();
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateUsage() {
+        try {
+            MetricTypes metric = MetricTypes.valueOf(metricType);
+            DbLayer.updateUsage(metric, deltaUsage);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
