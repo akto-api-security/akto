@@ -59,7 +59,7 @@ function AktoGPT() {
 
     const sortItems = () =>{
         setSelectedItems([])
-        const arr = [...displayItems].sort((a, b) => {
+        const arr = [...apiCollections].sort((a, b) => {
             let aComp = a.displayName.replace(/[^a-zA-Z]/g, '').toLowerCase();
             let bComp = b.displayName.replace(/[^a-zA-Z]/g, '').toLowerCase();
             if (aComp < bComp) return -1;
@@ -85,7 +85,7 @@ function AktoGPT() {
         if(searchQuery.length === 0){
             setDisplayItems(apiCollections.slice(0,30))
         }else{
-            const resultArr = displayItems.filter((x) => x?.displayName.toLowerCase().includes(searchQuery))
+            const resultArr = apiCollections.filter((x) => x?.displayName.toLowerCase().includes(searchQuery))
             setDisplayItems(resultArr.slice(0,30))
             setTimeout(() => {
                 setSelectedItems(localVar)
