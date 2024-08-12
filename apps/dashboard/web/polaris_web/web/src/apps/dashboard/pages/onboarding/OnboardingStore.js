@@ -2,7 +2,7 @@ import {create} from "zustand"
 import {devtools} from "zustand/middleware"
 
 let onboardingStore = (set)=>({
-    selectedCollection: -1,
+    selectedCollection: null,
     setSelectedCollection:(selectedCollection)=>{
         set({selectedCollection: selectedCollection})
     },

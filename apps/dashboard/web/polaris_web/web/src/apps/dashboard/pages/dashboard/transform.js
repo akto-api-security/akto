@@ -116,10 +116,13 @@ const transform = {
     getCountInfo: (collectionsArr, coverageObject) => {
         let urlsCount = 0 ;
         let coverageCount = 0 ;
-        Object.keys(collectionsArr).forEach((key) =>{
-            const x = collectionsArr[key]
+        collectionsArr.forEach((x) =>{
+            if (x.hasOwnProperty('type') && x.type === 'API_GROUP') {
+                return
+            }
+
             urlsCount += x.urlsCount;
-            coverageCount += coverageObject[key] || 0 ;
+            coverageCount += coverageObject[x.id] || 0 ;
         })
         return {
             totalUrls: urlsCount,
@@ -211,28 +214,26 @@ const transform = {
 
     formatCoverageData: (coverageObj, collections) =>{
         const finalArr = [] ;
-        Object.keys(collections).forEach((x) => {
-            let coverage = coverageObj[x] ? Math.ceil((100 * coverageObj[x.id])/x.urlsCount) : 0;
+        collections.forEach((x) => {
+            let coverage = coverageObj[x.id] ? Math.ceil((100 * coverageObj[x.id])/x.urlsCount) : 0;
             finalArr.push( {
-                id: x,
+                id: x.id,
                 coverage: coverage,
-                status: transform.getStatus(coverage),
-                displayName: collections[x]?.displayName
+                status: transform.getStatus(coverage)
             })
         })
         return finalArr.sort((a, b) => a.coverage - b.coverage);
 
     },
 
-    prepareTableData: (riskScoreObj, collections, setActive) => {
+    prepareTableData: (riskScoreObj, collections, collectionsMap,setActive) => {
         let finalArr = [] ;
-        Object.keys(collections).forEach((key) => {
-            let score = riskScoreObj[key] || 0 
+        collections.forEach((c) => {
+            let score = riskScoreObj[c.id] || 0 
             let obj = {
-                id: key,
+                id: c.id,
                 score: score,
-                status: observeFunc.getStatus(score),
-                displayName: collections[key]?.displayName
+                status: observeFunc.getStatus(score)
             }
             finalArr.push(obj)
         })
@@ -242,13 +243,20 @@ const transform = {
         finalArr.forEach((c)=> {
             let tempRow = [
                 <Button onClick={()=>setActive(true)} plain monochrome removeUnderline  >
-                  <Box width='250px'> 
-                    <HorizontalStack align="space-between" gap="2">
-                        <Text truncate breakWord>{c.displayName}</Text>          
-                        <Badge status={c.status} size="small">{c.score.toString()}</Badge>
-                    </HorizontalStack>   
-                  </Box>
+
+                  <Box width='250px'  > 
+                 <HorizontalStack align="space-between" gap="2">
+                <Text>{collectionsMap[c.id]}</Text>  
+
+              
+        
+                <Badge status={c.status} size="small">{c.score.toString()}</Badge>
+                </HorizontalStack>   
+                </Box>
                 </Button>
+            
+             
+               
             ]
             tableRows.push(tempRow)
         })

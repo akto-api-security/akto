@@ -1,6 +1,6 @@
 import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button } from '@shopify/polaris';
 import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor } from '@shopify/polaris-icons';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
 import PersistStore from '../../../../main/PersistStore';
@@ -8,27 +8,22 @@ import './Headers.css'
 import api from '../../../../signup/api';
 import func from '@/util/func';
 import SemiCircleProgress from '../../shared/SemiCircleProgress';
-import { usePolling } from '../../../../main/PollingProvider';
-import { debounce } from 'lodash';
-
-function ContentWithIcon({icon,text, isAvatar= false}) {
-    return(
-        <HorizontalStack gap={2}>
-            <Box width='20px'>
-                {isAvatar ? <div className='reduce-size'><Avatar size="extraSmall" source={icon} /> </div>:
-                <Icon source={icon} color="base" />}
-            </Box>
-            <Text>{text}</Text>
-        </HorizontalStack>
-    )
-}
+import testingApi from "../../../pages/testing/api"
+import TestingStore from '../../../pages/testing/testingStore';
 
 export default function Header() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const [isSearchActive, setIsSearchActive] = useState(false);
     const [searchValue, setSearchValue] = useState('');
     const [newAccount, setNewAccount] = useState('')
     const [showCreateAccount, setShowCreateAccount] = useState(false)
-    const { currentTestsObj, clearPollingInterval } = usePolling();
+    const [currentTestsObj, setCurrentTestsObj] = useState({
+        totalTestsCompleted:0,
+        totalTestsInitiated:0,
+        totalTestsQueued: 0,
+        testRunsArr: [],
+    })
+
     const navigate = useNavigate()
 
     const username = Store((state) => state.username)
@@ -37,24 +32,20 @@ export default function Header() {
     const activeAccount = Store(state => state.activeAccount)
     const resetAll = PersistStore(state => state.resetAll)
 
-    const searchItemsArr = useMemo(() => func.getSearchItemsArr(),[])
-    const [filteredItemsArr, setFilteredItemsArr] = useState(searchItemsArr)
+    const allRoutes = Store((state) => state.allRoutes)
+    const allCollections = PersistStore((state) => state.allCollections)
+    const searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections)
+
+    const setCurrentTestingRuns = TestingStore(state => state.setCurrentTestingRuns)
+    const [intervalId, setIntervalId] = useState(null);
 
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
         [],
     );
-    const debouncedSearch = debounce((searchQuery) => {
-        if(searchQuery.length === 0){
-            setFilteredItemsArr(searchItemsArr)
-        }else{
-            const resultArr = searchItemsArr.filter((x) => x.content.toLowerCase().includes(searchQuery))
-            setFilteredItemsArr(resultArr)
-        }
-    }, 500);
 
     const handleLogOut = async () => { 
-        clearPollingInterval()
+        clearInterval(intervalId)
         api.logout().then(res => {
             resetAll();
             storeAccessToken(null)
@@ -67,6 +58,8 @@ export default function Header() {
             navigate("/");
         })
     }
+
+    
     const accountsItems = Object.keys(accounts).map(accountId => {
         return {
             id: accountId,
@@ -87,6 +80,18 @@ export default function Header() {
           resetAll();
           window.location.href="/dashboard/onboarding"
         })
+    }
+    
+    function ContentWithIcon({icon,text, isAvatar= false}) {
+        return(
+            <HorizontalStack gap={2}>
+                <Box width='20px'>
+                    {isAvatar ? <div className='reduce-size'><Avatar size="extraSmall" source={icon} /> </div>:
+                    <Icon source={icon} color="base" />}
+                </Box>
+                <Text>{text}</Text>
+            </HorizontalStack>
+        )
     }
 
     const userMenuMarkup = (
@@ -119,17 +124,23 @@ export default function Header() {
         />
     );
 
+    const handleSearchResultsDismiss = useCallback(() => {
+        setIsSearchActive(false);
+        setSearchValue('');
+    }, []);
+
     const handleSearchChange = useCallback((value) => {
         setSearchValue(value);
-        debouncedSearch(value.toLowerCase())
+        setIsSearchActive(value.length > 0);
     }, []);
 
     const handleNavigateSearch = (url) => {
         navigate(url)
-        handleSearchChange('')
+        handleSearchResultsDismiss()
     }
-    const searchItems = filteredItemsArr.slice(0,20).map((item) => {
-        const icon = DynamicSourceMajor;
+
+    const searchItems = searchItemsArr.map((item) => {
+        const icon = item.type === 'page' ? PageMajor : DynamicSourceMajor;
         return {
             value: item.content,
             content: <ContentWithIcon text={item.content} icon={icon} />,
@@ -139,7 +150,7 @@ export default function Header() {
 
     const searchResultsMarkup = (
         <ActionList
-            items={searchItems}
+            items={searchItems.filter(x => x.value.toLowerCase().includes(searchValue.toLowerCase()))}
         />
     );
 
@@ -160,10 +171,7 @@ export default function Header() {
         navigate(navUrl)
     }
 
-    const progress = useMemo(() => {
-        return currentTestsObj.totalTestsInitiated === 0 ? 0 : Math.floor((currentTestsObj.totalTestsCompleted * 100) / currentTestsObj.totalTestsInitiated);
-    }, [currentTestsObj.totalTestsCompleted, currentTestsObj.totalTestsInitiated]);
-
+    const progress = currentTestsObj.totalTestsInitiated === 0 ? 0 : Math.floor((currentTestsObj.totalTestsCompleted * 100)/ currentTestsObj.totalTestsInitiated)
 
     const secondaryMenuMarkup = (
         <HorizontalStack gap={"4"}>
@@ -195,9 +203,9 @@ export default function Header() {
                 showNavigationToggle
                 userMenu={userMenuMarkup}
                 searchField={searchFieldMarkup}
-                searchResultsVisible={searchValue.length > 0}
+                searchResultsVisible={isSearchActive}
                 searchResults={searchResultsMarkup}
-                onSearchResultsDismiss={() => handleSearchChange('')}
+                onSearchResultsDismiss={handleSearchResultsDismiss}
                 secondaryMenu={secondaryMenuMarkup}
             />
             <Modal
@@ -228,6 +236,30 @@ export default function Header() {
             </Modal>
         </div>
     );
+
+    useEffect(() => {
+        const fetchTestingStatus = () => {
+            const id = setInterval(() => {
+                testingApi.fetchTestingRunStatus().then((resp) => {
+                    setCurrentTestingRuns(resp.currentRunningTestsStatus);
+                    setCurrentTestsObj({
+                        totalTestsInitiated: resp?.testRunsScheduled || 0,
+                        totalTestsCompleted: resp?.totalTestsCompleted || 0,
+                        totalTestsQueued: resp?.testRunsQueued || 0,
+                        testRunsArr: resp?.currentRunningTestsStatus || []
+                    });
+                });
+            }, 2000);
+            setIntervalId(id); 
+        };
+
+        fetchTestingStatus();
+
+        return () => {
+            clearInterval(intervalId);
+        };
+    }, []);
+
 
     return (
         topBarMarkup
