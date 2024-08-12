@@ -32,13 +32,14 @@ function CollectionComponent(props) {
     }, [condition])
 
     const allCollections = PersistStore(state => state.allCollections);
-    const allCollectionsOptions = Object.keys(allCollections).filter(x => allCollections[x].type !== "API_GROUP")
+    const allCollectionsOptions = allCollections.filter(x => x.type !== "API_GROUP")
         .map(collection => {
             return {
-                label: allCollections[collection].displayName,
-                value: collection
+                label: collection.displayName,
+                value: collection.id
             }
         })
+
     const handleCollectionSelected = (collectionId) => {
         dispatch({ type: "overwrite", index: index, key: "data", obj: { [collectionId]: [] } })
     }
@@ -53,6 +54,8 @@ function CollectionComponent(props) {
 
         return Object.keys(data)[0];
     }
+
+    const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
 
     const handleEndpointsSelected = (apiEndpoints, data) => {
         let collectionId = getCollectionId(data);
@@ -110,7 +113,7 @@ function CollectionComponent(props) {
                     optionsList={allCollectionsOptions}
                     setSelected={(collectionId) => handleCollectionSelected(collectionId)}
                     preSelected={[Number(getCollectionId(condition.data))]}
-                    value={allCollections[getCollectionId(condition.data)]?.displayName}
+                    value={mapCollectionIdToName[getCollectionId(condition.data)]}
                 />
             </div>
             <div style={{ flex: "5" }}>

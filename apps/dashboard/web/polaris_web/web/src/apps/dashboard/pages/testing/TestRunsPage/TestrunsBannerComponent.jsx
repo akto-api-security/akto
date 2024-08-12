@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import BannerLayout from '../../../components/banners/BannerLayout'
-import { TESTING_VIDEO_LENGTH, TESTING_VIDEO_THUMBNAIL } from '../../../../main/onboardingData'
+import { TESTING_VIDEO_LENGTH, TESTING_VIDEO_URL, TESTING_VIDEO_THUMBNAIL } from '../../../../main/onboardingData'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import PersistStore from '../../../../main/PersistStore'
 import { Box, Button, Popover, Text } from '@shopify/polaris'
@@ -11,13 +11,12 @@ function SelectCollectionComponent() {
     const allCollections = PersistStore(state => state.allCollections);
     const navigate = useNavigate()
     let urlsCount = 0
-    const allCollectionsOptions = Object.keys(allCollections).filter(x => allCollections[x].type !== "API_GROUP")
-        .map(key => {
-            const collection = allCollections[key]
+    const allCollectionsOptions = allCollections.filter(x => x.type !== "API_GROUP")
+        .map(collection => {
             urlsCount += collection.urlsCount
             return {
                 label: collection.displayName,
-                value: key
+                value: collection.id
             }
         })
     
@@ -49,11 +48,10 @@ function SelectCollectionComponent() {
 function TestrunsBannerComponent({isInventory,onButtonClick}) {
     const allCollections = PersistStore(state => state.allCollections);
     let urlsCount = 0
-    Object.keys(allCollections).filter(x => allCollections[x].type !== "API_GROUP")
-        .forEach(key => {
-            const collection = allCollections[key]
-            urlsCount += collection.urlsCount
-        })
+    allCollections.filter(x => x.type !== "API_GROUP")
+        .forEach(collection => {
+            urlsCount += collection.urlsCount}
+        )
     return (
         <BannerLayout
             title={"Test your APIs"}

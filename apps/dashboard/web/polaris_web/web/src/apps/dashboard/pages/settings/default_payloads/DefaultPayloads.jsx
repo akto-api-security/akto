@@ -1,4 +1,5 @@
 import { Page, LegacyCard, TextField, VerticalStack, Button } from '@shopify/polaris'
+import Dropdown from '../../../components/layouts/Dropdown'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import PersistStore from '@/apps/main/PersistStore';
 
@@ -9,17 +10,28 @@ import {useState, useEffect} from 'react'
 function DefaultPayloads() {
 
     const allCollections = PersistStore(state => state.allCollections)
-    const allHostnames = func.reduceToCollectionArr(allCollections).map(x => x.hostName).filter(x => (x!=null && x.length > 0))
+    const allHostnames = allCollections.map(x => x.hostName).filter(x => x!=null)
+    const hostNameOptions = allHostnames.map(x => {
+        return {
+            label: x,
+            value: x
+        }
+    })
+
+
     const [selectedDomain, setSelectedDomain] = useState('')
     const [selectedDDefaultPayload, setSelectedDDefaultPayload] = useState('')
     const [patternText, setPatternText] = useState('')
     const [newCustomDomain, setNewCustomDomain] = useState('')
     const [allOptions, setAllOptions] = useState([{ label: "Add your own", value: "add-your-own" }])
 
+
+
     useEffect(()=>{
         async function combineDomainsFromPayloads() {
             let allDefaultPayloads = await defaultPayloadsApi.fetchAllDefaultPayloads()
-            let allDefaultPayloadDomains = allDefaultPayloads.domains.map(x => x.id).filter(x => allHostnames.indexOf(x) === -1)
+            let allDefaultPayloadDomains = allDefaultPayloads.domains.map(x => x.id).filter(x => allHostnames.indexOf(x) == -1)
+            console.log(allDefaultPayloadDomains)
             let allDefaultPayloadOptions =
                 allDefaultPayloadDomains.map(x => {
                     return {

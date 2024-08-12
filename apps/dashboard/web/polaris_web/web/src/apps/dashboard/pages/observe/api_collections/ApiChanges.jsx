@@ -1,4 +1,4 @@
-import { Card, Divider, Text, VerticalStack } from "@shopify/polaris"
+import { Card, Divider, HorizontalStack, Text, VerticalStack } from "@shopify/polaris"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { useEffect, useReducer, useState } from "react";
 import api from "../api";
@@ -20,6 +20,7 @@ import { useLocation } from "react-router-dom";
 function ApiChanges() {
 
     const allCollections = PersistStore(state => state.allCollections);
+    const collectionsMap = PersistStore(state => state.collectionsMap);
     const [newEndpoints, setNewEndpoints] = useState({prettify: [], normal: []})
     const [newParametersCount, setNewParametersCount] = useState(0)
     const [parametersTrend, setParametersTrend] = useState([])
@@ -73,7 +74,7 @@ function ApiChanges() {
                 setSensitiveParams([...sensitiveParams]);
                 apiCollection = transform.fillSensitiveParams(sensitiveParams, apiCollection);
             })
-            let data = func.mergeApiInfoAndApiCollection(apiCollection, apiInfoList);
+            let data = func.mergeApiInfoAndApiCollection(apiCollection, apiInfoList, collectionsMap);
             const prettifiedData = transform.prettifyEndpointsData(data)
             setNewEndpoints({prettify: prettifiedData, normal: data});
             await api.fetchNewParametersTrend(startTimestamp, endTimestamp).then((resp) => {
@@ -83,7 +84,7 @@ function ApiChanges() {
             })
             setLoading(false);
         }
-        if (Object.keys(allCollections).length > 0) {
+        if (allCollections.length > 0) {
             fetchData();
         }
     }, [allCollections, currDateRange])

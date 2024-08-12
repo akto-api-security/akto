@@ -144,9 +144,10 @@ function ApiEndpoints() {
 
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
+    const collectionsMap = PersistStore(state => state.collectionsMap)
     const allCollections = PersistStore(state => state.allCollections);
 
-    const pageTitle = allCollections[apiCollectionId]?.displayName
+    const pageTitle = collectionsMap[apiCollectionId]
 
     const [apiEndpoints, setApiEndpoints] = useState([])
     const [apiInfoList, setApiInfoList] = useState([])
@@ -177,9 +178,11 @@ function ApiEndpoints() {
     const selectedMethod = queryParams.get('selected_method')
 
     // the values used here are defined at the server.
-    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow'] )
+    const definedTableTabs = apiCollectionId == 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId == 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow'] )
 
-    const isApiGroup = allCollections[apiCollectionId]?.type === 'API_GROUP'
+    const isApiGroup = allCollections.filter(x => {
+        return x.id == apiCollectionId && x.type == "API_GROUP"
+    }).length > 0
 
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
@@ -226,7 +229,7 @@ function ApiEndpoints() {
         })
 
         let data = {}
-        let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection)
+        let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap)
 
         // handle code analysis endpoints
         const codeAnalysisCollectionInfo = apiCollectionData.codeAnalysisCollectionInfo
@@ -395,7 +398,7 @@ function ApiEndpoints() {
             let blob = new Blob([openApiString], {
                 type: "application/json",
             });
-            const fileName = "open_api_" + allCollections[apiCollectionId]?.displayName + ".json";
+            const fileName = "open_api_" + collectionsMap[apiCollectionId] + ".json";
             saveAs(blob, fileName);
 
             lastFetchedUrl = result["lastFetchedUrl"]
@@ -526,13 +529,17 @@ function ApiEndpoints() {
                                 <Text fontWeight="regular" variant="bodyMd">Refresh</Text>
                             </div>
                             {
-                                isApiGroup ?
+                                allCollections.filter(x => {
+                                    return x.id == apiCollectionId && x.type == "API_GROUP"
+                                }).length > 0 ?
                                     <div onClick={computeApiGroup} style={{ cursor: 'pointer' }}>
                                         <Text fontWeight="regular" variant="bodyMd">Re-compute api group</Text>
                                     </div> :
                                     null
                             }
-                            { !isApiGroup ?
+                            { allCollections.filter(x => {
+                                    return x.id == apiCollectionId && x.type == "API_GROUP"
+                                }).length == 0 ?
                                 <UploadFile
                                 fileFormat=".har"
                                 fileChanged={file => handleFileChange(file)}
@@ -620,6 +627,11 @@ function ApiEndpoints() {
     }
 
     const promotedBulkActions = (selectedResources) => {
+
+        let isApiGroup = allCollections.filter(x => {
+            return x.id == apiCollectionId && x.type == "API_GROUP"
+        }).length > 0
+
         let ret = []
         if (isApiGroup) {
             ret.push(
