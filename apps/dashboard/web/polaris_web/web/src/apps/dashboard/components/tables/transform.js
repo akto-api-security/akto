@@ -55,7 +55,7 @@ const tableFunc = {
           }).filter(value => {
             return (value.value.endsWith(sortOrder == -1 ? 'asc' : 'desc'))
           })[0]?.sortKey;
-  
+
           tempData = func.sortFunc(tempData, dataSortKey, sortOrder)
           if(props.getFilteredItems){
             props.getFilteredItems(tempData)

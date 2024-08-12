@@ -1,3 +1,8 @@
+import { Badge, Box, Checkbox, DataTable, HorizontalStack, Icon } from "@shopify/polaris";
+import TooltipText from "../TooltipText";
+import { ChevronRightMinor, ChevronDownMinor } from "@shopify/polaris-icons"
+import func from "@/util/func";
+import transform from "../../../pages/observe/transform";
 
 const treeViewFunc = {
     pruneTree(tree, branchFieldSplitter, reverse) {
@@ -65,7 +70,7 @@ const treeViewFunc = {
                         const secondaryBranchFieldValue = part
                         const secondaryBranchFieldValueParts = secondaryBranchFieldValue.split(secondaryBranchFieldSplitter).filter(part => part)
                         
-                        if (secondaryBranchFieldValueParts.length == 2) {
+                        if (secondaryBranchFieldValueParts.length === 2) {
                             // delete the created leaf node 
                             delete currentNode[part]
 
@@ -90,8 +95,12 @@ const treeViewFunc = {
         })
 
         this.pruneTree(itemsTree, branchFieldSplitter, reverse)
-        const result = this.flattenTree(itemsTree, headers)
-        return result ;
+        let finalResult = []
+        Object.keys(itemsTree).forEach((x) => {
+            const result = this.dfs(itemsTree[x], x, headers)
+            finalResult.push(result)
+        })
+        return finalResult;
     },
 
     getFinalKey(value, filterKey, numericValue){
@@ -105,53 +114,156 @@ const treeViewFunc = {
     },
 
     mergeNodeData(children, headers) {
-        const mergedNode = {};
-    
-        headers.forEach(header => {
-            const { value, filterKey, numericValue, mergeType } = header
-            const finalKey = this.getFinalKey(value, filterKey, numericValue)
-            if(finalKey !== 'displayName'){
-                mergedNode[finalKey] = children.reduce((acc, child) => {
-                    return mergeType(acc, child[finalKey]);
-                }, children[0][finalKey]);
+        let mergedNode = {};
+        
+        headers.forEach((h) => {
+            const key = this.getFinalKey(h?.value, h?.filterKey, h?.numericValue)
+            if(key !== 'displayName'){
+                mergedNode[key] = children[0][key]
+            }else{
+                mergedNode['apiCollectionIds'] = [children[0]['id']]
             }
-        });
+            
+        })
+        
+        if(children.length === 1)return mergedNode
+
+        children.slice(1, children.length).forEach((c) => {
+            headers.forEach((h) => {
+                const  {value, filterKey, numericValue, mergeType} = h
+                const key = this.getFinalKey(value, filterKey, numericValue)
+                if(key !== 'displayName'){
+                    mergedNode[key] = mergeType(mergedNode[key], c[key])
+                }else{
+                    let finalArr = []
+                    if(c.hasOwnProperty('id')){
+                        finalArr = [c.id]
+                    }else{
+                        finalArr = c.apiCollectionIds
+                    }
+
+                    let temp = mergedNode['apiCollectionIds'] || []
+                    temp = [...temp, ...finalArr]
+                    mergedNode['apiCollectionIds'] = [...new Set(temp)]
+                }
+            })
+        })
     
         return mergedNode;
     },
+
+    dfs(node, level = '', headers = [], visited = new Set()) {
+        if (visited.has(node)) return null;
+        visited.add(node);
     
-    flattenTree(tree, headers, path = '') {
-        const result = [];
+        let result = {};
+        let children = [];
     
-        Object.keys(tree).forEach(key => {
-            const currentNode = tree[key];
-            const currentPath = path ? `${path}#${key}` : key;
+        if (node.children) {
+            Object.keys(node.children).forEach((key) => {
+                const child = node.children[key];
+                const childResult = this.dfs(child, level ? `${level}#${key}` : key, headers, visited);
+                if (childResult) children.push(childResult);
+            });
+        }
     
-            if (currentNode.isTerminal) {
-                currentNode.items.forEach(item => {
-                    result.push({
-                        ...item,
-                        level: currentPath,
-                        showInRow: false
-                    });
-                });
-            } else {
-                const childNodes = this.flattenTree(currentNode.children, headers, currentPath);
-                const childrenData = childNodes.filter(node => node.level.startsWith(currentPath));
-                const mergedData = this.mergeNodeData(childrenData, headers);
+        if (node.items && node.items.length > 0) {
+            node.items.forEach((item) => {
+                item.level = level;
+                item.isOpen = false;
+                children.push(item);
+            });
+        }
     
-                result.push({
-                    ...mergedData,
-                    level: currentPath,
-                    isTerminal: false,
-                    showInRow: true
-                });
-    
-                result.push(...childNodes);
-            }
-        });
+        if (children.length > 1) {
+            const mergedNode = this.mergeNodeData(children, headers);
+            mergedNode.level = level;
+            mergedNode.isTerminal = false;
+            mergedNode.children = children;
+            result = mergedNode;
+        } else if (children.length === 1) {
+            // If there's only one child, merge it directly and mark it as terminal
+            result = children[0];
+            result.level = level;
+            result.isTerminal = true;
+        } else {
+            result = { level, isTerminal: true, ...node };
+        }
     
         return result;
+    },
+    handleChange(selectedItems, collectionIds, selectItems){
+        console.log("called change", selectedItems, collectionIds)
+        selectItems([...new Set([...selectedItems, ...collectionIds])])
+    }, 
+    prettifyDisplayName(name, level, isTerminal, isOpen, selectItems, selectedItems, collectionIds){
+        const len = level.split("#").length - 1
+        const spacingWidth = (len - 1) * 16;
+
+        console.log("hii", selectedItems)
+
+        let displayName = name
+        if(displayName === undefined || displayName.length === 0){
+            displayName = level.split("#")[len];
+        }
+        const icon = isOpen ? ChevronDownMinor : ChevronRightMinor
+        return(
+            <div style={{width: '300px'}} className="styled-name">
+                <HorizontalStack gap={"2"} wrap={false}>
+                    {spacingWidth > 0 ? <Box width={`${spacingWidth}px`} /> : null}
+                    {len !== 0 ? <Checkbox onChange={() => this.handleChange(selectedItems, collectionIds, selectItems)}/> : null}
+                    {!isTerminal ? <Box><Icon source={icon} /></Box> : null}
+                    <TooltipText text={displayName} tooltip={displayName} textProps={{variant: 'headingSm'}} />
+                </HorizontalStack>
+            </div>
+        )
+    },
+
+    prettifyChildrenData(childrenNodes, headers, selectItems, selectedItems){
+        let dataRows = []
+        childrenNodes.forEach((c) => {
+            let ids = []
+            if(c.hasOwnProperty('apiCollectionIds')){
+                ids = c['apiCollectionIds']
+            }else{
+                ids = [c.id]
+            }
+            let collectionObj = transform.convertToPrettifyData(c)
+            collectionObj.endpoints = c.endpoints
+            collectionObj.envTypeComp = c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null
+            collectionObj.displayNameComp = this.prettifyDisplayName(c.displayName, c.level, c.isTerminal, false, selectItems, selectedItems, ids)
+            let tempRow = [<div/>]
+            headers.forEach((x) => {
+                tempRow.push(collectionObj[x.value])
+            })
+            dataRows.push(tempRow)
+        })
+        return(
+            <td colSpan={10} style={{padding: '0px !important'}} className="control-row">
+                <DataTable
+                    rows={dataRows}
+                    hasZebraStripingOnData
+                    headings={[]}
+                    columnContentTypes={['text', 'numeric', 'text', 'text', 'text', 'text', 'text', 'text', 'text']}
+                    truncate
+                />
+            </td>
+        )
+    },
+    prettifyTreeViewData(normalData, headers, selectItems, selectedItems){
+        return normalData.map((c) => {
+            return{
+                ...c,
+                displayNameComp: c.level,
+                envTypeComp: c.userSetEnvType.map((type, index)=> {
+                    return(
+                        <Badge key={index} size="small" status="info">{func.toSentenceCase(type)}</Badge>
+                    )
+                }),
+                ...transform.convertToPrettifyData(c),
+                collapsibleRow: this.prettifyChildrenData(c.children, headers, selectItems, selectedItems)
+            }
+        })
     }
 }
 

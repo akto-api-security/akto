@@ -6,7 +6,7 @@ function GithubSimpleTable(props) {
 
     const [filters, setFilters] = useState([])
     return <GithubServerTable
-        key={JSON.stringify(props.data ? props.data : "{}")} // passing any value as a "key" re-renders the component when the value is changed.
+        key={Object.keys(props.data).length} // passing any value as a "key" re-renders the component when the value is changed.
         pageLimit={props.pageLimit}
         fetchData={(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => tableFunc.fetchDataSync(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props)}
         sortOptions={props.sortOptions} 
@@ -38,6 +38,7 @@ function GithubSimpleTable(props) {
         hidePagination={props?.hidePagination}
         bannerComp={props?.bannerComp}
         csvFileName={props?.csvFileName}
+        treeView={props?.treeView}
     />
 
 }

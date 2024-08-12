@@ -583,6 +583,7 @@ sortFunc: (data, sortKey, sortOrder) => {
     return (sortOrder) * (b[sortKey].localeCompare(a[sortKey]));
   })
 },
+
 async copyRequest(type, completeData) {
   let copyString = "";
   let snackBarMessage = ""

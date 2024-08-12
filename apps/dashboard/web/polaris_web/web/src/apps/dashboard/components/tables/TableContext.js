@@ -15,9 +15,21 @@ export const TableContextProvider = ({ children }) => {
     });
   };
 
+  const selectItems = (items) => {
+    console.log("called", items)
+    dispatch({
+      type: "SELECT_ROW_ITEMS",
+      payload: {
+        selectedItems: items
+      }
+    })
+  }
+
   const value = {
     tabsInfo: state.tabsInfo,
     applyFilter,
+    selectItems,
+    selectedItems: state.selectedItems
   };
   return <TableContext.Provider value={value}>{children}</TableContext.Provider>;
 };

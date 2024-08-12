@@ -102,3 +102,24 @@
     height: 92px !important;
     border-radius: unset !important;
 }
+
+.styled-name label.Polaris-Choice.Polaris-Checkbox__ChoiceLabel {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.styled-name .Polaris-Choice__Control {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.control-row .Polaris-DataTable__Cell {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    vertical-align: middle;
+    padding-left: 0px !important;
+}
+
+.control-row .Polaris-DataTable__Cell--firstColumn {
+    padding-left: 8px !important;
+}

@@ -289,6 +289,7 @@ function GithubServerTable(props) {
           notHighlightOnselected={props.notHighlightOnselected}
           popoverActive={popoverActive}
           setPopoverActive={setPopoverActive}
+          treeView={props?.treeView}
         />
       ),
     );

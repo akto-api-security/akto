@@ -12,7 +12,7 @@ import {
     Icon
 } from '@shopify/polaris';
 import {
-    HorizontalDotsMinor, ChevronDownMinor, ChevronUpMinor
+    HorizontalDotsMinor, ChevronDownMinor, ChevronUpMinor, ChevronRightMinor
 } from '@shopify/polaris-icons';
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from 'react';
@@ -188,12 +188,19 @@ function GithubRow(props) {
         )
     }
 
-    function CollapsibleCell() {
+    function CollapsibleCell(treeView, value) {
+        let iconSource = treeView ? ChevronRightMinor : ChevronDownMinor
+        if(collapsibleActive === data?.name){
+            iconSource = treeView ? ChevronDownMinor : ChevronUpMinor
+        }
         return (
             <IndexTable.Cell key={"collapsible"}>
-                <HorizontalStack align='end'>
-                    <Icon source={collapsibleActive === data?.name ? ChevronUpMinor : ChevronDownMinor} />
-                </HorizontalStack>
+                <Box width={treeView ? "300px": ''} >
+                    <HorizontalStack align={treeView ? "start" : "end"} wrap={false} gap={"2"}>
+                        <Box><Icon source={iconSource} /></Box>
+                        {treeView ? <Text variant='headingSm'>{value}</Text> : null} 
+                    </HorizontalStack>
+                </Box>
             </IndexTable.Cell>
         )
     }
@@ -206,7 +213,7 @@ function GithubRow(props) {
             case CellType.ACTION : 
                 return hasRowActions ? ActionCell() : null;
             case CellType.COLLAPSIBLE :
-                return CollapsibleCell();
+                return CollapsibleCell(props?.treeView, data[header?.value]);
             case CellType.TEXT :
                 return header.value ? LinkCell(TextCell(header), header) : null;
             default :
