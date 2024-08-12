@@ -38,6 +38,8 @@ import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
@@ -90,6 +92,8 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForTrafficMetrics;
     List<BulkUpdates> writesForTestingRunIssues;
     List<DependencyNode> dependencyNodeList;
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
 
     public List<BulkUpdates> getWritesForTestingRunIssues() {
         return writesForTestingRunIssues;
@@ -325,7 +329,7 @@ public class DbAction extends ActionSupport {
                 ApiInfo apiInfo = objectMapper.readValue(obj.toJson(), ApiInfo.class);
                 ApiInfoKey id = apiInfo.getId();
                 if (accountId == 1721887185 && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)  && !id.getMethod().equals(Method.OPTIONS))  {
-                    System.out.println("auth types for endpoint from runtime " + id.getUrl() + " " + id.getMethod() + " : " + apiInfo.getAllAuthTypesFound());
+                    loggerMaker.infoAndAddToDb("auth types for endpoint from runtime " + id.getUrl() + " " + id.getMethod() + " : " + apiInfo.getAllAuthTypesFound());
                 }
                 apiInfos.add(apiInfo);
             }
@@ -345,13 +349,13 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteSti() {
-        System.out.println("bulkWriteSti called");
+        loggerMaker.infoAndAddToDb("bulkWriteSti called");
 
         if (kafkaUtils.isWriteEnabled()) {
             int accId = Context.accountId.get();
             kafkaUtils.insertData(writesForSti, "bulkWriteSti", accId);
         } else {
-            System.out.println("Entering writes size: " + writesForSti.size());
+            loggerMaker.infoAndAddToDb("Entering writes size: " + writesForSti.size());
             try {
                 ArrayList<WriteModel<SingleTypeInfo>> writes = new ArrayList<>();
                 for (BulkUpdates bulkUpdate: writesForSti) {
@@ -416,15 +420,7 @@ public class DbAction extends ActionSupport {
     
                 DbLayer.bulkWriteSingleTypeInfo(writes);
             } catch (Exception e) {
-                String err = "Error: ";
-                if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
-                    StackTraceElement stackTraceElement = e.getStackTrace()[0];
-                    err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
-                } else {
-                    err = String.format("Err msg: %s\nStackTrace not available", err);
-                    e.printStackTrace();
-                }
-                System.out.println(err);
+                loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSti");
                 return Action.ERROR.toUpperCase();
             }
         }
@@ -437,7 +433,7 @@ public class DbAction extends ActionSupport {
             kafkaUtils.insertData(writesForSampleData, "bulkWriteSampleData", accId);
         } else {
             try {
-                System.out.println("called");
+                loggerMaker.infoAndAddToDb("bulkWriteSampleData called");
                 ArrayList<WriteModel<SampleData>> writes = new ArrayList<>();
                 for (BulkUpdates bulkUpdate: writesForSampleData) {
                     Map<String, Object> mObj = (Map) bulkUpdate.getFilters().get("_id");
@@ -495,15 +491,7 @@ public class DbAction extends ActionSupport {
                 }
                 DbLayer.bulkWriteSampleData(writes);
             } catch (Exception e) {
-                String err = "Error: ";
-                if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
-                    StackTraceElement stackTraceElement = e.getStackTrace()[0];
-                    err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
-                } else {
-                    err = String.format("Err msg: %s\nStackTrace not available", err);
-                }
-                e.printStackTrace();
-                System.out.println(err);
+                loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSampleData");
                 return Action.ERROR.toUpperCase();
             }
         }
@@ -516,7 +504,7 @@ public class DbAction extends ActionSupport {
             kafkaUtils.insertData(writesForSensitiveSampleData, "bulkWriteSensitiveSampleData", accId);
         } else {
             try {
-                System.out.println("bulkWriteSensitiveSampleData called");
+                loggerMaker.infoAndAddToDb("bulkWriteSensitiveSampleData called");
                 ArrayList<WriteModel<SensitiveSampleData>> writes = new ArrayList<>();
                 for (BulkUpdates bulkUpdate: writesForSensitiveSampleData) {
                     Bson filters = Filters.empty();
@@ -576,15 +564,7 @@ public class DbAction extends ActionSupport {
                 }
                 DbLayer.bulkWriteSensitiveSampleData(writes);
             } catch (Exception e) {
-                String err = "Error: ";
-                if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
-                    StackTraceElement stackTraceElement = e.getStackTrace()[0];
-                    err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
-                } else {
-                    err = String.format("Err msg: %s\nStackTrace not available", err);
-                    e.printStackTrace();
-                }
-                System.out.println(err);
+                loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSensitiveSampleData");
                 return Action.ERROR.toUpperCase();
             }
         }
@@ -597,7 +577,7 @@ public class DbAction extends ActionSupport {
             kafkaUtils.insertData(writesForTrafficInfo, "bulkWriteTrafficInfo", accId);
         } else {
             try {
-                System.out.println("bulkWriteTrafficInfo called");
+                loggerMaker.infoAndAddToDb("bulkWriteTrafficInfo called");
                 ArrayList<WriteModel<TrafficInfo>> writes = new ArrayList<>();
                 for (BulkUpdates bulkUpdate: writesForTrafficInfo) {
                     Bson filters = Filters.eq("_id", bulkUpdate.getFilters().get("_id"));
@@ -628,15 +608,7 @@ public class DbAction extends ActionSupport {
                 }
                 DbLayer.bulkWriteTrafficInfo(writes);
             } catch (Exception e) {
-                String err = "Error: ";
-                if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
-                    StackTraceElement stackTraceElement = e.getStackTrace()[0];
-                    err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
-                } else {
-                    err = String.format("Err msg: %s\nStackTrace not available", err);
-                    e.printStackTrace();
-                }
-                System.out.println(err);
+                loggerMaker.errorAndAddToDb(e, "Error in bulkWriteTrafficInfo");
                 return Action.ERROR.toUpperCase();
             }
         }
@@ -649,7 +621,7 @@ public class DbAction extends ActionSupport {
             kafkaUtils.insertData(writesForTrafficMetrics, "bulkWriteTrafficMetrics", accId);
         } else {
             try {
-                System.out.println("bulkWriteTrafficInfo called");
+                loggerMaker.infoAndAddToDb("bulkWriteTrafficInfo called");
                 ArrayList<WriteModel<TrafficMetrics>> writes = new ArrayList<>();
                 for (BulkUpdates bulkUpdate: writesForTrafficMetrics) {
                     
@@ -681,15 +653,7 @@ public class DbAction extends ActionSupport {
                 }
                 DbLayer.bulkWriteTrafficMetrics(writes);
             } catch (Exception e) {
-                String err = "Error: ";
-                if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
-                    StackTraceElement stackTraceElement = e.getStackTrace()[0];
-                    err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
-                } else {
-                    err = String.format("Err msg: %s\nStackTrace not available", err);
-                    e.printStackTrace();
-                }
-                System.out.println(err);
+                loggerMaker.errorAndAddToDb(e, "Error in bulkWriteTrafficMetrics");
                 return Action.ERROR.toUpperCase();
             }
         }
@@ -735,15 +699,7 @@ public class DbAction extends ActionSupport {
                 }
                 DbLayer.bulkWriteSensitiveParamInfo(writes);
             } catch (Exception e) {
-                String err = "Error: ";
-                if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
-                    StackTraceElement stackTraceElement = e.getStackTrace()[0];
-                    err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
-                } else {
-                    err = String.format("Err msg: %s\nStackTrace not available", err);
-                    e.printStackTrace();
-                }
-                System.out.println(err);
+                loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSensitiveParamInfo");
                 return Action.ERROR.toUpperCase();
             }
         }
@@ -830,15 +786,7 @@ public class DbAction extends ActionSupport {
                 }
                 DbLayer.bulkWriteTestingRunIssues(writes);
             } catch (Exception e) {
-                String err = "Error: ";
-                if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
-                    StackTraceElement stackTraceElement = e.getStackTrace()[0];
-                    err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
-                } else {
-                    err = String.format("Err msg: %s\nStackTrace not available", err);
-                    e.printStackTrace();
-                }
-                System.out.println(err);
+                loggerMaker.errorAndAddToDb(e, "Error in bulkWriteTestingRunIssues");
                 return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -1204,15 +1152,7 @@ public class DbAction extends ActionSupport {
             }
             testingRunIssues = DbLayer.fetchIssuesByIds(ids);
         } catch (Exception e) {
-            String err = "Error: ";
-            if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
-                StackTraceElement stackTraceElement = e.getStackTrace()[0];
-                err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
-            } else {
-                err = String.format("Err msg: %s\nStackTrace not available", err);
-                e.printStackTrace();
-            }
-            System.out.println(err);
+            loggerMaker.errorAndAddToDb(e, "Error in fetchIssuesByIds");
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -1474,7 +1414,7 @@ public class DbAction extends ActionSupport {
 
             DbLayer.insertTestingRunResults(testingRunResult);
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults");
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -1633,18 +1573,10 @@ public class DbAction extends ActionSupport {
 
     public String bulkWriteDependencyNodes() {
         try {
-            System.out.println("bulkWriteDependencyNodes called");
+            loggerMaker.infoAndAddToDb("bulkWriteDependencyNodes called");
             DbLayer.bulkWriteDependencyNodes(dependencyNodeList);
         } catch (Exception e) {
-            String err = "Error bulkWriteDependencyNodes: ";
-            if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
-                StackTraceElement stackTraceElement = e.getStackTrace()[0];
-                err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
-            } else {
-                err = String.format("Err msg: %s\nStackTrace not available", err);
-                e.printStackTrace();
-            }
-            System.out.println(err);
+            loggerMaker.errorAndAddToDb(e, "Error in bulkWriteDependencyNodes");
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
