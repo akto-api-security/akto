@@ -12,7 +12,6 @@ export const PollingProvider = ({ children }) => {
         totalTestsQueued: 0,
         testRunsArr: [],
     });
-
     const intervalIdRef = useRef(null);
     const setCurrentTestingRuns = TestingStore(state => state.setCurrentTestingRuns)
 
@@ -37,9 +36,9 @@ export const PollingProvider = ({ children }) => {
             }, 2000);
             intervalIdRef.current = id; 
         };
-
-        fetchTestingStatus();
-
+        if (window.location.pathname.startsWith('/dashboard')) {
+            fetchTestingStatus();
+        }
         return () => {
             clearInterval(intervalIdRef.current);
         };
