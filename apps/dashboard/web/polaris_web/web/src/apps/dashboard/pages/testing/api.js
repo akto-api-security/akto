@@ -420,7 +420,7 @@ export default {
             data: {testScript:{javascript}}
         })
     },
-    updateScript(id) {
+    updateScript(id, javascript) {
         return request({
             url: '/api/updateScript',
             method: 'post',

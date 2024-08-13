@@ -34,6 +34,7 @@ import javax.script.Invocable;
 import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
+import javax.script.SimpleScriptContext;
 
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
@@ -334,114 +335,44 @@ public class ApiExecutor {
     }
 
     private static void calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest) {
-        String script;
         try {
+            String script;
             if (Context.now() - lastTestScriptFetched > 5 * 60) {
                 testScript = TestScriptsDao.instance.fetchTestScript();
                 lastTestScriptFetched = Context.now();
-                if (testScript != null && testScript.getJavascript() != null) {
-                    script = testScript.getJavascript();
-                    engine.eval(script);
-                }
             }
-            if (testScript == null || testScript.getJavascript() == null) {
+            if (testScript != null && testScript.getJavascript() != null) {
+                script = testScript.getJavascript();
+            } else {
+                loggerMaker.infoAndAddToDb("returning from calculateHashAndAddAuth, no test script present");
                 return;
             }
-            String message = originalHttpRequest.getMethod();
-            String reqPayload = originalHttpRequest.getBody();
-            String urlPath = originalHttpRequest.getPath();
-            String queryParamStr = getQueryParam(originalHttpRequest);
-            String headerStr = getHeaderStr(originalHttpRequest);
 
-            message = message + ":" + urlPath + ":" + queryParamStr + ":" + headerStr + ":" + reqPayload;
+            SimpleScriptContext sctx = ((SimpleScriptContext) engine.get("context"));
+            sctx.setAttribute("method", originalHttpRequest.getMethod(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("headers", originalHttpRequest.getHeaders(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("url", originalHttpRequest.getPath(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("payload", originalHttpRequest.getBody(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("queryParams", originalHttpRequest.getFullUrlWithParams(), ScriptContext.ENGINE_SCOPE);
+            engine.eval(script);
 
-            Invocable invocable = (Invocable) engine;
-            String hmac = (String) invocable.invokeFunction("calculateHMACSHA256", message);
+            String method = (String) sctx.getAttribute("method");
+            Map<String, List<String>> headers = (Map) sctx.getAttribute("headers");
+            String url = (String) sctx.getAttribute("url");
+            String payload = (String) sctx.getAttribute("payload");
+            String queryParams = (String) sctx.getAttribute("queryParams");
 
-            String hmacBase64 = Base64.getEncoder().encodeToString(hmac.getBytes());
-            addAuthHeaderWithHash(originalHttpRequest, hmacBase64);
+            originalHttpRequest.setBody(payload);
+            originalHttpRequest.setMethod(method);
+            originalHttpRequest.setUrl(url);
+            originalHttpRequest.setHeaders(headers);
+            originalHttpRequest.setQueryParams(queryParams);
+
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error calculating hash " + e.getMessage() + " payload " + originalHttpRequest.getUrl());
+            loggerMaker.errorAndAddToDb("error in calculateHashAndAddAuth " + e.getMessage() + " url " + originalHttpRequest.getUrl());
             e.printStackTrace();
             return;
         }
-    }
-
-    private static void addAuthHeaderWithHash(OriginalHttpRequest request, String authHashVal) {
-        Map<String, List<String>> m = request.getHeaders();
-        if (m.get("authorization") == null || m.get("authorization").size() == 0) {
-            return;
-        }
-        String existingVal = m.get("authorization").get(0);
-        if (!existingVal.contains("Signature")) {
-            return;
-        }
-        List<String> val = new ArrayList<>();
-        val.add(replaceSignature(existingVal, authHashVal));
-        m.put("authorization", val);
-        loggerMaker.infoAndAddToDb("modified auth header with hash for url " + request.getUrl());
-    }
-
-    public static String replaceSignature(String input, String newSignature) {
-        String signaturePrefix = "Signature=";
-        int startIndex = input.indexOf(signaturePrefix);
-        if (startIndex == -1) {
-            // If the "Signature=" part is not found, return the original string
-            return input;
-        }
-
-        int endIndex = input.indexOf(",", startIndex);
-        if (endIndex == -1) {
-            // If there is no comma after "Signature=", replace till the end of the string
-            endIndex = input.length();
-        }
-
-        StringBuilder result = new StringBuilder();
-        result.append(input.substring(0, startIndex + signaturePrefix.length()));
-        result.append(newSignature);
-        result.append(input.substring(endIndex));
-
-        return result.toString();
-    }
-
-    private static String getQueryParam(OriginalHttpRequest originalHttpRequest) {
-        String url = originalHttpRequest.getFullUrlWithParams();
-        BasicDBObject qpObj = RequestTemplate.getQueryJSON(url);
-        String qp = "";
-        TreeMap<String, String> m = new TreeMap<>();
-        for (String key: qpObj.keySet()) {
-            m.put(key, qpObj.getString(key).trim());
-        }
-
-        for (String key: m.keySet()) {
-            qp = qp + key + "=" + m.get(key) + "&";
-        }
-        if (qp.length() > 0) {
-            return qp.substring(0, qp.length() - 1);
-        }
-        return qp;
-    }
-
-    private static String getHeaderStr(OriginalHttpRequest request) {
-        String headerStr = "";
-        Map<String, List<String>> m = request.getHeaders();
-        for (String key: m.keySet()) {
-            if (!(key.equalsIgnoreCase("channel") || key.equalsIgnoreCase("client_key") || 
-                key.equalsIgnoreCase("idempotent_request_key") || key.equalsIgnoreCase("product") || 
-                key.equalsIgnoreCase("orbipay_payments") || key.equalsIgnoreCase("requestor") || 
-                key.equalsIgnoreCase("requestor_type") || key.equalsIgnoreCase("timestamp"))) {
-                continue;
-            }
-            List<String> val = m.get(key);
-            if (val == null || val.size() == 0) {
-                continue;
-            }
-            headerStr = headerStr + key + "=" + val.get(0) + "&";
-        }
-        if (headerStr.length() > 0) {
-            return headerStr.substring(0, headerStr.length() - 1);
-        }
-        return headerStr;
     }
 
     private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {

@@ -56,7 +56,7 @@ function UserConfig() {
 
     async function addOrUpdateScript() {
         if (preRequestScript.id) {
-            api.updateScript(preRequestScript)
+            api.updateScript(preRequestScript.id, preRequestScript.javascript)
         } else {
             api.addScript(preRequestScript)
         }
