@@ -40,7 +40,7 @@ const tableFunc = {
           Object.keys(filters).forEach((filterKey)=>{
             singleFilterData = props.data;
             let filterSet = new Set(filters[filterKey]);
-            if(filterSet.size!=0){
+            if(filterSet.size!==0){
               singleFilterData = singleFilterData.filter((value) => {
                   return [].concat(value[filterKey]).filter(v => filterSet.has(v)).length > 0
                 })
@@ -53,10 +53,10 @@ const tableFunc = {
           let dataSortKey = props?.sortOptions?.filter(value => {
             return (value.value.startsWith(sortKey))
           }).filter(value => {
-            return (value.value.endsWith(sortOrder == -1 ? 'asc' : 'desc'))
+            return (value.value.endsWith(sortOrder === -1 ? 'asc' : 'desc'))
           })[0]?.sortKey;
 
-          tempData = func.sortFunc(tempData, dataSortKey, sortOrder)
+          tempData = func.sortFunc(tempData, dataSortKey, sortOrder, props?.treeView !== undefined ? true : false)
           if(props.getFilteredItems){
             props.getFilteredItems(tempData)
           }

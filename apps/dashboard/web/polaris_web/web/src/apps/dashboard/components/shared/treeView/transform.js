@@ -193,6 +193,7 @@ const treeViewFunc = {
         return result;
     },
     prettifyChildrenData(childrenNodes, headers, selectItems){
+        console.log("called after?")
         let dataRows = []
         childrenNodes.forEach((c) => {
             let ids = []
@@ -231,6 +232,7 @@ const treeViewFunc = {
         )
     },
     prettifyTreeViewData(normalData, headers, selectItems){
+        console.log("not called?")
         return normalData.map((c) => {
             return{
                 ...c,

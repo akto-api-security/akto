@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import GithubSimpleTable from '../../tables/GithubSimpleTable'
 import dummyDataObj from './dummyData'
 import func from '@/util/func'
@@ -17,23 +17,24 @@ function TreeViewTable() {
     }
 
     const definedTableTabs = ['Hostname', 'Custom']
-    const { selectItems, selectedItems } = useTable()
-
-    const convertToNewData = (collectionsArr, isLoading) => {
-        const normalData = treeViewFunc.buildTree(collectionsArr, "displayName", ".", false, true, ":", headers)
-        const prettifyData = treeViewFunc.prettifyTreeViewData(normalData, headers, selectItems)
-        return { prettify: prettifyData, normal: normalData }
-    }
-
-    const newData = convertToNewData(dummyData)
-    const [data, setData] = useState({'custom':newData.prettify, hostname: []})
+    const { selectItems, selectedItems } = useTable();
+    const [data, setData] = useState({'custom': [] ,'hostname': []})
 
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, data)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
+
+    const convertToNewData = () => {
+        const normalData = treeViewFunc.buildTree(dummyData, "displayName", ".", false, true, ":", headers)
+        const prettifyData = treeViewFunc.prettifyTreeViewData(normalData, headers, selectItems)
+        setData({custom: prettifyData, hostname: []});
+    }
+
+    useEffect(() => {
+        convertToNewData()
+    },[])
     return (
         <GithubSimpleTable
-            key={JSON.stringify(selectItems)}
             data={data[selectedTab]} 
             sortOptions={sortOptions} 
             resourceName={resourceName} 
