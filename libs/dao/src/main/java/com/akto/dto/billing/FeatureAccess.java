@@ -9,7 +9,17 @@ public class FeatureAccess {
     int overageFirstDetected = -1;
     public static final String OVERAGE_FIRST_DETECTED = "overageFirstDetected";
 
-    private static final int STANDARD_GRACE_PERIOD = 0;
+    /*
+     * One day grace period for mini-runtime stack,
+     * since due to multiple runtime machines, some lag in reporting
+     * or other reasons the usage might hit the limits early.
+     * To mitigate this, as we are already recalculating the limits
+     * every 4 hours on dashboard to report usage to billing,
+     * the usage will be corrected every 4 hour.
+     * In case the overage does happen even after usage correction,
+     * the mini-runtime stack will not send data, 1 day after it.
+     */
+    private static final int STANDARD_GRACE_PERIOD = 1 * 24 * 60 * 60;
 
     int usageLimit;
     public static final String USAGE_LIMIT = "usageLimit";
