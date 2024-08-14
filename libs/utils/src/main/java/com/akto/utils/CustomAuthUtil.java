@@ -24,6 +24,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parser.SampleParser;
+import com.akto.runtime.policies.ApiAccessTypePolicyUtil;
 import com.akto.runtime.policies.AuthPolicy;
 import com.akto.util.Constants;
 import com.google.gson.Gson;
@@ -75,7 +76,7 @@ public class CustomAuthUtil {
         return responseParams;
     }
 
-    public static List<WriteModel<ApiInfo>> calcAuth(List<ApiInfo> apiInfos, List<CustomAuthType> customAuthTypes, boolean printLogs){
+    public static List<WriteModel<ApiInfo>> calcAuth(List<ApiInfo> apiInfos, List<CustomAuthType> customAuthTypes, boolean printLogs, boolean reCalcAccessType){
         List<WriteModel<ApiInfo>> apiInfosUpdates = new ArrayList<>();
         if (customAuthTypes == null) {
             customAuthTypes = new ArrayList<>();
@@ -100,6 +101,9 @@ public class CustomAuthUtil {
                     try {
                         HttpResponseParams httpResponseParams = SampleParser.parseSampleMessage(sample);
                         AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+                        if(reCalcAccessType){
+                            ApiAccessTypePolicyUtil.getPolicy().findApiAccessType(httpResponseParams, apiInfo);
+                        }
                         sampleProcessed = true;
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Unable to parse sample data for custom auth setup job");
@@ -150,7 +154,7 @@ public class CustomAuthUtil {
             List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(new BasicDBObject(), skip, limit,
                     Sorts.descending(Constants.ID));
 
-            apiInfosUpdates.addAll(calcAuth(apiInfos, customAuthTypes, false));
+            apiInfosUpdates.addAll(calcAuth(apiInfos, customAuthTypes, false, false));
 
         if (apiInfos.size() == limit) {
             skip += limit;

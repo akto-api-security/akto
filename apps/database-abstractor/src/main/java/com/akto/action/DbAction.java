@@ -338,7 +338,7 @@ public class DbAction extends ActionSupport {
                 public void run() {
                     Context.accountId.set(accountId);
                     List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(accountId);
-                    CustomAuthUtil.calcAuth(apiInfos, customAuthTypes, accountId == 1721887185);
+                    CustomAuthUtil.calcAuth(apiInfos, customAuthTypes, accountId == 1721887185, true);
                     DbLayer.bulkWriteApiInfo(apiInfos);
                 }
             }, 0, TimeUnit.SECONDS);
