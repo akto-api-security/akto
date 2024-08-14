@@ -30,6 +30,7 @@ import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.SimpleScriptContext;
+import jdk.nashorn.api.scripting.ScriptObjectMirror;
 
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
@@ -353,15 +354,29 @@ public class ApiExecutor {
             engine.eval(script);
 
             String method = (String) sctx.getAttribute("method");
-            Map<String, List<String>> headers = (Map) sctx.getAttribute("headers");
+            Map<String, Object> headers = (Map) sctx.getAttribute("headers");
             String url = (String) sctx.getAttribute("url");
             String payload = (String) sctx.getAttribute("payload");
             String queryParams = (String) sctx.getAttribute("queryParams");
 
+            Map<String, List<String>> hs = new HashMap<>();
+            for (String key: headers.keySet()) {
+                try {
+                    ScriptObjectMirror scm = ((ScriptObjectMirror) headers.get(key));
+                    List<String> val = new ArrayList<>();
+                    for (int i = 0; i < scm.size(); i++) {
+                        val.add((String) scm.get(Integer.toString(i)));
+                    }
+                    hs.put(key, val);
+                } catch (Exception e) {
+                    hs.put(key, (List) headers.get(key));
+                }
+            }
+
             originalHttpRequest.setBody(payload);
             originalHttpRequest.setMethod(method);
             originalHttpRequest.setUrl(url);
-            originalHttpRequest.setHeaders(headers);
+            originalHttpRequest.setHeaders(hs);
             originalHttpRequest.setQueryParams(queryParams);
 
         } catch (Exception e) {
