@@ -8,14 +8,12 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
-import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.grpc.ProtoBufUtils;
-import com.mongodb.BasicDBObject;
 
 import kotlin.Pair;
 import okhttp3.*;
@@ -26,11 +24,8 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.*;
 
-import javax.script.Invocable;
 import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
@@ -44,8 +39,6 @@ public class ApiExecutor {
 
     private static int lastTestScriptFetched = 0;
     private static TestScript testScript = null;
-    private static ScriptEngineManager manager = new ScriptEngineManager();
-    private static ScriptEngine engine = manager.getEngineByName("nashorn");
     
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
 
@@ -348,12 +341,15 @@ public class ApiExecutor {
                 return;
             }
 
+            ScriptEngineManager manager = new ScriptEngineManager();
+            ScriptEngine engine = manager.getEngineByName("nashorn");
+
             SimpleScriptContext sctx = ((SimpleScriptContext) engine.get("context"));
             sctx.setAttribute("method", originalHttpRequest.getMethod(), ScriptContext.ENGINE_SCOPE);
             sctx.setAttribute("headers", originalHttpRequest.getHeaders(), ScriptContext.ENGINE_SCOPE);
             sctx.setAttribute("url", originalHttpRequest.getPath(), ScriptContext.ENGINE_SCOPE);
             sctx.setAttribute("payload", originalHttpRequest.getBody(), ScriptContext.ENGINE_SCOPE);
-            sctx.setAttribute("queryParams", originalHttpRequest.getFullUrlWithParams(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("queryParams", originalHttpRequest.getQueryParams(), ScriptContext.ENGINE_SCOPE);
             engine.eval(script);
 
             String method = (String) sctx.getAttribute("method");
