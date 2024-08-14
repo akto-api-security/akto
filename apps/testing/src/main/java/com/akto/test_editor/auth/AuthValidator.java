@@ -41,11 +41,11 @@ public class AuthValidator {
         for (String header: headerKeys) {
             contains = headers.containsKey(header) || CookieTransformer.isKeyPresentInCookie(cookieList, header);
             res = auth.getAuthenticated() && contains;
-            if (!res) {
-                return res;
+            if (res) {
+                return true;
             }
         }
-        return true;
+        return false;
     }
 
     public static List<String> getHeaders(Auth auth, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
