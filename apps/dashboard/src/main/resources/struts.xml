@@ -6032,8 +6032,11 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_CONFIG</param>
+                <param name="featureLabel">USER_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">TEST_PRE_SCRIPT</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6053,8 +6056,9 @@
         <action name="api/fetchScript" class="com.akto.action.testing.ScriptAction" method="fetchScript">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_CONFIG</param>
+                <param name="featureLabel">USER_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
             </interceptor-ref>
 
@@ -6076,8 +6080,11 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_CONFIG</param>
+                <param name="featureLabel">USER_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">TEST_PRE_SCRIPT</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">

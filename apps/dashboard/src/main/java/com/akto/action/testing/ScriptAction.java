@@ -9,6 +9,7 @@ import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dto.testing.config.TestScript;
+import com.akto.util.DashboardMode;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -24,6 +25,10 @@ public class ScriptAction extends UserAction {
     private TestScript testScript;
 
     public String addScript() {
+
+        if (!DashboardMode.isSaasDeployment()) {
+            return Action.ERROR.toUpperCase();
+        }
         if (this.testScript == null || this.testScript.getJavascript() == null) {
             return Action.ERROR.toUpperCase();
         }
@@ -48,6 +53,10 @@ public class ScriptAction extends UserAction {
     
     public String updateScript() {
 
+        if (!DashboardMode.isSaasDeployment()) {
+            return Action.ERROR.toUpperCase();
+        }
+        
         if (this.testScript == null || this.testScript.getJavascript() == null) {
             return Action.ERROR.toUpperCase();
         }
