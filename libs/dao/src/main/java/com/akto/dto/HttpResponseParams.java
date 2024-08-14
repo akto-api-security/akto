@@ -53,6 +53,7 @@ public class HttpResponseParams {
         this.orig = orig;
         this.sourceIP = sourceIP;
         this.destIP = destIP;
+        this.direction = direction;
     }
 
     public static boolean validHttpResponseCode(int statusCode)  {
