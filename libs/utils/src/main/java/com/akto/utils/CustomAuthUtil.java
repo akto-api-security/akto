@@ -23,7 +23,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.parser.SampleParser;
+import com.akto.runtime.parser.SampleParser;
 import com.akto.runtime.policies.AuthPolicy;
 import com.akto.util.Constants;
 import com.google.gson.Gson;
