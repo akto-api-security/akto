@@ -165,6 +165,34 @@ public class TestMergingNew extends MongoBasedTest {
     }
 
     @Test
+    public void testFirstUrlParameterMerging(){
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+        List<String> urls = new ArrayList<>();
+        urls.add("/D654447FF7"); // merges to /STRING
+        urls.add("/c7e5e544-4040-4405-b2a7-22bf9c5286fb"); // merges to /STRING
+        urls.add("/3"); // merges to /INTEGER
+        urls.add(new ObjectId().toHexString()); // merges to /OBJECT_ID
+        urls.add("test@akto.io"); //this shouldn't get merge because tokensBelowThreshold and subtype match
+
+        int i = 0;
+        for (String c: urls) {
+            HttpResponseParams resp = createDifferentHttpResponseParams(i*100, c);
+            responseParams.add(resp);
+            i +=1;
+        }
+
+        parser.syncFunction(responseParams, false, true, null);
+        parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
+        parser.apiCatalogSync.buildFromDB(false, true);
+        assertEquals(1, parser.apiCatalogSync.getDbState(123).getStrictURLToMethods().size());
+        assertEquals(3, parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods().size());
+
+    }
+
+    @Test
     public void testUUIDForceMerge() {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();

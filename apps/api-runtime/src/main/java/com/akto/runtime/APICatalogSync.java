@@ -709,9 +709,7 @@ public class APICatalogSync {
 
     public static URLTemplate tryParamteresingUrl(URLStatic newUrl){
         String[] tokens = tokenize(newUrl.getUrl());
-        if(tokens.length < 2){
-            return null;
-        }
+        boolean tokensBelowThreshold = tokens.length < 2;
         Pattern pattern = patternToSubType.get(SingleTypeInfo.UUID);
         boolean allNull = true;
         SuperType[] newTypes = new SuperType[tokens.length];
@@ -733,7 +731,7 @@ public class APICatalogSync {
 
             if(tokens[i] != null){
                 SubType tempSubType = KeyTypes.findSubType(tokens[i], ""+i, null,true);
-                if(isValidSubtype(tempSubType)){
+                if(!tokensBelowThreshold && isValidSubtype(tempSubType)){
                     newTypes[i] = SuperType.STRING;
                     tokens[i] = null;
                 }else if(isAlphanumericString(tempToken)){
