@@ -69,6 +69,8 @@ function TestRoleSettings() {
         { label: "JSON Recording", value: "RECORDED_FLOW" },
     ]
 
+    const [refresh, setRefresh] = useState(false)
+
     function getAuthWithCondList() {
         return  initialItems?.authWithCondList
     }
@@ -106,7 +108,7 @@ function TestRoleSettings() {
         } else {
             resetFunc(initialItems)
         }
-    }, [])
+    }, [refresh])
 
     useEffect(() => {
         if (func.deepComparison(conditions, transform.createConditions(initialItems.endpoints))) {
@@ -125,10 +127,14 @@ function TestRoleSettings() {
     }
 
     const saveAction = async (updatedAuth=false, authWithCondLists = null) => {
+        setRefresh(!refresh)
         let andConditions = transform.filterContainsConditions(conditions, 'AND')
         let orConditions = transform.filterContainsConditions(conditions, 'OR')
         if (!(andConditions || orConditions) || roleName.length == 0) {
+            navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions }, authWithCondList: authWithCondLists},
+                replace:true })
             func.setToast(true, true, "Please select valid values for a test role")
+            
         } else {
             if (isNew) {
                 api.addTestRoles(roleName, andConditions, orConditions).then((res) => {
@@ -311,7 +317,6 @@ function TestRoleSettings() {
                     }
                 }
             }
-
             resp = await api.addAuthToRole(initialItems.name, apiCond, currentInfo.authParams, automationType, currentInfo.steps, recordedLoginFlowInput)
         }
         handleCancel()
@@ -421,12 +426,12 @@ function TestRoleSettings() {
 
     return (
         <DetailsPage
-        pageTitle={pageTitle}
-        backUrl="/dashboard/testing/roles"
-        saveAction={saveAction}
-        discardAction={() => resetFunc(initialItems)}
-        isDisabled={compareFunc}
-        components={components}
+            pageTitle={pageTitle}
+            backUrl="/dashboard/testing/roles"
+            saveAction={saveAction}
+            discardAction={() => resetFunc(initialItems)}
+            isDisabled={compareFunc}
+            components={components}
         />
     )
 }
