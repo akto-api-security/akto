@@ -736,7 +736,7 @@ public class Executor {
                     // resolve context for auth mechanism keys
                     authVal = VariableResolver.resolveAuthContext(key, rawApi.getRequest().getHeaders(), authHeader);
                     if (authVal != null) {
-                        ExecutorSingleOperationResp authMechanismContextResult = Operations.modifyHeader(rawApi, authHeader, authVal);
+                        ExecutorSingleOperationResp authMechanismContextResult = Operations.modifyHeader(rawApi, authHeader, authVal, true);
                         modifiedAtLeastOne = modifiedAtLeastOne || authMechanismContextResult.getSuccess();
                     }
 
@@ -746,7 +746,7 @@ public class Executor {
                         for (String customAuthHeaderKey: customAuthHeaderKeys) {
                             authVal = VariableResolver.resolveAuthContext(key.toString(), rawApi.getRequest().getHeaders(), customAuthHeaderKey);
                             if (authVal == null) continue;
-                            ExecutorSingleOperationResp customAuthContextResult = Operations.modifyHeader(rawApi, customAuthHeaderKey, authVal);
+                            ExecutorSingleOperationResp customAuthContextResult = Operations.modifyHeader(rawApi, customAuthHeaderKey, authVal, true);
                             modifiedAtLeastOne = modifiedAtLeastOne || customAuthContextResult.getSuccess();
                         }
 
@@ -767,7 +767,7 @@ public class Executor {
 
                     for (AuthParam authParam: authMechanism.getAuthParams()) {
                         authVal = authParam.getValue();
-                        ExecutorSingleOperationResp result = Operations.modifyHeader(rawApi, authParam.getKey(), authVal);
+                        ExecutorSingleOperationResp result = Operations.modifyHeader(rawApi, authParam.getKey(), authVal, true);
                         modifiedAtLeastOne = modifiedAtLeastOne || result.getSuccess();
                     }
                 }
