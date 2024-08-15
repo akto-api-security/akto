@@ -22,12 +22,25 @@ public class ApiAccessTypePolicy {
 
     // RFC standard list. To be used later.
     static final private List<String> STANDARD_PRIVATE_IP_RANGES = Arrays.asList(
+            /*
+             * private internets : https://datatracker.ietf.org/doc/html/rfc1918#section-3
+             */
             "10.0.0.0/8",
-            "100.64.0.0/10",
             "172.16.0.0/12",
-            "192.0.0.0/24",
-            "198.18.0.0/15",
-            "192.168.0.0/16");
+            "192.168.0.0/16"
+    /*
+     * reserved for IANA : https://datatracker.ietf.org/doc/html/rfc6598
+     * "100.64.0.0/10",
+     */
+    /*
+     * reserved for IANA: https://datatracker.ietf.org/doc/html/rfc6890
+     * "192.0.0.0/24",
+     */
+    /*
+     * Used for benchmarking: https://datatracker.ietf.org/doc/html/rfc2544
+     * "198.18.0.0/15"
+     */
+    );
 
     static final private List<String> CLIENT_IP_HEADERS = Arrays.asList(
             "x-forwarded-for",

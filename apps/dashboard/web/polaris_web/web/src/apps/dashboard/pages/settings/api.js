@@ -414,6 +414,13 @@ const settingRequests = {
             data: {partnerIpList}
         })
     },
+    applyAccessType(){
+        return request({
+            url: '/api/applyAccessType',
+            method: 'post',
+            data: {}
+        })
+    },
     handleRedundantUrls(allowRedundantEndpointsList) {
         return request({
             url: '/api/updateUrlSettings',

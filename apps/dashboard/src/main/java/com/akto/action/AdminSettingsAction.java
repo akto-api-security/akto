@@ -244,9 +244,24 @@ public class AdminSettingsAction extends UserAction {
                 AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.PRIVATE_CIDR_LIST, privateCidrList)
             );
 
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String applyAccessType(){
+        try {
             int accountId = Context.accountId.get();
-            ApiAccessTypePolicy policy = new ApiAccessTypePolicy(new ArrayList<>(privateCidrList));
             accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            List<String> privateCidrList = new ArrayList<>();
+            if (accountSettings != null &&
+                    accountSettings.getPrivateCidrList() != null &&
+                    !accountSettings.getPrivateCidrList().isEmpty()) {
+                privateCidrList = accountSettings.getPrivateCidrList();
+            }
+            ApiAccessTypePolicy policy = new ApiAccessTypePolicy(privateCidrList);
+
             executorService.schedule(new Runnable() {
                 public void run() {
                     Context.accountId.set(accountId);
@@ -259,10 +274,9 @@ public class AdminSettingsAction extends UserAction {
                     ApiAccessTypePolicyUtil.calcApiAccessType(policy, partnerIpList);
                 }
             }, 0, TimeUnit.SECONDS);
-
-            return SUCCESS.toUpperCase();
+            return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
-            return ERROR.toUpperCase();
+            return Action.ERROR.toUpperCase();
         }
 
     }
@@ -302,23 +316,6 @@ public class AdminSettingsAction extends UserAction {
             AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.PARTNER_IP_LIST, partnerIpList)
             );
-
-            int accountId = Context.accountId.get();
-            accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-            List<String> privateCidrList = new ArrayList<>();
-            if (accountSettings != null &&
-                    accountSettings.getPrivateCidrList() != null &&
-                    !accountSettings.getPrivateCidrList().isEmpty()) {
-                privateCidrList = accountSettings.getPrivateCidrList();
-            }
-            ApiAccessTypePolicy policy = new ApiAccessTypePolicy(privateCidrList);
-            List<String> localPartnerIpList = new ArrayList<>(partnerIpList);
-            executorService.schedule(new Runnable() {
-                public void run() {
-                    Context.accountId.set(accountId);
-                    ApiAccessTypePolicyUtil.calcApiAccessType(policy, localPartnerIpList);
-                }
-            }, 0, TimeUnit.SECONDS);
 
             return SUCCESS.toUpperCase();
         } catch (Exception e) {

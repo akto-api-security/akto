@@ -130,6 +130,7 @@ function About() {
             updatedIps = Array.from(new Set(updatedIps))
             setPrivateCidrList(updatedIps)
             await settingRequests.configPrivateCidr(updatedIps)
+            func.setToast(true, false, "Updated private CIDR ranges")
         }else{
             let updatedIps = []
             if(isAdded){
@@ -141,7 +142,13 @@ function About() {
             updatedIps = Array.from(new Set(updatedIps))
             setPartnerIpsList(updatedIps)
             await settingRequests.configPartnerIps(updatedIps)
+            func.setToast(true, false, "Updated partner IPs list")
         }
+    }
+
+    const applyIps = async() => {
+        await settingRequests.applyAccessType()
+        func.setToast(true, false, "Access type configuration has been applied")
     }
 
     function ToggleComponent({text,onToggle,initial}){
@@ -385,7 +392,7 @@ function About() {
         </LegacyCard>
     )
 
-    function UpdateIpsComponent({onSubmit, title, labelText, description, ipsList, onRemove, type}){
+    function UpdateIpsComponent({onSubmit, title, labelText, description, ipsList, onRemove, type, onApply}){
         const [value, setValue] = useState('')
         const onFormSubmit = (ip) => {
             if(checkError(ip, type)){
@@ -417,7 +424,11 @@ function About() {
 
         const isError = checkError(value, type)
         return(
-            <LegacyCard title={<TitleComponent title={title} description={description}/>}>
+            <LegacyCard title={<TitleComponent title={title} description={description} />}
+                actions={[
+                    { content: 'Apply', onAction: onApply},
+                ]}
+            >
                 <Divider />
                 <LegacyCard.Section>
                     <VerticalStack gap={"2"}>
@@ -448,6 +459,7 @@ function About() {
                             ipsList={privateCidrList}
                             onSubmit={(val) => handleIpsChange(val,true,"cidr")}
                             onRemove={(val) => handleIpsChange(val, false, "cidr")}
+                            onApply={() => applyIps()}
                             type={"cidr"}
                         /> : null,
                         !func.checkLocal() ? <UpdateIpsComponent
@@ -458,6 +470,7 @@ function About() {
                             ipsList={partnerIpsList}
                             onSubmit={(val) => handleIpsChange(val,true,"partner")}
                             onRemove={(val) => handleIpsChange(val, false, "partner")}
+                            onApply={() => applyIps()}
                             type={"partner"}
                         /> : null
         ]
