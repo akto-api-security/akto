@@ -585,7 +585,6 @@ sortFunc: (data, sortKey, sortOrder, treeView) => {
   if(treeView){
     func.recursiveSort(data, sortKey, sortOrder)
   }
-  console.log("sor", data)
   return data
 },
 recursiveSort(data, sortKey, sortOrder = 1) {

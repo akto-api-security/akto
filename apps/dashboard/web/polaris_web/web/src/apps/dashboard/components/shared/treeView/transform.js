@@ -192,9 +192,7 @@ const treeViewFunc = {
     
         return result;
     },
-    prettifyChildrenData(childrenNodes, headers, selectItems){
-        console.log("called after?")
-        let dataRows = []
+    traverseAndMakeChildrenData(dataRows, childrenNodes, headers, selectItems){
         childrenNodes.forEach((c) => {
             let ids = []
             if(c.hasOwnProperty('apiCollectionIds')){
@@ -218,7 +216,14 @@ const treeViewFunc = {
                 tempRow.push(collectionObj[x.value])
             })
             dataRows.push(tempRow)
+            if(c?.isTerminal === false){
+                this.traverseAndMakeChildrenData(dataRows, c?.children, headers, selectItems)
+            }
         })
+    },
+    prettifyChildrenData(childrenNodes, headers, selectItems){
+        let dataRows = []
+        this.traverseAndMakeChildrenData(dataRows, childrenNodes, headers, selectItems)
         return(
             <td colSpan={10} style={{padding: '0px !important'}} className="control-row">
                 <DataTable
@@ -232,7 +237,6 @@ const treeViewFunc = {
         )
     },
     prettifyTreeViewData(normalData, headers, selectItems){
-        console.log("not called?")
         return normalData.map((c) => {
             return{
                 ...c,
@@ -243,7 +247,7 @@ const treeViewFunc = {
                     )
                 }),
                 ...transform.convertToPrettifyData(c),
-                collapsibleRow: this.prettifyChildrenData(c.children, headers, selectItems)
+                makeTree: (data) => this.prettifyChildrenData(data.children, headers, selectItems)
             }
         })
     }

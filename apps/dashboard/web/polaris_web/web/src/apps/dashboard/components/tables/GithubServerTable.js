@@ -10,7 +10,7 @@ import {
   Key,
   ChoiceList,
   Tabs} from '@shopify/polaris';
-import {CellType, GithubRow} from './rows/GithubRow';
+import { GithubRow } from './rows/GithubRow';
 import { useState, useCallback, useEffect } from 'react';
 import "./style.css"
 import transform from '../../pages/observe/transform';

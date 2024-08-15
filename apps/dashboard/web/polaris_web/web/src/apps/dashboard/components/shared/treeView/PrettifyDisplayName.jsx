@@ -5,7 +5,6 @@ import TooltipText from "../TooltipText";
 import { Box, Checkbox, HorizontalStack, Icon } from '@shopify/polaris';
 
 function PrettifyDisplayName({name, level, isTerminal, isOpen, selectItems, collectionIds}) {
-
     const selectedItems = TableStore.getState().selectedItems
     const [checked, setChecked] = useState(false)
 
@@ -31,7 +30,7 @@ function PrettifyDisplayName({name, level, isTerminal, isOpen, selectItems, coll
     const spacingWidth = (len - 1) * 16;
 
     let displayName = name
-    if(displayName === undefined || displayName.length === 0){
+    if(level !== undefined || level.length > 0){
         displayName = level.split("#")[len];
     }
     const icon = isOpen ? ChevronDownMinor : ChevronRightMinor

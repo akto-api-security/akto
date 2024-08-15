@@ -54,7 +54,7 @@ function GithubRow(props) {
             return;
         }
 
-        if(data?.collapsibleRow){
+        if(data?.collapsibleRow || props?.treeView){
             setCollapsibleActive((prev) => {
                 if(prev===data?.name){
                     return "none";
@@ -243,7 +243,7 @@ function GithubRow(props) {
                 {props?.newRow ? <NewCell /> :<OldCell/>}   
             </IndexTable.Row>
             
-            {collapsibleActive === data?.name ? data.collapsibleRow : null}
+            {collapsibleActive === data?.name ? ( props?.treeView ? data?.makeTree(data) : data?.collapsibleRow) : null}
             
         </>
     )

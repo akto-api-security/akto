@@ -4,7 +4,7 @@ const tableInitialState = PersistStore.getState().tableInitialState[window.locat
 const selectedItems = TableStore.getState().selectedItems
 export const initialState = {
     tabsInfo : tableInitialState,
-    selectedItems: selectedItems
+    selectedItems: selectedItems,
 }
 
 const tableReducer = (state, action) =>{

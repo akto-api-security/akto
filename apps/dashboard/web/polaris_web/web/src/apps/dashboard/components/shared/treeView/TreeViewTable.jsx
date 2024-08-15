@@ -23,15 +23,15 @@ function TreeViewTable() {
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, data)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
+    const normalData = treeViewFunc.buildTree(dummyData, "displayName", ".", false, true, ":", headers)
 
-    const convertToNewData = () => {
-        const normalData = treeViewFunc.buildTree(dummyData, "displayName", ".", false, true, ":", headers)
+    const prettifyAndRenderData = () => {
         const prettifyData = treeViewFunc.prettifyTreeViewData(normalData, headers, selectItems)
         setData({custom: prettifyData, hostname: []});
     }
 
     useEffect(() => {
-        convertToNewData()
+        prettifyAndRenderData();
     },[])
     return (
         <GithubSimpleTable

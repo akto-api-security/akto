@@ -5,7 +5,6 @@ const TableContext = createContext(initialState);
 
 export const TableContextProvider = ({ children }) => {
   const [state, dispatch] = useReducer(tableReducer, initialState);
-
   const applyFilter = (filter) => {
     dispatch({
       type: "APPLY_FILTER",
@@ -16,7 +15,6 @@ export const TableContextProvider = ({ children }) => {
   };
 
   const selectItems = (items) => {
-    console.log("called", items)
     dispatch({
       type: "SELECT_ROW_ITEMS",
       payload: {
