@@ -2,6 +2,7 @@ package com.akto.test_editor.filter.data_operands_impl;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
@@ -17,7 +18,14 @@ public class ContainsEitherFilter extends DataOperandsImpl {
         List<String> notMatchedQuerySet = new ArrayList<>();
         String data;
         try {
-            querySet = (List<String>) dataOperandFilterRequest.getQueryset();
+            Object querysetObj = dataOperandFilterRequest.getQueryset();
+            if (querysetObj instanceof List<?>) {
+                querySet = ((List<?>) querysetObj).stream()
+                        .map(String::valueOf)
+                        .collect(Collectors.toList());
+            } else {
+                querySet = new ArrayList<>();
+            }
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
             return new ValidationResult(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
