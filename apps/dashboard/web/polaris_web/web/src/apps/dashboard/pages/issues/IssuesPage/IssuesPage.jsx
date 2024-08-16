@@ -13,6 +13,9 @@ import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
 import { useEffect } from "react";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
+import { useSearchParams } from "react-router-dom";
+import TestRunResultPage from "../../testing/TestRunResultPage/TestRunResultPage";
+import LocalStore from "../../../../main/LocalStorageStore";
 
 const headers = [
     {
@@ -148,13 +151,13 @@ const resourceName = {
 
 async function getNextUrl(issueId){
     const res = await api.fetchTestingRunResult(JSON.parse(issueId))
-    return "/dashboard/testing/issues/result/"+res.testingRunResult.hexId;
+    return "/dashboard/issues?result="+res.testingRunResult.hexId;
 }
 
 function IssuesPage(){
 
     const [loading, setLoading] = useState(true);
-    const subCategoryMap = PersistStore(state => state.subCategoryMap);
+    const subCategoryMap = LocalStore(state => state.subCategoryMap);
     const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
     const [issueStatus, setIssueStatus] = useState([]);
     const [issuesFilters, setIssuesFilters] = useState({})
@@ -170,6 +173,9 @@ function IssuesPage(){
           message: message
         })
     }
+
+    const [searchParams, setSearchParams] = useSearchParams();
+  const resultId = searchParams.get("result")
 
     filtersOptions = func.getCollectionFilters(filtersOptions)
 
@@ -323,6 +329,7 @@ function IssuesPage(){
   }, [subCategoryMap, apiCollectionMap])
     
     return (
+        <>
         <PageWithMultipleCards
             title={<TitleWithInfo
                     titleText={"Issues"}
@@ -363,7 +370,9 @@ function IssuesPage(){
                 />
             ]}
             primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export vulnerability report</Button>}
-            />
+        />
+            {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
+        </>
     )
 }
 

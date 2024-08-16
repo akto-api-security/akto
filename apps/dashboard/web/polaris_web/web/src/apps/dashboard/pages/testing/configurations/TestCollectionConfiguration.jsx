@@ -6,11 +6,12 @@ import { useEffect } from "react";
 import PersistStore from '@/apps/main/PersistStore';
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
+import LocalStore from "../../../../main/LocalStorageStore";
 
 function TestCollectionConfiguration() {
     const allCollections = PersistStore(state => state.allCollections)
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
-    const subCategoryMap = PersistStore(state => state.subCategoryMap)
+    const subCategoryMap = LocalStore(state => state.subCategoryMap)
     const [testCollectionProperties, setTestCollectionProperties] = useState([])
     const [apiCollectionId, setApiCollectionId] = useState(0)
     const [possibleTestCollectionProperties, setPossibleTestCollectionProperties] = useState([])

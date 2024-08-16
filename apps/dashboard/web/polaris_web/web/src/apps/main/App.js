@@ -100,10 +100,6 @@ const router = createBrowserRouter([
                 element: <SingleTestRunPage />
               },
               {
-                path: ":hexId/result/:hexId2",
-                element: <TestRunResultPage />
-              },
-              {
                 path:"roles",
                 element: <TestRolesPage/>
               },
