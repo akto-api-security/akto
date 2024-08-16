@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import testingApi from "../dashboard/pages/testing/api"
-import TestingStore from '../dashboard/pages/testing/testingStore';
 const PollingContext = createContext();
 
 export const usePolling = () => useContext(PollingContext);
@@ -13,13 +12,19 @@ export const PollingProvider = ({ children }) => {
         testRunsArr: [],
     });
     const intervalIdRef = useRef(null);
-    const setCurrentTestingRuns = TestingStore(state => state.setCurrentTestingRuns)
+    const [currentTestingRuns, setCurrentTestingRuns] = useState([])
 
     useEffect(() => {
         const fetchTestingStatus = () => {
             const id = setInterval(() => {
                 testingApi.fetchTestingRunStatus().then((resp) => {
-                    setCurrentTestingRuns(resp?.currentRunningTestsStatus)
+                    setCurrentTestingRuns((prev) => {
+                        if(prev.length === 0 && resp?.currentRunningTestsStatus === 0){
+                            return prev
+                        }else{
+                            return resp?.currentRunningTestsStatus
+                        }
+                    })
                     setCurrentTestsObj(prevState => {
                         const newTestsObj = {
                             totalTestsInitiated: resp?.testRunsScheduled || 0,
@@ -49,7 +54,7 @@ export const PollingProvider = ({ children }) => {
     };
 
     return (
-        <PollingContext.Provider value={{ currentTestsObj, clearPollingInterval }}>
+        <PollingContext.Provider value={{ currentTestsObj, currentTestingRuns, clearPollingInterval }}>
             {children}
         </PollingContext.Provider>
     );
