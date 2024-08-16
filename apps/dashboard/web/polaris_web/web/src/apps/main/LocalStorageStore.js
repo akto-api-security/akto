@@ -10,7 +10,7 @@ let localStore = (set) => ({
     ...initialState,
     setSubCategoryMap: (subCategoryMap) => set({ subCategoryMap }),
     setCategoryMap: (categoryMap) => set({ categoryMap }),
-    resetAll: () => set(initialState), // Reset function
+    resetStore: () => set(initialState), // Reset function
 })
 
 localStore = devtools(localStore)
