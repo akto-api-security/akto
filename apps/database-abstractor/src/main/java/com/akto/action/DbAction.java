@@ -39,8 +39,10 @@ import com.akto.utils.SampleDataLogs;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.testing.TestExecutor;
+import com.akto.trafficFilter.HostFilter;
 import com.akto.util.Constants;
-import com.akto.dto.usage.MetricTypes;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
@@ -349,27 +351,76 @@ public class DbAction extends ActionSupport {
 
     public String bulkWriteSti() {
         loggerMaker.infoAndAddToDb("bulkWriteSti called");
+        int accId = Context.accountId.get();
+
+        Set<Integer> ignoreHosts = new HashSet<>();
+        try {
+            ignoreHosts = HostFilter.getCollectionSet(accId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in getting ignore host ids");
+        }
 
         if (kafkaUtils.isWriteEnabled()) {
-            int accId = Context.accountId.get();
-            kafkaUtils.insertData(writesForSti, "bulkWriteSti", accId);
+
+            try {
+                if (ignoreHosts != null && !ignoreHosts.isEmpty()) {
+
+                    List<Integer> indicesToDelete = new ArrayList<>();
+                    int i = 0;
+                    for (BulkUpdates bulkUpdate : writesForSti) {
+                        for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
+                            if (entry.getKey().equalsIgnoreCase("apiCollectionId")) {
+                                String valStr = entry.getValue().toString();
+                                int val = Integer.valueOf(valStr);
+                                if (ignoreHosts.contains(val)) {
+                                    indicesToDelete.add(i);
+                                }
+                            }
+                        }
+                        i++;
+                    }
+                    Collections.sort(indicesToDelete, Collections.reverseOrder());
+                    for (int j : indicesToDelete) {
+                        writesForSti.remove(j);
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "error in ignore STI updates");
+            }
+
+            if (writesForSti != null && !writesForSti.isEmpty()) {
+                kafkaUtils.insertData(writesForSti, "bulkWriteSti", accId);
+            }
+
         } else {
             loggerMaker.infoAndAddToDb("Entering writes size: " + writesForSti.size());
             try {
                 ArrayList<WriteModel<SingleTypeInfo>> writes = new ArrayList<>();
                 for (BulkUpdates bulkUpdate: writesForSti) {
                     List<Bson> filters = new ArrayList<>();
+                    boolean ignore = false;
                     for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                         if (entry.getKey().equalsIgnoreCase("isUrlParam")) {
                             continue;
                         }
-                        if (entry.getKey().equalsIgnoreCase("apiCollectionId") || entry.getKey().equalsIgnoreCase("responseCode")) {
+                        if (entry.getKey().equalsIgnoreCase("apiCollectionId")) {
+                            String valStr = entry.getValue().toString();
+                            int val = Integer.valueOf(valStr);
+                            if (ignoreHosts.contains(val)) {
+                                ignore = true;
+                                break;
+                            }
+                            filters.add(Filters.eq(entry.getKey(), val));
+                        } else if (entry.getKey().equalsIgnoreCase("responseCode")) {
                             String valStr = entry.getValue().toString();
                             int val = Integer.valueOf(valStr);
                             filters.add(Filters.eq(entry.getKey(), val));
                         } else {
                             filters.add(Filters.eq(entry.getKey(), entry.getValue()));
                         }
+                    }
+                    if (ignore) {
+                        continue;
                     }
                     List<Boolean> urlParamQuery;
                     if ((Boolean) bulkUpdate.getFilters().get("isUrlParam") == true) {
