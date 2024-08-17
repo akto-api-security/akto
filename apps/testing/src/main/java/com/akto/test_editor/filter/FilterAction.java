@@ -1113,7 +1113,7 @@ public final class FilterAction {
     public DataOperandsFilterResponse evaluatePrivateVariables(FilterActionRequest filterActionRequest) {
 
         List<BasicDBObject> privateValues = new ArrayList<>();
-        StringBuilder vulnerabilityReasonString = null;
+        StringBuilder vulnerabilityReasonString = new StringBuilder();
         if (filterActionRequest.getOperand().equalsIgnoreCase(TestEditorEnums.DataOperands.REGEX.toString())) {
             if (filterActionRequest.getContextEntities() == null) {
                 return new DataOperandsFilterResponse(false, null, filterActionRequest.getContextEntities(), null);
