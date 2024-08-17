@@ -379,9 +379,13 @@ public class DbAction extends ActionSupport {
                         }
                         i++;
                     }
-                    Collections.sort(indicesToDelete, Collections.reverseOrder());
-                    for (int j : indicesToDelete) {
-                        writesForSti.remove(j);
+
+                    if (indicesToDelete!=null && !indicesToDelete.isEmpty()){
+                        loggerMaker.infoAndAddToDb(String.format("Original writes: %d indices to delete: %d", writesForSti.size(), indicesToDelete.size()));
+                        Collections.sort(indicesToDelete, Collections.reverseOrder());
+                        for (int j : indicesToDelete) {
+                            writesForSti.remove(j);
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -396,6 +400,7 @@ public class DbAction extends ActionSupport {
             loggerMaker.infoAndAddToDb("Entering writes size: " + writesForSti.size());
             try {
                 ArrayList<WriteModel<SingleTypeInfo>> writes = new ArrayList<>();
+                int ignoreCount =0;
                 for (BulkUpdates bulkUpdate: writesForSti) {
                     List<Bson> filters = new ArrayList<>();
                     boolean ignore = false;
@@ -420,6 +425,7 @@ public class DbAction extends ActionSupport {
                         }
                     }
                     if (ignore) {
+                        ignoreCount++;
                         continue;
                     }
                     List<Boolean> urlParamQuery;
@@ -467,6 +473,8 @@ public class DbAction extends ActionSupport {
                         );
                     }
                 }
+
+                loggerMaker.infoAndAddToDb(String.format("Consumer data: %d ignored: %d writes: %d", writesForSti.size(), ignoreCount, writes.size()));
     
                 DbLayer.bulkWriteSingleTypeInfo(writes);
             } catch (Exception e) {
