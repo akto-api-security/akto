@@ -40,6 +40,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.testing.TestExecutor;
 import com.akto.trafficFilter.HostFilter;
+import com.akto.trafficFilter.ParamFilter;
 import com.akto.util.Constants;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -359,35 +360,54 @@ public class DbAction extends ActionSupport {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in getting ignore host ids");
         }
+        if (ignoreHosts == null) {
+            ignoreHosts = new HashSet<>();
+        }
 
         if (kafkaUtils.isWriteEnabled()) {
 
             try {
-                if (ignoreHosts != null && !ignoreHosts.isEmpty()) {
-
                     List<Integer> indicesToDelete = new ArrayList<>();
                     int i = 0;
                     for (BulkUpdates bulkUpdate : writesForSti) {
+                        boolean ignore = false;
+                        int apiCollectionId = -1;
+                        String url = null, method = null, param = null;
                         for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                             if (entry.getKey().equalsIgnoreCase("apiCollectionId")) {
                                 String valStr = entry.getValue().toString();
                                 int val = Integer.valueOf(valStr);
+                                apiCollectionId = val;
                                 if (ignoreHosts.contains(val)) {
-                                    indicesToDelete.add(i);
+                                    ignore = true;
                                 }
+                            } else if(entry.getKey().equalsIgnoreCase("url")){
+                                url = entry.getValue().toString();
+                            } else if(entry.getKey().equalsIgnoreCase("method")){
+                                method = entry.getValue().toString();
+                            } else if(entry.getKey().equalsIgnoreCase("param")){
+                                param = entry.getValue().toString();
                             }
+                        }
+                        if (!ignore && apiCollectionId != -1 && url != null && method != null && param!=null) {
+                            boolean isNew = ParamFilter.isNewEntry(accId, apiCollectionId, url, method, param);
+                            if (!isNew) {
+                                ignore = true;
+                            }
+                        }
+                        if(ignore){
+                            indicesToDelete.add(i);
                         }
                         i++;
                     }
 
-                    if (indicesToDelete!=null && !indicesToDelete.isEmpty()){
+                    if (indicesToDelete!=null && !indicesToDelete.isEmpty()) {
                         loggerMaker.infoAndAddToDb(String.format("Original writes: %d indices to delete: %d", writesForSti.size(), indicesToDelete.size()));
                         Collections.sort(indicesToDelete, Collections.reverseOrder());
                         for (int j : indicesToDelete) {
                             writesForSti.remove(j);
                         }
                     }
-                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "error in ignore STI updates");
             }
@@ -404,6 +424,8 @@ public class DbAction extends ActionSupport {
                 for (BulkUpdates bulkUpdate: writesForSti) {
                     List<Bson> filters = new ArrayList<>();
                     boolean ignore = false;
+                    int apiCollectionId = -1;
+                    String url = null, method = null, param = null;
                     for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                         if (entry.getKey().equalsIgnoreCase("isUrlParam")) {
                             continue;
@@ -411,6 +433,7 @@ public class DbAction extends ActionSupport {
                         if (entry.getKey().equalsIgnoreCase("apiCollectionId")) {
                             String valStr = entry.getValue().toString();
                             int val = Integer.valueOf(valStr);
+                            apiCollectionId = val;
                             if (ignoreHosts.contains(val)) {
                                 ignore = true;
                                 break;
@@ -422,6 +445,19 @@ public class DbAction extends ActionSupport {
                             filters.add(Filters.eq(entry.getKey(), val));
                         } else {
                             filters.add(Filters.eq(entry.getKey(), entry.getValue()));
+                            if(entry.getKey().equalsIgnoreCase("url")){
+                                url = entry.getValue().toString();
+                            } else if(entry.getKey().equalsIgnoreCase("method")){
+                                method = entry.getValue().toString();
+                            } else if(entry.getKey().equalsIgnoreCase("param")){
+                                param = entry.getValue().toString();
+                            }
+                        }
+                    }
+                    if (!ignore && apiCollectionId != -1 && url != null && method != null && param!=null) {
+                        boolean isNew = ParamFilter.isNewEntry(accId, apiCollectionId, url, method, param);
+                        if (!isNew) {
+                            ignore = true;
                         }
                     }
                     if (ignore) {
