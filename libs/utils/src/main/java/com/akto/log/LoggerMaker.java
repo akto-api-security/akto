@@ -65,7 +65,7 @@ public class LoggerMaker  {
     private LogDb db;
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, DB_ABS
     }
 
     private static AccountSettings accountSettings = null;
@@ -231,6 +231,7 @@ public class LoggerMaker  {
                 case BILLING:
                     BillingLogsDao.instance.insertOne(log);
                     break;
+                // Add db for db-abs
                 default:
                     break;
             }
