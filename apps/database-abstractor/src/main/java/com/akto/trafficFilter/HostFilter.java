@@ -2,7 +2,6 @@ package com.akto.trafficFilter;
 
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -13,7 +12,6 @@ import com.mongodb.client.model.Filters;
 public class HostFilter {
 
     private static final String K8S_DEFAULT_HOST = "kubernetes.default.svc";
-    private static final String LOCALHOST = "localhost";
 
     private static Map<Integer, Set<Integer>> collectionSet = new HashMap<>();
 
@@ -25,17 +23,13 @@ public class HostFilter {
             return collectionSet.get(accountId);
         }
 
-        List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
-                Filters.exists(ApiCollection.HOST_NAME, true));
+        ApiCollection collection = ApiCollectionsDao.instance.findOne(
+                Filters.eq(ApiCollection.HOST_NAME, K8S_DEFAULT_HOST));
 
-        if (collections != null && !collections.isEmpty()) {
-            for (ApiCollection collection : collections) {
-                if (collection.getHostName() != null && (collection.getHostName().contains(K8S_DEFAULT_HOST) ||
-                        collection.getHostName().contains(LOCALHOST))) {
-                    ignoreCollectionSet.add(collection.getId());
-                }
-            }
+        if (collection != null) {
+            ignoreCollectionSet.add(collection.getId());
         }
+        ignoreCollectionSet.add(0);
         collectionSet.put(accountId, ignoreCollectionSet);
         return collectionSet.get(accountId);
     }
