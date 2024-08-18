@@ -20,7 +20,7 @@ public class ParamFilter {
     private static int currentFilterIndex = -1;
     private static int filterFillStart = 0;
     private static final int TIME_LIMIT = 5 * 60;
-    private static final int FILTER_LIMIT = 5;
+    private static final int FILTER_LIMIT = 50;
     private static final String DOLLAR = "$";
     private static final String HOST = "host";
 
