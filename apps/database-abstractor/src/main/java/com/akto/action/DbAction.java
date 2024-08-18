@@ -350,9 +350,35 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private static long mongoTime = 0;
+    private static long totalTime = 0;
+    private static int resetTime = 0;
+    private static int requests = 0;
+    private static final int INTERVAL = 60;
+    
+    private static void saveAndPrintTime(long now1, long now2, long now3) {
+
+        totalTime += (now3 - now1);
+        mongoTime += (now3 - now2);
+        requests++;
+
+        int now = Context.now();
+        if ((resetTime + INTERVAL) < now) {
+            loggerMaker.infoAndAddToDb(
+                    String.format("Time intervals: resetTime: %d , now: %d , totalTime: %d , mongoTime: %d , requests: %d", resetTime,
+                            now, totalTime, mongoTime, requests));
+            resetTime = now;
+            totalTime = 0;
+            mongoTime = 0;
+            requests = 0;
+        }
+    }
+
     public String bulkWriteSti() {
         loggerMaker.infoAndAddToDb("bulkWriteSti called");
         int accId = Context.accountId.get();
+
+        long now1 = Context.epochInMillis();
 
         Set<Integer> ignoreHosts = new HashSet<>();
         try {
@@ -512,7 +538,10 @@ public class DbAction extends ActionSupport {
 
                 loggerMaker.infoAndAddToDb(String.format("Consumer data: %d ignored: %d writes: %d", writesForSti.size(), ignoreCount, writes.size()));
     
+                long now2 = Context.epochInMillis();
                 DbLayer.bulkWriteSingleTypeInfo(writes);
+                long now3 = Context.epochInMillis();
+                saveAndPrintTime(now1, now2, now3);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSti");
                 return Action.ERROR.toUpperCase();
