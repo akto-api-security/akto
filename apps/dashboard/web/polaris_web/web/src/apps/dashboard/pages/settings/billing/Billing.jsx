@@ -108,7 +108,7 @@ function Billing() {
                         switch (intentionType) {
 
                             case SubscribeIntentionType.REQUEST_CUSTOM_PLAN_ACCESS:
-                              redirectToPricingForm()
+                              redirectToPricingFormEnterprise()
                               break;
                             case SubscribeIntentionType.CHANGE_UNIT_QUANTITY:
                             case SubscribeIntentionType.UPGRADE_PLAN:
