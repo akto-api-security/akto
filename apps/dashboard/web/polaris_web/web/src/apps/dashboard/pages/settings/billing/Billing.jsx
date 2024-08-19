@@ -88,7 +88,9 @@ function Billing() {
             <Text variant="headingMd">Switch plan</Text>
         </Box>
     )
-
+    function redirectToPricingForm () {
+        window.location.href = "https://www.akto.io/pricing-free-trial"
+    }
     const planInfo = (
             <Box>
                   <Paywall
@@ -102,11 +104,26 @@ function Billing() {
                         switch (intentionType) {
 
                             case SubscribeIntentionType.REQUEST_CUSTOM_PLAN_ACCESS:
-                              window.location.href = "https://calendly.com/ankita-akto/akto-demo?month=2023-11"
+                              redirectToPricingForm()
                               break;
                             case SubscribeIntentionType.CHANGE_UNIT_QUANTITY:
                             case SubscribeIntentionType.UPGRADE_PLAN:
                             case SubscribeIntentionType.DOWNGRADE_PLAN:
+                            
+                                if (customer.subscriptions.length != 1) {
+                                    redirectToPricingForm()
+                                    break;
+                                }
+                                if (!customer.subscriptions[0].plan) {
+                                    redirectToPricingForm()
+                                    break;
+                                }
+                                if (customer.subscriptions[0].plan.id === "plan-akto-saa-s-free-plan")
+                                {
+                                    redirectToPricingForm()
+                                    break;
+                                }
+                            
                                 const checkoutResult = await billingApi.provisionSubscription({
                                   billingPeriod: selectedBillingPeriod,
                                   customerId: customer.id,
