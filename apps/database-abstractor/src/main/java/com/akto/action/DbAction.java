@@ -40,6 +40,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.testing.TestExecutor;
 import com.akto.trafficFilter.HostFilter;
+import com.akto.trafficFilter.ParamFilter;
 import com.akto.util.Constants;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -359,35 +360,60 @@ public class DbAction extends ActionSupport {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in getting ignore host ids");
         }
+        if (ignoreHosts == null) {
+            ignoreHosts = new HashSet<>();
+        }
 
         if (kafkaUtils.isWriteEnabled()) {
 
             try {
-                if (ignoreHosts != null && !ignoreHosts.isEmpty()) {
-
-                    List<Integer> indicesToDelete = new ArrayList<>();
+                    Set<Integer> indicesToDelete = new HashSet<>();
                     int i = 0;
                     for (BulkUpdates bulkUpdate : writesForSti) {
+                        boolean ignore = false;
+                        int apiCollectionId = -1;
+                        String url = null, method = null, param = null;
                         for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
-                            if (entry.getKey().equalsIgnoreCase("apiCollectionId")) {
+                            if (entry.getKey().equalsIgnoreCase(SingleTypeInfo._API_COLLECTION_ID)) {
                                 String valStr = entry.getValue().toString();
                                 int val = Integer.valueOf(valStr);
+                                apiCollectionId = val;
                                 if (ignoreHosts.contains(val)) {
-                                    indicesToDelete.add(i);
+                                    ignore = true;
                                 }
+                            } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._URL)){
+                                url = entry.getValue().toString();
+                            } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._METHOD)){
+                                method = entry.getValue().toString();
+                            } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._PARAM)){
+                                param = entry.getValue().toString();
                             }
+                        }
+                        if (!ignore && apiCollectionId != -1 && url != null && method != null && param!=null) {
+                            boolean isNew = ParamFilter.isNewEntry(accId, apiCollectionId, url, method, param);
+                            if (!isNew) {
+                                ignore = true;
+                            }
+                        }
+                        if(ignore){
+                            indicesToDelete.add(i);
                         }
                         i++;
                     }
 
-                    if (indicesToDelete!=null && !indicesToDelete.isEmpty()){
-                        loggerMaker.infoAndAddToDb(String.format("Original writes: %d indices to delete: %d", writesForSti.size(), indicesToDelete.size()));
-                        Collections.sort(indicesToDelete, Collections.reverseOrder());
-                        for (int j : indicesToDelete) {
-                            writesForSti.remove(j);
+                    if (indicesToDelete != null && !indicesToDelete.isEmpty()) {
+                        int size = writesForSti.size();
+                        List<BulkUpdates> tempWrites = new ArrayList<>();
+                        for (int index = 0; index < writesForSti.size(); index++) {
+                            if (indicesToDelete.contains(index)) {
+                                continue;
+                            }
+                            tempWrites.add(writesForSti.get(index));
                         }
+                        writesForSti = tempWrites;
+                        int newSize = writesForSti.size();
+                        loggerMaker.infoAndAddToDb(String.format("Original writes: %d Final writes: %d", size, newSize));
                     }
-                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "error in ignore STI updates");
             }
