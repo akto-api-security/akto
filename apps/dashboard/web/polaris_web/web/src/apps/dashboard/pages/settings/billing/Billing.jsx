@@ -118,7 +118,7 @@ function Billing() {
                                     redirectToPricingForm()
                                     break;
                                 }
-                                if (customer.subscriptions[0].plan.id === "plan-akto-saa-s-free-plan")
+                                if (customer.subscriptions[0].plan.id === "plan-akto-saas-free")
                                 {
                                     redirectToPricingForm()
                                     break;
