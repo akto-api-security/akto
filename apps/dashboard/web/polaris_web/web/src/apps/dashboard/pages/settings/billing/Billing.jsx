@@ -88,8 +88,12 @@ function Billing() {
             <Text variant="headingMd">Switch plan</Text>
         </Box>
     )
-    function redirectToPricingForm () {
-        window.location.href = "https://www.akto.io/pricing-free-trial"
+    function redirectToPricingFormEnterprise() {
+        window.open("https://www.akto.io/pricing-sales", "_blank");
+    }
+    
+    function redirectToPricingForm() {
+        window.open("https://www.akto.io/pricing-free-trial", "_blank");
     }
     const planInfo = (
             <Box>
@@ -98,7 +102,7 @@ function Billing() {
                     onPlanSelected={async ({ plan, customer, intentionType, selectedBillingPeriod }) => {
                         console.log(plan, customer, intentionType);
                         if (window.IS_SAAS !== 'true') {
-                            window.location.href = "https://app.akto.io/dashboard/settings/self-hosted"
+                            redirectToPricingFormEnterprise()
                             return;
                         }
                         switch (intentionType) {
