@@ -84,16 +84,18 @@ public class ParamFilter {
     public static boolean isNewEntry(int accountId, int apiCollectionId, String url, String method, String param) {
         String key = createKey(accountId, apiCollectionId, url, method, param);
 
+        /*
+         * The host filter is no-op
+         * It serves as reference to how many new hosts we get.
+         */
         if (HOST.equals(param.toLowerCase())) {
             if (!hostFilter.mightContain(key)) {
                 hostMisses++;
                 hostFilter.put(key);
                 printL("ParamFilter inserting host: " + key, hostMisses < DEBUG_COUNT);
-                return true;
             } else {
                 hostHits++;
                 printL("ParamFilter skipping host: " + key, hostHits < DEBUG_COUNT);
-                return false;
             }
         }
 
