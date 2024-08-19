@@ -18,9 +18,9 @@ public class ParamFilterTest {
         String param = "host";
 
         boolean firstTime = ParamFilter.isNewEntry(accountId, apiCollectionId, url, method, param);
-        assertFalse(firstTime);
+        assertTrue(firstTime);
         boolean secondTime = ParamFilter.isNewEntry(accountId, apiCollectionId, url, method, param);
-        assertTrue(secondTime);
+        assertFalse(secondTime);
     }
 
 }
