@@ -367,7 +367,7 @@ public class DbAction extends ActionSupport {
         if (kafkaUtils.isWriteEnabled()) {
 
             try {
-                    List<Integer> indicesToDelete = new ArrayList<>();
+                    Set<Integer> indicesToDelete = new HashSet<>();
                     int i = 0;
                     for (BulkUpdates bulkUpdate : writesForSti) {
                         boolean ignore = false;
@@ -401,12 +401,18 @@ public class DbAction extends ActionSupport {
                         i++;
                     }
 
-                    if (indicesToDelete!=null && !indicesToDelete.isEmpty()){
-                        loggerMaker.infoAndAddToDb(String.format("Original writes: %d indices to delete: %d", writesForSti.size(), indicesToDelete.size()));
-                        Collections.sort(indicesToDelete, Collections.reverseOrder());
-                        for (int j : indicesToDelete) {
-                            writesForSti.remove(j);
+                    if (indicesToDelete != null && !indicesToDelete.isEmpty()) {
+                        int size = writesForSti.size();
+                        List<BulkUpdates> tempWrites = new ArrayList<>();
+                        for (int index = 0; index < writesForSti.size(); index++) {
+                            if (indicesToDelete.contains(index)) {
+                                continue;
+                            }
+                            tempWrites.add(writesForSti.get(index));
                         }
+                        writesForSti = tempWrites;
+                        int newSize = writesForSti.size();
+                        loggerMaker.infoAndAddToDb(String.format("Original writes: %d Final writes: %d", size, newSize));
                     }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "error in ignore STI updates");
