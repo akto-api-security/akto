@@ -101,20 +101,26 @@ public class ParamFilter {
 
         boolean isNew = true;
         refreshFilterList();
-        int i=0;
-        for (BloomFilter<CharSequence> filter : filterList) {
-            boolean notFound = (!filter.mightContain(key));
-            isNew &= notFound;
-            if(!notFound){
-                int temp = filterListHitCount.getOrDefault(i, 0)+1;
-                filterListHitCount.put(i, temp);
+        int i = FILTER_LIMIT;
+        while (i > 0) {
+            int ind = (currentFilterIndex + i) % FILTER_LIMIT;
+            try {
+                BloomFilter<CharSequence> filter = filterList.get(ind);
+                boolean notFound = (!filter.mightContain(key));
+                isNew &= notFound;
+                if (!notFound) {
+                    int temp = filterListHitCount.getOrDefault(ind, 0) + 1;
+                    filterListHitCount.put(ind, temp);
+                    break;
+                }
+            } catch (Exception e) {
             }
-            i++;
+            i--;
         }
+        insertInFilter(key);
         if (isNew) {
             misses++;
             printL("ParamFilter inserting: " + key, misses < DEBUG_COUNT);
-            insertInFilter(key);
             // return true;
         }else {
             hits++;
