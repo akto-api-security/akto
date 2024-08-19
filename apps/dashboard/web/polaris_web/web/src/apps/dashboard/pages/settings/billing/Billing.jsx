@@ -102,7 +102,7 @@ function Billing() {
                     onPlanSelected={async ({ plan, customer, intentionType, selectedBillingPeriod }) => {
                         console.log(plan, customer, intentionType);
                         if (window.IS_SAAS !== 'true') {
-                            redirectToPricingFormEnterprise()
+                            redirectToPricingForm()
                             return;
                         }
                         switch (intentionType) {
