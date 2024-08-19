@@ -19,6 +19,8 @@ import useTable from "@/apps/dashboard/components/tables/TableContext"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
 import { saveAs } from 'file-saver'
+import { useNavigate } from "react-router-dom";
+
 
 const headers = [
     {
@@ -145,6 +147,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 
 function ApiCollections() {
 
+    const navigate = useNavigate();
     const [data, setData] = useState({'groups':[]})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
@@ -176,6 +179,10 @@ function ApiCollections() {
 
     const showCreateNewCollectionPopup = () => {
         setActive(true)
+    }
+
+    const navigateToQueryPage = () => {
+        navigate("/dashboard/observe/query_mode")
     }
 
     const allCollections = PersistStore(state => state.allCollections)
@@ -492,7 +499,8 @@ function ApiCollections() {
                     docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                 />
             }
-            primaryAction={<Button id={"create-new-collection-popup"} primary secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
+            primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
+            secondaryActions={<Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
             isFirstPage={true}
             components={components}
         />
