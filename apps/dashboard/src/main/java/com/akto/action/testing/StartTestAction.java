@@ -503,7 +503,7 @@ public class StartTestAction extends UserAction {
     List<TestingRunResult> testingRunResults;
     private boolean fetchOnlyVulnerable;
     public enum QueryMode {
-        VULNERABLE, SECURED, SKIPPED_EXEC_NEED_CONFIG, SKIPPED_EXEC_NO_ACTION, SKIPPED_EXEC, ALL;
+        VULNERABLE, SECURED, SKIPPED_EXEC_NEED_CONFIG, SKIPPED_EXEC_NO_ACTION, SKIPPED_EXEC, ALL, SKIPPED_EXEC_API_REQUEST_FAILED;
     }
     private QueryMode queryMode;
 
@@ -517,7 +517,7 @@ public class StartTestAction extends UserAction {
             addActionError("Invalid test summary id");
             return ERROR.toUpperCase();
         }
-
+        String apiCallFailedErrorString = "Error executing test request: Api Call failed";
         List<Bson> testingRunResultFilters = new ArrayList<>();
 
         testingRunResultFilters.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
@@ -531,17 +531,23 @@ public class StartTestAction extends UserAction {
                 case VULNERABLE:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, true));
                     break;
+                case SKIPPED_EXEC_API_REQUEST_FAILED:
+                    testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
+                    testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, apiCallFailedErrorString));
+                    break;
                 case SKIPPED_EXEC:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
                     testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
                     break;
                 case SECURED:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
+                    List<String> errorsToSkipTest = TestResult.TestError.getErrorsToSkipTests();
+                    errorsToSkipTest.add(apiCallFailedErrorString);
                     testingRunResultFilters.add(
                         Filters.or(
                             Filters.exists(WorkflowTestingEndpoints._WORK_FLOW_TEST),
                             Filters.and(
-                                Filters.nin(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()),
+                                Filters.nin(TestingRunResultDao.ERRORS_KEY, errorsToSkipTest),
                                 Filters.ne(TestingRunResult.REQUIRES_CONFIG, true)
                             )
                         )
@@ -558,6 +564,9 @@ public class StartTestAction extends UserAction {
             for(TestError testError: testErrors){
                 this.errorEnums.put(testError, testError.getMessage());
             }
+        }
+        if(queryMode == QueryMode.SKIPPED_EXEC_API_REQUEST_FAILED){
+            this.errorEnums.put(TestError.NO_API_REQUEST, TestError.NO_API_REQUEST.getMessage());
         }
 
         this.testingRunResults = TestingRunResultDao.instance

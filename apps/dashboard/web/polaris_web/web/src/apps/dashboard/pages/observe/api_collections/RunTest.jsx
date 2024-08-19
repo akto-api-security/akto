@@ -22,7 +22,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         startTimestamp: func.timeNow(),
         hourlyLabel: "Now",
         testRunTime: -1,
-        testRunTimeLabel: "Till complete",
+        testRunTimeLabel: "30 minutes",
         runTypeLabel: "Now",
         maxConcurrentRequests: -1,
         testName: "",
@@ -270,7 +270,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         return abc
     }, [])
 
-    const testRunTimeOptions = [{ label: "Till complete", value: "Till complete" }, ...runTimeMinutes, ...runTimeHours]
+    const testRunTimeOptions = [ ...runTimeMinutes, ...runTimeHours]
 
     const runTypeOptions = [{ label: "Daily", value: "Daily" }, { label: "Continuously", value: "Continuously" }, { label: "Now", value: "Now" }]
 
