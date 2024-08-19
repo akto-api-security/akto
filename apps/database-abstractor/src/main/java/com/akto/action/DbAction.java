@@ -350,35 +350,9 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private static long mongoTime = 0;
-    private static long totalTime = 0;
-    private static int resetTime = 0;
-    private static int requests = 0;
-    private static final int INTERVAL = 60;
-    
-    private static void saveAndPrintTime(long now1, long now2, long now3) {
-
-        totalTime += (now3 - now1);
-        mongoTime += (now3 - now2);
-        requests++;
-
-        int now = Context.now();
-        if ((resetTime + INTERVAL) < now) {
-            loggerMaker.infoAndAddToDb(
-                    String.format("Time intervals: resetTime: %d , now: %d , totalTime: %d , mongoTime: %d , requests: %d", resetTime,
-                            now, totalTime, mongoTime, requests));
-            resetTime = now;
-            totalTime = 0;
-            mongoTime = 0;
-            requests = 0;
-        }
-    }
-
     public String bulkWriteSti() {
         loggerMaker.infoAndAddToDb("bulkWriteSti called");
         int accId = Context.accountId.get();
-
-        long now1 = Context.epochInMillis();
 
         Set<Integer> ignoreHosts = new HashSet<>();
         try {
@@ -400,18 +374,18 @@ public class DbAction extends ActionSupport {
                         int apiCollectionId = -1;
                         String url = null, method = null, param = null;
                         for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
-                            if (entry.getKey().equalsIgnoreCase("apiCollectionId")) {
+                            if (entry.getKey().equalsIgnoreCase(SingleTypeInfo._API_COLLECTION_ID)) {
                                 String valStr = entry.getValue().toString();
                                 int val = Integer.valueOf(valStr);
                                 apiCollectionId = val;
                                 if (ignoreHosts.contains(val)) {
                                     ignore = true;
                                 }
-                            } else if(entry.getKey().equalsIgnoreCase("url")){
+                            } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._URL)){
                                 url = entry.getValue().toString();
-                            } else if(entry.getKey().equalsIgnoreCase("method")){
+                            } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._METHOD)){
                                 method = entry.getValue().toString();
-                            } else if(entry.getKey().equalsIgnoreCase("param")){
+                            } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._PARAM)){
                                 param = entry.getValue().toString();
                             }
                         }
@@ -427,7 +401,7 @@ public class DbAction extends ActionSupport {
                         i++;
                     }
 
-                    if (indicesToDelete!=null && !indicesToDelete.isEmpty()) {
+                    if (indicesToDelete!=null && !indicesToDelete.isEmpty()){
                         loggerMaker.infoAndAddToDb(String.format("Original writes: %d indices to delete: %d", writesForSti.size(), indicesToDelete.size()));
                         Collections.sort(indicesToDelete, Collections.reverseOrder());
                         for (int j : indicesToDelete) {
@@ -450,8 +424,6 @@ public class DbAction extends ActionSupport {
                 for (BulkUpdates bulkUpdate: writesForSti) {
                     List<Bson> filters = new ArrayList<>();
                     boolean ignore = false;
-                    int apiCollectionId = -1;
-                    String url = null, method = null, param = null;
                     for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                         if (entry.getKey().equalsIgnoreCase("isUrlParam")) {
                             continue;
@@ -459,7 +431,6 @@ public class DbAction extends ActionSupport {
                         if (entry.getKey().equalsIgnoreCase("apiCollectionId")) {
                             String valStr = entry.getValue().toString();
                             int val = Integer.valueOf(valStr);
-                            apiCollectionId = val;
                             if (ignoreHosts.contains(val)) {
                                 ignore = true;
                                 break;
@@ -471,19 +442,6 @@ public class DbAction extends ActionSupport {
                             filters.add(Filters.eq(entry.getKey(), val));
                         } else {
                             filters.add(Filters.eq(entry.getKey(), entry.getValue()));
-                            if(entry.getKey().equalsIgnoreCase("url")){
-                                url = entry.getValue().toString();
-                            } else if(entry.getKey().equalsIgnoreCase("method")){
-                                method = entry.getValue().toString();
-                            } else if(entry.getKey().equalsIgnoreCase("param")){
-                                param = entry.getValue().toString();
-                            }
-                        }
-                    }
-                    if (!ignore && apiCollectionId != -1 && url != null && method != null && param!=null) {
-                        boolean isNew = ParamFilter.isNewEntry(accId, apiCollectionId, url, method, param);
-                        if (!isNew) {
-                            ignore = true;
                         }
                     }
                     if (ignore) {
@@ -538,10 +496,7 @@ public class DbAction extends ActionSupport {
 
                 loggerMaker.infoAndAddToDb(String.format("Consumer data: %d ignored: %d writes: %d", writesForSti.size(), ignoreCount, writes.size()));
     
-                long now2 = Context.epochInMillis();
                 DbLayer.bulkWriteSingleTypeInfo(writes);
-                long now3 = Context.epochInMillis();
-                saveAndPrintTime(now1, now2, now3);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSti");
                 return Action.ERROR.toUpperCase();

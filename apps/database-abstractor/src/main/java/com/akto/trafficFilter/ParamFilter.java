@@ -20,7 +20,7 @@ public class ParamFilter {
     private static int currentFilterIndex = -1;
     private static int filterFillStart = 0;
     private static final int TIME_LIMIT = 5 * 60;
-    private static final int FILTER_LIMIT = 50;
+    private static final int FILTER_LIMIT = 5;
     private static final String DOLLAR = "$";
     private static final String HOST = "host";
 
@@ -87,16 +87,14 @@ public class ParamFilter {
         if (HOST.equals(param.toLowerCase())) {
             if (!hostFilter.mightContain(key)) {
                 hostMisses++;
+                hostFilter.put(key);
                 printL("ParamFilter inserting host: " + key, hostMisses < DEBUG_COUNT);
-                // return true;
+                return true;
             } else {
                 hostHits++;
                 printL("ParamFilter skipping host: " + key, hostHits < DEBUG_COUNT);
-                // return false;
+                return false;
             }
-            hostFilter.put(key);
-            // to make it no-op.
-            return true;
         }
 
         boolean isNew = true;
@@ -121,15 +119,12 @@ public class ParamFilter {
         if (isNew) {
             misses++;
             printL("ParamFilter inserting: " + key, misses < DEBUG_COUNT);
-            // return true;
+            return true;
         }else {
             hits++;
             printL("ParamFilter skipping: " + key, hits < DEBUG_COUNT);
         }
-        // return false;
-
-        // to make it no-op.
-        return true;
+        return false;
     }
 
 }
