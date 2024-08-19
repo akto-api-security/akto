@@ -84,9 +84,7 @@ public class AccessMatrixAnalyzer {
             loggerMaker.infoAndAddToDb("Number of endpoints: " + (endpoints == null ? 0 : endpoints.size()),LogDb.TESTING);
             SampleMessageStore sampleMessageStore = SampleMessageStore.create();
             CustomTestingEndpoints tempTestingEndpoints = new CustomTestingEndpoints(endpoints);
-            sampleMessageStore.buildSingleTypeInfoMap(tempTestingEndpoints);
-            Map<String, SingleTypeInfo> singleTypeInfoMap = sampleMessageStore.getSingleTypeInfos();
-        
+
 
             List<ApiInfo.ApiInfoKey> apiInfoKeyList = tempTestingEndpoints.returnApis();
             if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;

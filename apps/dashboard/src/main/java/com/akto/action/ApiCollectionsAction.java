@@ -92,7 +92,11 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setUrlsCount(count);
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
                 if (count == null) {
-                    count = SingleTypeInfoDao.instance.countEndpoints(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
+                    List<Bson> filters = SingleTypeInfoDao.filterForHostHostHeaderRaw();
+                    filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
+                    count = (int) SingleTypeInfoDao.instance.count(
+                            Filters.and(filters)
+                    );
                 }
                 apiCollection.setUrlsCount(count);
             } else {

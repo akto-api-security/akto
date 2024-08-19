@@ -8,6 +8,7 @@ import "./dashboard.css"
 import func from "@/util/func"
 import transform from "./testing/transform";
 import PersistStore from "../../main/PersistStore";
+import LocalStore from "../../main/LocalStorageStore";
 import ConfirmationModal from "../components/shared/ConfirmationModal";
 import homeRequests from "./home/api";
 
@@ -23,7 +24,7 @@ function Dashboard() {
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
 
-    const subCategoryMap = PersistStore(state => state.subCategoryMap)
+    const subCategoryMap = LocalStore(state => state.subCategoryMap)
     const [eventForUser, setEventForUser] = useState({})
     
     const sendEventOnLogin = PersistStore(state => state.sendEventOnLogin)

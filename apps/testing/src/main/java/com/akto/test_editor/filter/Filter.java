@@ -92,79 +92,58 @@ public class Filter {
         boolean keyValOpSeen = keyValOperandSeen;
         
         FilterNode firstExtractNode = null;
-        Map<FilterNode, String> childNodeVsValidationReason = new HashMap<>();
-        for (int i = 0; i < childNodes.size(); i++) {
-            FilterNode childNode = childNodes.get(i);
-            boolean skipExecutingExtractNode = skipExtractExecution;
-            if (node.getNodeType().equalsIgnoreCase(TestEditorEnums.OperandTypes.Collection.toString()) && i == 0) {
-                skipExecutingExtractNode = (firstExtractNode == null);
-            }
-            dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId, skipExecutingExtractNode);
-            if (!dataOperandsFilterResponse.getResult()) {
-                childNodeVsValidationReason.put(childNode, dataOperandsFilterResponse.getValidationReason());
-//                validationFailedReasons.add(dataOperandsFilterResponse.getValidationReason());
-//                validationReason.append("\n ParentOperand:- ").append(node.getOperand()).append(" - ").append(dataOperandsFilterResponse.getValidationReason());
-            }
-
-            // if (!dataOperandsFilterResponse.getResult()) {
-            //     loggerMaker.infoAndAddToDb("invalid node condition " + logId + " operand " + childNode.getOperand() + 
-            //     " concernedProperty " + childNode.getConcernedProperty() + " subConcernedProperty " + childNode.getSubConcernedProperty()
-            //     + " contextProperty " + childNode.getContextProperty() + " context " + context, LogDb.TESTING);
-            // }
-            if (firstExtractNode == null) {
-                firstExtractNode = dataOperandsFilterResponse.getExtractNode();
-            }
-            contextEntities = dataOperandsFilterResponse.getContextEntities();
-            result = operator.equals("and") ? result && dataOperandsFilterResponse.getResult() : result || dataOperandsFilterResponse.getResult();
-            
-            if (childNodes.get(i).getOperand().toLowerCase().equals("key")) {
-                keyValOpSeen = true;
-            }
-
-            if (!childNode.getNodeType().equalsIgnoreCase("extract")) {
-                matchingKeySet = evaluateMatchingKeySet(matchingKeySet, dataOperandsFilterResponse.getMatchedEntities(), operator);
-            }
-        }
         StringBuilder validationReason = new StringBuilder();
-        if (!result && !childNodeVsValidationReason.isEmpty()) {//Validation failed by all conditions
-            validationReason.append("\n").append(node.getOperand().toLowerCase()).append(":");
-            if (operator.equalsIgnoreCase("or")) {
-//                validationReason.append("\nThese 'or' conditions failed for `parent type`").append(node.getOperand()).append(":- ");
-                for (FilterNode failedValidation: childNodeVsValidationReason.keySet()) {
-                    String validationReasonStr = childNodeVsValidationReason.get(failedValidation).replaceAll("\n","\n\t");
+        try {
+            Map<FilterNode, String> childNodeVsValidationReason = new HashMap<>();
+            for (int i = 0; i < childNodes.size(); i++) {
+                FilterNode childNode = childNodes.get(i);
+                boolean skipExecutingExtractNode = skipExtractExecution;
+                if (node.getNodeType().equalsIgnoreCase(TestEditorEnums.OperandTypes.Collection.toString()) && i == 0) {
+                    skipExecutingExtractNode = (firstExtractNode == null);
+                }
+                dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId, skipExecutingExtractNode);
+                if (!dataOperandsFilterResponse.getResult()) {
+                    childNodeVsValidationReason.put(childNode, dataOperandsFilterResponse.getValidationReason());
+                }
+
+                if (firstExtractNode == null) {
+                    firstExtractNode = dataOperandsFilterResponse.getExtractNode();
+                }
+                contextEntities = dataOperandsFilterResponse.getContextEntities();
+                result = operator.equals("and") ? result && dataOperandsFilterResponse.getResult() : result || dataOperandsFilterResponse.getResult();
+
+                if (childNodes.get(i).getOperand().toLowerCase().equals("key")) {
+                    keyValOpSeen = true;
+                }
+
+                if (!childNode.getNodeType().equalsIgnoreCase("extract")) {
+                    matchingKeySet = evaluateMatchingKeySet(matchingKeySet, dataOperandsFilterResponse.getMatchedEntities(), operator);
+                }
+            }
+            if (!result && !childNodeVsValidationReason.isEmpty()) {//Validation failed by all conditions
+                validationReason.append("\n").append(node.getOperand().toLowerCase()).append(":");
+                if (operator.equalsIgnoreCase("or")) {
+                    for (FilterNode failedValidation: childNodeVsValidationReason.keySet()) {
+                        String validationReasonStr = childNodeVsValidationReason.getOrDefault(failedValidation, null);
+                        if (!StringUtils.isEmpty(validationReasonStr)) {
+                            validationReasonStr = validationReasonStr.replaceAll("\n","\n\t");
+                            validationReason.append(validationReasonStr);
+                        }
+                    }
+                } else {
+                    String validationReasonStr = childNodeVsValidationReason.getOrDefault(childNodeVsValidationReason.keySet().iterator().next(), null);
                     if (!StringUtils.isEmpty(validationReasonStr)) {
+                        validationReasonStr = validationReasonStr.replaceAll("\n","\n\t");
                         validationReason.append(validationReasonStr);
                     }
-//                    if (!validationReason.toString().replaceAll("\t","").contains(failedV';alidation.replaceAll("\t",""))) {
-//                        validationReason.insert(0,failedValidation);
-//                        validationReason.insert(0, "\n");
-//                    }
                 }
-            } else {
-                String validationReasonStr = childNodeVsValidationReason.get(childNodeVsValidationReason.keySet().iterator().next()).replaceAll("\n","\n\t");
-                if (!StringUtils.isEmpty(validationReasonStr)) {
-                    validationReason.append(validationReasonStr);
-                }
-//                if (!validationReason.toString().replaceAll("\t","").contains(validationFailedReasons.get(0).replaceAll("\t",""))) {
-//                    validationReason.insert(0, validationFailedReasons.get(0));
-////                    validationReason.insert(0, "\n");
-//                }
             }
-//            if (validationReason.length() > 0) {
-//                validationReason.replace(0, validationReason.length(), validationReason.toString().replaceAll("\n","\n\t"));
-//            }
-//            validationReason = new StringBuilder(validationReason.toString().replaceAll("\n","\n\t"));
-//            validationReason.insert(0, ":");
-//            validationReason.insert(0, node.getOperand().toLowerCase());
-//            validationReason.insert(0, "\n");
-//
-        }
 
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while creating failed validation reason", LogDb.TESTING);
+        }
         if (node.getNodeType().equalsIgnoreCase(TestEditorEnums.OperandTypes.Collection.toString()) && firstExtractNode != null && result) {
             DataOperandsFilterResponse resp = isEndpointValid(firstExtractNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId, false);
-//            if (!resp.getResult()) {
-//                validationReason.append("\nThe 'and' condition failed because :- ").append(resp.getValidationReason());
-//            }
             result = resp.getResult();
         }
 

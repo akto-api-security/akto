@@ -19,6 +19,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.URLAggregator;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.DbMode;
@@ -52,7 +53,7 @@ public class HttpCallParser {
     private final int sync_threshold_time;
     private int sync_count = 0;
     private int last_synced;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class, LogDb.RUNTIME);
     public APICatalogSync apiCatalogSync;
     public DependencyAnalyser dependencyAnalyser;
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
@@ -230,7 +231,11 @@ public class HttpCallParser {
 
         if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
             for (HttpResponseParams responseParam: filteredResponseParams) {
-                dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+                try{
+                    dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+                } catch (Exception e){
+                    loggerMaker.errorAndAddToDb(e, "error in analyzing dependency");
+                }
             }
         }
 
@@ -444,6 +449,10 @@ public class HttpCallParser {
 
             Map<String, List<String>> reqHeaders = httpResponseParam.getRequestParams().getHeaders();
             String hostName = getHeaderValue(reqHeaders, "host");
+
+            if (hostName != null && !hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
+                hostName = "Special_Char_Host";
+            }
 
             if (StringUtils.isEmpty(hostName)) {
                 hostName = getHeaderValue(reqHeaders, "authority");

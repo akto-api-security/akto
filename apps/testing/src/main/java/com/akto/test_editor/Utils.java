@@ -859,5 +859,20 @@ public class Utils {
         }
         return val;
     }
+    
+    public static String escapeSpecialCharacters(String inputString){
+        String specialChars = "\\.*+?^${}()|[]";
+        StringBuilder escaped = new StringBuilder();
+        
+        for (char c : inputString.toCharArray()) {
+            if (specialChars.contains(String.valueOf(c))) {
+                // Escape special character
+                escaped.append("\\").append(c);
+            } else {
+                escaped.append(c);
+            }
+        }
+        return escaped.toString();
+    }
 
 }

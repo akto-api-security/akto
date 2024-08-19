@@ -29,12 +29,19 @@ function TestRunResultFlyout(props) {
                 apiInfo = JSON.parse(JSON.stringify(res))
             })
             let sensitiveParam = ""
+            const sensitiveParamsSet = new Set();
             await api.loadSensitiveParameters(apiInfoKey.apiCollectionId,apiInfoKey.url, apiInfo.method).then((resp) => {
                 resp?.data?.endpoints.forEach((x, index) => {
-                    sensitiveParam += x.subTypeString.toUpperCase()
-                    if(index !== resp?.data?.endpoints.length - 1){
+                    sensitiveParamsSet.add(x.subTypeString.toUpperCase())
+                })
+                const unique = sensitiveParamsSet.size
+                let index = 0;
+                sensitiveParamsSet.forEach((x) =>{
+                    sensitiveParam += x;
+                    if(index !== unique - 1){
                         sensitiveParam += ", "
                     }
+                    index++
                 })
             })
             setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam))

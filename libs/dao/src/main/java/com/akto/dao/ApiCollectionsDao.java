@@ -237,5 +237,11 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
             return endpoints;
         }
-    }    
+    }
+
+    public static List<ApiCollection> fetchAllHosts() {
+        Bson filters = Filters.exists("hostName", true);
+        return ApiCollectionsDao.instance.findAll(filters, Projections.include("hostName", "_id"));
+    }
+
 }
