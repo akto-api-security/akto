@@ -7,12 +7,12 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.Log;
+import com.akto.util.Constants;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -32,6 +32,7 @@ public class LoggerMaker  {
     private final Class<?> aClass;
 
     private static String slackWebhookUrl;
+    private static String slackCyborgWebhookUrl;
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
@@ -52,6 +53,25 @@ public class LoggerMaker  {
                     Config.SlackAlertConfig slackAlertConfig = (Config.SlackAlertConfig) config;
                     slackWebhookUrl = slackAlertConfig.getSlackWebhookUrl();
                 } catch (Exception e) {
+                    internalLogger.error("error in getting slack config: " + e.toString());
+                }
+
+                try {
+
+                    if (slackCyborgWebhookUrl != null) {
+                        return;
+                    }
+
+                    Config config = ConfigsDao.instance.findOne(Constants.ID, Config.SlackAlertCyborgConfig.CONFIG_ID);
+                    if(config == null){
+                        return;
+                    }
+                    Config.SlackAlertCyborgConfig slackCyborgWebhook = (Config.SlackAlertCyborgConfig) config;
+                    if (slackCyborgWebhook != null && slackCyborgWebhook.getSlackWebhookUrl() != null
+                            && !slackCyborgWebhook.getSlackWebhookUrl().isEmpty()) {
+                        slackCyborgWebhookUrl = slackCyborgWebhook.getSlackWebhookUrl();
+                    }
+                } catch (Exception e){
                     internalLogger.error("error in getting slack config: " + e.toString());
                 }
             }
@@ -130,6 +150,10 @@ public class LoggerMaker  {
         sendToSlack(slackWebhookUrl, err);
     }
 
+    protected static void sendToCyborgSlack(String err){
+        sendToSlack(slackCyborgWebhookUrl, err);
+    }
+
     protected String basicError(String err, LogDb db) {
         if(Context.accountId.get() != null){
             err = String.format("%s\nAccount id: %d", err, Context.accountId.get());
@@ -149,6 +173,8 @@ public class LoggerMaker  {
 
             if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
                 sendToSlack(err);
+            } else if(LogDb.DB_ABS.equals(db)){
+                sendToCyborgSlack(err);
             }
         } catch (Exception e) {
             e.printStackTrace();

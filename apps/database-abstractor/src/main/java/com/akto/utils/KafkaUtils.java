@@ -32,7 +32,7 @@ public class KafkaUtils {
     
     private final static ObjectMapper mapper = new ObjectMapper();
     private static final Gson gson = new Gson();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(KafkaUtils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(KafkaUtils.class, LogDb.DB_ABS);
     private static final Logger logger = LoggerFactory.getLogger(KafkaUtils.class);
     private Consumer<String, String> consumer;
     private static Kafka kafkaProducer;
@@ -81,7 +81,7 @@ public class KafkaUtils {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 } catch (Error e){
-                    loggerMaker.errorAndAddToDb("Error in add shut down hook: "+ e.getMessage(), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb("Error in add shut down hook: "+ e.getMessage());
                 }
             }
         });
@@ -89,7 +89,7 @@ public class KafkaUtils {
 
         try {
             this.consumer.subscribe(Arrays.asList(topicName));
-            loggerMaker.infoAndAddToDb("Kafka Consumer subscribed", LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Kafka Consumer subscribed");
             while (true) {
                 ConsumerRecords<String, String> records = this.consumer.poll(Duration.ofMillis(10000));
                 try {
@@ -107,7 +107,7 @@ public class KafkaUtils {
 
                         parseAndTriggerWrites(r.value());
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error in parseAndTriggerWrites " + e, LogDb.DASHBOARD);
+                        loggerMaker.errorAndAddToDb(e, "Error in parseAndTriggerWrites " + e);
                         continue;
                     }
                 }
@@ -116,7 +116,7 @@ public class KafkaUtils {
           // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
             exceptionOnCommitSync.set(true);
-            loggerMaker.errorAndAddToDb("Exception in init kafka consumer  " + e.getMessage(),LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("Exception in init kafka consumer  " + e.getMessage());
             e.printStackTrace();
             System.exit(0);
         } finally {
@@ -218,14 +218,22 @@ public class KafkaUtils {
         return System.getenv("KAFKA_WRITE_ENABLED").equalsIgnoreCase("true");
     }
 
+    String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+
     public void insertData(List<BulkUpdates> writes, String triggerMethod, int accountId) {
-        String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("triggerMethod", triggerMethod);
-        String payloadStr = gson.toJson(writes);
-        obj.put("payload", payloadStr);
-        obj.put("accountId", accountId);
-        kafkaProducer.send(obj.toString(), topicName);
+        try {
+            if (topicName == null) {
+                throw new Exception("AKTO_KAFKA_TOPIC_NAME is null");
+            }
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("triggerMethod", triggerMethod);
+            String payloadStr = gson.toJson(writes);
+            obj.put("payload", payloadStr);
+            obj.put("accountId", accountId);
+            kafkaProducer.send(obj.toString(), topicName);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in kafka insertData");
+        }
     }
 
 }
