@@ -517,7 +517,6 @@ public class StartTestAction extends UserAction {
             addActionError("Invalid test summary id");
             return ERROR.toUpperCase();
         }
-        String apiCallFailedErrorString = "Error executing test request: Api Call failed";
         List<Bson> testingRunResultFilters = new ArrayList<>();
 
         testingRunResultFilters.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
@@ -533,7 +532,7 @@ public class StartTestAction extends UserAction {
                     break;
                 case SKIPPED_EXEC_API_REQUEST_FAILED:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
-                    testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, apiCallFailedErrorString));
+                    testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, TestResult.API_CALL_FAILED_ERROR_STRING));
                     break;
                 case SKIPPED_EXEC:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
@@ -542,7 +541,7 @@ public class StartTestAction extends UserAction {
                 case SECURED:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
                     List<String> errorsToSkipTest = TestResult.TestError.getErrorsToSkipTests();
-                    errorsToSkipTest.add(apiCallFailedErrorString);
+                    errorsToSkipTest.add(TestResult.API_CALL_FAILED_ERROR_STRING);
                     testingRunResultFilters.add(
                         Filters.or(
                             Filters.exists(WorkflowTestingEndpoints._WORK_FLOW_TEST),
