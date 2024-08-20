@@ -27,8 +27,8 @@ function Dashboard() {
     const subCategoryMap = LocalStore(state => state.subCategoryMap)
     const [eventForUser, setEventForUser] = useState({})
     
-    const sendEventOnLogin = PersistStore(state => state.sendEventOnLogin)
-    const setSendEventOnLogin = PersistStore(state => state.setSendEventOnLogin)
+    const sendEventOnLogin = LocalStore(state => state.sendEventOnLogin)
+    const setSendEventOnLogin = LocalStore(state => state.setSendEventOnLogin)
     const fetchAllCollections = async () => {
         let apiCollections = await homeFunctions.getAllCollections()
         const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
@@ -44,8 +44,9 @@ function Dashboard() {
 
     const getEventForIntercom = async() => {
         let resp = await homeRequests.getEventForIntercom();
-        setEventForUser(resp)
-        setSendEventOnLogin(true)
+        if(resp !== null){
+            setEventForUser(resp)
+        }
     }
 
     useEffect(() => {
@@ -60,8 +61,11 @@ function Dashboard() {
         }
         if(window?.Intercom){
             if(!sendEventOnLogin){
+                setSendEventOnLogin(true)
                 getEventForIntercom()
-                window.Intercom("trackEvent","metrics", eventForUser)
+                if(Object.keys(eventForUser).length > 0){
+                    window?.Intercom("trackEvent","metrics", eventForUser)
+                }
             }
         }
     }, [])

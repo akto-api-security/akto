@@ -96,7 +96,9 @@
 
                     if (window.USER_NAME.length > 0) {
                         // Initialize mixpanel
-                        clarity("set", "userEmail", window.USER_NAME)
+                        if(window.IS_SAAS == 'true'){
+                            clarity("set", "userEmail", window.USER_NAME)
+                        }
                         mixpanel.init('c403d0b00353cc31d7e33d68dc778806', { debug: false, ignore_dnt: true });
                         let distinct_id = window.USER_NAME + '_' + (window.IS_SAAS === 'true' ? "SAAS" : window.DASHBOARD_MODE);
                         mixpanel.identify(distinct_id);
