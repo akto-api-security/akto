@@ -20,13 +20,13 @@ import java.util.Map;
 
 public class AuthValidator {
     
-    public static boolean validate(Auth auth, RawApi rawApi, AuthMechanism authMechanism) {
+    public static boolean validate(Auth auth, RawApi rawApi, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
 
         if (auth == null) {
             return true;
         }
 
-        List<String> headerKeys = getHeaders(auth, authMechanism);
+        List<String> headerKeys = getHeaders(auth, authMechanism, customAuthTypes);
 
         auth.setHeaders(headerKeys);
 
@@ -41,14 +41,14 @@ public class AuthValidator {
         for (String header: headerKeys) {
             contains = headers.containsKey(header) || CookieTransformer.isKeyPresentInCookie(cookieList, header);
             res = auth.getAuthenticated() && contains;
-            if (!res) {
-                return res;
+            if (res) {
+                return true;
             }
         }
-        return true;
+        return false;
     }
 
-    public static List<String> getHeaders(Auth auth, AuthMechanism authMechanism) {
+    public static List<String> getHeaders(Auth auth, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
 
         if (auth != null && auth.getHeaders() != null && auth.getHeaders().size() > 0) {
             return auth.getHeaders();
@@ -56,14 +56,18 @@ public class AuthValidator {
 
         List<String> headerKeys = new ArrayList<>();
 
-        if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().size() == 0) {
-            return null;
+        if (authMechanism != null && authMechanism.getAuthParams() != null && authMechanism.getAuthParams().size() > 0) {
+            for (AuthParam authParam: authMechanism.getAuthParams()) {
+                String key = authParam.getKey();
+                if (key == null) continue;
+                headerKeys.add(key.toLowerCase());
+            }
         }
 
-        for (AuthParam authParam: authMechanism.getAuthParams()) {
-            String key = authParam.getKey();
-            if (key == null) continue;
-            headerKeys.add(key.toLowerCase());
+        if (customAuthTypes != null) {
+            for(CustomAuthType customAuthType: customAuthTypes) {
+                headerKeys.addAll(customAuthType.getHeaderKeys());
+            }
         }
 
         return headerKeys;

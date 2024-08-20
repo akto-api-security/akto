@@ -14,8 +14,6 @@ let testingStore = (set)=>({
     setRerunModal: (rerunModal) => set({rerunModal: rerunModal}),
     errorsObject: {},
     setErrorsObject: (errorsObject) => set({errorsObject: errorsObject}),
-    currentTestingRuns: [],
-    setCurrentTestingRuns: (currentTestingRuns) => set({currentTestingRuns: currentTestingRuns}),
 })
 
 testingStore = devtools(testingStore)

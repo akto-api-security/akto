@@ -146,7 +146,6 @@ public class TestExecutor {
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
-        sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
         AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();;
 
@@ -593,8 +592,11 @@ public class TestExecutor {
                     e.printStackTrace();
                 }
                 if (testingRunResult != null) {
+                    List<String> errorList = testingRunResult.getErrorsList();
                     testingRunResults.add(testingRunResult);
-                    countSuccessfulTests++;
+                    if (errorList == null || !errorList.contains(TestResult.API_CALL_FAILED_ERROR_STRING)) {
+                        countSuccessfulTests++;
+                    }
                 }
 
                 insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);

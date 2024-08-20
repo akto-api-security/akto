@@ -10,6 +10,7 @@ import func from '@/util/func';
 import SemiCircleProgress from '../../shared/SemiCircleProgress';
 import { usePolling } from '../../../../main/PollingProvider';
 import { debounce } from 'lodash';
+import LocalStore from '../../../../main/LocalStorageStore';
 
 function ContentWithIcon({icon,text, isAvatar= false}) {
     return(
@@ -36,6 +37,7 @@ export default function Header() {
     const accounts = Store(state => state.accounts)
     const activeAccount = Store(state => state.activeAccount)
     const resetAll = PersistStore(state => state.resetAll)
+    const resetStore = LocalStore(state => state.resetStore)
 
     const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
@@ -50,6 +52,7 @@ export default function Header() {
         clearPollingInterval()
         api.logout().then(res => {
             resetAll();
+            resetStore() ;
             storeAccessToken(null)
             if(res.logoutUrl){
                 window.location.href = res.logoutUrl
@@ -78,6 +81,7 @@ export default function Header() {
                 await api.goToAccount(accountId)
                 func.setToast(true, false, `Switched to account ${accounts[accountId]}`)
                 resetAll();
+                resetStore();
                 window.location.href = '/dashboard/observe/inventory'
             }
         }
@@ -88,6 +92,7 @@ export default function Header() {
           setShowCreateAccount(false)
           setNewAccount('')
           resetAll();
+          resetStore();
           window.location.href="/dashboard/onboarding"
         })
     }

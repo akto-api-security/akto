@@ -284,6 +284,7 @@ public final class FilterAction {
 
     public DataOperandsFilterResponse applyFilterOnPayload(FilterActionRequest filterActionRequest, String payload) {
 
+        String origPayload = payload;
         BasicDBObject payloadObj = new BasicDBObject();
         try {
             payload = Utils.jsonifyIfArray(payload);
@@ -339,16 +340,16 @@ public final class FilterAction {
                 return new DataOperandsFilterResponse(false, matchingValueKeySet, null, null, validationReason.toString());
             }
         } else if (filterActionRequest.getConcernedSubProperty() == null) {
-            Object val = payload;
+            Object val = origPayload;
 
             if (filterActionRequest.getBodyOperand() != null && filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.LENGTH.toString())) {
-                val = payload.trim().length() - 2; // todo:
+                val = origPayload.trim().length() - 2; // todo:
             } else if (filterActionRequest.getBodyOperand() != null && filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.PERCENTAGE_MATCH.toString())) {
                 RawApi sampleRawApi = filterActionRequest.getRawApi();
                 if (sampleRawApi == null) {
                     return new DataOperandsFilterResponse(false, null, null, null);
                 }
-                double percentageMatch = TestPlugin.compareWithOriginalResponse(payload, sampleRawApi.getResponse().getBody(), new HashMap<>());
+                double percentageMatch = TestPlugin.compareWithOriginalResponse(origPayload, sampleRawApi.getResponse().getBody(), new HashMap<>());
                 val = (int) percentageMatch;
             } else if (filterActionRequest.getBodyOperand() != null && filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.PERCENTAGE_MATCH_SCHEMA.toString())) {
                 RawApi sampleRawApi = filterActionRequest.getRawApi();
@@ -1112,7 +1113,7 @@ public final class FilterAction {
     public DataOperandsFilterResponse evaluatePrivateVariables(FilterActionRequest filterActionRequest) {
 
         List<BasicDBObject> privateValues = new ArrayList<>();
-        StringBuilder vulnerabilityReasonString = null;
+        StringBuilder vulnerabilityReasonString = new StringBuilder();
         if (filterActionRequest.getOperand().equalsIgnoreCase(TestEditorEnums.DataOperands.REGEX.toString())) {
             if (filterActionRequest.getContextEntities() == null) {
                 return new DataOperandsFilterResponse(false, null, filterActionRequest.getContextEntities(), null);

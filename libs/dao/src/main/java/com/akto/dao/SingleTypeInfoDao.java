@@ -90,13 +90,18 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         );
     }
 
-    public static Bson filterForHostHeader(int apiCollectionId, boolean useApiCollectionId) {
+    public static List<Bson> filterForHostHostHeaderRaw() {
         List<Bson> filters = new ArrayList<>();
         filters.add(Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1));
         filters.add(Filters.eq(SingleTypeInfo._IS_HEADER, true));
         filters.add(Filters.eq(SingleTypeInfo._PARAM, "host"));
         filters.add(Filters.eq(SingleTypeInfo.SUB_TYPE, SingleTypeInfo.GENERIC.getName()));
 
+        return filters;
+    }
+
+    public static Bson filterForHostHeader(int apiCollectionId, boolean useApiCollectionId) {
+        List<Bson> filters = filterForHostHostHeaderRaw();
         if (useApiCollectionId) filters.add(Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId));
 
         return Filters.and(filters);
