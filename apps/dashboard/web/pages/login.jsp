@@ -11,7 +11,7 @@
                 <title>Akto</title>
                 <link rel="shortcut icon" href="/public/favicon.svg" type="image/svg" />
                 <link rel="manifest" href="/public/manifest.json" />
-                <link href="https://cdn.jsdelivr.net/npm/monaco-editor@0.40.0/min/vs/editor/editor.main.min.css" rel="stylesheet">
+                <link href="https://cdn.jsdelivr.net/npm/vscode-codicons@0.0.16/dist/codicon.min.css" rel="stylesheet">
             </head>
 
             <body>
