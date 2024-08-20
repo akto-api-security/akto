@@ -4,12 +4,14 @@ import {devtools, persist, createJSONStorage} from "zustand/middleware"
 const initialState = {
     subCategoryMap: {},
     categoryMap: {},
+    sendEventOnLogin: false,
 };
 
 let localStore = (set) => ({
     ...initialState,
     setSubCategoryMap: (subCategoryMap) => set({ subCategoryMap }),
     setCategoryMap: (categoryMap) => set({ categoryMap }),
+    setSendEventOnLogin: (sendEventOnLogin) => set({ sendEventOnLogin }),
     resetStore: () => set(initialState), // Reset function
 })
 
