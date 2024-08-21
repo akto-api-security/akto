@@ -575,7 +575,8 @@ public class DbAction extends ActionSupport {
                 }
                 DbLayer.bulkWriteSampleData(writes);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSampleData");
+                loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSampleData " + e.getMessage());
+                e.printStackTrace();
                 return Action.ERROR.toUpperCase();
             }
         }
