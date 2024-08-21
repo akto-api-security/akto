@@ -15,6 +15,7 @@ import com.akto.dao.context.Context;
 import com.akto.merging.Cron;
 import com.akto.utils.KafkaUtils;
 import com.mongodb.ConnectionString;
+import com.mongodb.ReadPreference;
 
 
 public class InitializerListener implements ServletContextListener {
@@ -36,7 +37,7 @@ public class InitializerListener implements ServletContextListener {
                 do {
                     try {
                         if (!calledOnce) {
-                            DaoInit.init(new ConnectionString(mongoURI));
+                            DaoInit.init(new ConnectionString(mongoURI), ReadPreference.primary());
                             calledOnce = true;
                         }
                         checkMongoConnection();
