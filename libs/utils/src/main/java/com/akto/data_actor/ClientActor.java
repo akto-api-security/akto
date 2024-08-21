@@ -726,8 +726,8 @@ public class ClientActor extends DataActor {
                     BasicDBObject obj2 = (BasicDBObject) obj;
                     String id = (String) obj2.get("id");
                     obj2.put("id", null);
-                    CustomAuthTypeMapper customAuthTypeMapper = objectMapper.readValue(obj2.toJson(), CustomAuthTypeMapper.class);
-                    CustomAuthType customAuthType = CustomAuthTypeMapper.buildCustomAuthType(customAuthTypeMapper, id);
+                    // CustomAuthTypeMapper customAuthTypeMapper = objectMapper.readValue(obj2.toJson(), CustomAuthTypeMapper.class);
+                    CustomAuthType customAuthType = objectMapper.readValue(obj2.toJson(), CustomAuthType.class);
                     customAuthTypes.add(customAuthType);
                 }
             } catch(Exception e) {
