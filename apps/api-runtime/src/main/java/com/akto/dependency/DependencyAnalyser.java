@@ -22,6 +22,8 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 
 import java.util.*;
 
@@ -31,6 +33,7 @@ public class DependencyAnalyser {
     Store valueStore; // this is to store all the values seen in response payload
     Store urlValueStore; // this is to store all the url$value seen in response payload
     Store urlParamValueStore; // this is to store all the url$param$value seen in response payload
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DependencyAnalyser.class, LogDb.RUNTIME);
 
     Map<String, Set<String>> urlsToResponseParam = new HashMap<>();
 
@@ -354,10 +357,12 @@ public class DependencyAnalyser {
     }
 
     public void syncWithDb() {
+        loggerMaker.infoAndAddToDb("Syncing dependency analyser nodes");
         ArrayList<WriteModel<DependencyNode>> bulkUpdates1 = new ArrayList<>();
         ArrayList<WriteModel<DependencyNode>> bulkUpdates2 = new ArrayList<>();
         ArrayList<WriteModel<DependencyNode>> bulkUpdates3 = new ArrayList<>();
 
+        loggerMaker.infoAndAddToDb("dependency analyser nodes size: " + nodes.size());
         mergeNodes();
 
         for (DependencyNode dependencyNode: nodes.values()) {
@@ -448,6 +453,10 @@ public class DependencyAnalyser {
                 bulkUpdates3.add(updateOneModel3);
             }
         }
+
+        loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates1 size: " + bulkUpdates1.size());
+        loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates2 size: " + bulkUpdates2.size());
+        loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates3 size: " + bulkUpdates3.size());
 
         // ordered has to be true or else won't work
         if (bulkUpdates1.size() > 0) DependencyNodeDao.instance.getMCollection().bulkWrite(bulkUpdates1, new BulkWriteOptions().ordered(false));
