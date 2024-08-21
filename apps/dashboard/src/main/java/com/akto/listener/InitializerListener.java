@@ -1928,33 +1928,33 @@ public class InitializerListener implements ServletContextListener {
                 setDashboardMode();
                 updateGlobalAktoVersion();
 
-                AccountTask.instance.executeTask(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account account) {
-                        AccountSettingsDao.instance.getStats();
-                        Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
-                        runInitializerFunctions();
-                    }
-                }, "context-initializer");
+//                AccountTask.instance.executeTask(new Consumer<Account>() {
+//                    @Override
+//                    public void accept(Account account) {
+//                        AccountSettingsDao.instance.getStats();
+//                        Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
+//                        runInitializerFunctions();
+//                    }
+//                }, "context-initializer");
 
-                if (DashboardMode.isMetered()) {
-                    setupUsageScheduler();
-                    setupUsageSyncScheduler();
-                }
-                trimCappedCollections();
-                setUpPiiAndTestSourcesScheduler();
-                setUpTrafficAlertScheduler();
+//                if (DashboardMode.isMetered()) {
+//                    setupUsageScheduler();
+//                    setupUsageSyncScheduler();
+//                }
+//                trimCappedCollections();
+//                setUpPiiAndTestSourcesScheduler();
+//                setUpTrafficAlertScheduler();
                 // setUpAktoMixpanelEndpointsScheduler();
-                SingleTypeInfo.init();
-                setUpDailyScheduler();
-                setUpWebhookScheduler();
-                setUpDefaultPayloadRemover();
-                setUpTestEditorTemplatesScheduler();
-                setUpDependencyFlowScheduler();
-                tokenGeneratorCron.tokenGeneratorScheduler();
-                crons.deleteTestRunsScheduler();
-                updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                syncCronInfo.setUpUpdateCronScheduler();
+//                SingleTypeInfo.init();
+//                setUpDailyScheduler();
+//                setUpWebhookScheduler();
+//                setUpDefaultPayloadRemover();
+//                setUpTestEditorTemplatesScheduler();
+//                setUpDependencyFlowScheduler();
+//                tokenGeneratorCron.tokenGeneratorScheduler();
+//                crons.deleteTestRunsScheduler();
+//                updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+//                syncCronInfo.setUpUpdateCronScheduler();
                 // setUpAktoMixpanelEndpointsScheduler();
                 //fetchGithubZip();
                 if(isSaas){
@@ -1965,15 +1965,15 @@ public class InitializerListener implements ServletContextListener {
                         loggerMaker.errorAndAddToDb("Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
                     }
                 }
-                updateApiGroupsForAccounts();
-                setUpUpdateCustomCollections();
-                setUpFillCollectionIdArrayJob();
-                setupAutomatedApiGroupsScheduler();
+//                updateApiGroupsForAccounts();
+//                setUpUpdateCustomCollections();
+//                setUpFillCollectionIdArrayJob();
+//                setupAutomatedApiGroupsScheduler();
                 /*
                  * This is a temporary job. 
                  * TODO: Remove this once traffic pipeline is cleaned.
                  */
-                CleanInventory.cleanInventoryJobRunner();
+//                CleanInventory.cleanInventoryJobRunner();
             }
         }, 0, TimeUnit.SECONDS);
 
