@@ -73,6 +73,7 @@ public class StartTestAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
     private TestingRunType testingRunType;
     private String searchString;
+    private boolean continuousTesting;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
@@ -186,6 +187,10 @@ public class StartTestAction extends UserAction {
         if (localTestingRun == null) {
             try {
                 localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
+                // pass boolean from ui, which will tell if testing is coniinuous on new endpoints
+                if (this.continuousTesting) {
+                    localTestingRun.setPeriodInSeconds(-1);
+                }
                 if (triggeredBy != null && !triggeredBy.isEmpty()) {
                     localTestingRun.setTriggeredBy(triggeredBy);
                 }
@@ -343,7 +348,12 @@ public class StartTestAction extends UserAction {
             case RECURRING:
                 return Filters.and(
                     Filters.nin(Constants.ID, getCicdTests()),
-                    Filters.ne(TestingRun.PERIOD_IN_SECONDS,0
+                    Filters.ne(TestingRun.PERIOD_IN_SECONDS,0),
+                    Filters.ne(TestingRun.PERIOD_IN_SECONDS, -1));
+            case CONTINUOUS_TESTING:
+                return Filters.and(
+                    Filters.nin(Constants.ID, getCicdTests()),
+                    Filters.eq(TestingRun.PERIOD_IN_SECONDS,-1
                 ));
             default:
                 return Filters.empty();
@@ -493,7 +503,7 @@ public class StartTestAction extends UserAction {
     List<TestingRunResult> testingRunResults;
     private boolean fetchOnlyVulnerable;
     public enum QueryMode {
-        VULNERABLE, SECURED, SKIPPED_EXEC_NEED_CONFIG, SKIPPED_EXEC_NO_ACTION, SKIPPED_EXEC, ALL;
+        VULNERABLE, SECURED, SKIPPED_EXEC_NEED_CONFIG, SKIPPED_EXEC_NO_ACTION, SKIPPED_EXEC, ALL, SKIPPED_EXEC_API_REQUEST_FAILED;
     }
     private QueryMode queryMode;
 
@@ -507,7 +517,6 @@ public class StartTestAction extends UserAction {
             addActionError("Invalid test summary id");
             return ERROR.toUpperCase();
         }
-
         List<Bson> testingRunResultFilters = new ArrayList<>();
 
         testingRunResultFilters.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
@@ -521,14 +530,27 @@ public class StartTestAction extends UserAction {
                 case VULNERABLE:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, true));
                     break;
+                case SKIPPED_EXEC_API_REQUEST_FAILED:
+                    testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
+                    testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, TestResult.API_CALL_FAILED_ERROR_STRING));
+                    break;
                 case SKIPPED_EXEC:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
                     testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
                     break;
                 case SECURED:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
-                    testingRunResultFilters.add(Filters.nin(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
-                    testingRunResultFilters.add(Filters.eq(TestingRunResult.REQUIRES_CONFIG, false));
+                    List<String> errorsToSkipTest = TestResult.TestError.getErrorsToSkipTests();
+                    errorsToSkipTest.add(TestResult.API_CALL_FAILED_ERROR_STRING);
+                    testingRunResultFilters.add(
+                        Filters.or(
+                            Filters.exists(WorkflowTestingEndpoints._WORK_FLOW_TEST),
+                            Filters.and(
+                                Filters.nin(TestingRunResultDao.ERRORS_KEY, errorsToSkipTest),
+                                Filters.ne(TestingRunResult.REQUIRES_CONFIG, true)
+                            )
+                        )
+                    );
                     break;
                 case SKIPPED_EXEC_NEED_CONFIG:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
@@ -541,6 +563,9 @@ public class StartTestAction extends UserAction {
             for(TestError testError: testErrors){
                 this.errorEnums.put(testError, testError.getMessage());
             }
+        }
+        if(queryMode == QueryMode.SKIPPED_EXEC_API_REQUEST_FAILED){
+            this.errorEnums.put(TestError.NO_API_REQUEST, TestError.NO_API_REQUEST.getMessage());
         }
 
         this.testingRunResults = TestingRunResultDao.instance
@@ -748,13 +773,22 @@ public class StartTestAction extends UserAction {
 
         long oneTimeCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filters));
 
-        long scheduleCount = totalCount - oneTimeCount - cicdCount;
+        ArrayList<Bson> continuousTestsFilter = new ArrayList<>(); // Create a copy of filters
+        continuousTestsFilter.add(getTestingRunTypeFilter(TestingRunType.CONTINUOUS_TESTING));
+        continuousTestsFilter.add(Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTimestamp));
+
+        long continuousTestsCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(continuousTestsFilter));
+
+        System.out.println("cont count" + continuousTestsCount);
+
+        long scheduleCount = totalCount - oneTimeCount - cicdCount - continuousTestsCount;
 
         
         result.put("allTestRuns", totalCount);
         result.put("oneTime", oneTimeCount);
         result.put("scheduled", scheduleCount);
         result.put("cicd", cicdCount);
+        result.put("continuous", continuousTestsCount);
 
         this.allTestsCountMap = result;
         return SUCCESS.toUpperCase();
@@ -1206,4 +1240,13 @@ public class StartTestAction extends UserAction {
     public Map<TestError, String> getErrorEnums() {
         return errorEnums;
     }
+
+    public boolean getContinuousTesting() {
+        return continuousTesting;
+    }
+
+    public void setContinuousTesting(boolean continuousTesting) {
+        this.continuousTesting = continuousTesting;
+    }
+
 }

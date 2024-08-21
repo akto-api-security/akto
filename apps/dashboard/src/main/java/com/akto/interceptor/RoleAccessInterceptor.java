@@ -41,9 +41,6 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
     private final static String FEATURE_LABEL_STRING = "RBAC_FEATURE";
 
     private boolean checkForPaidFeature(int accountId){
-        if(!DashboardMode.isMetered()){
-            return false;
-        }
         Organization organization = OrganizationsDao.instance.findOne(Filters.in(Organization.ACCOUNTS, accountId));
         if(organization == null || organization.getFeatureWiseAllowed() == null || organization.getFeatureWiseAllowed().isEmpty()){
             return true;
@@ -52,6 +49,20 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
         HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
         FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(FEATURE_LABEL_STRING, FeatureAccess.noAccess);
         return featureAccess.getIsGranted();
+    }
+
+    private int getUserAccountId (Map<String, Object> session) throws Exception{
+        try {
+            Object accountIdObj = session.get(UserDetailsFilter.ACCOUNT_ID);
+            String accountIdStr = accountIdObj == null ? null : accountIdObj+"";
+            if(accountIdStr == null){
+                throw new Exception("found account id as null in interceptor");
+            }
+            int accountId = Integer.parseInt(accountIdStr);
+            return accountId;
+        } catch (Exception e) {
+            throw new Exception("unable to parse account id: " + e.getMessage());
+        }
     }
 
     @Override
@@ -63,16 +74,23 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             }
 
             Map<String, Object> session = invocation.getInvocationContext().getSession();
+            if(session == null){
+                throw new Exception("Found session null, returning from interceptor");
+            }
             loggerMaker.infoAndAddToDb("Found session in interceptor.", LogDb.DASHBOARD);
             User user = (User) session.get(USER);
-            int sessionAccId = (int) session.get(UserDetailsFilter.ACCOUNT_ID);
 
-            if(!(checkForPaidFeature(sessionAccId) || featureLabel.equalsIgnoreCase(RbacEnums.Feature.ADMIN_ACTIONS.toString()))){
+            if(user == null) {
+                throw new Exception("User not found in session, returning from interceptor");
+            }
+            int sessionAccId = getUserAccountId(session);
+
+            if(!DashboardMode.isMetered()){
                 return invocation.invoke();
             }
 
-            if(user == null) {
-                throw new Exception("User not found in session");
+            if(!(checkForPaidFeature(sessionAccId) || featureLabel.equalsIgnoreCase(RbacEnums.Feature.ADMIN_ACTIONS.toString()))){
+                return invocation.invoke();
             }
 
             loggerMaker.infoAndAddToDb("Found user in interceptor: " + user.getLogin(), LogDb.DASHBOARD);

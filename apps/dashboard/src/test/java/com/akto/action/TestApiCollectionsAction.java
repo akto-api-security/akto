@@ -2,9 +2,13 @@ package com.akto.action;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
 import org.junit.Test;
@@ -95,6 +99,21 @@ public class TestApiCollectionsAction extends MongoBasedTest {
         apiCollectionList.add(new ApiCollection(3000, "three", 3000, urls3, null,0, false, true));
 
         ApiCollectionsDao.instance.insertMany(apiCollectionList);
+        Method method = Method.GET;
+
+        List<ApiInfo> apiInfos = new ArrayList<>();
+        for (int c=1; c<4; c++) {
+            int apiCollectionId = c*1000;
+            for (int i = 0; i < 100; i++) {
+                String url = "/api/v1" + i;
+                ApiInfo apiInfo= new ApiInfo(
+                    new ApiInfoKey(apiCollectionId, url, method)
+                );
+                apiInfos.add(apiInfo);
+            }
+        }
+
+        ApiInfoDao.instance.insertMany(apiInfos);
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
         for (int c=1; c<4; c++) {

@@ -6,10 +6,65 @@ import com.google.gson.Gson;
 import com.google.gson.JsonParser;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
 
 import java.util.*;
 
 public class JSONUtils {
+    public static Map<String, Set<Object>> flattenJSONObject(JSONObject jsonObject) {
+        Map<String, Set<Object>> ret = new HashMap<>();
+        if (jsonObject == null) return ret;
+        String prefix = "";
+        flattenJSONObject(jsonObject, prefix, ret);
+        return ret;
+    }
+
+    private static void flattenJSONObject(Object obj, String prefix, Map<String, Set<Object>> ret) {
+        if (obj instanceof JSONObject) {
+            JSONObject jsonObject = (JSONObject) obj;
+
+            Set<String> keySet = jsonObject.keySet();
+
+            if (prefix != null && !prefix.isEmpty() && (keySet == null || keySet.isEmpty())) {
+                Set<Object> values = ret.getOrDefault(prefix, new HashSet<>());
+                values.add(obj);
+                ret.put(prefix, values);
+            }
+
+            for(String key: keySet) {
+
+                if (key == null) {
+                    continue;
+                }
+                boolean anyAlphabetExists = false;
+
+                final int sz = key.length();
+                for (int i = 0; i < sz; i++) {
+                    final char nowChar = key.charAt(i);
+                    if (Character.isLetter(nowChar)) {
+                        anyAlphabetExists = true;
+                        break;
+                    }
+                }
+
+                key = anyAlphabetExists ? key: "NUMBER";
+                Object value = jsonObject.get(key);
+                flattenJSONObject(value, prefix + (prefix.isEmpty() ? "" : "#") + key, ret);
+            }
+        } else if (obj instanceof JSONArray) {
+            for(Object elem: (JSONArray) obj) {
+                flattenJSONObject(elem, prefix+(prefix.isEmpty() ? "$" : "#$"), ret);
+            }
+        } else {
+            Set<Object> values = ret.getOrDefault(prefix, new HashSet<>());
+            values.add(obj);
+            ret.put(prefix, values);
+        }
+    }
+
+
+
     private static void flatten(Object obj, String prefix, Map<String, Set<Object>> ret) {
         if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;

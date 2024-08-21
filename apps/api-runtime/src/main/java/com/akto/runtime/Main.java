@@ -101,24 +101,6 @@ public class Main {
     }
 
     public static Kafka kafkaProducer = null;
-    private static void buildKafka() {
-        logger.info("Building kafka...................");
-        AccountTask.instance.executeTask(t -> {
-            int accountId = Context.accountId.get();
-            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(accountId));
-            if (accountSettings != null && accountSettings.getCentralKafkaIp()!= null) {
-                String centralKafkaBrokerUrl = accountSettings.getCentralKafkaIp();
-                int centralKafkaBatchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
-                int centralKafkaLingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
-                if (centralKafkaBrokerUrl != null) {
-                    kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
-                    logger.info("Connected to central kafka @ " + Context.now());
-                }
-        } else {
-                logger.info(String.valueOf(accountSettings));
-            }
-        }, "build-kafka-task");
-    }
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
@@ -179,22 +161,18 @@ public class Main {
 
         DaoInit.init(new ConnectionString(mongoURI));
         loggerMaker.infoAndAddToDb("Runtime starting at " + Context.now() + "....", LogDb.RUNTIME);
-        initializeRuntime();
+        try {
+            initializeRuntime();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in initializeRuntime " + e.getMessage(), LogDb.RUNTIME);
+        }
 
-        String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
-
-        buildKafka();
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                if (kafkaProducer == null || !kafkaProducer.producerReady) {
-                    buildKafka();
-                }
-            }
-        }, 5, 5, TimeUnit.MINUTES);
-
-
-        APIConfig apiConfig;
-        apiConfig = APIConfigsDao.instance.findOne(Filters.eq("name", configName));
+        APIConfig apiConfig = null;
+        try {
+            apiConfig = APIConfigsDao.instance.findOne(Filters.eq("name", configName));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error while fetching api config " + e.getMessage(), LogDb.RUNTIME);
+        }
         if (apiConfig == null) {
             apiConfig = new APIConfig(configName,"access-token", 1, 10_000_000, sync_threshold_time); // this sync threshold time is used for deleting sample data
         }
@@ -252,10 +230,6 @@ public class Main {
 
                         if (lastSyncOffset % 100 == 0) {
                             logger.info("Committing offset at position: " + lastSyncOffset);
-                        }
-
-                        if (tryForCollectionName(r.value())) {
-                            continue;
                         }
 
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
@@ -318,24 +292,6 @@ public class Main {
                         loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId, LogDb.RUNTIME);
                         parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
                         loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId, LogDb.RUNTIME);
-
-                        // send to central kafka
-                        if (kafkaProducer != null) {
-                            loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to context analyzer", LogDb.RUNTIME);
-                            for (HttpResponseParams httpResponseParams: accWiseResponse) {
-                                try {
-                                    loggerMaker.debugInfoAddToDb("Sending to kafka data for account: " + httpResponseParams.getAccountId(), LogDb.RUNTIME);
-                                    kafkaProducer.send(httpResponseParams.getOrig(), centralKafkaTopicName);
-                                } catch (Exception e) {
-                                    // force close it
-                                    loggerMaker.errorAndAddToDb("Closing kafka: " + e.getMessage(), LogDb.RUNTIME);
-                                    kafkaProducer.close();
-                                    loggerMaker.infoAndAddToDb("Successfully closed kafka", LogDb.RUNTIME);
-                                }
-                            }
-                        } else {
-                            loggerMaker.errorAndAddToDb("Kafka producer is null", LogDb.RUNTIME);
-                        }
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
                     }

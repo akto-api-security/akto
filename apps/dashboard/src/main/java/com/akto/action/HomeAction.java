@@ -1,15 +1,17 @@
 package com.akto.action;
 
+import com.akto.dao.UsersDao;
+import com.akto.dto.User;
 import com.akto.listener.InitializerListener;
-import com.akto.utils.Auth0;
-import com.akto.utils.AzureLogin;
+import com.akto.utils.*;
 import com.akto.util.DashboardMode;
-import com.akto.utils.GithubLogin;
-import com.akto.utils.OktaLogin;
 import com.auth0.AuthorizeUrl;
 import com.auth0.SessionUtils;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
 import org.apache.struts2.interceptor.SessionAware;
@@ -67,11 +69,20 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
         }
         logger.info("in Home::execute: settings IS_SAAS to " + InitializerListener.isSaas);
         if(DashboardMode.isSaasDeployment()){
-            //Use Auth0
+            if(accessToken != null && servletRequest.getAttribute("username") == null) {
+                try {
+                    Jws<Claims> jws = JWT.parseJwt(accessToken, "");
+                    String username = jws.getBody().get("username").toString();
+                    User user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, username));
+                    if(user != null && user.getRefreshTokens() != null && !user.getRefreshTokens().isEmpty()){
+                        logger.info("User has refresh tokens, setting up window vars");
+                        ProfileAction.executeMeta1(null, user, servletRequest, servletResponse);
+                    }
+                }catch (Exception e){
+                    logger.info("Access token expired, unable to set window vars", e);
+                }
+            }
             return redirectToAuth0(servletRequest, servletResponse, accessToken, new BasicDBObject());
-//            if (SUCCESS1 != null) return SUCCESS1;
-//            logger.info("Executed home action for auth0");
-//            return "SUCCESS";
         }
         // Use existing flow
 
@@ -119,7 +130,16 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
     }
 
     private static boolean checkIfAccessTokenExists(HttpServletRequest servletRequest, String accessToken) {
-        return accessToken != null || SessionUtils.get(servletRequest, "accessToken") != null;
+        String at = accessToken;
+        if (at == null) {
+            at = (String) SessionUtils.get(servletRequest, "accessToken");
+        }
+        try{
+            JWT.parseJwt(at, "");
+        } catch (Exception e){
+            return false;
+        }
+        return true;
     }
 
     public String error() {

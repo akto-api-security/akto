@@ -118,7 +118,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             logger.info("updating vulnerable api's collection for account " + accountId);
             try {
                 BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
-                if (backwardCompatibility.getVulnerableApiUpdationVersionV1() == 0) {
+                if (backwardCompatibility == null || backwardCompatibility.getVulnerableApiUpdationVersionV1() == 0) {
                     RuntimeListener.addSampleData();
                 }
                 BackwardCompatibilityDao.instance.updateOne(

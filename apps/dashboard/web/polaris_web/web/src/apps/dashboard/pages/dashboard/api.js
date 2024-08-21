@@ -53,7 +53,7 @@ const api = {
                 connectionSkipped: skippedConnection
             }
         })
-    },
+    }
 }
 
 export default api;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { Badge, Box, Button, Frame, HorizontalGrid, HorizontalStack, TopBar } from "@shopify/polaris"
+import { Box, Button, Frame, HorizontalGrid, HorizontalStack, TopBar } from "@shopify/polaris"
 import { ExitMajor } from "@shopify/polaris-icons"
 
 import TestEditorFileExplorer from "./components/TestEditorFileExplorer"
@@ -17,6 +17,7 @@ import convertFunc from "./transform"
 import { learnMoreObject } from "../../../main/onboardingData"
 import LearnPopoverComponent from "../../components/layouts/LearnPopoverComponent"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
+import LocalStore from "../../../main/LocalStorageStore"
 
 const TestEditor = () => {
     const navigate = useNavigate()
@@ -26,7 +27,7 @@ const TestEditor = () => {
     const setVulnerableRequestMap = TestEditorStore(state => state.setVulnerableRequestMap)
     const setDefaultRequest = TestEditorStore(state => state.setDefaultRequest)
     const setActive = PersistStore(state => state.setActive)
-    const setSubCategoryMap = PersistStore(state => state.setSubCategoryMap)
+    const setSubCategoryMap = LocalStore(state => state.setSubCategoryMap)
 
     const [loading, setLoading] = useState(true)
 
@@ -85,7 +86,6 @@ const TestEditor = () => {
                 <Button onClick={handleExit} icon={ExitMajor} plain/>
                 <HorizontalStack gap={"2"}>
                     <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={"Test Editor"} />
-                    <Badge status="success">Beta</Badge>
                 </HorizontalStack>
             </HorizontalStack>
 

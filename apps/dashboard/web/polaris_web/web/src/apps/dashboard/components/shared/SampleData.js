@@ -135,7 +135,7 @@ function highlightHeaders(data, ref, getLineNumbers){
 
 function SampleData(props) {
 
-    let {showDiff, data, minHeight, editorLanguage, currLine, getLineNumbers, readOnly, getEditorData} = props;
+    let {showDiff, data, minHeight, editorLanguage, currLine, getLineNumbers, readOnly, getEditorData, wordWrap} = props;
 
     const ref = useRef(null);
     const [instance, setInstance] = useState(undefined);
@@ -151,6 +151,10 @@ function SampleData(props) {
 
     if (readOnly == undefined) {
       readOnly = true
+    }
+
+    if (wordWrap == undefined) {
+      wordWrap = true
     }
 
     useEffect(() => {
@@ -202,7 +206,7 @@ function SampleData(props) {
         const options = {
             language: editorLanguage,
             minimap: { enabled: false },
-            wordWrap: true,
+            wordWrap: wordWrap,
             automaticLayout: true,
             colorDecorations: true,
             scrollBeyondLastLine: false,

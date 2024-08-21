@@ -19,6 +19,7 @@ import TooltipText from "../../components/shared/TooltipText";
 import TestingStore from "./testingStore";
 
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
+import LocalStore from "../../../main/LocalStorageStore";
 
 let headers = [
     {
@@ -259,7 +260,13 @@ const transform = {
 
     let apiCollectionId = -1
     if(Object.keys(data).length > 0){
-      apiCollectionId = data?.testingEndpoints?.apiCollectionId ||  data?.testingEndpoints?.workflowTest?.apiCollectionId || data?.testingEndpoints?.apisList[0]?.apiCollectionId
+      if(data?.testingEndpoints?.apiCollectionId !== undefined){
+        apiCollectionId = data?.testingEndpoints?.apiCollectionId
+      }else if(data?.testingEndpoints?.workflowTest?.apiCollectionId !== undefined){
+        apiCollectionId = data?.testingEndpoints?.workflowTest?.apiCollectionId 
+      }else{
+        apiCollectionId = data?.testingEndpoints?.apisList[0]?.apiCollectionId
+      }
     }
     const iconObj = func.getTestingRunIconObj(state)
 
@@ -286,6 +293,7 @@ const transform = {
       obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
       obj['apiCollectionId'] = apiCollectionId
+      obj['userEmail'] = data.userEmail
       if(prettified){
         
         const prettifiedTest={
@@ -325,7 +333,7 @@ const transform = {
       obj['errors'] = obj['testResults'].filter((res) => (res.errors && res.errors.length > 0)).map((res) => res.errors.join(", "))
       obj['singleTypeInfos'] = data['singleTypeInfos'] || []
       obj['vulnerable'] = data['vulnerable'] || false
-      obj['nextUrl'] = "/dashboard/testing/"+ hexId + "/result/" + data.hexId;
+      obj['nextUrl'] = "/dashboard/testing/"+ hexId + "?result=" + data.hexId;
       obj['cwe'] = subCategoryMap[data.testSubType]?.cwe ? subCategoryMap[data.testSubType]?.cwe : []
       obj['cweDisplay'] = minimizeTagList(obj['cwe'])
       obj['cve'] = subCategoryMap[data.testSubType]?.cve ? subCategoryMap[data.testSubType]?.cve : []
@@ -598,9 +606,9 @@ const transform = {
     resp.categories.forEach((category) => {
       categoryMap[category.name] = category;
     });
-    PersistStore.getState().setSubCategoryMap(subCategoryMap);
+    LocalStore.getState().setSubCategoryMap(subCategoryMap);
     PersistStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap);
-    PersistStore.getState().setCategoryMap(categoryMap);
+    LocalStore.getState().setCategoryMap(categoryMap);
   },
   prettifySummaryTable(summaries) {
     summaries = summaries.map((obj) => {
@@ -669,7 +677,7 @@ convertSubIntoSubcategory(resp){
     MEDIUM: 0,
     LOW: 0,
   }
-  const subCategoryMap = PersistStore.getState().subCategoryMap
+  const subCategoryMap = LocalStore.getState().subCategoryMap
   Object.keys(resp).forEach((key)=>{
     const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.shortName : key;
     const objectKeyName = subCategoryMap[key] ? subCategoryMap[key].superCategory.name : key;
@@ -854,9 +862,13 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
   let access_type = null
   let access_types = apiInfo["apiAccessTypes"]
   if (!access_types || access_types.length == 0) {
-      access_type = "none"
+      access_type = "No access type"
   } else if (access_types.indexOf("PUBLIC") !== -1) {
       access_type = "Public"
+  } else if (access_types.indexOf("PARTNER") !== -1) {
+      access_type = "Partner"
+  } else if (access_types.indexOf("THIRD_PARTY") !== -1) {
+      access_type = "Third-party"
   } else {
       access_type = "Private"
   }

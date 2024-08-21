@@ -3,6 +3,7 @@ import { Badge, Box, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polar
 import PersistStore from "../../../main/PersistStore";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
+import CopyEndpoint from "./api_collections/component/CopyEndpoint"
 import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor } from "@shopify/polaris-icons"
 import api from "./api";
 import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
@@ -105,6 +106,12 @@ const apiDetailsHeaders = [
         icon: InfoMinor,
         itemOrder: 3,
         iconTooltip: "Changes in API"
+    },
+    {
+        text: "",
+        value: "parameterisedEndpoint",
+        itemOrder: 1,
+        component: (data) => CopyEndpoint(data)
     }
 ]
 
@@ -227,7 +234,8 @@ const transform = {
         let currDate = twoMonthsAgo
         let ret = []
         let dateToCount = resp.reduce((m, e) => {
-            let detectDate = func.toYMD(new Date(e._id * 86400 * 1000))
+
+            let detectDate = func.toYMD(new Date((e._id+1) * 86400 * 1000))
             m[detectDate] = (m[detectDate] || 0) + e.count
             newParametersCount += e.count
             return m
@@ -282,6 +290,9 @@ const transform = {
         }
     },
     formatNumberWithCommas(number) {
+        if(number === undefined){
+            return 0;
+        }
         const numberString = number.toString();
         return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     },
@@ -405,11 +416,11 @@ const transform = {
     prettifyCollectionsData(newData, isLoading){
         const prettifyData = newData.map((c)=>{
             let calcCoverage = '0%';
-            if(c.endpoints > 0){
-                if(c.endpoints < c.testedEndpoints){
+            if(c.urlsCount > 0){
+                if(c.urlsCount < c.testedEndpoints){
                     calcCoverage= '100%'
                 }else{
-                    calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%'
+                    calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.urlsCount) + '%'
                 }
             }
             const loadingComp = <Text color="subdued" variant="bodyMd">...</Text>
@@ -419,7 +430,6 @@ const transform = {
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: c.displayName,
                 displayNameComp: c.displayNameComp,
-                endpoints: c.endpoints,
                 riskScoreComp: isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
                 coverage: isLoading ? '...' : calcCoverage,
                 issuesArr: isLoading ? loadingComp : this.getIssuesList(c.severityInfo),
@@ -448,7 +458,7 @@ const transform = {
                 return
             }
 
-            totalUrl += c.endpoints ;
+            totalUrl += c.urlsCount ;
             totalTested += c.testedEndpoints;
         })
 

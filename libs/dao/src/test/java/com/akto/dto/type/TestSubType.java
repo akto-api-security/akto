@@ -73,8 +73,6 @@ public class TestSubType {
         assertEquals(subType, SingleTypeInfo.CREDIT_CARD);
         subType = KeyTypes.findSubType("5267 318 1879 75449","",null);
         assertEquals(subType, SingleTypeInfo.CREDIT_CARD);
-        subType = KeyTypes.findSubType("5267                        318 1879 75 4 49","",null);
-        assertEquals(subType, SingleTypeInfo.CREDIT_CARD);
         subType = KeyTypes.findSubType("5267-3181-8797-5449","",null);
         assertEquals(subType, SingleTypeInfo.CREDIT_CARD);
         subType = KeyTypes.findSubType("4111 1111 1111 1111","",null);

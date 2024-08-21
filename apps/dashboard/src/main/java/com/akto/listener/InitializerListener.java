@@ -4,6 +4,7 @@ import com.akto.DaoInit;
 import com.akto.action.AdminSettingsAction;
 import com.akto.action.ApiCollectionsAction;
 import com.akto.action.CustomDataTypeAction;
+import com.akto.action.EventMetricsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.action.testing.StartTestAction;
 import com.akto.dao.*;
@@ -12,6 +13,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.CustomWebhooksResultDao;
+import com.akto.dao.notifications.EventsMetricsDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.pii.PIISourceDao;
 import com.akto.dao.test_editor.TestConfigYamlParser;
@@ -34,6 +36,8 @@ import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
 import com.akto.dto.data_types.RegexPredicate;
 import com.akto.dto.dependency_flow.DependencyFlow;
+import com.akto.dto.events.EventsExample;
+import com.akto.dto.events.EventsMetrics;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.notifications.CustomWebhook.WebhookOptions;
@@ -63,6 +67,7 @@ import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.task.Cluster;
 import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
@@ -74,6 +79,7 @@ import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.util.AccountTask;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.EmailAccountName;
+import com.akto.util.IntercomEventsUtil;
 import com.akto.util.Constants;
 import com.akto.util.DbMode;
 import com.akto.util.JSONUtils;
@@ -89,6 +95,7 @@ import com.akto.utils.scripts.FixMultiSTIs;
 import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
+import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
@@ -107,6 +114,7 @@ import com.slack.api.Slack;
 import com.slack.api.util.http.SlackHttpClient;
 import com.slack.api.webhook.WebhookResponse;
 
+import io.intercom.api.Intercom;
 import okhttp3.OkHttpClient;
 
 import org.apache.commons.csv.CSVRecord;
@@ -1113,6 +1121,31 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public static void dropSpecialCharacterApiCollections(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDropSpecialCharacterApiCollections() == 0) {
+            ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+            List<ApiCollection> collections = new ArrayList<>();
+            try {
+                List<ApiCollection> apiCollections = ApiCollectionsDao.fetchAllHosts();
+                for (ApiCollection apiCollection: apiCollections) {
+                    if (RuntimeUtil.hasSpecialCharacters(apiCollection.getHostName())) {
+                        collections.add(new ApiCollection(apiCollection.getId(), null, 0, null, null, 0, false, true));
+                    }
+                }
+                apiCollectionsAction.setApiCollections(collections);
+                apiCollectionsAction.deleteMultipleCollections();
+                BackwardCompatibilityDao.instance.updateOne(
+                        Filters.eq("_id", backwardCompatibility.getId()),
+                        Updates.set(BackwardCompatibility.DROP_SPECIAL_CHARACTER_API_COLLECTIONS, Context.now())
+                );
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error dropping special character collections " + e.getStackTrace());
+            }
+
+        }
+
+    }
+
     public static void dropAuthMechanismData(BackwardCompatibility authMechanismData) {
         if (authMechanismData.getAuthMechanismData() == 0) {
             AuthMechanismsDao.instance.getMCollection().drop();
@@ -1184,7 +1217,7 @@ public class InitializerListener implements ServletContextListener {
                 Filters.eq("_id", UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID)) == null) {
             loggerMaker.infoAndAddToDb("AccountId: " + Context.accountId.get() + " Creating unauthenticated api group.", LogDb.DASHBOARD);
             ApiCollection unauthenticatedApisGroup = new ApiCollection(UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID,
-                    "Unauthenticated Apis", Context.now(), new HashSet<>(), null, 0, false, false);
+                    "Unauthenticated APIs", Context.now(), new HashSet<>(), null, 0, false, false);
 
             unauthenticatedApisGroup.setAutomated(true);
             unauthenticatedApisGroup.setType(ApiCollection.Type.API_GROUP);
@@ -1732,6 +1765,40 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void sendEventsToIntercom () throws Exception {
+        EventsMetrics lastEventsMetrics = EventsMetricsDao.instance.findLatestOne(Filters.empty());
+        EventsMetrics currentEventsMetrics = new EventsMetrics(
+            false, new EventsExample(0, new ArrayList<>()), new HashMap<>(), new HashMap<>(), new HashMap<>(), 0, Context.now());
+            
+        int lastSentEpoch = 0;
+        int lastApisCount = 0;
+        if(lastEventsMetrics != null){
+            lastSentEpoch = lastEventsMetrics.getCreatedAt();
+            if(lastEventsMetrics.getMilestones() != null){
+                lastApisCount = lastEventsMetrics.getMilestones().get(EventsMetrics.APIS_INFO_COUNT);
+            }
+        }
+        int timeNow = Context.now();
+        if(timeNow - lastSentEpoch >= (24 * 60 * 60)){
+            IntercomEventsUtil.fillMetaDataForIntercomEvent(lastApisCount, currentEventsMetrics);
+            IntercomEventsUtil.sendPostureMapToIntercom(lastSentEpoch, currentEventsMetrics);
+            int businessLogicTests = YamlTemplateDao.instance.getNewCustomTemplates(lastSentEpoch);
+            if(businessLogicTests > 0){
+                currentEventsMetrics.setCustomTemplatesCount(businessLogicTests);
+            }
+
+            Map<String, Integer> issuesMap = TestingRunIssuesDao.instance.countIssuesMapForPrivilegeEscalations(lastSentEpoch);
+            if(!issuesMap.isEmpty()){
+                currentEventsMetrics.setSecurityTestFindings(issuesMap);
+            }
+            currentEventsMetrics.setCreatedAt(timeNow);
+            EventsMetricsDao.instance.insertOne(currentEventsMetrics);
+        }
+
+        EventMetricsAction eventMetricsAction = new EventMetricsAction();
+        eventMetricsAction.sendEventsToAllUsersInAccount(currentEventsMetrics);
+    }
+
     public void setUpUpdateCustomCollections() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -1742,6 +1809,17 @@ public class InitializerListener implements ServletContextListener {
                             updateCustomCollections();
                         } catch (Exception e){
                             loggerMaker.errorAndAddToDb(e, "Error while updating custom collections: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+
+                        try {
+                            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                                AccountSettingsDao.generateFilter()
+                            );
+                            if(accountSettings != null && accountSettings.getAllowSendingEventsToIntercom()){
+                                sendEventsToIntercom() ;
+                            }
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, "Error while reporting event to Intercom: " + e.getMessage(), LogDb.DASHBOARD);
                         }
                     }
                 }, "update-custom-collections");
@@ -1809,7 +1887,7 @@ public class InitializerListener implements ServletContextListener {
 
     public static boolean isNotKubernetes() {
         return !DashboardMode.isKubernetes();
-    }
+    } 
 
 
     @Override
@@ -1854,6 +1932,7 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account account) {
                         AccountSettingsDao.instance.getStats();
+                        Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
                         runInitializerFunctions();
                     }
                 }, "context-initializer");
@@ -1890,6 +1969,11 @@ public class InitializerListener implements ServletContextListener {
                 setUpUpdateCustomCollections();
                 setUpFillCollectionIdArrayJob();
                 setupAutomatedApiGroupsScheduler();
+                /*
+                 * This is a temporary job. 
+                 * TODO: Remove this once traffic pipeline is cleaned.
+                 */
+                CleanInventory.cleanInventoryJobRunner();
             }
         }, 0, TimeUnit.SECONDS);
 
@@ -2223,6 +2307,7 @@ public class InitializerListener implements ServletContextListener {
         setDefaultTelemetrySettings(backwardCompatibility);
         disableAwsSecretPiiType(backwardCompatibility);
         makeFirstUserAdmin(backwardCompatibility);
+        dropSpecialCharacterApiCollections(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {
@@ -2243,7 +2328,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void runInitializerFunctions() {
-        // DaoInit.createIndices();
+         DaoInit.createIndices();
 
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());

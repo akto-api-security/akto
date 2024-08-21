@@ -2,13 +2,15 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { history } from "@/util/history";
 import Store from "../store";
 import homeFunctions from "./home/module";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Frame, Toast } from "@shopify/polaris";
 import "./dashboard.css"
 import func from "@/util/func"
 import transform from "./testing/transform";
 import PersistStore from "../../main/PersistStore";
+import LocalStore from "../../main/LocalStorageStore";
 import ConfirmationModal from "../components/shared/ConfirmationModal";
+import homeRequests from "./home/api";
 
 function Dashboard() {
 
@@ -22,8 +24,11 @@ function Dashboard() {
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
 
-    const subCategoryMap = PersistStore(state => state.subCategoryMap)
-
+    const subCategoryMap = LocalStore(state => state.subCategoryMap)
+    const [eventForUser, setEventForUser] = useState({})
+    
+    const sendEventOnLogin = LocalStore(state => state.sendEventOnLogin)
+    const setSendEventOnLogin = LocalStore(state => state.setSendEventOnLogin)
     const fetchAllCollections = async () => {
         let apiCollections = await homeFunctions.getAllCollections()
         const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
@@ -37,6 +42,13 @@ function Dashboard() {
         await transform.setTestMetadata();
     };
 
+    const getEventForIntercom = async() => {
+        let resp = await homeRequests.getEventForIntercom();
+        if(resp !== null){
+            setEventForUser(resp)
+        }
+    }
+
     useEffect(() => {
         if((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)){
             fetchAllCollections()
@@ -46,6 +58,15 @@ function Dashboard() {
         }
         if(window.Beamer){
             window.Beamer.init();
+        }
+        if(window?.Intercom){
+            if(!sendEventOnLogin){
+                setSendEventOnLogin(true)
+                getEventForIntercom()
+                if(Object.keys(eventForUser).length > 0){
+                    window?.Intercom("trackEvent","metrics", eventForUser)
+                }
+            }
         }
     }, [])
 

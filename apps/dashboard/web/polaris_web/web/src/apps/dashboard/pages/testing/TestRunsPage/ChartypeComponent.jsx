@@ -2,8 +2,9 @@ import {Box, DataTable,HorizontalStack, Scrollable, Text, VerticalStack } from '
 import React from 'react'
 import DonutChart from '../../../components/shared/DonutChart'
 import ConcentricCirclesChart from '../../../components/shared/ConcentricCirclesChart'
+import observeFunc from "../../observe/transform"
 
-function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navUrl}) {
+function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navUrl, isRequest}) {
     let tableRows = []
     if(data && Object.keys(data).length > 0)
     {
@@ -17,7 +18,7 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                         </div>
                     </Box>
                 ),
-                <Text>{data[key]?.text}</Text>
+                <Text>{observeFunc.formatNumberWithCommas(data[key]?.text)}</Text>
             ]
             tableRows.push(comp)
         })
@@ -30,7 +31,7 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
 
     const chartComponent = (
 
-        isNormal ? <DonutChart navUrl={navUrl} data={chartData}  title=""  type={title} size={210}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
+        isNormal ? <DonutChart navUrl={navUrl} data={chartData}  title=""  type={title} size={210} isRequest={isRequest}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
     )
 
     return (

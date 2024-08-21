@@ -213,6 +213,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     }
 
     public String registerViaAuth0() throws Exception {
+        loggerMaker.infoAndAddToDb("registerViaAuth0 called");
         String error = servletRequest.getParameter(ERROR_STR);
         String errorDescription = servletRequest.getParameter(ERROR_DESCRIPTION);
         BasicDBObject parsedState = getParsedState();
@@ -697,14 +698,17 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
                                        int invitationToAccount, String method, RBAC.Role invitedRole) throws IOException {
+        loggerMaker.infoAndAddToDb("createUserAndRedirect called");
         User user = UsersDao.instance.findOne(eq("login", userEmail));
         if (user == null && "false".equalsIgnoreCase(shouldLogin)) {
+            loggerMaker.infoAndAddToDb("user null in createUserAndRedirect");
             SignupUserInfo signupUserInfo = SignupDao.instance.insertSignUp(userEmail, username, signupInfo, invitationToAccount);
             LoginAction.loginUser(signupUserInfo.getUser(), servletResponse, false, servletRequest);
             servletRequest.setAttribute("username", userEmail);
             servletResponse.sendRedirect("/dashboard/onboarding");
         } else {
-
+            loggerMaker.infoAndAddToDb("user not null in createUserAndRedirect");
+            loggerMaker.infoAndAddToDb("invitationToAccount: " + invitationToAccount);
             int accountId = 0;
             if (invitationToAccount > 0) {
                 Account account = AccountsDao.instance.findOne("_id", invitationToAccount);
@@ -717,6 +721,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
                 if (accountId == 0) {
                     accountId = AccountAction.createAccountRecord("My account");
+                    loggerMaker.infoAndAddToDb("new accountId : " + accountId);
 
                     // Create organization for new user
                     if (DashboardMode.isSaasDeployment()) {
@@ -735,6 +740,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 }
 
                 user = UsersDao.instance.insertSignUp(userEmail, username, signupInfo, accountId);
+                loggerMaker.infoAndAddToDb("new user: " + user.getId());
 
             } else if (StringUtils.isEmpty(code)) {
                 if (accountId == 0) {
@@ -746,7 +752,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 return;
             }
 
-            user = AccountAction.initializeAccount(userEmail, accountId, "My account",invitationToAccount == 0, invitedRole == null ? RBAC.Role.MEMBER : invitedRole);
+
+            loggerMaker.infoAndAddToDb("Initialize Account");
+            user = AccountAction.initializeAccount(userEmail, accountId, "My account",invitationToAccount == 0, invitedRole == null ? RBAC.Role.ADMIN : invitedRole);
 
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);

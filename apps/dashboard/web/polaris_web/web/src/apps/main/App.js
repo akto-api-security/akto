@@ -68,6 +68,7 @@ import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
 import TokenValidator from "./TokenValidator"
 import { TableContextProvider } from "@/apps/dashboard/components/tables/TableContext";
 import VulnerabilityReport from "../dashboard/pages/testing/vulnerability_report/VulnerabilityReport";
+import { PollingProvider } from "./PollingProvider";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -97,10 +98,6 @@ const router = createBrowserRouter([
               {
                 path: ":hexId",
                 element: <SingleTestRunPage />
-              },
-              {
-                path: ":hexId/result/:hexId2",
-                element: <TestRunResultPage />
               },
               {
                 path:"roles",
@@ -360,9 +357,11 @@ function App() {
   }, [])
 
   return (
+    <PollingProvider>
     <TableContextProvider>
       <RouterProvider router={router} />
     </TableContextProvider>
+    </PollingProvider>
   );
 }
 

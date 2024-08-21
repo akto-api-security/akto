@@ -19,8 +19,10 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.URLAggregator;
 import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.DbMode;
 import com.akto.util.JSONUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.Constants;
@@ -32,6 +34,7 @@ import okhttp3.*;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
+import com.alibaba.fastjson2.*;
 
 import java.io.IOException;
 import java.util.*;
@@ -43,13 +46,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
+import static com.akto.util.HttpRequestResponseUtils.GRPC_CONTENT_TYPE;
 
 public class HttpCallParser {
     private final int sync_threshold_count;
     private final int sync_threshold_time;
     private int sync_count = 0;
     private int last_synced;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class, LogDb.RUNTIME);
     public APICatalogSync apiCatalogSync;
     public DependencyAnalyser dependencyAnalyser;
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
@@ -88,23 +92,33 @@ public class HttpCallParser {
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
         this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
     }
-    
+    private static int GRPC_DEBUG_COUNTER = 50;
+
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
 
         //convert java object to JSON format
-        Map<String, Object> json = gson.fromJson(message, Map.class);
+        JSONObject jsonObject = JSON.parseObject(message);
 
-        String method = (String) json.get("method");
-        String url = (String) json.get("path");
-        String type = (String) json.get("type");
-        Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(json, "requestHeaders");
+        String method = jsonObject.getString("method");
+        String url = jsonObject.getString("path");
+        String type = jsonObject.getString("type");
+        Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(jsonObject, "requestHeaders");
 
-        String rawRequestPayload = (String) json.get("requestPayload");
+        String rawRequestPayload = jsonObject.getString("requestPayload");
         String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
 
+        if (GRPC_DEBUG_COUNTER > 0) {
+            String acceptableContentType = HttpRequestResponseUtils.getAcceptableContentType(requestHeaders);
+            if (acceptableContentType != null && rawRequestPayload.length() > 0) {
+                // only if request payload is of FORM_URL_ENCODED_CONTENT_TYPE we convert it to json
+                if (acceptableContentType.equals(GRPC_CONTENT_TYPE)) {
+                    loggerMaker.infoAndAddToDb("grpc kafka payload:" + message,LogDb.RUNTIME);
+                    GRPC_DEBUG_COUNTER--;
+                }
+            }
+        }
 
-
-        String apiCollectionIdStr = json.getOrDefault("akto_vxlan_id", "0").toString();
+        String apiCollectionIdStr = jsonObject.getOrDefault("akto_vxlan_id", "0").toString();
         int apiCollectionId = 0;
         if (NumberUtils.isDigits(apiCollectionIdStr)) {
             apiCollectionId = NumberUtils.toInt(apiCollectionIdStr, 0);
@@ -114,19 +128,19 @@ public class HttpCallParser {
                 method,url,type, requestHeaders, requestPayload, apiCollectionId
         );
 
-        int statusCode = Integer.parseInt(json.get("statusCode").toString());
-        String status = (String) json.get("status");
-        Map<String,List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
-        String payload = (String) json.get("responsePayload");
+        int statusCode = jsonObject.getInteger("statusCode");
+        String status = jsonObject.getString("status");
+        Map<String,List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(jsonObject, "responseHeaders");
+        String payload = jsonObject.getString("responsePayload");
         payload = HttpRequestResponseUtils.rawToJsonString(payload, responseHeaders);
         payload = JSONUtils.parseIfJsonP(payload);
-        int time = Integer.parseInt(json.get("time").toString());
-        String accountId = (String) json.get("akto_account_id");
-        String sourceIP = (String) json.get("ip");
+        int time = jsonObject.getInteger("time");
+        String accountId = jsonObject.getString("akto_account_id");
+        String sourceIP = jsonObject.getString("ip");
 
-        String isPendingStr = (String) json.getOrDefault("is_pending", "false");
+        String isPendingStr = (String) jsonObject.getOrDefault("is_pending", "false");
         boolean isPending = !isPendingStr.toLowerCase().equals("false");
-        String sourceStr = (String) json.getOrDefault("source", HttpResponseParams.Source.OTHER.name());
+        String sourceStr = (String) jsonObject.getOrDefault("source", HttpResponseParams.Source.OTHER.name());
         HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
         
         return new HttpResponseParams(
@@ -215,9 +229,15 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-          for (HttpResponseParams responseParam: filteredResponseParams) {
-              dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
-          }
+        if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
+            for (HttpResponseParams responseParam: filteredResponseParams) {
+                try{
+                    dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+                } catch (Exception e){
+                    loggerMaker.errorAndAddToDb(e, "error in analyzing dependency: " + e);
+                }
+            }
+        }
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
@@ -228,8 +248,10 @@ public class HttpCallParser {
 
             numberOfSyncs++;
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
-            dependencyAnalyser.dbState = apiCatalogSync.dbState;
-            dependencyAnalyser.syncWithDb();
+            if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
+                dependencyAnalyser.dbState = apiCatalogSync.dbState;
+                dependencyAnalyser.syncWithDb();
+            }
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
@@ -427,6 +449,10 @@ public class HttpCallParser {
 
             Map<String, List<String>> reqHeaders = httpResponseParam.getRequestParams().getHeaders();
             String hostName = getHeaderValue(reqHeaders, "host");
+
+            if (hostName != null && !hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
+                hostName = "Special_Char_Host";
+            }
 
             if (StringUtils.isEmpty(hostName)) {
                 hostName = getHeaderValue(reqHeaders, "authority");

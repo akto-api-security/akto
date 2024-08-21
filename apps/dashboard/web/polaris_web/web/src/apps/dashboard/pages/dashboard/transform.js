@@ -1,9 +1,9 @@
-import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import observeFunc from "../observe/transform"
 import { Badge, Button, Text , HorizontalStack, Box} from "@shopify/polaris";
+import LocalStore from "../../../main/LocalStorageStore";
 
-const subCategoryMap = PersistStore.getState().subCategoryMap;
+const subCategoryMap = LocalStore.getState().subCategoryMap;
 
 const transform = {
 

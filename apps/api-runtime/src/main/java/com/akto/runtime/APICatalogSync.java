@@ -27,7 +27,10 @@ import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
+import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.google.api.client.util.Charsets;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
@@ -43,6 +46,7 @@ import org.bson.json.JsonParseException;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 import java.util.*;
 import java.util.Map.Entry;
@@ -81,6 +85,10 @@ public class APICatalogSync {
         this.aktoPolicyNew = new AktoPolicyNew();
         if (buildFromDb) {
             buildFromDB(false, fetchAllSTI);
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            if (accountSettings != null && accountSettings.getPartnerIpList() != null) {
+                partnerIpsList = accountSettings.getPartnerIpList();
+            }
         }
     }
 
@@ -120,10 +128,9 @@ public class APICatalogSync {
         }
 
         requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp);
-        BasicDBObject requestPayload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams);
-        if (requestPayload != null) {
-            deletedInfo.addAll(requestTemplate.process2(requestPayload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
-        }
+        JSONObject jsonObject = RequestTemplate.parseRequestPayloadToJsonObject(requestParams.getPayload(), urlWithParams);
+        Map<String, Set<Object>> flattened = JSONUtils.flattenJSONObject(jsonObject);
+        deletedInfo.addAll(requestTemplate.process2(flattened, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
         requestTemplate.recordMessage(responseParams.getOrig());
 
         Map<Integer, RequestTemplate> responseTemplates = requestTemplate.getResponseTemplates();
@@ -145,15 +152,15 @@ public class APICatalogSync {
                 respPayload = "{\"json\": "+respPayload+"}";
             }
 
-
-            BasicDBObject payload;
+            JSONObject payload;
             try {
-                payload = BasicDBObject.parse(respPayload);
+                payload = JSON.parseObject(respPayload);
             } catch (Exception e) {
-                payload = BasicDBObject.parse("{}");
+                payload = JSON.parseObject("{}");
             }
 
-            deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
+            flattened = JSONUtils.flattenJSONObject(payload);
+            deletedInfo.addAll(responseTemplate.process2(flattened, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
             responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp);
             if (!responseParams.getIsPending()) {
                 responseTemplate.processTraffic(responseParams.getTime());
@@ -206,7 +213,7 @@ public class APICatalogSync {
             Set<HttpResponseParams> value = entry.getValue();
             for (HttpResponseParams responseParams: value) {
                 try {
-                    aktoPolicyNew.process(responseParams);
+                    aktoPolicyNew.process(responseParams, partnerIpsList);
                 } catch (Exception e) {
                     e.printStackTrace();
                     throw new RuntimeException(e);
@@ -702,9 +709,7 @@ public class APICatalogSync {
 
     public static URLTemplate tryParamteresingUrl(URLStatic newUrl){
         String[] tokens = tokenize(newUrl.getUrl());
-        if(tokens.length < 2){
-            return null;
-        }
+        boolean tokensBelowThreshold = tokens.length < 2;
         Pattern pattern = patternToSubType.get(SingleTypeInfo.UUID);
         boolean allNull = true;
         SuperType[] newTypes = new SuperType[tokens.length];
@@ -726,7 +731,7 @@ public class APICatalogSync {
 
             if(tokens[i] != null){
                 SubType tempSubType = KeyTypes.findSubType(tokens[i], ""+i, null,true);
-                if(isValidSubtype(tempSubType)){
+                if(!tokensBelowThreshold && isValidSubtype(tempSubType)){
                     newTypes[i] = SuperType.STRING;
                     tokens[i] = null;
                 }else if(isAlphanumericString(tempToken)){
@@ -1706,6 +1711,7 @@ public class APICatalogSync {
     }
 
     int counter = 0;
+    List<String> partnerIpsList = new ArrayList<>();
     
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit syncLimit) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
@@ -1725,6 +1731,9 @@ public class APICatalogSync {
         boolean redact = false;
         if (accountSettings != null) {
             redact =  accountSettings.isRedactPayload();
+            if (accountSettings.getPartnerIpList() != null) {
+                partnerIpsList = accountSettings.getPartnerIpList();
+            }
         }
 
         counter++;

@@ -5,11 +5,10 @@ import com.google.protobuf.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InvalidObjectException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class ProtoBufUtils {
 
@@ -28,17 +27,16 @@ public class ProtoBufUtils {
     }
 
     public Map<Object, Object> decodeProto(String encodedString) {
-        byte[] originalByteArray = Base64.getDecoder().decode(encodedString);
-        //Remove initial 5 bytes for unnecessary proto headers
-        byte[] truncatedByteArray = new byte[originalByteArray.length - 5];
-        for (int index = 5; index < originalByteArray.length; index++) {
-            truncatedByteArray[index - 5] = originalByteArray[index];
-        }
-        return decodeProto(truncatedByteArray);
+        return decodeProto(Base64.getDecoder().decode(encodedString));
     }
 
     public Map<Object, Object> decodeProto(byte[] data) {
-        return decodeProto(ByteString.copyFrom(data), 0);
+        //Remove initial 5 bytes for unnecessary proto headers
+        byte[] truncatedByteArray = new byte[data.length - 5];
+        for (int index = 5; index < data.length; index++) {
+            truncatedByteArray[index - 5] = data[index];
+        }
+        return decodeProto(ByteString.copyFrom(truncatedByteArray), 0);
     }
 
     public static Map<Object, Object> decodeProto(ByteString data, int depth) {
@@ -72,21 +70,37 @@ public class ProtoBufUtils {
                 case WireFormat.WIRETYPE_LENGTH_DELIMITED:
                     ByteString data = input.readBytes();
                     Map<Object, Object> subMessage = decodeProto(data, depth + 1);
-                    if (data.size() < 30) {
-                        boolean probablyString = true;
-                        String str = new String(data.toByteArray(), StandardCharsets.UTF_8);
-                        for (char c : str.toCharArray()) {
-                            if (c < '\n') {
-                                probablyString = false;
-                                break;
-                            }
+                    boolean probablyString = true;
+                    String str = new String(data.toByteArray(), StandardCharsets.UTF_8);
+                    for (char c : str.toCharArray()) {
+                        if (c <= '\u001B') {
+                            probablyString = false;
+                            break;
                         }
-                        if (probablyString) {
-                            map.put(keyPrefix, str);
-                        } else if (!subMessage.isEmpty()) {
-                            map.put(keyPrefix, subMessage);
+                    }
+                    Object value = null;
+                    if (probablyString) {
+                        value = str;
+                    } else {
+                        if (!subMessage.isEmpty()) {
+                            value = subMessage;
+                        }
+                    }
+                    if (value != null) {
+                        Object arrayValue = map.get(keyPrefix);
+                        if (arrayValue == null) {
+                            map.put(keyPrefix, value);
                         } else {
-                            new String(data.toByteArray());
+                            if (arrayValue instanceof List) {
+                                List list = (List) arrayValue;
+                                list.add(value);
+                                map.put(keyPrefix, list);
+                            } else {
+                                List<Object> list = new ArrayList<>();
+                                list.add(value);
+                                list.add(arrayValue);
+                                map.put(keyPrefix, list);
+                            }
                         }
                     }
                     break;
@@ -103,12 +117,12 @@ public class ProtoBufUtils {
         return map;
     }
 
-    public static String base64EncodedJsonToProtobuf(String payload) throws IOException{
+    public static String base64EncodedJsonToProtobuf(String payload) throws Exception{
         Map<Object, Object> map = null;
         try {
             map = ProtoBufUtils.getInstance().mapper.readValue(payload, Map.class);
         } catch (Exception e) {
-            map = new HashMap<>();
+            throw new InvalidObjectException("Unable to parse payload");
         }
         return base64EncodedJsonToProtobuf(map);
     }
@@ -152,7 +166,9 @@ public class ProtoBufUtils {
 
             codedOutputStream.writeTag(number, getWireType(value));
 
-            if (value instanceof Long) {
+            if (value instanceof Integer) {
+                codedOutputStream.writeInt64NoTag((int) value);
+            } else if (value instanceof Long) {
                 codedOutputStream.writeInt64NoTag((Long) value);
             } else if (value instanceof Double) {
                 codedOutputStream.writeFixed64NoTag(Double.doubleToRawLongBits((Double) value));
@@ -171,7 +187,7 @@ public class ProtoBufUtils {
     }
 
     private static int getWireType(Object value) {
-        if (value instanceof Long) {
+        if (value instanceof Long || value instanceof Integer) {
             return WireFormat.WIRETYPE_VARINT;
         } else if (value instanceof Double) {
             return WireFormat.WIRETYPE_FIXED64;

@@ -96,8 +96,12 @@ public class AuthPolicy {
         // find bearer or basic tokens in any header
         for (String header : headers.keySet()) {
             List<String> headerValues = headers.getOrDefault(header, new ArrayList<>());
-            for (String value : headerValues) {
-                authTypes.addAll(findBearerBasicAuth(header, value));
+            if (!headerValues.isEmpty()) {
+                for (String value : headerValues) {
+                    authTypes.addAll(findBearerBasicAuth(header, value));
+                }
+            } else {
+                authTypes.addAll(findBearerBasicAuth(header, ""));
             }
         }
 

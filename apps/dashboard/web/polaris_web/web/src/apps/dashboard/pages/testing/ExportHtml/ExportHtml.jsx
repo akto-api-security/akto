@@ -4,9 +4,9 @@ import issuesApi from '../../issues/api';
 import api from '../api';
 import PersistStore from '../../../../main/PersistStore';
 import { Avatar, Box, Frame, HorizontalGrid, HorizontalStack, LegacyCard, Text, TopBar, VerticalStack, Icon } from '@shopify/polaris'
-import { FlagMajor, CollectionsMajor, ResourcesMajor, InfoMinor, CreditCardSecureMajor, FraudProtectMajor } from "@shopify/polaris-icons"
 import './styles.css'
 import transform from '../transform';
+import LocalStore from '../../../../main/LocalStorageStore';
 
 function ExportHtml() {
     const params = useParams();
@@ -19,7 +19,7 @@ function ExportHtml() {
     const [severitiesCount, setSeveritiesCount] = useState({ HIGH: 0, MEDIUM: 0, LOW: 0 });
     const collectionsMap = PersistStore(state => state.collectionsMap)
 
-    const subCategoryMap = PersistStore(state => state.subCategoryMap)
+    const subCategoryMap = LocalStore(state => state.subCategoryMap)
 
     const createVulnerabilityMap = (testingRunResults) => {
         let categoryVsVulMap = {}

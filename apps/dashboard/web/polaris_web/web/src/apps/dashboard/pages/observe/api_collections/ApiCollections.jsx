@@ -32,7 +32,7 @@ const headers = [
     {
         title: "Total endpoints",
         text: "Total endpoints",
-        value: "endpoints",
+        value: "urlsCount",
         isText: CellType.TEXT,
         sortActive: true
     },
@@ -90,6 +90,8 @@ const headers = [
 ]
 
 const sortOptions = [
+    { label: 'Endpoints', value: 'urlsCount asc', directionLabel: 'More', sortKey: 'urlsCount', columnIndex: 2 },
+    { label: 'Endpoints', value: 'urlsCount desc', directionLabel: 'Less', sortKey: 'urlsCount' , columnIndex: 2},
     { label: 'Name', value: 'displayName asc', directionLabel: 'A-Z', sortKey: 'displayName' },
     { label: 'Name', value: 'displayName desc', directionLabel: 'Z-A', sortKey: 'displayName' },
     { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'deactivatedRiskScore' },
@@ -98,8 +100,6 @@ const sortOptions = [
     { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' , columnIndex: 3},
     { label: 'Discovered', value: 'discovered asc', directionLabel: 'Recent first', sortKey: 'startTs', columnIndex: 9 },
     { label: 'Discovered', value: 'discovered desc', directionLabel: 'Oldest first', sortKey: 'startTs' , columnIndex: 9},
-    { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints', columnIndex: 2 },
-    { label: 'Endpoints', value: 'endpoints desc', directionLabel: 'Less', sortKey: 'endpoints' , columnIndex: 2},
     { label: 'Last traffic seen', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'detectedTimestamp', columnIndex: 8 },
     { label: 'Last traffic seen', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'detectedTimestamp' , columnIndex: 8},
   ];        
@@ -113,7 +113,6 @@ const resourceName = {
 function convertToCollectionData(c) {
     return {
         ...c,
-        endpoints: c["urlsCount"] || 0,
         detected: func.prettifyEpoch(c.startTs),
         icon: CircleTickMajor,
         nextUrl: "/dashboard/observe/inventory/"+ c.id
@@ -146,13 +145,13 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 
 function ApiCollections() {
 
-    const [data, setData] = useState({'all':[]})
+    const [data, setData] = useState({'groups':[]})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
-    const [selectedTab, setSelectedTab] = useState("all")
-    const [selected, setSelected] = useState(0)
+    const [selectedTab, setSelectedTab] = useState("groups")
+    const [selected, setSelected] = useState(2)
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
-    const [hasUsageEndpoints, setHasUsageEndpoints] = useState(false)
+    const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
     const [refreshData, setRefreshData] = useState(false)
     const [popover,setPopover] = useState(false)
@@ -202,8 +201,10 @@ function ApiCollections() {
 
         // first api call to get only collections name and collection id
         setLoading(true)
-        let apiCollectionsResp = await api.getAllCollectionsBasic();
+        const apiCollectionsResp = await api.getAllCollectionsBasic();
         setLoading(false)
+        let hasUserEndpoints = await api.getUserEndpoints()
+        setHasUsageEndpoints(hasUserEndpoints)
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
         let dataObj = {}
         dataObj = convertToNewData(tmp, {}, {}, {}, {}, {}, true);
@@ -214,15 +215,20 @@ function ApiCollections() {
         res.custom = res.all.filter(x => !res.hostname.includes(x) && !res.groups.includes(x));
         setData(res);
 
+        let envTypeObj = {}
+        tmp.forEach((c) => {
+            envTypeObj[c.id] = c.envType
+        })
+        setEnvTypeMap(envTypeObj)
+        setAllCollections(apiCollectionsResp.apiCollections || [])
+
         const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
 
         // fire all the other apis in parallel
 
         let apiPromises = [
-            api.getAllCollections(),
             api.getCoverageInfoForCollections(),
             api.getLastTrafficSeen(),
-            api.getUserEndpoints(),
         ];
         if(shouldCallHeavyApis){
             apiPromises = [
@@ -232,35 +238,32 @@ function ApiCollections() {
         }
         
         let results = await Promise.allSettled(apiPromises);
-
-        apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : {};
-        let coverageInfo = results[1].status === 'fulfilled' ? results[1].value : {};
-        let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
-        let hasUserEndpoints = results[3].status === 'fulfilled' ? results[3].value : true;
+        let coverageInfo = results[0].status === 'fulfilled' ? results[0].value : {};
+        let trafficInfo = results[1].status === 'fulfilled' ? results[1].value : {};
 
         let riskScoreObj = lastFetchedResp
         let sensitiveInfo = lastFetchedSensitiveResp
         let severityObj = lastFetchedSeverityResp
 
         if(shouldCallHeavyApis){
-            if(results[4]?.status === "fulfilled"){
-                const res = results[4].value
+            if(results[2]?.status === "fulfilled"){
+                const res = results[2].value
                 riskScoreObj = {
                     criticalUrls: res.criticalEndpointsCount,
                     riskScoreMap: res.riskScoreOfCollectionsMap
                 } 
             }
 
-            if(results[5]?.status === "fulfilled"){
-                const res = results[5].value
+            if(results[3]?.status === "fulfilled"){
+                const res = results[3].value
                 sensitiveInfo ={ 
                     sensitiveUrls: res.sensitiveUrlsInResponse,
                     sensitiveInfoMap: res.sensitiveSubtypesInCollection
                 }
             }
 
-            if(results[6]?.status === "fulfilled"){
-                const res = results[6].value
+            if(results[4]?.status === "fulfilled"){
+                const res = results[4].value
                 severityObj = res
             }
 
@@ -275,13 +278,6 @@ function ApiCollections() {
         setHasUsageEndpoints(hasUserEndpoints)
         setCoverageMap(coverageInfo)
 
-        tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
-        let envTypeObj = {}
-        tmp.forEach((c) => {
-            envTypeObj[c.id] = c.envType
-        })
-        setEnvTypeMap(envTypeObj)
-
         dataObj = convertToNewData(tmp, sensitiveInfo.sensitiveInfoMap, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap, false);
 
         const summary = transform.getSummaryData(dataObj.normal)
@@ -289,7 +285,7 @@ function ApiCollections() {
         summary.totalSensitiveEndpoints = sensitiveInfo.sensitiveUrls
         setSummaryData(summary)
 
-        setAllCollections(apiCollectionsResp.apiCollections || [])
+        
         setCollectionsMap(func.mapCollectionIdToName(tmp))
         const allHostNameMap = func.mapCollectionIdToHostName(tmp)
         setHostNameMap(allHostNameMap)
