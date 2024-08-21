@@ -147,18 +147,20 @@ public class DependencyAnalyser {
         if (APICatalog.isTemplateUrl(url)) {
             String ogUrl = urlStatic.getUrl();
             String[] ogUrlSplit = ogUrl.split("/");
-            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.fromString(method));
-            for (int i = 0; i < urlTemplate.getTypes().length; i++) {
-                SingleTypeInfo.SuperType superType = urlTemplate.getTypes()[i];
-                if (superType == null) continue;
-                int idx = ogUrl.startsWith("http") ? i:i+1;
-                Object s = ogUrlSplit[idx]; // because ogUrl=/api/books/123 while template url=api/books/INTEGER
-                if (superType.equals(SingleTypeInfo.SuperType.INTEGER)) {
-                    s = Integer.parseInt(ogUrlSplit[idx]);
+            if (ogUrlSplit.length > 0) {
+                URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.fromString(method));
+                for (int i = 0; i < urlTemplate.getTypes().length; i++) {
+                    SingleTypeInfo.SuperType superType = urlTemplate.getTypes()[i];
+                    if (superType == null) continue;
+                    int idx = ogUrl.startsWith("http") ? i:i+1;
+                    Object s = ogUrlSplit[idx]; // because ogUrl=/api/books/123 while template url=api/books/INTEGER
+                    if (superType.equals(SingleTypeInfo.SuperType.INTEGER)) {
+                        s = Integer.parseInt(ogUrlSplit[idx]);
+                    }
+                    Set<Object> val = new HashSet<>();
+                    val.add(s);
+                    processRequestParam(i+"", val, combinedUrl, true, false);
                 }
-                Set<Object> val = new HashSet<>();
-                val.add(s);
-                processRequestParam(i+"", val, combinedUrl, true, false);
             }
         }
 
