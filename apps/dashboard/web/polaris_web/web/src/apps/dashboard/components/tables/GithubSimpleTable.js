@@ -39,6 +39,7 @@ function GithubSimpleTable(props) {
         bannerComp={props?.bannerComp}
         csvFileName={props?.csvFileName}
         treeView={props?.treeView}
+        customFilters={props?.customFilters}
     />
 
 }

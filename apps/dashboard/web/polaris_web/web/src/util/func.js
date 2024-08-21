@@ -360,6 +360,18 @@ prettifyEpoch(epoch) {
       return []
     }
     let localFilters = filters;
+    let filtersHaveChoices = true;
+    for(var x in filtersHaveChoices){
+      if(x.choices !== undefined || x.choices.length === 0){
+        filtersHaveChoices = false;
+        break;
+      }
+    }
+
+    if(filtersHaveChoices){
+      return filters;
+    }
+
     localFilters.forEach((filter, index) => {
       localFilters[index].availableChoices = new Set()
       localFilters[index].choices = []

@@ -23,11 +23,22 @@ export const TableContextProvider = ({ children }) => {
     })
   }
 
+  const modifyOpenedLevels = (items) => {
+    dispatch({
+      type: "OPEN_LEVELS",
+      payload: {
+        openedRows: items
+      }
+    })
+  }
+
   const value = {
     tabsInfo: state.tabsInfo,
     applyFilter,
     selectItems,
-    selectedItems: state.selectedItems
+    selectedItems: state.selectedItems,
+    openedRows: state.openedRows,
+    modifyOpenedLevels
   };
   return <TableContext.Provider value={value}>{children}</TableContext.Provider>;
 };

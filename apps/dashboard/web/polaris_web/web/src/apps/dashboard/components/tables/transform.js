@@ -36,6 +36,11 @@ const tableFunc = {
         localFilters = localFilters.filter((filter) => {return filter.choices.length>0})
         setFilters(localFilters);
           let tempData = props.data;
+
+        if(props?.customFilters){
+          tempData = props?.modifyData(filters)
+          return {value: tempData, total: tempData.length}
+        }
           let singleFilterData = tempData
           Object.keys(filters).forEach((filterKey)=>{
             singleFilterData = props.data;

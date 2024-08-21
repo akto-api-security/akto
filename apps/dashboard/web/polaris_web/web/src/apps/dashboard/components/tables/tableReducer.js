@@ -2,9 +2,11 @@ import PersistStore from "../../../main/PersistStore";
 import TableStore from "./TableStore";
 const tableInitialState = PersistStore.getState().tableInitialState[window.location.pathname + "/" + window.location.hash] || 0
 const selectedItems = TableStore.getState().selectedItems
+const openedRows = TableStore.getState().openedLevels
 export const initialState = {
     tabsInfo : tableInitialState,
     selectedItems: selectedItems,
+    openedRows: openedRows
 }
 
 const tableReducer = (state, action) =>{
@@ -19,6 +21,12 @@ const tableReducer = (state, action) =>{
             return {
                 ...state,
                 selectedItems: payload.selectedItems
+            }
+        }
+        case "OPEN_LEVELS": {
+            return {
+                ...state,
+                openedRows: payload.openedRows
             }
         }
         default:

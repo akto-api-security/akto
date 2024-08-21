@@ -1,8 +1,8 @@
-import { Badge, DataTable } from "@shopify/polaris";
+import { Badge } from "@shopify/polaris";
 
 import func from "@/util/func";
 import transform from "../../../pages/observe/transform";
-import PrettifyDisplayName from "./PrettifyDisplayName";
+import PrettifyChildren from "./PrettifyChildren";
 
 const treeViewFunc = {
     pruneTree(tree, branchFieldSplitter, reverse) {
@@ -47,7 +47,7 @@ const treeViewFunc = {
             this.pruneTree(tree[key].children, branchFieldSplitter, reverse)
         })
     },
-    buildTree(items, branchField, branchFieldSplitter, reverse=false, secondaryBranch=false, secondaryBranchFieldSplitter, headers) {
+    buildTree(items, branchField, branchFieldSplitter, reverse=false, secondaryBranch=false, secondaryBranchFieldSplitter, headers, shouldPrune) {
         const itemsTree = {}
 
         items.forEach(item => {
@@ -93,8 +93,6 @@ const treeViewFunc = {
                 currentNode = currentNode[part].children;
             })
         })
-
-        this.pruneTree(itemsTree, branchFieldSplitter, reverse)
         let finalResult = []
         Object.keys(itemsTree).forEach((x) => {
             const result = this.dfs(itemsTree[x], x, headers)
@@ -192,51 +190,7 @@ const treeViewFunc = {
     
         return result;
     },
-    traverseAndMakeChildrenData(dataRows, childrenNodes, headers, selectItems){
-        childrenNodes.forEach((c) => {
-            let ids = []
-            if(c.hasOwnProperty('apiCollectionIds')){
-                ids = c['apiCollectionIds']
-            }else{
-                ids = [c.id]
-            }
-            let collectionObj = transform.convertToPrettifyData(c)
-            collectionObj.endpoints = c.endpoints
-            collectionObj.envTypeComp = c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null
-            collectionObj.displayNameComp = 
-                <PrettifyDisplayName name={c.displayName} 
-                    level={c.level} 
-                    isTerminal={c.isTerminal} 
-                    isOpen={false} 
-                    selectItems={selectItems} 
-                    collectionIds={ids} 
-                />
-            let tempRow = [<div/>]
-            headers.forEach((x) => {
-                tempRow.push(collectionObj[x.value])
-            })
-            dataRows.push(tempRow)
-            if(c?.isTerminal === false){
-                this.traverseAndMakeChildrenData(dataRows, c?.children, headers, selectItems)
-            }
-        })
-    },
-    prettifyChildrenData(childrenNodes, headers, selectItems){
-        let dataRows = []
-        this.traverseAndMakeChildrenData(dataRows, childrenNodes, headers, selectItems)
-        return(
-            <td colSpan={10} style={{padding: '0px !important'}} className="control-row">
-                <DataTable
-                    rows={dataRows}
-                    hasZebraStripingOnData
-                    headings={[]}
-                    columnContentTypes={['text', 'numeric', 'text', 'text', 'text', 'text', 'text', 'text', 'text']}
-                    truncate
-                />
-            </td>
-        )
-    },
-    prettifyTreeViewData(normalData, headers, selectItems){
+    prettifyTreeViewData(normalData, headers){
         return normalData.map((c) => {
             return{
                 ...c,
@@ -247,7 +201,7 @@ const treeViewFunc = {
                     )
                 }),
                 ...transform.convertToPrettifyData(c),
-                makeTree: (data) => this.prettifyChildrenData(data.children, headers, selectItems)
+                makeTree: (data) => <PrettifyChildren data={data.children} headers={headers} />
             }
         })
     }
