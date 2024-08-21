@@ -8,18 +8,15 @@ import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 
 import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
-import com.akto.dto.ApiCollection;
 import com.akto.dto.Config;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.mongodb.BasicDBObject;
 
 public class RedactAlert {
     private static final ExecutorService executorService = Executors.newFixedThreadPool(20);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(RedactAlert.class, LogDb.RUNTIME);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(RedactAlert.class, LogDb.DB_ABS);
 
     static final String regex = ".*\\*\\*\\*\\*.*";
     static final Pattern pattern = Pattern.compile(regex);
@@ -38,17 +35,15 @@ public class RedactAlert {
         }
 
         redactMap.put(accountId, false);
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-        List<ApiCollection> all = ApiCollectionsDao.instance.findAll(new BasicDBObject());
-        for (ApiCollection apiCollection : all) {
-            if (apiCollection.getRedact()) {
+        try{
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            if (accountSettings.isRedactPayload()) {
                 redactMap.put(accountId, true);
             }
+            lastFetchedMap.put(accountId, now);
+        } catch (Exception e){
+            loggerMaker.errorAndAddToDb(e, "Error in checkRedact");
         }
-        if (accountSettings.isRedactPayload()) {
-            redactMap.put(accountId, true);
-        }
-        lastFetchedMap.put(accountId, now);
         return redactMap.get(accountId);
     }
 
