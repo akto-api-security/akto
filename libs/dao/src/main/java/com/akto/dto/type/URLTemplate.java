@@ -6,6 +6,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 
+import com.akto.util.filter.DictionaryFilter;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 import org.bson.codecs.pojo.annotations.BsonId;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -70,7 +71,7 @@ public class URLTemplate {
 
             if (thisToken == null) {
                 SuperType type = types[i];
-
+                if (DictionaryFilter.isEnglishWord(thatToken)) return false;
                 switch(type) {
                     case BOOLEAN:
                         if (!"true".equals(thatToken.toLowerCase()) && !"false".equals(thatToken.toLowerCase())) return false;
