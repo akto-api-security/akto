@@ -837,6 +837,10 @@ export default {
         } else {
             let a = testSubType.superCategory["severity"]["_name"]
             switch(a){
+
+                case "CRITICAL":
+                    return {title: a, value: 4}
+                    
                 case "HIGH": 
                     return {title: a, value: 3}
 

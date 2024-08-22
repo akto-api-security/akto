@@ -92,7 +92,7 @@ function getTotalSeverity(countIssues) {
   if (countIssues == null) {
     return 0;
   }
-  ts = MAX_SEVERITY_THRESHOLD * (countIssues['High'] * MAX_SEVERITY_THRESHOLD + countIssues['Medium']) + countIssues['Low']
+  ts = MAX_SEVERITY_THRESHOLD * (countIssues['Critical'] * MAX_SEVERITY_THRESHOLD + countIssues['High'] * MAX_SEVERITY_THRESHOLD + countIssues['Medium']) + countIssues['Low']
   return ts;
 }
 
@@ -100,7 +100,7 @@ function getTotalSeverityTestRunResult(severity) {
   if (severity == null || severity.length == 0) {
     return 0;
   }
-  let ts = MAX_SEVERITY_THRESHOLD * ((severity[0].includes("High")) * MAX_SEVERITY_THRESHOLD + (severity[0].includes('Medium'))) + (severity[0].includes('Low'))
+  let ts = MAX_SEVERITY_THRESHOLD * ((severity[0].includes("Critical")) * MAX_SEVERITY_THRESHOLD + (severity[0].includes("High")) * MAX_SEVERITY_THRESHOLD + (severity[0].includes('Medium'))) + (severity[0].includes('Low'))
   return ts;
 }
 
@@ -214,6 +214,7 @@ const transform = {
     },
     prepareCountIssues : (data) => {
       let obj={
+        'Critical': data['CRITICAL'] || 0,
         'High': data['HIGH'] || 0,
         'Medium': data['MEDIUM'] || 0,
         'Low': data['LOW'] || 0
@@ -299,7 +300,7 @@ const transform = {
         const prettifiedTest={
           ...obj,
           testName: transform.prettifyTestName(data.name || "Test", iconObj.icon,iconObj.color, iconObj.tooltipContent),
-          severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues || {"HIGH" : 0, "MEDIUM": 0, "LOW": 0}))
+          severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues || { "CRITICAL": 0, "HIGH" : 0, "MEDIUM": 0, "LOW": 0}))
         }
         return prettifiedTest
       }else{
@@ -615,7 +616,7 @@ const transform = {
       const date = new Date(obj.startTimestamp * 1000)
       return{
         ...obj,
-        prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues || {"HIGH" : 0, "MEDIUM": 0, "LOW": 0}),
+        prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues || {"CRITICAL": 0, "HIGH" : 0, "MEDIUM": 0, "LOW": 0}),
         startTime: date.toLocaleTimeString() + " on " +  date.toLocaleDateString(),
         id: obj.hexId
       }
@@ -673,6 +674,7 @@ getInfoSectionsHeaders(){
 convertSubIntoSubcategory(resp){
   let obj = {}
   let countObj = {
+    CRITICAL: 0,
     HIGH: 0,
     MEDIUM: 0,
     LOW: 0,

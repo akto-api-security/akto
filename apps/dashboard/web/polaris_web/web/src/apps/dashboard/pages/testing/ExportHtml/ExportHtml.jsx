@@ -16,13 +16,14 @@ function ExportHtml() {
     
     const [vulnerableResultsMap, setVulnerableResultsMap] = useState([]);
     const [dataToCurlObj, setDataToCurlObj] = useState({});
-    const [severitiesCount, setSeveritiesCount] = useState({ HIGH: 0, MEDIUM: 0, LOW: 0 });
+    const [severitiesCount, setSeveritiesCount] = useState({ CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 });
     const collectionsMap = PersistStore(state => state.collectionsMap)
 
     const subCategoryMap = LocalStore(state => state.subCategoryMap)
 
     const createVulnerabilityMap = (testingRunResults) => {
         let categoryVsVulMap = {}
+        let critical = 0
         let high = 0
         let medium = 0
         let low = 0
@@ -35,6 +36,10 @@ function ExportHtml() {
             let severity = subCategory?.superCategory?.severity?._name
             let severityIndex = 0;
             switch (severity) {
+                case 'CRITICAL':
+                    ++critical
+                    severityIndex = 3
+                    break;                
                 case 'HIGH':
                     ++high
                     severityIndex = 2
@@ -64,7 +69,7 @@ function ExportHtml() {
             vulnerabilities['severityIndex'] = severityIndex
             categoryVsVulMap[subtype] = vulnerabilities
         })
-        setSeveritiesCount({ HIGH: high, MEDIUM: medium, LOW: low });
+        setSeveritiesCount({ CRITICAL: critical, HIGH: high, MEDIUM: medium, LOW: low });
         let localCopy = vulnerableResultsMap
         Object.keys(categoryVsVulMap).forEach((category) => {
             let obj = categoryVsVulMap[category]

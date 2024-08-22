@@ -1275,6 +1275,7 @@ public class InitializerListener implements ServletContextListener {
             createRiskScoreApiGroup(111_111_148, "Low Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.LOW);
             createRiskScoreApiGroup(111_111_149, "Medium Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.MEDIUM);
             createRiskScoreApiGroup(111_111_150, "High Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.HIGH);
+            createRiskScoreApiGroup(111_111_151, "Critical Risk APIs", RiskScoreTestingEndpoints.RiskScoreGroupType.CRITICAL);
 
             BackwardCompatibilityDao.instance.updateOne(
                     Filters.eq("_id", backwardCompatibility.getId()),

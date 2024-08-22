@@ -23,7 +23,7 @@ public class TestResult extends GenericTestResult {
     private boolean requiresConfig;
 
     public enum Confidence {
-        HIGH, MEDIUM, LOW
+        CRITICAL, HIGH, MEDIUM, LOW
     }
 
     public enum TestError {

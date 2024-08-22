@@ -58,16 +58,18 @@ while true; do
 
   if [[ "$state" == "COMPLETED" ]]; then
     count=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues // empty')
+    critical=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues.CRITICAL // empty')
     high=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues.HIGH // empty')
     medium=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues.MEDIUM // empty')
     low=$(echo "$response" | jq -r '.testingRunResultSummaries[0].countIssues.LOW // empty')
 
     echo "[Results]($AKTO_DASHBOARD_URL/dashboard/testing/$AKTO_TEST_ID)" >> $GITHUB_STEP_SUMMARY
+    echo "CRITICAL: $critical" >> $GITHUB_STEP_SUMMARY
     echo "HIGH: $high" >> $GITHUB_STEP_SUMMARY
     echo "MEDIUM: $medium" >> $GITHUB_STEP_SUMMARY
     echo "LOW: $low"  >> $GITHUB_STEP_SUMMARY
 
-    if [ "$high" -gt 0 ] || [ "$medium" -gt 0 ] || [ "$low" -gt 0 ] ; then
+    if [ "$critical" -gt 0 ] || [ "$high" -gt 0 ] || [ "$medium" -gt 0 ] || [ "$low" -gt 0 ] ; then
         echo "Vulnerabilities found!!" >> $GITHUB_STEP_SUMMARY
         #exit 1
         exit 0

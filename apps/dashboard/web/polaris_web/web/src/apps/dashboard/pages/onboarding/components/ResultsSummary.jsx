@@ -12,7 +12,7 @@ import LocalStore from '../../../../main/LocalStorageStore'
 
 function ResultsSummary() {
 
-    const severities = ['High' , 'Medium', 'Low']
+    const severities = ['Critical' ,'High' , 'Medium', 'Low']
 
     const selectedTestSuite = OnboardingStore(state => state.selectedTestSuite)
     const authObj = OnboardingStore(state => state.authObject)
@@ -27,6 +27,7 @@ function ResultsSummary() {
     const [fetchTests, setFetchTests] = useState(false)
     const [activeTab, setActiveTab] = useState("High")
     const [countIssues, setCountIssues] = useState({
+        "CRITICAL": 0,
         "HIGH": 0,
         "MEDIUM": 0,
         "LOW": 0,

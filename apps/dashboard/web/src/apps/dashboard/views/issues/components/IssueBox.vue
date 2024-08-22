@@ -143,6 +143,8 @@ export default {
         },
         getSeverityColor(severity) {
             switch (severity) {
+                case "CRITICAL":
+                    return "var(--hexColor4)";
                 case "HIGH":
                     return "var(--hexColor3)";
                 case "MEDIUM":
@@ -263,6 +265,9 @@ export default {
     background: var(--white2);
     border: 1px solid var(--hexColor21);
     border-radius: 6px;
+}
+.severity-critical {
+    border-left: 6px solid var(--hexColor3);
 }
 
 .severity-high {

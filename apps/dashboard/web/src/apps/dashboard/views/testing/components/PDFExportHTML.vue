@@ -11,6 +11,10 @@
                     <th>Vulnerable APIs </th>
                 </tr>
                 <tr class="data-row">
+                    <td>Critical</td>
+                    <td>{{ critical }}</td>
+                </tr>
+                <tr class="data-row">
                     <td>High</td>
                     <td>{{ high }}</td>
                 </tr>

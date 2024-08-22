@@ -20,6 +20,7 @@ const onFunc = {
             return groupedResults
         }
         return {
+            "Critical": [],
             "High": [],
             "Medium":[],
             "Low": [],

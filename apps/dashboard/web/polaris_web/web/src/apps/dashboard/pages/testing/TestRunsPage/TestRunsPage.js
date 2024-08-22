@@ -86,6 +86,7 @@ let filters = [
     label: 'Severity',
     title: 'Severity',
     choices: [
+      { label: "Critical", value: "CRITICAL"},
       { label: "High", value: "HIGH" }, 
       { label: "Medium", value: "MEDIUM" },
       { label: "Low", value: "LOW" }
@@ -132,6 +133,7 @@ const [countMap, setCountMap] = useState({});
 const [selected, setSelected] = useState(1);
 
 const [severityCountMap, setSeverityCountMap] = useState({
+  CRITICAL: {text : 0, color: func.getColorForCharts("CRITICAL")},
   HIGH: {text : 0, color: func.getColorForCharts("HIGH")},
   MEDIUM: {text : 0, color: func.getColorForCharts("MEDIUM")},
   LOW: {text : 0, color: func.getColorForCharts("LOW")},
@@ -271,7 +273,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
 const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
 const SummaryCardComponent = () =>{
-  let totalVulnerabilities = severityCountMap?.HIGH?.text + severityCountMap?.MEDIUM?.text +  severityCountMap?.LOW?.text 
+  let totalVulnerabilities = severityCountMap?.CRITICAL?.text + severityCountMap?.HIGH?.text + severityCountMap?.MEDIUM?.text +  severityCountMap?.LOW?.text 
   return(
     <LegacyCard>
       <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>

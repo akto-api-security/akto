@@ -1190,6 +1190,8 @@ mapCollectionIdToHostName(apiCollections){
   },
   getHexColorForSeverity(key){
     switch(key){
+      case "CRITICAL":
+        return "#D72C0D"
       case "HIGH":
         return "#D72C0D"
       case "MEDIUM":
@@ -1204,6 +1206,8 @@ mapCollectionIdToHostName(apiCollections){
 
   getColorForCharts(key){
     switch(key){
+      case "CRITICAL":
+        return tokens.color["color-icon-critical"]
       case "HIGH":
         return tokens.color["color-icon-critical"]
       case "MEDIUM":

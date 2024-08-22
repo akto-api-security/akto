@@ -294,6 +294,10 @@ public class GithubUtils {
         Map<String, Integer> countIssues =  testingRunResultSummary.getCountIssues();
         for (String severity : countIssues.keySet()) {
             switch (severity) {
+                case "CRITICAL":
+                    messageStringBuilder.replace(messageStringBuilder.indexOf("@@CRITICAL_COUNT@@")
+                            ,messageStringBuilder.indexOf("@@CRITICAL_COUNT@@") + "@@CRITICAL_COUNT@@".length(), String.valueOf(countIssues.get(severity)));
+                    break;
                 case "HIGH":
                     messageStringBuilder.replace(messageStringBuilder.indexOf("@@HIGH_COUNT@@")
                             ,messageStringBuilder.indexOf("@@HIGH_COUNT@@") + "@@HIGH_COUNT@@".length(), String.valueOf(countIssues.get(severity)));
@@ -314,6 +318,7 @@ public class GithubUtils {
 
     private static final String GITHUB_COMMENT = "### **Test on @@TEST_NAME@@ summary:**\n" +
             "**Issues:**\n" +
+            "![High](https://akto-web-assets.s3.ap-south-1.amazonaws.com/assets/critical.png 'High') @@CRITICAL_COUNT@@ Critical  \n" +
             "![High](https://akto-web-assets.s3.ap-south-1.amazonaws.com/assets/high.png 'High') @@HIGH_COUNT@@ High  \n" +
             "![High](https://akto-web-assets.s3.ap-south-1.amazonaws.com/assets/medium.png 'High') @@MEDIUM_COUNT@@ Medium  \n" +
             "![High](https://akto-web-assets.s3.ap-south-1.amazonaws.com/assets/low.png 'High') @@LOW_COUNT@@ Low \n" +
