@@ -56,6 +56,7 @@
     --p-color-bg-critical-subdued: #FED3D1 !important;
     --p-color-bg-caution-subdued: #FFD79D !important;
     --p-color-bg-info-subdued: #A4E8F2 !important;
+    --critical-color: #D72C0D !important;
 }
 
 .Polaris-Page{
