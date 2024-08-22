@@ -67,6 +67,7 @@ import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.task.Cluster;
 import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
@@ -94,6 +95,7 @@ import com.akto.utils.scripts.FixMultiSTIs;
 import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
+import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
@@ -150,7 +152,7 @@ import static com.mongodb.client.model.Filters.eq;
 
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class, LogDb.DASHBOARD);
     private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     public static final boolean isSaas = "true".equals(System.getenv("IS_SAAS"));
@@ -1119,6 +1121,31 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public static void dropSpecialCharacterApiCollections(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDropSpecialCharacterApiCollections() == 0) {
+            ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+            List<ApiCollection> collections = new ArrayList<>();
+            try {
+                List<ApiCollection> apiCollections = ApiCollectionsDao.fetchAllHosts();
+                for (ApiCollection apiCollection: apiCollections) {
+                    if (RuntimeUtil.hasSpecialCharacters(apiCollection.getHostName())) {
+                        collections.add(new ApiCollection(apiCollection.getId(), null, 0, null, null, 0, false, true));
+                    }
+                }
+                apiCollectionsAction.setApiCollections(collections);
+                apiCollectionsAction.deleteMultipleCollections();
+                BackwardCompatibilityDao.instance.updateOne(
+                        Filters.eq("_id", backwardCompatibility.getId()),
+                        Updates.set(BackwardCompatibility.DROP_SPECIAL_CHARACTER_API_COLLECTIONS, Context.now())
+                );
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error dropping special character collections " + e.getStackTrace());
+            }
+
+        }
+
+    }
+
     public static void dropAuthMechanismData(BackwardCompatibility authMechanismData) {
         if (authMechanismData.getAuthMechanismData() == 0) {
             AuthMechanismsDao.instance.getMCollection().drop();
@@ -1942,6 +1969,11 @@ public class InitializerListener implements ServletContextListener {
                 setUpUpdateCustomCollections();
                 setUpFillCollectionIdArrayJob();
                 setupAutomatedApiGroupsScheduler();
+                /*
+                 * This is a temporary job. 
+                 * TODO: Remove this once traffic pipeline is cleaned.
+                 */
+                CleanInventory.cleanInventoryJobRunner();
             }
         }, 0, TimeUnit.SECONDS);
 
@@ -1966,6 +1998,9 @@ public class InitializerListener implements ServletContextListener {
                             DependencyFlow dependencyFlow = new DependencyFlow();
                             loggerMaker.infoAndAddToDb("Starting dependency flow");
                             dependencyFlow.run(null);
+                            if (dependencyFlow.resultNodes != null) {
+                                loggerMaker.infoAndAddToDb("Result nodes size: " + dependencyFlow.resultNodes.size());
+                            }
                             dependencyFlow.syncWithDb();
                             loggerMaker.infoAndAddToDb("Finished running dependency flow");
                         } catch (Exception e) {
@@ -2275,6 +2310,7 @@ public class InitializerListener implements ServletContextListener {
         setDefaultTelemetrySettings(backwardCompatibility);
         disableAwsSecretPiiType(backwardCompatibility);
         makeFirstUserAdmin(backwardCompatibility);
+        dropSpecialCharacterApiCollections(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {

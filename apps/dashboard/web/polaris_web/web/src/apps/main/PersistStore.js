@@ -3,9 +3,7 @@ import {devtools, persist, createJSONStorage} from "zustand/middleware"
 
 const initialState = {
     quickstartTasksCompleted: 0,
-    subCategoryMap: {},
     subCategoryFromSourceConfigMap: {},
-    categoryMap: {},
     active: '',
     collectionsMap: {},
     allCollections: [],
@@ -33,9 +31,7 @@ let persistStore = (set) => ({
     accessToken: null,
     storeAccessToken: (accessToken) => set({ accessToken: accessToken }),
     setQuickstartTasksCompleted: (quickstartTasksCompleted) => set({ quickstartTasksCompleted }),
-    setSubCategoryMap: (subCategoryMap) => set({ subCategoryMap }),
     setSubCategoryFromSourceConfigMap: (subCategoryFromSourceConfigMap) => set({ subCategoryFromSourceConfigMap }),
-    setCategoryMap: (categoryMap) => set({ categoryMap }),
     setActive: (selected) => set({ active: selected }),
     setCollectionsMap: (collectionsMap) => set({ collectionsMap }),
     setAllCollections: (allCollections) => set({ allCollections }),
@@ -49,7 +45,6 @@ let persistStore = (set) => ({
     setCoverageMap:(coverageMap)=>{set({coverageMap: coverageMap})},
     setFiltersMap: (filtersMap) => set({ filtersMap }),
     setTableInitialState: (tableInitialState) => set({ tableInitialState }),
-    setSendEventOnLogin: (sendEventOnLogin) => set({ sendEventOnLogin }),
     resetAll: () => set(initialState), // Reset function
 })
 

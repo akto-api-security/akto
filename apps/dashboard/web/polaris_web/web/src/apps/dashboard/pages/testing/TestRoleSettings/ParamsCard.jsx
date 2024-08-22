@@ -1,4 +1,4 @@
-import { Box, Button, HorizontalGrid, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import TooltipText from "../../../components/shared/TooltipText"
 import { DeleteMajor } from "@shopify/polaris-icons"
@@ -17,26 +17,26 @@ function ParamsCard({dataObj, handleDelete}) {
 
     function LineComponent({title,value}){
         return(
-            <HorizontalStack gap={5}>
+            <div style={{display: 'flex', gap: '20px', flexWrap: 'nowrap'}}>
                 <Box maxWidth='200px'>
                     <TooltipText tooltip={title} text={title} textProps={{variant:"bodyMd", fontWeight: "medium"}} />
                 </Box>
-                <Text variant="bodyMd" color="subdued">{value}</Text>
-            </HorizontalStack>
+                <Text breakWord truncate alignment="start" variant="bodyMd" color="subdued">{value}</Text>
+            </div>
         )
     }
 
     function ParamsList({valuesList}){
         return(
-            <VerticalStack gap={1}>
+            <VerticalStack align="start" gap={1}>
                 {valuesList.map((param,index) => {
                     return(
-                        <HorizontalGrid key={index} columns={2}>
+                        <HorizontalStack blockAlign="start" gap={"4"} key={index}>
                             <LineComponent title={(param.key || '-') + " :"} value={(param.value || '-')} />
                             {param.showHeader !== null ? 
-                                <HorizontalStack gap={1}><Box borderInlineEndWidth='1' borderColor="border-subdued" minHeight='20px'/><LineComponent title={"Position :"} value={param.where}/></HorizontalStack>
+                                <HorizontalStack blockAlign="start" gap={1}><Box borderInlineEndWidth='1' borderColor="border-subdued" minHeight='20px'/><LineComponent title={"Position :"} value={param.where}/></HorizontalStack>
                             :null}
-                        </HorizontalGrid>
+                        </HorizontalStack>
                     )
                 })}
             </VerticalStack>
@@ -68,7 +68,7 @@ function ParamsCard({dataObj, handleDelete}) {
 
                 </VerticalStack>
                 <HorizontalStack align="end">
-                    <Button size="slim" onClick={handleDelete} icon={DeleteMajor}><div data-testid="delete_button">Delete</div></Button>
+                    <Button onClick={handleDelete} icon={DeleteMajor}><div data-testid="delete_button">Delete</div></Button>
                 </HorizontalStack>
             </VerticalStack>
         </Box>

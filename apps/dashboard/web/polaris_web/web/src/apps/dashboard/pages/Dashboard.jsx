@@ -8,6 +8,7 @@ import "./dashboard.css"
 import func from "@/util/func"
 import transform from "./testing/transform";
 import PersistStore from "../../main/PersistStore";
+import LocalStore from "../../main/LocalStorageStore";
 import ConfirmationModal from "../components/shared/ConfirmationModal";
 import homeRequests from "./home/api";
 
@@ -23,11 +24,11 @@ function Dashboard() {
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
 
-    const subCategoryMap = PersistStore(state => state.subCategoryMap)
+    const subCategoryMap = LocalStore(state => state.subCategoryMap)
     const [eventForUser, setEventForUser] = useState({})
     
-    const sendEventOnLogin = PersistStore(state => state.sendEventOnLogin)
-    const setSendEventOnLogin = PersistStore(state => state.setSendEventOnLogin)
+    const sendEventOnLogin = LocalStore(state => state.sendEventOnLogin)
+    const setSendEventOnLogin = LocalStore(state => state.setSendEventOnLogin)
     const fetchAllCollections = async () => {
         let apiCollections = await homeFunctions.getAllCollections()
         const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
@@ -43,8 +44,9 @@ function Dashboard() {
 
     const getEventForIntercom = async() => {
         let resp = await homeRequests.getEventForIntercom();
-        setEventForUser(resp)
-        setSendEventOnLogin(true)
+        if(resp !== null){
+            setEventForUser(resp)
+        }
     }
 
     useEffect(() => {
@@ -59,8 +61,11 @@ function Dashboard() {
         }
         if(window?.Intercom){
             if(!sendEventOnLogin){
+                setSendEventOnLogin(true)
                 getEventForIntercom()
-                window.Intercom("trackEvent","metrics", eventForUser)
+                if(Object.keys(eventForUser).length > 0){
+                    window?.Intercom("trackEvent","metrics", eventForUser)
+                }
             }
         }
     }, [])

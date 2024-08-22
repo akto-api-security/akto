@@ -1,5 +1,5 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, ButtonGroup, Badge, Banner,HorizontalGrid, HorizontalStack, Link, VerticalStack } from "@shopify/polaris";
-import { TickMinor, CancelMajor } from "@shopify/polaris-icons"
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,HorizontalGrid, HorizontalStack, Link, VerticalStack, Tooltip } from "@shopify/polaris";
+import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons"
 import { useEffect, useRef, useState } from "react";
 import { default as observeApi } from "../api";
 import { default as testingApi } from "../../testing/api";
@@ -14,7 +14,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const initialState = {
         categories: [],
         tests: {},
-        selectedCategory: "",
+        selectedCategory: "BOLA",
         recurringDaily: false,
         continuousTesting: false,
         overriddenTestAppUrl: "",
@@ -22,7 +22,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         startTimestamp: func.timeNow(),
         hourlyLabel: "Now",
         testRunTime: -1,
-        testRunTimeLabel: "Till complete",
+        testRunTimeLabel: "30 minutes",
         runTypeLabel: "Now",
         maxConcurrentRequests: -1,
         testName: "",
@@ -42,6 +42,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [active, setActive] = useState(runTestFromOutside || false);
 
     const runTestRef = useRef(null);
+    const [searchValue, setSearchValue] = useState('')
+    const [showSearch, setShowSearch] = useState(false)
 
     function nameSuffixes(tests) {
         return Object.entries(tests)
@@ -79,12 +81,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         const businessLogicSubcategories = allSubCategoriesResponse.subCategories
         const categories = allSubCategoriesResponse.categories
         const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(businessLogicSubcategories)
-
         // Store all tests
         const processMapCategoryToSubcategory = {}
-        Object.keys(mapCategoryToSubcategory).map(category => {
-            processMapCategoryToSubcategory[category] = [...mapCategoryToSubcategory[category]["all"]]
-        })
+        if(Object.keys(businessLogicSubcategories).length > 0){
+            Object.keys(mapCategoryToSubcategory).map(category => {
+                processMapCategoryToSubcategory[category] = [...mapCategoryToSubcategory[category]["all"]]
+            })
+        }
 
         // Set if a test is selected or not
         Object.keys(processMapCategoryToSubcategory).map(category => {
@@ -108,7 +111,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             ...prev,
             categories: categories,
             tests: processMapCategoryToSubcategory,
-            selectedCategory: Object.keys(processMapCategoryToSubcategory)[0],
+            selectedCategory: Object.keys(processMapCategoryToSubcategory).length > 0 ? Object.keys(processMapCategoryToSubcategory)[0] : "",
             testName: testName,
             authMechanismPresent: authMechanismPresent
         }))
@@ -145,7 +148,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             ret[x.superCategory.name].all.push(obj)
             ret[x.superCategory.name].selected.push(obj)
         })
-
         //store this
         return {
             selectedCategory: Object.keys(ret)[0],
@@ -155,16 +157,20 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const activator = (
         <div ref={runTestRef}>
-            <Button onClick={toggleRunTest} primary disabled={disabled} ><div data-testid="run_test_button">Run test</div></Button>
+            <Button onClick={toggleRunTest} primary disabled={disabled || testRun.selectedCategory.length === 0} ><div data-testid="run_test_button">Run test</div></Button>
         </div>
     );
+
+    const resetSearchFunc = () => {
+        setShowSearch(false);
+        setSearchValue('');
+    }
 
     let categoryRows = [], testRows = []
 
     if (!loading) {
         categoryRows = testRun.categories.map(category => {
             const tests = testRun.tests[category.name]
-
             if (tests) {
                 let selected = 0
                 const total = tests.length
@@ -177,7 +183,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 return ([(
                     <div
                         style={{ display: "grid", gridTemplateColumns: "auto max-content", alignItems: "center" }}
-                        onClick={() => setTestRun(prev => ({ ...prev, selectedCategory: category.name }))}>
+                        onClick={() => { setTestRun(prev => ({ ...prev, selectedCategory: category.name })); resetSearchFunc(); }}>
                         <div>
                             <Text variany="headingMd" fontWeight="bold" color={category.name === testRun.selectedCategory ? "success" : ""}>{category.displayName}</Text>
                             <Text>{selected} out of {total} selected</Text>
@@ -216,7 +222,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             }))
         }
 
-        testRows = testRun.tests[testRun.selectedCategory].map(test => {
+        testRows = testRun.selectedCategory.length > 0 ? testRun.tests[testRun.selectedCategory].filter(x=> x.label.toLowerCase().includes(searchValue.toLowerCase())).map(test => {
             const isCustom = test?.author !== "AKTO"
             const label = (
                 <span style={{display: 'flex', gap: '4px', alignItems: 'flex-start'}}>
@@ -232,7 +238,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     onChange={() => handleTestsSelected(test)}
                 />
             )])
-        })
+        }) : []
     }
 
     const hours = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
@@ -264,7 +270,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         return abc
     }, [])
 
-    const testRunTimeOptions = [{ label: "Till complete", value: "Till complete" }, ...runTimeMinutes, ...runTimeHours]
+    const testRunTimeOptions = [ ...runTimeMinutes, ...runTimeHours]
 
     const runTypeOptions = [{ label: "Daily", value: "Daily" }, { label: "Continuously", value: "Continuously" }, { label: "Now", value: "Now" }]
 
@@ -393,6 +399,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         })
     }
 
+    const handleInputValue = (val) => {
+        setSearchValue(val);
+    }
+
     return (
         <div>
             {activator}
@@ -470,13 +480,19 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 </div>
                             </div>
                             <div>
-                                <div style={{ padding: "15px", alignItems: "center" }}>
+                                <div style={{ padding: !showSearch ? "13px" : "9px", alignItems: "center", justifyContent: 'space-between', display: 'flex' }}>
                                     <HorizontalStack gap={"2"}>
                                         <Checkbox
                                             checked={allTestsSelectedOfCategory}
                                             onChange={(val) => toggleTestsSelection(val)}
                                         />
                                         <Text variant="headingMd">Tests</Text>
+                                    </HorizontalStack>
+                                    <HorizontalStack gap={"2"}>
+                                        {showSearch ? <TextField onChange={handleInputValue} value={searchValue} selectTextOnFocus/> : null}
+                                        <Tooltip content={"Click to search"} dismissOnMouseOut>
+                                            <Button size="slim" icon={SearchMinor} onClick={() => setShowSearch(!showSearch)}/>
+                                        </Tooltip>
                                     </HorizontalStack>
                                 </div>
                                 <Divider />

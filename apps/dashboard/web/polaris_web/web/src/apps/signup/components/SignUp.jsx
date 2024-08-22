@@ -7,6 +7,8 @@ import api from '../api'
 import func from '@/util/func'
 import "../styles.css"
 import Store from '../../dashboard/store'
+import PersistStore from '../../main/PersistStore'
+import { usePolling } from '../../main/PollingProvider'
 
 function SignUp() {
 
@@ -22,6 +24,8 @@ function SignUp() {
   const azureUrl = window.AZURE_REQUEST_URL
   const githubId = window.GITHUB_CLIENT_ID
   const githubUrl = window.GITHUB_URL ? window.GITHUB_URL : "https://github.com"
+  const resetAll = PersistStore(state => state.resetAll)
+  const { clearPollingInterval } = usePolling();
 
   const githubAuthObj = {
     logo: '/public/github_icon.svg',
@@ -42,6 +46,8 @@ function SignUp() {
   }
 
   useEffect(() => {
+    resetAll()
+    clearPollingInterval()
     let copySsoList = []
     if (githubId !== undefined && githubId.length > 0) {
       copySsoList.push(githubAuthObj)

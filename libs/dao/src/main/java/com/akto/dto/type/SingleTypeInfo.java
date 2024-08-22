@@ -537,6 +537,18 @@ public class SingleTypeInfo {
     @BsonIgnore
     private Object value;
 
+    // Only being used for generating OpenAPI spec.
+    @BsonIgnore
+    private boolean isQueryParam;
+
+    public boolean isQueryParam() {
+        return isQueryParam;
+    }
+
+    public void setQueryParam(boolean isQueryParam) {
+        this.isQueryParam = isQueryParam;
+    }
+
     public static final String _UNIQUE_COUNT = "uniqueCount";
     public long uniqueCount = 0L;
     public static final String _PUBLIC_COUNT = "publicCount";

@@ -39,4 +39,16 @@ public class RuntimeUtil {
 
         return false;
     }
+
+    public static boolean hasSpecialCharacters(String input) {
+        // Define the special characters
+        String specialCharacters = "<>%/?#[]@!$&'()*+,;=";
+        for (char c : input.toCharArray()) {
+            if (specialCharacters.contains(Character.toString(c))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
