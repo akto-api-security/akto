@@ -72,6 +72,7 @@ import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
+import com.akto.utils.jobs.JobUtils;
 import com.akto.util.AccountTask;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.EmailAccountName;
@@ -1904,8 +1905,8 @@ public class InitializerListener implements ServletContextListener {
             e.printStackTrace();
         }
 
-        boolean runJobFunctions = Boolean.parseBoolean(System.getenv().getOrDefault("AKTO_RUN_JOB", "false"));
-        boolean runJobFunctionsAnyway = DashboardMode.isOnPremDeployment() || !DashboardMode.isSaasDeployment();
+        boolean runJobFunctions = JobUtils.getRunJobFunctions();
+        boolean runJobFunctionsAnyway = JobUtils.getRunJobFunctionsAnyway();
 
         executorService.schedule(new Runnable() {
             public void run() {

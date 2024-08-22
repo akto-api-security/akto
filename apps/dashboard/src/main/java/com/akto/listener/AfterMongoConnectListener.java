@@ -7,7 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.akto.dao.context.Context;
-import com.akto.util.DashboardMode;
+import com.akto.utils.jobs.JobUtils;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -37,10 +37,8 @@ public abstract class AfterMongoConnectListener implements ServletContextListene
                         continue;
                     }
 
-                    boolean runJobFunctions = Boolean
-                            .parseBoolean(System.getenv().getOrDefault("AKTO_RUN_JOB", "false"));
-                    boolean runJobFunctionsAnyway = DashboardMode.isOnPremDeployment()
-                            || !DashboardMode.isSaasDeployment();
+                    boolean runJobFunctions = JobUtils.getRunJobFunctions();
+                    boolean runJobFunctionsAnyway = JobUtils.getRunJobFunctionsAnyway();
 
                     try {
 
