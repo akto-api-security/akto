@@ -152,7 +152,7 @@ import static com.mongodb.client.model.Filters.eq;
 
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class, LogDb.DASHBOARD);
     private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     public static final boolean isSaas = "true".equals(System.getenv("IS_SAAS"));
@@ -1998,6 +1998,9 @@ public class InitializerListener implements ServletContextListener {
                             DependencyFlow dependencyFlow = new DependencyFlow();
                             loggerMaker.infoAndAddToDb("Starting dependency flow");
                             dependencyFlow.run(null);
+                            if (dependencyFlow.resultNodes != null) {
+                                loggerMaker.infoAndAddToDb("Result nodes size: " + dependencyFlow.resultNodes.size());
+                            }
                             dependencyFlow.syncWithDb();
                             loggerMaker.infoAndAddToDb("Finished running dependency flow");
                         } catch (Exception e) {
