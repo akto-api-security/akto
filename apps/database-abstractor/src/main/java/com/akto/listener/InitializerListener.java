@@ -37,7 +37,7 @@ public class InitializerListener implements ServletContextListener {
                 do {
                     try {
                         if (!calledOnce) {
-                            DaoInit.init(new ConnectionString(mongoURI), ReadPreference.primary());
+                            DaoInit.init(new ConnectionString(mongoURI));
                             calledOnce = true;
                         }
                         checkMongoConnection();
