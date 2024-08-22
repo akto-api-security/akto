@@ -23,7 +23,6 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.upload.FileUploadLogsDao;
 import com.akto.dao.upload.FileUploadsDao;
-import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.*;
 import com.akto.dto.billing.FeatureAccess;
@@ -57,9 +56,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.upload.FileUpload;
 import com.akto.dto.type.URLMethods;
-import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
-import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -73,7 +70,6 @@ import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
-import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.util.AccountTask;
@@ -91,7 +87,6 @@ import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.*;
 import com.akto.util.DashboardMode;
-import com.akto.utils.scripts.FixMultiSTIs;
 import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
@@ -126,7 +121,6 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.print.attribute.standard.Severity;
 import javax.servlet.ServletContextListener;
 import java.io.*;
 import java.net.URI;
@@ -912,7 +906,7 @@ public class InitializerListener implements ServletContextListener {
                     public void accept(Account t) {
                         webhookSender();
                     }
-                }, "webhook-sener");
+                }, "webhook-sender");
             }
         }, 0, 1, TimeUnit.HOURS);
     }
@@ -1910,10 +1904,19 @@ public class InitializerListener implements ServletContextListener {
             e.printStackTrace();
         }
 
+        boolean runJob = Boolean.parseBoolean(System.getenv().getOrDefault("AKTO_RUN_JOB", "false"));
+        boolean runJobFunctions = (DashboardMode.isSaasDeployment() && runJob);
+        boolean runJobFunctionsAnyway = DashboardMode.isOnPremDeployment()
+        || (DashboardMode.isLocalDeployment() && !DashboardMode.isSaasDeployment());                
 
         executorService.schedule(new Runnable() {
             public void run() {
-                DaoInit.init(new ConnectionString(mongoURI), ReadPreference.primary());
+
+                ReadPreference readPreference = ReadPreference.primary();
+                if (runJobFunctions) {
+                    readPreference = ReadPreference.secondary();
+                }
+                DaoInit.init(new ConnectionString(mongoURI), readPreference);
 
                 connectedToMongo = false;
                 do {
@@ -1928,33 +1931,52 @@ public class InitializerListener implements ServletContextListener {
                 setDashboardMode();
                 updateGlobalAktoVersion();
 
-//                AccountTask.instance.executeTask(new Consumer<Account>() {
-//                    @Override
-//                    public void accept(Account account) {
-//                        AccountSettingsDao.instance.getStats();
-//                        Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
-//                        runInitializerFunctions();
-//                    }
-//                }, "context-initializer");
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account account) {
+                        AccountSettingsDao.instance.getStats();
+                        Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
+                        setDashboardVersionForAccount();
+                    }
+                }, "context-initializer");
 
-//                if (DashboardMode.isMetered()) {
-//                    setupUsageScheduler();
-//                    setupUsageSyncScheduler();
-//                }
-//                trimCappedCollections();
-//                setUpPiiAndTestSourcesScheduler();
-//                setUpTrafficAlertScheduler();
-                // setUpAktoMixpanelEndpointsScheduler();
-//                SingleTypeInfo.init();
-//                setUpDailyScheduler();
-//                setUpWebhookScheduler();
-//                setUpDefaultPayloadRemover();
-//                setUpTestEditorTemplatesScheduler();
-//                setUpDependencyFlowScheduler();
-//                tokenGeneratorCron.tokenGeneratorScheduler();
-//                crons.deleteTestRunsScheduler();
-//                updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-//                syncCronInfo.setUpUpdateCronScheduler();
+                SingleTypeInfo.init();
+
+                if (runJobFunctions || runJobFunctionsAnyway) {
+                    AccountTask.instance.executeTask(new Consumer<Account>() {
+                        @Override
+                        public void accept(Account account) {
+                            runInitializerFunctions();
+                        }
+                    }, "context-initializer-secondary");
+
+                    if (DashboardMode.isMetered()) {
+                        setupUsageScheduler();
+                        setupUsageSyncScheduler();
+                    }
+                    trimCappedCollections();
+                    setUpPiiAndTestSourcesScheduler();
+                    setUpTrafficAlertScheduler();
+                    // setUpAktoMixpanelEndpointsScheduler();
+                    setUpDailyScheduler();
+                    setUpWebhookScheduler();
+                    setUpDefaultPayloadRemover();
+                    setUpTestEditorTemplatesScheduler();
+                    setUpDependencyFlowScheduler();
+                    tokenGeneratorCron.tokenGeneratorScheduler();
+                    crons.deleteTestRunsScheduler();
+                    updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                    syncCronInfo.setUpUpdateCronScheduler();
+                    updateApiGroupsForAccounts();
+                    setUpUpdateCustomCollections();
+                    setUpFillCollectionIdArrayJob();
+                    setupAutomatedApiGroupsScheduler();
+                    /*
+                     * This is a temporary job.
+                     * TODO: Remove this once traffic pipeline is cleaned.
+                     */
+                    CleanInventory.cleanInventoryJobRunner();
+                }
                 // setUpAktoMixpanelEndpointsScheduler();
                 //fetchGithubZip();
                 if(isSaas){
@@ -1965,18 +1987,8 @@ public class InitializerListener implements ServletContextListener {
                         loggerMaker.errorAndAddToDb("Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
                     }
                 }
-//                updateApiGroupsForAccounts();
-//                setUpUpdateCustomCollections();
-//                setUpFillCollectionIdArrayJob();
-//                setupAutomatedApiGroupsScheduler();
-                /*
-                 * This is a temporary job. 
-                 * TODO: Remove this once traffic pipeline is cleaned.
-                 */
-//                CleanInventory.cleanInventoryJobRunner();
             }
         }, 0, TimeUnit.SECONDS);
-
 
     }
 
@@ -2358,14 +2370,6 @@ public class InitializerListener implements ServletContextListener {
             loggerMaker.errorAndAddToDb(e,"error while setting up dashboard: " + e.toString(), LogDb.DASHBOARD);
         }
 
-        try {
-            loggerMaker.infoAndAddToDb("Updating account version for " + Context.accountId.get(), LogDb.DASHBOARD);
-            AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
-        }
-
-
         if(DashboardMode.isOnPremDeployment()) {
             telemetryExecutorService.scheduleAtFixedRate(() -> {
                 boolean dibs = callDibs(Cluster.TELEMETRY_CRON, 60, 60);
@@ -2380,6 +2384,14 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void setDashboardVersionForAccount(){
+        try {
+            loggerMaker.infoAndAddToDb("Updating account version for " + Context.accountId.get(), LogDb.DASHBOARD);
+            AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
+        }
+    }
 
     public static int burpPluginVersion = -1;
 
