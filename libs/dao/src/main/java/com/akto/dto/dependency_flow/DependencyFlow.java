@@ -153,6 +153,7 @@ public class DependencyFlow {
             }
 
             Node nodeFromQueue = resultNodes.get(apiInfoKey);
+            if (nodeFromQueue == null) continue;
             nodeFromQueue.fillMaxDepth();
             int depth = nodeFromQueue.getMaxDepth();
 
@@ -237,7 +238,9 @@ public class DependencyFlow {
                     ApiInfo.ApiInfoKey childApi = new ApiInfo.ApiInfoKey(Integer.parseInt(reverseEdge.getApiCollectionId()), reverseEdge.getUrl(), URLMethods.Method.fromString(reverseEdge.getMethod()));
 
                     Node resultNode = resultNodes.get(childApi);
+                    if (resultNode == null) continue;
                     Map<String, Connection> connections = resultNode.getConnections();
+                    if (connections == null) continue;
 
                     String param = reverseEdge.getParam();
                     if (reverseEdge.getIsHeader()) {
@@ -270,6 +273,7 @@ public class DependencyFlow {
             ApiInfo.ApiInfoKey apiInfoKey = generateApiInfoKeyFromString(apiInfoKeyString);
 
             Node node = resultNodes.get(apiInfoKey);
+            if (node == null) continue;
             Map<String, Connection> connections = node.getConnections();
             int missing = 0;
             int filled = 0;
@@ -289,7 +293,7 @@ public class DependencyFlow {
             if (missing < currentMinMissingCount)  result = apiInfoKey;
         }
 
-        if (result != null) {
+        if (result != null && resultNodes.get(result) != null) {
             logger.info(resultNodes.get(result).getUrl() + " is being marked done");
         }
 
