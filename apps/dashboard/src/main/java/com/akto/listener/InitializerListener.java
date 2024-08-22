@@ -1904,10 +1904,8 @@ public class InitializerListener implements ServletContextListener {
             e.printStackTrace();
         }
 
-        boolean runJob = Boolean.parseBoolean(System.getenv().getOrDefault("AKTO_RUN_JOB", "false"));
-        boolean runJobFunctions = (DashboardMode.isSaasDeployment() && runJob);
-        boolean runJobFunctionsAnyway = DashboardMode.isOnPremDeployment()
-        || (DashboardMode.isLocalDeployment() && !DashboardMode.isSaasDeployment());                
+        boolean runJobFunctions = Boolean.parseBoolean(System.getenv().getOrDefault("AKTO_RUN_JOB", "false"));
+        boolean runJobFunctionsAnyway = DashboardMode.isOnPremDeployment() || !DashboardMode.isSaasDeployment();
 
         executorService.schedule(new Runnable() {
             public void run() {
@@ -1942,7 +1940,11 @@ public class InitializerListener implements ServletContextListener {
 
                 SingleTypeInfo.init();
 
+                int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {
+
+                    logger.info("Starting init functions and scheduling jobs at " + now);
+
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
                         public void accept(Account account) {
@@ -1976,6 +1978,12 @@ public class InitializerListener implements ServletContextListener {
                      * TODO: Remove this once traffic pipeline is cleaned.
                      */
                     CleanInventory.cleanInventoryJobRunner();
+
+                    int now2 = Context.now();
+                    int diffNow = now2 - now;
+                    logger.info(String.format("Completed init functions and scheduling jobs at %d , time taken : %d", now2, diffNow));
+                } else {
+                    logger.info("Skipping init functions and scheduling jobs at " + now);
                 }
                 // setUpAktoMixpanelEndpointsScheduler();
                 //fetchGithubZip();
