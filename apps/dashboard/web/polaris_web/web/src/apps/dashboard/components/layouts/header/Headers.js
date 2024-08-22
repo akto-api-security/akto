@@ -11,6 +11,7 @@ import SemiCircleProgress from '../../shared/SemiCircleProgress';
 import { usePolling } from '../../../../main/PollingProvider';
 import { debounce } from 'lodash';
 import LocalStore from '../../../../main/LocalStorageStore';
+import homeFunctions from '../../../../dashboard/pages/home/module';
 
 function ContentWithIcon({icon,text, isAvatar= false}) {
     return(
@@ -41,7 +42,8 @@ export default function Header() {
 
     const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
-    const searchItemsArr = useMemo(() => func.getSearchItemsArr(allRoutes, allCollections), [])
+    const setAllCollections = PersistStore(state => state.setAllCollections)
+    var searchItemsArr = useMemo(() => func.getSearchItemsArr(allRoutes, allCollections), [])
     const [filteredItemsArr, setFilteredItemsArr] = useState(searchItemsArr)
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
@@ -64,7 +66,18 @@ export default function Header() {
         })
     }
 
-    const debouncedSearch = debounce((searchQuery) => {
+    const debouncedSearch = debounce(async (searchQuery) => {
+
+        let apiCollections = []
+        if (allCollections.length === 0 && searchItemsArr.length === 0) {
+            apiCollections = await homeFunctions.getAllCollections()
+            setAllCollections(apiCollections)
+        }
+
+        if (searchItemsArr.length === 0) {
+            searchItemsArr = func.getSearchItemsArr(allRoutes, apiCollections)
+        }
+
         if(searchQuery.length === 0){
             setFilteredItemsArr(searchItemsArr)
         }else{
