@@ -154,6 +154,9 @@ function ExportHtml() {
 
             case 2:
                 return "bg-critical"
+            
+            case 3: 
+                return "bg-critical"
 
             default:
                 return "";

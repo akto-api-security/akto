@@ -555,7 +555,7 @@ public class Utils {
         float riskScore = 0 ;
         switch (severity) {
             case "CRITICAL":
-                riskScore += 300;
+                riskScore += 1000;
                 break;
 
             case "HIGH":
