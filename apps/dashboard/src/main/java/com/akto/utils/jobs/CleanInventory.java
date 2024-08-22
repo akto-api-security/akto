@@ -10,6 +10,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
@@ -24,6 +27,7 @@ import com.mongodb.client.model.Filters;
 public class CleanInventory {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(CleanInventory.class, LogDb.DASHBOARD);
+    private static final Logger logger = LoggerFactory.getLogger(CleanInventory.class);
 
     final static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
@@ -31,6 +35,10 @@ public class CleanInventory {
 
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+
+                int now = Context.now();
+                logger.info("Starting cleanInventoryJob for all accounts at " + now);
+
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
@@ -41,6 +49,10 @@ public class CleanInventory {
                         }
                     }
                 }, "clean-inventory-job");
+
+                int now2 = Context.now();
+                int diffNow = now2-now;
+                logger.info(String.format("Completed cleanInventoryJob for all accounts at %d , time taken : %d", now2, diffNow));
             }
         }, 0, 5, TimeUnit.HOURS);
 

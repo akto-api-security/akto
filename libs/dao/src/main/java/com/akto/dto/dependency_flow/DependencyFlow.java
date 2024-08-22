@@ -153,6 +153,7 @@ public class DependencyFlow {
             }
 
             Node nodeFromQueue = resultNodes.get(apiInfoKey);
+            if (nodeFromQueue == null) continue;
             nodeFromQueue.fillMaxDepth();
             int depth = nodeFromQueue.getMaxDepth();
 
@@ -162,6 +163,7 @@ public class DependencyFlow {
                     // resultNode is basically find which node is receiving the data and fill the edge with that particular parameter
                     ApiInfo.ApiInfoKey resultApiInfoKey = new ApiInfo.ApiInfoKey(Integer.parseInt(reverseEdge.getApiCollectionId()), reverseEdge.getUrl(), URLMethods.Method.fromString(reverseEdge.getMethod()));
                     Node resultNode = resultNodes.get(resultApiInfoKey);
+                    if (resultNode == null) continue;
                     if (done.contains(resultApiInfoKey)) continue;
                     Edge edge = new Edge(reverseNode.getApiCollectionId(), reverseNode.getUrl(), reverseNode.getMethod(), reverseConnection.getParam(), reverseEdge.getIsHeader(), reverseEdge.getCount(), depth + 1);
                     String requestParam = reverseEdge.getParam();
@@ -172,10 +174,12 @@ public class DependencyFlow {
                         requestParam += "_isHeader";
                     }
 
-                    Connection connection = resultNode.getConnections().get(requestParam);
+                    Map<String, Connection> resultNodeconnections = resultNode.getConnections();
+                    if (resultNodeconnections == null) resultNodeconnections = new HashMap<>();
+                    Connection connection = resultNodeconnections.get(requestParam);
                     if (connection == null) {
                         connection = new Connection(edge.getParam(), new ArrayList<>(), reverseEdge.isUrlParam(), reverseEdge.getIsHeader());
-                        resultNode.getConnections().put(reverseEdge.getParam(), connection);
+                        resultNodeconnections.put(reverseEdge.getParam(), connection);
                     }
                     connection.getEdges().add(edge);
 
@@ -234,7 +238,9 @@ public class DependencyFlow {
                     ApiInfo.ApiInfoKey childApi = new ApiInfo.ApiInfoKey(Integer.parseInt(reverseEdge.getApiCollectionId()), reverseEdge.getUrl(), URLMethods.Method.fromString(reverseEdge.getMethod()));
 
                     Node resultNode = resultNodes.get(childApi);
+                    if (resultNode == null) continue;
                     Map<String, Connection> connections = resultNode.getConnections();
+                    if (connections == null) continue;
 
                     String param = reverseEdge.getParam();
                     if (reverseEdge.getIsHeader()) {
@@ -267,6 +273,7 @@ public class DependencyFlow {
             ApiInfo.ApiInfoKey apiInfoKey = generateApiInfoKeyFromString(apiInfoKeyString);
 
             Node node = resultNodes.get(apiInfoKey);
+            if (node == null) continue;
             Map<String, Connection> connections = node.getConnections();
             int missing = 0;
             int filled = 0;
@@ -286,7 +293,7 @@ public class DependencyFlow {
             if (missing < currentMinMissingCount)  result = apiInfoKey;
         }
 
-        if (result != null) {
+        if (result != null && resultNodes.get(result) != null) {
             logger.info(resultNodes.get(result).getUrl() + " is being marked done");
         }
 

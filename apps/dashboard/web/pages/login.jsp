@@ -11,6 +11,7 @@
                 <title>Akto</title>
                 <link rel="shortcut icon" href="/public/favicon.svg" type="image/svg" />
                 <link rel="manifest" href="/public/manifest.json" />
+                <link href="https://cdn.jsdelivr.net/npm/vscode-codicons@0.0.16/dist/codicon.min.css" rel="stylesheet">
             </head>
 
             <body>
@@ -140,9 +141,6 @@
                 <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>                
                 <script>
                     var script = document.createElement('script');
-
-                    // since release_version is not available till a user login, 
-                    // the user will always see the old login screen
                     script.type = "text/javascript"
                     if (window.RELEASE_VERSION_GLOBAL == '' || window.RELEASE_VERSION_GLOBAL == 'akto-release-version') {// Case when akto version is not available
                         script.src = "/polaris_web/web/dist/main.js";
