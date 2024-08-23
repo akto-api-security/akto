@@ -17,6 +17,8 @@ import okhttp3.*;
 import okio.BufferedSink;
 
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,6 +29,7 @@ import java.util.*;
 
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
+    private static final Logger logger = LoggerFactory.getLogger(ApiExecutor.class);
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
@@ -283,19 +286,29 @@ public class ApiExecutor {
         return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, false);
     }
 
-    private static final List<Integer> BACK_OFF_LIMITS = new ArrayList<>(Arrays.asList(2, 5, 15));
+    private static final List<Integer> BACK_OFF_LIMITS = new ArrayList<>(Arrays.asList(5, 10, 15));
 
     public static OriginalHttpResponse sendRequestBackOff(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
         OriginalHttpResponse response = null;
 
-        for(int limit: BACK_OFF_LIMITS){
-            response = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, false);
-            if (response == null || response.getStatusCode() != 200 ) {
+        for (int limit : BACK_OFF_LIMITS) {
+            try {
+                response = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, false);
+                if (response == null) {
+                    throw new NullPointerException(String.format("Response is null"));
+                }
+                if (response.getStatusCode() != 200) {
+                    throw new Exception(String.format("Invalid response code %d", response.getStatusCode()));
+                }
+                break;
+            } catch (Exception e) {
+                logger.error("Error in sending request for api : {} , will retry after {} seconds : {}", request.getUrl(),
+                        limit, e.toString());
                 try {
                     Thread.sleep(1000 * limit);
-                  } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error in ", null);
-                  }
+                } catch (Exception f) {
+                    logger.error("Error in exponential backoff at limit {} : {}", limit, f.toString());
+                }
             }
         }
         return response;
