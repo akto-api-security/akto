@@ -15,6 +15,7 @@ import com.akto.dao.context.Context;
 import com.akto.merging.Cron;
 import com.akto.utils.KafkaUtils;
 import com.mongodb.ConnectionString;
+import com.mongodb.ReadPreference;
 
 
 public class InitializerListener implements ServletContextListener {
