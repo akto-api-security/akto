@@ -81,7 +81,7 @@ public class KafkaUtils {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 } catch (Error e){
-                    loggerMaker.errorAndAddToDb("Error in add shut down hook: "+ e.getMessage());
+                    loggerMaker.errorAndAddToDb("Error in add shut down hook: "+ e.toString());
                 }
             }
         });
@@ -116,7 +116,7 @@ public class KafkaUtils {
           // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
             exceptionOnCommitSync.set(true);
-            loggerMaker.errorAndAddToDb("Exception in init kafka consumer  " + e.getMessage());
+            loggerMaker.errorAndAddToDb("Exception in init kafka consumer  " + e.toString());
             e.printStackTrace();
             System.exit(0);
         } finally {
@@ -227,7 +227,7 @@ public class KafkaUtils {
             String payloadStr = gson.toJson(writes);
             insertDataCore(payloadStr, triggerMethod, accountId, topicName);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in kafka insertData " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Error in kafka insertData " + e.toString());
         }
     }
 
@@ -239,7 +239,7 @@ public class KafkaUtils {
             obj.put("accountId", accountId);
             kafkaProducer.send(obj.toString(), topic);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in kafka insertDataCore " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Error in kafka insertDataCore " + e.toString());
         }
     }
 
@@ -253,7 +253,7 @@ public class KafkaUtils {
             String payloadStr = gson.toJson(writes);
             insertDataCore(payloadStr, triggerMethod, accountId, topicNameSecondary);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in kafka insertDataSecondary " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Error in kafka insertDataSecondary " + e.toString());
         }
     }
 
