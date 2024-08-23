@@ -261,8 +261,7 @@ public class InventoryAction extends UserAction {
         return unused;
     }
 
-    public String fetchAPICollection() {
-        List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
+    private void attachUnusedEndpoints(List<BasicDBObject> list,BasicDBObject response){
         APISpec apiSpec = APISpecDao.instance.findById(apiCollectionId);
         Set<String> unused = null;
         try {
@@ -274,17 +273,13 @@ public class InventoryAction extends UserAction {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-        attachTagsInAPIList(list);
-        attachAPIInfoListInResponse(list, apiCollectionId);
-
         if (unused == null) {
             unused = new HashSet<>();
         }
-        
         response.put("unusedEndpoints", unused);
+    }
 
-        // Attach code analysis collection
+    private void attachCodeAnalysisInResponse(BasicDBObject response){
         BasicDBObject codeAnalysisCollectionInfo = new BasicDBObject();
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
         CodeAnalysisCollection codeAnalysisCollection = null;
@@ -314,8 +309,44 @@ public class InventoryAction extends UserAction {
             }
         }
         codeAnalysisCollectionInfo.put("codeAnalysisApisMap", codeAnalysisApisMap);
-
         response.put("codeAnalysisCollectionInfo", codeAnalysisCollectionInfo);
+    }
+
+    public String fetchCodeAnalysisApiInfos(){
+        response = new BasicDBObject();
+        attachCodeAnalysisInResponse(response);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchApiInfosFromSTIs(){
+        List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0);
+        response = new BasicDBObject();
+        response.put("list", list);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchApiInfosForCollection(){
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.in(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId));
+        for(ApiInfo apiInfo: apiInfos){
+            apiInfo.calculateActualAuth();
+        }
+        response = new BasicDBObject();
+        response.put("apiInfoList", apiInfos);
+        if(apiCollectionId != -1){
+            ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
+            response.put("redacted", apiCollection.getRedact());
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchAPICollection() {
+        List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
+        attachTagsInAPIList(list);
+        attachAPIInfoListInResponse(list, apiCollectionId);
+        attachUnusedEndpoints(list, response);
+
+        // Attach code analysis collection
+        attachCodeAnalysisInResponse(response);
 
         return Action.SUCCESS.toUpperCase();
     }
