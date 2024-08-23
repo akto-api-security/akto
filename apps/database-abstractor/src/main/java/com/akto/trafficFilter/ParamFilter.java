@@ -15,7 +15,16 @@ import com.google.common.hash.Funnels;
 public class ParamFilter {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ParamFilter.class, LogDb.DB_ABS);
 
-    private static List<BloomFilter<CharSequence>> filterList = new ArrayList<>();
+    private static List<BloomFilter<CharSequence>> filterList = new ArrayList<BloomFilter<CharSequence>>() {
+        {
+            add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001));
+            add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001));
+            add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001));
+            add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001));
+            add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001));
+        }
+    };
+
     private static BloomFilter<CharSequence> hostFilter = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000,0.001);
     private static int currentFilterIndex = -1;
     private static int filterFillStart = 0;
@@ -29,7 +38,7 @@ public class ParamFilter {
     }
     private static Map<Integer, Integer> filterListHitCount = new HashMap<>();
 
-    private static void refreshFilterList() {
+    private static synchronized void refreshFilterList() {
         int now = Context.now();
 
         if ((filterFillStart + TIME_LIMIT) < now) {
