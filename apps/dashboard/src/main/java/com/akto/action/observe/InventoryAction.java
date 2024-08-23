@@ -326,7 +326,7 @@ public class InventoryAction extends UserAction {
     }
 
     public String fetchApiInfosForCollection(){
-        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.in(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId));
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
         for(ApiInfo apiInfo: apiInfos){
             apiInfo.calculateActualAuth();
         }

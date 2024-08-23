@@ -252,16 +252,22 @@ function GithubServerTable(props) {
   }, []);
 
   const resourceIDResolver = (data) => {
-    console.log("data",data)
     return data.id;
   };
+  
 
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(props?.fullData, {
       resourceIDResolver,
     });
 
-  console.log("hey", selectedResources)
+  const customSelectionChange = (selectionType,toggleType, selection) => {
+    if(selectionType === "page"){
+      handleSelectionChange("all",toggleType, selection)
+    }else{
+      handleSelectionChange(selectionType,toggleType, selection)
+    }
+  }
 
   const [popoverActive, setPopoverActive] = useState(-1);
 
@@ -354,7 +360,7 @@ function GithubServerTable(props) {
                 }
                 // condensed
                 selectable={props.selectable || false}
-                onSelectionChange={handleSelectionChange}
+                onSelectionChange={customSelectionChange}
                 headings={props?.headings ? props.headings :[
                   {
                     id: "data",
