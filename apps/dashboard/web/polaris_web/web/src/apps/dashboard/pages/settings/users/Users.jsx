@@ -19,14 +19,7 @@ const Users = () => {
     const [loading, setLoading] = useState(false)
     const [users, setUsers] = useState([])
     const [roleHierarchy, setRoleHierarchy] = useState([])
-    const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
-    let rbacAccess = false;
-
-    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
-        rbacAccess = true
-    } else if(stiggFeatures && stiggFeatures['RBAC_FEATURE']){
-        rbacAccess = stiggFeatures['RBAC_FEATURE'].isGranted
-    }
+    const rbacAccess = func.checkForRbacFeature();
 
     const [roleSelectionPopup, setRoleSelectionPopup] = useState({})
 

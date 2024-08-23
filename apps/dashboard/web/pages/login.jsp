@@ -11,6 +11,7 @@
                 <title>Akto</title>
                 <link rel="shortcut icon" href="/public/favicon.svg" type="image/svg" />
                 <link rel="manifest" href="/public/manifest.json" />
+                <link href="https://cdn.jsdelivr.net/npm/vscode-codicons@0.0.16/dist/codicon.min.css" rel="stylesheet">
             </head>
 
             <body>
@@ -96,7 +97,9 @@
 
                     if (window.USER_NAME.length > 0) {
                         // Initialize mixpanel
-                        clarity("set", "userEmail", window.USER_NAME)
+                        if(window.IS_SAAS == 'true'){
+                            clarity("set", "userEmail", window.USER_NAME)
+                        }
                         mixpanel.init('c403d0b00353cc31d7e33d68dc778806', { debug: false, ignore_dnt: true });
                         let distinct_id = window.USER_NAME + '_' + (window.IS_SAAS === 'true' ? "SAAS" : window.DASHBOARD_MODE);
                         mixpanel.identify(distinct_id);
@@ -138,9 +141,6 @@
                 <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>                
                 <script>
                     var script = document.createElement('script');
-
-                    // since release_version is not available till a user login, 
-                    // the user will always see the old login screen
                     script.type = "text/javascript"
                     if (window.RELEASE_VERSION_GLOBAL == '' || window.RELEASE_VERSION_GLOBAL == 'akto-release-version') {// Case when akto version is not available
                         script.src = "/polaris_web/web/dist/main.js";

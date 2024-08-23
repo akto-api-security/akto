@@ -234,7 +234,7 @@ public class HttpCallParser {
                 try{
                     dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
                 } catch (Exception e){
-                    loggerMaker.errorAndAddToDb(e, "error in analyzing dependency");
+                    loggerMaker.errorAndAddToDb(e, "error in analyzing dependency: " + e);
                 }
             }
         }

@@ -45,7 +45,6 @@ let persistStore = (set) => ({
     setCoverageMap:(coverageMap)=>{set({coverageMap: coverageMap})},
     setFiltersMap: (filtersMap) => set({ filtersMap }),
     setTableInitialState: (tableInitialState) => set({ tableInitialState }),
-    setSendEventOnLogin: (sendEventOnLogin) => set({ sendEventOnLogin }),
     resetAll: () => set(initialState), // Reset function
 })
 

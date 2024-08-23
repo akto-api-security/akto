@@ -1518,7 +1518,21 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
     return false;
   },
+  checkForRbacFeature(){
+    const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
+    let rbacAccess = false;
+    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
+        rbacAccess = true
+    } else if(stiggFeatures && stiggFeatures['RBAC_FEATURE']){
+        rbacAccess = stiggFeatures['RBAC_FEATURE'].isGranted
+    }
+    return rbacAccess;
+  },
   checkUserValidForIntegrations(){
+    const rbacAccess = this.checkForRbacFeature();
+    if(!rbacAccess){
+      return true;
+    }
     const userRole = window.USER_ROLE
     return !(userRole === "GUEST" || userRole === "MEMBER")
   },
