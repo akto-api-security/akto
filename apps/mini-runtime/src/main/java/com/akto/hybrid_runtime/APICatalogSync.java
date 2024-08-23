@@ -313,7 +313,6 @@ public class APICatalogSync {
         while (iterator.hasNext()) {
             Map.Entry<URLStatic, RequestTemplate> entry = iterator.next();
             URLStatic newUrl = entry.getKey();
-            if(DictionaryFilter.isEnglishWord(newUrl.getUrl())) continue;
 
             RequestTemplate newTemplate = entry.getValue();
             String[] tokens = tokenize(newUrl.getUrl());
@@ -524,6 +523,7 @@ public class APICatalogSync {
         int start = newUrl.getUrl().startsWith("http") ? 3 : 0;
         for(int i = start; i < tokens.length; i ++) {
             String tempToken = tokens[i];
+            if(DictionaryFilter.isEnglishWord(tempToken)) continue;
 
             if (NumberUtils.isParsable(tempToken)) {
                 newTypes[i] = isNumber(tempToken) ? SuperType.INTEGER : SuperType.FLOAT;
@@ -575,6 +575,7 @@ public class APICatalogSync {
         for(int i = 0; i < newTokens.length; i ++) {
             String tempToken = newTokens[i];
             String dbToken = dbTokens[i];
+            if (DictionaryFilter.isEnglishWord(tempToken) || DictionaryFilter.isEnglishWord(dbToken)) continue;
 
             int minCount = dbUrl.getUrl().startsWith("http") && newUrl.getUrl().startsWith("http") ? 3 : 0;
             if (tempToken.equalsIgnoreCase(dbToken) || i < minCount) {
@@ -626,7 +627,6 @@ public class APICatalogSync {
             while (iterator.hasNext()) {
                 Map.Entry<URLStatic, RequestTemplate> entry = iterator.next();
                 URLStatic newUrl = entry.getKey();
-                if(DictionaryFilter.isEnglishWord(newUrl.getUrl())) continue;
 
                 RequestTemplate newRequestTemplate = entry.getValue();
 

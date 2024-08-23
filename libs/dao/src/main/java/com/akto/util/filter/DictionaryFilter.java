@@ -2,6 +2,7 @@ package com.akto.util.filter;
 
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,9 +25,26 @@ public class DictionaryFilter {
     public static boolean isEnglishWord(String word) {
         if(dictFilter == null || word.trim().isEmpty()) return false;
 
-        String[] wordSegments = word.split("[-_.]");
+        String[] symbolWords = word.split("[-_.]");
+        if(wordsChecker(symbolWords)) return true;
 
-        for(String seg : wordSegments) {
+        boolean flag = true;
+
+        for(String symbolWord : symbolWords) {
+            String[] camelCaseWords = StringUtils.splitByCharacterTypeCamelCase(symbolWord);
+            if(!wordsChecker(camelCaseWords)) {
+                flag = false;
+                break;
+            }
+        }
+
+        if(flag) return true;
+
+        return dictFilter.mightContain(word);
+    }
+
+    private static boolean wordsChecker(String[] words) {
+        for(String seg : words) {
             if(!seg.isEmpty() && !dictFilter.mightContain(seg.toUpperCase())) return false;
         }
 

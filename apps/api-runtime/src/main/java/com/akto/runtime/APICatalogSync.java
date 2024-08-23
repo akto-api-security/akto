@@ -764,7 +764,7 @@ public class APICatalogSync {
         for(int i = 0; i < newTokens.length; i ++) {
             String tempToken = newTokens[i];
             String dbToken = dbTokens[i];
-            if (DictionaryFilter.isEnglishWord(tempToken) && DictionaryFilter.isEnglishWord(dbToken)) continue;
+            if (DictionaryFilter.isEnglishWord(tempToken) || DictionaryFilter.isEnglishWord(dbToken)) continue;
 
             int minCount = dbUrl.getUrl().startsWith("http") && newUrl.getUrl().startsWith("http") ? 3 : 0;
             if (tempToken.equalsIgnoreCase(dbToken) || i < minCount) {

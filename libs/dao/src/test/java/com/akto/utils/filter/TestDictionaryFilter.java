@@ -56,7 +56,17 @@ public class TestDictionaryFilter {
     public void testMixedCaseWords() {
         assertTrue(DictionaryFilter.isEnglishWord("Demo"));
         assertTrue(DictionaryFilter.isEnglishWord("CaT"));
-        assertFalse(DictionaryFilter.isEnglishWord("NotExist"));
+        assertTrue(DictionaryFilter.isEnglishWord("YesExist"));
+        assertFalse(DictionaryFilter.isEnglishWord("NotExistz"));
+    }
+
+    @Test
+    public void testEveryCase() {
+        assertTrue(DictionaryFilter.isEnglishWord("smallDog_Cute"));
+        assertTrue(DictionaryFilter.isEnglishWord("You.and-JohnHappy"));
+        assertTrue(DictionaryFilter.isEnglishWord("DEMO_goingWhere"));
+        assertFalse(DictionaryFilter.isEnglishWord("DEMOZ_goingHere"));
+        assertFalse(DictionaryFilter.isEnglishWord("You.and-XyzabcHappy"));
     }
 
 }
