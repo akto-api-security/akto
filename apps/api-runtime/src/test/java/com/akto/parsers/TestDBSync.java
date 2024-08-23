@@ -25,6 +25,7 @@ import com.akto.dto.HttpResponseParams.Source;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
 import com.akto.runtime.URLAggregator;
+import com.akto.util.filter.DictionaryFilter;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
@@ -41,6 +42,8 @@ public class TestDBSync extends MongoBasedTest {
     public void changeAccountId() {
         Context.accountId.set(currAccountId);
         currAccountId += 1;
+        DictionaryFilter.readDictionaryBinary();
+
     }
 
     public void testInitializer(){
@@ -229,7 +232,7 @@ public class TestDBSync extends MongoBasedTest {
         APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb);
         sync.buildFromDB(false, true);
 
-        assertEquals(0, sync.getDbState(123).getStrictURLToMethods().size());
+        assertEquals(1, sync.getDbState(123).getStrictURLToMethods().size());
         assertEquals(1, sync.getDbState(123).getTemplateURLToMethods().size());
 
 
