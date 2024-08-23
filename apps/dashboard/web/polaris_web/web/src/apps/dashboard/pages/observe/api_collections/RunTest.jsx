@@ -489,7 +489,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         <Text variant="headingMd">Tests</Text>
                                     </HorizontalStack>
                                     <HorizontalStack gap={"2"}>
-                                        {showSearch ? <TextField onChange={handleInputValue} value={searchValue} selectTextOnFocus/> : null}
+                                        {showSearch ? <TextField onChange={handleInputValue} value={searchValue} autoFocus
+                                    focused /> : null}
                                         <Tooltip content={"Click to search"} dismissOnMouseOut>
                                             <Button size="slim" icon={SearchMinor} onClick={() => setShowSearch(!showSearch)}/>
                                         </Tooltip>
