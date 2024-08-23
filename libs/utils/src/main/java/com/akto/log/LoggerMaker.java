@@ -79,7 +79,7 @@ public class LoggerMaker  {
                     internalLogger.error("error in getting slack cyborg config: " + e.toString());
                 }
             }
-        }, 0, 1, TimeUnit.MINUTES);
+        }, 2, 15, TimeUnit.MINUTES);
     }
 
     private static int logCount = 0;
