@@ -414,10 +414,11 @@ public class DbAction extends ActionSupport {
                         i++;
                     }
 
-                    if (indicesToDelete != null && !indicesToDelete.isEmpty()) {
+                    if (writesForSti != null && !writesForSti.isEmpty() &&
+                            indicesToDelete != null && !indicesToDelete.isEmpty()) {
                         int size = writesForSti.size();
                         List<BulkUpdates> tempWrites = new ArrayList<>();
-                        for (int index = 0; index < writesForSti.size(); index++) {
+                        for (int index = 0; index < size; index++) {
                             if (indicesToDelete.contains(index)) {
                                 continue;
                             }
@@ -429,6 +430,7 @@ public class DbAction extends ActionSupport {
                     }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "error in ignore STI updates " + e.toString());
+                e.printStackTrace();
             }
 
             if (writesForSti != null && !writesForSti.isEmpty()) {

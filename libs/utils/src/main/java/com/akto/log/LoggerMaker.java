@@ -58,21 +58,28 @@ public class LoggerMaker  {
                 }
             }
         }, 0, 1, TimeUnit.MINUTES);
-    }
 
-    static {
-        try {
-            Config config = ConfigsDao.instance.findOne(Constants.ID, Config.SlackAlertCyborgConfig.CONFIG_ID);
-            if (config != null) {
-                Config.SlackAlertCyborgConfig slackCyborgWebhook = (Config.SlackAlertCyborgConfig) config;
-                if (slackCyborgWebhook != null && slackCyborgWebhook.getSlackWebhookUrl() != null
-                        && !slackCyborgWebhook.getSlackWebhookUrl().isEmpty()) {
-                    slackCyborgWebhookUrl = slackCyborgWebhook.getSlackWebhookUrl();
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (slackCyborgWebhookUrl != null) {
+                        return;
+                    }
+                    Config config = ConfigsDao.instance.findOne(Constants.ID, Config.SlackAlertCyborgConfig.CONFIG_ID);
+                    if (config != null) {
+                        Config.SlackAlertCyborgConfig slackCyborgWebhook = (Config.SlackAlertCyborgConfig) config;
+                        if (slackCyborgWebhook != null && slackCyborgWebhook.getSlackWebhookUrl() != null
+                                && !slackCyborgWebhook.getSlackWebhookUrl().isEmpty()) {
+                            slackCyborgWebhookUrl = slackCyborgWebhook.getSlackWebhookUrl();
+                            internalLogger.info("found slack cyborg config");
+                        }
+                    }
+                } catch (Exception e) {
+                    internalLogger.error("error in getting slack cyborg config: " + e.toString());
                 }
             }
-        } catch (Exception e) {
-            internalLogger.error("error in getting slack config: " + e.toString());
-        }
+        }, 0, 1, TimeUnit.MINUTES);
     }
 
     private static int logCount = 0;
