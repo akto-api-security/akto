@@ -9,6 +9,7 @@ function GithubSimpleTable(props) {
         key={JSON.stringify(props.data ? props.data : "{}")} // passing any value as a "key" re-renders the component when the value is changed.
         pageLimit={props.pageLimit}
         fetchData={(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => tableFunc.fetchDataSync(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props)}
+        fullData={props.data}
         sortOptions={props.sortOptions} 
         resourceName={props.resourceName} 
         filters={filters}
