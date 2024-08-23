@@ -166,13 +166,12 @@ function GithubServerTable(props) {
       });
     }
     setPage(0);
-    setFiltersMap(prev => ({
-      ...prev,
-      [currentPageKey]: {
-        filters: temp,
-        sort: pageFiltersMap?.sort || []
-      }
-    }));
+    let tempFilters = filtersMap
+    tempFilters[currentPageKey]= {
+      filters: temp,
+      sort: pageFiltersMap?.sort || []
+    }
+    setFiltersMap(tempFilters);
     setAppliedFilters(temp);
   }, [appliedFilters, props.disambiguateLabel, handleRemoveAppliedFilter, setFiltersMap, currentPageKey, pageFiltersMap]);
 
