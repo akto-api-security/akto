@@ -45,8 +45,6 @@ import com.akto.util.Constants;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
@@ -955,26 +953,6 @@ public class DbAction extends ActionSupport {
         try {
             ObjectId lastTsObjectId = lastStiId != null ? new ObjectId(lastStiId) : null;
             stis = DbLayer.fetchStiBasedOnHostHeaders(lastTsObjectId);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in fetchStiBasedOnHostHeaders " + e.toString());
-            return Action.ERROR.toUpperCase();
-        }
-        return Action.SUCCESS.toUpperCase();
-    }
-
-    public String fetchDeactivatedCollections() {
-        try {
-            apiCollectionIds = DbLayer.fetchDeactivatedCollections();
-        } catch (Exception e) {
-            return Action.ERROR.toUpperCase();
-        }
-        return Action.SUCCESS.toUpperCase();
-    }
-
-    public String updateUsage() {
-        try {
-            MetricTypes metric = MetricTypes.valueOf(metricType);
-            DbLayer.updateUsage(metric, deltaUsage);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchStiBasedOnHostHeaders " + e.toString());
             return Action.ERROR.toUpperCase();
