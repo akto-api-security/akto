@@ -42,9 +42,6 @@ public class ParamFilter {
         int now = Context.now();
 
         if ((filterFillStart + TIME_LIMIT) < now) {
-            filterFillStart = now;
-            currentFilterIndex++;
-            currentFilterIndex %= FILTER_LIMIT;
             BloomFilter<CharSequence> newFilter = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000,
                     0.001);
             
@@ -54,6 +51,8 @@ public class ParamFilter {
             }
             loggerMaker.infoAndAddToDb(String.format("ParamFilter hitCounts: %s",hitCountLog));
 
+            filterFillStart = now;
+            currentFilterIndex = (currentFilterIndex + 1) % FILTER_LIMIT;
             if (currentFilterIndex < filterList.size()) {
                 filterList.set(currentFilterIndex, newFilter);
             } else {
