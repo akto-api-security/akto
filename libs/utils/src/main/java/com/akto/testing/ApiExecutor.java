@@ -283,6 +283,23 @@ public class ApiExecutor {
         return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, false);
     }
 
+    private static final List<Integer> BACK_OFF_LIMITS = new ArrayList<>(Arrays.asList(2, 5, 15));
+
+    public static OriginalHttpResponse sendRequestBackOff(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
+        OriginalHttpResponse response = null;
+
+        for(int limit: BACK_OFF_LIMITS){
+            response = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, false);
+            if (response == null || response.getStatusCode() != 200 ) {
+                try {
+                    Thread.sleep(1000 * limit);
+                  } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error in ", null);
+                  }
+            }
+        }
+        return response;
+    }
 
     private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck)  throws Exception{
         Request okHttpRequest = builder.build();
