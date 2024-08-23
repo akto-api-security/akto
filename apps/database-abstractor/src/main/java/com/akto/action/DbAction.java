@@ -371,7 +371,7 @@ public class DbAction extends ActionSupport {
         try {
             ignoreHosts = HostFilter.getCollectionSet(accId);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "error in getting ignore host ids");
+            loggerMaker.errorAndAddToDb(e, "error in getting ignore host ids " + e.toString());
         }
         if (ignoreHosts == null) {
             ignoreHosts = new HashSet<>();
@@ -428,7 +428,7 @@ public class DbAction extends ActionSupport {
                         loggerMaker.infoAndAddToDb(String.format("Original writes: %d Final writes: %d", size, newSize));
                     }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "error in ignore STI updates");
+                loggerMaker.errorAndAddToDb(e, "error in ignore STI updates " + e.toString());
             }
 
             if (writesForSti != null && !writesForSti.isEmpty()) {
