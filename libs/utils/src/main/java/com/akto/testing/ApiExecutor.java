@@ -37,9 +37,8 @@ public class ApiExecutor {
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
-
-    private static int lastTestScriptFetched = 0;
-    private static TestScript testScript = null;
+    private static Map<Integer, Integer> lastFetchedMap = new HashMap<>();
+    private static Map<Integer, TestScript> testScriptMap = new HashMap<>();
     
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
 
@@ -334,11 +333,16 @@ public class ApiExecutor {
             loggerMaker.infoAndAddToDb("invalid context for hash calculation, returning");
             return;
         }
+        int accountId = Context.accountId.get();
         try {
             String script;
+            TestScript testScript = testScriptMap.getOrDefault(accountId, null);
+            int lastTestScriptFetched = lastFetchedMap.getOrDefault(accountId, 0);
             if (Context.now() - lastTestScriptFetched > 5 * 60) {
                 testScript = TestScriptsDao.instance.fetchTestScript();
                 lastTestScriptFetched = Context.now();
+                testScriptMap.put(accountId, testScript);
+                lastFetchedMap.put(accountId, Context.now());
             }
             if (testScript != null && testScript.getJavascript() != null) {
                 script = testScript.getJavascript();
