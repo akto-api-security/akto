@@ -202,7 +202,6 @@ function ApiEndpoints() {
         let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
         let sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
         let sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
-        console.log("timataken by apis", func.timeNow() - timeNow)
         setShowEmptyScreen(stisEndpoints.list.length === 0)
         setIsRedacted(apiInfosData.redacted)
         let apiEndpointsInCollection = stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
@@ -301,7 +300,6 @@ function ApiEndpoints() {
         data['new'] = prettifyData.filter(x=> x.isNew)
         data['no_auth'] = prettifyData.filter(x => x.open)
         data['shadow'] = [ ...shadowApis ]
-        console.log("time taken by data manipulation", func.timeNow() - timeNow)
         setLoading(false)
         setEndpointData(data)
         setSelectedTab("all")
