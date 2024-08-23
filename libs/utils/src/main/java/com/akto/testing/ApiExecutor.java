@@ -254,7 +254,8 @@ public class ApiExecutor {
 
         builder = builder.url(request.getFullUrlWithParams());
 
-        calculateHashAndAddAuth(request);
+        boolean executeScript = testingRunConfig != null;
+        calculateHashAndAddAuth(request, executeScript);
 
         OriginalHttpResponse response = null;
         switch (method) {
@@ -328,7 +329,11 @@ public class ApiExecutor {
         
     }
 
-    private static void calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest) {
+    private static void calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest, boolean executeScript) {
+        if (!executeScript) {
+            loggerMaker.infoAndAddToDb("invalid context for hash calculation, returning");
+            return;
+        }
         try {
             String script;
             if (Context.now() - lastTestScriptFetched > 5 * 60) {
