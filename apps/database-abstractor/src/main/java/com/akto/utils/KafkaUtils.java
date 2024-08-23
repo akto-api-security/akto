@@ -219,20 +219,41 @@ public class KafkaUtils {
     }
 
     String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
-
     public void insertData(List<BulkUpdates> writes, String triggerMethod, int accountId) {
         try {
             if (topicName == null) {
                 throw new Exception("AKTO_KAFKA_TOPIC_NAME is null");
             }
+            String payloadStr = gson.toJson(writes);
+            insertDataCore(payloadStr, triggerMethod, accountId, topicName);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in kafka insertData " + e.getMessage());
+        }
+    }
+
+    public void insertDataCore(String payloadStr, String triggerMethod, int accountId, String topic) {
+        try {
             BasicDBObject obj = new BasicDBObject();
             obj.put("triggerMethod", triggerMethod);
-            String payloadStr = gson.toJson(writes);
             obj.put("payload", payloadStr);
             obj.put("accountId", accountId);
-            kafkaProducer.send(obj.toString(), topicName);
+            kafkaProducer.send(obj.toString(), topic);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in kafka insertData");
+            loggerMaker.errorAndAddToDb(e, "Error in kafka insertDataCore " + e.getMessage());
+        }
+    }
+
+    String topicNameSecondary = System.getenv("AKTO_KAFKA_TOPIC_NAME_SECONDARY");
+
+    public void insertDataSecondary(Object writes, String triggerMethod, int accountId) {
+        try {
+            if (topicNameSecondary == null) {
+                topicNameSecondary = "akto.secondary.trafficdata";
+            }
+            String payloadStr = gson.toJson(writes);
+            insertDataCore(payloadStr, triggerMethod, accountId, topicNameSecondary);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in kafka insertDataSecondary " + e.getMessage());
         }
     }
 
