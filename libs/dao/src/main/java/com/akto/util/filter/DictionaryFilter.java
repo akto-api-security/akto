@@ -9,10 +9,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 public class DictionaryFilter {
-    public static void main(String[] args) {
-        DictionaryFilter.readDictionaryBinary();
-        System.out.println(DictionaryFilter.isEnglishWord("NotExist"));
-    }
     private static final Logger logger = LoggerFactory.getLogger(DictionaryFilter.class);
     public static BloomFilter<CharSequence> dictFilter = null;
 
