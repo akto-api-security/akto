@@ -62,8 +62,13 @@ const tableFunc = {
           }
   
           let finalData = props.useModifiedData ? props.modifyData(tempData,filters) : tempData
-  
-          return {value:finalData,total:tempData.length}
+          
+          let page = skip / limit;
+          let pageLimit = limit;
+          let final2Data = finalData && finalData.length <= pageLimit ? finalData :
+          finalData.slice(page * pageLimit, Math.min((page + 1) * pageLimit, finalData.length))
+
+          return {value:final2Data,total:tempData.length}
     },
     mergeFilters(filterArray1, filterArray2, labelFunc, handleRemoveAppliedFilter){
       const combined = [...filterArray1, ...filterArray2];

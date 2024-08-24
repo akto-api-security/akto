@@ -187,17 +187,28 @@ function ApiEndpoints() {
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
-
+    let timeNow = func.timeNow();
     async function fetchData() {
+        let apiPromises = [
+            api.fetchApisFromStis(apiCollectionId),
+            api.fetchApiInfosForCollection(apiCollectionId),
+            api.fetchAPIsFromSourceCode(apiCollectionId),
+            api.loadSensitiveParameters(apiCollectionId)
+        ];
         setLoading(true)
-        let apiCollectionData = await api.fetchAPICollection(apiCollectionId)
-        setShowEmptyScreen(apiCollectionData.data.endpoints.length === 0)
-        setIsRedacted(apiCollectionData.redacted)
-        let apiEndpointsInCollection = apiCollectionData.data.endpoints.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
-        let apiInfoListInCollection = apiCollectionData.data.apiInfoList
-        let unusedEndpointsInCollection = apiCollectionData.unusedEndpoints
-        let sensitiveParamsResp = await api.loadSensitiveParameters(apiCollectionId)
+        
+        let results = await Promise.allSettled(apiPromises);
+        let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
+        let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
+        let sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
+        let sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
+        setShowEmptyScreen(stisEndpoints.list.length === 0)
+        setIsRedacted(apiInfosData.redacted)
+        let apiEndpointsInCollection = stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
+        let apiInfoListInCollection = apiInfosData.apiInfoList
+        let unusedEndpointsInCollection = stisEndpoints.unusedEndpoints
         let sensitiveParams = sensitiveParamsResp.data.endpoints
+        timeNow = func.timeNow();
 
         let sensitiveParamsMap = {}
         sensitiveParams.forEach(p => {
@@ -232,7 +243,7 @@ function ApiEndpoints() {
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap)
 
         // handle code analysis endpoints
-        const codeAnalysisCollectionInfo = apiCollectionData.codeAnalysisCollectionInfo
+        const codeAnalysisCollectionInfo = sourceCodeData.codeAnalysisCollectionInfo
         const codeAnalysisApisMap = codeAnalysisCollectionInfo.codeAnalysisApisMap
         let shadowApis = []
 
@@ -289,7 +300,7 @@ function ApiEndpoints() {
         data['new'] = prettifyData.filter(x=> x.isNew)
         data['no_auth'] = prettifyData.filter(x => x.open)
         data['shadow'] = [ ...shadowApis ]
-
+        setLoading(false)
         setEndpointData(data)
         setSelectedTab("all")
         setSelected(0)

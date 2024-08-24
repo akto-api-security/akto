@@ -3,17 +3,16 @@ package com.akto.dao;
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
-import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -186,9 +185,7 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         }
         
         pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
-
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-
         List<BasicDBObject> endpoints = new ArrayList<>();
         while(endpointsCursor.hasNext()) {
             endpoints.add(endpointsCursor.next());
@@ -199,9 +196,12 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
     public static final int STIS_LIMIT = 10_000;
 
-    public static List<SingleTypeInfo> fetchHostSTI(int apiCollectionId, int skip) {
+    public static List<SingleTypeInfo> fetchHostSTI(int apiCollectionId, int skip, ObjectId lastScannedId, Bson projection) {
         Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
-        return SingleTypeInfoDao.instance.findAll(filterQ, skip, STIS_LIMIT, null);
+        if(lastScannedId != null){
+            filterQ = Filters.and(filterQ, Filters.gte(Constants.ID, lastScannedId));
+        }
+        return SingleTypeInfoDao.instance.findAll(filterQ, skip, STIS_LIMIT, Sorts.ascending(Constants.ID), projection);
     }
 
     public static List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int limit, int deltaPeriodValue) {
@@ -217,10 +217,13 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         } else {
             List<SingleTypeInfo> allUrlsInCollection = new ArrayList<>();
             int localSkip = 0;
+            ObjectId lastScannedId = null;
+            Bson projection = Projections.include(Constants.TIMESTAMP, ApiInfoKey.API_COLLECTION_ID, ApiInfoKey.URL, ApiInfoKey.METHOD);
             while(true){
-                List<SingleTypeInfo> stis = fetchHostSTI(apiCollectionId, localSkip);
+                List<SingleTypeInfo> stis = fetchHostSTI(apiCollectionId, localSkip, lastScannedId, projection);
+                lastScannedId = stis.size() != 0 ? stis.get(stis.size() - 1).getId() : null;
                 allUrlsInCollection.addAll(stis);
-                if(stis.size() < STIS_LIMIT){
+                if(stis.size() <= STIS_LIMIT){
                     break;
                 }
 

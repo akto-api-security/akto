@@ -1,4 +1,4 @@
-import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button } from '@shopify/polaris';
+import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
 import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor } from '@shopify/polaris-icons';
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -160,9 +160,11 @@ export default function Header() {
     })
 
     const searchResultsMarkup = (
+        <Scrollable style={{maxHeight: '300px'}} shadow>
         <ActionList
             items={searchItems}
         />
+        </Scrollable>
     );
 
     const searchFieldMarkup = (
