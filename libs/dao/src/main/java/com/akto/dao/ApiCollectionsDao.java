@@ -162,20 +162,20 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         return countMap;
     }
 
-    public static List<BasicDBObject> fetchEndpointsInCollection(int apiCollectionId, int skip, int limit, int deltaPeriodValue) {
+    public static List<BasicDBObject> fetchEndpointsInCollection(Bson filter, int skip, int limit, int deltaPeriodValue) {
         List<Bson> pipeline = new ArrayList<>();
-        BasicDBObject groupedId = 
-            new BasicDBObject(ApiInfoKey.API_COLLECTION_ID, "$apiCollectionId")
-            .append(ApiInfoKey.URL, "$url")
-            .append(ApiInfoKey.METHOD, "$method");
+        BasicDBObject groupedId =
+                new BasicDBObject(ApiInfoKey.API_COLLECTION_ID, "$apiCollectionId")
+                        .append(ApiInfoKey.URL, "$url")
+                        .append(ApiInfoKey.METHOD, "$method");
 
-        pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId)));
+        pipeline.add(Aggregates.match(filter));
 
         int recentEpoch = Context.now() - deltaPeriodValue;
 
         Bson projections = Projections.fields(
-            Projections.include(Constants.TIMESTAMP, ApiInfoKey.API_COLLECTION_ID, ApiInfoKey.URL, ApiInfoKey.METHOD),
-            Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", recentEpoch}))
+                Projections.include(Constants.TIMESTAMP, ApiInfoKey.API_COLLECTION_ID, ApiInfoKey.URL, ApiInfoKey.METHOD),
+                Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", recentEpoch}))
         );
 
         pipeline.add(Aggregates.project(projections));
@@ -184,7 +184,7 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
             pipeline.add(Aggregates.skip(skip));
             pipeline.add(Aggregates.limit(limit));
         }
-        
+
         pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
 
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -195,6 +195,10 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         }
 
         return endpoints;
+    }
+    public static List<BasicDBObject> fetchEndpointsInCollection(int apiCollectionId, int skip, int limit, int deltaPeriodValue) {
+        Bson filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
+        return fetchEndpointsInCollection(filter, skip, limit, deltaPeriodValue);
     }
 
     public static final int STIS_LIMIT = 10_000;

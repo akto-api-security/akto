@@ -550,6 +550,17 @@ export default {
             }
         })
     },
+    async getEndpointsListFromConditions(conditions) {
+        return await request({
+            url: '/api/getEndpointsListFromConditions',
+            method: 'post',
+            data: {
+                conditions
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
     async getEndpointsFromConditions(conditions) {
         return await request({
             url: '/api/getEndpointsFromConditions',

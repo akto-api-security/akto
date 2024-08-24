@@ -68,6 +68,13 @@ public class ApiCollectionUsers {
             });
         }});
 
+    public static List<BasicDBObject> getSingleTypeInfoListFromConditions(List<TestingEndpoints> conditions, int skip, int limit, int deltaPeriodValue) {
+        if(conditions == null || conditions.isEmpty()){
+            return new ArrayList<>();
+        }
+        Bson singleTypeInfoFilters = getFilters(conditions, CollectionType.ApiCollectionId);
+        return ApiCollectionsDao.fetchEndpointsInCollection(singleTypeInfoFilters, skip, limit, deltaPeriodValue);
+    }
     public static int getApisCountFromConditions(List<TestingEndpoints> conditions) {
 
         if(conditions == null || conditions.isEmpty()){

@@ -127,7 +127,7 @@ public class InventoryAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private void attachTagsInAPIList(List<BasicDBObject> list) {
+    public void attachTagsInAPIList(List<BasicDBObject> list) {
         List<TagConfig> tagConfigs = TagConfigsDao.instance.findAll(new BasicDBObject("active", true));
         for (BasicDBObject singleTypeInfo: list) {
             singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
@@ -142,7 +142,7 @@ public class InventoryAction extends UserAction {
         }
     }
 
-    private void attachAPIInfoListInResponse(List<BasicDBObject> list, int apiCollectionId) {
+    public void attachAPIInfoListInResponse(List<BasicDBObject> list, int apiCollectionId) {
         response = new BasicDBObject();
         List<ApiInfo> apiInfoList = ApiInfoDao.getApiInfosFromList(list, apiCollectionId);
 
@@ -260,6 +260,7 @@ public class InventoryAction extends UserAction {
 
         return unused;
     }
+
 
     public String fetchAPICollection() {
         List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
