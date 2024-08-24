@@ -23,9 +23,12 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.metadata.ActiveAccounts;
 import com.akto.log.LoggerMaker;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+
 import org.bson.conversions.Bson;
 
 public class UsageMetricCalculator {
@@ -60,7 +63,7 @@ public class UsageMetricCalculator {
 
     public static Set<Integer> getDeactivatedLatest(){
         List<ApiCollection> deactivated = ApiCollectionsDao.instance
-                .findAll(Filters.eq(ApiCollection._DEACTIVATED, true));
+                .findAll(Filters.eq(ApiCollection._DEACTIVATED, true), Projections.include(Constants.ID));
         Set<Integer> deactivatedIds = new HashSet<>(
                 deactivated.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList()));
 

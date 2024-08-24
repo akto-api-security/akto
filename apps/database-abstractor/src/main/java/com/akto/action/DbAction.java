@@ -42,6 +42,7 @@ import com.akto.testing.TestExecutor;
 import com.akto.trafficFilter.HostFilter;
 import com.akto.trafficFilter.ParamFilter;
 import com.akto.util.Constants;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
@@ -223,6 +224,26 @@ public class DbAction extends ActionSupport {
     ObjectMapper objectMapper = new ObjectMapper();
     KafkaUtils kafkaUtils = new KafkaUtils();
     String endpointLogicalGroupId;
+
+    String metricType;
+
+    public String getMetricType() {
+        return metricType;
+    }
+
+    public void setMetricType(String metricType) {
+        this.metricType = metricType;
+    }
+
+    int deltaUsage;
+
+    public int getDeltaUsage() {
+        return deltaUsage;
+    }
+
+    public void setDeltaUsage(int deltaUsage) {
+        this.deltaUsage = deltaUsage;
+    }
 
     DataControlSettings dataControlSettings;
     public String fetchDataControlSettings() {
@@ -934,6 +955,27 @@ public class DbAction extends ActionSupport {
             stis = DbLayer.fetchStiBasedOnHostHeaders(lastTsObjectId);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchStiBasedOnHostHeaders " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchDeactivatedCollections() {
+        try {
+            apiCollectionIds = DbLayer.fetchDeactivatedCollections();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchDeactivatedCollections " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateUsage() {
+        try {
+            MetricTypes metric = MetricTypes.valueOf(metricType);
+            DbLayer.updateUsage(metric, deltaUsage);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateUsage " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
