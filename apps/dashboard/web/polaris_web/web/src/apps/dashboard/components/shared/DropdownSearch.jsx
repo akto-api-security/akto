@@ -188,7 +188,7 @@ function DropdownSearch(props) {
     return (
             <Autocomplete
                 {...(allowMultiple ? {allowMultiple:true} : {} )}
-                options={options}
+                options={options.slice(0,20)}
                 selected={selectedOptions}
                 onSelect={updateSelection}
                 emptyState={emptyState}
