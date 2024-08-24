@@ -286,7 +286,7 @@ public class ApiExecutor {
         return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, false);
     }
 
-    private static final List<Integer> BACK_OFF_LIMITS = new ArrayList<>(Arrays.asList(5, 10, 15));
+    private static final List<Integer> BACK_OFF_LIMITS = new ArrayList<>(Arrays.asList(1, 2, 5));
 
     public static OriginalHttpResponse sendRequestBackOff(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
         OriginalHttpResponse response = null;
