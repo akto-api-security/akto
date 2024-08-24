@@ -964,6 +964,7 @@ public class DbAction extends ActionSupport {
         try {
             apiCollectionIds = DbLayer.fetchDeactivatedCollections();
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchDeactivatedCollections " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -974,6 +975,7 @@ public class DbAction extends ActionSupport {
             MetricTypes metric = MetricTypes.valueOf(metricType);
             DbLayer.updateUsage(metric, deltaUsage);
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateUsage " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
