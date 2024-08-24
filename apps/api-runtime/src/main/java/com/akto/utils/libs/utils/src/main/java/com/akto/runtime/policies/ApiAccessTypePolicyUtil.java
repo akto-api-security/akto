@@ -6,6 +6,7 @@ import org.apache.commons.lang3.function.FailableFunction;
 
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.traffic.SampleData;
@@ -46,7 +47,12 @@ public class ApiAccessTypePolicyUtil {
             }
             return null;
         };
+        int now = Context.now();
+        loggerMaker.infoAndAddToDb(String.format("Starting update job for calcApiAccessType at %d", now));
         CalculateJob.apiInfoUpdateJob(func);
+        int now2 = Context.now();
+        int diff = now2 - now;
+        loggerMaker.infoAndAddToDb(String.format("Finished update job for calcApiAccessType at %d , time taken : %d seconds", now2, diff));
     }
 
 }

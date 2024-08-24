@@ -23,6 +23,11 @@ public class ApiAccessTypePolicy {
     // RFC standard list. To be used later.
     static final private List<String> STANDARD_PRIVATE_IP_RANGES = Arrays.asList(
             /*
+             * localhost IP
+             * 127.0.0.1/32
+             */
+    
+            /*
              * private internets : https://datatracker.ietf.org/doc/html/rfc1918#section-3
              */
             "10.0.0.0/8",

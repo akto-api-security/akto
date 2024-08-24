@@ -264,14 +264,18 @@ public class AdminSettingsAction extends UserAction {
 
             executorService.schedule(new Runnable() {
                 public void run() {
-                    Context.accountId.set(accountId);
-                    List<String> partnerIpList = new ArrayList<>();
-                    if (accountSettings != null &&
-                            accountSettings.getPartnerIpList() != null &&
-                            !accountSettings.getPartnerIpList().isEmpty()) {
-                        partnerIpList = accountSettings.getPartnerIpList();
+                    try {
+                        Context.accountId.set(accountId);
+                        List<String> partnerIpList = new ArrayList<>();
+                        if (accountSettings != null &&
+                                accountSettings.getPartnerIpList() != null &&
+                                !accountSettings.getPartnerIpList().isEmpty()) {
+                            partnerIpList = accountSettings.getPartnerIpList();
+                        }
+                        ApiAccessTypePolicyUtil.calcApiAccessType(policy, partnerIpList);
+                    } catch (Exception e){
+                        logger.error("Error in applyAccessType", e);
                     }
-                    ApiAccessTypePolicyUtil.calcApiAccessType(policy, partnerIpList);
                 }
             }, 0, TimeUnit.SECONDS);
             return Action.SUCCESS.toUpperCase();

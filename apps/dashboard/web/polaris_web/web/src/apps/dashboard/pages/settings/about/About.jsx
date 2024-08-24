@@ -148,7 +148,7 @@ function About() {
 
     const applyIps = async() => {
         await settingRequests.applyAccessType()
-        func.setToast(true, false, "Access type configuration has been applied")
+        func.setToast(true, false, "Access type configuration is being applied. Please wait for some time for the results to be reflected.")
     }
 
     function ToggleComponent({text,onToggle,initial}){
@@ -426,7 +426,7 @@ function About() {
         return(
             <LegacyCard title={<TitleComponent title={title} description={description} />}
                 actions={[
-                    { content: 'Apply', onAction: onApply},
+                    { content: 'Apply', onAction: onApply }
                 ]}
             >
                 <Divider />
