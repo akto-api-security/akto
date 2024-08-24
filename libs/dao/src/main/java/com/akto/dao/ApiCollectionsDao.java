@@ -198,8 +198,10 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
     public static List<SingleTypeInfo> fetchHostSTI(int apiCollectionId, int skip, ObjectId lastScannedId, Bson projection) {
         Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
-        filterQ = Filters.and(filterQ, Filters.gte(Constants.ID, lastScannedId));
-        return SingleTypeInfoDao.instance.findAll(filterQ, skip, STIS_LIMIT, null, projection);
+        if(lastScannedId != null){
+            filterQ = Filters.and(filterQ, Filters.gte(Constants.ID, lastScannedId));
+        }
+        return SingleTypeInfoDao.instance.findAll(filterQ, skip, STIS_LIMIT, Sorts.ascending(Constants.ID), projection);
     }
 
     public static List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int limit, int deltaPeriodValue) {
@@ -215,11 +217,11 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         } else {
             List<SingleTypeInfo> allUrlsInCollection = new ArrayList<>();
             int localSkip = 0;
-            ObjectId lastScannedId = SingleTypeInfoDao.instance.findOne(Filters.empty()).getId();
+            ObjectId lastScannedId = null;
             Bson projection = Projections.include(Constants.TIMESTAMP, ApiInfoKey.API_COLLECTION_ID, ApiInfoKey.URL, ApiInfoKey.METHOD);
             while(true){
                 List<SingleTypeInfo> stis = fetchHostSTI(apiCollectionId, localSkip, lastScannedId, projection);
-                lastScannedId = stis.size() != 0 ? stis.get(stis.size() - 1).getId() : new ObjectId();
+                lastScannedId = stis.size() != 0 ? stis.get(stis.size() - 1).getId() : null;
                 allUrlsInCollection.addAll(stis);
                 if(stis.size() <= STIS_LIMIT){
                     break;
