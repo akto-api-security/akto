@@ -47,6 +47,7 @@ function TrendChart(props) {
         let retH = []
         let retM = []
         let retL = []
+        let retC = []
 
         let items = data;
 
@@ -65,6 +66,7 @@ function TrendChart(props) {
             let ts = x["startTimestamp"] * 1000
             let countIssuesMap = x["countIssues"]
             if(countIssuesMap && Object.keys(countIssuesMap).length > 0){
+                retC.push([ts],countIssuesMap["CRITICAL"])
                 retH.push([ts, countIssuesMap["HIGH"]])
                 retM.push([ts, countIssuesMap["MEDIUM"]])
                 retL.push([ts, countIssuesMap["LOW"]])
@@ -73,9 +75,9 @@ function TrendChart(props) {
 
         return [
             {
-                data: retH,
+                data: retC,
                 color: "var(--p-color-bg-critical-strong)",
-                name: "CRITICAL"
+                name: "Critical"
             },
             {
                 data: retH,
