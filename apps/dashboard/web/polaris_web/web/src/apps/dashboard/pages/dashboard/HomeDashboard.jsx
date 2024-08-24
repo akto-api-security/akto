@@ -146,12 +146,6 @@ function HomeDashboard() {
 
     const riskScoreRanges = [
         {
-            text: "Critical risk",
-            range: '5-6',
-            status: "very critical",
-            apiCollectionId: 111_111_151
-        },
-        {
             text: "High risk",
             range: '4-5',
             status: "critical",

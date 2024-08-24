@@ -24,7 +24,6 @@ public class RiskScoreTestingEndpointsUtils {
         put(RiskScoreTestingEndpoints.RiskScoreGroupType.LOW, new ArrayList<>());
         put(RiskScoreTestingEndpoints.RiskScoreGroupType.MEDIUM, new ArrayList<>());
         put(RiskScoreTestingEndpoints.RiskScoreGroupType.HIGH, new ArrayList<>());
-        put(RiskScoreTestingEndpoints.RiskScoreGroupType.CRITICAL, new ArrayList<>());
     }}; 
 
     
@@ -32,7 +31,6 @@ public class RiskScoreTestingEndpointsUtils {
         put(RiskScoreTestingEndpoints.RiskScoreGroupType.LOW, new ArrayList<>());
         put(RiskScoreTestingEndpoints.RiskScoreGroupType.MEDIUM, new ArrayList<>());
         put(RiskScoreTestingEndpoints.RiskScoreGroupType.HIGH, new ArrayList<>());
-        put(RiskScoreTestingEndpoints.RiskScoreGroupType.CRITICAL, new ArrayList<>());
     }}; 
     
     private static final ExecutorService executorService = Executors.newFixedThreadPool(1);

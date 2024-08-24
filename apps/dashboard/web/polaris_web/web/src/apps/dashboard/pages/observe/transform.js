@@ -349,7 +349,7 @@ const transform = {
     getColor(key){
         switch(key.toUpperCase()){
             case "CRITICAL" : return "critical";
-            case "HIGH" : return "critical";
+            case "HIGH" : return "warning";
             case "MEDIUM": return "attention";
             case "LOW": return "info";
             default:

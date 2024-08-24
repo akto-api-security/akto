@@ -32,7 +32,7 @@ public class RiskScoreTestingEndpoints extends TestingEndpoints {
     public static int BATCH_SIZE = 100;
 
     public enum RiskScoreGroupType {
-        LOW, MEDIUM, HIGH, CRITICAL
+        LOW, MEDIUM, HIGH
     }
 
     public RiskScoreTestingEndpoints() {
@@ -54,10 +54,6 @@ public class RiskScoreTestingEndpoints extends TestingEndpoints {
                 riskScoreGroupUpperBound = 4f;
                 break;
             case HIGH:
-                riskScoreGroupLowerBound = 4f;
-                riskScoreGroupUpperBound = 5f;
-                break;
-            case CRITICAL:
                 riskScoreGroupLowerBound = 4f;
                 riskScoreGroupUpperBound = 5f;
                 break;
@@ -118,8 +114,6 @@ public class RiskScoreTestingEndpoints extends TestingEndpoints {
             return RiskScoreGroupType.MEDIUM;
         } else if (riskScore >= 4f && riskScore <= 5f) {
             return RiskScoreGroupType.HIGH;
-        } else if (riskScore >= 4f && riskScore <= 5f) {
-            return RiskScoreGroupType.CRITICAL;
         }
 
         
