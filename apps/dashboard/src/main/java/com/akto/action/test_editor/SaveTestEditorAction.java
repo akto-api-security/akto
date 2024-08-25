@@ -29,6 +29,7 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowNodeDetails;
@@ -329,7 +330,8 @@ public class SaveTestEditorAction extends UserAction {
         List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
         int lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
         
-        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs);
+        TestingRunConfig testingRunConfig = new TestingRunConfig();
+        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunConfig, true, testLogs);
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
                     new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(lastSampleIndex),
