@@ -300,7 +300,7 @@ function GithubServerTable(props) {
         />
       ),
     );
-  }, [data, selectedResources, props]);
+  }, [data, selectedResources, props, popoverActive, setPopoverActive]);
 
   const onPageNext = () => {
     setPage((page) => (page + 1));
