@@ -14,6 +14,7 @@ public class DictionaryFilter {
     public static BloomFilter<CharSequence> dictFilter = null;
 
     public static void readDictionaryBinary() {
+        // English Word List Repo: https://github.com/dwyl/english-words
         try (InputStream binary = DictionaryFilter.class.getResourceAsStream("/DictionaryBinary")) {
             logger.info("reading dictionary binary");
             dictFilter = BloomFilter.readFrom(binary, Funnels.stringFunnel(StandardCharsets.UTF_8));

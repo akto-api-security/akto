@@ -118,6 +118,8 @@ public class TestMergingNew extends MongoBasedTest {
         List<String> urls = Arrays.asList(
                 baseUrl + "demo",
                 baseUrl + "cat",
+                baseUrl + "OSHE2CNS",
+                baseUrl + "2HOIWNJK",
                 baseUrl + "31a1a7c5-b4e3-47f5-8579-f7fc044c6a98",
                 baseUrl + "tree"
         );
