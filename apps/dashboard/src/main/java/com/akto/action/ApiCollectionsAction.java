@@ -125,7 +125,7 @@ public class ApiCollectionsAction extends UserAction {
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.project(Projections.fields(
             Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE)
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE, ApiCollection._DEACTIVATED)
         )));
         MongoCursor<BasicDBObject> cursor = ApiCollectionsDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
         while(cursor.hasNext()){
@@ -136,6 +136,7 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setUrlsCount(collection.getInt(ApiCollection.URLS_COUNT)); 
                 apiCollection.setName(collection.getString(ApiCollection.NAME));
                 apiCollection.setHostName(collection.getString(ApiCollection.HOST_NAME));
+                apiCollection.setDeactivated(collection.getBoolean(ApiCollection._DEACTIVATED));
                 
                 String type = collection.getString(ApiCollection._TYPE);
                 if(type != null && type.length() > 0){
