@@ -139,9 +139,6 @@ const sortOptions = [
 function ApiEndpoints(props) {
 
     const { endpointListFromConditions, sensitiveParamsForQuery, isQueryPage } = props
-    console.log("endpointListFromConditions", endpointListFromConditions)
-    console.log("sensitiveParamsForQuery", sensitiveParamsForQuery)
-    console.log("isQueryPage", isQueryPage)
     const params = useParams()
     const location = useLocation()
     const apiCollectionId = params.apiCollectionId
@@ -195,13 +192,17 @@ function ApiEndpoints(props) {
 
     async function fetchData() {
         setLoading(true)
-        if (isQueryPage && Object.keys(endpointListFromConditions).length === 0 && Object.keys(sensitiveParamsForQuery).length === 0) {
-            setLoading(false)
-            return
-        }
         let apiCollectionData = endpointListFromConditions
         if (!isQueryPage) {
             apiCollectionData = await api.fetchAPICollection(apiCollectionId)
+        }
+        if (isQueryPage && Object.keys(endpointListFromConditions).length === 0) {
+            apiCollectionData = {
+                data: {
+                    endpoints: [],
+                    apiInfoList: []
+                }
+            }
         }
         setShowEmptyScreen(apiCollectionData.data.endpoints.length === 0)
         setIsRedacted(apiCollectionData.redacted)
@@ -211,6 +212,14 @@ function ApiEndpoints(props) {
         let sensitiveParamsResp = sensitiveParamsForQuery
         if (!isQueryPage) {
             sensitiveParamsResp = await api.loadSensitiveParameters(apiCollectionId)
+        }
+        if (isQueryPage && Object.keys(sensitiveParamsForQuery).length === 0) {
+            sensitiveParamsResp = {
+                data: {
+                    endpoints: [],
+                    apiInfoList: []
+                }
+            }
         }
         let sensitiveParams = sensitiveParamsResp.data.endpoints
         let sensitiveParamsMap = {}
@@ -311,11 +320,9 @@ function ApiEndpoints(props) {
         setApiInfoList(apiInfoListInCollection)
         setUnusedEndpoints(unusedEndpointsInCollection)
 
-        console.log("setting loading false")
         setLoading(false)
     }
 
-    console.log("endpointData", endpointData)
     useEffect(() => {
         if (!endpointData || !endpointData["all"] || !selectedUrl || !selectedMethod) return
         let allData = endpointData["all"]

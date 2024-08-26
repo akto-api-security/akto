@@ -1,12 +1,13 @@
 import CollectionComponent from "../../../components/CollectionComponent"
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
-import { VerticalStack, Card, Button, HorizontalStack } from "@shopify/polaris";
+import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import React, { useState, useReducer, useCallback } from 'react'
 import { produce } from "immer"
 import ApiEndpoints from "./ApiEndpoints";
 import api from "../api"
+import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
 
 
 function APIQuery() {
@@ -14,7 +15,9 @@ function APIQuery() {
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => conditionsReducer(draft, action)), []);
     const [endpointListFromConditions, setEndpointListFromConditions] = useState({})
     const [sensitiveParams, setSensitiveParams] = useState({})
-
+    const [open, setOpen] = useState(true);
+    const handleToggle = useCallback(() => setOpen((open) => !open), []);
+    const [apiCount, setApiCount] = useState(0)
 
     function conditionsReducer(draft, action) {
         switch (action.type) {
@@ -32,9 +35,10 @@ function APIQuery() {
         dispatchConditions({ type: "add", obj: emptyCondition })
     };
 
-    const handleClearFunction = () => {
+    const handleClearFunction = async () => {
         dispatchConditions({ type: "clear" })
-        exploreEndpoints()
+        setEndpointListFromConditions({})
+        setSensitiveParams({})
     }
     function prepareData() {
         let dt = []
@@ -66,6 +70,7 @@ function APIQuery() {
             if (endpointListFromConditions || sensitiveParams) {
                 setEndpointListFromConditions(endpointListFromConditions)
                 setSensitiveParams(sensitiveParams)
+                setApiCount(endpointListFromConditions.apiCount)
             }
         } else {
             setEndpointListFromConditions({})
@@ -73,50 +78,68 @@ function APIQuery() {
         }
     }
 
-    console.log("endpointListFromConditions", endpointListFromConditions)
-    console.log("Object.keys(endpointListFromConditions) > 0", Object.keys(endpointListFromConditions) > 0)
-    const components = [<VerticalStack gap="6" key="conditions-component">
-        <Card>
-            <VerticalStack gap="4">
-                {
-                    conditions.length > 0 && conditions.map((condition, index) => (
-                        <CollectionComponent
-                            condition={condition}
-                            index={index}
-                            dispatch={dispatchConditions}
-                            operatorComponent={<OperatorDropdown
-                                items={[{
-                                    label: 'OR',
-                                    value: 'OR',
-                                },
+    const collapsibleComponent =
+        <VerticalStack gap={"0"} key="conditions-filters">
+            <Box background={"bg-subdued"} width="100%" padding={"2"} onClick={handleToggle}>
+                <HorizontalStack align="space-between">
+                    <Text variant="headingSm">
+                        { endpointListFromConditions.data ? apiCount > 200 ? `Listing 200 sample endpoints out of total ` + apiCount + ` endpoints`: `Listing total ` + apiCount + ` endpoints` : "Select filters to see endpoints"}
+                    </Text>
+                    <Box>
+                        <Icon source={open ? ChevronDownMinor : ChevronUpMinor} />
+                    </Box>
+                </HorizontalStack>
+            </Box>
+            <Collapsible
+                open={open}
+                id="basic-collapsible"
+                transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
+            >
+                <VerticalStack gap={"0"} key="conditions-component">
+                    <Card>
+                        <VerticalStack gap="4">
+                            {
+                                conditions.length > 0 && conditions.map((condition, index) => (
+                                    <CollectionComponent
+                                        condition={condition}
+                                        index={index}
+                                        dispatch={dispatchConditions}
+                                        operatorComponent={<OperatorDropdown
+                                            items={[{
+                                                label: 'OR',
+                                                value: 'OR',
+                                            },
+                                            {
+                                                label: 'AND',
+                                                value: 'AND'
+                                            }]}
+                                            label={condition.operator}
+                                            selected={(value) => {
+                                                dispatchConditions({ type: "updateKey", index: index, key: "operator", obj: value })
+                                            }} />}
+                                    />
+                                ))
+                            }
+                            <HorizontalStack gap={4} align="start">
+                                <Button onClick={() => handleAddField()}>Add condition</Button>
                                 {
-                                    label: 'AND',
-                                    value: 'AND'
-                                }]}
-                                label={condition.operator}
-                                selected={(value) => {
-                                    dispatchConditions({ type: "updateKey", index: index, key: "operator", obj: value })
-                                }} />}
-                        />
-                    ))
-                }
-                <HorizontalStack gap={4} align="start">
-                    <Button onClick={() => handleAddField()}>Add condition</Button>
-                    {
-                        conditions.length > 0 ? <Button plain destructive onClick={handleClearFunction}>Clear all</Button> : null
-                    }
-                </HorizontalStack>
-                <HorizontalStack gap={4} align="end">
-                    <Button onClick={() => exploreEndpoints()}>Explore endpoints</Button>
-                </HorizontalStack>
-            </VerticalStack>
-        </Card>
-    </VerticalStack>,
-    <ApiEndpoints key="endpoint-table"
-        endpointListFromConditions={endpointListFromConditions}
-        sensitiveParamsForQuery={sensitiveParams}
-        isQueryPage={true}
-    ></ApiEndpoints>
+                                    conditions.length > 0 ? <Button plain destructive onClick={handleClearFunction}>Clear all</Button> : null
+                                }
+                            </HorizontalStack>
+                            <HorizontalStack gap={4} align="end">
+                                <Button onClick={() => exploreEndpoints()}>Explore endpoints</Button>
+                            </HorizontalStack>
+                        </VerticalStack>
+                    </Card>
+                </VerticalStack>
+            </Collapsible>
+        </VerticalStack>
+    const components = [collapsibleComponent,
+        <ApiEndpoints key="endpoint-table"
+            endpointListFromConditions={endpointListFromConditions}
+            sensitiveParamsForQuery={sensitiveParams}
+            isQueryPage={true}
+        ></ApiEndpoints>
     ]
     return (
         <PageWithMultipleCards
