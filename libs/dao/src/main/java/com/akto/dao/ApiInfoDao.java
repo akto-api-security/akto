@@ -53,9 +53,6 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
         fieldNames = new String[]{"_id." + ApiInfo.ApiInfoKey.URL};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
-
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL }, true);
         
         fieldNames = new String[]{"_id." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, "_id." + ApiInfo.ApiInfoKey.URL};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
