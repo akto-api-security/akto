@@ -112,6 +112,7 @@ public class TestingIssuesHandler {
         ObjectId summaryId = null;
 
         Map<String, Integer> countIssuesMap = new HashMap<>();
+        countIssuesMap.put(Severity.CRITICAL.toString(), 0);
         countIssuesMap.put(Severity.HIGH.toString(), 0);
         countIssuesMap.put(Severity.MEDIUM.toString(), 0);
         countIssuesMap.put(Severity.LOW.toString(), 0);

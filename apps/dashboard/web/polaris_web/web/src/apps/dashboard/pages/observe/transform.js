@@ -348,9 +348,9 @@ const transform = {
 
     getColor(key){
         switch(key.toUpperCase()){
-            case "CRITICAL" : return "critical";
-            case "HIGH" : return "warning";
-            case "MEDIUM": return "attention";
+            case "CRITICAL" : return "critical-strong-experimental";
+            case "HIGH" : return "critical";
+            case "MEDIUM": return "warning";
             case "LOW": return "info";
             default:
                 return "bg";
@@ -371,7 +371,26 @@ const transform = {
         }
     },
 
+    sortOnSeverity(severityInfo) {
+        const severityOrder = {
+            "CRITICAL": 1,
+            "HIGH": 2,
+            "MEDIUM": 3,
+            "LOW": 4
+        };
+        const sortedKeys = Object.keys(severityInfo).sort((a, b) => {
+            return severityOrder[a] - severityOrder[b];
+        });
+        const sortedSeverityInfo = {};
+        sortedKeys.forEach(key => {
+            sortedSeverityInfo[key] = severityInfo[key];
+        });
+    
+        return sortedSeverityInfo;
+    },
+
     getIssuesList(severityInfo){
+        severityInfo = this.sortOnSeverity(severityInfo)
         return (
             <HorizontalStack gap="1" wrap={false}>
                 {
