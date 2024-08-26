@@ -1,13 +1,15 @@
 import CollectionComponent from "../../../components/CollectionComponent"
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
-import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon } from "@shopify/polaris";
+import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon, Modal, TextField } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
-import React, { useState, useReducer, useCallback } from 'react'
+import React, { useState, useReducer, useCallback, useMemo } from 'react'
 import { produce } from "immer"
 import ApiEndpoints from "./ApiEndpoints";
 import api from "../api"
 import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
+import func from "@/util/func";
+import { Navigate } from "react-router-dom";
 
 
 function APIQuery() {
@@ -18,6 +20,13 @@ function APIQuery() {
     const [open, setOpen] = useState(true);
     const handleToggle = useCallback(() => setOpen((open) => !open), []);
     const [apiCount, setApiCount] = useState(0)
+    const [active, setActive] = useState(false);
+    const [newCollectionName, setNewCollectionName] = useState('');
+
+    const handleNewCollectionNameChange =
+        useCallback(
+            (newValue) => setNewCollectionName(newValue),
+            []);
 
     function conditionsReducer(draft, action) {
         switch (action.type) {
@@ -31,59 +40,113 @@ function APIQuery() {
         }
     }
 
-    const handleAddField = () => {
-        dispatchConditions({ type: "add", obj: emptyCondition })
-    };
+    const handleAddField = useCallback(() => {
+        dispatchConditions({ type: "add", obj: emptyCondition });
+    }, []);
 
-    const handleClearFunction = async () => {
-        dispatchConditions({ type: "clear" })
-        setEndpointListFromConditions({})
-        setSensitiveParams({})
-    }
-    function prepareData() {
-        let dt = []
+    const openModal = useCallback(() => {
+        setActive(true);
+    }, []);
+
+    const prepareData = useCallback(() => {
+        let dt = [];
         conditions.forEach(condition => {
-            if (condition.type == "CUSTOM") {
-                let apiList = []
-                let collectionId = Object.keys(condition.data)[0]
-                if (collectionId != undefined && condition.data[collectionId].length > 0) {
+            if (condition.type === "CUSTOM") {
+                let apiList = [];
+                let collectionId = Object.keys(condition.data)[0];
+                if (collectionId !== undefined && condition.data[collectionId].length > 0) {
                     condition.data[collectionId].forEach(x =>
                         apiList.push({
                             apiCollectionId: parseInt(collectionId),
                             url: x.url,
                             method: x.method
-                        }))
+                        }));
                 }
-                dt.push({ type: condition.type, operator: condition.operator, data: { apiList: apiList } })
+                dt.push({ type: condition.type, operator: condition.operator, data: { apiList: apiList } });
             } else {
-                dt.push(condition)
+                dt.push(condition);
             }
-        })
+        });
         return dt;
-    }
+    }, [conditions]);
 
-    const exploreEndpoints = async () => {
+    const createNewCollection = useCallback(async () => {
+        if (newCollectionName.length === 0) {
+            func.setToast(true, true, "Collection name cannot be empty");
+            return;
+        }
+        let dt = prepareData();
+        if (dt && dt.length > 0) {
+            await api.createCustomCollection(newCollectionName, dt);
+            setActive(false);
+            func.setToast(true, false, <div data-testid="collection_creation_message">{"API collection created successfully"}</div>);
+        } else {
+            func.setToast(true, true, <div data-testid="collection_creation_message">{"No endpoints selected"}</div>);
+        }
+    }, [newCollectionName, prepareData]);
+
+    const handleClearFunction = useCallback(() => {
+        dispatchConditions({ type: "clear" });
+        setEndpointListFromConditions({});
+        setSensitiveParams({});
+    }, []);
+
+
+    const exploreEndpoints = useCallback(async () => {
         let dt = prepareData();
         if (dt.length > 0) {
             let endpointListFromConditions = await api.getEndpointsListFromConditions(dt);
             let sensitiveParams = await api.loadSensitiveParameters(-1);
             if (endpointListFromConditions || sensitiveParams) {
-                setEndpointListFromConditions(endpointListFromConditions)
-                setSensitiveParams(sensitiveParams)
-                setApiCount(endpointListFromConditions.apiCount)
+                setEndpointListFromConditions(endpointListFromConditions);
+                setSensitiveParams(sensitiveParams);
+                setApiCount(endpointListFromConditions.apiCount);
             }
         } else {
-            setEndpointListFromConditions({})
-            setSensitiveParams({})
+            setEndpointListFromConditions({});
+            setSensitiveParams({});
         }
-    }
+    }, [prepareData]);
 
-    const collapsibleComponent =
+    const modalComponent = useMemo(() => (
+        <Modal
+            large
+            key="modal"
+            open={active}
+            onClose={() => setActive(false)}
+            title="New collection"
+            primaryAction={{
+                id: "create-new-collection",
+                content: 'Create',
+                onAction: createNewCollection,
+            }}
+        >
+            <Modal.Section>
+                <VerticalStack gap={3}>
+                    <TextField
+                        id={"new-collection-input"}
+                        label="Name"
+                        value={newCollectionName}
+                        onChange={handleNewCollectionNameChange}
+                        autoComplete="off"
+                        maxLength="24"
+                        suffix={(
+                            <Text>{newCollectionName.length}/24</Text>
+                        )}
+                        autoFocus
+                        {...newCollectionName.length === 0 ? { error: "Collection name cannot be empty" } : {}}
+                    />
+                </VerticalStack>
+            </Modal.Section>
+        </Modal>
+    ), [active, newCollectionName, createNewCollection, handleNewCollectionNameChange]);
+
+    const collapsibleComponent = useMemo(() => (
         <VerticalStack gap={"0"} key="conditions-filters">
-            <Box background={"bg-subdued"} width="100%" padding={"2"} onClick={handleToggle}>
+            <Box background={"bg-subdued"} width="100%" padding={"2"} onClick={handleToggle} key="collapsible-component-header">
                 <HorizontalStack align="space-between">
                     <Text variant="headingSm">
-                        { endpointListFromConditions.data ? apiCount > 200 ? `Listing 200 sample endpoints out of total ` + apiCount + ` endpoints`: `Listing total ` + apiCount + ` endpoints` : "Select filters to see endpoints"}
+                        {endpointListFromConditions.data ? apiCount > 200 ? `Listing 200 sample endpoints out of total ` + apiCount + ` endpoints` : `Listing total ` + apiCount + ` endpoints` : "Select filters to see endpoints"}
                     </Text>
                     <Box>
                         <Icon source={open ? ChevronDownMinor : ChevronUpMinor} />
@@ -91,6 +154,7 @@ function APIQuery() {
                 </HorizontalStack>
             </Box>
             <Collapsible
+                key="basic-collapsible"
                 open={open}
                 id="basic-collapsible"
                 transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
@@ -103,6 +167,7 @@ function APIQuery() {
                                     <CollectionComponent
                                         condition={condition}
                                         index={index}
+                                        key={`collections-condition-${index}`}
                                         dispatch={dispatchConditions}
                                         operatorComponent={<OperatorDropdown
                                             items={[{
@@ -121,26 +186,32 @@ function APIQuery() {
                                 ))
                             }
                             <HorizontalStack gap={4} align="start">
-                                <Button onClick={() => handleAddField()}>Add condition</Button>
+                                <Button onClick={handleAddField}>Add condition</Button>
                                 {
                                     conditions.length > 0 ? <Button plain destructive onClick={handleClearFunction}>Clear all</Button> : null
                                 }
                             </HorizontalStack>
                             <HorizontalStack gap={4} align="end">
-                                <Button onClick={() => exploreEndpoints()}>Explore endpoints</Button>
+                                <Button onClick={exploreEndpoints}>Explore endpoints</Button>
                             </HorizontalStack>
                         </VerticalStack>
                     </Card>
                 </VerticalStack>
             </Collapsible>
         </VerticalStack>
-    const components = [collapsibleComponent,
-        <ApiEndpoints key="endpoint-table"
+    ), [handleToggle, open, apiCount, endpointListFromConditions, conditions, handleAddField, handleClearFunction, exploreEndpoints]);
+
+    const components = useMemo(() => [
+        modalComponent,
+        collapsibleComponent,
+        <ApiEndpoints
+            key="endpoint-table"
             endpointListFromConditions={endpointListFromConditions}
             sensitiveParamsForQuery={sensitiveParams}
             isQueryPage={true}
-        ></ApiEndpoints>
-    ]
+        />
+    ], [modalComponent, collapsibleComponent, endpointListFromConditions, sensitiveParams]);
+
     return (
         <PageWithMultipleCards
             title={
@@ -149,7 +220,7 @@ function APIQuery() {
                     titleText={"Explore Mode"}
                 />
             }
-            primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={exploreEndpoints}>Save as collection</Button>}
+            primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={openModal}>Save as collection</Button>}
             isFirstPage={false}
             components={components}
         />

@@ -138,6 +138,7 @@ const sortOptions = [
 
 function ApiEndpoints(props) {
 
+    console.log("apiEndpoint called")
     const { endpointListFromConditions, sensitiveParamsForQuery, isQueryPage } = props
     const params = useParams()
     const location = useLocation()
@@ -156,7 +157,7 @@ function ApiEndpoints(props) {
     const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const [runTests, setRunTests ] = useState(false)
 
-    const [endpointData, setEndpointData] = useState([])
+    const [endpointData, setEndpointData] = useState({"all":[]})
     const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
     const [loading, setLoading] = useState(true)
@@ -190,53 +191,55 @@ function ApiEndpoints(props) {
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
     let timeNow = func.timeNow();
     async function fetchData() {
-        let apiPromises = [
-            api.fetchApisFromStis(apiCollectionId),
-            api.fetchApiInfosForCollection(apiCollectionId),
-            api.fetchAPIsFromSourceCode(apiCollectionId),
-            api.loadSensitiveParameters(apiCollectionId)
-        ];
         setLoading(true)
+        let apiEndpointsInCollection;
+        let apiInfoListInCollection;
+        let unusedEndpointsInCollection;
+        let sensitiveParamsResp;
+        let sourceCodeData = {};
+        if (isQueryPage) {
+            let apiCollectionData = endpointListFromConditions
+            if (Object.keys(endpointListFromConditions).length === 0) {
+                apiCollectionData = {
+                    data: {
+                        endpoints: [],
+                        apiInfoList: []
+                    }
+                }
+            }
+            setShowEmptyScreen(apiCollectionData.data.endpoints.length === 0)
+            setIsRedacted(apiCollectionData.redacted)
+            apiEndpointsInCollection = apiCollectionData.data.endpoints.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
+            apiInfoListInCollection = apiCollectionData.data.apiInfoList
+            unusedEndpointsInCollection = apiCollectionData.unusedEndpoints
+            sensitiveParamsResp = sensitiveParamsForQuery
+            if (Object.keys(sensitiveParamsForQuery).length === 0) {
+                sensitiveParamsResp = {
+                    data: {
+                        endpoints: [],
+                        apiInfoList: []
+                    }
+                }
+            }
+        } else {
+            let apiPromises = [
+                api.fetchApisFromStis(apiCollectionId),
+                api.fetchApiInfosForCollection(apiCollectionId),
+                api.fetchAPIsFromSourceCode(apiCollectionId),
+                api.loadSensitiveParameters(apiCollectionId)
+            ];
+            let results = await Promise.allSettled(apiPromises);
+            let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
+            let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
+            sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
+            sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
+            apiEndpointsInCollection = stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
+            apiInfoListInCollection = apiInfosData.apiInfoList
+            unusedEndpointsInCollection = stisEndpoints.unusedEndpoints
+            setShowEmptyScreen(stisEndpoints.list.length === 0)
+            setIsRedacted(apiInfosData.redacted)
+        }
 
-        let results = await Promise.allSettled(apiPromises);
-        let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
-        let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
-        let sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
-        let sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
-        setShowEmptyScreen(stisEndpoints.list.length === 0)
-        setIsRedacted(apiInfosData.redacted)
-        let apiEndpointsInCollection = stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
-        let apiInfoListInCollection = apiInfosData.apiInfoList
-        let unusedEndpointsInCollection = stisEndpoints.unusedEndpoints
-        let apiCollectionData = endpointListFromConditions
-        if (!isQueryPage) {
-            apiCollectionData = await api.fetchAPICollection(apiCollectionId)
-        }
-        if (isQueryPage && Object.keys(endpointListFromConditions).length === 0) {
-            apiCollectionData = {
-                data: {
-                    endpoints: [],
-                    apiInfoList: []
-                }
-            }
-        }
-        setShowEmptyScreen(apiCollectionData.data.endpoints.length === 0)
-        setIsRedacted(apiCollectionData.redacted)
-        let apiEndpointsInCollection = apiCollectionData.data.endpoints.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
-        let apiInfoListInCollection = apiCollectionData.data.apiInfoList
-        let unusedEndpointsInCollection = apiCollectionData.unusedEndpoints
-        let sensitiveParamsResp = sensitiveParamsForQuery
-        if (!isQueryPage) {
-            sensitiveParamsResp = await api.loadSensitiveParameters(apiCollectionId)
-        }
-        if (isQueryPage && Object.keys(sensitiveParamsForQuery).length === 0) {
-            sensitiveParamsResp = {
-                data: {
-                    endpoints: [],
-                    apiInfoList: []
-                }
-            }
-        }
         let sensitiveParams = sensitiveParamsResp.data.endpoints
         timeNow = func.timeNow();
 
@@ -330,7 +333,6 @@ function ApiEndpoints(props) {
         data['new'] = prettifyData.filter(x=> x.isNew)
         data['no_auth'] = prettifyData.filter(x => x.open)
         data['shadow'] = [ ...shadowApis ]
-        setLoading(false)
         setEndpointData(data)
         setSelectedTab("all")
         setSelected(0)
@@ -710,7 +712,7 @@ function ApiEndpoints(props) {
     )
 
     const apiEndpointTable = [<GithubSimpleTable
-        key="table"
+        key="api-endpoint-table"
         pageLimit={50}
         data={endpointData[selectedTab]}
         sortOptions={sortOptions}

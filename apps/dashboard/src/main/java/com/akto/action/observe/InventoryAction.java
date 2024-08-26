@@ -262,9 +262,6 @@ public class InventoryAction extends UserAction {
     }
 
     private void attachUnusedEndpoints(List<BasicDBObject> list,BasicDBObject response){
-
-    public String fetchAPICollection() {
-        List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
         APISpec apiSpec = APISpecDao.instance.findById(apiCollectionId);
         Set<String> unused = null;
         try {

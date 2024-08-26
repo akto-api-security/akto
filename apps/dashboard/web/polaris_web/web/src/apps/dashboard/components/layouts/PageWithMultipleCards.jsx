@@ -20,7 +20,6 @@ const PageWithMultipleCards = (props) => {
         if(backUrl){
             return { onAction: ()=>navigate(backUrl) }
         }
-        console.log("isNewTab",isNewTab)
         return isNewTab || isFirstPage ? null : { onAction: navigateBack }
     }
 
