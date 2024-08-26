@@ -675,7 +675,7 @@ public class DbLayer {
         Bson projection = Projections.computed(SampleData.SAMPLES,
                 Projections.computed("$slice", Arrays.asList("$" + SampleData.SAMPLES, -1)));
 
-        return SampleDataDao.instance.findAll(filterQ, skip, SAMPLE_DATA_LIMIT, null, projection);
+        return SampleDataDao.instance.findAll(filterQ, skip, SAMPLE_DATA_LIMIT, Sorts.descending(Constants.ID), projection);
     }
 
     public static TestRoles fetchTestRole(String key) {
