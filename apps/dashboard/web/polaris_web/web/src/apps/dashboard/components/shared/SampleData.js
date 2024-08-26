@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react'
+import {Modal, Text} from "@shopify/polaris"
 import * as monaco from "monaco-editor"
 import "./style.css";
 import func from "@/util/func"
 import editorSetup from './customEditor';
 import yamlEditorSetup from "../../pages/test_editor/components/editor_config/editorSetup"
+import authTypesApi from "@/apps/dashboard/pages/settings/auth_types/api";
 
 function highlightPaths(highlightPathMap, ref){
   highlightPathMap && Object.keys(highlightPathMap).forEach((key) => {
@@ -140,6 +142,9 @@ function SampleData(props) {
     const ref = useRef(null);
     const [instance, setInstance] = useState(undefined);
     const [editorData, setEditorData] = useState(data);
+    const [showActionsModal, setShowActionsModal] = useState(false);
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [selectedWord, setSelectedWord] = useState("");
 
     if(minHeight==undefined){
       minHeight="300px";
@@ -232,6 +237,25 @@ function SampleData(props) {
           instance = monaco.editor.createDiffEditor(ref.current, options)
         } else {
           instance = monaco.editor.create(ref.current, options) 
+          instance.addAction({
+            id: "add_auth_type",
+            label: "Add as Header auth type",
+            keybindings: [],
+            precondition: null,
+            keybindingContext: null,
+            contextMenuGroupId: "1_modification",
+            contextMenuOrder: 1,
+            run: function (ed) {
+              var textSelected = ed.getModel().getValueInRange(ed.getSelection())
+              setSelectedWord(textSelected)
+              if (textSelected && textSelected.length > 0) {
+                setShowActionsModal(true)
+              } else {
+                setShowErrorModal(true)
+              }
+            },
+          });
+          
         }
         setInstance(instance)
 
@@ -255,8 +279,51 @@ function SampleData(props) {
       }
     }
 
+    function createAuthTypeHeader(selectedWord) {
+      authTypesApi.addCustomAuthType(selectedWord, [selectedWord], [], true).then((res) => {
+        func.setToast(true, false, "Auth type added successfully");
+        setSelectedWord("")
+        setShowActionsModal(false)
+      }).catch((err) => {
+        func.setToast(true, true, "Unable to add auth type");
+        setSelectedWord("")
+        setShowActionsModal(false)
+      });
+    }
+
     return (
-      <div ref={ref} style={{height:minHeight}} className={'editor ' + (data.headersMap ? 'new-diff' : '')}/>
+      <div>
+        <div ref={ref} style={{height:minHeight}} className={'editor ' + (data.headersMap ? 'new-diff' : '')}/>
+        <Modal
+            open={showActionsModal}
+            onClose={() => setShowActionsModal(false)}
+            title="Are you sure?"
+            primaryAction={{
+                content: 'Create',
+                onAction: () => createAuthTypeHeader(selectedWord)
+            }}
+            key="redact-modal"
+        >
+            <Modal.Section>
+                <Text>Are you sure you want to add the header (or cookie) key: <b>{selectedWord.toLowerCase()}</b> as an auth type?</Text>
+            </Modal.Section>
+        </Modal>
+        <Modal
+            open={showErrorModal}
+            onClose={() => setShowErrorModal(false)}
+            title="Incorrect data"
+            primaryAction={{
+                content: 'OK',
+                onAction: () => setShowErrorModal(false)
+            }}
+            key="redact-modal"
+        >
+            <Modal.Section>
+                <Text>Invalid auth type: <b>{(selectedWord && selectedWord.length>0) ? selectedWord.toLowerCase(): "blank"}</b></Text>
+            </Modal.Section>
+        </Modal>
+      </div>
+      
     )
 }
 

@@ -226,6 +226,36 @@ export default {
             return resp
         })
     },
+
+    async fetchAPIsFromSourceCode(apiCollectionId) {
+        return await request({
+            url: '/api/fetchCodeAnalysisApiInfos',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId,
+            }
+        })
+    },
+
+    async fetchApisFromStis(apiCollectionId) {
+        return await request({
+            url: '/api/fetchApiInfosFromSTIs',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId,
+            }
+        })
+    },
+
+    async fetchApiInfosForCollection(apiCollectionId) {
+        return await request({
+            url: '/api/fetchApiInfosForCollection',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId,
+            }
+        })
+    },
     redactCollection(apiCollectionId, redacted){
         return request({
             url: '/api/redactCollection',

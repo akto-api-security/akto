@@ -1,4 +1,4 @@
-import { Box, Button, Collapsible, Divider, LegacyCard, LegacyStack, Text } from "@shopify/polaris"
+import { TextField, Button, Collapsible, Divider, LegacyCard, LegacyStack, Text } from "@shopify/polaris"
 import { ChevronRightMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import { useState } from "react";
 import api from "../api"
@@ -20,8 +20,13 @@ function UserConfig() {
     const [isLoading, setIsLoading] = useState(true)
     const [hardcodedOpen, setHardcodedOpen] = useState(true);
     const [initialLimit, setInitialLimit] = useState(0);
+    const [preRequestScript, setPreRequestScript] = useState({javascript: ""});
 
     const handleToggleHardcodedOpen = () => setHardcodedOpen((prev) => !prev)
+
+    const handlePreRequestScriptChange = (value) => { 
+        setPreRequestScript({...preRequestScript, javascript: value})
+    }
 
     async function fetchAuthMechanismData() {
         setIsLoading(true)
@@ -36,12 +41,26 @@ function UserConfig() {
         await settingRequests.fetchAdminSettings().then((resp)=> {
             setInitialLimit(resp.accountSettings.globalRateLimit);
         })
+
+        await api.fetchScript().then((resp)=> {
+            if (resp) { 
+                setPreRequestScript(resp.testScript)
+            }
+        });
         setIsLoading(false)
     }
 
     useEffect(() => {
         fetchAuthMechanismData()
     }, [])
+
+    async function addOrUpdateScript() {
+        if (preRequestScript.id) {
+            api.updateScript(preRequestScript.id, preRequestScript.javascript)
+        } else {
+            api.addScript(preRequestScript)
+        }
+    }
 
     async function handleStopAllTests() {
         await api.stopAllTests()
@@ -121,7 +140,6 @@ function UserConfig() {
             <Divider />
             <LegacyCard.Section>
                 <div style={{ display: "grid", gridTemplateColumns: "max-content max-content", gap: "10px", alignItems: "center" }}>
-                    <Text>Allowed requests / min:</Text>
                     <Dropdown
                         selected={handleSelect}
                         menuItems={dropdownItems}
@@ -135,7 +153,34 @@ function UserConfig() {
         </LegacyCard>
     )
 
-    const components = [<TestCollectionConfiguration/>, rateLimit]
+    const preRequestScriptComponent = (
+        <LegacyCard sectioned title="Configure Pre-request script" key="preRequestScript"  primaryFooterAction={
+            
+                { 
+                    content: "Save", destructive: false, onAction: () => {addOrUpdateScript()}
+                }
+            
+        }>
+            <Divider />
+            <LegacyCard.Section>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "10px", alignItems: "center" }}>
+                    <TextField
+                        placeholder="Enter pre-request javascript here..."
+                        value={preRequestScript?.javascript || ""}
+                        onChange={handlePreRequestScriptChange}
+                        multiline={10}
+                        monospaced
+                        autoComplete="off"
+                    />
+
+                </div>
+            </LegacyCard.Section>
+
+            
+        </LegacyCard>
+    )
+
+    const components = [<TestCollectionConfiguration/>, rateLimit, preRequestScriptComponent]
 
     return (
         isLoading ? <SpinnerCentered /> 
