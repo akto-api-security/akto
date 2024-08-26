@@ -1,4 +1,4 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,HorizontalGrid, HorizontalStack, Link, VerticalStack, Tooltip } from "@shopify/polaris";
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,HorizontalGrid, HorizontalStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList } from "@shopify/polaris";
 import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons"
 import { useEffect, useRef, useState } from "react";
 import { default as observeApi } from "../api";
@@ -44,6 +44,21 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const runTestRef = useRef(null);
     const [searchValue, setSearchValue] = useState('')
     const [showSearch, setShowSearch] = useState(false)
+    const [showFiltersOption, setShowFiltersOption] = useState(false);
+    const sectionsForFilters = [
+        {
+            title: 'Author',
+            filterKey: 'author',
+            options: [
+                {value: 'akto', label: 'Akto default'},
+                {value: 'custom', label: 'Custom tests'}
+            ]
+        }
+    ]
+
+    const initialArr = ['akto','custom']
+
+    const [optionsSelected, setOptionsSelected] = useState(initialArr)
 
     function nameSuffixes(tests) {
         return Object.entries(tests)
@@ -161,6 +176,24 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         </div>
     );
 
+    const filterFunc = (test) => {
+        let ans = false;
+        sectionsForFilters.forEach((filter) => {
+            const filterKey = filter.filterKey;
+            if(filterKey === 'author'){
+                if(optionsSelected.includes('custom')){
+                    ans = optionsSelected.includes(test[filterKey].toLowerCase()) || test[filterKey].toLowerCase() !== 'akto'
+                }else{
+                    ans = optionsSelected.includes(test[filterKey].toLowerCase())
+                }
+            }
+            else if(optionsSelected.includes(test[filterKey].toLowerCase())){
+                ans = true
+            }
+        })
+        return ans;
+    }
+
     const resetSearchFunc = () => {
         setShowSearch(false);
         setSearchValue('');
@@ -183,7 +216,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 return ([(
                     <div
                         style={{ display: "grid", gridTemplateColumns: "auto max-content", alignItems: "center" }}
-                        onClick={() => { setTestRun(prev => ({ ...prev, selectedCategory: category.name })); resetSearchFunc(); }}>
+                        onClick={() => { setTestRun(prev => ({ ...prev, selectedCategory: category.name })); resetSearchFunc(); setOptionsSelected(initialArr)}}>
                         <div>
                             <Text variany="headingMd" fontWeight="bold" color={category.name === testRun.selectedCategory ? "success" : ""}>{category.displayName}</Text>
                             <Text>{selected} out of {total} selected</Text>
@@ -222,7 +255,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             }))
         }
 
-        testRows = testRun.selectedCategory.length > 0 ? testRun.tests[testRun.selectedCategory].filter(x=> x.label.toLowerCase().includes(searchValue.toLowerCase())).map(test => {
+        testRows = testRun.selectedCategory.length > 0 ? testRun.tests[testRun.selectedCategory].filter(x => (x.label.toLowerCase().includes(searchValue.toLowerCase()) && filterFunc(x))).map(test => {
             const isCustom = test?.author !== "AKTO"
             const label = (
                 <span style={{display: 'flex', gap: '4px', alignItems: 'flex-start'}}>
@@ -489,6 +522,20 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         <Text variant="headingMd">Tests</Text>
                                     </HorizontalStack>
                                     <HorizontalStack gap={"2"}>
+                                        <Popover
+                                            activator={<Button size="slim" onClick={() => setShowFiltersOption(!showFiltersOption)}>More filters</Button>}
+                                            onClose={() => setShowFiltersOption(false)}
+                                            active={showFiltersOption}
+                                        >
+                                            <Popover.Pane fixed>
+                                                <OptionList
+                                                    onChange={setOptionsSelected}
+                                                    allowMultiple
+                                                    sections={sectionsForFilters}
+                                                    selected={optionsSelected}
+                                                />
+                                            </Popover.Pane>
+                                        </Popover>
                                         {showSearch ? <TextField onChange={handleInputValue} value={searchValue} autoFocus
                                     focused /> : null}
                                         <Tooltip content={"Click to search"} dismissOnMouseOut>

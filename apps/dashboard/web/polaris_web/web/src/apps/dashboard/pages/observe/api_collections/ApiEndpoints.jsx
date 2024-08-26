@@ -187,7 +187,6 @@ function ApiEndpoints() {
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
-    let timeNow = func.timeNow();
     async function fetchData() {
         let apiPromises = [
             api.fetchApisFromStis(apiCollectionId),
@@ -202,13 +201,12 @@ function ApiEndpoints() {
         let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
         let sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
         let sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
-        setShowEmptyScreen(stisEndpoints.list.length === 0)
+        setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
         setIsRedacted(apiInfosData.redacted)
-        let apiEndpointsInCollection = stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
+        let apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
         let apiInfoListInCollection = apiInfosData.apiInfoList
         let unusedEndpointsInCollection = stisEndpoints.unusedEndpoints
         let sensitiveParams = sensitiveParamsResp.data.endpoints
-        timeNow = func.timeNow();
 
         let sensitiveParamsMap = {}
         sensitiveParams.forEach(p => {
