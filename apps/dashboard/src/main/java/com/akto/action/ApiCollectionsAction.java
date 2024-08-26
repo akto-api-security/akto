@@ -377,6 +377,7 @@ public class ApiCollectionsAction extends UserAction {
         inventoryAction.attachTagsInAPIList(list);
         inventoryAction.attachAPIInfoListInResponse(list,-1);
         this.setResponse(inventoryAction.getResponse());
+        response.put("apiCount", ApiCollectionUsers.getApisCountFromConditions(conditions));
         return SUCCESS.toUpperCase();
     }
     public String getEndpointsFromConditions(){
