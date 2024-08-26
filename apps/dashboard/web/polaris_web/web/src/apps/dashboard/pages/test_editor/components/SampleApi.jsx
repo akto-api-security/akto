@@ -188,8 +188,8 @@ const SampleApi = () => {
                 let status = func.getRunResultSeverity(testResult.testingRunResult, testResult.subCategoryMap)
                 status = status.toUpperCase();
                 switch(status){
-                    case "CRITICAL" : return "bg-critical-strong";
-                    case "HIGH" : return "bg-critical";
+                    case "CRITICAL": return "bg-critical"
+                    case "HIGH" : return "bg-critical-subdued";
                     case "MEDIUM": return "bg-caution";
                     case "LOW": return "bg-info";
                     default:

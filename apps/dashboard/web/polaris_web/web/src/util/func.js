@@ -259,6 +259,7 @@ prettifyEpoch(epoch) {
   },
   getTestResultStatus(item) {
     let localItem = item.toUpperCase();
+    if(localItem.includes("CRITICAL")) return 'critical';
     if(localItem.includes("HIGH")) return 'critical';
     if(localItem.includes("MEDIUM")) return 'warning';
     if(localItem.includes("LOW")) return 'neutral';
