@@ -1,6 +1,8 @@
 package com.akto.utils.libs.utils.src.main.java.com.akto.runtime.policies;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.lang3.function.FailableFunction;
 
@@ -8,6 +10,7 @@ import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.traffic.SampleData;
 import com.akto.log.LoggerMaker;
@@ -29,6 +32,11 @@ public class ApiAccessTypePolicyUtil {
                     apiInfo.getId().getApiCollectionId(),
                     apiInfo.getId().getUrl(), apiInfo.getId().getMethod());
             if (sampleData != null && sampleData.getSamples() != null && !sampleData.getSamples().isEmpty()) {
+                if (apiInfo.getApiAccessTypes() == null) {
+                    apiInfo.setApiAccessTypes(new HashSet<>());
+                }
+                Set<ApiAccessType> oldApiAccessTypes = new HashSet<>(apiInfo.getApiAccessTypes());
+                apiInfo.setApiAccessTypes(new HashSet<>());
                 for (String sample : sampleData.getSamples()) {
                     try {
                         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
@@ -37,13 +45,21 @@ public class ApiAccessTypePolicyUtil {
                         loggerMaker.errorAndAddToDb(e, "Unable to calculate access type for access type policy job for " + apiInfo.getId().toString());
                     }
                 }
-            }
 
-            if (apiInfo.getApiAccessTypes() != null && !apiInfo.getApiAccessTypes().isEmpty()) {
-                return new UpdateOneModel<>(
-                        ApiInfoDao.getFilter(apiInfo.getId()),
-                        Updates.set(ApiInfo.API_ACCESS_TYPES, apiInfo.getApiAccessTypes()),
-                        new UpdateOptions().upsert(false));
+                /*
+                 * If no change in access type ,
+                 * return no update.
+                 */
+                if (oldApiAccessTypes.equals(apiInfo.getApiAccessTypes())) {
+                    return null;
+                }
+
+                if (apiInfo.getApiAccessTypes() != null) {
+                    return new UpdateOneModel<>(
+                            ApiInfoDao.getFilter(apiInfo.getId()),
+                            Updates.set(ApiInfo.API_ACCESS_TYPES, apiInfo.getApiAccessTypes()),
+                            new UpdateOptions().upsert(false));
+                }
             }
             return null;
         };
