@@ -7,13 +7,14 @@ import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.runtime.Main;
+import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.util.DashboardMode;
+import com.akto.utils.libs.utils.src.main.java.com.akto.runtime.policies.ApiAccessTypePolicyUtil;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
 import com.opensymphony.xwork2.Action;
-import org.apache.kafka.common.protocol.types.Field.Str;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,8 +22,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.Set;
 
-import org.checkerframework.checker.units.qual.C;
-
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -243,9 +243,44 @@ public class AdminSettingsAction extends UserAction {
             AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.PRIVATE_CIDR_LIST, privateCidrList)
             );
+
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             return ERROR.toUpperCase();
+        }
+    }
+
+    public String applyAccessType(){
+        try {
+            int accountId = Context.accountId.get();
+            accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            List<String> privateCidrList = new ArrayList<>();
+            if (accountSettings != null &&
+                    accountSettings.getPrivateCidrList() != null &&
+                    !accountSettings.getPrivateCidrList().isEmpty()) {
+                privateCidrList = accountSettings.getPrivateCidrList();
+            }
+            ApiAccessTypePolicy policy = new ApiAccessTypePolicy(privateCidrList);
+
+            executorService.schedule(new Runnable() {
+                public void run() {
+                    try {
+                        Context.accountId.set(accountId);
+                        List<String> partnerIpList = new ArrayList<>();
+                        if (accountSettings != null &&
+                                accountSettings.getPartnerIpList() != null &&
+                                !accountSettings.getPartnerIpList().isEmpty()) {
+                            partnerIpList = accountSettings.getPartnerIpList();
+                        }
+                        ApiAccessTypePolicyUtil.calcApiAccessType(policy, partnerIpList);
+                    } catch (Exception e){
+                        logger.error("Error in applyAccessType", e);
+                    }
+                }
+            }, 0, TimeUnit.SECONDS);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
         }
 
     }
@@ -285,6 +320,7 @@ public class AdminSettingsAction extends UserAction {
             AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.PARTNER_IP_LIST, partnerIpList)
             );
+
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             return ERROR.toUpperCase();
