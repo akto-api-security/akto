@@ -648,9 +648,21 @@ public class DbLayer {
         return TestRolesDao.instance.findAll(new BasicDBObject());
     }
 
+    public static final int SAMPLE_DATA_LIMIT = 50;
+
     public static List<SampleData> fetchSampleData(Set<Integer> apiCollectionIds, int skip) {
-        Bson filterQ = Filters.in("_id.apiCollectionId", apiCollectionIds);
-        return SampleDataDao.instance.findAll(filterQ, skip, 500, null);
+        Bson filterQ = Filters.and(
+                Filters.in("_id.apiCollectionId", apiCollectionIds),
+                // only send sample data if sample exists.
+                Filters.exists(SampleData.SAMPLES + ".0"));
+        /*
+         * Since we use only the last sample data,
+         * sending only the last sample data to send minimal data.
+         */
+        Bson projection = Projections.computed(SampleData.SAMPLES,
+                Projections.computed("$slice", Arrays.asList("$" + SampleData.SAMPLES, -1)));
+
+        return SampleDataDao.instance.findAll(filterQ, skip, SAMPLE_DATA_LIMIT, null, projection);
     }
 
     public static TestRoles fetchTestRole(String key) {
