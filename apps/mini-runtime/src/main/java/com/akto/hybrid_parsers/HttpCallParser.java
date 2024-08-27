@@ -154,6 +154,36 @@ public class HttpCallParser {
 
     int numberOfSyncs = 0;
 
+    private static int lastSyncLimitFetch = 0;
+    private static final int REFRESH_INTERVAL = 60 * 10; // 10 minutes.
+    private static SyncLimit syncLimit = FeatureAccess.fullAccess.fetchSyncLimit();
+    /*
+     * This is the epoch for August 27, 2024 7:15:31 AM GMT .
+     * Enabling this feature for all users after this timestamp.
+     */
+    private static final int DAY_0_EPOCH = 1724742931;
+
+    private SyncLimit fetchSyncLimit() {
+        try {
+            if ((lastSyncLimitFetch + REFRESH_INTERVAL) >= Context.now()) {
+                return syncLimit;
+            }
+            int accountId = Context.accountId.get();
+
+            if(accountId < DAY_0_EPOCH){
+                return syncLimit;
+            }
+
+            Organization organization = dataActor.fetchOrganization(accountId);
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
+            syncLimit = featureAccess.fetchSyncLimit();
+            lastSyncLimitFetch = Context.now();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetching sync limit from feature access " + e.toString());
+        }
+        return syncLimit;
+    }
+
     public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
         // USE ONLY filteredResponseParams and not responseParams
         List<HttpResponseParams> filteredResponseParams = responseParams;
@@ -180,11 +210,7 @@ public class HttpCallParser {
             for (ApiCollection apiCollection: apiCollections) {
                 apiCollectionsMap.put(apiCollection.getId(), apiCollection);
             }
-
-            int accountId = Context.accountId.get();
-            Organization organization = dataActor.fetchOrganization(accountId);
-            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
-            SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+            SyncLimit syncLimit = fetchSyncLimit();
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
             dependencyAnalyser.dbState = apiCatalogSync.dbState;
             dependencyAnalyser.syncWithDb();
@@ -198,6 +224,7 @@ public class HttpCallParser {
                  * submit a job only if it is not running.
                  */
                 if (!pgMerging) {
+                    int accountId = Context.accountId.get();
                     pgMerging = true;
                     service.submit(() -> {
                         Context.accountId.set(accountId);
