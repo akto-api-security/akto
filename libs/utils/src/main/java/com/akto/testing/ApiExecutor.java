@@ -31,7 +31,7 @@ public class ApiExecutor {
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
     
-    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext) throws Exception {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
@@ -80,7 +80,12 @@ public class ApiExecutor {
         String body;
         try {
             response = call.execute();
-            ResponseBody responseBody = response.peekBody(MAX_RESPONSE_SIZE);
+            ResponseBody responseBody = null;
+            if (nonTestingContext) {
+                responseBody = response.body();
+            } else {
+                responseBody = response.peekBody(MAX_RESPONSE_SIZE);
+            }
             if (responseBody == null) {
                 throw new Exception("Couldn't read response body");
             }
@@ -257,11 +262,16 @@ public class ApiExecutor {
 
         builder = builder.url(request.getFullUrlWithParams());
 
+        boolean nonTestingContext = false;
+        if (testingRunConfig == null) {
+            nonTestingContext = true;
+        }
+
         OriginalHttpResponse response = null;
         switch (method) {
             case GET:
             case HEAD:
-                response = getRequest(request, builder, followRedirects, debug, testLogs, skipSSRFCheck);
+                response = getRequest(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
                 break;
             case POST:
             case PUT:
@@ -270,7 +280,7 @@ public class ApiExecutor {
             case PATCH:
             case TRACK:
             case TRACE:
-                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs, skipSSRFCheck);
+                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
                 break;
             case OTHER:
                 throw new Exception("Invalid method name");
@@ -284,9 +294,9 @@ public class ApiExecutor {
     }
 
 
-    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck)  throws Exception{
+    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext)  throws Exception{
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
     }
 
     public static RequestBody getFileRequestBody(String fileUrl){
@@ -331,7 +341,7 @@ public class ApiExecutor {
 
 
 
-    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
         if (headers == null) {
             headers = new HashMap<>();
@@ -348,7 +358,7 @@ public class ApiExecutor {
             Request updatedRequest = builder.build();
 
 
-            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck);
+            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
         }
 
         String contentType = request.findContentType();
@@ -364,6 +374,6 @@ public class ApiExecutor {
         RequestBody body = RequestBody.create(payload, MediaType.parse(contentType));
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
     }
 }
