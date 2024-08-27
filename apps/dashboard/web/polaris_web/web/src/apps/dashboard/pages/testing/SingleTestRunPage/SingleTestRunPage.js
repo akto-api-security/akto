@@ -184,6 +184,13 @@ function SingleTestRunPage() {
     fillTempData(testRunResults, 'vulnerable')
     fillData(transform.getPrettifiedTestRunResults(testRunResults), 'vulnerable')
 
+    await api.fetchTestingRunResults(summaryHexId, "SKIPPED_EXEC_API_REQUEST_FAILED").then(({ testingRunResults, errorEnums }) => {
+      testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+      errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
+      setErrorsObject(errorEnums)
+    })
+    fillTempData(testRunResults, 'domain_unreachable')
+    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'domain_unreachable')
     await api.fetchTestingRunResults(summaryHexId, "SKIPPED_EXEC").then(({ testingRunResults, errorEnums }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
       errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
@@ -345,7 +352,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     </div> : null
   )
 
-  const definedTableTabs = ['Vulnerable', 'Need configurations','Skipped', 'No vulnerability found']
+  const definedTableTabs = ['Vulnerable', 'Need configurations','Skipped', 'No vulnerability found','Domain unreachable']
 
   const { tabsInfo } = useTable()
   const tableCountObj = func.getTabsCount(definedTableTabs, testRunResults)
@@ -477,7 +484,7 @@ const runningTestsComp = useMemo(() => (
   }
 
   const allResultsLength = testRunResults.skipped.length + testRunResults.need_configurations.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length + progress
-  const useComponents = (!workflowTest && allResultsLength === 0) ? [<EmptyData key="empty"/>] : components
+  const useComponents = (!workflowTest && allResultsLength === 0 && (selectedTestRun.run_type && selectedTestRun.run_type!=='One-time')) ? [<EmptyData key="empty"/>] : components
   const headingComp = (
     <Box paddingBlockStart={1}>
       <VerticalStack gap="2">

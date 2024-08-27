@@ -18,6 +18,8 @@ public class TestResult extends GenericTestResult {
     private TestInfo testInfo;
 
     public static final String REQUIRES_CONFIG = "requiresConfig";
+    public static final String  API_CALL_FAILED_ERROR_STRING = "Error executing test request: Api Call failed";
+
     private boolean requiresConfig;
 
     public enum Confidence {

@@ -592,8 +592,11 @@ public class TestExecutor {
                     e.printStackTrace();
                 }
                 if (testingRunResult != null) {
+                    List<String> errorList = testingRunResult.getErrorsList();
                     testingRunResults.add(testingRunResult);
-                    countSuccessfulTests++;
+                    if (errorList == null || !errorList.contains(TestResult.API_CALL_FAILED_ERROR_STRING)) {
+                        countSuccessfulTests++;
+                    }
                 }
 
                 insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);

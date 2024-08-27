@@ -10,8 +10,8 @@ import {
   Key,
   ChoiceList,
   Tabs} from '@shopify/polaris';
-import { GithubRow } from './rows/GithubRow';
-import { useState, useCallback, useEffect } from 'react';
+import { GithubRow} from './rows/GithubRow';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import "./style.css"
 import transform from '../../pages/observe/transform';
 import DropdownSearch from '../shared/DropdownSearch';
@@ -155,39 +155,38 @@ function GithubServerTable(props) {
     setFiltersMap(copyFilters)
   }
 
-  const changeAppliedFilters = (key, value) => {
-    let temp = appliedFilters
-    temp = temp.filter((filter) => {
-      return filter.key !== key
-    })
+  const changeAppliedFilters = useCallback((key, value) => {
+    let temp = appliedFilters.filter(filter => filter.key !== key);
     if (value.length > 0 || Object.keys(value).length > 0) {
       temp.push({
         key: key,
         label: props.disambiguateLabel(key, value),
         onRemove: handleRemoveAppliedFilter,
         value: value
-      })
+      });
     }
     setPage(0);
     let tempFilters = filtersMap
-    tempFilters[currentPageKey] = {
-      'filters': temp,
-      'sort': pageFiltersMap?.sort || []
+    tempFilters[currentPageKey]= {
+      filters: temp,
+      sort: pageFiltersMap?.sort || []
     }
-    setFiltersMap(tempFilters)
+    setFiltersMap(tempFilters);
     setAppliedFilters(temp);
-  };
+  }, [appliedFilters, props.disambiguateLabel, handleRemoveAppliedFilter, setFiltersMap, currentPageKey, pageFiltersMap]);
 
   const debouncedSearch = debounce((searchQuery) => {
       fetchData(searchQuery)
   }, 500);
 
-  const handleFiltersQueryChange = (val) =>{
-    setQueryValue(val)
-    debouncedSearch(val)
-  }
+  const handleFiltersQueryChange = useCallback((val) => {
+    setQueryValue(val);
+    debouncedSearch(val);
+  }, []);
+
   const handleFiltersQueryClear = useCallback(
-    () => setQueryValue(""),
+    () => {setQueryValue("");
+    debouncedSearch("")},
     [],
   );
 
@@ -199,7 +198,9 @@ function GithubServerTable(props) {
     return choices.sort((a, b) => (a?.label || a) - (b?.label || b));
   }
 
-  let filters = formatFilters(props.filters)
+  const filters = useMemo(() => {
+    return formatFilters(props.filters);
+  }, [props.filters]);
 
   function formatFilters(filters) {
     return filters 
@@ -252,24 +253,31 @@ function GithubServerTable(props) {
   const resourceIDResolver = (data) => {
     return data.id;
   };
+  
 
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
-    useIndexResourceState(data, {
+    useIndexResourceState(props?.fullData, {
       resourceIDResolver,
     });
+
+  const customSelectionChange = (selectionType,toggleType, selection) => {
+    if(selectionType === "page"){
+      handleSelectionChange("all",toggleType, selection)
+    }else{
+      handleSelectionChange(selectionType,toggleType, selection)
+    }
+  }
 
   const [popoverActive, setPopoverActive] = useState(-1);
 
   // sending all data in case of simple table because the select-all state is controlled from the data.
   // not doing this affects bulk select functionality.
-  let tmp = data && data.length <= pageLimit ? data :
-    data.slice(page * pageLimit, Math.min((page + 1) * pageLimit, data.length))
-  let rowMarkup = tmp
-    .map(
-      (
-        data,
-        index,
-      ) => (
+  // let tmp = data && data.length <= pageLimit ? data :
+  //   data.slice(page * pageLimit, Math.min((page + 1) * pageLimit, data.length))
+
+  const rowMarkup = useMemo(() => {
+    return data.map(
+      (data, index) => (
         <GithubRow
           key={data.id}
           id={data.id}
@@ -293,6 +301,7 @@ function GithubServerTable(props) {
         />
       ),
     );
+  }, [data, selectedResources, props, popoverActive, setPopoverActive]);
 
   const onPageNext = () => {
     setPage((page) => (page + 1));
@@ -351,7 +360,7 @@ function GithubServerTable(props) {
                 }
                 // condensed
                 selectable={props.selectable || false}
-                onSelectionChange={handleSelectionChange}
+                onSelectionChange={customSelectionChange}
                 headings={props?.headings ? props.headings :[
                   {
                     id: "data",

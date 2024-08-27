@@ -1,4 +1,4 @@
-import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button } from '@shopify/polaris';
+import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
 import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor } from '@shopify/polaris-icons';
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +11,7 @@ import SemiCircleProgress from '../../shared/SemiCircleProgress';
 import { usePolling } from '../../../../main/PollingProvider';
 import { debounce } from 'lodash';
 import LocalStore from '../../../../main/LocalStorageStore';
+import homeFunctions from '../../../../dashboard/pages/home/module';
 
 function ContentWithIcon({icon,text, isAvatar= false}) {
     return(
@@ -41,7 +42,8 @@ export default function Header() {
 
     const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
-    const searchItemsArr = useMemo(() => func.getSearchItemsArr(allRoutes, allCollections), [])
+    const setAllCollections = PersistStore(state => state.setAllCollections)
+    var searchItemsArr = useMemo(() => func.getSearchItemsArr(allRoutes, allCollections), [])
     const [filteredItemsArr, setFilteredItemsArr] = useState(searchItemsArr)
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
@@ -64,7 +66,18 @@ export default function Header() {
         })
     }
 
-    const debouncedSearch = debounce((searchQuery) => {
+    const debouncedSearch = debounce(async (searchQuery) => {
+
+        let apiCollections = []
+        if (allCollections.length === 0 && searchItemsArr.length === 0) {
+            apiCollections = await homeFunctions.getAllCollections()
+            setAllCollections(apiCollections)
+        }
+
+        if (searchItemsArr.length === 0) {
+            searchItemsArr = func.getSearchItemsArr(allRoutes, apiCollections)
+        }
+
         if(searchQuery.length === 0){
             setFilteredItemsArr(searchItemsArr)
         }else{
@@ -147,9 +160,11 @@ export default function Header() {
     })
 
     const searchResultsMarkup = (
+        <Scrollable style={{maxHeight: '300px'}} shadow>
         <ActionList
             items={searchItems}
         />
+        </Scrollable>
     );
 
     const searchFieldMarkup = (
