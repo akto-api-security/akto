@@ -105,9 +105,9 @@ const headers = [
         text: 'Collection type',
         title: 'Collection type',
         value: 'envTypeComp',
-        filterKey: "userSetEnvType",
+        filterKey: "envType",
         showFilter: true,
-        textValue: 'userSetEnvType',
+        textValue: 'envType',
         tooltipContent: (<Text variant="bodySm">Environment type for an API collection, Staging or Production </Text>),
     },
     {   
@@ -257,7 +257,7 @@ function ApiCollections() {
         setLoading(false)
         let hasUserEndpoints = await api.getUserEndpoints()
         setHasUsageEndpoints(hasUserEndpoints)
-        let tmp = allCollections.map(convertToCollectionData)
+        let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
         let dataObj = {}
         dataObj = convertToNewData(tmp, {}, {}, {}, {}, {}, true);
         let res = {}

@@ -67,7 +67,6 @@ import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
 import TokenValidator from "./TokenValidator"
 import { TableContextProvider } from "@/apps/dashboard/components/tables/TableContext";
 import VulnerabilityReport from "../dashboard/pages/testing/vulnerability_report/VulnerabilityReport";
-import TreeViewTable from "../dashboard/components/shared/treeView/TreeViewTable";
 
 import { PollingProvider } from "./PollingProvider";
 
@@ -129,10 +128,6 @@ const router = createBrowserRouter([
               {
                 path: "sensitive",
                 element: <AllSensitiveData/>
-              },
-              {
-                path: "tree",
-                element: <TreeViewTable />
               },
               {
                 path: "inventory",

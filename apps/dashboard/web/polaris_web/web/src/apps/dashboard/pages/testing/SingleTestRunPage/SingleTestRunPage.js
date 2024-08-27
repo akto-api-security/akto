@@ -384,7 +384,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
         headings={tableHeaders}
         useNewRow={true}
         condensedHeight={true}
-        customFilter={true}
+        useModifiedData={true}
         modifyData={(data,filters) => modifyData(data,filters)}
         notHighlightOnselected={true}
         selected={selected}

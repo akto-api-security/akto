@@ -145,7 +145,7 @@ function GithubRow(props) {
     function LinkCell(cellData, header, cellWidth) {
         const boxWidth = cellWidth !== undefined ? cellWidth: ''
         return (
-            <IndexTable.Cell key={header.title} style={{width: boxWidth}}>
+            <IndexTable.Cell key={header.title}>
                 <div className={`linkClass ${data.deactivated ? "text-subdued" : ""}`} style={{width: boxWidth}}>
                     <Link
                         dataPrimaryLink
