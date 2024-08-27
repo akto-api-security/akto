@@ -1237,7 +1237,7 @@ public class APICatalogSync {
 
     private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams, BloomFilter<CharSequence> existingAPIsInDb) {
         Map<Integer, APICatalog> ret = new HashMap<>();
-        
+        demosAndDeactivatedCollections = getDemosAndDeactivated();
         for (SingleTypeInfo param: allParams) {
             try {
                 buildHelper(param, ret);
@@ -1299,7 +1299,7 @@ public class APICatalogSync {
     private static Set<Integer> demosAndDeactivatedCollections = getDemosAndDeactivated();
     
     private static void fillExistingAPIsInDb(SingleTypeInfo sti, BloomFilter<CharSequence> existingAPIsInDb) {
-        demosAndDeactivatedCollections = getDemosAndDeactivated();
+
         if (demosAndDeactivatedCollections.contains(sti.getApiCollectionId())) {
             return;
         }
