@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import useTable from '../../tables/TableContext'
 import transform from '../../../pages/observe/transform';
 import PrettifyDisplayName from "./PrettifyDisplayName"
@@ -7,80 +7,116 @@ import func from '@/util/func';
 import { useNavigate } from 'react-router-dom';
 import TableStore from '../../tables/TableStore';
 
-function PrettifyChildren({data, headers}) {
-    const [dataRows, setDataRows] = useState([])
+function PrettifyChildren({ data, headers }) {
+    const [refresh, setRefresh] = useState(false);
     const navigate = useNavigate();
+    const { openedRows, selectItems, modifyOpenedLevels } = useTable();
 
-    const { openedRows, selectItems, modifyOpenedLevels} = useTable();
-
-    const handleRowClick = (isTerminal, level, apiCollectionId) => {
-        if(isTerminal){
-            navigate("/dashboard/observe/inventory/" + apiCollectionId)
-        }else{
-            let newItems = []
-            if(openedRows.includes(level)){
-                newItems = openedRows.filter((x) => x !== level)
-            }else{
-                newItems = [...new Set([...openedRows, ...[level]])]
+    const handleRowClick = useCallback((isTerminal, level, apiCollectionId) => {
+        if (isTerminal) {
+            navigate("/dashboard/observe/inventory/" + apiCollectionId);
+        } else {
+            setRefresh(!refresh); // Trigger a refresh
+            let newItems = [];
+            if (openedRows.includes(level)) {
+                newItems = openedRows.filter(x => x !== level);
+            } else {
+                newItems = [...new Set([...openedRows, level])];
             }
-            TableStore.getState().setOpenedLevels(newItems)
-            modifyOpenedLevels(newItems)
+            TableStore.getState().setOpenedLevels(newItems);
+            modifyOpenedLevels(newItems);
         }
-    }
+    }, [openedRows, navigate, modifyOpenedLevels, refresh]);
 
-    const traverseAndMakeChildrenData = (childrenNodes, headers) =>{
-        childrenNodes.forEach((c) => {
-            let ids = []
-            if(c.hasOwnProperty('apiCollectionIds')){
-                ids = c['apiCollectionIds']
-            }else{
-                ids = [c.id]
+    const isLevelVisible = useCallback((level) => {
+        const inputSegments = level.split("#");
+        const currentDepth = inputSegments.length - 1;
+
+        if (currentDepth < 2) {
+            return true;
+        }
+        if (openedRows.length === 0) {
+            return false;
+        }
+
+        for (let i = 0; i < openedRows.length; i++) {
+            const arrayString = openedRows[i];
+            const arraySegments = arrayString.split('#');
+
+            if (arraySegments.length === inputSegments.length || arraySegments.length === inputSegments.length - 1) {
+                let match = true;
+                for (let j = 0; j < arraySegments.length; j++) {
+                    if (arraySegments[j] !== inputSegments[j]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) {
+                    return true;
+                }
             }
-            let collectionObj = transform.convertToPrettifyData(c)
-            collectionObj.endpoints = c.endpoints
-            collectionObj.envTypeComp = c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null
-            let isChildOpen = false;
+        }
+        return false;
+    }, [openedRows]);
+
+    const traverseAndMakeChildrenData = useCallback((childrenNodes, headers) => {
+        let newRows = [];
+        childrenNodes && childrenNodes.length > 0 && childrenNodes.forEach((c) => {
+            let ids = c.hasOwnProperty('apiCollectionIds') ? c['apiCollectionIds'] : [c.id];
+            let collectionObj = transform.convertToPrettifyData(c);
+            collectionObj.urlsCount = c.urlsCount;
+            collectionObj.envTypeComp = c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null;
+
+            let isChildOpen = isLevelVisible(c.level);
             collectionObj.displayNameComp = 
-                <PrettifyDisplayName name={c.displayName} 
+                <PrettifyDisplayName 
+                    key={c.level}
+                    name={c.displayName} 
                     level={c.level} 
                     isTerminal={c.isTerminal} 
-                    isOpen={isChildOpen} 
                     selectItems={selectItems} 
                     collectionIds={ids} 
-                />
-            let tempRow = [<div/>]
-            headers.forEach((x) => {
-                tempRow.push(<div style={{cursor: 'pointer'}} onClick={() => handleRowClick(c.isTerminal, c?.level, c?.id)}>{collectionObj[x.value]}</div>)
-            })
-            console.log("level", c.level)
+                    isOpen={openedRows.includes(c.level)}
+                />;
             
+            let tempRow = [<div style={{width: '5px'}} key={c.level}/>];
+            headers.forEach((x) => {
+                const width = x?.boxWidth || "180px"
+                tempRow.push(
+                    <div 
+                        key={`${c.level}-${x.value}`} 
+                        style={{ cursor: 'pointer', width: width }} 
+                        onClick={() => handleRowClick(c.isTerminal, c?.level, c?.id)}
+                    >
+                        {collectionObj[x.value]}
+                    </div>
+                );
+            });
 
-            setDataRows((prev) => {
-                let newRow = [...prev];
-                newRow.push(tempRow)
-                return newRow
-            })
-            if(c?.isTerminal === false){
-                traverseAndMakeChildrenData(c?.children, headers, selectItems)
+            if (isChildOpen) {
+                newRows.push(tempRow);
+                if (!c?.isTerminal) {
+                    newRows = [...newRows, ...traverseAndMakeChildrenData(c?.children, headers)];
+                }
             }
-        })
-    }
-    useEffect(() => {
-        traverseAndMakeChildrenData(data, headers, selectItems)
-    },[])
-    
+        });
+        return newRows;
+    }, [isLevelVisible]);
+
+    const dataRows = useMemo(() => {
+        return traverseAndMakeChildrenData(data, headers);
+    }, [refresh]);
+
     return (
-        <td colSpan={10} style={{padding: '0px !important'}} className="control-row">
+        <td colSpan={8} style={{ padding: '0px !important' }} className="control-row">
             <DataTable
                 rows={dataRows}
                 hasZebraStripingOnData
                 headings={[]}
-                columnContentTypes={['text', 'numeric', 'text', 'text', 'text', 'text', 'text', 'text', 'text']}
-                truncate
-                
+                columnContentTypes={['text', 'text', 'text', 'text', 'text', 'text', 'text', 'text']}
             />
         </td>
-    )
+    );
 }
 
-export default PrettifyChildren
+export default PrettifyChildren;

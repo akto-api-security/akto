@@ -35,14 +35,16 @@ function PrettifyDisplayName({name, level, isTerminal, isOpen, selectItems, coll
     }
     const icon = isOpen ? ChevronDownMinor : ChevronRightMinor
     return(
-        <div style={{width: '300px'}} className="styled-name">
-            <HorizontalStack gap={"2"} wrap={false}>
-                {spacingWidth > 0 ? <Box width={`${spacingWidth}px`} /> : null}
-                {len !== 0 ? <Checkbox checked={checkedVal} onChange={() => handleChange(collectionIds, selectItems)}/> : null}
-                {!isTerminal ? <Box><Icon source={icon} /></Box> : null}
-                <TooltipText text={displayName} tooltip={displayName} textProps={{variant: 'headingSm'}} />
-            </HorizontalStack>
-        </div>
+        <Box width='200px'>
+            <div className="styled-name">
+                <HorizontalStack gap={"2"} wrap={false}>
+                    {spacingWidth > 0 ? <Box width={`${spacingWidth}px`} /> : null}
+                    {len !== 0 ? <Checkbox checked={checkedVal} onChange={() => handleChange(collectionIds, selectItems)}/> : null}
+                    {!isTerminal ? <Box><Icon source={icon} /></Box> : null}
+                    <TooltipText text={displayName} tooltip={displayName} textProps={{variant: 'headingSm'}} />
+                </HorizontalStack>
+            </div>
+        </Box>
     )
 }
 

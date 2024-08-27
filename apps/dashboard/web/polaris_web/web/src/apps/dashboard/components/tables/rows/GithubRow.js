@@ -54,7 +54,7 @@ function GithubRow(props) {
             return;
         }
 
-        if(data?.collapsibleRow || props?.treeView){
+        if(data?.collapsibleRow || (props?.treeView && data?.isTerminal !== true)){
             setCollapsibleActive((prev) => {
                 if(prev===data?.name){
                     return "none";
@@ -142,10 +142,11 @@ function GithubRow(props) {
         )
     }
 
-    function LinkCell(cellData, header) {
+    function LinkCell(cellData, header, cellWidth) {
+        const boxWidth = cellWidth !== undefined ? cellWidth: ''
         return (
-            <IndexTable.Cell key={header.title}>
-                <div className={`linkClass ${data.deactivated ? "text-subdued" : ""}`} >
+            <IndexTable.Cell key={header.title} style={{width: boxWidth}}>
+                <div className={`linkClass ${data.deactivated ? "text-subdued" : ""}`} style={{width: boxWidth}}>
                     <Link
                         dataPrimaryLink
                         monochrome
@@ -195,7 +196,7 @@ function GithubRow(props) {
         }
         return (
             <IndexTable.Cell key={"collapsible"}>
-                <Box width={treeView ? "300px": ''} >
+                <Box maxWidth={treeView ? "180px": ''} >
                     <HorizontalStack align={treeView ? "start" : "end"} wrap={false} gap={"2"}>
                         <Box><Icon source={iconSource} /></Box>
                         {treeView ? <Text variant='headingSm'>{value}</Text> : null} 
@@ -207,17 +208,21 @@ function GithubRow(props) {
 
     function getHeader(header){
         let type = header?.type;
-
         switch(type){
 
             case CellType.ACTION : 
                 return hasRowActions ? ActionCell() : null;
             case CellType.COLLAPSIBLE :
+                if(props?.treeView){
+                    if(data?.isTerminal === true){
+                        return header.value ? LinkCell(data[header.value], header, undefined) : null
+                    }
+                }
                 return CollapsibleCell(props?.treeView, data[header?.value]);
             case CellType.TEXT :
-                return header.value ? LinkCell(TextCell(header), header) : null;
+                return header.value ? LinkCell(TextCell(header), header, header?.boxWidth) : null;
             default :
-                return header.value ? LinkCell(data[header.value], header) : null;
+                return header.value ? LinkCell(data[header.value], header, header?.boxWidth) : null;
         }
     }
 

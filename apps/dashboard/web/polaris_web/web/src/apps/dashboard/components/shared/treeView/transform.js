@@ -1,6 +1,3 @@
-import { Badge } from "@shopify/polaris";
-
-import func from "@/util/func";
 import transform from "../../../pages/observe/transform";
 import PrettifyChildren from "./PrettifyChildren";
 
@@ -52,7 +49,7 @@ const treeViewFunc = {
 
         items.forEach(item => {
             const branchFieldValue = item?.[branchField]
-            let branchFieldValueParts = branchFieldValue?.split(branchFieldSplitter)?.filter(part => part) || []
+            let branchFieldValueParts = branchFieldValue?.split(branchFieldSplitter) || []
             
             if (reverse) {
                 branchFieldValueParts.reverse()
@@ -93,6 +90,9 @@ const treeViewFunc = {
                 currentNode = currentNode[part].children;
             })
         })
+        if(shouldPrune){
+            this.pruneTree(itemsTree, branchFieldSplitter, reverse)
+        }
         let finalResult = []
         Object.keys(itemsTree).forEach((x) => {
             const result = this.dfs(itemsTree[x], x, headers)
@@ -119,7 +119,11 @@ const treeViewFunc = {
             if(key !== 'displayName'){
                 mergedNode[key] = children[0][key]
             }else{
-                mergedNode['apiCollectionIds'] = [children[0]['id']]
+                if(children[0].hasOwnProperty('apiCollectionIds')){
+                    mergedNode['apiCollectionIds'] = children[0].apiCollectionIds
+                }else{
+                    mergedNode['apiCollectionIds'] = [children[0]['id']]
+                }
             }
             
         })
@@ -194,14 +198,10 @@ const treeViewFunc = {
         return normalData.map((c) => {
             return{
                 ...c,
-                displayNameComp: c.level,
-                envTypeComp: c.userSetEnvType.map((type, index)=> {
-                    return(
-                        <Badge key={index} size="small" status="info">{func.toSentenceCase(type)}</Badge>
-                    )
-                }),
+                id: c.apiCollectionIds || c.id,
+                displayNameComp: c?.isTerminal ? c.displayName: c.level,
                 ...transform.convertToPrettifyData(c),
-                makeTree: (data) => <PrettifyChildren data={data.children} headers={headers} />
+                makeTree: (data) => <PrettifyChildren data={data?.children} headers={headers} />
             }
         })
     }

@@ -37,9 +37,23 @@ const tableFunc = {
         setFilters(localFilters);
           let tempData = props.data;
 
+        let dataSortKey = props?.sortOptions?.filter(value => {
+          return (value.value.startsWith(sortKey))
+        }).filter(value => {
+          return (value.value.endsWith(sortOrder === -1 ? 'asc' : 'desc'))
+        })[0]?.sortKey;
+
         if(props?.customFilters){
-          tempData = props?.modifyData(filters)
-          return {value: tempData, total: tempData.length}
+          tempData = props?.modifyData(filters, dataSortKey, sortOrder)
+          tempData = tempData.filter((value) => {
+            return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order', 'conditions']);
+          })
+          let page = skip / limit;
+          let pageLimit = limit;
+          let final2Data = tempData && tempData.length <= pageLimit ? tempData :
+          tempData.slice(page * pageLimit, Math.min((page + 1) * pageLimit, tempData.length))
+
+          return {value:final2Data,total:tempData.length}
         }
           let singleFilterData = tempData
           Object.keys(filters).forEach((filterKey)=>{
@@ -55,11 +69,6 @@ const tableFunc = {
           tempData = tempData.filter((value) => {
             return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order', 'conditions']);
           })
-          let dataSortKey = props?.sortOptions?.filter(value => {
-            return (value.value.startsWith(sortKey))
-          }).filter(value => {
-            return (value.value.endsWith(sortOrder === -1 ? 'asc' : 'desc'))
-          })[0]?.sortKey;
 
           tempData = func.sortFunc(tempData, dataSortKey, sortOrder, props?.treeView !== undefined ? true : false)
           if(props.getFilteredItems){

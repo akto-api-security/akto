@@ -604,9 +604,9 @@ const transform = {
     convertToPrettifyData(c){
         return{
             riskScoreComp:<Badge key={c.level} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
-            coverage: c.endpoints !== 0 ? Math.min( Math.floor((c.coverage * 100)/c.endpoints), 100) + "%": '0%',
+            coverage: c.urlsCount !== 0 ? Math.min( Math.floor((c.testedEndpoints * 100)/c.urlsCount), 100) + "%": '0%',
             issuesArr: this.getIssuesList(c.severityInfo),
-            sensitiveSubTypes: this.prettifySubtypes(c.sensitiveSubTypes),
+            sensitiveSubTypes: this.prettifySubtypes(c?.sensitiveInRespTypes || []),
             lastTraffic: func.prettifyEpoch(c.detectedTimestamp),
             discovered: func.prettifyEpoch(c.startTs),
         }
