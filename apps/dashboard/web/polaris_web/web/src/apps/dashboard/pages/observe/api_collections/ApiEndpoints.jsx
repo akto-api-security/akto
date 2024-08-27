@@ -230,19 +230,13 @@ function ApiEndpoints(props) {
             let results = await Promise.allSettled(apiPromises);
             let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
             let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
-        let sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
-        let sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
-        setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
             sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
             sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
-            apiEndpointsInCollection = stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
+            setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
+            apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
             apiInfoListInCollection = apiInfosData.apiInfoList
             unusedEndpointsInCollection = stisEndpoints.unusedEndpoints
-            setShowEmptyScreen(stisEndpoints.list.length === 0)
             setIsRedacted(apiInfosData.redacted)
-        let apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
-        let apiInfoListInCollection = apiInfosData.apiInfoList
-        let unusedEndpointsInCollection = stisEndpoints.unusedEndpoints
         }
 
         let sensitiveParams = sensitiveParamsResp.data.endpoints
