@@ -357,8 +357,6 @@ public class Main {
                         continue;
                     }
 
-                    Context.accountId.set(accountIdInt);
-
                     AccountInfo accountInfo = accountInfoMap.get(accountIdInt);
                     if (accountInfo == null) {
                         accountInfo = new AccountInfo();
