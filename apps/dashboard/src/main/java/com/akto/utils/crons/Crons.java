@@ -78,8 +78,8 @@ public class Crons {
                     @Override
                     public void accept(Account t) {
                         try {
-                            List<RuntimeMetrics> runmetric = RuntimeMetricsDao.instance.findAll(Filters.empty(), 0, 1, Sorts.ascending("timestamp"));
-                            if (Context.now() - oldMetricThreshold < runmetric.get(0).getTimestamp()) {
+                            int accId = Context.accountId.get();
+                            if (Context.now() - oldMetricThreshold < accId) {
                                 return;
                             }
 
