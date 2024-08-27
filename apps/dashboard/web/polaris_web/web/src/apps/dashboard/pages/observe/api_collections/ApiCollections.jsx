@@ -200,7 +200,7 @@ function ApiCollections() {
     const [refreshData, setRefreshData] = useState(false)
     const [popover,setPopover] = useState(false)
     const [normalData, setNormalData] = useState([])
-    const [treeView, setTreeView] = useState(true);
+    const [treeView, setTreeView] = useState(false);
     const [moreActions, setMoreActions] = useState(false);
 
     // const dummyData = dummyJson;
