@@ -10,8 +10,7 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.CustomAuthType;
 import com.akto.log.LoggerMaker;
-import com.akto.testing.ApiExecutor;
-import com.akto.util.AccountTask;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -33,7 +32,7 @@ public class CustomAuthTypeAction extends UserAction{
     private CustomAuthType customAuthType;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(CustomAuthTypeAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(CustomAuthTypeAction.class, LogDb.DASHBOARD);
 
     public String fetchCustomAuthTypes(){
         customAuthTypes = CustomAuthTypeDao.instance.findAll(new BasicDBObject());

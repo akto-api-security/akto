@@ -1,4 +1,4 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,HorizontalGrid, HorizontalStack, Link, VerticalStack, Tooltip } from "@shopify/polaris";
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,HorizontalGrid, HorizontalStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList } from "@shopify/polaris";
 import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons"
 import { useEffect, useRef, useState } from "react";
 import { default as observeApi } from "../api";
@@ -44,6 +44,21 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const runTestRef = useRef(null);
     const [searchValue, setSearchValue] = useState('')
     const [showSearch, setShowSearch] = useState(false)
+    const [showFiltersOption, setShowFiltersOption] = useState(false);
+    const sectionsForFilters = [
+        {
+            title: 'Author',
+            filterKey: 'author',
+            options: [
+                {value: 'akto', label: 'Akto default'},
+                {value: 'custom', label: 'Custom tests'}
+            ]
+        }
+    ]
+
+    const initialArr = ['akto','custom']
+
+    const [optionsSelected, setOptionsSelected] = useState(initialArr)
 
     function nameSuffixes(tests) {
         return Object.entries(tests)
@@ -161,12 +176,72 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         </div>
     );
 
+    const filterFunc = (test, selectedVal = []) => {
+        const useFilterArr = selectedVal.length > 0 ? selectedVal : optionsSelected
+        let ans = false;
+        sectionsForFilters.forEach((filter) => {
+            const filterKey = filter.filterKey;
+            if(filterKey === 'author'){
+                if(useFilterArr.includes('custom')){
+                    ans = useFilterArr.includes(test[filterKey].toLowerCase()) || test[filterKey].toLowerCase() !== 'akto'
+                }else{
+                    ans = useFilterArr.length > 0 && useFilterArr.includes(test[filterKey].toLowerCase())
+                }
+            }
+            else if(useFilterArr.includes(test[filterKey].toLowerCase())){
+                ans = true
+            }
+        })
+        return ans;
+    }
+
     const resetSearchFunc = () => {
         setShowSearch(false);
         setSearchValue('');
     }
 
     let categoryRows = [], testRows = []
+
+    const handleTestsSelected = (test) => {
+        let localCopy = JSON.parse(JSON.stringify(testRun.tests))
+        localCopy[testRun.selectedCategory] = localCopy[testRun.selectedCategory].map(curTest =>
+            curTest.label === test.label ?
+            {
+                ...curTest,
+                selected: !curTest.selected
+            } : curTest
+        ) 
+        const testName = convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(localCopy).join("_")
+        setTestRun(prev => ({
+            ...prev,
+            tests: {
+                ...prev.tests,
+                [testRun.selectedCategory]: prev.tests[testRun.selectedCategory].map(curTest =>
+                    curTest.label === test.label ?
+                        {
+                            ...curTest,
+                            selected: !curTest.selected
+                        } : curTest)
+            },
+            testName:testName
+        }))
+    }
+
+    const selectOnlyFilteredTests = (selected) => {
+        const filteredTests = testRun.selectedCategory.length > 0 ? testRun.tests[testRun.selectedCategory].filter(x => filterFunc(x, selected)).map(item => item.value) : []
+        setTestRun(prev => ({
+            ...prev,
+            tests: {
+                ...prev.tests,
+                [testRun.selectedCategory]: prev.tests[testRun.selectedCategory].map((curTest) => {
+                    return {
+                        ...curTest,
+                        selected: filteredTests.length > 0 && filteredTests.includes(curTest.value)
+                    }
+                })
+            }
+        }))
+    }
 
     if (!loading) {
         categoryRows = testRun.categories.map(category => {
@@ -183,9 +258,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 return ([(
                     <div
                         style={{ display: "grid", gridTemplateColumns: "auto max-content", alignItems: "center" }}
-                        onClick={() => { setTestRun(prev => ({ ...prev, selectedCategory: category.name })); resetSearchFunc(); }}>
+                        onClick={() => { setTestRun(prev => ({ ...prev, selectedCategory: category.name })); resetSearchFunc(); setOptionsSelected(initialArr)}}>
                         <div>
-                            <Text variany="headingMd" fontWeight="bold" color={category.name === testRun.selectedCategory ? "success" : ""}>{category.displayName}</Text>
+                            <Text variant="headingMd" fontWeight="bold" color={category.name === testRun.selectedCategory ? "success" : ""}>{category.displayName}</Text>
                             <Text>{selected} out of {total} selected</Text>
                         </div>
                         {selected > 0 && <Icon source={TickMinor} color="base" />}
@@ -197,32 +272,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
         })
 
-        const handleTestsSelected = (test) => {
-            let localCopy = JSON.parse(JSON.stringify(testRun.tests))
-            localCopy[testRun.selectedCategory] = localCopy[testRun.selectedCategory].map(curTest =>
-                curTest.label === test.label ?
-                {
-                    ...curTest,
-                    selected: !curTest.selected
-                } : curTest
-            ) 
-            const testName = convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(localCopy).join("_")
-            setTestRun(prev => ({
-                ...prev,
-                tests: {
-                    ...prev.tests,
-                    [testRun.selectedCategory]: prev.tests[testRun.selectedCategory].map(curTest =>
-                        curTest.label === test.label ?
-                            {
-                                ...curTest,
-                                selected: !curTest.selected
-                            } : curTest)
-                },
-                testName:testName
-            }))
-        }
-
-        testRows = testRun.selectedCategory.length > 0 ? testRun.tests[testRun.selectedCategory].filter(x=> x.label.toLowerCase().includes(searchValue.toLowerCase())).map(test => {
+        const filteredTests = testRun.selectedCategory.length > 0 ? testRun.tests[testRun.selectedCategory].filter(x => (x.label.toLowerCase().includes(searchValue.toLowerCase()) && filterFunc(x))) : []
+        testRows = filteredTests.map(test => {
             const isCustom = test?.author !== "AKTO"
             const label = (
                 <span style={{display: 'flex', gap: '4px', alignItems: 'flex-start'}}>
@@ -238,7 +289,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     onChange={() => handleTestsSelected(test)}
                 />
             )])
-        }) : []
+        })
     }
 
     const hours = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
@@ -489,6 +540,20 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         <Text variant="headingMd">Tests</Text>
                                     </HorizontalStack>
                                     <HorizontalStack gap={"2"}>
+                                        <Popover
+                                            activator={<Button plain size="slim" onClick={() => setShowFiltersOption(!showFiltersOption)}>More filters</Button>}
+                                            onClose={() => setShowFiltersOption(false)}
+                                            active={showFiltersOption}
+                                        >
+                                            <Popover.Pane fixed>
+                                                <OptionList
+                                                    onChange={(x) => {setOptionsSelected(x); selectOnlyFilteredTests(x);}}
+                                                    allowMultiple
+                                                    sections={sectionsForFilters}
+                                                    selected={optionsSelected}
+                                                />
+                                            </Popover.Pane>
+                                        </Popover>
                                         {showSearch ? <TextField onChange={handleInputValue} value={searchValue} autoFocus
                                     focused /> : null}
                                         <Tooltip content={"Click to search"} dismissOnMouseOut>
