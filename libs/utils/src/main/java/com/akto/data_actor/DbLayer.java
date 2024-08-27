@@ -61,8 +61,11 @@ import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricCalculator;
+import com.akto.usage.UsageMetricHandler;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
@@ -630,6 +633,16 @@ public class DbLayer {
                         Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
                         Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)),
                 options);
+    }
+
+    public static List<Integer> fetchDeactivatedCollections() {
+        return new ArrayList<>(UsageMetricCalculator.getDeactivatedLatest());
+    }
+
+    public static void updateUsage(MetricTypes metricType, int deltaUsage){
+        int accountId = Context.accountId.get();
+        UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(metricType, accountId, deltaUsage);
+        return;
     }
 
     public static List<TestingRunResult> fetchLatestTestingRunResultBySummaryId(String summaryId, int limit, int skip) {

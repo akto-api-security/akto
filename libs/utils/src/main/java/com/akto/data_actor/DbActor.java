@@ -26,6 +26,7 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.dto.usage.MetricTypes;
 import com.mongodb.client.model.WriteModel;
 
 import java.util.ArrayList;
@@ -404,6 +405,16 @@ public class DbActor extends DataActor {
             Map<String, Integer> totalCountIssues) {
         return DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues);
     }
+
+    public List<Integer> fetchDeactivatedCollections() {
+        return DbLayer.fetchDeactivatedCollections();
+    }
+
+    public void updateUsage(MetricTypes metricType,int deltaUsage){
+        DbLayer.updateUsage(metricType, deltaUsage);
+        return;
+    }
+
 
     public void updateIssueCountInTestSummary(String summaryId, Map<String, Integer> totalCountIssues) {
         DbLayer.updateIssueCountInTestSummary(summaryId, totalCountIssues, false);
