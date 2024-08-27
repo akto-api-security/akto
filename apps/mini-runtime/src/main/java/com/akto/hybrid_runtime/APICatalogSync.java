@@ -1082,7 +1082,11 @@ public class APICatalogSync {
         List<SingleTypeInfo> allParams;
         /*
          * This fetches all STIs in batches of 100, filtered by host headers.
-         * Since they are filtered by host header, APIs in the default collection will not be present here.
+         * Since they are filtered by host header, APIs with no hosts will not be present here.
+         * Impact: these APIs will be calculated as new APIs every time,
+         * but since we have a grace period of 1 day in mini-runtime 
+         * and we recalculate the usage every four hours, 
+         * the end user will not face a wrongful overage.
          */
         allParams = dataActor.fetchAllStis();
         if (allParams.size() > 0) {
@@ -1264,15 +1268,27 @@ public class APICatalogSync {
 
     public static Set<Integer> getDemosAndDeactivated() {
         Set<Integer> ret = new HashSet<>();
-        
+
         List<Integer> deactivatedIds = getDeactivated();
-        if(juiceShop == null){
+        if (juiceShop == null) {
             juiceShop = dataActor.findApiCollectionByName("juice_shop_demo");
+            /*
+             * In case the user has deleted juice shop demo collection,
+             * we insert a sample collection
+             * to avoid making the API call every time.
+             */
+            if (juiceShop == null) {
+                juiceShop = new ApiCollection();
+            }
         }
         Set<Integer> demos = new HashSet<>();
         demos.add(1111111111);
 
-        if (juiceShop != null) {
+        /*
+         * In case of no juice_shop_demo collection, 
+         * the id will be 0, as set above.
+         */
+        if (juiceShop != null && juiceShop.getId() != 0) {
             demos.add(juiceShop.getId());
         }
         ret.addAll(deactivatedIds);
@@ -1326,6 +1342,11 @@ public class APICatalogSync {
         counter++;
         for(int apiCollectionId: this.delta.keySet()) {
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
+
+            /*
+             * Caching for the actual API call is done in getDeactivated() function.
+             */
+            demosAndDeactivatedCollections = getDemosAndDeactivated();
 
             if (syncLimit.checkLimit && !demosAndDeactivatedCollections.contains(apiCollectionId)) {
 
