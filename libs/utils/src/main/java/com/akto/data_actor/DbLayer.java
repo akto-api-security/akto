@@ -16,6 +16,7 @@ import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.dependency_analyser.DependencyAnalyserUtils;
 import com.akto.dto.*;
 import com.akto.dto.settings.DataControlSettings;
+import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -36,6 +37,7 @@ import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
@@ -58,6 +60,7 @@ import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
+import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -857,5 +860,34 @@ public class DbLayer {
 
     public static List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {
         return SingleTypeInfoDao.fetchLatestEndpointsForTesting(startTimestamp, endTimestamp, apiCollectionId);
+    }
+
+    public static void insertRuntimeMetricsData(BasicDBList metricsData) {
+
+        ArrayList<WriteModel<RuntimeMetrics>> bulkUpdates = new ArrayList<>();
+        RuntimeMetrics runtimeMetrics;
+        for (Object metrics: metricsData) {
+            try {
+                Map<String, Object> obj = (Map) metrics;
+                String name = (String) obj.get("metric_id");
+                String instanceId = (String) obj.get("instance_id");
+                Long tsVal = (Long) obj.get("timestamp");
+                int ts = tsVal.intValue();
+                Double valDouble = (Double) obj.get("val");
+                int val = valDouble.intValue();
+                if (name == null || name.length() == 0) {
+                    continue;
+                }
+                runtimeMetrics = new RuntimeMetrics(name, ts, instanceId, val);
+                bulkUpdates.add(new InsertOneModel<>(runtimeMetrics));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error writing bulk update " + e.getMessage());
+            }
+        }
+
+        if (bulkUpdates.size() > 0) {
+            loggerMaker.infoAndAddToDb("insertRuntimeMetricsData bulk write size " + metricsData.size());
+            RuntimeMetricsDao.bulkInsertMetrics(bulkUpdates);
+        }
     }
 }
