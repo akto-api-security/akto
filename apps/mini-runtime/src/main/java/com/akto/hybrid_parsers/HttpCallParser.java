@@ -168,7 +168,12 @@ public class HttpCallParser {
             if ((lastSyncLimitFetch + REFRESH_INTERVAL) >= Context.now()) {
                 return syncLimit;
             }
+
+            AccountSettings accountSettings = dataActor.fetchAccountSettings();
             int accountId = Context.accountId.get();
+            if (accountSettings != null) {
+                accountId = accountSettings.getId();
+            }
 
             /*
              * If a user is using on-prem mini-runtime, no limits would apply there.
