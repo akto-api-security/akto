@@ -17,6 +17,17 @@ public class CustomAuthTypeMapper {
     private int creatorId;
     private int timestamp;
 
+    public CustomAuthTypeMapper(String id, String name, List<String> headerKeys, List<String> payloadKeys,
+            boolean active, int creatorId, int timestamp) {
+        this.id = id;
+        this.name = name;
+        this.headerKeys = headerKeys;
+        this.payloadKeys = payloadKeys;
+        this.active = active;
+        this.creatorId = creatorId;
+        this.timestamp = timestamp;
+    }
+
     public CustomAuthTypeMapper(CustomAuthType customAuthType) {
         this.id = customAuthType.getId().toHexString();
         this.name = customAuthType.getName();
