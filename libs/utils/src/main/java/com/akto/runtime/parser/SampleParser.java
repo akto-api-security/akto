@@ -5,7 +5,6 @@ import java.util.Map;
 
 import org.apache.commons.lang3.math.NumberUtils;
 
-import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
@@ -49,7 +48,7 @@ public class SampleParser {
         payload = HttpRequestResponseUtils.rawToJsonString(payload, responseHeaders);
         payload = JSONUtils.parseIfJsonP(payload);
         int time = Integer.parseInt(json.get("time").toString());
-        String accountId = (Context.accountId.get() + "");
+        String accountId = (String) json.get("akto_account_id");
         String sourceIP = (String) json.get("ip");
         String destIP = (String) json.getOrDefault("destIp", "");
         String direction = (String) json.getOrDefault("direction", "");
