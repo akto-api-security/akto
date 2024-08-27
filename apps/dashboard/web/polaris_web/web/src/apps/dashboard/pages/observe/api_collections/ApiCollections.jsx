@@ -1,5 +1,6 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList} from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, HorizontalStack, Icon} from "@shopify/polaris"
+import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import api from "../api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
@@ -19,50 +20,86 @@ import useTable from "@/apps/dashboard/components/tables/TableContext"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
 import { saveAs } from 'file-saver'
+// import dummyJson from "../../../components/shared/treeView/dummyJson"
+import TreeViewTable from "../../../components/shared/treeView/TreeViewTable"
+import TableStore from "../../../components/tables/TableStore";
 
 const headers = [
     {
         title: "API collection name",
         text: "API collection name",
         value: "displayNameComp",
-        filterKey:"displayName",
+        filterKey: "displayName",
         textValue: 'displayName',
-        showFilter:true
+        showFilter: true
     },
     {
         title: "Total endpoints",
         text: "Total endpoints",
         value: "urlsCount",
         isText: CellType.TEXT,
-        sortActive: true
+        sortActive: true,
+        mergeType: (a, b) => {
+            return (a || 0) + (b || 0);
+        },
+        shouldMerge: true,
+        boxWidth: '80px'
     },
     {
         title: <HeadingWithTooltip content={<Text variant="bodySm">Risk score of collection is maximum risk score of the endpoints inside this collection</Text>} title="Risk score" />,
         value: 'riskScoreComp',
         textValue: 'riskScore',
+        numericValue: 'riskScore',
         text: 'Risk Score',
-        sortActive: true
+        sortActive: true,
+        mergeType: (a, b) => {
+            return Math.max(a || 0, b || 0);
+        },
+        shouldMerge: true,
+        boxWidth: '80px'
     },
     {   
         title: 'Test coverage',
         text: 'Test coverage', 
         value: 'coverage',
         isText: CellType.TEXT,
-        tooltipContent: (<Text variant="bodySm">Percentage of endpoints tested successfully in the collection</Text>)
+        tooltipContent: (<Text variant="bodySm">Percentage of endpoints tested successfully in the collection</Text>),
+        mergeType: (a, b) => {
+            return (a || 0) + (b || 0);
+        },
+        numericValue: 'testedEndpoints',
+        shouldMerge: true,
+        boxWidth: '80px'
     },
     {
         title: 'Issues', 
         text: 'Issues', 
         value: 'issuesArr',
+        numericValue: 'severityInfo',
         textValue: 'issuesArrVal',
-        tooltipContent: (<Text variant="bodySm">Severity and count of issues present in the collection</Text>)
+        tooltipContent: (<Text variant="bodySm">Severity and count of issues present in the collection</Text>),
+        mergeType: (a, b) => {
+            return {
+                HIGH: ((a?.HIGH || 0) + (b?.HIGH || 0)),
+                MEDIUM: ((a?.MEDIUM || 0) + (b?.MEDIUM || 0)),
+                LOW: ((a?.LOW || 0) + (b?.LOW || 0)),
+            };
+        },
+        shouldMerge: true,
+        boxWidth: '100px'
     },
     {   
-        title: 'Sensitive data' , 
-        text: 'Sensitive data' , 
+        title: 'Sensitive data', 
+        text: 'Sensitive data', 
         value: 'sensitiveSubTypes',
+        numericValue: 'sensitiveInRespTypes',
         textValue: 'sensitiveSubTypesVal',
-        tooltipContent: (<Text variant="bodySm">Types of data type present in response of endpoint inside the collection</Text>)
+        tooltipContent: (<Text variant="bodySm">Types of data type present in response of endpoint inside the collection</Text>),
+        mergeType: (a, b) => {
+            return [...new Set([...(a || []), ...(b || [])])];
+        },
+        shouldMerge: true,
+        boxWidth: '160px'
     },
     {
         text: 'Collection type',
@@ -71,14 +108,20 @@ const headers = [
         filterKey: "envType",
         showFilter: true,
         textValue: 'envType',
-        tooltipContent: (<Text variant="bodySm">Environment type for an API collection, Staging or Production </Text>)
+        tooltipContent: (<Text variant="bodySm">Environment type for an API collection, Staging or Production </Text>),
     },
     {   
         title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time an endpoint within collection was either discovered for the first time or seen again</Text>} title="Last traffic seen" />, 
         text: 'Last traffic seen', 
         value: 'lastTraffic',
+        numericValue: 'detectedTimestamp',
         isText: CellType.TEXT,
-        sortActive: true
+        sortActive: true,
+        mergeType: (a, b) => {
+            return Math.max(a || 0, b || 0);
+        },
+        shouldMerge: true,
+        boxWidth: '80px'
     },
     {
         title: <HeadingWithTooltip content={<Text variant="bodySm">Time when collection was created</Text>} title="Discovered" />,
@@ -87,7 +130,8 @@ const headers = [
         isText: CellType.TEXT,
         sortActive: true,
     }
-]
+];
+
 
 const sortOptions = [
     { label: 'Endpoints', value: 'urlsCount asc', directionLabel: 'More', sortKey: 'urlsCount', columnIndex: 2 },
@@ -155,10 +199,15 @@ function ApiCollections() {
     const [envTypeMap, setEnvTypeMap] = useState({})
     const [refreshData, setRefreshData] = useState(false)
     const [popover,setPopover] = useState(false)
+    const [normalData, setNormalData] = useState([])
+    const [treeView, setTreeView] = useState(false);
+    const [moreActions, setMoreActions] = useState(false);
+
+    // const dummyData = dummyJson;
 
     const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom']
 
-    const { tabsInfo } = useTable()
+    const { tabsInfo, selectItems } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, data)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
@@ -179,12 +228,15 @@ function ApiCollections() {
     }
 
     const allCollections = PersistStore(state => state.allCollections)
+    // const allCollections = dummyData.allCollections;
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
-
     const setCoverageMap = PersistStore(state => state.setCoverageMap)
 
+    // const lastFetchedResp = dummyData.lastFetchedResp
+    // const lastFetchedSeverityResp = dummyData.lastFetchedSeverityResp
+    // const lastFetchedSensitiveResp = dummyData.lastFetchedSensitiveResp
     const lastFetchedInfo = PersistStore.getState().lastFetchedInfo
     const lastFetchedResp = PersistStore.getState().lastFetchedResp
     const lastFetchedSeverityResp = PersistStore.getState().lastFetchedSeverityResp
@@ -223,6 +275,7 @@ function ApiCollections() {
         setAllCollections(apiCollectionsResp.apiCollections || [])
 
         const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
+        // const shouldCallHeavyApis = false;
 
         // fire all the other apis in parallel
 
@@ -239,6 +292,7 @@ function ApiCollections() {
         
         let results = await Promise.allSettled(apiPromises);
         let coverageInfo = results[0].status === 'fulfilled' ? results[0].value : {};
+        // let coverageInfo = dummyData.coverageMap
         let trafficInfo = results[1].status === 'fulfilled' ? results[1].value : {};
 
         let riskScoreObj = lastFetchedResp
@@ -279,7 +333,7 @@ function ApiCollections() {
         setCoverageMap(coverageInfo)
 
         dataObj = convertToNewData(tmp, sensitiveInfo.sensitiveInfoMap, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap, false);
-
+        setNormalData(dataObj.normal)
         const summary = transform.getSummaryData(dataObj.normal)
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
         summary.totalSensitiveEndpoints = sensitiveInfo.sensitiveUrls
@@ -308,10 +362,14 @@ function ApiCollections() {
         resetFunc()    
     }, [])
     const createCollectionModalActivatorRef = useRef();
-
+    const resetResourcesSelected = () => {
+        TableStore.getState().setSelectedItems([])
+        selectItems([])
+    }
     async function handleCollectionsAction(collectionIdList, apiFunction, toastContent){
         const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
         await apiFunction(collectionIdListObj)
+        resetResourcesSelected();
         fetchData()
         func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
     }
@@ -332,15 +390,13 @@ function ApiCollections() {
         }
     }
 
+    
+
     const promotedBulkActions = (selectedResources) => {
         let actions = [
             {
                 content: `Remove collection${func.addPlurality(selectedResources.length)}`,
                 onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
-            },
-            {
-                content: 'Export as CSV',
-                onAction: () => exportCsv()
             }
         ];
 
@@ -414,6 +470,7 @@ function ApiCollections() {
             setEnvTypeMap(copyObj)
             updateData(copyObj)
         })
+        resetResourcesSelected();
         
     }
 
@@ -453,12 +510,53 @@ function ApiCollections() {
         }
     ]
 
+    const secondaryActionsComp = (
+        <Popover
+            active={moreActions}
+            activator={(
+                <Button onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
+                    More Actions
+                </Button>
+            )}
+            autofocusTarget="first-node"
+            onClose={() => { setMoreActions(false) }}
+            preferredAlignment="right"
+        >
+            <Popover.Pane fixed>
+                <Popover.Section>
+                    <Button plain monochrome onClick={() =>exportCsv()} removeUnderline>
+                        <HorizontalStack gap={"2"}>
+                            <Box><Icon source={FileMinor} /></Box>
+                            <Text>Export as CSV</Text>
+                        </HorizontalStack>
+                    </Button>
+                    </Popover.Section>
+                <Popover.Section>
+                    <Button plain monochrome onClick={() => setTreeView(!treeView)} removeUnderline>
+                        <HorizontalStack gap={"2"}>
+                            <Box><Icon source={treeView ? HideMinor : ViewMinor} /></Box>
+                            <Text>{treeView ? "Hide tree view": "Display tree view"}</Text>
+                        </HorizontalStack>
+                    </Button>
+                </Popover.Section>
+            </Popover.Pane>
+        </Popover>
+    )
+
 
     const handleSelectedTab = (selectedIndex) => {
         setSelected(selectedIndex)
     }
 
     const tableComponent = (
+        treeView ? 
+        <TreeViewTable 
+            collectionsArr={normalData.filter((x) => x?.type !== "API_GROUP")} 
+            sortOptions={sortOptions} 
+            resourceName={resourceName} 
+            tableHeaders={headers.filter((x) => x.shouldMerge !== undefined)} 
+            promotedBulkActions={promotedBulkActions}
+        />:
         <GithubSimpleTable
             key={refreshData}
             pageLimit={100}
@@ -495,6 +593,7 @@ function ApiCollections() {
             primaryAction={<Button id={"create-new-collection-popup"} primary secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
             isFirstPage={true}
             components={components}
+            secondaryActions={secondaryActionsComp}
         />
     )
 }

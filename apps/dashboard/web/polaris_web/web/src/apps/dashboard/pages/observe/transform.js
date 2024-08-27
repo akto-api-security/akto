@@ -401,7 +401,7 @@ const transform = {
             <Box maxWidth="200px">
                 <HorizontalStack gap={1} wrap={false}>
                     {sensitiveTags.map((item,index)=>{
-                        return (index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index}><Box>
+                        return (index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index + item}><Box>
                             <div className={deactivated ? "icon-deactivated" : ""}>
                                 <Icon color={deactivated ? "" : "subdued"} source={func.getSensitiveIcons(item)} />
                             </div>
@@ -599,9 +599,18 @@ const transform = {
             
         }
         return tempSensitiveInfo; 
-    }
+    },
 
-      
+    convertToPrettifyData(c){
+        return{
+            riskScoreComp:<Badge key={c.level} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
+            coverage: c.urlsCount !== 0 ? Math.min( Math.floor((c.testedEndpoints * 100)/c.urlsCount), 100) + "%": '0%',
+            issuesArr: this.getIssuesList(c.severityInfo),
+            sensitiveSubTypes: this.prettifySubtypes(c?.sensitiveInRespTypes || []),
+            lastTraffic: func.prettifyEpoch(c.detectedTimestamp),
+            discovered: func.prettifyEpoch(c.startTs),
+        }
+    }
 }
 
 export default transform
