@@ -213,6 +213,8 @@ public class DbAction extends ActionSupport {
     String endpointLogicalGroupId;
 
     DataControlSettings dataControlSettings;
+    BasicDBList metricsData;
+
     public String fetchDataControlSettings() {
         try {
             String prevCommand = "";
@@ -1604,6 +1606,15 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String insertRuntimeMetricsData() {
+        try {
+            DbLayer.insertRuntimeMetricsData(metricsData);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -2480,6 +2491,14 @@ public class DbAction extends ActionSupport {
 
     public void setNewEps(List<ApiInfo.ApiInfoKey> newEps) {
         this.newEps = newEps;
+    }
+
+    public BasicDBList getMetricsData() {
+        return metricsData;
+    }
+
+    public void setMetricsData(BasicDBList metricsData) {
+        this.metricsData = metricsData;
     }
 
 }
