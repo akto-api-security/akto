@@ -3,17 +3,21 @@ package com.akto.hybrid_parsers;
 import com.akto.RuntimeMode;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.hybrid_dependency.DependencyAnalyser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -150,6 +154,44 @@ public class HttpCallParser {
 
     int numberOfSyncs = 0;
 
+    private static int lastSyncLimitFetch = 0;
+    private static final int REFRESH_INTERVAL = 60 * 10; // 10 minutes.
+    private static SyncLimit syncLimit = FeatureAccess.fullAccess.fetchSyncLimit();
+    /*
+     * This is the epoch for August 27, 2024 7:15:31 AM GMT .
+     * Enabling this feature for all users after this timestamp.
+     */
+    private static final int DAY_0_EPOCH = 1724742931;
+
+    private SyncLimit fetchSyncLimit() {
+        try {
+            if ((lastSyncLimitFetch + REFRESH_INTERVAL) >= Context.now()) {
+                return syncLimit;
+            }
+
+            AccountSettings accountSettings = dataActor.fetchAccountSettings();
+            int accountId = Context.accountId.get();
+            if (accountSettings != null) {
+                accountId = accountSettings.getId();
+            }
+
+            /*
+             * If a user is using on-prem mini-runtime, no limits would apply there.
+             */
+            if(accountId < DAY_0_EPOCH){
+                return syncLimit;
+            }
+
+            Organization organization = dataActor.fetchOrganization(accountId);
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
+            syncLimit = featureAccess.fetchSyncLimit();
+            lastSyncLimitFetch = Context.now();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetching sync limit from feature access " + e.toString());
+        }
+        return syncLimit;
+    }
+
     public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
         // USE ONLY filteredResponseParams and not responseParams
         List<HttpResponseParams> filteredResponseParams = responseParams;
@@ -176,7 +218,8 @@ public class HttpCallParser {
             for (ApiCollection apiCollection: apiCollections) {
                 apiCollectionsMap.put(apiCollection.getId(), apiCollection);
             }
-            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI);
+            SyncLimit syncLimit = fetchSyncLimit();
+            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
             dependencyAnalyser.dbState = apiCatalogSync.dbState;
             dependencyAnalyser.syncWithDb();
             syncTrafficMetricsWithDB();
