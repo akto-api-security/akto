@@ -170,6 +170,9 @@ public class HttpCallParser {
             }
             int accountId = Context.accountId.get();
 
+            /*
+             * If a user is using on-prem mini-runtime, no limits would apply there.
+             */
             if(accountId < DAY_0_EPOCH){
                 return syncLimit;
             }
