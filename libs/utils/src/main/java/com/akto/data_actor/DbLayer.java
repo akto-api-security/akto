@@ -848,8 +848,7 @@ public class DbLayer {
                 String instanceId = (String) obj.get("instance_id");
                 Long tsVal = (Long) obj.get("timestamp");
                 int ts = tsVal.intValue();
-                Double valDouble = (Double) obj.get("val");
-                int val = valDouble.intValue();
+                Double val = (Double) obj.get("val");
                 if (name == null || name.length() == 0) {
                     continue;
                 }
