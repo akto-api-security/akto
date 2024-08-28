@@ -12,7 +12,10 @@ function PrettifyChildren({ data, headers }) {
     const navigate = useNavigate();
     const { openedRows, selectItems, modifyOpenedLevels } = useTable();
 
-    const handleRowClick = useCallback((isTerminal, level, apiCollectionId) => {
+    const handleRowClick = useCallback((isTerminal, level, apiCollectionId,e) => {
+        if(e.target.type === 'checkbox'){
+            return ;
+        }
         if (isTerminal) {
             navigate("/dashboard/observe/inventory/" + apiCollectionId);
         } else {
@@ -86,7 +89,7 @@ function PrettifyChildren({ data, headers }) {
                     <div 
                         key={`${c.level}-${x.value}`} 
                         style={{ cursor: 'pointer', width: width }} 
-                        onClick={() => handleRowClick(c.isTerminal, c?.level, c?.id)}
+                        onClick={(e) => handleRowClick(c.isTerminal, c?.level, c?.id, e)}
                     >
                         {collectionObj[x.value]}
                     </div>
