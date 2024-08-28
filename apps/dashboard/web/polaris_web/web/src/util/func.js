@@ -360,6 +360,18 @@ prettifyEpoch(epoch) {
       return []
     }
     let localFilters = filters;
+    let filtersHaveChoices = true;
+    for(var x in filtersHaveChoices){
+      if(x.choices !== undefined || x.choices.length === 0){
+        filtersHaveChoices = false;
+        break;
+      }
+    }
+
+    if(filtersHaveChoices){
+      return filters;
+    }
+
     localFilters.forEach((filter, index) => {
       localFilters[index].availableChoices = new Set()
       localFilters[index].choices = []
@@ -544,7 +556,7 @@ prettifyEpoch(epoch) {
     }, {});
   },
   
-sortFunc: (data, sortKey, sortOrder) => {
+sortFunc: (data, sortKey, sortOrder, treeView) => {
   if(sortKey === 'displayName'){
     let finalArr = data.sort((a, b) => {
         let nameA = ""
@@ -576,13 +588,33 @@ sortFunc: (data, sortKey, sortOrder) => {
     }
     return finalArr
   }
-  return data.sort((a, b) => {
+  data.sort((a, b) => {
     if(typeof a[sortKey] ==='number')
     return (sortOrder) * (a[sortKey] - b[sortKey]);
     if(typeof a[sortKey] ==='string')
     return (sortOrder) * (b[sortKey].localeCompare(a[sortKey]));
   })
+  if(treeView){
+    func.recursiveSort(data, sortKey, sortOrder)
+  }
+  return data
 },
+recursiveSort(data, sortKey, sortOrder = 1) {
+  data.sort((a, b) => {
+      if (typeof a[sortKey] === 'number') {
+          return sortOrder * (a[sortKey] - b[sortKey]);
+      } else if (typeof a[sortKey] === 'string') {
+          return sortOrder * b[sortKey].localeCompare(a[sortKey]);
+      }
+      return 0;
+  });
+  data.forEach(item => {
+      if (item.children && !item.isTerminal) {
+          func.recursiveSort(item.children, sortKey, sortOrder);
+      }
+  });
+},
+
 async copyRequest(type, completeData) {
   let copyString = "";
   let snackBarMessage = ""

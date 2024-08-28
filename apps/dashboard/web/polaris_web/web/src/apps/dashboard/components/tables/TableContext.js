@@ -5,7 +5,6 @@ const TableContext = createContext(initialState);
 
 export const TableContextProvider = ({ children }) => {
   const [state, dispatch] = useReducer(tableReducer, initialState);
-
   const applyFilter = (filter) => {
     dispatch({
       type: "APPLY_FILTER",
@@ -15,9 +14,31 @@ export const TableContextProvider = ({ children }) => {
     });
   };
 
+  const selectItems = (items) => {
+    dispatch({
+      type: "SELECT_ROW_ITEMS",
+      payload: {
+        selectedItems: items
+      }
+    })
+  }
+
+  const modifyOpenedLevels = (items) => {
+    dispatch({
+      type: "OPEN_LEVELS",
+      payload: {
+        openedRows: items
+      }
+    })
+  }
+
   const value = {
     tabsInfo: state.tabsInfo,
     applyFilter,
+    selectItems,
+    selectedItems: state.selectedItems,
+    openedRows: state.openedRows,
+    modifyOpenedLevels
   };
   return <TableContext.Provider value={value}>{children}</TableContext.Provider>;
 };

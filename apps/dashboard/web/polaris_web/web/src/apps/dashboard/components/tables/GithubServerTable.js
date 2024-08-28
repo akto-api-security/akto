@@ -21,6 +21,7 @@ import useTable from './TableContext';
 import { debounce } from 'lodash';
 
 import { useSearchParams } from 'react-router-dom';
+import TableStore from './TableStore';
 
 function GithubServerTable(props) {
 
@@ -36,7 +37,9 @@ function GithubServerTable(props) {
   const tableInitialState = PersistStore(state => state.tableInitialState)
   const setTableInitialState = PersistStore(state => state.setTableInitialState)
   const currentPageKey = props?.filterStateUrl || (window.location.pathname + "/" +  window.location.hash)
-  const pageFiltersMap = filtersMap[currentPageKey]
+  const pageFiltersMap = filtersMap[currentPageKey];
+
+  const { selectedItems, selectItems } = useTable();
 
   const handleRemoveAppliedFilter = (key) => {
     let temp = appliedFilters
@@ -68,7 +71,6 @@ function GithubServerTable(props) {
   const pageLimit = props?.pageLimit || 20;
   const [appliedFilters, setAppliedFilters] = useState(initialStateFilters);
   const [queryValue, setQueryValue] = useState('');
-
   const { applyFilter } = useTable()
 
   const [sortableColumns, setSortableColumns] = useState([])
@@ -255,17 +257,36 @@ function GithubServerTable(props) {
   };
   
 
-  const { selectedResources, allResourcesSelected, handleSelectionChange } =
+  const {selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(props?.fullData, {
       resourceIDResolver,
     });
 
   const customSelectionChange = (selectionType,toggleType, selection) => {
+    if(props?.treeView){
+      if(selectionType !== "page"){
+        let newItems = []
+        if(toggleType){
+          newItems = [...new Set([...selectedItems, ...selection])]
+        }else{
+          newItems = selectedItems.filter((x) => !selection.includes(x))
+        }
+        selectItems(newItems);
+        TableStore.getState().setSelectedItems(newItems)
+      }else{
+        if(selection === false){
+          selectItems([])
+          TableStore.getState().setSelectedItems([])
+        }else{
+        }
+      }
+    }
     if(selectionType === "page"){
       handleSelectionChange("all",toggleType, selection)
     }else{
       handleSelectionChange(selectionType,toggleType, selection)
     }
+    
   }
 
   const [popoverActive, setPopoverActive] = useState(-1);
@@ -297,6 +318,7 @@ function GithubServerTable(props) {
           notHighlightOnselected={props.notHighlightOnselected}
           popoverActive={popoverActive}
           setPopoverActive={setPopoverActive}
+          treeView={props?.treeView}
         />
       ),
     );
@@ -318,6 +340,7 @@ function GithubServerTable(props) {
 
   let tableHeightClass = props.increasedHeight ? "control-row" : (props.condensedHeight ? "condensed-row" : '') 
   let tableClass = props.useNewRow ? "new-table" : (props.selectable ? "removeHeaderColor" : "hideTableHead")
+  const bulkActionResources = selectedItems.length > 0 ? selectedItems : selectedResources
   return (
     <div className={tableClass}>
       <LegacyCard>
@@ -355,7 +378,7 @@ function GithubServerTable(props) {
                 resourceName={props.resourceName}
                 itemCount={data.length}
                 selectedItemsCount={
-                  allResourcesSelected ? 'All' : selectedResources.length
+                  allResourcesSelected ? 'All' : bulkActionResources.length
                 }
                 // condensed
                 selectable={props.selectable || false}
@@ -367,8 +390,7 @@ function GithubServerTable(props) {
                     flush: true
                   }
                 ]}
-                bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
-                promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
+                promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(bulkActionResources) : []}
                 hasZebraStriping={props.hasZebraStriping || false}
                 sortable={sortableColumns}
                 sortColumnIndex={activeColumnSort.columnIndex}
