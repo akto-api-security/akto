@@ -1820,6 +1820,7 @@ public class InitializerListener implements ServletContextListener {
                 setUpDependencyFlowScheduler();
                 tokenGeneratorCron.tokenGeneratorScheduler();
                 crons.deleteTestRunsScheduler();
+                crons.trafficMetricsScheduler();
                 updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                 syncCronInfo.setUpUpdateCronScheduler();
                 // setUpAktoMixpanelEndpointsScheduler();

@@ -187,6 +187,8 @@ const dashboardFunc = {
                 return "Can't capture traffic";
             case "TRAFFIC_OVERLOADED":
                 return "Latency captured, traffic rate high";
+            case "CYBORG_STOPPED_RECEIVING_TRAFFIC":
+                return "Akto not receiving traffic";
             default:
                 return "Unknown error occurred"
         }
