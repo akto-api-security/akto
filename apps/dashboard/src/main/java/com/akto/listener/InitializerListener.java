@@ -1827,7 +1827,8 @@ public class InitializerListener implements ServletContextListener {
             Map<String,ConnectionInfo> infoMap = new HashMap<>();
             
             // check if mirroring is enabled for getting traffic.
-            if(DashboardMode.isOnPremDeployment()) {
+            ApiCollection collection = ApiCollectionsDao.instance.findOne(Filters.exists(ApiCollection.HOST_NAME));
+            if(collection != null){
                 infoMap.put(ConnectionInfo.AUTOMATED_TRAFFIC, new ConnectionInfo(0,true));
             }
 

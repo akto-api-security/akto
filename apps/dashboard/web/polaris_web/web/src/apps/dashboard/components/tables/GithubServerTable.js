@@ -72,6 +72,7 @@ function GithubServerTable(props) {
   const [appliedFilters, setAppliedFilters] = useState(initialStateFilters);
   const [queryValue, setQueryValue] = useState('');
   const { applyFilter } = useTable()
+  const [fullDataIds, setFullDataIds] = useState([])
 
   const [sortableColumns, setSortableColumns] = useState([])
   const [activeColumnSort, setActiveColumnSort] = useState({columnIndex: -1, sortDirection: 'descending'})
@@ -103,6 +104,7 @@ function GithubServerTable(props) {
     let tempData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, page * pageLimit, pageLimit, filters, filterOperators, searchVal);
     tempData ? setData([...tempData.value]) : setData([])
     tempData ? setTotal(tempData.total) : setTotal(0)
+    tempData ? setFullDataIds(tempData?.fullDataIds) : setFullDataIds([])
     applyFilter(tempData.total)
     if (!performance.getEntriesByType('navigation')[0].type === 'reload') {
       setTableInitialState({
@@ -258,7 +260,7 @@ function GithubServerTable(props) {
   
 
   const {selectedResources, allResourcesSelected, handleSelectionChange } =
-    useIndexResourceState(props?.fullData, {
+    useIndexResourceState(fullDataIds, {
       resourceIDResolver,
     });
 

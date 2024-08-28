@@ -53,7 +53,7 @@ const tableFunc = {
           let final2Data = tempData && tempData.length <= pageLimit ? tempData :
           tempData.slice(page * pageLimit, Math.min((page + 1) * pageLimit, tempData.length))
 
-          return {value:final2Data,total:tempData.length}
+          return {value:final2Data,total:tempData.length, fullDataIds: tempData.map((x) => {return {id: x?.id}})}
         }
           let singleFilterData = tempData
           Object.keys(filters).forEach((filterKey)=>{
@@ -82,7 +82,7 @@ const tableFunc = {
           let final2Data = finalData && finalData.length <= pageLimit ? finalData :
           finalData.slice(page * pageLimit, Math.min((page + 1) * pageLimit, finalData.length))
 
-          return {value:final2Data,total:tempData.length}
+          return {value:final2Data,total:tempData.length, fullDataIds: finalData.map((x) => {return {id: x?.id}})}
     },
     mergeFilters(filterArray1, filterArray2, labelFunc, handleRemoveAppliedFilter){
       const combined = [...filterArray1, ...filterArray2];
