@@ -418,14 +418,17 @@ function ApiEndpoints() {
         func.setToast(true, false, <div data-testid="openapi_spec_download_message">OpenAPI spec downloaded successfully</div>)
     }
 
-    function exportCsv() {
+    function exportCsv(selectedResources = []) {
+        const selectedResourcesSet = new Set(selectedResources)
         if (!loading) {
             let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.type === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0].length > 0));
 
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
             const allEndpoints = endpointData['all']
             allEndpoints.forEach(i => {
-                csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
+                if(selectedResources.length === 0 || selectedResourcesSet.has(i.id)){
+                    csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
+                }
             })
             let blob = new Blob([csv], {
                 type: "application/csvcharset=UTF-8"
@@ -641,7 +644,12 @@ function ApiEndpoints() {
             return x.id == apiCollectionId && x.type == "API_GROUP"
         }).length > 0
 
-        let ret = []
+        let ret = [
+            {
+                content: 'Export as CSV',
+                onAction: () => exportCsv(selectedResources)
+            }
+        ]
         if (isApiGroup) {
             ret.push(
                 {

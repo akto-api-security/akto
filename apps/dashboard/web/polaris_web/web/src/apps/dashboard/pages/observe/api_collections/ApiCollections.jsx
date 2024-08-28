@@ -374,13 +374,16 @@ function ApiCollections() {
         func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
     }
 
-    const exportCsv = () =>{
+    const exportCsv = (selectedResources = []) =>{
         const csvFileName = definedTableTabs[selected] + " Collections.csv"
+        const selectedResourcesSet = new Set(selectedResources)
         if (!loading) {
             let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.isText === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0]?.length > 0));
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
             data[selectedTab].forEach(i => {
-                csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
+                if(selectedResources.length === 0 || selectedResourcesSet.has(i.id)){
+                    csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
+                }
             })
             let blob = new Blob([csv], {
                 type: "application/csvcharset=UTF-8"
@@ -397,6 +400,10 @@ function ApiCollections() {
             {
                 content: `Remove collection${func.addPlurality(selectedResources.length)}`,
                 onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
+            },
+            {
+                content: 'Export as CSV',
+                onAction: () => exportCsv(selectedResources)
             }
         ];
 
