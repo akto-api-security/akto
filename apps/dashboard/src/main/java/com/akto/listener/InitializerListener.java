@@ -4,6 +4,7 @@ import com.akto.DaoInit;
 import com.akto.action.AdminSettingsAction;
 import com.akto.action.ApiCollectionsAction;
 import com.akto.action.CustomDataTypeAction;
+import com.akto.action.EventMetricsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.action.testing.StartTestAction;
 import com.akto.dao.*;
@@ -12,6 +13,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.CustomWebhooksResultDao;
+import com.akto.dao.notifications.EventsMetricsDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.pii.PIISourceDao;
 import com.akto.dao.test_editor.TestConfigYamlParser;
@@ -21,7 +23,6 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.upload.FileUploadLogsDao;
 import com.akto.dao.upload.FileUploadsDao;
-import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.*;
 import com.akto.dto.billing.FeatureAccess;
@@ -34,6 +35,8 @@ import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
 import com.akto.dto.data_types.RegexPredicate;
 import com.akto.dto.dependency_flow.DependencyFlow;
+import com.akto.dto.events.EventsExample;
+import com.akto.dto.events.EventsMetrics;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.notifications.CustomWebhook.WebhookOptions;
@@ -53,9 +56,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.upload.FileUpload;
 import com.akto.dto.type.URLMethods;
-import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
-import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -63,17 +64,19 @@ import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.task.Cluster;
 import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
-import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
+import com.akto.utils.jobs.JobUtils;
 import com.akto.util.AccountTask;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.EmailAccountName;
+import com.akto.util.IntercomEventsUtil;
 import com.akto.util.Constants;
 import com.akto.util.DbMode;
 import com.akto.util.JSONUtils;
@@ -85,10 +88,10 @@ import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.*;
 import com.akto.util.DashboardMode;
-import com.akto.utils.scripts.FixMultiSTIs;
 import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
+import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
@@ -107,6 +110,7 @@ import com.slack.api.Slack;
 import com.slack.api.util.http.SlackHttpClient;
 import com.slack.api.webhook.WebhookResponse;
 
+import io.intercom.api.Intercom;
 import okhttp3.OkHttpClient;
 
 import org.apache.commons.csv.CSVRecord;
@@ -118,7 +122,6 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.print.attribute.standard.Severity;
 import javax.servlet.ServletContextListener;
 import java.io.*;
 import java.net.URI;
@@ -144,7 +147,7 @@ import static com.mongodb.client.model.Filters.eq;
 
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class, LogDb.DASHBOARD);
     private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     public static final boolean isSaas = "true".equals(System.getenv("IS_SAAS"));
@@ -904,7 +907,7 @@ public class InitializerListener implements ServletContextListener {
                     public void accept(Account t) {
                         webhookSender();
                     }
-                }, "webhook-sener");
+                }, "webhook-sender");
             }
         }, 0, 1, TimeUnit.HOURS);
     }
@@ -1111,6 +1114,31 @@ public class InitializerListener implements ServletContextListener {
                 Filters.eq("_id", backwardCompatibility.getId()),
                 Updates.set(BackwardCompatibility.DROP_FILTER_SAMPLE_DATA, Context.now())
         );
+    }
+
+    public static void dropSpecialCharacterApiCollections(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDropSpecialCharacterApiCollections() == 0) {
+            ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+            List<ApiCollection> collections = new ArrayList<>();
+            try {
+                List<ApiCollection> apiCollections = ApiCollectionsDao.fetchAllHosts();
+                for (ApiCollection apiCollection: apiCollections) {
+                    if (RuntimeUtil.hasSpecialCharacters(apiCollection.getHostName())) {
+                        collections.add(new ApiCollection(apiCollection.getId(), null, 0, null, null, 0, false, true));
+                    }
+                }
+                apiCollectionsAction.setApiCollections(collections);
+                apiCollectionsAction.deleteMultipleCollections();
+                BackwardCompatibilityDao.instance.updateOne(
+                        Filters.eq("_id", backwardCompatibility.getId()),
+                        Updates.set(BackwardCompatibility.DROP_SPECIAL_CHARACTER_API_COLLECTIONS, Context.now())
+                );
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error dropping special character collections " + e.getStackTrace());
+            }
+
+        }
+
     }
 
     public static void dropAuthMechanismData(BackwardCompatibility authMechanismData) {
@@ -1732,6 +1760,40 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void sendEventsToIntercom () throws Exception {
+        EventsMetrics lastEventsMetrics = EventsMetricsDao.instance.findLatestOne(Filters.empty());
+        EventsMetrics currentEventsMetrics = new EventsMetrics(
+            false, new EventsExample(0, new ArrayList<>()), new HashMap<>(), new HashMap<>(), new HashMap<>(), 0, Context.now());
+            
+        int lastSentEpoch = 0;
+        int lastApisCount = 0;
+        if(lastEventsMetrics != null){
+            lastSentEpoch = lastEventsMetrics.getCreatedAt();
+            if(lastEventsMetrics.getMilestones() != null){
+                lastApisCount = lastEventsMetrics.getMilestones().get(EventsMetrics.APIS_INFO_COUNT);
+            }
+        }
+        int timeNow = Context.now();
+        if(timeNow - lastSentEpoch >= (24 * 60 * 60)){
+            IntercomEventsUtil.fillMetaDataForIntercomEvent(lastApisCount, currentEventsMetrics);
+            IntercomEventsUtil.sendPostureMapToIntercom(lastSentEpoch, currentEventsMetrics);
+            int businessLogicTests = YamlTemplateDao.instance.getNewCustomTemplates(lastSentEpoch);
+            if(businessLogicTests > 0){
+                currentEventsMetrics.setCustomTemplatesCount(businessLogicTests);
+            }
+
+            Map<String, Integer> issuesMap = TestingRunIssuesDao.instance.countIssuesMapForPrivilegeEscalations(lastSentEpoch);
+            if(!issuesMap.isEmpty()){
+                currentEventsMetrics.setSecurityTestFindings(issuesMap);
+            }
+            currentEventsMetrics.setCreatedAt(timeNow);
+            EventsMetricsDao.instance.insertOne(currentEventsMetrics);
+        }
+
+        EventMetricsAction eventMetricsAction = new EventMetricsAction();
+        eventMetricsAction.sendEventsToAllUsersInAccount(currentEventsMetrics);
+    }
+
     public void setUpUpdateCustomCollections() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -1742,6 +1804,17 @@ public class InitializerListener implements ServletContextListener {
                             updateCustomCollections();
                         } catch (Exception e){
                             loggerMaker.errorAndAddToDb(e, "Error while updating custom collections: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+
+                        try {
+                            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                                AccountSettingsDao.generateFilter()
+                            );
+                            if(accountSettings != null && accountSettings.getAllowSendingEventsToIntercom()){
+                                sendEventsToIntercom() ;
+                            }
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, "Error while reporting event to Intercom: " + e.getMessage(), LogDb.DASHBOARD);
                         }
                     }
                 }, "update-custom-collections");
@@ -1754,7 +1827,8 @@ public class InitializerListener implements ServletContextListener {
             Map<String,ConnectionInfo> infoMap = new HashMap<>();
             
             // check if mirroring is enabled for getting traffic.
-            if(DashboardMode.isOnPremDeployment()) {
+            ApiCollection collection = ApiCollectionsDao.instance.findOne(Filters.exists(ApiCollection.HOST_NAME));
+            if(collection != null){
                 infoMap.put(ConnectionInfo.AUTOMATED_TRAFFIC, new ConnectionInfo(0,true));
             }
 
@@ -1809,7 +1883,7 @@ public class InitializerListener implements ServletContextListener {
 
     public static boolean isNotKubernetes() {
         return !DashboardMode.isKubernetes();
-    }
+    } 
 
 
     @Override
@@ -1832,10 +1906,17 @@ public class InitializerListener implements ServletContextListener {
             e.printStackTrace();
         }
 
+        boolean runJobFunctions = JobUtils.getRunJobFunctions();
+        boolean runJobFunctionsAnyway = JobUtils.getRunJobFunctionsAnyway();
 
         executorService.schedule(new Runnable() {
             public void run() {
-                DaoInit.init(new ConnectionString(mongoURI), ReadPreference.primary());
+
+                ReadPreference readPreference = ReadPreference.primary();
+                if (runJobFunctions) {
+                    readPreference = ReadPreference.secondary();
+                }
+                DaoInit.init(new ConnectionString(mongoURI), readPreference);
 
                 connectedToMongo = false;
                 do {
@@ -1854,28 +1935,58 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account account) {
                         AccountSettingsDao.instance.getStats();
-                        runInitializerFunctions();
+                        Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
+                        setDashboardVersionForAccount();
                     }
                 }, "context-initializer");
 
-                if (DashboardMode.isMetered()) {
-                    setupUsageScheduler();
-                    setupUsageSyncScheduler();
-                }
-                trimCappedCollections();
-                setUpPiiAndTestSourcesScheduler();
-                setUpTrafficAlertScheduler();
-                // setUpAktoMixpanelEndpointsScheduler();
                 SingleTypeInfo.init();
-                setUpDailyScheduler();
-                setUpWebhookScheduler();
-                setUpDefaultPayloadRemover();
-                setUpTestEditorTemplatesScheduler();
-                setUpDependencyFlowScheduler();
-                tokenGeneratorCron.tokenGeneratorScheduler();
-                crons.deleteTestRunsScheduler();
-                updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                syncCronInfo.setUpUpdateCronScheduler();
+
+                int now = Context.now();
+                if (runJobFunctions || runJobFunctionsAnyway) {
+
+                    logger.info("Starting init functions and scheduling jobs at " + now);
+
+                    AccountTask.instance.executeTask(new Consumer<Account>() {
+                        @Override
+                        public void accept(Account account) {
+                            runInitializerFunctions();
+                        }
+                    }, "context-initializer-secondary");
+
+                    if (DashboardMode.isMetered()) {
+                        setupUsageScheduler();
+                        setupUsageSyncScheduler();
+                    }
+                    trimCappedCollections();
+                    setUpPiiAndTestSourcesScheduler();
+                    setUpTrafficAlertScheduler();
+                    // setUpAktoMixpanelEndpointsScheduler();
+                    setUpDailyScheduler();
+                    setUpWebhookScheduler();
+                    setUpDefaultPayloadRemover();
+                    setUpTestEditorTemplatesScheduler();
+                    setUpDependencyFlowScheduler();
+                    tokenGeneratorCron.tokenGeneratorScheduler();
+                    crons.deleteTestRunsScheduler();
+                    updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                    syncCronInfo.setUpUpdateCronScheduler();
+                    updateApiGroupsForAccounts();
+                    setUpUpdateCustomCollections();
+                    setUpFillCollectionIdArrayJob();
+                    setupAutomatedApiGroupsScheduler();
+                    /*
+                     * This is a temporary job.
+                     * TODO: Remove this once traffic pipeline is cleaned.
+                     */
+                    CleanInventory.cleanInventoryJobRunner();
+
+                    int now2 = Context.now();
+                    int diffNow = now2 - now;
+                    logger.info(String.format("Completed init functions and scheduling jobs at %d , time taken : %d", now2, diffNow));
+                } else {
+                    logger.info("Skipping init functions and scheduling jobs at " + now);
+                }
                 // setUpAktoMixpanelEndpointsScheduler();
                 //fetchGithubZip();
                 if(isSaas){
@@ -1886,13 +1997,8 @@ public class InitializerListener implements ServletContextListener {
                         loggerMaker.errorAndAddToDb("Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
                     }
                 }
-                updateApiGroupsForAccounts();
-                setUpUpdateCustomCollections();
-                setUpFillCollectionIdArrayJob();
-                setupAutomatedApiGroupsScheduler();
             }
         }, 0, TimeUnit.SECONDS);
-
 
     }
 
@@ -1914,6 +2020,9 @@ public class InitializerListener implements ServletContextListener {
                             DependencyFlow dependencyFlow = new DependencyFlow();
                             loggerMaker.infoAndAddToDb("Starting dependency flow");
                             dependencyFlow.run(null);
+                            if (dependencyFlow.resultNodes != null) {
+                                loggerMaker.infoAndAddToDb("Result nodes size: " + dependencyFlow.resultNodes.size());
+                            }
                             dependencyFlow.syncWithDb();
                             loggerMaker.infoAndAddToDb("Finished running dependency flow");
                         } catch (Exception e) {
@@ -2223,6 +2332,7 @@ public class InitializerListener implements ServletContextListener {
         setDefaultTelemetrySettings(backwardCompatibility);
         disableAwsSecretPiiType(backwardCompatibility);
         makeFirstUserAdmin(backwardCompatibility);
+        dropSpecialCharacterApiCollections(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {
@@ -2270,14 +2380,6 @@ public class InitializerListener implements ServletContextListener {
             loggerMaker.errorAndAddToDb(e,"error while setting up dashboard: " + e.toString(), LogDb.DASHBOARD);
         }
 
-        try {
-            loggerMaker.infoAndAddToDb("Updating account version for " + Context.accountId.get(), LogDb.DASHBOARD);
-            AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
-        }
-
-
         if(DashboardMode.isOnPremDeployment()) {
             telemetryExecutorService.scheduleAtFixedRate(() -> {
                 boolean dibs = callDibs(Cluster.TELEMETRY_CRON, 60, 60);
@@ -2292,6 +2394,14 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void setDashboardVersionForAccount(){
+        try {
+            loggerMaker.infoAndAddToDb("Updating account version for " + Context.accountId.get(), LogDb.DASHBOARD);
+            AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
+        }
+    }
 
     public static int burpPluginVersion = -1;
 

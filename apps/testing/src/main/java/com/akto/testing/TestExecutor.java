@@ -146,7 +146,6 @@ public class TestExecutor {
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
-        sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
         AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();;
 
@@ -287,7 +286,7 @@ public class TestExecutor {
         Map<String , Integer> totalCountIssues = testingRunResultSummary.getCountIssues();
 
         loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
-        if(totalCountIssues.getOrDefault(Severity.HIGH.toString(),0) > 0){
+        if(totalCountIssues != null && totalCountIssues.getOrDefault(Severity.HIGH.toString(),0) > 0){
             ActivitiesDao.instance.insertActivity("High Vulnerability detected", totalCountIssues.get(Severity.HIGH.toString()) + " HIGH vulnerabilites detected");
         }
     }
@@ -593,8 +592,11 @@ public class TestExecutor {
                     e.printStackTrace();
                 }
                 if (testingRunResult != null) {
+                    List<String> errorList = testingRunResult.getErrorsList();
                     testingRunResults.add(testingRunResult);
-                    countSuccessfulTests++;
+                    if (errorList == null || !errorList.contains(TestResult.API_CALL_FAILED_ERROR_STRING)) {
+                        countSuccessfulTests++;
+                    }
                 }
 
                 insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);

@@ -266,6 +266,8 @@ public class RedactSampleData {
         m.put("time", httpResponseParams.getTime() + "");
         m.put("akto_account_id", httpResponseParams.getAccountId() + "");
         m.put("ip", httpResponseParams.getSourceIP());
+        m.put("destIp", httpResponseParams.getDestIP());
+        m.put("direction", httpResponseParams.getDirection());
         m.put("is_pending", httpResponseParams.getIsPending() + "");
         m.put("source", httpResponseParams.getSource());
 

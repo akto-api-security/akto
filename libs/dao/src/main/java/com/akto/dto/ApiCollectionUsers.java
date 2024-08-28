@@ -68,6 +68,13 @@ public class ApiCollectionUsers {
             });
         }});
 
+    public static List<BasicDBObject> getSingleTypeInfoListFromConditions(List<TestingEndpoints> conditions, int skip, int limit, int deltaPeriodValue) {
+        if(conditions == null || conditions.isEmpty()){
+            return new ArrayList<>();
+        }
+        Bson singleTypeInfoFilters = getFilters(conditions, CollectionType.ApiCollectionId);
+        return ApiCollectionsDao.fetchEndpointsInCollection(singleTypeInfoFilters, skip, limit, deltaPeriodValue);
+    }
     public static int getApisCountFromConditions(List<TestingEndpoints> conditions) {
 
         if(conditions == null || conditions.isEmpty()){
@@ -188,11 +195,7 @@ public class ApiCollectionUsers {
 
     private static void updateCollections(MCollection<?>[] collections, Bson filter, Bson update) {
         for (MCollection<?> collection : collections) {
-            long now = System.currentTimeMillis();
-            UpdateResult res = collection.getMCollection().updateMany(filter, update);
-            long diff = System.currentTimeMillis() - now;
-            logger.info(String.format("acc: %d Updated collection for API group %s update: %s in %d ms matched: %d modified: %d", Context.accountId.get(), 
-            collection.getCollName(), update.toString(), diff, res.getMatchedCount(), res.getModifiedCount()));
+            collection.getMCollection().updateMany(filter, update);
         }
     }
 

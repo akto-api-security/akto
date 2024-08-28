@@ -23,6 +23,13 @@ const homeRequests = {
             data: {trafficAlert}
         })
     },
+    getEventForIntercom : async() => {
+        return await request({
+            url: '/api/send_event',
+            method: 'post',
+            data: {}
+        })
+    }
 }
 
 export default homeRequests

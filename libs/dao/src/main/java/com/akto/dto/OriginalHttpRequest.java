@@ -4,6 +4,7 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.util.HttpRequestResponseUtils;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.ctc.wstx.shaded.msv_core.util.Uri;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -221,6 +222,19 @@ public class OriginalHttpRequest {
             return OriginalHttpRequest.makeUrlAbsolute(url, findHostFromHeader(), findProtocolFromHeader());
         }
         return url;
+    }
+
+    public String getUrlPath() throws Exception {
+        if (!url.startsWith("http")) {
+            return url;
+        } else {
+            try {
+                URI uri = new URI(url);
+                return uri.getPath();
+            } catch (Exception e) {
+                return url;
+            }
+        }        
     }
 
     public String getFullUrlWithParams() {

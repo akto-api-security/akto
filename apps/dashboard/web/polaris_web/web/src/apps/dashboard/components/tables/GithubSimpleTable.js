@@ -38,6 +38,8 @@ function GithubSimpleTable(props) {
         hidePagination={props?.hidePagination}
         bannerComp={props?.bannerComp}
         csvFileName={props?.csvFileName}
+        treeView={props?.treeView}
+        customFilters={props?.customFilters}
     />
 
 }

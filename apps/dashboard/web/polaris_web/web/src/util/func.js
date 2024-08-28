@@ -360,6 +360,18 @@ prettifyEpoch(epoch) {
       return []
     }
     let localFilters = filters;
+    let filtersHaveChoices = true;
+    for(var x in filtersHaveChoices){
+      if(x.choices !== undefined || x.choices.length === 0){
+        filtersHaveChoices = false;
+        break;
+      }
+    }
+
+    if(filtersHaveChoices){
+      return filters;
+    }
+
     localFilters.forEach((filter, index) => {
       localFilters[index].availableChoices = new Set()
       localFilters[index].choices = []
@@ -544,7 +556,7 @@ prettifyEpoch(epoch) {
     }, {});
   },
   
-sortFunc: (data, sortKey, sortOrder) => {
+sortFunc: (data, sortKey, sortOrder, treeView) => {
   if(sortKey === 'displayName'){
     let finalArr = data.sort((a, b) => {
         let nameA = ""
@@ -576,13 +588,33 @@ sortFunc: (data, sortKey, sortOrder) => {
     }
     return finalArr
   }
-  return data.sort((a, b) => {
+  data.sort((a, b) => {
     if(typeof a[sortKey] ==='number')
     return (sortOrder) * (a[sortKey] - b[sortKey]);
     if(typeof a[sortKey] ==='string')
     return (sortOrder) * (b[sortKey].localeCompare(a[sortKey]));
   })
+  if(treeView){
+    func.recursiveSort(data, sortKey, sortOrder)
+  }
+  return data
 },
+recursiveSort(data, sortKey, sortOrder = 1) {
+  data.sort((a, b) => {
+      if (typeof a[sortKey] === 'number') {
+          return sortOrder * (a[sortKey] - b[sortKey]);
+      } else if (typeof a[sortKey] === 'string') {
+          return sortOrder * b[sortKey].localeCompare(a[sortKey]);
+      }
+      return 0;
+  });
+  data.forEach(item => {
+      if (item.children && !item.isTerminal) {
+          func.recursiveSort(item.children, sortKey, sortOrder);
+      }
+  });
+},
+
 async copyRequest(type, completeData) {
   let copyString = "";
   let snackBarMessage = ""
@@ -792,6 +824,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
                   access_type = "Public"
               } else if (access_types.indexOf("PARTNER") !== -1){
                   access_type = "Partner"
+              } else if (access_types.indexOf("THIRD_PARTY") !== -1){
+                  access_type = "Third-party"
               }else{
                   access_type = "Private"
               }
@@ -800,7 +834,6 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
           let authTypeTag = authType.replace(",", "");
           let riskScore = apiInfoMap[key] ? apiInfoMap[key]?.riskScore : 0
-          let isSensitive = apiInfoMap[key] ? apiInfoMap[key]?.isSensitive : false
 
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
@@ -830,8 +863,9 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               }).map( x => {
                 return apiGroupsMap[x]
               }) : [],
-              isSensitive: isSensitive,
-              riskScore: riskScore
+              riskScore: riskScore,
+              sensitiveInReq: [...this.convertSensitiveTags(x.sensitiveInReq)],
+              sensitiveInResp: [...this.convertSensitiveTags(x.sensitiveInResp)]
           }
 
       }
@@ -1516,7 +1550,21 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
     return false;
   },
+  checkForRbacFeature(){
+    const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
+    let rbacAccess = false;
+    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
+        rbacAccess = true
+    } else if(stiggFeatures && stiggFeatures['RBAC_FEATURE']){
+        rbacAccess = stiggFeatures['RBAC_FEATURE'].isGranted
+    }
+    return rbacAccess;
+  },
   checkUserValidForIntegrations(){
+    const rbacAccess = this.checkForRbacFeature();
+    if(!rbacAccess){
+      return true;
+    }
     const userRole = window.USER_ROLE
     return !(userRole === "GUEST" || userRole === "MEMBER")
   },

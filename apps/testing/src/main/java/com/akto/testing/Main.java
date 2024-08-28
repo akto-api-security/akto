@@ -11,6 +11,7 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -18,6 +19,7 @@ import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.TestingEndpoints.Operator;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
@@ -295,6 +297,22 @@ public class Main {
                 int usageLeft = syncLimit.getUsageLeft();
 
                 try {
+                    fillTestingEndpoints(testingRun);
+                    // continuous testing condition
+                    if (testingRun.getPeriodInSeconds() == -1) {
+                        CustomTestingEndpoints eps = (CustomTestingEndpoints) testingRun.getTestingEndpoints();
+                        if (eps.getApisList().size() == 0) {
+                            Bson completedUpdate = Updates.combine(
+                                Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                                Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
+                                Updates.set(TestingRun.SCHEDULE_TIMESTAMP, Context.now() + 5 * 60)
+                            );
+                            TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                                Filters.eq("_id", testingRun.getId()),  completedUpdate
+                            );
+                            return;
+                        }
+                    }
                     setTestingRunConfig(testingRun, trrs);
 
                     if (isSummaryRunning || isTestingRunRunning) {
@@ -394,6 +412,12 @@ public class Main {
                             Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
                             Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds())
                     );
+                } else if (testingRun.getPeriodInSeconds() == -1) {
+                    completedUpdate = Updates.combine(
+                            Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                            Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
+                            Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + 5 * 60)
+                    );
                 }
 
                 if(GetRunningTestsStatus.getRunningTests().isTestRunning(testingRun.getId())){
@@ -412,7 +436,7 @@ public class Main {
                 Organization organization = OrganizationsDao.instance.findOne(
                         Filters.in(Organization.ACCOUNTS, Context.accountId.get()));
 
-                if(organization.getTestTelemetryEnabled()){
+                if(organization != null && organization.getTestTelemetryEnabled()){
                     loggerMaker.infoAndAddToDb("Test telemetry enabled for account: " + accountId + ", sending results", LogDb.TESTING);
                     ObjectId finalSummaryId = summaryId;
                     testTelemetryScheduler.execute(() -> {
@@ -439,6 +463,36 @@ public class Main {
             }, "testing");
             Thread.sleep(1000);
         }
+    }
+
+    private static void fillTestingEndpoints(TestingRun tr) {
+        if (tr.getPeriodInSeconds() != -1) {
+            return;
+        }
+        
+        int apiCollectionId;
+        if (tr.getTestingEndpoints() instanceof CollectionWiseTestingEndpoints) {
+            CollectionWiseTestingEndpoints eps = (CollectionWiseTestingEndpoints) tr.getTestingEndpoints();
+            apiCollectionId = eps.getApiCollectionId();
+        } else if (tr.getTestingEndpoints() instanceof CustomTestingEndpoints) {
+            CustomTestingEndpoints eps = (CustomTestingEndpoints) tr.getTestingEndpoints();
+            apiCollectionId = eps.getApisList().get(0).getApiCollectionId();
+        } else {
+            return;
+        }
+
+        int st = tr.getEndTimestamp();
+        int et = 0;
+        if (st == -1) {
+            st = 0;
+            et = Context.now() + 20 * 60;
+        } else {
+            et = st + 20 * 60;
+        }
+
+        List<ApiInfo.ApiInfoKey> endpoints = SingleTypeInfoDao.fetchLatestEndpointsForTesting(st, et, apiCollectionId);
+        CustomTestingEndpoints newEps = new CustomTestingEndpoints(endpoints, Operator.AND);
+        tr.setTestingEndpoints(newEps);
     }
 
     private static void raiseMixpanelEvent(ObjectId summaryId, TestingRun testingRun, int accountId) {

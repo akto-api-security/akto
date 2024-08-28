@@ -226,6 +226,36 @@ export default {
             return resp
         })
     },
+
+    async fetchAPIsFromSourceCode(apiCollectionId) {
+        return await request({
+            url: '/api/fetchCodeAnalysisApiInfos',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId,
+            }
+        })
+    },
+
+    async fetchApisFromStis(apiCollectionId) {
+        return await request({
+            url: '/api/fetchApiInfosFromSTIs',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId,
+            }
+        })
+    },
+
+    async fetchApiInfosForCollection(apiCollectionId) {
+        return await request({
+            url: '/api/fetchApiInfosForCollection',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId,
+            }
+        })
+    },
     redactCollection(apiCollectionId, redacted){
         return request({
             url: '/api/redactCollection',
@@ -455,20 +485,20 @@ export default {
             data: {}
         })
     },
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId }
+            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting }
         }).then((resp) => {
             return resp
         })
     },
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting}
         }).then((resp) => {
             return resp
         })        
@@ -548,6 +578,17 @@ export default {
             data: {
                 collectionName, conditions
             }
+        })
+    },
+    async getEndpointsListFromConditions(conditions) {
+        return await request({
+            url: '/api/getEndpointsListFromConditions',
+            method: 'post',
+            data: {
+                conditions
+            }
+        }).then((resp) => {
+            return resp
         })
     },
     async getEndpointsFromConditions(conditions) {

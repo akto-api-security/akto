@@ -3,14 +3,13 @@ import {CircleTickMajor,ArchiveMinor,LinkMinor} from '@shopify/polaris-icons';
 import TestingStore from '../testingStore';
 import api from '../api';
 import transform from '../transform';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 import parse from 'html-react-parser';
 import PersistStore from '../../../../main/PersistStore';
 import Store from '../../../store';
 import TestRunResultFull from './TestRunResultFull';
 import TestRunResultFlyout from './TestRunResultFlyout';
-import SingleTestRunPage from '../SingleTestRunPage/SingleTestRunPage';
-import IssuesPage from '../../issues/IssuesPage/IssuesPage';
+import LocalStore from '../../../../main/LocalStorageStore';
 
 let headerDetails = [
   {
@@ -63,10 +62,11 @@ function TestRunResultPage(props) {
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const [issueDetails, setIssueDetails] = useState({});
   const [jiraIssueUrl, setJiraIssueUrl] = useState({});
-  const subCategoryMap = PersistStore(state => state.subCategoryMap);
-  const params = useParams()
+  const subCategoryMap = LocalStore(state => state.subCategoryMap);
+  const params = useParams();
   const hexId = params.hexId;
-  const hexId2 = params.hexId2;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const hexId2 = searchParams.get("result")
   const [infoState, setInfoState] = useState([])
   const [loading, setLoading] = useState(true);
   const [showDetails, setShowDetails] = useState(true)
@@ -204,7 +204,6 @@ function TestRunResultPage(props) {
   return (
     useFlyout ?
     <>
-    {location.pathname.includes("issues") ? <IssuesPage /> :<SingleTestRunPage />}
     <TestRunResultFlyout
       selectedTestRunResult={selectedTestRunResult} 
       testingRunResult={testingRunResult} 

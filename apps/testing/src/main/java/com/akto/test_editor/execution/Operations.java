@@ -57,13 +57,18 @@ public class Operations {
     }
 
     public static ExecutorSingleOperationResp modifyHeader(RawApi rawApi, String key, String value) {
+        return modifyHeader(rawApi, key, value, false);
+    }
+    public static ExecutorSingleOperationResp modifyHeader(RawApi rawApi, String key, String value, boolean upsert) {
         Map<String, List<String>> headers = rawApi.fetchReqHeaders();
         boolean modified = false;
         modified = modifyCookie(headers, key, value);
 
         if (!headers.containsKey(key)) {
             if (!modified) {
-                return new ExecutorSingleOperationResp(true, "header key not present " + key);
+                if (!upsert) {
+                    return new ExecutorSingleOperationResp(true, "header key not present " + key);
+                }
             } else {
                 rawApi.modifyReqHeaders(headers);
                 return new ExecutorSingleOperationResp(true, "");

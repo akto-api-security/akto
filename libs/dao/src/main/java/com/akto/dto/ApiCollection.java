@@ -36,6 +36,7 @@ public class ApiCollection {
 
     public static final String SAMPLE_COLLECTIONS_DROPPED = "sampleCollectionsDropped";
 
+    public static final String URLS_COUNT = "urlsCount";
     @BsonIgnore
     int urlsCount;
 
@@ -46,6 +47,12 @@ public class ApiCollection {
 
     public static final String AUTOMATED = "automated";
     boolean automated;
+
+    private boolean runDependencyAnalyser;
+    public static final String RUN_DEPENDENCY_ANALYSER = "runDependencyAnalyser";
+
+    private boolean matchDependencyWithOtherCollections;
+    public static final String MATCH_DEPENDENCY_WITH_OTHER_COLLECTIONS = "matchDependencyWithOtherCollections";
 
     public enum Type {
         API_GROUP
@@ -285,5 +292,24 @@ public class ApiCollection {
     public void setAutomated(boolean automated) {
         this.automated = automated;
     }
-    
+
+    public boolean isMatchDependencyWithOtherCollections() {
+        return matchDependencyWithOtherCollections;
+    }
+
+    public void setMatchDependencyWithOtherCollections(boolean matchDependencyWithOtherCollections) {
+        this.matchDependencyWithOtherCollections = matchDependencyWithOtherCollections;
+    }
+
+    public boolean isRunDependencyAnalyser() {
+        return runDependencyAnalyser;
+    }
+
+    public boolean getRunDependencyAnalyser() {
+        return runDependencyAnalyser;
+    }
+
+    public void setRunDependencyAnalyser(boolean runDependencyAnalyser) {
+        this.runDependencyAnalyser = runDependencyAnalyser;
+    }
 }

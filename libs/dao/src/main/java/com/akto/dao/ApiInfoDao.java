@@ -7,6 +7,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -16,19 +17,22 @@ import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UnwindOptions;
 import com.mongodb.client.model.Updates;
 
-import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
     public static ApiInfoDao instance = new ApiInfoDao();
 
     public static final String ID = "_id.";
+    public static final int AKTO_DISCOVERED_APIS_COLLECTION_ID = 1333333333;
 
     public void createIndicesIfAbsent() {
 
@@ -49,9 +53,6 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
         fieldNames = new String[]{"_id." + ApiInfo.ApiInfoKey.URL};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
-
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL }, true);
         
         fieldNames = new String[]{"_id." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, "_id." + ApiInfo.ApiInfoKey.URL};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
@@ -157,6 +158,44 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         riskScore += riskScoreFromSeverityScore;
         return riskScore;
     }
+
+    public static List<ApiInfo> getApiInfosFromList(List<BasicDBObject> list, int apiCollectionId){
+        List<ApiInfo> apiInfoList = new ArrayList<>();
+
+        Set<ApiInfoKey> apiInfoKeys = new HashSet<ApiInfoKey>();
+        for (BasicDBObject singleTypeInfo: list) {
+            singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
+            apiInfoKeys.add(new ApiInfoKey(singleTypeInfo.getInt("apiCollectionId"),singleTypeInfo.getString("url"), Method.fromString(singleTypeInfo.getString("method"))));
+        }
+
+        BasicDBObject query = new BasicDBObject();
+        if (apiCollectionId > -1) {
+            query.append(SingleTypeInfo._COLLECTION_IDS, new BasicDBObject("$in", Arrays.asList(apiCollectionId)));
+        }
+
+        int counter = 0;
+        int batchSize = 100;
+
+        List<String> urlsToSearch = new ArrayList<>();
+        
+        for(ApiInfoKey apiInfoKey: apiInfoKeys) {
+            urlsToSearch.add(apiInfoKey.getUrl());
+            counter++;
+            if (counter % batchSize == 0 || counter == apiInfoKeys.size()) {
+                query.append("_id.url", new BasicDBObject("$in", urlsToSearch));
+                List<ApiInfo> fromDb = ApiInfoDao.instance.findAll(query);
+                for (ApiInfo a: fromDb) {
+                    if (apiInfoKeys.contains(a.getId())) {
+                        a.calculateActualAuth();
+                        apiInfoList.add(a);
+                    }
+                }
+                urlsToSearch.clear();
+            } 
+        }
+        return apiInfoList;
+    }
+
     @Override
     public String getCollName() {
         return "api_info";

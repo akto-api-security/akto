@@ -9,13 +9,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.runtime.policies.AuthPolicy;
 
 public class CookieExpireFilter extends DataOperandsImpl {
     
     @Override
-    public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
+    public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
         List<Boolean> querySet = new ArrayList<>();
         Boolean queryVal;
@@ -26,11 +27,11 @@ public class CookieExpireFilter extends DataOperandsImpl {
             queryVal = (Boolean) querySet.get(0);
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return false;
+            return new ValidationResult(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
 
         if (data == null || queryVal == null) {
-            return false;
+            return new ValidationResult(false, queryVal == null ? TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + " is not set true": "no data to be matched for validation");
         }
 
         Map<String,String> cookieMap = AuthPolicy.parseCookie(Arrays.asList(data));
@@ -70,6 +71,13 @@ public class CookieExpireFilter extends DataOperandsImpl {
                 res = true;
             }
         }
-        return result == res;
+        if (result == res) {
+            return new ValidationResult(true, result? TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": true passed because cookie:"+ data+" expired":
+                    TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": false passed because cookie:"+ data+" not expired");
+        }
+        if (result) {
+            return new ValidationResult(false, TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": true failed cookie:"+ data+" not expired");
+        }
+        return new ValidationResult(false, TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": false failed because cookie:"+ data+" expired");
     }
 }

@@ -19,6 +19,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
 import com.akto.hybrid_runtime.URLAggregator;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.util.JSONUtils;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
@@ -119,6 +120,8 @@ public class HttpCallParser {
         int time = jsonObject.getInteger("time");
         String accountId = jsonObject.getString("akto_account_id");
         String sourceIP = jsonObject.getString("ip");
+        String destIP = jsonObject.getString("destIp");
+        String direction = jsonObject.getString("direction");
 
         String isPendingStr = (String) jsonObject.getOrDefault("is_pending", "false");
         boolean isPending = !isPendingStr.toLowerCase().equals("false");
@@ -126,7 +129,7 @@ public class HttpCallParser {
         HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
         
         return new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction
         );
     }
 
@@ -368,6 +371,9 @@ public class HttpCallParser {
 
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
+            if (hostName != null && !hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
+                hostName = "Special_Char_Host";
+            }
 
             int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
             int apiCollectionId ;

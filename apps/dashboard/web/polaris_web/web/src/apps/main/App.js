@@ -4,6 +4,7 @@ import SingleTestRunPage from "../dashboard/pages/testing/SingleTestRunPage/Sing
 import TestRunResultPage from "../dashboard/pages/testing/TestRunResultPage/TestRunResultPage";
 import AllSensitiveData from "../dashboard/pages/observe/AllSensitiveData/AllSensitiveData";
 import ApiCollections from "../dashboard/pages/observe/api_collections/ApiCollections";
+import ApiQuery from "../dashboard/pages/observe/api_collections/APIQuery";
 import ApiEndpoints from  "../dashboard/pages/observe/api_collections/ApiEndpoints";
 import SensitiveDataExposure from "../dashboard/pages/observe/SensitiveDataExposure/SensitiveDataExposure";
 import SingleRequest from "../dashboard/pages/observe/SingleRequest/SingleRequest";
@@ -47,7 +48,6 @@ import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
 import Slack from "../dashboard/pages/settings/integrations/Slack";
 import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
-import ExportHtml from "../dashboard/pages/testing/ExportHtml/ExportHtml";
 
 import Store from "../dashboard/store";
 import { generateSearchData } from "@/util/searchItems"
@@ -68,6 +68,8 @@ import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
 import TokenValidator from "./TokenValidator"
 import { TableContextProvider } from "@/apps/dashboard/components/tables/TableContext";
 import VulnerabilityReport from "../dashboard/pages/testing/vulnerability_report/VulnerabilityReport";
+
+import { PollingProvider } from "./PollingProvider";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -97,10 +99,6 @@ const router = createBrowserRouter([
               {
                 path: ":hexId",
                 element: <SingleTestRunPage />
-              },
-              {
-                path: ":hexId/result/:hexId2",
-                element: <TestRunResultPage />
               },
               {
                 path:"roles",
@@ -135,6 +133,10 @@ const router = createBrowserRouter([
               {
                 path: "inventory",
                 element: <ApiCollections/>
+              },
+              {
+                path: "query_mode",
+                element: <ApiQuery/>
               },
               {
                 path: "changes",
@@ -360,9 +362,11 @@ function App() {
   }, [])
 
   return (
+    <PollingProvider>
     <TableContextProvider>
       <RouterProvider router={router} />
     </TableContextProvider>
+    </PollingProvider>
   );
 }
 

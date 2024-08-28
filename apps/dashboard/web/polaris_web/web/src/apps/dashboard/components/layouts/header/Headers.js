@@ -1,6 +1,6 @@
-import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button } from '@shopify/polaris';
+import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
 import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor } from '@shopify/polaris-icons';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
 import PersistStore from '../../../../main/PersistStore';
@@ -8,23 +8,29 @@ import './Headers.css'
 import api from '../../../../signup/api';
 import func from '@/util/func';
 import SemiCircleProgress from '../../shared/SemiCircleProgress';
-import testingApi from "../../../pages/testing/api"
-import TestingStore from '../../../pages/testing/testingStore';
-import homeRequests from '../../../pages/home/api';
+import { usePolling } from '../../../../main/PollingProvider';
+import { debounce } from 'lodash';
+import LocalStore from '../../../../main/LocalStorageStore';
+import homeFunctions from '../../../../dashboard/pages/home/module';
+
+function ContentWithIcon({icon,text, isAvatar= false}) {
+    return(
+        <HorizontalStack gap={2}>
+            <Box width='20px'>
+                {isAvatar ? <div className='reduce-size'><Avatar size="extraSmall" source={icon} /> </div>:
+                <Icon source={icon} color="base" />}
+            </Box>
+            <Text>{text}</Text>
+        </HorizontalStack>
+    )
+}
 
 export default function Header() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-    const [isSearchActive, setIsSearchActive] = useState(false);
     const [searchValue, setSearchValue] = useState('');
     const [newAccount, setNewAccount] = useState('')
     const [showCreateAccount, setShowCreateAccount] = useState(false)
-    const [currentTestsObj, setCurrentTestsObj] = useState({
-        totalTestsCompleted:0,
-        totalTestsInitiated:0,
-        totalTestsQueued: 0,
-        testRunsArr: [],
-    })
-
+    const { currentTestsObj, clearPollingInterval } = usePolling();
     const navigate = useNavigate()
 
     const username = Store((state) => state.username)
@@ -32,26 +38,23 @@ export default function Header() {
     const accounts = Store(state => state.accounts)
     const activeAccount = Store(state => state.activeAccount)
     const resetAll = PersistStore(state => state.resetAll)
+    const resetStore = LocalStore(state => state.resetStore)
 
     const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
-    const searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections)
-    const setTrafficAlerts = PersistStore((state) => state.setTrafficAlerts)
-
-    const setCurrentTestingRuns = TestingStore(state => state.setCurrentTestingRuns)
-    const [intervalId, setIntervalId] = useState(null);
-    const [intervalId2, setIntervalId2] = useState(null);
-
+    const setAllCollections = PersistStore(state => state.setAllCollections)
+    var searchItemsArr = useMemo(() => func.getSearchItemsArr(allRoutes, allCollections), [])
+    const [filteredItemsArr, setFilteredItemsArr] = useState(searchItemsArr)
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
         [],
     );
 
     const handleLogOut = async () => { 
-        clearInterval(intervalId)
-        clearInterval(intervalId2)
+        clearPollingInterval()
         api.logout().then(res => {
             resetAll();
+            resetStore() ;
             storeAccessToken(null)
             if(res.logoutUrl){
                 window.location.href = res.logoutUrl
@@ -63,7 +66,26 @@ export default function Header() {
         })
     }
 
-    
+    const debouncedSearch = debounce(async (searchQuery) => {
+
+        let apiCollections = []
+        if (allCollections.length === 0 && searchItemsArr.length === 0) {
+            apiCollections = await homeFunctions.getAllCollections()
+            setAllCollections(apiCollections)
+        }
+
+        if (searchItemsArr.length === 0) {
+            searchItemsArr = func.getSearchItemsArr(allRoutes, apiCollections)
+        }
+
+        if(searchQuery.length === 0){
+            setFilteredItemsArr(searchItemsArr)
+        }else{
+            const resultArr = searchItemsArr.filter((x) => x.content.toLowerCase().includes(searchQuery))
+            setFilteredItemsArr(resultArr)
+        }
+    }, 500);
+
     const accountsItems = Object.keys(accounts).map(accountId => {
         return {
             id: accountId,
@@ -72,6 +94,7 @@ export default function Header() {
                 await api.goToAccount(accountId)
                 func.setToast(true, false, `Switched to account ${accounts[accountId]}`)
                 resetAll();
+                resetStore();
                 window.location.href = '/dashboard/observe/inventory'
             }
         }
@@ -82,20 +105,9 @@ export default function Header() {
           setShowCreateAccount(false)
           setNewAccount('')
           resetAll();
+          resetStore();
           window.location.href="/dashboard/onboarding"
         })
-    }
-    
-    function ContentWithIcon({icon,text, isAvatar= false}) {
-        return(
-            <HorizontalStack gap={2}>
-                <Box width='20px'>
-                    {isAvatar ? <div className='reduce-size'><Avatar size="extraSmall" source={icon} /> </div>:
-                    <Icon source={icon} color="base" />}
-                </Box>
-                <Text>{text}</Text>
-            </HorizontalStack>
-        )
     }
 
     const userMenuMarkup = (
@@ -128,22 +140,17 @@ export default function Header() {
         />
     );
 
-    const handleSearchResultsDismiss = useCallback(() => {
-        setIsSearchActive(false);
-        setSearchValue('');
-    }, []);
-
     const handleSearchChange = useCallback((value) => {
         setSearchValue(value);
-        setIsSearchActive(value.length > 0);
+        debouncedSearch(value.toLowerCase())
     }, []);
 
     const handleNavigateSearch = (url) => {
         navigate(url)
-        handleSearchResultsDismiss()
+        handleSearchChange('')
     }
 
-    const searchItems = searchItemsArr.map((item) => {
+    const searchItems = filteredItemsArr.slice(0,20).map((item) => {
         const icon = item.type === 'page' ? PageMajor : DynamicSourceMajor;
         return {
             value: item.content,
@@ -153,9 +160,11 @@ export default function Header() {
     })
 
     const searchResultsMarkup = (
+        <Scrollable style={{maxHeight: '300px'}} shadow>
         <ActionList
-            items={searchItems.filter(x => x.value.toLowerCase().includes(searchValue.toLowerCase()))}
+            items={searchItems}
         />
+        </Scrollable>
     );
 
     const searchFieldMarkup = (
@@ -175,11 +184,14 @@ export default function Header() {
         navigate(navUrl)
     }
 
-    const progress = currentTestsObj.totalTestsInitiated === 0 ? 0 : Math.floor((currentTestsObj.totalTestsCompleted * 100)/ currentTestsObj.totalTestsInitiated)
+    const progress = useMemo(() => {
+        return currentTestsObj.totalTestsInitiated === 0 ? 0 : Math.floor((currentTestsObj.totalTestsCompleted * 100) / currentTestsObj.totalTestsInitiated);
+    }, [currentTestsObj.totalTestsCompleted, currentTestsObj.totalTestsInitiated]);
+
 
     const secondaryMenuMarkup = (
         <HorizontalStack gap={"4"}>
-            {(Object.keys(currentTestsObj).length > 0 && currentTestsObj?.testRunsArr?.length !== 0) ? 
+            {(Object.keys(currentTestsObj).length > 0 && currentTestsObj?.testRunsArr?.length !== 0 && currentTestsObj?.totalTestsCompleted > 0) ? 
             <HorizontalStack gap={"2"}>
                 <Button plain monochrome onClick={() => {handleTestingNavigate()}}>
                  <SemiCircleProgress key={"progress"} progress={progress} size={60} height={55} width={75}/>
@@ -207,9 +219,9 @@ export default function Header() {
                 showNavigationToggle
                 userMenu={userMenuMarkup}
                 searchField={searchFieldMarkup}
-                searchResultsVisible={isSearchActive}
+                searchResultsVisible={searchValue.length > 0}
                 searchResults={searchResultsMarkup}
-                onSearchResultsDismiss={handleSearchResultsDismiss}
+                onSearchResultsDismiss={() =>handleSearchChange('')}
                 secondaryMenu={secondaryMenuMarkup}
             />
             <Modal
@@ -240,41 +252,6 @@ export default function Header() {
             </Modal>
         </div>
     );
-
-    useEffect(() => {
-        const fetchTestingStatus = () => {
-            const id = setInterval(() => {
-                testingApi.fetchTestingRunStatus().then((resp) => {
-                    setCurrentTestingRuns(resp.currentRunningTestsStatus);
-                    setCurrentTestsObj({
-                        totalTestsInitiated: resp?.testRunsScheduled || 0,
-                        totalTestsCompleted: resp?.totalTestsCompleted || 0,
-                        totalTestsQueued: resp?.testRunsQueued || 0,
-                        testRunsArr: resp?.currentRunningTestsStatus || []
-                    });
-                });
-            }, 2000);
-            setIntervalId(id); 
-        };
-
-        const fetchAlerts = () => {
-            const id2 = setInterval(() => {
-                homeRequests.getTrafficAlerts().then((resp) => {
-                    setTrafficAlerts(resp)
-                });
-            }, (5000 * 60));
-            setIntervalId2(id2); 
-        };
-
-        fetchAlerts();
-        fetchTestingStatus();
-
-        return () => {
-            clearInterval(intervalId);
-            clearInterval(intervalId2)
-        };
-    }, []);
-
 
     return (
         topBarMarkup

@@ -23,12 +23,13 @@ import {
   ArchiveMinor,
   PriceLookupMinor,
   ReportMinor,
-  RefreshMajor
+  RefreshMajor,
+  CustomersMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import func from '@/util/func';
 import { useParams } from 'react-router';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import WorkflowTestBuilder from "../workflow_test/WorkflowTestBuilder";
@@ -39,6 +40,10 @@ import TrendChart from "./TrendChart";
 import useTable from "../../../components/tables/TableContext";
 import ReRunModal from "./ReRunModal";
 import TestingStore from "../testingStore";
+import { useSearchParams } from "react-router-dom";
+import TestRunResultPage from "../TestRunResultPage/TestRunResultPage";
+import { usePolling } from "../../../../main/PollingProvider";
+import LocalStore from "../../../../main/LocalStorageStore";
 
 const sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 2},
@@ -106,7 +111,7 @@ function SingleTestRunPage() {
   const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [] })
   const [ selectedTestRun, setSelectedTestRun ] = useState({});
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
-  const subCategoryMap = PersistStore(state => state.subCategoryMap);
+  const subCategoryMap = LocalStore(state => state.subCategoryMap);
   const params= useParams()
   const [loading, setLoading] = useState(false);
   const [tempLoading , setTempLoading] = useState({vulnerable: false, no_vulnerability_found: false, skipped: false, running: false,need_configurations:false})
@@ -114,18 +119,19 @@ function SingleTestRunPage() {
   const [selected, setSelected] = useState(0)
   const [workflowTest, setWorkflowTest ] = useState(false);
   const [secondaryPopover, setSecondaryPopover] = useState(false)
-  const currentTestingRuns = TestingStore((state) => state.currentTestingRuns)
   const  setErrorsObject = TestingStore((state) => state.setErrorsObject)
-  const [currentTestRunObj, setCurrentTestObj] = useState({
-    testsInitiated: 0,
-    testsInsertedInDb: 0,
-    testingRunId: -1
-  })
+  const currentTestingRuns = []
+  const [refresh, setRefresh] = useState(false)
+
+  const initialTestingObj = {testsInitiated: 0,testsInsertedInDb: 0,testingRunId: -1}
+  const [currentTestObj, setCurrentTestObj] = useState(initialTestingObj)
   const [missingConfigs, setMissingConfigs] = useState([])
 
   const refreshId = useRef(null);
   const hexId = params.hexId;
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const resultId = searchParams.get("result")
   const collectionsMap = PersistStore(state => state.collectionsMap)
 
   function fillData(data, key){
@@ -178,6 +184,13 @@ function SingleTestRunPage() {
     fillTempData(testRunResults, 'vulnerable')
     fillData(transform.getPrettifiedTestRunResults(testRunResults), 'vulnerable')
 
+    await api.fetchTestingRunResults(summaryHexId, "SKIPPED_EXEC_API_REQUEST_FAILED").then(({ testingRunResults, errorEnums }) => {
+      testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+      errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
+      setErrorsObject(errorEnums)
+    })
+    fillTempData(testRunResults, 'domain_unreachable')
+    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'domain_unreachable')
     await api.fetchTestingRunResults(summaryHexId, "SKIPPED_EXEC").then(({ testingRunResults, errorEnums }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
       errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
@@ -236,21 +249,37 @@ function SingleTestRunPage() {
     loadData();
   }, [subCategoryMap])
 
-  useEffect(() => {
-    let found = false
-    for(var ind in currentTestingRuns){
-      let obj = currentTestingRuns[ind]
-      if(obj.testingRunId === hexId){
-        setCurrentTestObj(obj)
-        found = true
-        break
-      }
-    }
-    if(!found){
-      setCurrentTestObj({testsInitiated: 0,testsInsertedInDb: 0,testingRunId: -1})
-    }
-  },[currentTestingRuns])
+  // console.log("rest in peace")
 
+  useEffect(() => {
+    if (resultId === null || resultId.length === 0) {
+      let found = false;
+        for (var ind in currentTestingRuns) {
+            let obj = currentTestingRuns[ind];
+            if (obj.testingRunId === hexId) {
+              found = true;
+                setCurrentTestObj(prevObj => {
+                    if (JSON.stringify(prevObj) !== JSON.stringify(obj)) {
+                        setRefresh(refresh => !refresh);
+                        return obj;
+                    }
+                    return prevObj; // No state change if object is the same
+                });
+                break;
+            }
+        }
+
+        if (!found) {
+            setCurrentTestObj(prevObj => {
+                if (JSON.stringify(prevObj) !== JSON.stringify(initialTestingObj)) {
+                    return initialTestingObj;
+                }
+                return prevObj; // No state change if object is the same
+            });
+        }
+    }
+
+}, []);
 
 const promotedBulkActions = (selectedDataHexIds) => { 
   return [
@@ -323,7 +352,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     </div> : null
   )
 
-  const definedTableTabs = ['Vulnerable', 'Need configurations','Skipped', 'No vulnerability found']
+  const definedTableTabs = ['Vulnerable', 'Need configurations','Skipped', 'No vulnerability found','Domain unreachable']
 
   const { tabsInfo } = useTable()
   const tableCountObj = func.getTabsCount(definedTableTabs, testRunResults)
@@ -402,18 +431,23 @@ const promotedBulkActions = (selectedDataHexIds) => {
     )
   }
 
-  const progress = currentTestRunObj.testsInitiated === 0 ? 0 : Math.floor((currentTestRunObj.testsInsertedInDb * 100)/ currentTestRunObj.testsInitiated)
-  const runningTestsComp = (
-    currentTestRunObj.testingRunId !== -1 ?<Card key={"test-progress"}>
-      <VerticalStack gap={"3"}>
-        <Text variant="headingSm">{`Running ${currentTestRunObj.testsInitiated} tests`}</Text>
-        <div style={{display: "flex", gap: '4px', alignItems: 'center'}}>
-          <ProgressBar progress={progress} color="primary" size="small"/>
-          <Text color="subdued">{`${progress}%`}</Text>
-        </div>
-      </VerticalStack>
-    </Card> : null
-  )
+  const progress = useMemo(() => {
+    return currentTestObj.testsInitiated === 0 ? 0 : Math.floor((currentTestObj.testsInsertedInDb * 100) / currentTestObj.testsInitiated);
+}, [currentTestObj]);
+
+const runningTestsComp = useMemo(() => (
+    currentTestObj.testingRunId !== -1 ? (
+        <Card key={"test-progress"}>
+            <VerticalStack gap={"3"}>
+                <Text variant="headingSm">{`Running ${currentTestObj.testsInitiated} tests`}</Text>
+                <div style={{ display: "flex", gap: '4px', alignItems: 'center' }}>
+                    <ProgressBar progress={progress} color="primary" size="small" />
+                    <Text color="subdued">{`${progress}%`}</Text>
+                </div>
+            </VerticalStack>
+        </Card>
+    ) : null
+), [currentTestObj, progress]);
   const components = [ 
     runningTestsComp,<TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type!=='One-time'}/> , 
     metadataComponent(), loading ? <SpinnerCentered key="loading"/> : (!workflowTest ? resultTable : workflowTestBuilder)];
@@ -450,7 +484,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
   }
 
   const allResultsLength = testRunResults.skipped.length + testRunResults.need_configurations.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length + progress
-  const useComponents = (!workflowTest && allResultsLength === 0) ? [<EmptyData key="empty"/>] : components
+  const useComponents = (!workflowTest && allResultsLength === 0 && (selectedTestRun.run_type && selectedTestRun.run_type!=='One-time')) ? [<EmptyData key="empty"/>] : components
   const headingComp = (
     <Box paddingBlockStart={1}>
       <VerticalStack gap="2">
@@ -478,6 +512,12 @@ const promotedBulkActions = (selectedDataHexIds) => {
             <Button plain monochrome onClick={() => fetchData(true)}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
         </HorizontalStack>
         <HorizontalStack gap={"2"}>
+          <HorizontalStack gap={"1"}>
+            <Box><Icon color="subdued" source={CustomersMinor}/></Box>
+            <Text color="subdued" fontWeight="medium" variant="bodyMd">created by:</Text>
+            <Text color="subdued" variant="bodyMd">{selectedTestRun.userEmail}</Text>
+          </HorizontalStack>
+          <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
           <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
             <HorizontalStack gap={"1"}>
               <Box><Icon color="subdued" source={ArchiveMinor}/></Box>
@@ -529,6 +569,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
         components={useComponents}
       />
       <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false}/>
+      {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
     </>
   );
 }
