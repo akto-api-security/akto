@@ -277,7 +277,7 @@ function ApiEndpoints(props) {
         const codeAnalysisCollectionInfo = sourceCodeData.codeAnalysisCollectionInfo
         const codeAnalysisApisMap = codeAnalysisCollectionInfo?.codeAnalysisApisMap
         let shadowApis = []
-
+        setLoading(false)
         if (codeAnalysisApisMap) {
             // Don't show empty screen if there are codeanalysis endpoints present
             if (codeAnalysisApisMap && Object.keys(codeAnalysisApisMap).length > 0) {
@@ -339,7 +339,6 @@ function ApiEndpoints(props) {
         setApiInfoList(apiInfoListInCollection)
         setUnusedEndpoints(unusedEndpointsInCollection)
 
-        setLoading(false)
     }
 
     useEffect(() => {

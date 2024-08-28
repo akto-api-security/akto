@@ -9,8 +9,7 @@ import ApiEndpoints from "./ApiEndpoints";
 import api from "../api"
 import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
 import func from "@/util/func";
-import { Navigate } from "react-router-dom";
-
+import SaveAsCollectionModal from "./api_query_component/SaveAsCollectionModal";
 
 function APIQuery() {
     const emptyCondition = { data: {}, operator: "AND", type: "CUSTOM" };
@@ -70,7 +69,7 @@ function APIQuery() {
         return dt;
     }, [conditions]);
 
-    const createNewCollection = useCallback(async () => {
+    const createNewCollection = async (newCollectionName) => {
         if (newCollectionName.length === 0) {
             func.setToast(true, true, "Collection name cannot be empty");
             return;
@@ -83,7 +82,7 @@ function APIQuery() {
         } else {
             func.setToast(true, true, <div data-testid="collection_creation_message">{"No endpoints selected"}</div>);
         }
-    }, [newCollectionName, prepareData]);
+    }
 
     const handleClearFunction = useCallback(() => {
         dispatchConditions({ type: "clear" });
@@ -108,40 +107,15 @@ function APIQuery() {
         }
     }, [prepareData]);
 
-    const modalComponent = useMemo(() => (
-        <Modal
-            large
-            key="modal"
-            open={active}
-            onClose={() => setActive(false)}
-            title="New collection"
-            primaryAction={{
-                id: "create-new-collection",
-                content: 'Create',
-                onAction: createNewCollection,
-            }}
-        >
-            <Modal.Section>
-                <VerticalStack gap={3}>
-                    <TextField
-                        id={"new-collection-input"}
-                        label="Name"
-                        value={newCollectionName}
-                        onChange={handleNewCollectionNameChange}
-                        autoComplete="off"
-                        maxLength="24"
-                        suffix={(
-                            <Text>{newCollectionName.length}/24</Text>
-                        )}
-                        autoFocus
-                        {...newCollectionName.length === 0 ? { error: "Collection name cannot be empty" } : {}}
-                    />
-                </VerticalStack>
-            </Modal.Section>
-        </Modal>
-    ), [active, newCollectionName, createNewCollection, handleNewCollectionNameChange]);
+    const modalComponent =
+        <SaveAsCollectionModal
+            key="save-as-collection-modal"
+            createNewCollection={createNewCollection}
+            active={active}
+            setActive={setActive}
+        ></SaveAsCollectionModal>
 
-    const collapsibleComponent = useMemo(() => (
+    const collapsibleComponent =
         <VerticalStack gap={"0"} key="conditions-filters">
             <Box background={"bg-subdued"} width="100%" padding={"2"} onClick={handleToggle} key="collapsible-component-header">
                 <HorizontalStack align="space-between">
@@ -199,7 +173,6 @@ function APIQuery() {
                 </VerticalStack>
             </Collapsible>
         </VerticalStack>
-    ), [handleToggle, open, apiCount, endpointListFromConditions, conditions, handleAddField, handleClearFunction, exploreEndpoints]);
 
     const components = useMemo(() => [
         modalComponent,

@@ -375,7 +375,6 @@ public class ApiCollectionsAction extends UserAction {
         List<TestingEndpoints> conditions = generateConditions(this.conditions);
         List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(conditions, 0, 200, Utils.DELTA_PERIOD_VALUE);
         InventoryAction inventoryAction = new InventoryAction();
-        inventoryAction.attachTagsInAPIList(list);
         inventoryAction.attachAPIInfoListInResponse(list,-1);
         this.setResponse(inventoryAction.getResponse());
         response.put("apiCount", ApiCollectionUsers.getApisCountFromConditions(conditions));
