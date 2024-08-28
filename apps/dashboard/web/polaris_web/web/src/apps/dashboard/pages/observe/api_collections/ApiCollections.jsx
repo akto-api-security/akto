@@ -518,36 +518,39 @@ function ApiCollections() {
     ]
 
     const secondaryActionsComp = (
-        <Popover
-            active={moreActions}
-            activator={(
-                <Button onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
-                    More Actions
-                </Button>
-            )}
-            autofocusTarget="first-node"
-            onClose={() => { setMoreActions(false) }}
-            preferredAlignment="right"
-        >
-            <Popover.Pane fixed>
-                <Popover.Section>
-                    <Button plain monochrome onClick={() =>exportCsv()} removeUnderline>
-                        <HorizontalStack gap={"2"}>
-                            <Box><Icon source={FileMinor} /></Box>
-                            <Text>Export as CSV</Text>
-                        </HorizontalStack>
+        <HorizontalStack gap={2}>
+            <Popover
+                active={moreActions}
+                activator={(
+                    <Button onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
+                        More Actions
                     </Button>
+                )}
+                autofocusTarget="first-node"
+                onClose={() => { setMoreActions(false) }}
+                preferredAlignment="right"
+            >
+                <Popover.Pane fixed>
+                    <Popover.Section>
+                        <Button plain monochrome onClick={() =>exportCsv()} removeUnderline>
+                            <HorizontalStack gap={"2"}>
+                                <Box><Icon source={FileMinor} /></Box>
+                                <Text>Export as CSV</Text>
+                            </HorizontalStack>
+                        </Button>
+                        </Popover.Section>
+                    <Popover.Section>
+                        <Button plain monochrome onClick={() => setTreeView(!treeView)} removeUnderline>
+                            <HorizontalStack gap={"2"}>
+                                <Box><Icon source={treeView ? HideMinor : ViewMinor} /></Box>
+                                <Text>{treeView ? "Hide tree view": "Display tree view"}</Text>
+                            </HorizontalStack>
+                        </Button>
                     </Popover.Section>
-                <Popover.Section>
-                    <Button plain monochrome onClick={() => setTreeView(!treeView)} removeUnderline>
-                        <HorizontalStack gap={"2"}>
-                            <Box><Icon source={treeView ? HideMinor : ViewMinor} /></Box>
-                            <Text>{treeView ? "Hide tree view": "Display tree view"}</Text>
-                        </HorizontalStack>
-                    </Button>
-                </Popover.Section>
-            </Popover.Pane>
-        </Popover>
+                </Popover.Pane>
+            </Popover>
+            <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>
+        </HorizontalStack>
     )
 
 
@@ -598,7 +601,6 @@ function ApiCollections() {
                 />
             }
             primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
-            secondaryActions={<Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
             isFirstPage={true}
             components={components}
             secondaryActions={secondaryActionsComp}

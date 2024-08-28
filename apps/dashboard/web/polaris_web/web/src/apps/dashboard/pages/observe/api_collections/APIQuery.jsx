@@ -194,8 +194,8 @@ function APIQuery() {
                 />
             }
             primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={openModal}>Save as collection</Button>}
-            isFirstPage={false}
             components={components}
+            backUrl="/dashboard/observe/inventory"
         />
     )
 }
