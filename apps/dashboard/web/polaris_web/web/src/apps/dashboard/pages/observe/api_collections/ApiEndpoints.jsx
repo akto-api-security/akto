@@ -136,8 +136,10 @@ const sortOptions = [
     { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 7 }
 ];
 
-function ApiEndpoints() {
+function ApiEndpoints(props) {
 
+    console.log("apiEndpoint called")
+    const { endpointListFromConditions, sensitiveParamsForQuery, isQueryPage } = props
     const params = useParams()
     const location = useLocation()
     const apiCollectionId = params.apiCollectionId
@@ -155,7 +157,7 @@ function ApiEndpoints() {
     const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const [runTests, setRunTests ] = useState(false)
 
-    const [endpointData, setEndpointData] = useState([])
+    const [endpointData, setEndpointData] = useState({"all":[]})
     const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
     const [loading, setLoading] = useState(true)
@@ -188,24 +190,55 @@ function ApiEndpoints() {
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
     async function fetchData() {
-        let apiPromises = [
-            api.fetchApisFromStis(apiCollectionId),
-            api.fetchApiInfosForCollection(apiCollectionId),
-            api.fetchAPIsFromSourceCode(apiCollectionId),
-            api.loadSensitiveParameters(apiCollectionId)
-        ];
         setLoading(true)
-        
-        let results = await Promise.allSettled(apiPromises);
-        let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
-        let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
-        let sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
-        let sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
-        setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
-        setIsRedacted(apiInfosData.redacted)
-        let apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
-        let apiInfoListInCollection = apiInfosData.apiInfoList
-        let unusedEndpointsInCollection = stisEndpoints.unusedEndpoints
+        let apiEndpointsInCollection;
+        let apiInfoListInCollection;
+        let unusedEndpointsInCollection;
+        let sensitiveParamsResp;
+        let sourceCodeData = {};
+        if (isQueryPage) {
+            let apiCollectionData = endpointListFromConditions
+            if (Object.keys(endpointListFromConditions).length === 0) {
+                apiCollectionData = {
+                    data: {
+                        endpoints: [],
+                        apiInfoList: []
+                    }
+                }
+            }
+            setShowEmptyScreen(apiCollectionData.data.endpoints.length === 0)
+            setIsRedacted(apiCollectionData.redacted)
+            apiEndpointsInCollection = apiCollectionData.data.endpoints.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
+            apiInfoListInCollection = apiCollectionData.data.apiInfoList
+            unusedEndpointsInCollection = apiCollectionData.unusedEndpoints
+            sensitiveParamsResp = sensitiveParamsForQuery
+            if (Object.keys(sensitiveParamsForQuery).length === 0) {
+                sensitiveParamsResp = {
+                    data: {
+                        endpoints: [],
+                        apiInfoList: []
+                    }
+                }
+            }
+        } else {
+            let apiPromises = [
+                api.fetchApisFromStis(apiCollectionId),
+                api.fetchApiInfosForCollection(apiCollectionId),
+                api.fetchAPIsFromSourceCode(apiCollectionId),
+                api.loadSensitiveParameters(apiCollectionId)
+            ];
+            let results = await Promise.allSettled(apiPromises);
+            let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
+            let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
+            sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
+            sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
+            setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
+            apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
+            apiInfoListInCollection = apiInfosData.apiInfoList
+            unusedEndpointsInCollection = stisEndpoints.unusedEndpoints
+            setIsRedacted(apiInfosData.redacted)
+        }
+
         let sensitiveParams = sensitiveParamsResp.data.endpoints
 
         let sensitiveParamsMap = {}
@@ -242,9 +275,9 @@ function ApiEndpoints() {
 
         // handle code analysis endpoints
         const codeAnalysisCollectionInfo = sourceCodeData.codeAnalysisCollectionInfo
-        const codeAnalysisApisMap = codeAnalysisCollectionInfo.codeAnalysisApisMap
+        const codeAnalysisApisMap = codeAnalysisCollectionInfo?.codeAnalysisApisMap
         let shadowApis = []
-
+        setLoading(false)
         if (codeAnalysisApisMap) {
             // Don't show empty screen if there are codeanalysis endpoints present
             if (codeAnalysisApisMap && Object.keys(codeAnalysisApisMap).length > 0) {
@@ -298,7 +331,6 @@ function ApiEndpoints() {
         data['new'] = prettifyData.filter(x=> x.isNew)
         data['no_auth'] = prettifyData.filter(x => x.open)
         data['shadow'] = [ ...shadowApis ]
-        setLoading(false)
         setEndpointData(data)
         setSelectedTab("all")
         setSelected(0)
@@ -307,7 +339,6 @@ function ApiEndpoints() {
         setApiInfoList(apiInfoListInCollection)
         setUnusedEndpoints(unusedEndpointsInCollection)
 
-        setLoading(false)
     }
 
     useEffect(() => {
@@ -334,9 +365,11 @@ function ApiEndpoints() {
     }
 
     useEffect(() => {
+        if (!isQueryPage) {
+            checkGptActive()
+        }
         fetchData()
-        checkGptActive()
-    }, [apiCollectionId])
+    }, [apiCollectionId, endpointListFromConditions])
 
     const resourceName = {
         singular: 'endpoint',
@@ -675,59 +708,72 @@ function ApiEndpoints() {
         </Modal>
     )
 
-      const components = [
+    const apiEndpointTable = [<GithubSimpleTable
+        key="api-endpoint-table"
+        pageLimit={50}
+        data={endpointData[selectedTab]}
+        sortOptions={sortOptions}
+        resourceName={resourceName}
+        filters={[]}
+        disambiguateLabel={disambiguateLabel}
+        headers={headers.filter(x => {
+            if (!isApiGroup && x.text === 'Collection') {
+                return false;
+            }
+            return true;
+        })}
+        getStatus={() => { return "warning" }}
+        selected={selected}
+        onRowClick={handleRowClick}
+        onSelect={handleSelectedTab}
+        getFilteredItems={getFilteredItems}
+        mode={IndexFiltersMode.Default}
+        headings={headings.filter(x => {
+            if (!isApiGroup && x.text === 'Collection') {
+                return false;
+            }
+            return true;
+        })}
+        useNewRow={true}
+        condensedHeight={true}
+        tableTabs={tableTabs}
+        selectable={true}
+        promotedBulkActions={promotedBulkActions}
+        loading={tableLoading || loading}
+    />,
+    <ApiDetails
+        key="api-details"
+        showDetails={showDetails && apiDetail && Object.keys(apiDetail).length > 0}
+        setShowDetails={setShowDetails}
+        apiDetail={apiDetail}
+        headers={transform.getDetailsHeaders()}
+        getStatus={() => { return "warning" }}
+        isGptActive={isGptActive}
+    />,
+    ]
+
+
+    const components = [
         loading ? [<SpinnerCentered key="loading" />] : (
             showWorkflowTests ? [
                 <WorkflowTests
-                key={"workflow-tests"}
-                apiCollectionId={apiCollectionId}
-                endpointsList={loading ? [] : endpointData["all"]}
-            />
-             ] : showEmptyScreen ? [
+                    key={"workflow-tests"}
+                    apiCollectionId={apiCollectionId}
+                    endpointsList={loading ? [] : endpointData["all"]}
+                />
+            ] : showEmptyScreen ? [
                 <EmptyScreensLayout key={"emptyScreen"}
-                            iconSrc={"/public/file_plus.svg"}
-                            headingText={"Discover APIs to get started"}
-                            description={"Your API collection is currently empty. Import APIs from other collections now."}
-                            buttonText={"Import from other collections"}
-                            redirectUrl={"/dashboard/observe/inventory"}
-                            learnText={"inventory"}
-                            docsUrl={ENDPOINTS_PAGE_DOCS_URL}
-                />] :[
-                    (coverageInfo[apiCollectionId] === 0  || !(coverageInfo.hasOwnProperty(apiCollectionId))? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true} /> : null),
+                    iconSrc={"/public/file_plus.svg"}
+                    headingText={"Discover APIs to get started"}
+                    description={"Your API collection is currently empty. Import APIs from other collections now."}
+                    buttonText={"Import from other collections"}
+                    redirectUrl={"/dashboard/observe/inventory"}
+                    learnText={"inventory"}
+                    docsUrl={ENDPOINTS_PAGE_DOCS_URL}
+                />] : [
+                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true} /> : null),
                 <div className="apiEndpointsTable" key="table">
-                      <GithubSimpleTable
-                          key="table"
-                          pageLimit={50}
-                          data={endpointData[selectedTab]}
-                          sortOptions={sortOptions}
-                          resourceName={resourceName}
-                          filters={[]}
-                          disambiguateLabel={disambiguateLabel}
-                          headers={headers.filter(x => {
-                            if(!isApiGroup && x.text==='Collection'){
-                                return false;
-                            }
-                            return true;
-                          })}
-                          getStatus={() => { return "warning" }}
-                          selected={selected}
-                          onRowClick={handleRowClick}
-                          onSelect={handleSelectedTab}
-                          getFilteredItems={getFilteredItems}
-                          mode={IndexFiltersMode.Default}
-                          headings={headings.filter(x => {
-                            if(!isApiGroup && x.text==='Collection'){
-                                return false;
-                            }
-                            return true;
-                          })}
-                          useNewRow={true}
-                          condensedHeight={true}
-                          tableTabs={tableTabs}
-                          selectable={true}
-                          promotedBulkActions={promotedBulkActions}
-                          loading={tableLoading || loading}
-                      />
+                    {apiEndpointTable}
                       <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                           <Modal.Section flush>
                               <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} />
@@ -758,16 +804,21 @@ function ApiEndpoints() {
       ]
 
     return (
-        <PageWithMultipleCards
-            title={
-                <Box maxWidth="35vw">
-                    <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{variant:'headingLg'}} />
-                </Box>
+        <div>
+            {isQueryPage ? apiEndpointTable :
+                <PageWithMultipleCards
+                    title={
+                        <Box maxWidth="35vw">
+                            <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
+                        </Box>
+                    }
+                    backUrl="/dashboard/observe/inventory"
+                    secondaryActions={secondaryActionsComponent}
+                    components={components}
+                />
             }
-            backUrl="/dashboard/observe/inventory"
-            secondaryActions={secondaryActionsComponent}
-            components={components}
-        />
+        </div>
+
     )
 }
 
