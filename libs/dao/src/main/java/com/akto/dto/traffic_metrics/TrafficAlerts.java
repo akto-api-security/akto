@@ -6,7 +6,8 @@ public class TrafficAlerts {
 
     public enum ALERT_TYPE {
         TRAFFIC_STOPPED("traffic_stopped"), 
-        TRAFFIC_OVERLOADED("traffic_overloaded");
+        TRAFFIC_OVERLOADED("traffic_overloaded"),
+        CYBORG_STOPPED_RECEIVING_TRAFFIC("cyborg_stopped_receiving_traffic");
 
         private final String name;
 
