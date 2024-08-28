@@ -23,6 +23,8 @@ import { saveAs } from 'file-saver'
 // import dummyJson from "../../../components/shared/treeView/dummyJson"
 import TreeViewTable from "../../../components/shared/treeView/TreeViewTable"
 import TableStore from "../../../components/tables/TableStore";
+import { useNavigate } from "react-router-dom";
+
 
 const headers = [
     {
@@ -89,8 +91,8 @@ const headers = [
         boxWidth: '100px'
     },
     {   
-        title: 'Sensitive data', 
-        text: 'Sensitive data', 
+        title: 'Sensitive data',
+        text: 'Sensitive data',
         value: 'sensitiveSubTypes',
         numericValue: 'sensitiveInRespTypes',
         textValue: 'sensitiveSubTypesVal',
@@ -189,6 +191,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 
 function ApiCollections() {
 
+    const navigate = useNavigate();
     const [data, setData] = useState({'groups':[]})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
@@ -225,6 +228,10 @@ function ApiCollections() {
 
     const showCreateNewCollectionPopup = () => {
         setActive(true)
+    }
+
+    const navigateToQueryPage = () => {
+        navigate("/dashboard/observe/query_mode")
     }
 
     const allCollections = PersistStore(state => state.allCollections)
@@ -393,7 +400,7 @@ function ApiCollections() {
         }
     }
 
-    
+
 
     const promotedBulkActions = (selectedResources) => {
         let actions = [
@@ -478,7 +485,7 @@ function ApiCollections() {
             updateData(copyObj)
         })
         resetResourcesSelected();
-        
+
     }
 
     const modalComponent = <CreateNewCollectionModal
@@ -518,36 +525,39 @@ function ApiCollections() {
     ]
 
     const secondaryActionsComp = (
-        <Popover
-            active={moreActions}
-            activator={(
-                <Button onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
-                    More Actions
-                </Button>
-            )}
-            autofocusTarget="first-node"
-            onClose={() => { setMoreActions(false) }}
-            preferredAlignment="right"
-        >
-            <Popover.Pane fixed>
-                <Popover.Section>
-                    <Button plain monochrome onClick={() =>exportCsv()} removeUnderline>
-                        <HorizontalStack gap={"2"}>
-                            <Box><Icon source={FileMinor} /></Box>
-                            <Text>Export as CSV</Text>
-                        </HorizontalStack>
+        <HorizontalStack gap={2}>
+            <Popover
+                active={moreActions}
+                activator={(
+                    <Button onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
+                        More Actions
                     </Button>
+                )}
+                autofocusTarget="first-node"
+                onClose={() => { setMoreActions(false) }}
+                preferredAlignment="right"
+            >
+                <Popover.Pane fixed>
+                    <Popover.Section>
+                        <Button plain monochrome onClick={() =>exportCsv()} removeUnderline>
+                            <HorizontalStack gap={"2"}>
+                                <Box><Icon source={FileMinor} /></Box>
+                                <Text>Export as CSV</Text>
+                            </HorizontalStack>
+                        </Button>
+                        </Popover.Section>
+                    <Popover.Section>
+                        <Button plain monochrome onClick={() => setTreeView(!treeView)} removeUnderline>
+                            <HorizontalStack gap={"2"}>
+                                <Box><Icon source={treeView ? HideMinor : ViewMinor} /></Box>
+                                <Text>{treeView ? "Hide tree view": "Display tree view"}</Text>
+                            </HorizontalStack>
+                        </Button>
                     </Popover.Section>
-                <Popover.Section>
-                    <Button plain monochrome onClick={() => setTreeView(!treeView)} removeUnderline>
-                        <HorizontalStack gap={"2"}>
-                            <Box><Icon source={treeView ? HideMinor : ViewMinor} /></Box>
-                            <Text>{treeView ? "Hide tree view": "Display tree view"}</Text>
-                        </HorizontalStack>
-                    </Button>
-                </Popover.Section>
-            </Popover.Pane>
-        </Popover>
+                </Popover.Pane>
+            </Popover>
+            <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>
+        </HorizontalStack>
     )
 
 
@@ -556,12 +566,12 @@ function ApiCollections() {
     }
 
     const tableComponent = (
-        treeView ? 
-        <TreeViewTable 
-            collectionsArr={normalData.filter((x) => x?.type !== "API_GROUP")} 
-            sortOptions={sortOptions} 
-            resourceName={resourceName} 
-            tableHeaders={headers.filter((x) => x.shouldMerge !== undefined)} 
+        treeView ?
+        <TreeViewTable
+            collectionsArr={normalData.filter((x) => x?.type !== "API_GROUP")}
+            sortOptions={sortOptions}
+            resourceName={resourceName}
+            tableHeaders={headers.filter((x) => x.shouldMerge !== undefined)}
             promotedBulkActions={promotedBulkActions}
         />:
         <GithubSimpleTable
@@ -597,7 +607,7 @@ function ApiCollections() {
                     docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                 />
             }
-            primaryAction={<Button id={"create-new-collection-popup"} primary secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
+            primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
             isFirstPage={true}
             components={components}
             secondaryActions={secondaryActionsComp}

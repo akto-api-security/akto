@@ -3,6 +3,7 @@ package com.akto.action;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.akto.action.observe.InventoryAction;
 import org.bson.conversions.Bson;
 
 import com.akto.DaoInit;
@@ -64,7 +65,7 @@ public class ApiCollectionsAction extends UserAction {
     Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
     int apiCollectionId;
     List<ApiInfoKey> apiList;
-
+    private BasicDBObject response;
     private boolean hasUsageEndpoints;
 
     public List<ApiInfoKey> getApiList() {
@@ -370,6 +371,15 @@ public class ApiCollectionsAction extends UserAction {
 
     int apiCount;
 
+    public String getEndpointsListFromConditions() {
+        List<TestingEndpoints> conditions = generateConditions(this.conditions);
+        List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(conditions, 0, 200, Utils.DELTA_PERIOD_VALUE);
+        InventoryAction inventoryAction = new InventoryAction();
+        inventoryAction.attachAPIInfoListInResponse(list,-1);
+        this.setResponse(inventoryAction.getResponse());
+        response.put("apiCount", ApiCollectionUsers.getApisCountFromConditions(conditions));
+        return SUCCESS.toUpperCase();
+    }
     public String getEndpointsFromConditions(){
         List<TestingEndpoints> conditions = generateConditions(this.conditions);
 
@@ -705,5 +715,13 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setApiCollectionIds(List<Integer> apiCollectionIds) {
         this.apiCollectionIds = apiCollectionIds;
+    }
+
+    public BasicDBObject getResponse() {
+        return response;
+    }
+
+    public void setResponse(BasicDBObject response) {
+        this.response = response;
     }
 }
