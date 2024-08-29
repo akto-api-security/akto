@@ -1,8 +1,7 @@
 import React, { useState } from 'react'
 import TableStore from '../../tables/TableStore'
 import { ChevronRightMinor, ChevronDownMinor } from "@shopify/polaris-icons"
-import TooltipText from "../TooltipText";
-import { Box, Checkbox, HorizontalStack, Icon } from '@shopify/polaris';
+import { Box, Checkbox, HorizontalStack, Icon, Text, Tooltip } from '@shopify/polaris';
 
 function PrettifyDisplayName({name, level, isTerminal, isOpen, selectItems, collectionIds}) {
     const selectedItems = TableStore.getState().selectedItems
@@ -41,7 +40,11 @@ function PrettifyDisplayName({name, level, isTerminal, isOpen, selectItems, coll
                     {spacingWidth > 0 ? <Box width={`${spacingWidth}px`} /> : null}
                     {len !== 0 ? <Checkbox checked={checkedVal} onChange={() => handleChange(collectionIds, selectItems)}/> : null}
                     {!isTerminal ? <Box><Icon source={icon} /></Box> : null}
-                    <TooltipText text={displayName} tooltip={displayName} textProps={{variant: 'headingSm'}} />
+                    <Box maxWidth="130px">
+                        <Tooltip content={name || displayName} dismissOnMouseOut>
+                            <Text variant="headingSm" truncate>{displayName}</Text>
+                        </Tooltip>
+                    </Box>
                 </HorizontalStack>
             </div>
         </Box>
