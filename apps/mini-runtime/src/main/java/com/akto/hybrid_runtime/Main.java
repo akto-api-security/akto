@@ -1,5 +1,10 @@
 package com.akto.hybrid_runtime;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -23,6 +28,8 @@ import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
+
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
@@ -109,6 +116,37 @@ public class Main {
         }
     }
 
+    private static void insertCredsRecordInKafka(String brokerUrl) {
+        File f = new File("creds.txt");
+        String instanceId = UUID.randomUUID().toString();
+        if (f.exists()) {
+            try (FileReader reader = new FileReader(f);
+                BufferedReader bufferedReader = new BufferedReader(reader)) {
+                String line;
+                while ((line = bufferedReader.readLine()) != null) {
+                    instanceId = line;
+                }
+            } catch (IOException e) {
+                loggerMaker.errorAndAddToDb("Error reading instanceId from file: " + e.getMessage());
+            }
+        } else {
+            try (FileWriter writer = new FileWriter(f)) {
+                writer.write(instanceId);
+            } catch (IOException e) {
+                loggerMaker.errorAndAddToDb("Error writing instanceId to file: " + e.getMessage());
+            }
+        }
+
+        int batchSize = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_BATCH_SIZE"));
+        int kafkaLingerMS = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_LINGER_MS"));
+        kafkaProducer = new Kafka(brokerUrl, kafkaLingerMS, batchSize);
+        BasicDBObject creds = new BasicDBObject();
+        creds.put("id", instanceId);
+        creds.put("token", System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN"));
+        creds.put("url", System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL"));
+        kafkaProducer.send(creds.toJson(), "credentials");
+    }
+
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     public static class AccountInfo {
@@ -171,6 +209,7 @@ public class Main {
             fetchAllSTI = false;
         }
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
+        insertCredsRecordInKafka(kafkaBrokerUrl);
 
         AccountSettings aSettings = dataActor.fetchAccountSettings();
         if (aSettings == null) {
