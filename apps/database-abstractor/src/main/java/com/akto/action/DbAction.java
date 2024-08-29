@@ -1835,6 +1835,7 @@ public class DbAction extends ActionSupport {
         try {
             DbLayer.insertRuntimeMetricsData(metricsData);
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertRuntimeMetricsData " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();

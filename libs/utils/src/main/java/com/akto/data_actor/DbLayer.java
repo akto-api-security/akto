@@ -880,7 +880,7 @@ public class DbLayer {
                 runtimeMetrics = new RuntimeMetrics(name, ts, instanceId, val);
                 bulkUpdates.add(new InsertOneModel<>(runtimeMetrics));
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error writing bulk update " + e.getMessage());
+                loggerMaker.errorAndAddToDb(e, "error writing bulk update " + e.getMessage());
             }
         }
 
