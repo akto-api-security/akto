@@ -49,6 +49,17 @@
             </modules>
         </profile>
         <profile>
+            <id>api-protection</id>
+            <activation>
+                <file>
+                    <exists>api-protection/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>api-protection</module>
+            </modules>
+        </profile>
+        <profile>
             <id>database-abstractor</id>
             <activation>
                 <file>
