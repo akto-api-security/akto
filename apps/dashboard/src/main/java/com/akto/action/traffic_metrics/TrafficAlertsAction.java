@@ -26,8 +26,7 @@ public class TrafficAlertsAction {
         List<Severity> allowedSeverityList = new ArrayList<>(Arrays.asList(Severity.HIGH, Severity.MEDIUM, Severity.LOW));
 
         Bson filterQ = Filters.and(
-            Filters.lte(TrafficAlerts.LAST_DISMISSED, Context.now() - (REFRESH_LIMIT/12)),
-            Filters.gte(TrafficAlerts.LAST_DETECTED, Context.now() - REFRESH_LIMIT),
+            Filters.eq(TrafficAlerts.LAST_DISMISSED, 0),
             Filters.in(TrafficAlerts.ALERT_SEVERITY, allowedSeverityList)
         );
 
