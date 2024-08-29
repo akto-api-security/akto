@@ -82,6 +82,7 @@ public class Crons {
                             RuntimeMetrics runtimeMetrics = RuntimeMetricsDao.instance.findOne(Filters.empty());
                             if (runtimeMetrics == null) {
                                 logger.infoAndAddToDb("Skipping traffic alert cron " + accId);
+                                return;
                             }
                             List<Bson> pipeline = new ArrayList<>();
                             int startTs = Context.now() - oldMetricThreshold;
