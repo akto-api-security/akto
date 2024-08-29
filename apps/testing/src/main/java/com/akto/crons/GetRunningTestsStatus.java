@@ -10,11 +10,13 @@ import java.util.function.Consumer;
 import org.bson.types.ObjectId;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.Account;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.util.AccountTask;
+import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
@@ -49,7 +51,9 @@ public class GetRunningTestsStatus {
                                     currentRunningTestsMap.remove(trrs.getTestingRunId());
                                 }else{
                                     currentRunningTestsMap.put(trrs.getId(), trrs.getState());
-                                    currentRunningTestsMap.put(trrs.getTestingRunId(), trrs.getState());
+                                    ObjectId TR_ID = trrs.getTestingRunId();
+                                    TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, TR_ID), Projections.include(TestingRun.STATE));
+                                    currentRunningTestsMap.put(TR_ID, testingRun.getState());
                                 }
                             } 
                         } catch (Exception e) {
