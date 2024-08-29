@@ -193,6 +193,21 @@ const dashboardFunc = {
                 return "Unknown error occurred"
         }
     },
+
+    replaceEpochWithFormattedDate(input) {
+        const match = input.match(/\$\{(\d+)\}/);
+
+        if (match && match[1]) {
+            const epochTime = Number(match[1]);
+            const date = new Date(epochTime * 1000);
+            const formattedDate = date.toLocaleString();
+            const result = input.replace(match[0], formattedDate);
+            return result;
+        } else {
+            return input;
+        }
+    },
+
     getBannerStatus(key){
         switch(key.toUpperCase()){
             case "HIGH" : return "critical";

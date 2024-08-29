@@ -79,14 +79,13 @@ public class Crons {
                     public void accept(Account t) {
                         try {
                             int accId = Context.accountId.get();
-                            if (Context.now() - oldMetricThreshold < accId) {
-                                return;
+                            RuntimeMetrics runtimeMetrics = RuntimeMetricsDao.instance.findOne(Filters.empty());
+                            if (runtimeMetrics == null) {
+                                logger.infoAndAddToDb("Skipping traffic alert cron " + accId);
                             }
-
                             List<Bson> pipeline = new ArrayList<>();
                             int startTs = Context.now() - oldMetricThreshold;
                             int endTs = Context.now();
-                            LocalDateTime dateTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(startTs), ZoneId.systemDefault());
 
                             pipeline.add(Aggregates.match(RuntimeMetricsDao.buildFilters(startTs, endTs)));
                             BasicDBObject groupedId = 
@@ -107,7 +106,7 @@ public class Crons {
                                         );
                                         TrafficAlerts trafficAlerts = TrafficAlertsDao.instance.findOne(filters);
                                         if (trafficAlerts == null) {
-                                            TrafficAlertsDao.instance.insertOne(new TrafficAlerts("Runtime Stopped Receiving Traffic " + dateTime.toString(), Context.now(), ALERT_TYPE.TRAFFIC_STOPPED, Severity.HIGH, 0));
+                                            TrafficAlertsDao.instance.insertOne(new TrafficAlerts("Runtime Stopped Receiving Traffic " + "${" + startTs + "}", Context.now(), ALERT_TYPE.TRAFFIC_STOPPED, Severity.HIGH, 0));
                                         }
                                     }
                                 }
@@ -119,11 +118,11 @@ public class Crons {
                                 );
                                 TrafficAlerts trafficAlerts = TrafficAlertsDao.instance.findOne(filters);
                                 if (trafficAlerts == null) {
-                                    TrafficAlertsDao.instance.insertOne(new TrafficAlerts("Akto Stopped Receiving Traffic " + dateTime.toString(), Context.now(), ALERT_TYPE.CYBORG_STOPPED_RECEIVING_TRAFFIC, Severity.HIGH, 0));
+                                    TrafficAlertsDao.instance.insertOne(new TrafficAlerts("Akto Stopped Receiving Traffic " + "${" + startTs + "}", Context.now(), ALERT_TYPE.CYBORG_STOPPED_RECEIVING_TRAFFIC, Severity.HIGH, 0));
                                 }
                             }
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            logger.errorAndAddToDb(e, "Error in trafficAlertsScheduler " + e.toString());
                         }
                     }
                 },"traffic-alerts-scheduler");

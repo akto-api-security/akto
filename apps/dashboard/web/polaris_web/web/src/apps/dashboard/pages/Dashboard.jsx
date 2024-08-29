@@ -132,8 +132,8 @@ function Dashboard() {
                             return(
                                 <AlertsBanner key={index} 
                                     type={dashboardFunc.getAlertMessageFromType(alert.alertType)} 
-                                    content={alert.content}
-                                    severity={dashboardFunc.getBannerStatus(alert.severity)} 
+                                    content={dashboardFunc.replaceEpochWithFormattedDate(alert.content)}
+                                    severity={dashboardFunc.getBannerStatus(alert.severity)}
                                     onDismiss= {handleOnDismiss}
                                     index={index}
                                 />
