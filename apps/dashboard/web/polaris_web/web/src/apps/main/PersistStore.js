@@ -23,7 +23,7 @@ const initialState = {
     coverageMap:{},
     filtersMap:{},
     tableInitialState: {},
-    trafficAlerts: null,
+    trafficAlerts: [],
     sendEventOnLogin: false
 };
 

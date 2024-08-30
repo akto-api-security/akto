@@ -52,11 +52,11 @@ export const PollingProvider = ({ children }) => {
             }, (5000 * 60));
             intervalAlertRef.current = id2
         };
-
-        fetchAlerts();
         if (window.location.pathname.startsWith('/dashboard')) {
             fetchTestingStatus();
-            fetchAlerts();
+            if (window.USER_NAME.length > 0 && window.USER_NAME.includes('akto.io')) {
+                fetchAlerts();
+            }
         }
         return () => {
             clearInterval(intervalIdRef.current);

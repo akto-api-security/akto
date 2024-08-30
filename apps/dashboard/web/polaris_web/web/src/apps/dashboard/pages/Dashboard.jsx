@@ -54,6 +54,21 @@ function Dashboard() {
         }
     }
 
+    console.log("traffic", trafficAlerts, displayItems)
+
+    useEffect(() => {
+        if(trafficAlerts == null && window.USER_NAME.length > 0 && window.USER_NAME.includes('akto.io')){
+            homeRequests.getTrafficAlerts().then((resp) => {
+                setDisplayItems(dashboardFunc.sortAndFilterAlerts(resp))
+                setTrafficAlerts(resp)
+            })
+        }else{
+            setDisplayItems((prev) => {
+                return dashboardFunc.sortAndFilterAlerts(trafficAlerts)
+            })
+        }
+    },[trafficAlerts.length])
+
     useEffect(() => {
         if((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)){
             fetchAllCollections()
@@ -63,14 +78,6 @@ function Dashboard() {
         }
         if(window.Beamer){
             window.Beamer.init();
-        }
-        if(trafficAlerts == null){
-            homeRequests.getTrafficAlerts().then((resp) => {
-                setDisplayItems(dashboardFunc.sortAndFilterAlerts(resp))
-                setTrafficAlerts(resp)
-            })
-        }else{
-            setDisplayItems(dashboardFunc.sortAndFilterAlerts(trafficAlerts))
         }
         if(window?.Intercom){
             if(!sendEventOnLogin){
