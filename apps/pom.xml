@@ -49,14 +49,14 @@
             </modules>
         </profile>
         <profile>
-            <id>api-protection</id>
+            <id>api-threat-detection</id>
             <activation>
                 <file>
-                    <exists>api-protection/pom.xml</exists>
+                    <exists>api-threat-detection/pom.xml</exists>
                 </file>
             </activation>
             <modules>
-                <module>api-protection</module>
+                <module>api-threat-detection</module>
             </modules>
         </profile>
         <profile>

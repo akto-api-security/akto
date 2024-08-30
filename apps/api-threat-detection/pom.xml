@@ -10,8 +10,8 @@
         <version>${revision}</version>
     </parent>
 
-    <groupId>com.akto.apps.api-protection</groupId>
-    <artifactId>api-protection</artifactId>
+    <groupId>com.akto.apps.api-threat-detection</groupId>
+    <artifactId>api-threat-detection</artifactId>
     <packaging>jar</packaging>
 
     <dependencies>
@@ -31,8 +31,13 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.akto.apps.api-runtime</groupId>
-            <artifactId>api-runtime</artifactId>
+            <groupId>com.akto.apps.mini-runtime</groupId>
+            <artifactId>mini-runtime</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.akto.apps.testing</groupId>
+            <artifactId>testing</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -128,7 +133,7 @@
                         <archive>
                             <manifest>
                                 <mainClass>
-                                    com.akto.protection.Main
+                                    com.akto.monitoring.Main
                                 </mainClass>
                             </manifest>
                         </archive>
@@ -151,11 +156,11 @@
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-jar-plugin</artifactId>
             <configuration>
-                <finalName>api-protection-1.0-SNAPSHOT-jar-with-dependencies</finalName>
+                <finalName>api-threat-detection-1.0-SNAPSHOT-jar-with-dependencies</finalName>
                 <archive>
                 <manifest>
                     <addClasspath>true</addClasspath>
-                    <mainClass>com.akto.protection.Main</mainClass>
+                    <mainClass>com.akto.monitoring.Main</mainClass>
                     <classpathPrefix>dependency-jars/</classpathPrefix>
                 </manifest>
                 </archive>

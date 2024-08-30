@@ -1,4 +1,4 @@
-package com.akto.protection;
+package com.akto.monitoring;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -23,26 +23,26 @@ import com.akto.dto.APIConfig;
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.Main.AccountInfo;
+import com.akto.filters.HttpCallFilter;
+import com.akto.hybrid_parsers.HttpCallParser;
+import com.akto.hybrid_runtime.Main.AccountInfo;
 import com.mongodb.client.model.Filters;
 
 public class Main {
     private Consumer<String, String> consumer;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.PROTECTION);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.THREAD_DETECTION);
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
     public static final int sync_threshold_time = 120;
 
     public static void main(String[] args) {
 
         final Main main = new Main();
-        boolean fetchAllSTI = true;
 
         String kafkaBrokerUrl = "kafka1:19092";
         String groupIdConfig = System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
 
-        Properties properties = com.akto.runtime.Main.configProperties(kafkaBrokerUrl, groupIdConfig,
+        Properties properties = com.akto.hybrid_runtime.Main.configProperties(kafkaBrokerUrl, groupIdConfig,
                 maxPollRecordsConfig);
 
         main.consumer = new KafkaConsumer<>(properties);
@@ -65,7 +65,7 @@ public class Main {
             }
         });
 
-        Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
+        Map<String, HttpCallFilter> httpCallFilterMap = new HashMap<>();
         long lastSyncOffset = 0;
         Map<Integer, AccountInfo> accountInfoMap = new HashMap<>();
 
@@ -100,7 +100,7 @@ public class Main {
                     HttpResponseParams httpResponseParams;
                     try {
 
-                        com.akto.runtime.Main.printL(r.value());
+                        com.akto.hybrid_runtime.Main.printL(r.value());
                         lastSyncOffset++;
 
                         if (lastSyncOffset % 100 == 0) {
@@ -136,20 +136,15 @@ public class Main {
                         accountInfoMap.put(accountIdInt, accountInfo);
                     }
 
-                    if (!httpCallParserMap.containsKey(accountId)) {
-                        HttpCallParser parser = new HttpCallParser(
-                                apiConfig.getUserIdentifier(), apiConfig.getThreshold(),
-                                apiConfig.getSync_threshold_count(),
-                                apiConfig.getSync_threshold_time(), fetchAllSTI);
-                        httpCallParserMap.put(accountId, parser);
-                        loggerMaker.infoAndAddToDb("New parser created for account: " + accountId, LogDb.RUNTIME);
+                    if (!httpCallFilterMap.containsKey(accountId)) {
+                        HttpCallFilter filter = new HttpCallFilter(1000, sync_threshold_time);
+                        httpCallFilterMap.put(accountId, filter);
+                        loggerMaker.infoAndAddToDb("New filter created for account: " + accountId);
                     }
 
-                    HttpCallParser parser = httpCallParserMap.get(accountId);
+                    HttpCallFilter filter = httpCallFilterMap.get(accountId);
                     List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
-
-                    
-
+                    filter.filterFunction(accWiseResponse);
                 }
             }
 
@@ -157,7 +152,7 @@ public class Main {
             // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
             exceptionOnCommitSync.set(true);
-            com.akto.runtime.Main.printL(e);
+            com.akto.hybrid_runtime.Main.printL(e);
             loggerMaker.errorAndAddToDb("Error in main runtime: " + e.getMessage(), LogDb.RUNTIME);
             e.printStackTrace();
             System.exit(0);

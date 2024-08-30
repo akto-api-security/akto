@@ -49,7 +49,7 @@ public class Main {
     public static final int sync_threshold_time = 120;
 
     private static int debugPrintCounter = 500;
-    private static void printL(Object o) {
+    public static void printL(Object o) {
         if (debugPrintCounter > 0) {
             debugPrintCounter--;
             logger.info(o.toString());
