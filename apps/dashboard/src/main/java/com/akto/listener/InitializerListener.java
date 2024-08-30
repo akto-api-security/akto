@@ -2156,15 +2156,17 @@ public class InitializerListener implements ServletContextListener {
                  * 
                  * then attempt to recreate org in stigg.
                  */
-                int accountId = Context.accountId.get();
-                if (accountId > 1724544000 && accountId < 1724976000) {
-                    try {
-                        String res = StiggReporterClient.instance.provisionCustomer(organization);
-                        if(!res.contains("err")){
-                            loggerMaker.infoAndAddToDb(String.format("Created org and set subs in stigg %s accountId : %s email: %s", organization.getId(), accountId, organization.getAdminEmail()));
+                if(accounts!=null && !accounts.isEmpty()){
+                    int accountId = accounts.iterator().next();
+                    if (accountId > 1724544000 && accountId < 1724976000) {
+                        try {
+                            String res = StiggReporterClient.instance.provisionCustomer(organization);
+                            if(!res.contains("err")){
+                                loggerMaker.infoAndAddToDb(String.format("Created org and set subs in stigg %s accountId : %s email: %s", organization.getId(), accountId, organization.getAdminEmail()));
+                            }
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, String.format("Unable to create org in stigg %s accountId : %s email: %s error: %s", organization.getId(), accountId, organization.getAdminEmail(), e.toString()));
                         }
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, String.format("Unable to create org in stigg %s accountId : %s email: %s error: %s", organization.getId(), accountId, organization.getAdminEmail(), e.toString()));
                     }
                 }
             }
