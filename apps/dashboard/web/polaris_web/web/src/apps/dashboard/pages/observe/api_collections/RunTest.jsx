@@ -9,7 +9,7 @@ import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForTesting }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction }) {
 
     const initialState = {
         categories: [],
@@ -394,14 +394,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         })
 
         let apiInfoKeyList;
-        if(!selectedResourcesForTesting || selectedResourcesForTesting.length === 0) {
+        if(!selectedResourcesForPrimaryAction || selectedResourcesForPrimaryAction.length === 0) {
             apiInfoKeyList = endpoints.map(endpoint => ({
                 apiCollectionId: endpoint.apiCollectionId,
                 method: endpoint.method,
                 url: endpoint.endpoint
             }))
         } else {
-            apiInfoKeyList = selectedResourcesForTesting.map(str => {
+            apiInfoKeyList = selectedResourcesForPrimaryAction.map(str => {
                 const parts = str.split('###')
                 
                 const method = parts[0]
@@ -416,7 +416,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             })
         }
 
-        if (filtered || selectedResourcesForTesting.length > 0) {
+        if (filtered || selectedResourcesForPrimaryAction.length > 0) {
             await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting)
         } else {
             await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting)

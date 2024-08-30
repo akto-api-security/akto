@@ -349,8 +349,8 @@ function GithubServerTable(props) {
   let tableHeightClass = props.increasedHeight ? "control-row" : (props.condensedHeight ? "condensed-row" : '') 
   let tableClass = props.useNewRow ? "new-table" : (props.selectable ? "removeHeaderColor" : "hideTableHead")
   const bulkActionResources = selectedItems.length > 0 ? selectedItems : selectedResources
-  if (typeof props.handleSelectedResourcesForTesting === 'function') {
-    props.handleSelectedResourcesForTesting(bulkActionResources)
+  if (typeof props.setSelectedResourcesForPrimaryAction === 'function') {
+    props.setSelectedResourcesForPrimaryAction(bulkActionResources)
   }
   return (
     <div className={tableClass} style={{display: "flex", flexDirection: "column", gap: "20px"}}>
