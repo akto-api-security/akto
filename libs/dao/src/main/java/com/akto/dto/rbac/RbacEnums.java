@@ -13,6 +13,7 @@ public class RbacEnums {
         TEST_LIBRARY,
         SETTINGS,
         ADMIN,
+        DEBUG_INFO,
         USER;
     
         public static AccessGroups[] getAccessGroups() {
@@ -37,8 +38,8 @@ public class RbacEnums {
         TEST_EDITOR(AccessGroups.TEST_LIBRARY),
         EXTERNAL_TEST_LIBRARY(AccessGroups.TEST_LIBRARY),
         INTEGRATIONS(AccessGroups.SETTINGS),
-        METRICS(AccessGroups.SETTINGS),
-        LOGS(AccessGroups.SETTINGS),
+        METRICS(AccessGroups.DEBUG_INFO),
+        LOGS(AccessGroups.DEBUG_INFO),
         BILLING(AccessGroups.SETTINGS),
         INVITE_MEMBERS(AccessGroups.SETTINGS),
         ADMIN_ACTIONS(AccessGroups.ADMIN),
