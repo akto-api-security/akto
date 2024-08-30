@@ -103,7 +103,7 @@ public class Crons {
                                     if (val == 0) {
                                         Bson filters = Filters.and(
                                             Filters.eq("alertType", ALERT_TYPE.TRAFFIC_STOPPED),
-                                            Filters.gt("lastDismissed", 0)
+                                            Filters.eq("lastDismissed", 0)
                                         );
                                         TrafficAlerts trafficAlerts = TrafficAlertsDao.instance.findOne(filters);
                                         if (trafficAlerts == null) {

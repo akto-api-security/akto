@@ -1956,6 +1956,7 @@ public class InitializerListener implements ServletContextListener {
                         }
                     }, "context-initializer-secondary");
 
+                    crons.trafficAlertsScheduler();
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
                         setupUsageSyncScheduler();
@@ -1971,7 +1972,6 @@ public class InitializerListener implements ServletContextListener {
                     setUpDependencyFlowScheduler();
                     tokenGeneratorCron.tokenGeneratorScheduler();
                     crons.deleteTestRunsScheduler();
-                    crons.trafficAlertsScheduler();
                     updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                     syncCronInfo.setUpUpdateCronScheduler();
                     updateApiGroupsForAccounts();
