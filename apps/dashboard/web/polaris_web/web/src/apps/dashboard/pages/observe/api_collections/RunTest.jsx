@@ -9,7 +9,7 @@ import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForTesting }) {
 
     const initialState = {
         categories: [],
@@ -393,13 +393,30 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             })
         })
 
-        const apiInfoKeyList = endpoints.map(endpoint => ({
-            apiCollectionId: endpoint.apiCollectionId,
-            method: endpoint.method,
-            url: endpoint.endpoint
-        }))
+        let apiInfoKeyList;
+        if(!selectedResourcesForTesting || selectedResourcesForTesting.length === 0) {
+            apiInfoKeyList = endpoints.map(endpoint => ({
+                apiCollectionId: endpoint.apiCollectionId,
+                method: endpoint.method,
+                url: endpoint.endpoint
+            }))
+        } else {
+            apiInfoKeyList = selectedResourcesForTesting.map(str => {
+                const parts = str.split('###')
+                
+                const method = parts[0]
+                const url = parts[1]
+                const apiCollectionId = parseInt(parts[2], 10)
 
-        if (filtered) {
+                return {
+                  apiCollectionId: apiCollectionId,
+                  method: method,
+                  url: url
+                }
+            })
+        }
+
+        if (filtered || selectedResourcesForTesting.length > 0) {
             await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting)
         } else {
             await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting)
