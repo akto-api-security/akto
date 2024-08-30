@@ -40,7 +40,6 @@ function GithubSimpleTable(props) {
         csvFileName={props?.csvFileName}
         treeView={props?.treeView}
         customFilters={props?.customFilters}
-        handleSelectedResourcesForTesting={props?.handleSelectedResourcesForTesting}
         showFooter={props?.showFooter}
         setSelectedResourcesForPrimaryAction={props?.setSelectedResourcesForPrimaryAction}
     />
