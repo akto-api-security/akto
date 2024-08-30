@@ -1963,6 +1963,7 @@ public class InitializerListener implements ServletContextListener {
                     trimCappedCollections();
                     setUpPiiAndTestSourcesScheduler();
                     setUpTrafficAlertScheduler();
+                    crons.trafficAlertsScheduler();
                     // setUpAktoMixpanelEndpointsScheduler();
                     setUpDailyScheduler();
                     setUpWebhookScheduler();
@@ -1971,7 +1972,6 @@ public class InitializerListener implements ServletContextListener {
                     setUpDependencyFlowScheduler();
                     tokenGeneratorCron.tokenGeneratorScheduler();
                     crons.deleteTestRunsScheduler();
-                    crons.trafficAlertsScheduler();
                     updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                     syncCronInfo.setUpUpdateCronScheduler();
                     updateApiGroupsForAccounts();
