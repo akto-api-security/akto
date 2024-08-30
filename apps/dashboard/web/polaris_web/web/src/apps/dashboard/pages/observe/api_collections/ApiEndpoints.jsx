@@ -160,7 +160,7 @@ function ApiEndpoints(props) {
     const [endpointData, setEndpointData] = useState({"all":[]})
     const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
-    const [selectedResourcesForTesting, setSelectedResourcesForTesting] = useState([])
+    const [selectedResourcesForPrimaryAction, setSelectedResourcesForPrimaryAction] = useState([])
     const [loading, setLoading] = useState(true)
     const [apiDetail, setApiDetail] = useState({})
     const [exportOpen, setExportOpen] = useState(false)
@@ -645,7 +645,7 @@ function ApiEndpoints(props) {
                 runTestFromOutside={runTests}
                 closeRunTest={() => setRunTests(false)}
                 disabled={showEmptyScreen}
-                selectedResourcesForTesting={selectedResourcesForTesting}
+                selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
             />
         </HorizontalStack>
     )
@@ -701,10 +701,6 @@ function ApiEndpoints(props) {
         return ret;
     }
 
-    const handleSelectedResourcesForTesting = (selectedResources) => {
-        setSelectedResourcesForTesting(selectedResources)
-    }
-
     let modal = (
         <Modal
             open={showRedactModal}
@@ -754,7 +750,7 @@ function ApiEndpoints(props) {
         selectable={true}
         promotedBulkActions={promotedBulkActions}
         loading={tableLoading || loading}
-        handleSelectedResourcesForTesting={handleSelectedResourcesForTesting}
+        setSelectedResourcesForPrimaryAction={setSelectedResourcesForPrimaryAction}
     />,
     <ApiDetails
         key="api-details"
