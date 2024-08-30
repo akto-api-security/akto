@@ -42,6 +42,7 @@ function GithubSimpleTable(props) {
         customFilters={props?.customFilters}
         handleSelectedResourcesForTesting={props?.handleSelectedResourcesForTesting}
         showFooter={props?.showFooter}
+        setSelectedResourcesForPrimaryAction={props?.setSelectedResourcesForPrimaryAction}
     />
 
 }
