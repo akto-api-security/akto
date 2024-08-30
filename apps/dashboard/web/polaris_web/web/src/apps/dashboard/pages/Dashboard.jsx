@@ -54,8 +54,6 @@ function Dashboard() {
         }
     }
 
-    console.log("traffic", trafficAlerts, displayItems)
-
     useEffect(() => {
         if(trafficAlerts == null && window.USER_NAME.length > 0 && window.USER_NAME.includes('akto.io')){
             homeRequests.getTrafficAlerts().then((resp) => {
