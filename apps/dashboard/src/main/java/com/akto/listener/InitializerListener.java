@@ -67,6 +67,7 @@ import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.RuntimeUtil;
+import com.akto.stigg.StiggReporterClient;
 import com.akto.task.Cluster;
 import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
@@ -2146,6 +2147,29 @@ public class InitializerListener implements ServletContextListener {
             featureWiseAllowed = UsageMetricHandler.updateFeatureMapWithLocalUsageMetrics(featureWiseAllowed, accounts);
 
             loggerMaker.infoAndAddToDb(String.format("Processed %s features", featureWiseAllowed.size()),LogDb.DASHBOARD);
+
+            if (featureWiseAllowed.isEmpty()) {
+                /*
+                 * If feature map unavailable and account belongs b/w
+                 * 1724544000 -> Sunday, August 25, 2024 12:00:00 AM GMT
+                 * 1724976000 -> Friday, August 30, 2024 12:00:00 AM GMT
+                 * 
+                 * then attempt to recreate org in stigg.
+                 */
+                if(accounts!=null && !accounts.isEmpty()){
+                    int accountId = accounts.iterator().next();
+                    if (accountId > 1724544000 && accountId < 1724976000) {
+                        try {
+                            String res = StiggReporterClient.instance.provisionCustomer(organization);
+                            if(!res.contains("err")){
+                                loggerMaker.infoAndAddToDb(String.format("Created org and set subs in stigg %s accountId : %s email: %s", organization.getId(), accountId, organization.getAdminEmail()));
+                            }
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, String.format("Unable to create org in stigg %s accountId : %s email: %s error: %s", organization.getId(), accountId, organization.getAdminEmail(), e.toString()));
+                        }
+                    }
+                }
+            }
 
             for (Map.Entry<String, FeatureAccess> entry : featureWiseAllowed.entrySet()) {
                 String label = entry.getKey();
