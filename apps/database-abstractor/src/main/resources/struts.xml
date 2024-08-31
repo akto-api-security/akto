@@ -1135,7 +1135,11 @@
             </result>
         </action>
 
+<<<<<<< Updated upstream
         <action name="api/insertRuntimeMetricsData" class="com.akto.action.DbAction" method="insertRuntimeMetricsData">
+=======
+        <action name="api/updateTrafficCollectorMetrics" class="com.akto.action.DbAction" method="updateTrafficCollectorMetrics">
+>>>>>>> Stashed changes
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

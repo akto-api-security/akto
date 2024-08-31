@@ -3,6 +3,8 @@ package com.akto.action;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
+import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -30,6 +32,7 @@ import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
+import com.akto.dto.traffic_collector.TrafficCollectorMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.utils.CustomAuthUtil;
@@ -352,6 +355,30 @@ public class DbAction extends ActionSupport {
             loggerMaker.errorAndAddToDb(e, "error in fetchNonTrafficApiInfos " + e.toString());
             return Action.ERROR.toUpperCase();
         }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
+    TrafficCollectorMetrics trafficCollectorMetrics = null;
+    public String updateTrafficCollectorMetrics() {
+        if (trafficCollectorMetrics == null) {
+            return Action.SUCCESS.toUpperCase();
+        }
+
+        // update heartbeat
+        try {
+            TrafficCollectorInfoDao.instance.updateHeartbeat(trafficCollectorMetrics.getId(), trafficCollectorMetrics.getRuntimeId());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error while updating heartbeat: " + e);
+        }
+
+        // update metrics
+        try {
+            TrafficCollectorMetricsDao.instance.updateCount(trafficCollectorMetrics);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error while updating count of traffic collector metrics: " + e);
+        }
+
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -2727,4 +2754,7 @@ public class DbAction extends ActionSupport {
         this.metricsData = metricsData;
     }
 
+    public void setTrafficCollectorMetrics(TrafficCollectorMetrics trafficCollectorMetrics) {
+        this.trafficCollectorMetrics = trafficCollectorMetrics;
+    }
 }
