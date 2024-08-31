@@ -266,12 +266,16 @@ function GithubServerTable(props) {
 
   const customSelectionChange = (selectionType,toggleType, selection) => {
     if(props?.treeView){
+      let tempItems = selection;
+        if(typeof selectItems !== 'object'){
+          tempItems = [selection]
+        }
       if(selectionType !== "page"){
         let newItems = []
         if(toggleType){
-          newItems = [...new Set([...selectedItems, ...selection])]
+          newItems = [...new Set([...selectedItems, ...tempItems])]
         }else{
-          newItems = selectedItems.filter((x) => !selection.includes(x))
+          newItems = selectedItems.filter((x) => !tempItems.includes(x))
         }
         selectItems(newItems);
         TableStore.getState().setSelectedItems(newItems)

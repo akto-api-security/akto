@@ -387,7 +387,7 @@ function ApiCollections() {
         if (!loading) {
             let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.isText === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0]?.length > 0));
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
-            data[selectedTab].forEach(i => {
+            data['all'].forEach(i => {
                 if(selectedResources.length === 0 || selectedResourcesSet.has(i.id)){
                     csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
                 }
