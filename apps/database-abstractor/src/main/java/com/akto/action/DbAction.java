@@ -362,6 +362,7 @@ public class DbAction extends ActionSupport {
     TrafficCollectorMetrics trafficCollectorMetrics = null;
     public String updateTrafficCollectorMetrics() {
         if (trafficCollectorMetrics == null) {
+            loggerMaker.errorAndAddToDb("trafficCollectorMetrics is null");
             return Action.SUCCESS.toUpperCase();
         }
 
