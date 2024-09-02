@@ -33,7 +33,7 @@ public class RedactSampleData {
         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
         HttpResponseParams.Source source = httpResponseParams.getSource();
         if(source.equals(HttpResponseParams.Source.PCAP)) return sample;
-        return redact(httpResponseParams, accountLevelRedact || apiCollectionLevelRedact);
+        return redact(httpResponseParams, (accountLevelRedact && !source.equals(HttpResponseParams.Source.HAR)) || apiCollectionLevelRedact);
     }
 
     public static String redactDataTypes(String sample) throws Exception{
