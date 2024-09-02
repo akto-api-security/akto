@@ -137,8 +137,6 @@ const sortOptions = [
 ];
 
 function ApiEndpoints(props) {
-
-    console.log("apiEndpoint called")
     const { endpointListFromConditions, sensitiveParamsForQuery, isQueryPage } = props
     const params = useParams()
     const location = useLocation()
@@ -605,7 +603,7 @@ function ApiEndpoints(props) {
                                 <div data-testid="postman_option" onClick={exportPostman} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">Postman</Text>
                                 </div>
-                                <div data-testid="csv_option" onClick={exportCsv} style={{cursor: 'pointer'}}>
+                                <div data-testid="csv_option" onClick={() =>exportCsv()} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">CSV</Text>
                                 </div>
                             </VerticalStack>
