@@ -32,7 +32,7 @@ public class RedactSampleData {
     public static String redactIfRequired(String sample, boolean accountLevelRedact, boolean apiCollectionLevelRedact) throws Exception {
         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
         HttpResponseParams.Source source = httpResponseParams.getSource();
-        if(source.equals(HttpResponseParams.Source.HAR) || source.equals(HttpResponseParams.Source.PCAP)) return sample;
+        if(source.equals(HttpResponseParams.Source.PCAP)) return sample;
         return redact(httpResponseParams, accountLevelRedact || apiCollectionLevelRedact);
     }
 
