@@ -20,6 +20,114 @@ const mirroringObj = {
     component: <AwsSource />
 }
 
+const ApigeeObj = {
+    icon: '/public/apigee.svg',
+    label: "Apigee",
+    text: "Apigee setup is recommended if you are using Google's Apigee API Management platform to design, secure, and scale your APIs.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Apigee",
+    component: <FutureConnection/>
+}
+
+const AzureObj = {
+    icon: '/public/azure.svg',
+    label: "Azure API Gateway",
+    text: "Azure API Gateway setup is recommended if you are using Azure's API Management service to manage, secure, and analyze your APIs.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Azure",
+    component: <FutureConnection/>
+}
+
+const CloudflareObj = {
+    icon: '/public/cloudflare.svg',
+    label: "Cloudflare",
+    text: "You should use Cloudflare as a traffic connector if you are leveraging Cloudflare's CDN and security features to manage and optimize your API traffic.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Cloudflare",
+    component: <FutureConnection/>
+}
+
+const F5Obj = {
+    icon: '/public/f5.svg',
+    label: "F5",
+    text: "F5 setup is recommended if you are using F5's BIG-IP as an API gateway or load balancer to manage and control your API traffic.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "F5",
+    component: <FutureConnection/>
+}
+
+const GoObj = {
+    icon: '/public/go.svg',
+    label: "Go",
+    text: "Use where Go-based services are deployed.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Go",
+    component: <FutureConnection/>
+}
+
+const HAproxyObj = {
+    icon: '/public/haproxy.svg',
+    label: "HAproxy",
+    text: "HA Proxy should be used as a traffic connector if you are leveraging HA Proxy for load balancing, high availability, and proxying HTTP and TCP-based applications.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "HAproxy",
+    component: <FutureConnection/>
+}
+
+const JavaObj = {
+    icon: '/public/java.svg',
+    label: "Java",
+    text: "You can use Akto's Java agent to capture API traffic directly from your Java applications.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Java",
+    component: <FutureConnection/>
+}
+
+const kongmeshObj = {
+    icon: '/public/kongmesh.svg',
+    label: "Kong Mesh",
+    text: "Use this set-up if you are utilizing Kong's service mesh capabilities to manage and secure your microservices and APIs.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Kong Mesh",
+    component: <FutureConnection/>
+}
+
+const layer7Obj = {
+    icon: '/public/layer7.svg',
+    label: "Layer 7",
+    text: "Layer7 is recommended if you are using CA Technologies' Layer7 API Management for securing and managing your APIs.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Layer 7",
+    component: <FutureConnection/>
+}
+
+const nodejsObj = {
+    icon: '/public/nodejs.svg',
+    label: "NodeJS",
+    text: "This setup is ideal for environments where NodeJS-based services are deployed, ensuring seamless integration and real-time traffic monitoring.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "NodeJS",
+    component: <FutureConnection/>
+}
+
+const openshiftObj = {
+    icon: '/public/openshift.svg',
+    label: "OpenShift",
+    text: "OpenShift should be used as a traffic connector if you are deploying and managing containerized applications using OpenShift.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "OpenShift",
+    component: <FutureConnection/>
+}
+
+const threescaleObj = {
+    icon: '/public/threescale.svg',
+    label: "3Scale",
+    text: "This setup is recommended if your APIs are managed by 3scale.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "3Scale",
+    component: <FutureConnection/>
+}
+
 const beanStalkObj = {
     icon: '/public/beanstalk.svg',
     label: "AWS Beanstalk",
@@ -746,14 +854,16 @@ const yaml_kubernetes = [
 const quickStartFunc = {
     getConnectorsList: function () {
 
-        if(func.checkLocal()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj]
-        }
+        // if(func.checkLocal()){
+        //     return [burpObj, postmanObj, openApiObj, harFileUploadObj]
+        // }
 
-        const connectorsList = [gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
+        const connectorsList = [
+            gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
             openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
-            ebpfObj, ebpfMTLSObj, istioObj, aktoSdkObj, awsApiGatewayObj
+            ebpfObj, ebpfMTLSObj, istioObj, aktoSdkObj, awsApiGatewayObj,
+            ApigeeObj, AzureObj, CloudflareObj, F5Obj, GoObj, HAproxyObj, JavaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj
         ]
         return connectorsList
     },
