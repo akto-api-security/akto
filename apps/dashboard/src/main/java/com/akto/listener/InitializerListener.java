@@ -18,6 +18,8 @@ import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
+import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.upload.FileUploadLogsDao;
 import com.akto.dao.upload.FileUploadsDao;
@@ -1951,6 +1953,8 @@ public class InitializerListener implements ServletContextListener {
         clear(ActivitiesDao.instance, ActivitiesDao.maxDocuments);
         clear(BillingLogsDao.instance, BillingLogsDao.maxDocuments);
         clear(TestingRunResultDao.instance, TestingRunResultDao.maxDocuments);
+        clear(TrafficCollectorInfoDao.instance, TrafficCollectorInfoDao.maxDocuments);
+        clear(TrafficCollectorMetricsDao.instance, TrafficCollectorInfoDao.maxDocuments);
     }
 
     public static void clear(AccountsContextDao mCollection, int maxDocuments) {
