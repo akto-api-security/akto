@@ -10,6 +10,7 @@ import BannerComponent from "./components/shared/BannerComponent"
 import OpenApiSource from "./components/OpenApiSource"
 import ApiInventoryFromSourceCode from "./components/ApiInventoryFromSourceCode"
 import func from "@/util/func"
+import AddOnComponenet from "./components/shared/AddOnComponenet"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -26,7 +27,34 @@ const ApigeeObj = {
     text: "Apigee setup is recommended if you are using Google's Apigee API Management platform to design, secure, and scale your APIs.",
     docsUrl: 'https://docs.akto.io/traffic-connections',
     key: "Apigee",
-    component: <FutureConnection/>
+    component: <AddOnComponenet/>
+}
+
+const githubObj = {
+    icon: '/public/github.svg',
+    label: "GitHub",
+    text: "We recommend setting up GitHub if you want to connect and retrieve APIs directly from your source code hosted on GitHub.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "GitHub",
+    component: <AddOnComponenet/>
+}
+
+const gitlabObj = {
+    icon: '/public/gitlab.svg',
+    label: "GitLab",
+    text: "We recommend setting up GitLab if you want to connect and retrieve APIs directly from your source code hosted on GitLab.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "GitLab",
+    component: <AddOnComponenet/>
+}
+
+const bitbucketObj = {
+    icon: '/public/bitbucket.svg',
+    label: "Bitbucket",
+    text: "We recommend setting up Bitbucket if you want to connect and retrieve APIs directly from your source code hosted on Bitbucket.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Bitbucket",
+    component: <AddOnComponenet/>
 }
 
 const AzureObj = {
@@ -35,7 +63,7 @@ const AzureObj = {
     text: "Azure API Gateway setup is recommended if you are using Azure's API Management service to manage, secure, and analyze your APIs.",
     docsUrl: 'https://docs.akto.io/traffic-connections',
     key: "Azure",
-    component: <FutureConnection/>
+    component: <AddOnComponenet/>
 }
 
 const CloudflareObj = {
@@ -44,7 +72,7 @@ const CloudflareObj = {
     text: "You should use Cloudflare as a traffic connector if you are leveraging Cloudflare's CDN and security features to manage and optimize your API traffic.",
     docsUrl: 'https://docs.akto.io/traffic-connections',
     key: "Cloudflare",
-    component: <FutureConnection/>
+    component: <AddOnComponenet/>
 }
 
 const F5Obj = {
@@ -53,7 +81,7 @@ const F5Obj = {
     text: "F5 setup is recommended if you are using F5's BIG-IP as an API gateway or load balancer to manage and control your API traffic.",
     docsUrl: 'https://docs.akto.io/traffic-connections',
     key: "F5",
-    component: <FutureConnection/>
+    component: <AddOnComponenet/>
 }
 
 const GoObj = {
@@ -62,16 +90,16 @@ const GoObj = {
     text: "Use where Go-based services are deployed.",
     docsUrl: 'https://docs.akto.io/traffic-connections',
     key: "Go",
-    component: <FutureConnection/>
+    component: <AddOnComponenet/>
 }
 
 const HAproxyObj = {
     icon: '/public/haproxy.svg',
-    label: "HAproxy",
+    label: "HA Proxy",
     text: "HA Proxy should be used as a traffic connector if you are leveraging HA Proxy for load balancing, high availability, and proxying HTTP and TCP-based applications.",
     docsUrl: 'https://docs.akto.io/traffic-connections',
     key: "HAproxy",
-    component: <FutureConnection/>
+    component: <AddOnComponenet/>
 }
 
 const JavaObj = {
@@ -80,7 +108,7 @@ const JavaObj = {
     text: "You can use Akto's Java agent to capture API traffic directly from your Java applications.",
     docsUrl: 'https://docs.akto.io/traffic-connections',
     key: "Java",
-    component: <FutureConnection/>
+    component: <AddOnComponenet/>
 }
 
 const kongmeshObj = {
@@ -89,7 +117,7 @@ const kongmeshObj = {
     text: "Use this set-up if you are utilizing Kong's service mesh capabilities to manage and secure your microservices and APIs.",
     docsUrl: 'https://docs.akto.io/traffic-connections',
     key: "Kong Mesh",
-    component: <FutureConnection/>
+    component: <AddOnComponenet/>
 }
 
 const layer7Obj = {
@@ -98,7 +126,7 @@ const layer7Obj = {
     text: "Layer7 is recommended if you are using CA Technologies' Layer7 API Management for securing and managing your APIs.",
     docsUrl: 'https://docs.akto.io/traffic-connections',
     key: "Layer 7",
-    component: <FutureConnection/>
+    component: <AddOnComponenet/>
 }
 
 const nodejsObj = {
@@ -107,7 +135,7 @@ const nodejsObj = {
     text: "This setup is ideal for environments where NodeJS-based services are deployed, ensuring seamless integration and real-time traffic monitoring.",
     docsUrl: 'https://docs.akto.io/traffic-connections',
     key: "NodeJS",
-    component: <FutureConnection/>
+    component: <AddOnComponenet/>
 }
 
 const openshiftObj = {
@@ -116,7 +144,7 @@ const openshiftObj = {
     text: "OpenShift should be used as a traffic connector if you are deploying and managing containerized applications using OpenShift.",
     docsUrl: 'https://docs.akto.io/traffic-connections',
     key: "OpenShift",
-    component: <FutureConnection/>
+    component: <AddOnComponenet/>
 }
 
 const threescaleObj = {
@@ -125,7 +153,7 @@ const threescaleObj = {
     text: "This setup is recommended if your APIs are managed by 3scale.",
     docsUrl: 'https://docs.akto.io/traffic-connections',
     key: "3Scale",
-    component: <FutureConnection/>
+    component: <AddOnComponenet/>
 }
 
 const beanStalkObj = {
@@ -304,13 +332,13 @@ const istioObj = {
     component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/envoy-1" bannerTitle="Setup using Istio" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/envoy-1#adding-akto-traffic-collector"/>,
 }
 
-const aktoSdkObj = {
-    icon: '/public/favicon.svg',
-    label: 'Akto SDK',
-    text: 'Use our SDKs to create a data pipeline.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/akto-sdk',
-    component: <BannerComponent title="Setup SDK" docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/akto-sdk" content="Use our SDKs to create a data pipeline." />,
-    key: "AKTO_SDK"
+const pythonObj = {
+    icon: '/public/python.svg',
+    label: 'Python',
+    text: 'Use where Python-based services are deployed.',
+    docsUrl: 'https://docs.akto.io/traffic-connections/',
+    component: <FutureConnection/>,
+    key: "Python"
 }
 
 const awsApiGatewayObj = {
@@ -851,18 +879,81 @@ const yaml_kubernetes = [
     `            value: "<AKTO_MONGO_CONN>"`,
 ]
 
+
+
 const quickStartFunc = {
+
+    getConnectorsListCategorized: function () {
+        // Virtual Machines
+        const vm = [
+            dockerObj, tcpObj
+        ];
+        
+        // Source code
+        const sourceCode = [
+            apiInventoryFromSourceCodeObj, githubObj, gitlabObj, bitbucketObj
+        ];
+
+        // Hybrid Saas
+        const hybridSaas = [
+            hybridSaasObj
+        ];
+
+        // Kubernetes
+        const kubernetes = [
+            kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj
+        ];
+
+        // API Gateways
+        const apiGateways = [
+            ApigeeObj, AzureObj, CloudflareObj, F5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, HAproxyObj, envoyObj, istioObj, kongObj
+        ];
+
+        // Mirroring
+        const mirroring = [
+            mirroringObj, gcpObj
+        ];
+
+        // AWS Services
+        const awsServices = [
+            awsApiGatewayObj, eksObj, fargateObj, beanStalkObj
+        ];
+
+        // Manual
+        const manual = [
+            burpObj, postmanObj, harFileUploadObj, openApiObj
+        ];
+
+        // Akto SDK
+        const aktoSdk = [
+            GoObj, JavaObj, nodejsObj, pythonObj
+        ];
+
+        return {
+            "Hybrid SaaS": hybridSaas,
+            "Kubernetes": kubernetes,
+            "API Gateways": apiGateways,
+            "Mirroring": mirroring,
+            "AWS Services": awsServices,
+            "Manual": manual,
+            "Akto SDK": aktoSdk,
+            "Virtual Machines": vm,
+            "Source Code": sourceCode,
+        }
+    },
+
     getConnectorsList: function () {
 
         // if(func.checkLocal()){
         //     return [burpObj, postmanObj, openApiObj, harFileUploadObj]
         // }
 
+        // Combine all categories into connectorsList
         const connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
             openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
-            ebpfObj, ebpfMTLSObj, istioObj, aktoSdkObj, awsApiGatewayObj,
+            ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj,
             ApigeeObj, AzureObj, CloudflareObj, F5Obj, GoObj, HAproxyObj, JavaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj
         ]
         return connectorsList
