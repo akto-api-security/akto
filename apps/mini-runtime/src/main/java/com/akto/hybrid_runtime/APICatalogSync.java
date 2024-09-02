@@ -6,9 +6,11 @@ import java.util.regex.Pattern;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.*;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -56,6 +58,7 @@ public class APICatalogSync {
     public int lastStiFetchTs = 0;
 
     private DataActor dataActor = DataActorFactory.fetchInstance();
+    public static Set<MergedUrls> mergedUrls;
 
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
@@ -69,6 +72,7 @@ public class APICatalogSync {
         this.delta = new HashMap<>();
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
         this.aktoPolicyNew = new AktoPolicyNew();
+        this.mergedUrls = new HashSet<>();
         if (buildFromDb) {
             buildFromDB(false, fetchAllSTI);
             AccountSettings accountSettings = dataActor.fetchAccountSettings();
@@ -553,7 +557,21 @@ public class APICatalogSync {
         }
 
         if (allNull) return null;
-        return new URLTemplate(tokens, newTypes, newUrl.getMethod());
+
+        URLTemplate urlTemplate = new URLTemplate(tokens, newTypes, newUrl.getMethod());
+
+        try {
+            for(MergedUrls mergedUrl : mergedUrls) {
+                if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
+                        mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
+                    return null;
+                }
+            }
+        } catch(Exception e) {
+            loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
+        }
+
+        return urlTemplate;
     }
 
 
@@ -609,7 +627,20 @@ public class APICatalogSync {
         if (allNull) return null;
 
         if (templatizedStrTokens <= 1) {
-            return new URLTemplate(newTokens, newTypes, newUrl.getMethod());
+            URLTemplate urlTemplate = new URLTemplate(newTokens, newTypes, newUrl.getMethod());
+
+            try {
+                for(MergedUrls mergedUrl : mergedUrls) {
+                    if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
+                            mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
+                        return null;
+                    }
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
+            }
+
+            return urlTemplate;
         }
 
         return null;
@@ -1085,6 +1116,9 @@ public class APICatalogSync {
         } catch (Exception e) {
             loggerMaker.infoAndAddToDb("Error while clearing values in db: " + e.getMessage(), LogDb.RUNTIME);
         }
+
+        mergedUrls = MergedUrlsDao.instance.getMergedUrls();
+
         aktoPolicyNew.buildFromDb(fetchAllSTI);
     }
 
