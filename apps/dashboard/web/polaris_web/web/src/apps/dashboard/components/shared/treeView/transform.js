@@ -1,3 +1,4 @@
+import { Badge, HorizontalStack, Text } from "@shopify/polaris";
 import transform from "../../../pages/observe/transform";
 import PrettifyChildren from "./PrettifyChildren";
 
@@ -199,7 +200,11 @@ const treeViewFunc = {
             return{
                 ...c,
                 id: c.apiCollectionIds || c.id,
-                displayNameComp: c?.isTerminal ? c.displayName: c.level,
+                displayNameComp: c?.isTerminal ? c.displayName: (
+                        <HorizontalStack gap={"1"} align="space-between" wrap={false}>
+                            <Text variant="headingSm">{c.level}</Text>
+                            <Badge size="small" status="new">{c?.apiCollectionIds?.length}</Badge>
+                        </HorizontalStack>),
                 ...transform.convertToPrettifyData(c),
                 makeTree: (data) => <PrettifyChildren data={data?.children} headers={headers} />
             }

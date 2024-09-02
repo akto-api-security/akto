@@ -84,7 +84,7 @@ function PrettifyChildren({ data, headers }) {
             
             let tempRow = [<div style={{width: '5px'}} key={c.level}/>];
             headers.forEach((x) => {
-                const width = x?.boxWidth || "180px"
+                const width = x?.boxWidth || "200px"
                 tempRow.push(
                     <div 
                         key={`${c.level}-${x.value}`} 

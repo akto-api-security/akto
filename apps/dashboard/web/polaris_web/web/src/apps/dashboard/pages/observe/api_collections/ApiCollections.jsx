@@ -402,7 +402,13 @@ function ApiCollections() {
 
 
 
-    const promotedBulkActions = (selectedResources) => {
+    const promotedBulkActions = (selectedResourcesArr) => {
+        let selectedResources;
+        if(treeView){
+            selectedResources = selectedResourcesArr.flat();
+        }else{
+            selectedResources = selectedResourcesArr
+        }
         let actions = [
             {
                 content: `Remove collection${func.addPlurality(selectedResources.length)}`,
