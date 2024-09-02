@@ -56,6 +56,7 @@ public class TrafficCollectorMetricsDao extends AccountsContextDao<TrafficCollec
     public void updateCount(TrafficCollectorMetrics trafficCollectorMetrics) {
         List<Bson> updates = new ArrayList<>();
         Map<String, Integer> requestsCountMapPerMinute = trafficCollectorMetrics.getRequestsCountMapPerMinute();
+        if (requestsCountMapPerMinute == null || requestsCountMapPerMinute.isEmpty()) return;
         for (String key: requestsCountMapPerMinute.keySet()) {
             updates.add(Updates.inc(TrafficCollectorMetrics.REQUESTS_COUNT_MAP_PER_MINUTE + "." + key, requestsCountMapPerMinute.getOrDefault(key, 0)));
         }
