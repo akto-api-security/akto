@@ -21,7 +21,7 @@ const mirroringObj = {
     component: <AwsSource />
 }
 
-const ApigeeObj = {
+const apigeeObj = {
     icon: '/public/apigee.svg',
     label: "Apigee",
     text: "Apigee setup is recommended if you are using Google's Apigee API Management platform to design, secure, and scale your APIs.",
@@ -57,7 +57,7 @@ const bitbucketObj = {
     component: <AddOnComponenet/>
 }
 
-const AzureObj = {
+const azureObj = {
     icon: '/public/azure.svg',
     label: "Azure API Gateway",
     text: "Azure API Gateway setup is recommended if you are using Azure's API Management service to manage, secure, and analyze your APIs.",
@@ -66,7 +66,7 @@ const AzureObj = {
     component: <AddOnComponenet/>
 }
 
-const CloudflareObj = {
+const cloudflareObj = {
     icon: '/public/cloudflare.svg',
     label: "Cloudflare",
     text: "You should use Cloudflare as a traffic connector if you are leveraging Cloudflare's CDN and security features to manage and optimize your API traffic.",
@@ -75,7 +75,7 @@ const CloudflareObj = {
     component: <AddOnComponenet/>
 }
 
-const F5Obj = {
+const f5Obj = {
     icon: '/public/f5.svg',
     label: "F5",
     text: "F5 setup is recommended if you are using F5's BIG-IP as an API gateway or load balancer to manage and control your API traffic.",
@@ -84,7 +84,7 @@ const F5Obj = {
     component: <AddOnComponenet/>
 }
 
-const GoObj = {
+const goObj = {
     icon: '/public/go.svg',
     label: "Go",
     text: "Use where Go-based services are deployed.",
@@ -93,7 +93,7 @@ const GoObj = {
     component: <AddOnComponenet/>
 }
 
-const HAproxyObj = {
+const haproxyObj = {
     icon: '/public/haproxy.svg',
     label: "HA Proxy",
     text: "HA Proxy should be used as a traffic connector if you are leveraging HA Proxy for load balancing, high availability, and proxying HTTP and TCP-based applications.",
@@ -102,7 +102,7 @@ const HAproxyObj = {
     component: <AddOnComponenet/>
 }
 
-const JavaObj = {
+const javaObj = {
     icon: '/public/java.svg',
     label: "Java",
     text: "You can use Akto's Java agent to capture API traffic directly from your Java applications.",
@@ -906,7 +906,7 @@ const quickStartFunc = {
 
         // API Gateways
         const apiGateways = [
-            ApigeeObj, AzureObj, CloudflareObj, F5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, HAproxyObj, envoyObj, istioObj, kongObj
+            apigeeObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj
         ];
 
         // Mirroring
@@ -926,7 +926,7 @@ const quickStartFunc = {
 
         // Akto SDK
         const aktoSdk = [
-            GoObj, JavaObj, nodejsObj, pythonObj
+            goObj, javaObj, nodejsObj, pythonObj
         ];
 
         return {
@@ -944,9 +944,9 @@ const quickStartFunc = {
 
     getConnectorsList: function () {
 
-        // if(func.checkLocal()){
-        //     return [burpObj, postmanObj, openApiObj, harFileUploadObj]
-        // }
+        if(func.checkLocal()){
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj]
+        }
 
         // Combine all categories into connectorsList
         const connectorsList = [
@@ -954,7 +954,7 @@ const quickStartFunc = {
             openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj,
-            ApigeeObj, AzureObj, CloudflareObj, F5Obj, GoObj, HAproxyObj, JavaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj
+            apigeeObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj
         ]
         return connectorsList
     },
