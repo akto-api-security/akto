@@ -146,7 +146,7 @@ function Dashboard() {
                         })}
                     </VerticalStack>
             </div> : null}
-            {!(location.pathname.includes("test-editor") || location.pathname.includes("settings")) ?<div className="call-banner">
+            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings")) ?<div className="call-banner">
                 <Banner hideIcon={true}> 
                     <Text variant="headingMd">Need a 1:1 experience?</Text>
                     <Button plain monochrome onClick={() => {
