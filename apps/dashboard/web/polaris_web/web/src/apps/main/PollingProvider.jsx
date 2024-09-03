@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import testingApi from "../dashboard/pages/testing/api"
+import homeRequests from '../dashboard/pages/home/api';
+import PersistStore from './PersistStore';
 const PollingContext = createContext();
 
 export const usePolling = () => useContext(PollingContext);
@@ -12,6 +14,7 @@ export const PollingProvider = ({ children }) => {
         testRunsArr: [],
     });
     const intervalIdRef = useRef(null);
+    const intervalAlertRef = useRef(null);
     const [currentTestingRuns, setCurrentTestingRuns] = useState([])
 
     useEffect(() => {
@@ -41,16 +44,29 @@ export const PollingProvider = ({ children }) => {
             }, 2000);
             intervalIdRef.current = id; 
         };
+        const fetchAlerts = () => {
+            const id2 = setInterval(() => {
+                homeRequests.getTrafficAlerts().then((resp) => {
+                    PersistStore.getState().setTrafficAlerts(resp)
+                });
+            }, (5000 * 60));
+            intervalAlertRef.current = id2
+        };
         if (window.location.pathname.startsWith('/dashboard')) {
             fetchTestingStatus();
+            if (window.USER_NAME.length > 0 && window.USER_NAME.includes('akto.io')) {
+                fetchAlerts();
+            }
         }
         return () => {
             clearInterval(intervalIdRef.current);
+            clearInterval(intervalAlertRef.current);
         };
     }, []);
 
     const clearPollingInterval = () => {
         clearInterval(intervalIdRef.current);
+        clearInterval(intervalAlertRef.current);
     };
 
     return (
