@@ -204,7 +204,7 @@ function GithubServerTable(props) {
 
   const filters = useMemo(() => {
     return formatFilters(props.filters);
-  }, [props.filters]);
+  }, [props.filters, appliedFilters]);
 
   function formatFilters(filters) {
     return filters 
