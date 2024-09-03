@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.UUID;
 
 import com.akto.dao.SusSampleDataDao;
@@ -27,9 +28,9 @@ import com.mongodb.client.model.InsertOneModel;
 import com.mongodb.client.model.WriteModel;
 
 public class HttpCallFilter {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallFilter.class, LogDb.THREAD_DETECTION);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallFilter.class, LogDb.THREAT_DETECTION);
 
-    private FilterConfig apiFilters;
+    private Map<String, FilterConfig> apiFilters;
     private List<WriteModel<SusSampleData>> susSampleDataList;
     private final int sync_threshold_count;
     private final int sync_threshold_time;
@@ -59,34 +60,39 @@ public class HttpCallFilter {
             lastFilterFetch = now;
         }
 
-        if (apiFilters != null) {
+        if (apiFilters != null && !apiFilters.isEmpty()) {
             for (HttpResponseParams responseParam : responseParams) {
-                try {
-                    String message = responseParam.getOrig();
-                    List<String> sourceIps = ApiAccessTypePolicy.getSourceIps(responseParam);
-                    RawApi rawApi = RawApi.buildFromMessage(message);
-                    int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
-                    responseParam.requestParams.setApiCollectionId(apiCollectionId);
-                    String url = responseParam.getRequestParams().getURL();
-                    Method method = Method.valueOf(responseParam.getRequestParams().getMethod());
-                    ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
-                    Map<String, Object> varMap = apiFilters.resolveVarMap();
-                    VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
-                        {
-                            put(apiInfoKey, Arrays.asList(message));
+                for (Entry<String, FilterConfig> apiFilterEntry : apiFilters.entrySet()) {
+                    try {
+                        FilterConfig apiFilter = apiFilterEntry.getValue();
+                        String filterId = apiFilterEntry.getKey();
+                        String message = responseParam.getOrig();
+                        List<String> sourceIps = ApiAccessTypePolicy.getSourceIps(responseParam);
+                        RawApi rawApi = RawApi.buildFromMessage(message);
+                        int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
+                        responseParam.requestParams.setApiCollectionId(apiCollectionId);
+                        String url = responseParam.getRequestParams().getURL();
+                        Method method = Method.valueOf(responseParam.getRequestParams().getMethod());
+                        ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
+                        Map<String, Object> varMap = apiFilter.resolveVarMap();
+                        VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
+                            {
+                                put(apiInfoKey, Arrays.asList(message));
+                            }
+                        }, apiInfoKey);
+                        String filterExecutionLogId = UUID.randomUUID().toString();
+                        ValidationResult res = TestPlugin.validateFilter(apiFilter.getFilter().getNode(), rawApi,
+                                apiInfoKey, varMap, filterExecutionLogId);
+                        if (res.getIsValid()) {
+                            now = Context.now();
+                            SusSampleData sampleData = new SusSampleData(
+                                    sourceIps, apiCollectionId, url, method,
+                                    message, now, filterId);
+                            susSampleDataList.add(new InsertOneModel<SusSampleData>(sampleData));
                         }
-                    }, apiInfoKey);
-                    String filterExecutionLogId = UUID.randomUUID().toString();
-                    ValidationResult res = TestPlugin.validateFilter(apiFilters.getFilter().getNode(), rawApi,
-                            apiInfoKey, varMap, filterExecutionLogId);
-                    if (res.getIsValid()) {
-                        now = Context.now();
-                        SusSampleData sampleData = new SusSampleData(sourceIps, apiCollectionId, url, method, message,
-                                now);
-                        susSampleDataList.add(new InsertOneModel<SusSampleData>(sampleData));
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
                     }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
                 }
             }
         }

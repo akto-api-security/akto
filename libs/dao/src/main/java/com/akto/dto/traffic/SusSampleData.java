@@ -9,15 +9,15 @@ import com.akto.dto.type.URLMethods.Method;
 public class SusSampleData {
 
     ObjectId id;
-    public final static String SOURCE_IPS = "sourceIPs";
+    public static final String SOURCE_IPS = "sourceIPs";
     List<String> sourceIPs;
-    public final static String API_COLLECTION_ID = "apiCollectionId";
+    public static final String API_COLLECTION_ID = "apiCollectionId";
     int apiCollectionId;
     String url;
     Method method;
     public static final String _SAMPLE = "sample";
     String sample;
-    public final static String _DISCOVERED = "discovered";
+    public static final String _DISCOVERED = "discovered";
     int discovered;
     /*
      * we retrospectively match all sus-samples' url
@@ -26,18 +26,27 @@ public class SusSampleData {
     public final static String MATCHING_URL = "matchingUrl";
     String matchingUrl;
 
+    /*
+     * Corresponding filter which marked it sus.
+     */
+    String filterId;
+
     public SusSampleData() {
     }
 
     public SusSampleData(List<String> sourceIPs, int apiCollectionId, String url, Method method, String sample,
-            int discovered) {
+            int discovered, String filterId) {
         this.sourceIPs = sourceIPs;
         this.apiCollectionId = apiCollectionId;
         this.url = url;
         this.method = method;
         this.sample = sample;
         this.discovered = discovered;
-        this.matchingUrl = "";
+        /*
+         * By default we assume that the attacker was trying to attack home url.
+         */
+        this.matchingUrl = "/";
+        this.filterId = filterId;
     }
 
     public List<String> getSourceIPs() {
@@ -103,4 +112,13 @@ public class SusSampleData {
     public void setId(ObjectId id) {
         this.id = id;
     }
+
+    public String getFilterId() {
+        return filterId;
+    }
+
+    public void setFilterId(String filterId) {
+        this.filterId = filterId;
+    }
+
 }

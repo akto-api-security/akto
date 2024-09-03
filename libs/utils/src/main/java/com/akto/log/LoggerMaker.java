@@ -65,7 +65,7 @@ public class LoggerMaker  {
     private LogDb db;
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAD_DETECTION
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION
     }
 
     private static AccountSettings accountSettings = null;

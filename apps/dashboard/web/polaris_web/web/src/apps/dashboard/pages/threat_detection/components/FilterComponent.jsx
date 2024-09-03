@@ -3,16 +3,24 @@ import { useEffect, useState } from "react";
 import SampleData from "../../../components/shared/SampleData";
 import api from "../api"
 import func from '@/util/func';
+import DropdownSearch from "../../../components/shared/DropdownSearch";
 
 function FilterComponent() {
     const [ogData, setOgData] = useState({ message: "" })
     const [data, setData] = useState({ message: "" })
+    const [allData, setAllData] = useState([])
+    const [id, setId] = useState("")
     const fetchData = async () => {
         await api.fetchFilterYamlTemplate().then((resp) => {
-            let temp = { message: "" }
-            temp["message"] = resp?.template?.content == undefined ? "" : resp?.template?.content;
-            setOgData(temp)
-            setData(temp)
+            const temp = resp?.templates ? resp?.templates : []
+            setAllData(temp)
+            if (temp.length > 0) {
+                const temp2 = temp[0]
+                setId(temp2.id)
+                const temp3 = { message: temp2.content }
+                setData(temp3)
+                setOgData(temp3)
+            }
         });
     }
     useEffect(() => {
@@ -35,6 +43,30 @@ function FilterComponent() {
                         </Button>
                     </HorizontalStack>
                 </Box>
+            </LegacyCard.Section>
+            <LegacyCard.Section>
+                <DropdownSearch
+                    placeholder={"Search filters"}
+                    optionsList={allData.map(x => {
+                        return {
+                            label: x.id,
+                            value: x.id
+                        }
+                    })}
+                    setSelected={(value) => {
+                        let content = allData.filter(x =>
+                            x.id == value
+                        )[0].content;
+                        let temp = { message: content }
+                        setId(value)
+                        setData(temp)
+                        setOgData(temp)
+                    }}
+                    preSelected={[
+                        id
+                    ]}
+                    value={id}
+                />
             </LegacyCard.Section>
             <LegacyCard.Section flush>
                 <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="240px" readOnly={false} getEditorData={setData} />

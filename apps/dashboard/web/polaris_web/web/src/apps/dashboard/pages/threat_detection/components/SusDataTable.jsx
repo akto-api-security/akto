@@ -18,6 +18,16 @@ const headers = [
         title: "Api endpoints",
     },
     {
+        text: "matchingUrl",
+        value: "matchingUrl",
+        title: "Affected url",
+    },
+    {
+        text: "Filter",
+        value: "filterId",
+        title: "Threat filter",
+    },
+    {
         text: "Collection",
         value: 'apiCollectionName',
         title: "Collection",

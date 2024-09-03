@@ -26,7 +26,7 @@ function ThreatDetectionPage() {
             <SampleDataComponent
                 type={"request"}
                 sampleData={sampleData[Math.min(0, sampleData.length - 1)]}
-                minHeight={"35vh"}
+                minHeight={"47vh"}
                 showDiff={false}
                 isNewDiff={false}
             />

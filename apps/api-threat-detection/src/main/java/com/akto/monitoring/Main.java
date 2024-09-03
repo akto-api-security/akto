@@ -32,7 +32,7 @@ import com.mongodb.client.model.Filters;
 
 public class Main {
     private Consumer<String, String> consumer;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.THREAD_DETECTION);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.THREAT_DETECTION);
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
     public static final int sync_threshold_time = 120;
 

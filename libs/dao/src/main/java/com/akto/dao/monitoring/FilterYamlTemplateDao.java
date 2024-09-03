@@ -1,5 +1,9 @@
 package com.akto.dao.monitoring;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.akto.dao.AccountsContextDao;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -9,24 +13,26 @@ public class FilterYamlTemplateDao extends AccountsContextDao<YamlTemplate> {
 
     public static final FilterYamlTemplateDao instance = new FilterYamlTemplateDao();
 
-    public FilterConfig fetchFilterConfig(boolean includeYamlContent) {
-        YamlTemplate yamlTemplate = FilterYamlTemplateDao.instance.findOne(Filters.empty());
-        FilterConfig filterConfig = null;
-        try {
-            if (yamlTemplate != null) {
-                filterConfig = FilterConfigYamlParser.parseTemplate(yamlTemplate.getContent());
-                filterConfig.setAuthor(yamlTemplate.getAuthor());
-                filterConfig.setCreatedAt(yamlTemplate.getCreatedAt());
-                filterConfig.setUpdatedAt(yamlTemplate.getUpdatedAt());
-                if(includeYamlContent){
-                    filterConfig.setContent(yamlTemplate.getContent());
+    public Map<String, FilterConfig> fetchFilterConfig(boolean includeYamlContent) {
+        List<YamlTemplate> yamlTemplates = FilterYamlTemplateDao.instance.findAll(Filters.empty());
+        Map<String, FilterConfig> filterConfigMap = new HashMap<>();
+        for (YamlTemplate yamlTemplate : yamlTemplates) {
+            try {
+                if (yamlTemplate != null) {
+                    FilterConfig filterConfig = FilterConfigYamlParser.parseTemplate(yamlTemplate.getContent());
+                    filterConfig.setAuthor(yamlTemplate.getAuthor());
+                    filterConfig.setCreatedAt(yamlTemplate.getCreatedAt());
+                    filterConfig.setUpdatedAt(yamlTemplate.getUpdatedAt());
+                    if (includeYamlContent) {
+                        filterConfig.setContent(yamlTemplate.getContent());
+                    }
+                    filterConfigMap.put(filterConfig.getId(), filterConfig);
                 }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-        } catch (Exception e) {
-            e.printStackTrace();
         }
-
-        return filterConfig;
+        return filterConfigMap;
     }
 
     @Override

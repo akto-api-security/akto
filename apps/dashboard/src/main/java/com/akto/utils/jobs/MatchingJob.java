@@ -42,15 +42,20 @@ import com.mongodb.client.model.WriteModel;
 public class MatchingJob {
 
     static final int LIMIT = 10_000;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(MatchingJob.class, LogDb.THREAD_DETECTION);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(MatchingJob.class, LogDb.THREAT_DETECTION);
     private static final Logger logger = LoggerFactory.getLogger(MatchingJob.class);
 
     final static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
+    static boolean jobRunning = false;
     public static void MatchingJobRunner() {
 
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                if (jobRunning) {
+                    return;
+                }
+                jobRunning = true;
 
                 int now = Context.now();
                 logger.info("Starting MatchingJobRunner for all accounts at " + now);
@@ -59,8 +64,8 @@ public class MatchingJob {
                     @Override
                     public void accept(Account t) {
                         try {
-                            FilterConfig apiFilters = FilterYamlTemplateDao.instance.fetchFilterConfig(false);
-                            if (apiFilters == null) {
+                            Map<String, FilterConfig> apiFilters = FilterYamlTemplateDao.instance.fetchFilterConfig(false);
+                            if (apiFilters == null || apiFilters.isEmpty()) {
                                 /*
                                  * Skip running job for accounts
                                  * which have not added a threat-filter.
@@ -78,6 +83,7 @@ public class MatchingJob {
                 int diffNow = now2 - now;
                 logger.info(String.format("Completed MatchingJobRunner for all accounts at %d , time taken : %d", now2,
                         diffNow));
+                jobRunning = false;
             }
         }, 0, 30, TimeUnit.MINUTES);
 
@@ -125,19 +131,15 @@ public class MatchingJob {
                 /*
                  * Todo: Use method agnostic matching.
                  */
-                if (!staticUrls.contains(new URLStatic(sample.getUrl(), sample.getMethod()))) {
+                if (staticUrls.contains(new URLStatic(sample.getUrl(), sample.getMethod()))) {
+                    matchingUrl = sample.getUrl();
+                } else {
                     for (URLTemplate template : templateUrls) {
                         if (template.match(sample.getUrl(), sample.getMethod())) {
                             matchingUrl = template.getTemplateString();
                             break;
                         }
                     }
-                } else {
-                    matchingUrl = sample.getUrl();
-                }
-
-                if (matchingUrl.isEmpty()) {
-                    matchingUrl = sample.getUrl();
                 }
 
                 if (!matchingUrl.equals(sample.getMatchingUrl())) {

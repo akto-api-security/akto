@@ -3,6 +3,8 @@ package com.akto.action.threat_detection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import org.bson.conversions.Bson;
 
@@ -14,29 +16,33 @@ import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
 public class FilterYamlTemplateAction extends UserAction {
 
-    BasicDBObject template;
+    BasicDBList templates;
     String content;
 
     public String fetchFilterYamlTemplate() {
-        FilterConfig config = FilterYamlTemplateDao.instance.fetchFilterConfig(true);
-        if (config != null) {
-
-            template = new BasicDBObject();
-            template.append(FilterConfig._CONTENT, config.getContent());
-            template.append(FilterConfig._AUTHOR, config.getAuthor());
-            template.append(FilterConfig.CREATED_AT, config.getCreatedAt());
-            template.append(FilterConfig.UPDATED_AT, config.getUpdatedAt());
+        Map<String, FilterConfig> configs = FilterYamlTemplateDao.instance.fetchFilterConfig(true);
+        if (configs != null && !configs.isEmpty()) {
+            templates = new BasicDBList();
+            for (Entry<String, FilterConfig> apiFilterEntry : configs.entrySet()) {
+                FilterConfig config = apiFilterEntry.getValue();
+                BasicDBObject template = new BasicDBObject();
+                template.append(FilterConfig.ID, config.getId());
+                template.append(FilterConfig._CONTENT, config.getContent());
+                template.append(FilterConfig._AUTHOR, config.getAuthor());
+                template.append(FilterConfig.CREATED_AT, config.getCreatedAt());
+                template.append(FilterConfig.UPDATED_AT, config.getUpdatedAt());
+                templates.add(template);
+            }
         }
         return SUCCESS.toUpperCase();
     }
-
-    private final static String THREAT_FILTER = "THREAT_FILTER";
 
     public String saveFilterYamlTemplate() {
 
@@ -45,14 +51,6 @@ public class FilterYamlTemplateAction extends UserAction {
             filterConfig = FilterConfigYamlParser.parseTemplate(content);
             if (filterConfig.getId() == null) {
                 addActionError("id field cannot be empty");
-                return ERROR.toUpperCase();
-            }
-            
-            /*
-             * Allowing only one filter for now, thus this check.
-             */
-            if(THREAT_FILTER.equals(filterConfig.getId())){
-                addActionError("Please enter the id field as THREAT_FILTER");
                 return ERROR.toUpperCase();
             }
 
@@ -85,12 +83,12 @@ public class FilterYamlTemplateAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public BasicDBObject getTemplate() {
-        return template;
+    public BasicDBList getTemplates() {
+        return templates;
     }
 
-    public void setTemplate(BasicDBObject template) {
-        this.template = template;
+    public void setTemplates(BasicDBList templates) {
+        this.templates = templates;
     }
 
     public String getContent() {
