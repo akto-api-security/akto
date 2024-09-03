@@ -2,16 +2,29 @@ package com.akto.dto.traffic;
 
 import java.util.List;
 
+import org.bson.types.ObjectId;
+
 import com.akto.dto.type.URLMethods.Method;
 
 public class SusSampleData {
 
+    ObjectId id;
+    public final static String SOURCE_IPS = "sourceIPs";
     List<String> sourceIPs;
+    public final static String API_COLLECTION_ID = "apiCollectionId";
     int apiCollectionId;
     String url;
     Method method;
+    public static final String _SAMPLE = "sample";
     String sample;
+    public final static String _DISCOVERED = "discovered";
     int discovered;
+    /*
+     * we retrospectively match all sus-samples' url
+     * with the urls present in the db to match them.
+     */
+    public final static String MATCHING_URL = "matchingUrl";
+    String matchingUrl;
 
     public SusSampleData() {
     }
@@ -24,6 +37,7 @@ public class SusSampleData {
         this.method = method;
         this.sample = sample;
         this.discovered = discovered;
+        this.matchingUrl = "";
     }
 
     public List<String> getSourceIPs() {
@@ -74,4 +88,19 @@ public class SusSampleData {
         this.discovered = discovered;
     }
 
+    public String getMatchingUrl() {
+        return matchingUrl;
+    }
+
+    public void setMatchingUrl(String matchingUrl) {
+        this.matchingUrl = matchingUrl;
+    }
+
+    public ObjectId getId() {
+        return id;
+    }
+
+    public void setId(ObjectId id) {
+        this.id = id;
+    }
 }

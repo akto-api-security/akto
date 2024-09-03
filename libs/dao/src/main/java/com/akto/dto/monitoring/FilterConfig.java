@@ -8,13 +8,19 @@ import com.akto.dto.test_editor.ConfigParserResult;
 
 public class FilterConfig {
     private String id;
+    public static final String ID = "id";
     private ConfigParserResult filter;
     public static final String FILTER = "filter";
     private Map<String, List<String>> wordLists;
     public static final String WORD_LISTS = "wordLists";
+    public static final String CREATED_AT = "createdAt";
     private int createdAt;
+    public static final String UPDATED_AT = "updatedAt";
     private int updatedAt;
+    public static final String _AUTHOR = "author";
     private String author;
+    public static final String _CONTENT = "content";
+    private String content;
 
     public FilterConfig(String id, ConfigParserResult filter, Map<String, List<String>> wordLists) {
         this.id = id;
@@ -70,7 +76,7 @@ public class FilterConfig {
     }
 
     public Map<String, Object> resolveVarMap() {
-        Map<String, List<String>> wordListsMap = this.wordLists == null ? new HashMap<>(): this.wordLists;
+        Map<String, List<String>> wordListsMap = this.wordLists == null ? new HashMap<>() : this.wordLists;
         Map<String, Object> varMap = new HashMap<>();
 
         for (String key : wordListsMap.keySet()) {
@@ -83,4 +89,11 @@ public class FilterConfig {
         this.wordLists = wordLists;
     }
 
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
 }

@@ -16,6 +16,9 @@ import com.akto.dto.RawApi;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.traffic.SusSampleData;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.rules.TestPlugin;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.test_editor.execution.VariableResolver;
@@ -24,6 +27,7 @@ import com.mongodb.client.model.InsertOneModel;
 import com.mongodb.client.model.WriteModel;
 
 public class HttpCallFilter {
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallFilter.class, LogDb.THREAD_DETECTION);
 
     private FilterConfig apiFilters;
     private List<WriteModel<SusSampleData>> susSampleDataList;
@@ -31,60 +35,68 @@ public class HttpCallFilter {
     private final int sync_threshold_time;
     private int last_synced;
     private int sync_count;
-    private int numberOfSyncs;
+    private HttpCallParser httpCallParser;
+
+    private static final int FILTER_REFRESH_INTERVAL = 10 * 60;
+    private int lastFilterFetch;
 
     public HttpCallFilter(int sync_threshold_count, int sync_threshold_time) {
-        apiFilters = FilterYamlTemplateDao.instance.fetchFilterConfig();
+        apiFilters = FilterYamlTemplateDao.instance.fetchFilterConfig(false);
         susSampleDataList = new ArrayList<>();
         this.sync_threshold_count = sync_threshold_count;
         this.sync_threshold_time = sync_threshold_time;
         last_synced = 0;
         sync_count = 0;
-        numberOfSyncs = 0;
+        lastFilterFetch = 0;
+        httpCallParser = new HttpCallParser(sync_threshold_count, sync_threshold_time);
     }
 
     public void filterFunction(List<HttpResponseParams> responseParams) {
 
-        for (HttpResponseParams responseParam : responseParams) {
-            String message = responseParam.getOrig();
-            List<String> sourceIps = ApiAccessTypePolicy.getSourceIps(responseParam);
-            RawApi rawApi = RawApi.buildFromMessage(message);
-            int apiCollectionId = responseParam.getRequestParams().getApiCollectionId();
-            String url = responseParam.getRequestParams().getURL();
-            Method method = Method.valueOf(responseParam.getRequestParams().getMethod());
-            ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
-            Map<String, Object> varMap = apiFilters.resolveVarMap();
-
-            VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
-                {
-                    put(apiInfoKey, Arrays.asList(message));
-                }
-            }, apiInfoKey);
-            String filterExecutionLogId = UUID.randomUUID().toString();
-
-            ValidationResult res = TestPlugin.validateFilter(apiFilters.getFilter().getNode(), rawApi,
-                    apiInfoKey,
-                    varMap, filterExecutionLogId);
-            if (res.getIsValid()) {
-                int now = Context.now();
-                SusSampleData sampleData = new SusSampleData(sourceIps, apiCollectionId, url, method, message, now);
-                susSampleDataList.add(new InsertOneModel<SusSampleData>(sampleData));
-            }
-
+        int now = Context.now();
+        if ((lastFilterFetch + FILTER_REFRESH_INTERVAL) < now) {
+            apiFilters = FilterYamlTemplateDao.instance.fetchFilterConfig(false);
+            lastFilterFetch = now;
         }
 
-        this.sync_count = susSampleDataList.size();
-        int syncThresh = numberOfSyncs < 10 ? 50 : sync_threshold_count;
-
-        if (this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time) {
-
+        if (apiFilters != null) {
+            for (HttpResponseParams responseParam : responseParams) {
+                try {
+                    String message = responseParam.getOrig();
+                    List<String> sourceIps = ApiAccessTypePolicy.getSourceIps(responseParam);
+                    RawApi rawApi = RawApi.buildFromMessage(message);
+                    int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
+                    responseParam.requestParams.setApiCollectionId(apiCollectionId);
+                    String url = responseParam.getRequestParams().getURL();
+                    Method method = Method.valueOf(responseParam.getRequestParams().getMethod());
+                    ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
+                    Map<String, Object> varMap = apiFilters.resolveVarMap();
+                    VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
+                        {
+                            put(apiInfoKey, Arrays.asList(message));
+                        }
+                    }, apiInfoKey);
+                    String filterExecutionLogId = UUID.randomUUID().toString();
+                    ValidationResult res = TestPlugin.validateFilter(apiFilters.getFilter().getNode(), rawApi,
+                            apiInfoKey, varMap, filterExecutionLogId);
+                    if (res.getIsValid()) {
+                        now = Context.now();
+                        SusSampleData sampleData = new SusSampleData(sourceIps, apiCollectionId, url, method, message,
+                                now);
+                        susSampleDataList.add(new InsertOneModel<SusSampleData>(sampleData));
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
+                }
+            }
+        }
+        sync_count = susSampleDataList.size();
+        if (sync_count > 0 && (sync_count >= sync_threshold_count ||
+                (Context.now() - last_synced) > sync_threshold_time)) {
             SusSampleDataDao.instance.getMCollection().bulkWrite(susSampleDataList);
-
-            this.last_synced = Context.now();
-            this.sync_count = 0;
+            last_synced = Context.now();
+            sync_count = 0;
             susSampleDataList.clear();
         }
-
     }
-
 }

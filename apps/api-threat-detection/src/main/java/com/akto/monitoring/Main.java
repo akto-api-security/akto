@@ -17,6 +17,7 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.akto.DaoInit;
 import com.akto.dao.APIConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.APIConfig;
@@ -26,6 +27,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.filters.HttpCallFilter;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.hybrid_runtime.Main.AccountInfo;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 
 public class Main {
@@ -40,7 +42,9 @@ public class Main {
 
         String kafkaBrokerUrl = "kafka1:19092";
         String groupIdConfig = System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
-        int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
+        int maxPollRecordsConfig = Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "100"));
+        String mongoURI = System.getenv("AKTO_MONGO_CONN");
+        DaoInit.init(new ConnectionString(mongoURI));
 
         Properties properties = com.akto.hybrid_runtime.Main.configProperties(kafkaBrokerUrl, groupIdConfig,
                 maxPollRecordsConfig);

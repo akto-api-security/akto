@@ -9,14 +9,19 @@ public class FilterYamlTemplateDao extends AccountsContextDao<YamlTemplate> {
 
     public static final FilterYamlTemplateDao instance = new FilterYamlTemplateDao();
 
-    public FilterConfig fetchFilterConfig() {
+    public FilterConfig fetchFilterConfig(boolean includeYamlContent) {
         YamlTemplate yamlTemplate = FilterYamlTemplateDao.instance.findOne(Filters.empty());
         FilterConfig filterConfig = null;
         try {
-            filterConfig = FilterConfigYamlParser.parseTemplate(yamlTemplate.getContent());
-            filterConfig.setAuthor(yamlTemplate.getAuthor());
-            filterConfig.setCreatedAt(yamlTemplate.getCreatedAt());
-            filterConfig.setUpdatedAt(yamlTemplate.getUpdatedAt());
+            if (yamlTemplate != null) {
+                filterConfig = FilterConfigYamlParser.parseTemplate(yamlTemplate.getContent());
+                filterConfig.setAuthor(yamlTemplate.getAuthor());
+                filterConfig.setCreatedAt(yamlTemplate.getCreatedAt());
+                filterConfig.setUpdatedAt(yamlTemplate.getUpdatedAt());
+                if(includeYamlContent){
+                    filterConfig.setContent(yamlTemplate.getContent());
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }

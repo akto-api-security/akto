@@ -73,6 +73,7 @@ import com.akto.testing.HostDNSLookup;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.utils.jobs.JobUtils;
+import com.akto.utils.jobs.MatchingJob;
 import com.akto.util.AccountTask;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.EmailAccountName;
@@ -1981,6 +1982,8 @@ public class InitializerListener implements ServletContextListener {
                      */
                     CleanInventory.cleanInventoryJobRunner();
 
+                    MatchingJob.MatchingJobRunner();
+
                     int now2 = Context.now();
                     int diffNow = now2 - now;
                     logger.info(String.format("Completed init functions and scheduling jobs at %d , time taken : %d", now2, diffNow));
@@ -2063,6 +2066,7 @@ public class InitializerListener implements ServletContextListener {
         clear(ActivitiesDao.instance, ActivitiesDao.maxDocuments);
         clear(BillingLogsDao.instance, BillingLogsDao.maxDocuments);
         clear(TestingRunResultDao.instance, TestingRunResultDao.maxDocuments);
+        clear(SusSampleDataDao.instance, SusSampleDataDao.maxDocuments);
     }
 
     public static void clear(AccountsContextDao mCollection, int maxDocuments) {

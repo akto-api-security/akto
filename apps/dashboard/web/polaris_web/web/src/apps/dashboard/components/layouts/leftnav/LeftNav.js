@@ -1,5 +1,5 @@
 import {Navigation, Text} from "@shopify/polaris"
-import {SettingsFilledMinor,AppsFilledMajor, InventoryFilledMajor, MarketingFilledMinor, FileFilledMinor, AnalyticsFilledMinor, ReportFilledMinor} from "@shopify/polaris-icons"
+import {SettingsFilledMinor,AppsFilledMajor, InventoryFilledMajor, MarketingFilledMinor, FileFilledMinor, AnalyticsFilledMinor, ReportFilledMinor, DiamondAlertMinor} from "@shopify/polaris-icons"
 import {useLocation, useNavigate} from "react-router-dom"
 
 import './LeftNav.css'
@@ -153,6 +153,17 @@ export default function LeftNav(){
                   },
                   selected: leftNavSelected === 'dashboard_issues',
                   key: '6',
+              },
+              {
+                label: <Text variant="bodyMd" fontWeight="medium">Threat Detection</Text>,
+                icon: DiamondAlertMinor,
+                onClick: ()=>{ 
+                    handleSelect("dashboard_threat_detection")
+                    navigate("/dashboard/threat-detection")
+                    setActive("normal")
+                  },
+                  selected: leftNavSelected === 'dashboard_threat_detection',
+                  key: '7',
               },
             ]}
           />

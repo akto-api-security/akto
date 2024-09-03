@@ -7,7 +7,6 @@ import java.util.Map;
 import com.akto.dao.test_editor.filter.ConfigParser;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.ConfigParserResult;
-import com.akto.util.Constants;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -27,7 +26,7 @@ public class FilterConfigYamlParser {
 
         FilterConfig filterConfig = null;
 
-        String id = (String) config.get(Constants.ID);
+        String id = (String) config.get(FilterConfig.ID);
         if (id == null) {
             return filterConfig;
         }
