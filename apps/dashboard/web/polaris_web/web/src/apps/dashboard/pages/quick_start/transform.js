@@ -5,7 +5,6 @@ import HybridSaasSource from "./components/HybridSaasSource"
 import AwsSource from "./components/AwsSource"
 import FargateSource from "./components/FargateSource"
 import Kubernetes from "./components/Kubernetes"
-import FutureConnection from "./components/shared/FutureConnection"
 import BannerComponent from "./components/shared/BannerComponent"
 import OpenApiSource from "./components/OpenApiSource"
 import ApiInventoryFromSourceCode from "./components/ApiInventoryFromSourceCode"
@@ -161,7 +160,7 @@ const beanStalkObj = {
     label: "AWS Beanstalk",
     text: "You can deploy Akto in AWS and collect traffic through mirroring on your AWS Beanstalk setup.",
     docsUrl: 'https://docs.akto.io/traffic-connections/aws-beanstalk',
-    component: <FutureConnection />,
+    component: <AddOnComponenet/>,
     key: "Bean Stalk",
 }
 
@@ -237,7 +236,7 @@ const kongObj = {
     text: 'Kong Gateway is an open source API gateway, built for multi-cloud and hybrid, and optimized for microservices and distributed architectures.',
     docsUrl: 'https://docs.akto.io/traffic-connections/kong',
     key: "KONG",
-    component: <FutureConnection/>
+    component: <AddOnComponenet/>
 }
 
 const kubernetesObj = {
@@ -337,7 +336,7 @@ const pythonObj = {
     label: 'Python',
     text: 'Use where Python-based services are deployed.',
     docsUrl: 'https://docs.akto.io/traffic-connections/',
-    component: <FutureConnection/>,
+    component: <AddOnComponenet/>,
     key: "Python"
 }
 
@@ -346,7 +345,7 @@ const awsApiGatewayObj = {
     label: "AWS API Gateway",
     text: "Akto-AWS-API-Gateway setup is recommended if you are using AWS API Gateway.",
     docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/aws-api-gateway',
-    component: <FutureConnection />,
+    component: <AddOnComponenet/>,
     key: "AWS_API_GATEWAY",
 }
 
