@@ -70,6 +70,7 @@ import { TableContextProvider } from "@/apps/dashboard/components/tables/TableCo
 import VulnerabilityReport from "../dashboard/pages/testing/vulnerability_report/VulnerabilityReport";
 
 import { PollingProvider } from "./PollingProvider";
+import Help from "../dashboard/pages/settings/help_and_support/Help";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -177,6 +178,10 @@ const router = createBrowserRouter([
           {
             path: "users",
             element: <Users />
+          },
+          {
+            path: "Help",
+            element: <Help />
           },
           {
             path: "integrations",

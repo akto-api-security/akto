@@ -1,9 +1,9 @@
-import { Outlet, useLocation, useNavigate } from "react-router-dom"
+import { Outlet, useLocation, useNavigate} from "react-router-dom"
 import { history } from "@/util/history";
 import Store from "../store";
 import homeFunctions from "./home/module";
 import { useEffect, useState } from "react";
-import { Frame, Toast, VerticalStack } from "@shopify/polaris";
+import { Frame, Toast, VerticalStack, Banner, Button, Text } from "@shopify/polaris";
 import "./dashboard.css"
 import func from "@/util/func"
 import transform from "./testing/transform";
@@ -145,6 +145,14 @@ function Dashboard() {
                             )
                         })}
                     </VerticalStack>
+            </div> : null}
+            {!(location.pathname.includes("test-editor") || location.pathname.includes("settings")) ?<div className="call-banner">
+                <Banner hideIcon={true}> 
+                    <Text variant="headingMd">Need a 1:1 experience?</Text>
+                    <Button plain monochrome onClick={() => {
+                        window.open("https://akto.io/api-security-demo", "_blank")
+                    }}><Text variant="bodyMd">Book a call</Text></Button>
+                </Banner>
             </div> : null}
         </Frame>
         </div>
