@@ -1,6 +1,5 @@
-import { Button, ButtonGroup, Divider, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
+import { LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
 import { useEffect, useState } from "react";
-import PasswordTextField from "../../../components/layouts/PasswordTextField";
 import api from "../api";
 
 
@@ -14,11 +13,10 @@ function BitBucketSource() {
 
     useEffect(()=> {
         let r = []
-        api.fetchCodeAnalysisRepos((resp) => {
+        api.fetchCodeAnalysisRepos().then((resp) => {
             resp["codeAnalysisRepos"].forEach((x) => {
                 r.push({"repo": x["repoName"], "project": x["projectName"]})
             })
-
             setRepoList(r)
         } )
     },[])
@@ -43,14 +41,16 @@ function BitBucketSource() {
             repo: repo
         }));
 
+        let codeAnalysisRepos = []
+        repoArray.forEach((x) => {
+            codeAnalysisRepos.push({
+                "projectName": projectName,
+                "repoName": x
+            })
+        })
+        api.addCodeAnalysisRepo(codeAnalysisRepos)
+
         setRepoList([...repoList, ...result])
-
-        let codeAnalysisRepo = {
-            "projectName": projectName,
-            "repoName": result[0]["repo"]
-        }
-        api.addCodeAnalysisRepo(codeAnalysisRepo)
-
         setProjectName('')
         setrepoNames('')
     }

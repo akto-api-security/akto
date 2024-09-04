@@ -138,11 +138,11 @@ const api = {
         })
     },
 
-    addCodeAnalysisRepo(codeAnalysisRepo) {
+    addCodeAnalysisRepo(codeAnalysisRepos) {
         return request({
             url: '/api/addCodeAnalysisRepo',
             method: 'post',
-            data: {codeAnalysisRepo}
+            data: {codeAnalysisRepos}
         })
     },
 
