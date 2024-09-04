@@ -9,7 +9,9 @@ import {
   HorizontalStack,
   Key,
   ChoiceList,
-  Tabs} from '@shopify/polaris';
+  Tabs,
+  Text,
+  Link} from '@shopify/polaris';
 import { GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import "./style.css"
@@ -204,7 +206,7 @@ function GithubServerTable(props) {
 
   const filters = useMemo(() => {
     return formatFilters(props.filters);
-  }, [props.filters]);
+  }, [props.filters, appliedFilters]);
 
   function formatFilters(filters) {
     return filters 
@@ -348,7 +350,7 @@ function GithubServerTable(props) {
   let tableClass = props.useNewRow ? "new-table" : (props.selectable ? "removeHeaderColor" : "hideTableHead")
   const bulkActionResources = selectedItems.length > 0 ? selectedItems : selectedResources
   return (
-    <div className={tableClass}>
+    <div className={tableClass} style={{display: "flex", flexDirection: "column", gap: "20px"}}>
       <LegacyCard>
         {props.tabs && <Tabs tabs={props.tabs} selected={props.selected} onSelect={(x) => handleTabChange(x)}></Tabs>}
         {props.tabs && props.tabs[props.selected].component ? props.tabs[props.selected].component :
@@ -430,6 +432,14 @@ function GithubServerTable(props) {
         }
 
       </LegacyCard>
+      <HorizontalStack gap="1" align="center">
+        <Text>Stuck? feel free to</Text>
+        <Link onClick={() => {
+          window?.Intercom("show")
+        }}>Contact us</Link>
+        <Text>or</Text>
+        <Link url="https://akto.io/api-security-demo" target="_blank">Book a call</Link>
+      </HorizontalStack>
     </div>
   );
 

@@ -28,6 +28,22 @@
     border-bottom: 1px solid #E1E3E5;
 }
 
+.call-banner {
+    width: 200px;
+    position: fixed;
+    left: 1.2vw;
+    z-index: 100;
+    bottom: 8vh;
+}
+
+.call-banner .Polaris-Text--headingMd {
+    font-size: 14px !important;
+}
+
+.call-banner .Polaris-Banner--withinPage {
+    background: #EDEEEF !important;
+}
+
 .alerts-banner {
     width: 400px;
     position: fixed;

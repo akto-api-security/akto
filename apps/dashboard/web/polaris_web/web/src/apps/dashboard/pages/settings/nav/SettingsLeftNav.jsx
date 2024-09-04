@@ -1,6 +1,6 @@
 import { Navigation } from "@shopify/polaris"
 import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor} from "@shopify/polaris-icons"
-import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor} from "@shopify/polaris-icons"
+import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor, ChatMajor} from "@shopify/polaris-icons"
 import { VariantMajor, VocabularyMajor } from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
 import func from "@/util/func"
@@ -11,7 +11,7 @@ const SettingsLeftNav = () => {
     const location = useLocation()
     const path = location.pathname
     const page = path.substring(path.lastIndexOf('/') + 1)
-    
+
     const logsArr = window.IS_SAAS === 'true' ? [] : [{
         label: 'Logs',
         icon: ListFilledMajor,
@@ -102,7 +102,13 @@ const SettingsLeftNav = () => {
                         onClick: () => navigate("/dashboard/settings/test-library")
                     },
                     ...billingArr,
-                    ...selfHostedArr
+                    ...selfHostedArr,
+                    {
+                        label: 'Help & Support',
+                        icon: ChatMajor,
+                        selected: page === "help",
+                        onClick: () => navigate("/dashboard/settings/help")
+                    }
                 ]}
             />
         </Navigation>

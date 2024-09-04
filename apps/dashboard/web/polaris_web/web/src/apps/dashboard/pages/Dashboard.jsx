@@ -1,9 +1,9 @@
-import { Outlet, useLocation, useNavigate } from "react-router-dom"
+import { Outlet, useLocation, useNavigate} from "react-router-dom"
 import { history } from "@/util/history";
 import Store from "../store";
 import homeFunctions from "./home/module";
-import { useEffect, useState } from "react";
-import { Frame, Toast, VerticalStack } from "@shopify/polaris";
+import { useEffect, useState, useRef} from "react";
+import { Frame, Toast, VerticalStack, Banner, Button, Text } from "@shopify/polaris";
 import "./dashboard.css"
 import func from "@/util/func"
 import transform from "./testing/transform";
@@ -22,6 +22,8 @@ function Dashboard() {
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
+
+    const navigate = useNavigate();
 
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
@@ -42,6 +44,9 @@ function Dashboard() {
     const trafficAlerts = PersistStore(state => state.trafficAlerts)
     const setTrafficAlerts = PersistStore(state => state.setTrafficAlerts)
     const [displayItems, setDisplayItems] = useState([])
+
+    const timeoutRef = useRef(null);
+    const inactivityTime = 10 * 60 * 1000;
 
     const fetchMetadata = async () => {
         await transform.setTestMetadata();
@@ -125,6 +130,40 @@ function Dashboard() {
         await homeRequests.markAlertAsDismissed(alert);
     }
 
+    const refreshFunc = () => {
+        if(document.visibilityState === 'hidden'){
+            PersistStore.getState().resetAll();
+            LocalStore.getState().resetStore();
+            navigate("/dashboard/observe/inventory")
+            window.location.reload();
+        }
+    }
+
+    const initializeTimer = () => {
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current); // Clear existing timeout to prevent duplicates
+          }
+          timeoutRef.current = setTimeout(refreshFunc, inactivityTime);
+    }
+
+    const handleVisibilityChange = () => {
+        if (document.visibilityState === 'hidden') {
+          initializeTimer(); 
+        } else {
+          clearTimeout(timeoutRef.current);
+        }
+    };
+
+    useEffect(() => {
+        initializeTimer();
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            clearTimeout(timeoutRef.current);
+        };
+
+    },[])
+
     return (
         <div className="dashboard">
         <Frame>
@@ -145,6 +184,14 @@ function Dashboard() {
                             )
                         })}
                     </VerticalStack>
+            </div> : null}
+            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings")) ?<div className="call-banner">
+                <Banner hideIcon={true}> 
+                    <Text variant="headingMd">Need a 1:1 experience?</Text>
+                    <Button plain monochrome onClick={() => {
+                        window.open("https://akto.io/api-security-demo", "_blank")
+                    }}><Text variant="bodyMd">Book a call</Text></Button>
+                </Banner>
             </div> : null}
         </Frame>
         </div>

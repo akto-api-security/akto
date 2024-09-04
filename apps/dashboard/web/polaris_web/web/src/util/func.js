@@ -321,7 +321,7 @@ prettifyEpoch(epoch) {
   },
   epochToDateTime(timestamp) {
     var date = new Date(timestamp * 1000);
-    return date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+    return date.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
   },
 
   getListOfHosts(apiCollections) {
