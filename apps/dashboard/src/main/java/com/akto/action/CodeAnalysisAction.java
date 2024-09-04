@@ -316,25 +316,31 @@ public class CodeAnalysisAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    CodeAnalysisRepo codeAnalysisRepo;
     public String addCodeAnalysisRepo() {
-        if (codeAnalysisRepo == null) {
-            addActionError("Can't delete null repo");
+        if (codeAnalysisRepos == null || codeAnalysisRepos.isEmpty()) {
+            addActionError("Can't add empty repo");
             return ERROR.toUpperCase();
         }
-        CodeAnalysisRepoDao.instance.updateOne(
+        List<WriteModel<CodeAnalysisRepo>> updates = new ArrayList<>();
+        for (CodeAnalysisRepo c: codeAnalysisRepos) {
+            updates.add(new UpdateOneModel<>(
                 Filters.and(
-                        Filters.eq(CodeAnalysisRepo.REPO_NAME, codeAnalysisRepo.getRepoName()),
-                        Filters.eq(CodeAnalysisRepo.PROJECT_NAME, codeAnalysisRepo.getProjectName())
+                        Filters.eq(CodeAnalysisRepo.REPO_NAME, c.getRepoName()),
+                        Filters.eq(CodeAnalysisRepo.PROJECT_NAME, c.getProjectName())
                 ),
                 Updates.combine(
                         Updates.setOnInsert(CodeAnalysisRepo.LAST_RUN, 0),
                         Updates.setOnInsert(CodeAnalysisRepo.SCHEDULE_TIME, Context.now())
-                )
-        );
+                ),
+                new UpdateOptions().upsert(true)
+            ));
+        }
+
+        CodeAnalysisRepoDao.instance.getMCollection().bulkWrite(updates);
         return SUCCESS.toUpperCase();
     }
 
+    CodeAnalysisRepo codeAnalysisRepo;
     public String deleteCodeAnalysisRepo() {
         if (codeAnalysisRepo == null) {
             addActionError("Can't delete null repo");
@@ -351,7 +357,7 @@ public class CodeAnalysisAction extends UserAction {
 
     List<CodeAnalysisRepo> codeAnalysisRepos;
     public String fetchCodeAnalysisRepos() {
-        CodeAnalysisRepoDao.instance.findAll(new BasicDBObject());
+        codeAnalysisRepos = CodeAnalysisRepoDao.instance.findAll(new BasicDBObject());
         return SUCCESS.toUpperCase();
     }
 
@@ -386,5 +392,9 @@ public class CodeAnalysisAction extends UserAction {
 
     public List<CodeAnalysisRepo> getCodeAnalysisRepos() {
         return codeAnalysisRepos;
+    }
+
+    public void setCodeAnalysisRepos(List<CodeAnalysisRepo> codeAnalysisRepos) {
+        this.codeAnalysisRepos = codeAnalysisRepos;
     }
 }
