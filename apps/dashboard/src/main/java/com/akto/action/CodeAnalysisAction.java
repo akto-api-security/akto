@@ -340,6 +340,27 @@ public class CodeAnalysisAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String runCodeAnalysisRepo() {
+        if (codeAnalysisRepos == null || codeAnalysisRepos.isEmpty()) {
+            addActionError("Can't run empty repo");
+            return ERROR.toUpperCase();
+        }
+        List<WriteModel<CodeAnalysisRepo>> updates = new ArrayList<>();
+        for (CodeAnalysisRepo c: codeAnalysisRepos) {
+            updates.add(new UpdateOneModel<>(
+                    Filters.and(
+                            Filters.eq(CodeAnalysisRepo.REPO_NAME, c.getRepoName()),
+                            Filters.eq(CodeAnalysisRepo.PROJECT_NAME, c.getProjectName())
+                    ),
+                    Updates.set(CodeAnalysisRepo.SCHEDULE_TIME, Context.now()),
+                    new UpdateOptions().upsert(false)
+            ));
+        }
+
+        CodeAnalysisRepoDao.instance.getMCollection().bulkWrite(updates);
+        return SUCCESS.toUpperCase();
+    }
+
     CodeAnalysisRepo codeAnalysisRepo;
     public String deleteCodeAnalysisRepo() {
         if (codeAnalysisRepo == null) {

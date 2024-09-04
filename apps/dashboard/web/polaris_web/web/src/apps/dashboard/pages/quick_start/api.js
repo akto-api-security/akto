@@ -146,6 +146,14 @@ const api = {
         })
     },
 
+    runCodeAnalysisRepo(codeAnalysisRepos) {
+        return request({
+            url: '/api/runCodeAnalysisRepo',
+            method: 'post',
+            data: {codeAnalysisRepos}
+        })
+    },
+
     deleteCodeAnalysisRepo(codeAnalysisRepo) {
         return request({
             url: '/api/deleteCodeAnalysisRepo',

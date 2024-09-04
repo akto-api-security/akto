@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import com.akto.dao.*;
 import com.akto.dto.*;
 import com.opensymphony.xwork2.ActionSupport;
+import org.bson.Document;
 import org.bson.types.Code;
 import org.bson.types.ObjectId;
 import org.checkerframework.checker.units.qual.s;
@@ -289,7 +290,7 @@ public class CodeAnalysisAction extends ActionSupport {
     public String findReposToRun() {
         reposToRun = CodeAnalysisRepoDao.instance.findAll(
                 Filters.expr(
-                    Filters.gt("$"+CodeAnalysisRepo.SCHEDULE_TIME, "$" + CodeAnalysisRepo.LAST_RUN)
+                        Document.parse("{ $gt: [ \"$" + CodeAnalysisRepo.SCHEDULE_TIME + "\", \"$" + CodeAnalysisRepo.LAST_RUN + "\" ] }")
                 )
         );
         return SUCCESS.toUpperCase();

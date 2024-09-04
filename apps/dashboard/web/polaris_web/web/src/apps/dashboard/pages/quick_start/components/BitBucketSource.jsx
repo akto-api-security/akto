@@ -1,6 +1,7 @@
-import { LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
+import { HorizontalStack, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import api from "../api";
+import func from "../../../../../util/func";
 
 
 
@@ -15,7 +16,7 @@ function BitBucketSource() {
         let r = []
         api.fetchCodeAnalysisRepos().then((resp) => {
             resp["codeAnalysisRepos"].forEach((x) => {
-                r.push({"repo": x["repoName"], "project": x["projectName"]})
+                r.push({"repo": x["repoName"], "project": x["projectName"], "lastRun": x["lastRun"], "scheduleTime": x["scheduleTime"]})
             })
             setRepoList(r)
         } )
@@ -32,6 +33,17 @@ function BitBucketSource() {
         const updatedRepoList = repoList.filter((_, i) => i !== index);
         setRepoList(updatedRepoList);
     };
+
+    const runRepo = (repo) => {
+        repo["scheduleTime"] = func.timeNow()
+        setRepoList([...repoList])
+        api.runCodeAnalysisRepo([{
+            "projectName": repo["project"],
+            "repoName": repo["repo"]
+        }])
+    }
+
+    console.log(repoList)
 
     const primaryAction = () => {
         const repoArray = repoNames.split(',').map(repo => repo.trim()).filter(Boolean);
@@ -93,8 +105,20 @@ function BitBucketSource() {
 
             <VerticalStack gap="1">
                 {repoList.map((repo, index) => (
-                    <LegacyCard key={index} title={repo.repo} actions={[{ content: "delete", onAction: () => { handleDelete(index) } }]} sectioned={true}>
-                        <Text variant="bodyMd">{repo.project}</Text>
+                    <LegacyCard 
+                        key={index} 
+                        title={repo.repo} 
+                        actions={[
+                            { content: "Delete", onAction: () => { handleDelete(index) }, destructive: true },
+                            { content: "Run", onAction: () => { runRepo(repo) } },
+                        ]} sectioned={true}
+                    >
+                        <HorizontalStack align="space-between">
+                            <Text variant="bodyMd">{repo.project}</Text>
+                            <Text variant="bodyMd">
+                                {repo.lastRun >= repo.scheduleTime ? func.prettifyEpoch(repo.lastRun) : "scheduled"}
+                            </Text>
+                        </HorizontalStack>
                     </LegacyCard>
                 ))}
             </VerticalStack>
