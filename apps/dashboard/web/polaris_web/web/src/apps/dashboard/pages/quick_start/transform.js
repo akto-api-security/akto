@@ -10,6 +10,8 @@ import BannerComponent from "./components/shared/BannerComponent"
 import OpenApiSource from "./components/OpenApiSource"
 import ApiInventoryFromSourceCode from "./components/ApiInventoryFromSourceCode"
 import func from "@/util/func"
+import AddOnComponenet from "./components/shared/AddOnComponenet"
+import BitBucketSource from "./components/BitBucketSource"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -18,6 +20,141 @@ const mirroringObj = {
     docsUrl: 'https://docs.akto.io/traffic-connections/amazon-aws',
     key: "AWS",
     component: <AwsSource />
+}
+
+const apigeeObj = {
+    icon: '/public/apigee.svg',
+    label: "Apigee",
+    text: "Apigee setup is recommended if you are using Google's Apigee API Management platform to design, secure, and scale your APIs.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Apigee",
+    component: <AddOnComponenet/>
+}
+
+const githubObj = {
+    icon: '/public/github.svg',
+    label: "GitHub",
+    text: "We recommend setting up GitHub if you want to connect and retrieve APIs directly from your source code hosted on GitHub.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "GitHub",
+    component: <AddOnComponenet/>
+}
+
+const gitlabObj = {
+    icon: '/public/gitlab.svg',
+    label: "GitLab",
+    text: "We recommend setting up GitLab if you want to connect and retrieve APIs directly from your source code hosted on GitLab.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "GitLab",
+    component: <AddOnComponenet/>
+}
+
+const bitbucketObj = {
+    icon: '/public/bitbucket.svg',
+    label: "Bitbucket",
+    text: "We recommend setting up Bitbucket if you want to connect and retrieve APIs directly from your source code hosted on Bitbucket.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Bitbucket",
+    component: <BitBucketSource/>
+}
+
+const azureObj = {
+    icon: '/public/azure.svg',
+    label: "Azure API Gateway",
+    text: "Azure API Gateway setup is recommended if you are using Azure's API Management service to manage, secure, and analyze your APIs.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Azure",
+    component: <AddOnComponenet/>
+}
+
+const cloudflareObj = {
+    icon: '/public/cloudflare.svg',
+    label: "Cloudflare",
+    text: "You should use Cloudflare as a traffic connector if you are leveraging Cloudflare's CDN and security features to manage and optimize your API traffic.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Cloudflare",
+    component: <AddOnComponenet/>
+}
+
+const f5Obj = {
+    icon: '/public/f5.svg',
+    label: "F5",
+    text: "F5 setup is recommended if you are using F5's BIG-IP as an API gateway or load balancer to manage and control your API traffic.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "F5",
+    component: <AddOnComponenet/>
+}
+
+const goObj = {
+    icon: '/public/go.svg',
+    label: "Go",
+    text: "Use where Go-based services are deployed.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Go",
+    component: <AddOnComponenet/>
+}
+
+const haproxyObj = {
+    icon: '/public/haproxy.svg',
+    label: "HA Proxy",
+    text: "HA Proxy should be used as a traffic connector if you are leveraging HA Proxy for load balancing, high availability, and proxying HTTP and TCP-based applications.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "HAproxy",
+    component: <AddOnComponenet/>
+}
+
+const javaObj = {
+    icon: '/public/java.svg',
+    label: "Java",
+    text: "You can use Akto's Java agent to capture API traffic directly from your Java applications.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Java",
+    component: <AddOnComponenet/>
+}
+
+const kongmeshObj = {
+    icon: '/public/kongmesh.svg',
+    label: "Kong Mesh",
+    text: "Use this set-up if you are utilizing Kong's service mesh capabilities to manage and secure your microservices and APIs.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Kong Mesh",
+    component: <AddOnComponenet/>
+}
+
+const layer7Obj = {
+    icon: '/public/layer7.svg',
+    label: "Layer 7",
+    text: "Layer7 is recommended if you are using CA Technologies' Layer7 API Management for securing and managing your APIs.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Layer 7",
+    component: <AddOnComponenet/>
+}
+
+const nodejsObj = {
+    icon: '/public/nodejs.svg',
+    label: "NodeJS",
+    text: "This setup is ideal for environments where NodeJS-based services are deployed, ensuring seamless integration and real-time traffic monitoring.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "NodeJS",
+    component: <AddOnComponenet/>
+}
+
+const openshiftObj = {
+    icon: '/public/openshift.svg',
+    label: "OpenShift",
+    text: "OpenShift should be used as a traffic connector if you are deploying and managing containerized applications using OpenShift.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "OpenShift",
+    component: <AddOnComponenet/>
+}
+
+const threescaleObj = {
+    icon: '/public/threescale.svg',
+    label: "3Scale",
+    text: "This setup is recommended if your APIs are managed by 3scale.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "3Scale",
+    component: <AddOnComponenet/>
 }
 
 const beanStalkObj = {
