@@ -52,7 +52,7 @@ public class CodeAnalysisAction extends ActionSupport {
     private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class);
 
     public String syncExtractedAPIs() {
-        String apiCollectionName = projectName + "-" + repoName;
+        String apiCollectionName = projectName + "/" + repoName;
         loggerMaker.infoAndAddToDb("Syncing code analysis endpoints for collection: " + apiCollectionName, LogDb.DASHBOARD);
 
         if (codeAnalysisApisList == null) {
@@ -84,12 +84,10 @@ public class CodeAnalysisAction extends ActionSupport {
             codeAnalysisApisMap.put(codeAnalysisApi.generateCodeAnalysisApisMapKey(), codeAnalysisApi);
         }
 
-        // todo:  If API collection does exist, create it
         ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(apiCollectionName);
         if (apiCollection == null) {
-            loggerMaker.errorAndAddToDb("API collection not found " + apiCollectionName, LogDb.DASHBOARD);
-            addActionError("API collection not found: " + apiCollectionName);
-            return ERROR.toUpperCase();
+            apiCollection = new ApiCollection(Context.now(), apiCollectionName, Context.now(), new HashSet<>(), null, 0, false, false);
+            ApiCollectionsDao.instance.insertOne(apiCollection);
         }
 
         /*
