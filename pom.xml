@@ -23,6 +23,7 @@
     <modules>
         <module>apps</module>
         <module>libs</module>
+        <module>apps/source-code-analyser</module>
     </modules>
 
     <build>
