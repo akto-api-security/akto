@@ -50,7 +50,6 @@ public class CodeAnalysisAction extends ActionSupport {
     public static final int MAX_BATCH_SIZE = 100;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class);
-    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public String syncExtractedAPIs() {
         String apiCollectionName = projectName + "-" + repoName;
@@ -298,5 +297,13 @@ public class CodeAnalysisAction extends ActionSupport {
 
     public List<CodeAnalysisRepo> getReposToRun() {
         return reposToRun;
+    }
+
+    public void setRepoName(String repoName) {
+        this.repoName = repoName;
+    }
+
+    public void setProjectName(String projectName) {
+        this.projectName = projectName;
     }
 }
