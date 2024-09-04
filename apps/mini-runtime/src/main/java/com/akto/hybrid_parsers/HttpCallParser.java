@@ -456,6 +456,7 @@ public class HttpCallParser {
 
             if (httpResponseParam.getRequestParams().getURL().toLowerCase().contains("/health")) {
                 continue;
+            }
 
             // check for garbage points here
             if(accountSettings != null && accountSettings.getAllowRedundantEndpointsList() != null){
