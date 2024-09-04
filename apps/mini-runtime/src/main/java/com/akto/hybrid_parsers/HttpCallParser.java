@@ -85,11 +85,6 @@ public class HttpCallParser {
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
         this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
     }
-
-    public HttpCallParser(int sync_threshold_count, int sync_threshold_time) {
-        this.sync_threshold_count = sync_threshold_count;
-        this.sync_threshold_time = sync_threshold_time;
-    }
     
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
 
@@ -354,8 +349,26 @@ public class HttpCallParser {
         trafficMetrics.inc(value);
     }
 
-    public int createApiCollectionId(HttpResponseParams httpResponseParam){
-            int apiCollectionId ;
+    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
+        List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
+        int originalSize = httpResponseParamsList.size();
+        for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
+
+            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
+                TrafficMetrics.Key totalRequestsKey = getTrafficMetricsKey(httpResponseParam, TrafficMetrics.Name.TOTAL_REQUESTS_RUNTIME);
+                incTrafficMetrics(totalRequestsKey,1);
+            }
+
+            boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
+            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.POSTMAN) && httpResponseParam.getStatusCode() <= 0) {
+                cond = true;
+            }
+
+            if (!cond) continue;
+            
+            String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(),Constants.AKTO_IGNORE_FLAG);
+            if (ignoreAktoFlag != null) continue;
+
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
             if (hostName != null && !hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
@@ -363,6 +376,8 @@ public class HttpCallParser {
             }
 
             int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
+            int apiCollectionId ;
+
             if (useHostCondition(hostName, httpResponseParam.getSource())) {
                 hostName = hostName.toLowerCase();
                 hostName = hostName.trim();
@@ -396,30 +411,6 @@ public class HttpCallParser {
 
                 apiCollectionId = vxlanId;
             }
-            return apiCollectionId;
-    }
-
-    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
-        List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
-        int originalSize = httpResponseParamsList.size();
-        for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
-
-            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
-                TrafficMetrics.Key totalRequestsKey = getTrafficMetricsKey(httpResponseParam, TrafficMetrics.Name.TOTAL_REQUESTS_RUNTIME);
-                incTrafficMetrics(totalRequestsKey,1);
-            }
-
-            boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
-            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.POSTMAN) && httpResponseParam.getStatusCode() <= 0) {
-                cond = true;
-            }
-
-            if (!cond) continue;
-            
-            String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(),Constants.AKTO_IGNORE_FLAG);
-            if (ignoreAktoFlag != null) continue;
-
-            int apiCollectionId = createApiCollectionId(httpResponseParam);
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 

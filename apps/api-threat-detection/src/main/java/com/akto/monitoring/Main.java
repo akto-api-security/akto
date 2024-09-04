@@ -18,17 +18,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.akto.DaoInit;
-import com.akto.dao.APIConfigsDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.APIConfig;
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.utils.Utils;
 import com.akto.filters.HttpCallFilter;
-import com.akto.hybrid_parsers.HttpCallParser;
-import com.akto.hybrid_runtime.Main.AccountInfo;
+import com.akto.parsers.HttpCallParser;
 import com.mongodb.ConnectionString;
-import com.mongodb.client.model.Filters;
 
 public class Main {
     private Consumer<String, String> consumer;
@@ -39,16 +36,18 @@ public class Main {
     public static void main(String[] args) {
 
         final Main main = new Main();
-
+        String mongoURI = System.getenv("AKTO_MONGO_CONN");
         String kafkaBrokerUrl = "kafka1:19092";
+        String isKubernetes = System.getenv("IS_KUBERNETES");
+        if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
+            loggerMaker.infoAndAddToDb("is_kubernetes: true", LogDb.RUNTIME);
+            kafkaBrokerUrl = "127.0.0.1:29092";
+        }
         String groupIdConfig = System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
         int maxPollRecordsConfig = Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "100"));
-        String mongoURI = System.getenv("AKTO_MONGO_CONN");
         DaoInit.init(new ConnectionString(mongoURI));
 
-        Properties properties = com.akto.hybrid_runtime.Main.configProperties(kafkaBrokerUrl, groupIdConfig,
-                maxPollRecordsConfig);
-
+        Properties properties = Utils.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
         main.consumer = new KafkaConsumer<>(properties);
 
         final Thread mainThread = Thread.currentThread();
@@ -71,25 +70,11 @@ public class Main {
 
         Map<String, HttpCallFilter> httpCallFilterMap = new HashMap<>();
         long lastSyncOffset = 0;
-        Map<Integer, AccountInfo> accountInfoMap = new HashMap<>();
-
         String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
-
-        APIConfig apiConfig = null;
-        String configName = System.getenv("AKTO_CONFIG_NAME");
-
-        try {
-            apiConfig = APIConfigsDao.instance.findOne(Filters.eq("name", configName));
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error while fetching api config " + e.getMessage(), LogDb.RUNTIME);
-        }
-        if (apiConfig == null) {
-            apiConfig = new APIConfig(configName, "access-token", 1, 10_000_000, sync_threshold_time);
-        }
 
         try {
             main.consumer.subscribe(Arrays.asList(topicName));
-            loggerMaker.infoAndAddToDb("Consumer subscribed", LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb(String.format("Consumer subscribed for topic : %s", topicName), LogDb.RUNTIME);
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 try {
@@ -104,7 +89,7 @@ public class Main {
                     HttpResponseParams httpResponseParams;
                     try {
 
-                        com.akto.hybrid_runtime.Main.printL(r.value());
+                        Utils.printL(r.value());
                         lastSyncOffset++;
 
                         if (lastSyncOffset % 100 == 0) {
@@ -134,12 +119,6 @@ public class Main {
 
                     Context.accountId.set(accountIdInt);
 
-                    AccountInfo accountInfo = accountInfoMap.get(accountIdInt);
-                    if (accountInfo == null) {
-                        accountInfo = new AccountInfo();
-                        accountInfoMap.put(accountIdInt, accountInfo);
-                    }
-
                     if (!httpCallFilterMap.containsKey(accountId)) {
                         HttpCallFilter filter = new HttpCallFilter(1000, sync_threshold_time);
                         httpCallFilterMap.put(accountId, filter);
@@ -156,7 +135,7 @@ public class Main {
             // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
             exceptionOnCommitSync.set(true);
-            com.akto.hybrid_runtime.Main.printL(e);
+            Utils.printL(e);
             loggerMaker.errorAndAddToDb("Error in main runtime: " + e.getMessage(), LogDb.RUNTIME);
             e.printStackTrace();
             System.exit(0);

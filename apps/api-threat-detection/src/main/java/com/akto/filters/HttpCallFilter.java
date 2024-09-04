@@ -19,7 +19,7 @@ import com.akto.dto.traffic.SusSampleData;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.hybrid_parsers.HttpCallParser;
+import com.akto.parsers.HttpCallParser;
 import com.akto.rules.TestPlugin;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.test_editor.execution.VariableResolver;

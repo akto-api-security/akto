@@ -31,8 +31,8 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.akto.apps.mini-runtime</groupId>
-            <artifactId>mini-runtime</artifactId>
+            <groupId>com.akto.apps.api-runtime</groupId>
+            <artifactId>api-runtime</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
