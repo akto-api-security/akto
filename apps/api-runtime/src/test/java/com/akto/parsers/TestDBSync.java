@@ -24,6 +24,7 @@ import com.akto.dto.type.URLTemplate;
 import com.akto.dto.HttpResponseParams.Source;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.URLAggregator;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -589,10 +590,10 @@ public class TestDBSync extends MongoBasedTest {
         String url5 = "test5.js.js";
 
         List<String> allowedUrlType = Arrays.asList("js");
-        assertEquals(httpCallParser.isRedundantEndpoint(url1, allowedUrlType), true);
-        assertEquals(httpCallParser.isRedundantEndpoint(url2, allowedUrlType), false);
-        assertEquals(httpCallParser.isRedundantEndpoint(url3, allowedUrlType), false);
-        assertEquals(httpCallParser.isRedundantEndpoint(url4, allowedUrlType), true);
-        assertEquals(httpCallParser.isRedundantEndpoint(url5, allowedUrlType), true);
+        assertEquals(RuntimeUtil.isRedundantEndpoint(url1, allowedUrlType), true);
+        assertEquals(RuntimeUtil.isRedundantEndpoint(url2, allowedUrlType), false);
+        assertEquals(RuntimeUtil.isRedundantEndpoint(url3, allowedUrlType), false);
+        assertEquals(RuntimeUtil.isRedundantEndpoint(url4, allowedUrlType), true);
+        assertEquals(RuntimeUtil.isRedundantEndpoint(url5, allowedUrlType), true);
     }
 }
