@@ -673,8 +673,10 @@ public class InitializerListener implements ServletContextListener {
                             }
 
                             if (allMatchDefault) {
-                                logger.info("[BadApisRemover] Deleting bad API: " + toBeDeleted, LogDb.DASHBOARD);
                                 toBeDeleted.add(sampleData.getId());
+                                logger.info("[BadApisRemover] Deleting bad API: " + sampleData.getId(), LogDb.DASHBOARD);
+                            } else {
+                                logger.info("[BadApisRemover] Keeping bad API: " + sampleData.getId(), LogDb.DASHBOARD);
                             }
                         } catch (Exception e) {
                             loggerMaker.errorAndAddToDb("[BadApisRemover] Couldn't delete an api for default payload: " + sampleData.getId() + e.getMessage(), LogDb.DASHBOARD);
