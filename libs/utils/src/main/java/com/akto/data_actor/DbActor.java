@@ -188,7 +188,7 @@ public class DbActor extends DataActor {
     }
 
     @Override
-    public void syncExtractedAPIs( String projectName, String repoName, List<CodeAnalysisApi> codeAnalysisApisList) {
+    public void syncExtractedAPIs( CodeAnalysisRepo codeAnalysisRepo, List<CodeAnalysisApi> codeAnalysisApisList, boolean isLastBatch) {
         return;
     }
 }

@@ -1101,12 +1101,14 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void syncExtractedAPIs( String projectName, String repoName, List<CodeAnalysisApi> codeAnalysisApisList) {
+    public void syncExtractedAPIs( CodeAnalysisRepo codeAnalysisRepo, List<CodeAnalysisApi> codeAnalysisApisList, boolean isLastBatch) {
         Map<String, List<String>> headers = buildHeaders();
 
         Map<String, Object> m = new HashMap<>();
-        m.put("projectName", projectName);
-        m.put("repoName", repoName);
+        m.put("projectName", codeAnalysisRepo.getProjectName());
+        m.put("repoName", codeAnalysisRepo.getRepoName());
+        m.put("codeAnalysisRepo",codeAnalysisRepo);
+        m.put("isLastBatch", isLastBatch);
         m.put("codeAnalysisApisList", codeAnalysisApisList);
 
         String json = gson.toJson(m);

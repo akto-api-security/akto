@@ -82,5 +82,5 @@ public abstract class DataActor {
 
     public abstract List<CodeAnalysisRepo> findReposToRun();
 
-    public abstract void syncExtractedAPIs( String projectName, String repoName, List<CodeAnalysisApi> codeAnalysisApisList);
+    public abstract void syncExtractedAPIs( CodeAnalysisRepo codeAnalysisRepo   , List<CodeAnalysisApi> codeAnalysisApisList, boolean isLastBatch);
 }

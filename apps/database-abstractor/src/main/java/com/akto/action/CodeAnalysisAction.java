@@ -45,8 +45,9 @@ public class CodeAnalysisAction extends ActionSupport {
 
     private String projectName;
     private String repoName;
+    private boolean isLastBatch;
     private List<CodeAnalysisApi> codeAnalysisApisList;
-
+    private CodeAnalysisRepo codeAnalysisRepo;
     public static final int MAX_BATCH_SIZE = 100;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class);
@@ -270,6 +271,10 @@ public class CodeAnalysisAction extends ActionSupport {
         loggerMaker.infoAndAddToDb("Updated code analysis collection: " + apiCollectionName, LogDb.DASHBOARD);
         loggerMaker.infoAndAddToDb("Source code endpoints count: " + codeAnalysisApisMap.size(), LogDb.DASHBOARD);
 
+        if (isLastBatch) {//Remove scheduled state from codeAnalysisRepo
+            CodeAnalysisRepoDao.instance.updateOne(Filters.eq("_id", codeAnalysisRepo.getId()), Updates.set(CodeAnalysisRepo.LAST_RUN, Context.now()));
+            loggerMaker.infoAndAddToDb("Updated last run for project:" + codeAnalysisRepo.getProjectName() + " repo:" + codeAnalysisRepo.getRepoName(), LogDb.DASHBOARD);
+        }
 
         return SUCCESS.toUpperCase();
     }
@@ -303,5 +308,21 @@ public class CodeAnalysisAction extends ActionSupport {
 
     public void setProjectName(String projectName) {
         this.projectName = projectName;
+    }
+
+    public boolean isLastBatch() {
+        return isLastBatch;
+    }
+
+    public void setLastBatch(boolean lastBatch) {
+        isLastBatch = lastBatch;
+    }
+
+    public CodeAnalysisRepo getCodeAnalysisRepo() {
+        return codeAnalysisRepo;
+    }
+
+    public void setCodeAnalysisRepo(CodeAnalysisRepo codeAnalysisRepo) {
+        this.codeAnalysisRepo = codeAnalysisRepo;
     }
 }
