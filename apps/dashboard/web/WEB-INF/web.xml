@@ -21,7 +21,7 @@
         <filter-class>org.eclipse.jetty.servlets.CrossOriginFilter</filter-class>
         <init-param>
             <param-name>allowedOrigins</param-name>
-            <param-value>*</param-value>
+            <param-value>*.akto.io</param-value>
         </init-param>
         <init-param>
             <param-name>allowedMethods</param-name>
