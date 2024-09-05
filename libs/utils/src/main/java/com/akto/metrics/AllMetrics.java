@@ -4,6 +4,8 @@ import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.Constants;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -19,15 +21,16 @@ import java.util.concurrent.TimeUnit;
 
 public class AllMetrics {
 
-    public void init(){
+    public void init(LogDb module){
+        loggerMaker.setDb(module);
         int accountId = Context.accountId.get();
 
         Organization organization = DataActorFactory.fetchInstance().fetchOrganization(accountId);
         String orgId = organization.getId();
 
-        runtimeKafkaRecordCount = new SumMetric("RT_KAFKA_RECORD_COUNT", 60, accountId, orgId);
-        runtimeKafkaRecordSize = new SumMetric("RT_KAFKA_RECORD_SIZE", 60, accountId, orgId);
-        runtimeProcessLatency = new LatencyMetric("RT_KAFKA_LATENCY", 60, accountId, orgId);
+        runtimeKafkaRecordCount = new SumMetric(module.name() + Constants.UNDERSCORE + "RT_KAFKA_RECORD_COUNT", 60, accountId, orgId);
+        runtimeKafkaRecordSize = new SumMetric(module.name()+ Constants.UNDERSCORE +"RT_KAFKA_RECORD_SIZE", 60, accountId, orgId);
+        runtimeProcessLatency = new LatencyMetric(module.name()+ Constants.UNDERSCORE +"RT_KAFKA_LATENCY", 60, accountId, orgId);
         postgreSampleDataInsertedCount = new SumMetric("PG_SAMPLE_DATA_INSERT_COUNT", 60, accountId, orgId);
         postgreSampleDataInsertLatency = new LatencyMetric("PG_SAMPLE_DATA_INSERT_LATENCY", 60, accountId, orgId);
         mergingJobLatency = new LatencyMetric("MERGING_JOB_LATENCY", 60, accountId, orgId);
@@ -44,11 +47,11 @@ public class AllMetrics {
         sampleDataFetchLatency = new LatencyMetric("SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId);
         sampleDataFetchCount = new SumMetric("SAMPLE_DATA_FETCH_COUNT", 60, accountId, orgId); // tODO: Do we need this?
         pgDataSizeInMb = new SumMetric("PG_DATA_SIZE_IN_MB", 60, accountId, orgId);
-        kafkaOffset = new SumMetric("KAFKA_OFFSET", 60, accountId, orgId);
-        kafkaRecordsLagMax = new SumMetric("KAFKA_RECORDS_LAG_MAX", 60, accountId, orgId);
-        kafkaRecordsConsumedRate = new SumMetric("KAFKA_RECORDS_CONSUMED_RATE", 60, accountId, orgId);
-        kafkaFetchAvgLatency = new LatencyMetric("KAFKA_FETCH_AVG_LATENCY", 60, accountId, orgId);
-        kafkaBytesConsumedRate = new SumMetric("KAFKA_BYTES_CONSUMED_RATE", 60, accountId, orgId);
+        kafkaOffset = new SumMetric(module.name() + Constants.UNDERSCORE + "KAFKA_OFFSET", 60, accountId, orgId);
+        kafkaRecordsLagMax = new SumMetric(module.name() + Constants.UNDERSCORE + "KAFKA_RECORDS_LAG_MAX", 60, accountId, orgId);
+        kafkaRecordsConsumedRate = new SumMetric(module.name() + Constants.UNDERSCORE + "KAFKA_RECORDS_CONSUMED_RATE", 60, accountId, orgId);
+        kafkaFetchAvgLatency = new LatencyMetric(module.name() + Constants.UNDERSCORE + "KAFKA_FETCH_AVG_LATENCY", 60, accountId, orgId);
+        kafkaBytesConsumedRate = new SumMetric(module.name() + Constants.UNDERSCORE + "KAFKA_BYTES_CONSUMED_RATE", 60, accountId, orgId);
         cyborgNewApiCount = new SumMetric("CYBORG_NEW_API_COUNT", 60, accountId, orgId);
         cyborgTotalApiCount = new SumMetric("CYBORG_TOTAL_API_COUNT", 60, accountId, orgId);
         deltaCatalogTotalCount = new SumMetric("DELTA_CATALOG_TOTAL_COUNT", 60, accountId, orgId);
@@ -108,7 +111,7 @@ public class AllMetrics {
             .build();
 
 
-    private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class);
+    private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class, LogDb.RUNTIME);
 
     private static final String instance_id = UUID.randomUUID().toString();
     private Metric runtimeKafkaRecordCount;

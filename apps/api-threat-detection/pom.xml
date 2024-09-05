@@ -133,7 +133,7 @@
                         <archive>
                             <manifest>
                                 <mainClass>
-                                    com.akto.monitoring.Main
+                                    com.akto.threat.detection.Main
                                 </mainClass>
                             </manifest>
                         </archive>
@@ -160,7 +160,7 @@
                 <archive>
                 <manifest>
                     <addClasspath>true</addClasspath>
-                    <mainClass>com.akto.monitoring.Main</mainClass>
+                    <mainClass>com.akto.threat.detection.Main</mainClass>
                     <classpathPrefix>dependency-jars/</classpathPrefix>
                 </manifest>
                 </archive>
