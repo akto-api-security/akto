@@ -107,11 +107,6 @@ public class RuntimeUtil {
          * 
          * We will need to add more type validation as needed.
          */
-        if (matchContentType.contains("html")) {
-            res &= responseBody.startsWith("<") && responseBody.endsWith(">");
-        } else {
-            res &= false;
-        }
         return res;
     }
 
