@@ -657,9 +657,14 @@ public class InitializerListener implements ServletContextListener {
 
                         Key key = new Key(apiCollectionId, url, Method.fromString(method), -1, 0, 0);
 
-                        if (method.equalsIgnoreCase("OPTIONS")) {
+                        if (method.equalsIgnoreCase("options")) {
                             logger.info("[BadApisRemover] OPTIONS Deleting bad API: " + key, LogDb.DASHBOARD);
                             toBeDeleted.add(key);
+                            continue;
+                        }
+
+                        if (!method.equalsIgnoreCase("get")) {
+                            logger.info("[BadApisRemover] Non-get Deleting bad API: " + key, LogDb.DASHBOARD);
                             continue;
                         }
 
