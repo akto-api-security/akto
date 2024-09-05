@@ -620,6 +620,152 @@ public class InitializerListener implements ServletContextListener {
         return ret;
     }
 
+    private void setupBadApisRemover() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                Integer[] accountIds = new Integer[]{1724877069, 1714700875};
+
+                for (int accountId: accountIds) {
+                    Account account = AccountsDao.instance.findOne(eq("_id", accountId));
+                    if (account == null) {
+                        continue;
+                    }
+
+                    try {
+                        Context.accountId.set(accountId);
+                        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.getMetaAll();
+                        Map<Integer, ApiCollection> apiCollectionMap = apiCollections.stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
+                        
+                        List<SampleData> sampleDataList = new ArrayList<>();
+                        Bson filters = Filters.empty();
+                        int skip = 0;
+                        int limit = 100;
+                        Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+
+                        do {
+                            sampleDataList = SampleDataDao.instance.findAll(filters, skip, limit, sort);
+                            skip += limit;
+                            List<Key> toBeDeleted = new ArrayList<>();
+                            for(SampleData sampleData: sampleDataList) {
+                                try {
+                                    List<String> samples = sampleData.getSamples();
+                                    if (samples == null || samples.isEmpty()) {
+                                        logger.info("[BadApisRemover] No samples found for : " + sampleData.getId());
+                                        continue;
+                                    }
+
+                                    ApiCollection apiCollection = apiCollectionMap.get(sampleData.getId().getApiCollectionId());
+                                    if (apiCollection == null) {
+                                        logger.info("[BadApisRemover] No apiCollection found for : " + sampleData.getId());
+                                        continue;
+                                    }
+
+                                    
+                                    boolean allMatchDefault = true;
+
+                                    for (String sample : samples) {
+                                        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                                        if(accountSettings != null && accountSettings.getAllowRedundantEndpointsList() != null){
+                                            if (!RuntimeUtil.shouldIgnore(httpResponseParams, accountSettings.getAllowRedundantEndpointsList())) {
+                                                allMatchDefault = false;
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    if (allMatchDefault) {
+                                        logger.info("[BadApisRemover] Deleting bad API: " + toBeDeleted, LogDb.DASHBOARD);
+                                        toBeDeleted.add(sampleData.getId());
+                                    }
+                                } catch (Exception e) {
+                                    loggerMaker.errorAndAddToDb("[BadApisRemover] Couldn't delete an api for default payload: " + sampleData.getId() + e.getMessage(), LogDb.DASHBOARD);
+                                }
+                            }
+
+                            // deleteApis(toBeDeleted);
+
+                        } while (!sampleDataList.isEmpty());
+
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Couldn't complete scan for APIs remover: " + e.getMessage(), LogDb.DASHBOARD);
+                    }
+
+                }
+
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account account) {
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        Map<String, DefaultPayload> defaultPayloadMap = accountSettings.getDefaultPayloads();
+                        if (defaultPayloadMap == null || defaultPayloadMap.isEmpty()) {
+                            return;
+                        }
+
+                        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.getMetaAll();
+                        Map<Integer, ApiCollection> apiCollectionMap = apiCollections.stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
+
+                        for(Map.Entry<String, DefaultPayload> entry: defaultPayloadMap.entrySet()) {
+                            DefaultPayload dp = entry.getValue();
+                            String base64Url = entry.getKey();
+                            if (!dp.getScannedExistingData()) {
+                                try {
+                                    List<SampleData> sampleDataList = new ArrayList<>();
+                                    Bson filters = Filters.empty();
+                                    int skip = 0;
+                                    int limit = 100;
+                                    Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");
+                                    do {
+                                        sampleDataList = SampleDataDao.instance.findAll(filters, skip, limit, sort);
+                                        skip += limit;
+                                        List<Key> toBeDeleted = new ArrayList<>();
+                                        for(SampleData sampleData: sampleDataList) {
+                                            try {
+                                                List<String> samples = sampleData.getSamples();
+                                                ApiCollection apiCollection = apiCollectionMap.get(sampleData.getId().getApiCollectionId());
+                                                if (apiCollection == null) continue;
+                                                if (apiCollection.getHostName() != null && !dp.getId().equalsIgnoreCase(apiCollection.getHostName())) continue;
+                                                if (samples == null || samples.isEmpty()) continue;
+
+                                                boolean allMatchDefault = true;
+
+                                                for (String sample : samples) {
+                                                    HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                                                    if (!matchesDefaultPayload(httpResponseParams, defaultPayloadMap)) {
+                                                        allMatchDefault = false;
+                                                        break;
+                                                    }
+                                                }
+
+                                                if (allMatchDefault) {
+                                                    loggerMaker.errorAndAddToDb("Deleting API that matches default payload: " + toBeDeleted, LogDb.DASHBOARD);
+                                                    toBeDeleted.add(sampleData.getId());
+                                                }
+                                            } catch (Exception e) {
+                                                loggerMaker.errorAndAddToDb("Couldn't delete an api for default payload: " + sampleData.getId() + e.getMessage(), LogDb.DASHBOARD);
+                                            }
+                                        }
+
+                                        deleteApis(toBeDeleted);
+
+                                    } while (!sampleDataList.isEmpty());
+
+                                    Bson completedScan = Updates.set(AccountSettings.DEFAULT_PAYLOADS+"."+base64Url+"."+DefaultPayload.SCANNED_EXISTING_DATA, true);
+                                    AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), completedScan);
+
+                                } catch (Exception e) {
+
+                                    loggerMaker.errorAndAddToDb("Couldn't complete scan for default payload: " + e.getMessage(), LogDb.DASHBOARD);
+                                }
+                            }
+                        }
+                    }
+                }, "setUpDefaultPayloadRemover");
+            }
+        }, 0, 5, TimeUnit.MINUTES);        
+    }
+
     private void setUpDefaultPayloadRemover() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             @Override
@@ -700,15 +846,34 @@ public class InitializerListener implements ServletContextListener {
         if (toBeDeleted == null || toBeDeleted.isEmpty()) return;
         List<WriteModel<T>> stiList = new ArrayList<>();
 
+        int counter = 0;
         for(Key key: toBeDeleted) {
             stiList.add(new DeleteManyModel<>(Filters.and(
                     Filters.eq(prefix + "apiCollectionId", key.getApiCollectionId()),
                     Filters.eq(prefix + "method", key.getMethod()),
                     Filters.eq(prefix + "url", key.getUrl())
             )));
+            counter ++;
+
+            if (counter%20 == 0) {
+                try {
+                    dao.bulkWrite(stiList, new BulkWriteOptions().ordered(false));
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while deleting apis: " + e.getMessage(), LogDb.DASHBOARD);
+                }
+                
+                stiList = new ArrayList<>();
+            }
         }
 
-        dao.bulkWrite(stiList, new BulkWriteOptions().ordered(false));
+        if (!stiList.isEmpty()) {
+            try {
+                dao.bulkWrite(stiList, new BulkWriteOptions().ordered(false));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error while deleting apis: " + e.getMessage(), LogDb.DASHBOARD);
+            }
+        }
+
     }
 
     private void deleteApis(List<Key> toBeDeleted) {
