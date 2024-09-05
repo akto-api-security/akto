@@ -80,4 +80,7 @@ public abstract class DataActor {
 
     public abstract Organization fetchOrganization(int accountId);
 
+    public abstract List<CodeAnalysisRepo> findReposToRun();
+
+    public abstract void syncExtractedAPIs( String projectName, String repoName, List<CodeAnalysisApi> codeAnalysisApisList);
 }

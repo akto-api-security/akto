@@ -25,6 +25,7 @@ public class AuthFilter implements Filter {
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
         String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
 
+        Context.accountId.set(1_000_000);
 //        try {
 //            Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
 //            Context.accountId.set((int) claims.getBody().get("accountId"));
@@ -32,7 +33,6 @@ public class AuthFilter implements Filter {
 //            System.out.println(e.getMessage());
 //            httpServletResponse.sendError(401);
 //        }
-        Context.accountId.set(1000000);
         chain.doFilter(servletRequest, servletResponse);
 
     }
