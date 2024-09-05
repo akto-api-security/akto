@@ -2040,6 +2040,7 @@ public class InitializerListener implements ServletContextListener {
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
                     logger.info("Starting init functions and scheduling jobs at " + now);
+                    setupBadApisRemover();
 
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
@@ -2047,7 +2048,6 @@ public class InitializerListener implements ServletContextListener {
                             runInitializerFunctions();
                         }
                     }, "context-initializer-secondary");
-                    setupBadApisRemover();
                     crons.trafficAlertsScheduler();
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
