@@ -661,9 +661,10 @@ public class InitializerListener implements ServletContextListener {
 
                             
                             boolean allMatchDefault = true;
-
+                            boolean isNetsparkerPresent = false;
                             for (String sample : samples) {
                                 HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                                isNetsparkerPresent |= sample.toLowerCase().contains("netsparker");
                                 if(accountSettings != null && accountSettings.getAllowRedundantEndpointsList() != null){
                                     if (!RuntimeUtil.shouldIgnore(httpResponseParams, accountSettings.getAllowRedundantEndpointsList())) {
                                         allMatchDefault = false;
@@ -674,9 +675,10 @@ public class InitializerListener implements ServletContextListener {
 
                             if (allMatchDefault) {
                                 toBeDeleted.add(sampleData.getId());
-                                logger.info("[BadApisRemover] Deleting bad API: " + sampleData.getId(), LogDb.DASHBOARD);
+                                
+                                logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad API: " + sampleData.getId(), LogDb.DASHBOARD);
                             } else {
-                                logger.info("[BadApisRemover] Keeping bad API: " + sampleData.getId(), LogDb.DASHBOARD);
+                                logger.info("[BadApisRemover] " + isNetsparkerPresent + " Keeping bad API: " + sampleData.getId(), LogDb.DASHBOARD);
                             }
                         } catch (Exception e) {
                             loggerMaker.errorAndAddToDb("[BadApisRemover] Couldn't delete an api for default payload: " + sampleData.getId() + e.getMessage(), LogDb.DASHBOARD);
