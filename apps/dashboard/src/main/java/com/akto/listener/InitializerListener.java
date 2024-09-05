@@ -686,7 +686,8 @@ public class InitializerListener implements ServletContextListener {
                         }
                     }
 
-                    if (System.getenv("DELETE_REDUNDANT_APIS").equalsIgnoreCase("true")) {
+                    String shouldDelete = System.getenv("DELETE_REDUNDANT_APIS");
+                    if ( shouldDelete != null && shouldDelete.equalsIgnoreCase("true")) {
                         deleteApis(toBeDeleted);
                     }
 
@@ -697,6 +698,7 @@ public class InitializerListener implements ServletContextListener {
 
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Couldn't complete scan for APIs remover: " + e.getMessage(), LogDb.DASHBOARD);
+                e.printStackTrace();
             }
 
         }
