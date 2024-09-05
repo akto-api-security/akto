@@ -1,28 +1,52 @@
 package com.akto;
 
+import com.akto.dto.CodeAnalysisRepo;
 import com.akto.testing.HTTPClientHandler;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
+import okhttp3.*;
 
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Objects;
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+
 
 public class Main {
     public static final String JSON_CONTENT_TYPE = "application/json";
 
-    public static final String BITBUCKET_URL = "http://localhost:7990";
+    public static final String BITBUCKET_URL = System.getenv("BITBUCKET_HOST");
+    public static final String SOURCE_CODE_HOST = System.getenv("SOURCE_CODE_HOST");
+    public static final String BITBUCKET_TOKEN = System.getenv("BITBUCKET_TOKEN");
+    public static final String ALL_PROJECT_LIST = "ALL_PROJECT_LIST";
+    public static final String SOURCE_CODE_URL = "SOURCE_CODE_URL";
 
-    private String listAllProjectsUrl(String hostUrl) {
-        return hostUrl + "/rest/api/1.0/projects";
+    static {
+        Map<String, String> allApiEndpoints = new HashMap<>();
+        allApiEndpoints.put(ALL_PROJECT_LIST, "/rest/api/1.0/projects");
+        allApiEndpoints.put(SOURCE_CODE_URL, "/api/run-analyser");
+        allApiEndpoints.put(ALL_PROJECT_LIST, "/rest/api/1.0/projects/SPRIN/repos/spring-boot-tutorial-master/archive");
+        allApiEndpoints.put(ALL_PROJECT_LIST, "/rest/api/1.0/projects");
     }
 
-    public static void main(String[] args) {
+    public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
-        String bitbucketUrl = "http://localhost:7990/projects/SPRIN";
-        String bitbucketToken = "BBDC-NjI4NTM0OTA0MjQ5Om7JQ1F5TZ9lR9gKAfaDCdeKyLzY";
+
+    private static List<CodeAnalysisRepo> fetchReposToSync () {
+        List<CodeAnalysisRepo> list = new ArrayList<>();
+        return list;
+    }
+
+    private static Map<String, String> fetchAllProjectKeys() {
+
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+
+        while (true) {
+            List<CodeAnalysisRepo> repos = fetchReposToSync();
+            Thread.sleep(1000);
+        }
 
         String repoUrl = "http://localhost:7990/rest/api/1.0/projects/SPRIN/repos/spring-boot-tutorial-master/archive"; // Replace with your repo URL
         String outputFilePath = "repository.zip"; // The local file where the repository will be saved
@@ -31,7 +55,7 @@ public class Main {
         Request.Builder builder = new Request.Builder();
         builder.url(repoUrl);
         builder.get();
-        builder.addHeader("Authorization", "Bearer " + bitbucketToken);
+        builder.addHeader("Authorization", "Bearer " + BITBUCKET_TOKEN);
         HTTPClientHandler.initHttpClientHandler(false);
         OkHttpClient okHttpClient = HTTPClientHandler.instance.getHTTPClient(false, JSON_CONTENT_TYPE);
         Request request = builder.build();
@@ -51,6 +75,16 @@ public class Main {
                     fileOutputStream.flush();
                     fileOutputStream.close();
                     System.out.println("Repository downloaded successfully.");
+                    Request.Builder codeAnalyserRequest = new Request.Builder();
+                    codeAnalyserRequest.url(SOURCE_CODE_HOST + SOURCE_CODE_URL);
+                    codeAnalyserRequest.method("POST", RequestBody.create("{\"path\":\"" + file.getAbsolutePath() + "\"}", MediaType.parse(JSON_CONTENT_TYPE)));
+                    response = okHttpClient.newCall(codeAnalyserRequest.build()).execute();
+                    if (response.isSuccessful() && response.body() != null) {
+                        ResponseBody responseBody = response.peekBody(1024*1024);
+                        System.out.println(responseBody.string());
+
+                    }
+
                 }
             } else {
                 System.out.println("Failed to download repository. Response code: " + response.code());
