@@ -676,7 +676,7 @@ public class InitializerListener implements ServletContextListener {
                                 Filters.eq("method", method),
                                 Filters.in("responseCode", new Integer[]{-1, 200, 201, 204, 302}),
                                 Filters.eq("isHeader", false),
-                                Filters.eq("isUrlParam", false),
+                                Filters.or(Filters.eq("isUrlParam", false), Filters.exists("isUrlParam", false)), 
                                 Filters.eq("apiCollectionId", apiCollectionId)
                             );
                             SingleTypeInfo singleTypeInfoForApi = SingleTypeInfoDao.instance.findOne(stiFilterReq);
