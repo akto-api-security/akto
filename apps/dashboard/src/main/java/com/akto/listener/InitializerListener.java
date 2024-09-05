@@ -671,8 +671,21 @@ public class InitializerListener implements ServletContextListener {
             
                         SampleData sampleData = SampleDataDao.instance.findOne(filter);
                         if (sampleData == null || sampleData.getSamples() == null || sampleData.getSamples().isEmpty()) {
-                            logger.info("[BadApisRemover] no-sample Deleting bad API: " + key, LogDb.DASHBOARD);
-                            toBeDeleted.add(key);
+                            Bson stiFilterReq = Filters.and(
+                                Filters.eq("url", url),
+                                Filters.eq("method", method),
+                                Filters.in("responseCode", new Integer[]{-1, 200, 201, 204, 302}),
+                                Filters.eq("isHeader", false),
+                                Filters.eq("isUrlParam", false),
+                                Filters.eq("apiCollectionId", apiCollectionId)
+                            );
+                            SingleTypeInfo singleTypeInfoForApi = SingleTypeInfoDao.instance.findOne(stiFilterReq);
+                            if (singleTypeInfoForApi == null) {
+                                logger.info("[BadApisRemover] no-sample Deleting bad API: " + key, LogDb.DASHBOARD);
+                                toBeDeleted.add(key);    
+                            } else {
+                                logger.info("[BadApisRemover] yes-sti Deleting bad API: " + key + " " + singleTypeInfoForApi.composeKey(), LogDb.DASHBOARD);
+                            }
                         } else {
                             logger.info("[BadApisRemover] yes-sample Deleting bad API: " + key, LogDb.DASHBOARD);
                         }
