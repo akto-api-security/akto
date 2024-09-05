@@ -634,7 +634,7 @@ public class InitializerListener implements ServletContextListener {
                 List<ApiCollection> apiCollections = ApiCollectionsDao.instance.getMetaAll();
                 Map<Integer, ApiCollection> apiCollectionMap = apiCollections.stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
                 String filePath = "./samples_"+accountId+".txt";
-
+                BufferedWriter writer = new BufferedWriter(new FileWriter(new File(filePath)));
                 List<SampleData> sampleDataList = new ArrayList<>();
                 Bson filters = Filters.empty();
                 int skip = 0;
@@ -675,12 +675,8 @@ public class InitializerListener implements ServletContextListener {
                             }
 
                             if (allMatchDefault) {                                
-                                try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(filePath)))) {                                
-                                  writer.write(sampleData.toString());
-                                }
-                                                                
-                                toBeDeleted.add(sampleData.getId());
-                                
+                                writer.write(sampleData.toString());
+                                toBeDeleted.add(sampleData.getId());                                
                                 logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad API: " + sampleData.getId(), LogDb.DASHBOARD);
                             } else {
                                 logger.info("[BadApisRemover] " + isNetsparkerPresent + " Keeping bad API: " + sampleData.getId(), LogDb.DASHBOARD);
@@ -695,6 +691,9 @@ public class InitializerListener implements ServletContextListener {
                     }
 
                 } while (!sampleDataList.isEmpty());
+
+                writer.flush();
+                writer.close();
 
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Couldn't complete scan for APIs remover: " + e.getMessage(), LogDb.DASHBOARD);
