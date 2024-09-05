@@ -633,7 +633,8 @@ public class InitializerListener implements ServletContextListener {
                 Context.accountId.set(accountId);
                 List<ApiCollection> apiCollections = ApiCollectionsDao.instance.getMetaAll();
                 Map<Integer, ApiCollection> apiCollectionMap = apiCollections.stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
-                
+                String filePath = "./samples_"+accountId+".txt";
+
                 List<SampleData> sampleDataList = new ArrayList<>();
                 Bson filters = Filters.empty();
                 int skip = 0;
@@ -673,7 +674,11 @@ public class InitializerListener implements ServletContextListener {
                                 }
                             }
 
-                            if (allMatchDefault) {
+                            if (allMatchDefault) {                                
+                                try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(filePath)))) {                                
+                                  writer.write(sampleData.toString());
+                                }
+                                                                
                                 toBeDeleted.add(sampleData.getId());
                                 
                                 logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad API: " + sampleData.getId(), LogDb.DASHBOARD);
@@ -685,7 +690,9 @@ public class InitializerListener implements ServletContextListener {
                         }
                     }
 
-                    // deleteApis(toBeDeleted);
+                    if (System.getenv("DELETE_REDUNDANT_APIS").equalsIgnoreCase("true")) {
+                        deleteApis(toBeDeleted);
+                    }
 
                 } while (!sampleDataList.isEmpty());
 
