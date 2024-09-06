@@ -6333,7 +6333,7 @@
             </result>
         </action>
 
-        <action name="api/fetchSusSampleData" class="com.akto.action.threat_detection.SusSampleDataAction" method="fetchSusSampleData">
+        <action name="api/fetchSuspectSampleData" class="com.akto.action.threat_detection.SuspectSampleDataAction" method="fetchSuspectSampleData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="FORBIDDEN" type="json">
@@ -6350,7 +6350,7 @@
             </result>
         </action>
 
-        <action name="api/fetchFiltersThreatTable" class="com.akto.action.threat_detection.SusSampleDataAction" method="fetchFilters">
+        <action name="api/fetchFiltersThreatTable" class="com.akto.action.threat_detection.SuspectSampleDataAction" method="fetchFilters">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="FORBIDDEN" type="json">

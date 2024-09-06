@@ -10,16 +10,16 @@ import java.util.Set;
 import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
-import com.akto.dao.SusSampleDataDao;
+import com.akto.dao.SuspectSampleDataDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.traffic.SusSampleData;
+import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 
-public class SusSampleDataAction extends UserAction {
+public class SuspectSampleDataAction extends UserAction {
 
-    List<SusSampleData> sampleData;
+    List<SuspectSampleData> sampleData;
     int skip;
     static final int LIMIT = 50;
     List<String> ips;
@@ -29,7 +29,7 @@ public class SusSampleDataAction extends UserAction {
     Map<String, Integer> sort;
     int startTimestamp, endTimestamp;
 
-    public String fetchSusSampleData() {
+    public String fetchSuspectSampleData() {
 
         List<Bson> filterList = new ArrayList<>();
 
@@ -45,17 +45,17 @@ public class SusSampleDataAction extends UserAction {
             endTimestamp = Context.now() + 10 * 60;
         }
 
-        filterList.add(Filters.gte(SusSampleData._DISCOVERED, startTimestamp));
-        filterList.add(Filters.lte(SusSampleData._DISCOVERED, endTimestamp));
+        filterList.add(Filters.gte(SuspectSampleData._DISCOVERED, startTimestamp));
+        filterList.add(Filters.lte(SuspectSampleData._DISCOVERED, endTimestamp));
 
         if (ips != null && !ips.isEmpty()) {
-            filterList.add(Filters.in(SusSampleData.SOURCE_IPS, ips));
+            filterList.add(Filters.in(SuspectSampleData.SOURCE_IPS, ips));
         }
         if (urls != null && !urls.isEmpty()) {
-            filterList.add(Filters.in(SusSampleData.MATCHING_URL, urls));
+            filterList.add(Filters.in(SuspectSampleData.MATCHING_URL, urls));
         }
         if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
-            filterList.add(Filters.in(SusSampleData.API_COLLECTION_ID, apiCollectionIds));
+            filterList.add(Filters.in(SuspectSampleData.API_COLLECTION_ID, apiCollectionIds));
         }
 
         Bson finalFilter = Filters.empty();
@@ -64,20 +64,20 @@ public class SusSampleDataAction extends UserAction {
             finalFilter = Filters.and(filterList);
         }
 
-        String sortKey = SusSampleData._DISCOVERED;
+        String sortKey = SuspectSampleData._DISCOVERED;
         int sortDirection = -1;
         /*
          * add any new sort key here,
          * for validation and sanity.
          */
         Set<String> sortKeys = new HashSet<>();
-        sortKeys.add(SusSampleData._DISCOVERED);
+        sortKeys.add(SuspectSampleData._DISCOVERED);
 
         if (sort != null && !sort.isEmpty()) {
             Entry<String, Integer> sortEntry = sort.entrySet().iterator().next();
             sortKey = sortEntry.getKey();
             if (!sortKeys.contains(sortKey)) {
-                sortKey = SusSampleData._DISCOVERED;
+                sortKey = SuspectSampleData._DISCOVERED;
             }
             sortDirection = sortEntry.getValue();
             if (!(sortDirection == -1 || sortDirection == 1)) {
@@ -91,25 +91,25 @@ public class SusSampleDataAction extends UserAction {
          */
         Bson sort = sortDirection == -1 ? Sorts.descending(sortKey, Constants.ID)
                 : Sorts.ascending(sortKey, Constants.ID);
-        sampleData = SusSampleDataDao.instance.findAll(finalFilter, skip, LIMIT, sort);
-        total = SusSampleDataDao.instance.count(finalFilter);
+        sampleData = SuspectSampleDataDao.instance.findAll(finalFilter, skip, LIMIT, sort);
+        total = SuspectSampleDataDao.instance.count(finalFilter);
 
         return SUCCESS.toUpperCase();
     }
 
     public String fetchFilters() {
         ips = new ArrayList<>(
-                SusSampleDataDao.instance.findDistinctFields(SusSampleData.SOURCE_IPS, String.class, Filters.empty()));
-        urls = new ArrayList<>(SusSampleDataDao.instance.findDistinctFields(SusSampleData.MATCHING_URL, String.class,
+                SuspectSampleDataDao.instance.findDistinctFields(SuspectSampleData.SOURCE_IPS, String.class, Filters.empty()));
+        urls = new ArrayList<>(SuspectSampleDataDao.instance.findDistinctFields(SuspectSampleData.MATCHING_URL, String.class,
                 Filters.empty()));
         return SUCCESS.toUpperCase();
     }
 
-    public List<SusSampleData> getSampleData() {
+    public List<SuspectSampleData> getSampleData() {
         return sampleData;
     }
 
-    public void setSampleData(List<SusSampleData> sampleData) {
+    public void setSampleData(List<SuspectSampleData> sampleData) {
         this.sampleData = sampleData;
     }
 

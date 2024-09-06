@@ -1,14 +1,14 @@
 package com.akto.dao;
 
 import com.akto.dao.context.Context;
-import com.akto.dto.traffic.SusSampleData;
+import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.util.Constants;
 import com.akto.util.DbMode;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.CreateCollectionOptions;
 
-public class SusSampleDataDao extends AccountsContextDao<SusSampleData> {
-    public static final SusSampleDataDao instance = new SusSampleDataDao();
+public class SuspectSampleDataDao extends AccountsContextDao<SuspectSampleData> {
+    public static final SuspectSampleDataDao instance = new SuspectSampleDataDao();
 
     public static final int maxDocuments = 100_000;
     public static final int sizeInBytes = 100_000_000;
@@ -33,17 +33,17 @@ public class SusSampleDataDao extends AccountsContextDao<SusSampleData> {
             }
         }
 
-        String[] fieldNames = { SusSampleData._DISCOVERED, SusSampleData.SOURCE_IPS, SusSampleData.MATCHING_URL, SusSampleData.API_COLLECTION_ID, Constants.ID };
+        String[] fieldNames = { SuspectSampleData._DISCOVERED, SuspectSampleData.SOURCE_IPS, SuspectSampleData.MATCHING_URL, SuspectSampleData.API_COLLECTION_ID, Constants.ID };
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
     @Override
     public String getCollName() {
-        return "sus_sample_data";
+        return "suspect_sample_data";
     }
 
     @Override
-    public Class<SusSampleData> getClassT() {
-        return SusSampleData.class;
+    public Class<SuspectSampleData> getClassT() {
+        return SuspectSampleData.class;
     }
 }

@@ -78,7 +78,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
             matchingUrlFilter = filters?.url
         }
         const sort = { [sortKey]: sortOrder }
-        const res = await api.fetchSusSampleData(skip, sourceIpsFilter, apiCollectionIdsFilter, matchingUrlFilter, sort, startTimestamp, endTimestamp)
+        const res = await api.fetchSuspectSampleData(skip, sourceIpsFilter, apiCollectionIdsFilter, matchingUrlFilter, sort, startTimestamp, endTimestamp)
         let total = res.total;
         let ret = res?.sampleData.map(x => {
             return {

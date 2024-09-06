@@ -16,9 +16,9 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSusSampleData(skip, ips, apiCollectionIds, urls, sort, startTimestamp, endTimestamp) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, sort, startTimestamp, endTimestamp) {
         return request({
-            url: '/api/fetchSusSampleData',
+            url: '/api/fetchSuspectSampleData',
             method: 'post',
             data: {
                 skip: skip,

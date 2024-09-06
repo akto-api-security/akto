@@ -6,7 +6,7 @@ import org.bson.types.ObjectId;
 
 import com.akto.dto.type.URLMethods.Method;
 
-public class SusSampleData {
+public class SuspectSampleData {
 
     ObjectId id;
     public static final String SOURCE_IPS = "sourceIPs";
@@ -31,10 +31,10 @@ public class SusSampleData {
      */
     String filterId;
 
-    public SusSampleData() {
+    public SuspectSampleData() {
     }
 
-    public SusSampleData(List<String> sourceIPs, int apiCollectionId, String url, Method method, String sample,
+    public SuspectSampleData(List<String> sourceIPs, int apiCollectionId, String url, Method method, String sample,
             int discovered, String filterId) {
         this.sourceIPs = sourceIPs;
         this.apiCollectionId = apiCollectionId;

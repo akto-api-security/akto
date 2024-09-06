@@ -8,14 +8,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
 
-import com.akto.dao.SusSampleDataDao;
+import com.akto.dao.SuspectSampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApi;
 import com.akto.dto.monitoring.FilterConfig;
-import com.akto.dto.traffic.SusSampleData;
+import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -31,7 +31,7 @@ public class HttpCallFilter {
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallFilter.class, LogDb.THREAT_DETECTION);
 
     private Map<String, FilterConfig> apiFilters;
-    private List<WriteModel<SusSampleData>> susSampleDataList;
+    private List<WriteModel<SuspectSampleData>> suspectSampleDataList;
     private final int sync_threshold_count;
     private final int sync_threshold_time;
     private int last_synced;
@@ -43,7 +43,7 @@ public class HttpCallFilter {
 
     public HttpCallFilter(int sync_threshold_count, int sync_threshold_time) {
         apiFilters = FilterYamlTemplateDao.instance.fetchFilterConfig(false);
-        susSampleDataList = new ArrayList<>();
+        suspectSampleDataList = new ArrayList<>();
         this.sync_threshold_count = sync_threshold_count;
         this.sync_threshold_time = sync_threshold_time;
         last_synced = 0;
@@ -85,10 +85,10 @@ public class HttpCallFilter {
                                 apiInfoKey, varMap, filterExecutionLogId);
                         if (res.getIsValid()) {
                             now = Context.now();
-                            SusSampleData sampleData = new SusSampleData(
+                            SuspectSampleData sampleData = new SuspectSampleData(
                                     sourceIps, apiCollectionId, url, method,
                                     message, now, filterId);
-                            susSampleDataList.add(new InsertOneModel<SusSampleData>(sampleData));
+                            suspectSampleDataList.add(new InsertOneModel<SuspectSampleData>(sampleData));
                         }
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
@@ -96,13 +96,14 @@ public class HttpCallFilter {
                 }
             }
         }
-        sync_count = susSampleDataList.size();
+        sync_count = suspectSampleDataList.size();
         if (sync_count > 0 && (sync_count >= sync_threshold_count ||
                 (Context.now() - last_synced) > sync_threshold_time)) {
-            SusSampleDataDao.instance.getMCollection().bulkWrite(susSampleDataList);
+            SuspectSampleDataDao.instance.getMCollection().bulkWrite(suspectSampleDataList);
+            loggerMaker.infoAndAddToDb(String.format("Inserting %d records in SuspectSampleData", sync_count));
             last_synced = Context.now();
             sync_count = 0;
-            susSampleDataList.clear();
+            suspectSampleDataList.clear();
         }
     }
 }

@@ -16,13 +16,13 @@ import org.slf4j.LoggerFactory;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.SusSampleDataDao;
+import com.akto.dao.SuspectSampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dto.Account;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.monitoring.FilterConfig;
-import com.akto.dto.traffic.SusSampleData;
+import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLStatic;
@@ -94,15 +94,15 @@ public class MatchingJob {
         int timestamp = 0;
         int previousTimestamp = 0;
         Map<Integer, APICatalog> dbState = new HashMap<>();
-        List<WriteModel<SusSampleData>> susSampleDataUpdates = new ArrayList<>();
-        List<SusSampleData> samples = new ArrayList<>();
+        List<WriteModel<SuspectSampleData>> suspectSampleDataUpdates = new ArrayList<>();
+        List<SuspectSampleData> samples = new ArrayList<>();
         do {
 
             /*
              * using gte would repeat some entries
              * but ensure that all entries are covered.
              */
-            Bson finalFilter = Filters.gte(SusSampleData._DISCOVERED, timestamp);
+            Bson finalFilter = Filters.gte(SuspectSampleData._DISCOVERED, timestamp);
 
             /*
              * 1. Ascending filter because any new entry
@@ -113,11 +113,11 @@ public class MatchingJob {
              * [ using find-limit type pagination ],
              * with the assumption that for any second we will have < 10_000 entries.
              */
-            samples = SusSampleDataDao.instance.findAll(finalFilter, 0, LIMIT,
-                    Sorts.ascending(SusSampleData._DISCOVERED, Constants.ID),
-                    Projections.exclude(SusSampleData._SAMPLE));
+            samples = SuspectSampleDataDao.instance.findAll(finalFilter, 0, LIMIT,
+                    Sorts.ascending(SuspectSampleData._DISCOVERED, Constants.ID),
+                    Projections.exclude(SuspectSampleData._SAMPLE));
 
-            for (SusSampleData sample : samples) {
+            for (SuspectSampleData sample : samples) {
                 int apiCollectionId = sample.getApiCollectionId();
                 if (!dbState.containsKey(apiCollectionId)) {
                     fillDbState(apiCollectionId, dbState);
@@ -143,8 +143,8 @@ public class MatchingJob {
                 }
 
                 if (!matchingUrl.equals(sample.getMatchingUrl())) {
-                    susSampleDataUpdates.add(new UpdateOneModel<>(Filters.eq(Constants.ID, sample.getId()),
-                            Updates.set(SusSampleData.MATCHING_URL, matchingUrl)));
+                    suspectSampleDataUpdates.add(new UpdateOneModel<>(Filters.eq(Constants.ID, sample.getId()),
+                            Updates.set(SuspectSampleData.MATCHING_URL, matchingUrl)));
                 }
                 timestamp = sample.getDiscovered();
             }
@@ -162,8 +162,8 @@ public class MatchingJob {
              */
         } while (samples.size() == LIMIT);
 
-        if (!susSampleDataUpdates.isEmpty()) {
-            SusSampleDataDao.instance.getMCollection().bulkWrite(susSampleDataUpdates);
+        if (!suspectSampleDataUpdates.isEmpty()) {
+            SuspectSampleDataDao.instance.getMCollection().bulkWrite(suspectSampleDataUpdates);
         }
     }
 
