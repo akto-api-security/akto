@@ -5,7 +5,6 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.util.Constants;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -21,43 +20,34 @@ import java.util.concurrent.TimeUnit;
 
 public class AllMetrics {
 
+    private final static int METRIC_SEND_LIMIT = 5;
+
     public void init(LogDb module){
         loggerMaker.setDb(module);
+
+        String prefix = "RT_";
+        if(LogDb.THREAT_DETECTION.equals(module)){
+            prefix = "TD_";
+        }
         int accountId = Context.accountId.get();
 
         Organization organization = DataActorFactory.fetchInstance().fetchOrganization(accountId);
         String orgId = organization.getId();
 
-        runtimeKafkaRecordCount = new SumMetric(module.name() + Constants.UNDERSCORE + "RT_KAFKA_RECORD_COUNT", 60, accountId, orgId);
-        runtimeKafkaRecordSize = new SumMetric(module.name()+ Constants.UNDERSCORE +"RT_KAFKA_RECORD_SIZE", 60, accountId, orgId);
-        runtimeProcessLatency = new LatencyMetric(module.name()+ Constants.UNDERSCORE +"RT_KAFKA_LATENCY", 60, accountId, orgId);
-        postgreSampleDataInsertedCount = new SumMetric("PG_SAMPLE_DATA_INSERT_COUNT", 60, accountId, orgId);
-        postgreSampleDataInsertLatency = new LatencyMetric("PG_SAMPLE_DATA_INSERT_LATENCY", 60, accountId, orgId);
-        mergingJobLatency = new LatencyMetric("MERGING_JOB_LATENCY", 60, accountId, orgId);
-        mergingJobUrlsUpdatedCount = new SumMetric("MERGING_JOB_URLS_UPDATED_COUNT", 60, accountId, orgId);
-        staleSampleDataCleanupJobLatency = new LatencyMetric("STALE_SAMPLE_DATA_CLEANUP_JOB_LATENCY", 60, accountId, orgId);
-        staleSampleDataDeletedCount = new SumMetric("STALE_SAMPLE_DATA_DELETED_COUNT", 60, accountId, orgId);
-        mergingJobUrlUpdateLatency = new LatencyMetric("MERGING_JOB_URL_UPDATE_LATENCY", 60, accountId, orgId);
-        cyborgCallLatency = new LatencyMetric("CYBORG_CALL_LATENCY", 60, accountId, orgId);
-        cyborgCallCount = new SumMetric("CYBORG_CALL_COUNT", 60, accountId, orgId);
-        cyborgDataSize = new SumMetric("CYBORG_DATA_SIZE", 60, accountId, orgId);
-        testingRunCount = new SumMetric("TESTING_RUN_COUNT", 60, accountId, orgId);
-        testingRunLatency = new LatencyMetric("TESTING_RUN_LATENCY", 60, accountId, orgId);
-        totalSampleDataCount = new SumMetric("TOTAL_SAMPLE_DATA_COUNT", 60, accountId, orgId);
-        sampleDataFetchLatency = new LatencyMetric("SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId);
-        sampleDataFetchCount = new SumMetric("SAMPLE_DATA_FETCH_COUNT", 60, accountId, orgId); // tODO: Do we need this?
-        pgDataSizeInMb = new SumMetric("PG_DATA_SIZE_IN_MB", 60, accountId, orgId);
-        kafkaOffset = new SumMetric(module.name() + Constants.UNDERSCORE + "KAFKA_OFFSET", 60, accountId, orgId);
-        kafkaRecordsLagMax = new SumMetric(module.name() + Constants.UNDERSCORE + "KAFKA_RECORDS_LAG_MAX", 60, accountId, orgId);
-        kafkaRecordsConsumedRate = new SumMetric(module.name() + Constants.UNDERSCORE + "KAFKA_RECORDS_CONSUMED_RATE", 60, accountId, orgId);
-        kafkaFetchAvgLatency = new LatencyMetric(module.name() + Constants.UNDERSCORE + "KAFKA_FETCH_AVG_LATENCY", 60, accountId, orgId);
-        kafkaBytesConsumedRate = new SumMetric(module.name() + Constants.UNDERSCORE + "KAFKA_BYTES_CONSUMED_RATE", 60, accountId, orgId);
-        cyborgNewApiCount = new SumMetric("CYBORG_NEW_API_COUNT", 60, accountId, orgId);
-        cyborgTotalApiCount = new SumMetric("CYBORG_TOTAL_API_COUNT", 60, accountId, orgId);
-        deltaCatalogTotalCount = new SumMetric("DELTA_CATALOG_TOTAL_COUNT", 60, accountId, orgId);
-        deltaCatalogNewCount = new SumMetric("DELTA_CATALOG_NEW_COUNT", 60, accountId, orgId);
-        cyborgApiPayloadSize = new SumMetric("CYBORG_API_PAYLOAD_SIZE", 60, accountId, orgId);
-        multipleSampleDataFetchLatency = new LatencyMetric("MULTIPLE_SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId);
+        /*
+         * Any metric added here must be added to logs-collector as well.
+         * Repo: https://github.com/akto-api-security/telemetry/blob/master/collector/main.py
+         */
+        runtimeKafkaRecordCount = new SumMetric(prefix+"KAFKA_RECORD_COUNT", 60, accountId, orgId);
+        runtimeKafkaRecordSize = new SumMetric(prefix+"KAFKA_RECORD_SIZE", 60, accountId, orgId);
+        runtimeProcessLatency = new LatencyMetric(prefix+"KAFKA_LATENCY", 60, accountId, orgId);
+        kafkaRecordsLagMax = new SumMetric(prefix+"KAFKA_RECORDS_LAG_MAX", 60, accountId, orgId);
+        kafkaRecordsConsumedRate = new SumMetric(prefix+"KAFKA_RECORDS_CONSUMED_RATE", 60, accountId, orgId);
+        kafkaFetchAvgLatency = new LatencyMetric(prefix+"KAFKA_FETCH_AVG_LATENCY", 60, accountId, orgId);
+        kafkaBytesConsumedRate = new SumMetric(prefix+"KAFKA_BYTES_CONSUMED_RATE", 60, accountId, orgId);
+        /*
+         * TODO: initialize metrics based on the module, to limit avoidable calls.
+         */
 
         metrics = Arrays.asList(runtimeKafkaRecordCount, runtimeKafkaRecordSize, runtimeProcessLatency,
                 postgreSampleDataInsertedCount, postgreSampleDataInsertLatency, mergingJobLatency, mergingJobUrlsUpdatedCount,
@@ -73,6 +63,7 @@ public class AllMetrics {
 
         executorService.scheduleAtFixedRate(() -> {
             try {
+                Context.accountId.set(accountId);
                 BasicDBList list = new BasicDBList();
                 for (Metric m : metrics) {
                     if (m == null) {
@@ -87,13 +78,16 @@ public class AllMetrics {
                     metricsData.put("instance_id", instance_id);
                     metricsData.put("account_id", m.accountId);
                     list.add(metricsData);
-
+                    if (list.size() >= METRIC_SEND_LIMIT) {
+                        sendDataToAkto(list);
+                        list.clear();
+                    }
                 }
                 if(!list.isEmpty()) {
                     sendDataToAkto(list);
                 }
             } catch (Exception e){
-                loggerMaker.errorAndAddToDb("Error while sending metrics to akto: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "Error while sending metrics to akto: " + e.getMessage());
             }
         }, 0, 60, TimeUnit.SECONDS);
     }
@@ -110,12 +104,11 @@ public class AllMetrics {
             .callTimeout(1, TimeUnit.SECONDS)
             .build();
 
-
     private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class, LogDb.RUNTIME);
 
     private static final String instance_id = UUID.randomUUID().toString();
-    private Metric runtimeKafkaRecordCount;
-    private Metric runtimeKafkaRecordSize;
+    private Metric runtimeKafkaRecordCount = null;
+    private Metric runtimeKafkaRecordSize = null;
     private Metric runtimeProcessLatency = null;
     private Metric postgreSampleDataInsertedCount = null;
     private Metric postgreSampleDataInsertLatency = null;
@@ -422,16 +415,16 @@ public class AllMetrics {
         try {
             response =  client.newCall(request).execute();
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "Error while executing request " + request.url() + ": " + e.getMessage());
         } finally {
             if (response != null) {
                 response.close();
             }
         }
         if (response!= null && response.isSuccessful()) {
-            loggerMaker.infoAndAddToDb("Updated traffic_metrics", LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("Updated traffic_metrics");
         } else {
-            loggerMaker.infoAndAddToDb("Traffic_metrics not sent", LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("Traffic_metrics not sent");
         }
     }
 }

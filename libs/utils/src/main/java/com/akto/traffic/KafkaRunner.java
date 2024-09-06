@@ -14,9 +14,6 @@ import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.errors.WakeupException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.akto.DaoInit;
 import com.akto.RuntimeMode;
 import com.akto.dao.context.Context;
@@ -32,7 +29,6 @@ import com.mongodb.ConnectionString;
 public class KafkaRunner {
     private Consumer<String, String> consumer;
     private static final LoggerMaker loggerMaker = new LoggerMaker(KafkaRunner.class, LogDb.RUNTIME);
-    private static final Logger logger = LoggerFactory.getLogger(KafkaRunner.class);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
@@ -85,7 +81,6 @@ public class KafkaRunner {
                 }
             }
         });
-        long lastSyncOffset = 0;
 
         scheduler.scheduleAtFixedRate(() -> {
             try {
@@ -109,10 +104,6 @@ public class KafkaRunner {
                 }
 
                 try {
-                    lastSyncOffset++;
-                    if (lastSyncOffset % 100 == 0) {
-                        logger.info("Committing offset at position: " + lastSyncOffset);
-                    }
                     recordProcessor.apply(records);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error while processing kafka messages " + e, LogDb.RUNTIME);

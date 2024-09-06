@@ -5,31 +5,33 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 
 import org.apache.commons.lang3.function.FailableFunction;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.runtime.utils.Utils;
 import com.akto.traffic.KafkaRunner;
 import com.akto.filters.HttpCallFilter;
 import com.akto.parsers.HttpCallParser;
 
 public class Main {
-
     private static final LogDb module = LogDb.THREAT_DETECTION;
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, module);
-    public static final int sync_threshold_time = 120;
-    public static final int sync_threshold_count = 1000;
-    public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
-
+    private static final Logger logger = LoggerFactory.getLogger(Main.class);
+    private static final int sync_threshold_time = 120;
+    private static final int sync_threshold_count = 1000;
+    private static long lastSyncOffset = 0;
+    
     public static void main(String[] args) {
-
+        
         Map<String, HttpCallFilter> httpCallFilterMap = new HashMap<>();
         String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         if (topicName == null) {
@@ -39,12 +41,21 @@ public class Main {
         }
         
         FailableFunction<ConsumerRecords<String, String>, Void, Exception> func = records -> {
+
+            long start = System.currentTimeMillis();
+            
             // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String, String> r : records) {
                     HttpResponseParams httpResponseParams;
                     try {
                         Utils.printL(r.value());
+                        AllMetrics.instance.setRuntimeKafkaRecordCount(1);
+                        AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
+                        lastSyncOffset++;
+                        if (lastSyncOffset % 100 == 0) {
+                            logger.info("Committing offset at position: " + lastSyncOffset);
+                        }
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e, LogDb.RUNTIME);
@@ -78,6 +89,9 @@ public class Main {
                     List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
                     filter.filterFunction(accWiseResponse);
                 }
+
+            AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
+
             return null;
         };
         KafkaRunner.processKafkaRecords(module, Arrays.asList(topicName), func);
