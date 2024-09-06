@@ -19,7 +19,7 @@ import com.akto.RuntimeMode;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
-import com.akto.dto.Account;
+import com.akto.dto.AccountSettings;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
@@ -39,21 +39,30 @@ public class KafkaRunner {
         loggerMaker.setDb(module);
 
         boolean hybridSaas = RuntimeMode.isHybridDeployment();
+        boolean connected =false;
         if (hybridSaas) {
-            Account account = dataActor.fetchActiveAccount();
-            Context.accountId.set(account.getId());
+            AccountSettings accountSettings = dataActor.fetchAccountSettings();
+            if (accountSettings != null) {
+                int acc = accountSettings.getId();
+                Context.accountId.set(acc);
+                connected = true;
+            }
         } else {
             String mongoURI = System.getenv("AKTO_MONGO_CONN");
             DaoInit.init(new ConnectionString(mongoURI));
             Context.accountId.set(1_000_000);
+            connected = true;
         }
 
-        AllMetrics.instance.init(module);
+        if (connected) {
+            loggerMaker.infoAndAddToDb(String.format("Starting module for account : %d", Context.accountId.get()));
+            AllMetrics.instance.init(module);
+        }
 
         String kafkaBrokerUrl = "kafka1:19092";
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
-            loggerMaker.infoAndAddToDb("is_kubernetes: true", LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("is_kubernetes: true");
             kafkaBrokerUrl = "127.0.0.1:29092";
         }
         String groupIdConfig = System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
@@ -77,7 +86,7 @@ public class KafkaRunner {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 } catch (Error e) {
-                    loggerMaker.errorAndAddToDb("Error in main thread: " + e.getMessage(), LogDb.RUNTIME);
+                    loggerMaker.errorAndAddToDb("Error in main thread: " + e.getMessage());
                 }
             }
         });
@@ -93,8 +102,7 @@ public class KafkaRunner {
 
         try {
             main.consumer.subscribe(topics);
-            loggerMaker.infoAndAddToDb(String.format("Consumer subscribed for topics : %s", topics.toString()),
-                    LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb(String.format("Consumer subscribed for topics : %s", topics.toString()));
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 try {
@@ -106,7 +114,7 @@ public class KafkaRunner {
                 try {
                     recordProcessor.apply(records);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error while processing kafka messages " + e, LogDb.RUNTIME);
+                    loggerMaker.errorAndAddToDb(e, "Error while processing kafka messages " + e);
                 }
             }
         } catch (WakeupException ignored) {
@@ -114,7 +122,7 @@ public class KafkaRunner {
         } catch (Exception e) {
             exceptionOnCommitSync.set(true);
             Utils.printL(e);
-            loggerMaker.errorAndAddToDb("Error in Kafka consumer: " + e.getMessage(), LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("Error in Kafka consumer: " + e.getMessage());
             e.printStackTrace();
             System.exit(0);
         } finally {
