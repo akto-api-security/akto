@@ -158,10 +158,10 @@ public class Main {
                             syncRepoToDashboard(originalHttpResponse.getBody(), repo);
                         }
                     } else {
-                        System.out.println("Failed to download repository. Response code: " + response.code());
+                        loggerMaker.errorAndAddToDb("Failed to download repository "+ repo.getRepoName() +". Response code: " + response.code());
                     }
                 } catch (Exception e) {
-                    System.out.println("failed to call" + e.getMessage());
+                    loggerMaker.errorAndAddToDb("error while calling api" + e.getMessage());
                 }
 
             }
