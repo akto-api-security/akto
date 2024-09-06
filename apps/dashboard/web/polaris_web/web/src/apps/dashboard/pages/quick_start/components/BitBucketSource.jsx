@@ -2,16 +2,26 @@ import { HorizontalStack, LegacyCard, Text, TextField, VerticalStack } from "@sh
 import { useEffect, useState } from "react";
 import api from "../api";
 import func from "../../../../../util/func";
-
-
+import JsonComponent from './shared/JsonComponent'
 
 function BitBucketSource() {
 
     const [repoNames, setrepoNames] = useState('')
     const [projectName, setProjectName] = useState('')
     const [repoList, setRepoList] = useState([])
+    const [apiToken, setApiToken] = useState("");
     const errorMessage = "This repository exists"
+    const fetchRuntimeHelmCommand = async() => {
+        await api.fetchRuntimeHelmCommand().then((resp) => {
+            if (!resp) return
+            setApiToken(resp?.apiToken)
+        })
+    }
 
+    const runtimeSvcCommand = "helm install source-code-analyser ~/akto_code/helm-charts/charts/source-code-analyser -n dev \
+    --set source_code_analyser.aktoApiSecurityCodeAnalyser.env.databaseAbstractorToken=\"" + apiToken + "\"";
+
+    const rcopyCommand = ()=>{func.copyToClipboard(runtimeSvcCommand, ref, null)}
     useEffect(()=> {
         let r = []
         api.fetchCodeAnalysisRepos().then((resp) => {
@@ -20,6 +30,7 @@ function BitBucketSource() {
             })
             setRepoList(r)
         } )
+        fetchRuntimeHelmCommand()
     },[])
 
     const handleDelete = (index) => {
@@ -89,6 +100,14 @@ function BitBucketSource() {
             <Text variant='bodyMd'>
                 Use BitBucket to import your APIs
             </Text>
+
+            <span>1. Run the below command to setup Source-code-analyser service: </span>
+
+            <LegacyCard>
+                <LegacyCard.Section>
+                    <JsonComponent title="Source code analyser service command" toolTipContent="Copy command" onClickFunc={()=> rcopyCommand()} dataString={runtimeSvcCommand} language="text" minHeight="150px" />
+                </LegacyCard.Section>
+            </LegacyCard>
 
             <LegacyCard
                 primaryFooterAction={{ content: 'Save', onAction: primaryAction, disabled: !enableButton() }}
