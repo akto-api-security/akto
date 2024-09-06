@@ -639,7 +639,7 @@ public class DbLayer {
     }
 
     public static List<Integer> fetchDeactivatedCollections() {
-        return new ArrayList<>(UsageMetricCalculator.getDeactivatedLatest());
+        return new ArrayList<>(UsageMetricCalculator.getDeactivated());
     }
 
     public static void updateUsage(MetricTypes metricType, int deltaUsage){
