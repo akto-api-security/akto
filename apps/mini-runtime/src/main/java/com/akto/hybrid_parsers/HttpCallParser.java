@@ -85,6 +85,11 @@ public class HttpCallParser {
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
         this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
     }
+
+    public HttpCallParser(int sync_threshold_count, int sync_threshold_time) {
+        this.sync_threshold_count = sync_threshold_count;
+        this.sync_threshold_time = sync_threshold_time;
+    }
     
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
 
@@ -349,6 +354,52 @@ public class HttpCallParser {
         trafficMetrics.inc(value);
     }
 
+    public int createApiCollectionId(HttpResponseParams httpResponseParam){
+        int apiCollectionId;
+        String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
+
+        if (hostName != null && !hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
+            hostName = "Special_Char_Host";
+        }
+
+        int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
+
+        if (useHostCondition(hostName, httpResponseParam.getSource())) {
+            hostName = hostName.toLowerCase();
+            hostName = hostName.trim();
+
+            String key = hostName;
+
+            if (hostNameToIdMap.containsKey(key)) {
+                apiCollectionId = hostNameToIdMap.get(key);
+
+            } else {
+                int id = hostName.hashCode();
+                try {
+
+                    apiCollectionId = createCollectionBasedOnHostName(id, hostName);
+
+                    hostNameToIdMap.put(key, apiCollectionId);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
+                    createCollectionSimple(vxlanId);
+                    hostNameToIdMap.put("null " + vxlanId, vxlanId);
+                    apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
+                }
+            }
+
+        } else {
+            String key = "null" + " " + vxlanId;
+            if (!hostNameToIdMap.containsKey(key)) {
+                createCollectionSimple(vxlanId);
+                hostNameToIdMap.put(key, vxlanId);
+            }
+
+            apiCollectionId = vxlanId;
+        }
+        return apiCollectionId;
+    }
+
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
@@ -369,48 +420,7 @@ public class HttpCallParser {
             String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(),Constants.AKTO_IGNORE_FLAG);
             if (ignoreAktoFlag != null) continue;
 
-            String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
-
-            if (hostName != null && !hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
-                hostName = "Special_Char_Host";
-            }
-
-            int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
-            int apiCollectionId ;
-
-            if (useHostCondition(hostName, httpResponseParam.getSource())) {
-                hostName = hostName.toLowerCase();
-                hostName = hostName.trim();
-
-                String key = hostName;
-
-                if (hostNameToIdMap.containsKey(key)) {
-                    apiCollectionId = hostNameToIdMap.get(key);
-
-                } else {
-                    int id = hostName.hashCode();
-                    try {
-
-                        apiCollectionId = createCollectionBasedOnHostName(id, hostName);
-
-                        hostNameToIdMap.put(key, apiCollectionId);
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
-                        createCollectionSimple(vxlanId);
-                        hostNameToIdMap.put("null " + vxlanId, vxlanId);
-                        apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
-                    }
-                }
-
-            } else {
-                String key = "null" + " " + vxlanId;
-                if (!hostNameToIdMap.containsKey(key)) {
-                    createCollectionSimple(vxlanId);
-                    hostNameToIdMap.put(key, vxlanId);
-                }
-
-                apiCollectionId = vxlanId;
-            }
+            int apiCollectionId = createApiCollectionId(httpResponseParam);
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 

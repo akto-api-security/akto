@@ -3,7 +3,9 @@ package com.akto.data_actor;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
@@ -179,5 +181,18 @@ public class DbActor extends DataActor {
 
     public Organization fetchOrganization(int accountId) {
         return DbLayer.fetchOrganization(accountId);
+    }
+
+    public void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData) {
+        ArrayList<WriteModel<SuspectSampleData>> writes = new ArrayList<>();
+        for (Object obj: writesForSuspectSampleData) {
+            WriteModel<SuspectSampleData> write = (WriteModel<SuspectSampleData>)obj;
+            writes.add(write);
+        }
+        DbLayer.bulkWriteSuspectSampleData(writes);
+    }
+
+    public List<YamlTemplate> fetchFilterYamlTemplates() {
+        return DbLayer.fetchFilterYamlTemplates();
     }
 }

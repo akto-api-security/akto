@@ -15,6 +15,10 @@ public class FilterYamlTemplateDao extends AccountsContextDao<YamlTemplate> {
 
     public Map<String, FilterConfig> fetchFilterConfig(boolean includeYamlContent) {
         List<YamlTemplate> yamlTemplates = FilterYamlTemplateDao.instance.findAll(Filters.empty());
+        return fetchFilterConfig(includeYamlContent, yamlTemplates);
+    }
+
+    public Map<String, FilterConfig> fetchFilterConfig(boolean includeYamlContent, List<YamlTemplate> yamlTemplates) {
         Map<String, FilterConfig> filterConfigMap = new HashMap<>();
         for (YamlTemplate yamlTemplate : yamlTemplates) {
             try {

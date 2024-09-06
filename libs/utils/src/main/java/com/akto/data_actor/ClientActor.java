@@ -22,6 +22,7 @@ import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo;
@@ -65,8 +66,6 @@ public class ClientActor extends DataActor {
         }
         return dbAbsHost + "/api";
     }
-
-    
 
     public AccountSettings fetchAccountSettings() {
         Map<String, List<String>> headers = buildHeaders();
@@ -1107,4 +1106,37 @@ public class ClientActor extends DataActor {
         return headers;
     }
 
+    public void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData) {
+        bulkWrite(writesForSuspectSampleData, "/bulkWriteSuspectSampleData", "writesForSuspectSampleData");
+    }
+
+    public List<YamlTemplate> fetchFilterYamlTemplates() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<YamlTemplate> templates = new ArrayList<>();
+        BasicDBObject obj = new BasicDBObject();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchFilterYamlTemplates", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchFilterYamlTemplates", LoggerMaker.LogDb.THREAT_DETECTION);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList yamlTemplates = (BasicDBList) payloadObj.get("yamlTemplates");
+                for (Object template: yamlTemplates) {
+                    BasicDBObject obj2 = (BasicDBObject) template;
+                    templates.add(objectMapper.readValue(obj2.toJson(), YamlTemplate.class));
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchFilterYamlTemplates" + e, LoggerMaker.LogDb.THREAT_DETECTION);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchFilterYamlTemplates" + e, LoggerMaker.LogDb.THREAT_DETECTION);
+            return null;
+        }
+        return templates;
+    }
 }
