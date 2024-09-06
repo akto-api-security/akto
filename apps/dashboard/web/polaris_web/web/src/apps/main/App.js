@@ -71,6 +71,7 @@ import VulnerabilityReport from "../dashboard/pages/testing/vulnerability_report
 import ThreatDetectionPage from "../dashboard/pages/threat_detection/ThreatDetectionPage";
 
 import { PollingProvider } from "./PollingProvider";
+import Help from "../dashboard/pages/settings/help_and_support/Help";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -182,6 +183,10 @@ const router = createBrowserRouter([
           {
             path: "users",
             element: <Users />
+          },
+          {
+            path: "Help",
+            element: <Help />
           },
           {
             path: "integrations",

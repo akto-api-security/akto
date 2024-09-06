@@ -400,9 +400,14 @@ public class HttpCallParser {
         trafficMetrics.inc(value);
     }
 
+    public static final String CONTENT_TYPE = "CONTENT-TYPE";
+
     public boolean isRedundantEndpoint(String url, List<String> discardedUrlList){
         StringJoiner joiner = new StringJoiner("|", ".*\\.(", ")(\\?.*)?");
         for (String extension : discardedUrlList) {
+            if(extension.startsWith(CONTENT_TYPE)){
+                continue;
+            }
             joiner.add(extension);
         }
         String regex = joiner.toString();
@@ -477,6 +482,28 @@ public class HttpCallParser {
         return apiCollectionId;
     }
 
+    private boolean isBlankResponseBodyForGET(String method, String contentType, String matchContentType,
+            String responseBody) {
+        boolean res = true;
+        if (contentType == null || contentType.length() == 0)
+            return false;
+        res &= contentType.contains(matchContentType);
+        res &= "GET".equals(method.toUpperCase());
+
+        /*
+         * To be sure that the content type
+         * header matches the actual payload.
+         * 
+         * We will need to add more type validation as needed.
+         */
+        if (matchContentType.contains("html")) {
+            res &= responseBody.startsWith("<") && responseBody.endsWith(">");
+        } else {
+            res &= false;
+        }
+        return res;
+    }
+
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, AccountSettings accountSettings) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
@@ -510,6 +537,30 @@ public class HttpCallParser {
                 if(isInvalidContentType(contentType)){
                     continue;
                 }
+
+                try {
+                    List<String> responseContentTypeList = (List<String>) httpResponseParam.getHeaders().getOrDefault("content-type", new ArrayList<>());
+                    String allContentTypes = responseContentTypeList.toString();
+                    String method = httpResponseParam.getRequestParams().getMethod();
+                    String responseBody = httpResponseParam.getPayload();
+                    boolean ignore = false;
+                    for (String extension : accountSettings.getAllowRedundantEndpointsList()) {
+                        if(extension.startsWith(CONTENT_TYPE)){
+                            String matchContentType = extension.split(" ")[1];
+                            if(isBlankResponseBodyForGET(method, allContentTypes, matchContentType, responseBody)){
+                                ignore = true;
+                                break;
+                            }
+                        }
+                    }
+                    if(ignore){
+                        continue;
+                    }
+    
+                } catch(Exception e){
+                    loggerMaker.errorAndAddToDb(e, "Error while ignoring content-type redundant samples " + e.toString(), LogDb.RUNTIME);
+                }
+
             }
 
             int apiCollectionId = createApiCollectionId(httpResponseParam);
