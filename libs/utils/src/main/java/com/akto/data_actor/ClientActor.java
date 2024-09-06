@@ -3040,4 +3040,38 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData) {
+        bulkWrite(writesForSuspectSampleData, "/bulkWriteSuspectSampleData", "writesForSuspectSampleData");
+    }
+
+    public List<YamlTemplate> fetchFilterYamlTemplates() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<YamlTemplate> templates = new ArrayList<>();
+        BasicDBObject obj = new BasicDBObject();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchFilterYamlTemplates", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchFilterYamlTemplates", LoggerMaker.LogDb.THREAT_DETECTION);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList yamlTemplates = (BasicDBList) payloadObj.get("yamlTemplates");
+                for (Object template: yamlTemplates) {
+                    BasicDBObject obj2 = (BasicDBObject) template;
+                    templates.add(objectMapper.readValue(obj2.toJson(), YamlTemplate.class));
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchFilterYamlTemplates" + e, LoggerMaker.LogDb.THREAT_DETECTION);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchFilterYamlTemplates" + e, LoggerMaker.LogDb.THREAT_DETECTION);
+            return null;
+        }
+        return templates;
+    }
+
 }

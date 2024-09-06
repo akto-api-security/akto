@@ -21,6 +21,7 @@ import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
@@ -473,4 +474,16 @@ public class DbActor extends DataActor {
         DbLayer.insertRuntimeMetricsData(metricsData);
     }
 
+    public void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData) {
+        ArrayList<WriteModel<SuspectSampleData>> writes = new ArrayList<>();
+        for (Object obj: writesForSuspectSampleData) {
+            WriteModel<SuspectSampleData> write = (WriteModel<SuspectSampleData>)obj;
+            writes.add(write);
+        }
+        DbLayer.bulkWriteSuspectSampleData(writes);
+    }
+
+    public List<YamlTemplate> fetchFilterYamlTemplates() {
+        return DbLayer.fetchFilterYamlTemplates();
+    }
 }

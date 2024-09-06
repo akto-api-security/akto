@@ -31,6 +31,7 @@ import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_collector.TrafficCollectorMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
@@ -98,6 +99,7 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForTrafficInfo;
     List<BulkUpdates> writesForTrafficMetrics;
     List<BulkUpdates> writesForTestingRunIssues;
+    List<BulkUpdates> writesForSuspectSampleData;
     List<DependencyNode> dependencyNodeList;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
@@ -1896,6 +1898,41 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String bulkWriteSuspectSampleData() {
+        if (kafkaUtils.isWriteEnabled()) {
+            int accId = Context.accountId.get();
+            kafkaUtils.insertData(writesForSuspectSampleData, "bulkWriteSuspectSampleData", accId);
+        } else {
+            ArrayList<WriteModel<SuspectSampleData>> writes = new ArrayList<>();
+            for (BulkUpdates update : writesForSuspectSampleData) {
+                List<String> updates = update.getUpdates();
+                try {
+                    SuspectSampleData sd = objectMapper.readValue(
+                            gson.toJson(gson.fromJson(updates.get(0), Map.class).get("val")), SuspectSampleData.class);
+                    writes.add(new InsertOneModel<SuspectSampleData>(sd));
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSuspectSampleData " + e.toString());
+                }
+            }
+            try {
+                DbLayer.bulkWriteSuspectSampleData(writes);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSuspectSampleData " + e.toString());
+            }
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchFilterYamlTemplates() {
+        try {
+            yamlTemplates = DbLayer.fetchFilterYamlTemplates();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchFilterYamlTemplates " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -2785,4 +2822,13 @@ public class DbAction extends ActionSupport {
     public void setTrafficCollectorMetrics(TrafficCollectorMetrics trafficCollectorMetrics) {
         this.trafficCollectorMetrics = trafficCollectorMetrics;
     }
+
+    public List<BulkUpdates> getWritesForSuspectSampleData() {
+        return writesForSuspectSampleData;
+    }
+
+    public void setWritesForSuspectSampleData(List<BulkUpdates> writesForSuspectSampleData) {
+        this.writesForSuspectSampleData = writesForSuspectSampleData;
+    }
+
 }
