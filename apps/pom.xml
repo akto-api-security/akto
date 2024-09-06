@@ -49,6 +49,17 @@
             </modules>
         </profile>
         <profile>
+            <id>source-code-analyser</id>
+            <activation>
+                <file>
+                    <exists>source-code-analyser/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>source-code-analyser</module>
+            </modules>
+        </profile>
+        <profile>
             <id>database-abstractor</id>
             <activation>
                 <file>
