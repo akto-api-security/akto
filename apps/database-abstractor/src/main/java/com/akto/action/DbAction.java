@@ -44,6 +44,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.testing.TestExecutor;
 import com.akto.trafficFilter.HostFilter;
 import com.akto.trafficFilter.ParamFilter;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
@@ -390,20 +391,25 @@ public class DbAction extends ActionSupport {
             for (BasicDBObject obj: apiInfoList) {
                 ApiInfo apiInfo = objectMapper.readValue(obj.toJson(), ApiInfo.class);
                 ApiInfoKey id = apiInfo.getId();
+                if (UsageMetricCalculator.getDeactivated().contains(id.getApiCollectionId())) {
+                    continue;
+                }
                 if (accountId == 1721887185 && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)  && !id.getMethod().equals(Method.OPTIONS))  {
                     loggerMaker.infoAndAddToDb("auth types for endpoint from runtime " + id.getUrl() + " " + id.getMethod() + " : " + apiInfo.getAllAuthTypesFound());
                 }
                 apiInfos.add(apiInfo);
             }
-            SingleTypeInfo.fetchCustomAuthTypes(accountId);
-            service.schedule(new Runnable() {
-                public void run() {
-                    Context.accountId.set(accountId);
-                    List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(accountId);
-                    CustomAuthUtil.calcAuth(apiInfos, customAuthTypes, accountId == 1721887185);
-                    DbLayer.bulkWriteApiInfo(apiInfos);
-                }
-            }, 0, TimeUnit.SECONDS);
+            if (apiInfos!=null && !apiInfos.isEmpty()) {
+                SingleTypeInfo.fetchCustomAuthTypes(accountId);
+                service.schedule(new Runnable() {
+                    public void run() {
+                        Context.accountId.set(accountId);
+                        List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(accountId);
+                        CustomAuthUtil.calcAuth(apiInfos, customAuthTypes, accountId == 1721887185);
+                        DbLayer.bulkWriteApiInfo(apiInfos);
+                    }
+                }, 0, TimeUnit.SECONDS);
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in bulkWriteApiInfo " + e.toString());
             if (kafkaUtils.isWriteEnabled()) {
@@ -443,6 +449,9 @@ public class DbAction extends ActionSupport {
                                 int val = Integer.valueOf(valStr);
                                 apiCollectionId = val;
                                 if (ignoreHosts.contains(val)) {
+                                    ignore = true;
+                                }
+                                if(UsageMetricCalculator.getDeactivated().contains(apiCollectionId)){
                                     ignore = true;
                                 }
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._URL)){
@@ -590,6 +599,10 @@ public class DbAction extends ActionSupport {
                     String apiCollectionIdStr = mObj.get("apiCollectionId").toString();
                     int apiCollectionId = Integer.valueOf(apiCollectionIdStr);
 
+                    if(UsageMetricCalculator.getDeactivated().contains(apiCollectionId)){
+                        continue;
+                    }
+
                     String bucketEndEpochStr = mObj.get("bucketEndEpoch").toString();
                     int bucketEndEpoch = Integer.valueOf(bucketEndEpochStr);
 
@@ -639,7 +652,9 @@ public class DbAction extends ActionSupport {
                             new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
                     );
                 }
-                DbLayer.bulkWriteSampleData(writes);
+                if(writes!=null && !writes.isEmpty()){
+                    DbLayer.bulkWriteSampleData(writes);
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSampleData " + e.toString());
                 e.printStackTrace();
@@ -660,11 +675,16 @@ public class DbAction extends ActionSupport {
                 for (BulkUpdates bulkUpdate: writesForSensitiveSampleData) {
                     Bson filters = Filters.empty();
                     int apiCollectionId = 0;
+                    boolean ignore = false;
                     for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                         if (entry.getKey().equalsIgnoreCase("_id.apiCollectionId") ) {
                             String valStr = entry.getValue().toString();
                             int val = Integer.valueOf(valStr);
                             apiCollectionId = val;
+                            if(UsageMetricCalculator.getDeactivated().contains(apiCollectionId)){
+                                ignore = true;
+                                break;
+                            }
                             filters = Filters.and(filters, Filters.eq(entry.getKey(), val));
                         } else if(entry.getKey().equalsIgnoreCase("_id.responseCode")) {
                             String valStr = entry.getValue().toString();
@@ -674,6 +694,11 @@ public class DbAction extends ActionSupport {
                             filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
                         }
                     }
+
+                    if(ignore){
+                        continue;
+                    }
+
                     List<String> updatePayloadList = bulkUpdate.getUpdates();
     
                     boolean isDeleteWrite = false;
@@ -713,7 +738,9 @@ public class DbAction extends ActionSupport {
                         );
                     }
                 }
-                DbLayer.bulkWriteSensitiveSampleData(writes);
+                if(writes!=null && !writes.isEmpty()){
+                    DbLayer.bulkWriteSensitiveSampleData(writes);
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSensitiveSampleData " + e.toString());
                 return Action.ERROR.toUpperCase();
