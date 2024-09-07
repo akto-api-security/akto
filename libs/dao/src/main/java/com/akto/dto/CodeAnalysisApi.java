@@ -15,6 +15,15 @@ public class CodeAnalysisApi {
         this.location = location;
     }
 
+    @Override
+    public String toString() {
+        return "CodeAnalysisApi{" +
+                "method='" + method + '\'' +
+                ", endpoint='" + endpoint + '\'' +
+                ", location=" + location +
+                '}';
+    }
+
     public String generateCodeAnalysisApisMapKey() {
         return method + " " + endpoint;
     }

@@ -1101,6 +1101,69 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void syncExtractedAPIs( CodeAnalysisRepo codeAnalysisRepo, List<CodeAnalysisApi> codeAnalysisApisList, boolean isLastBatch) {
+        Map<String, List<String>> headers = buildHeaders();
+
+        Map<String, Object> m = new HashMap<>();
+        m.put("projectName", codeAnalysisRepo.getProjectName());
+        m.put("repoName", codeAnalysisRepo.getRepoName());
+        m.put("codeAnalysisRepo",codeAnalysisRepo);
+        m.put("isLastBatch", isLastBatch);
+        m.put("codeAnalysisApisList", codeAnalysisApisList);
+
+        String json = gson.toJson(m);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/syncExtractedAPIs", "", "POST", json , headers, "");
+
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+
+
+    }
+
+    public List<CodeAnalysisRepo> findReposToRun()  {
+        List<CodeAnalysisRepo> codeAnalysisRepos = new ArrayList<>();
+
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findReposToRun", "", "GET", "{}", headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findReposToRun", LoggerMaker.LogDb.RUNTIME);
+                return codeAnalysisRepos;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList reposObj= (BasicDBList) payloadObj.get("reposToRun");
+                for (Object repoObj: reposObj) {
+                    BasicDBObject repo = (BasicDBObject) repoObj;
+                    repo.put("id", null);
+                    String hexId = repo.getString("hexId");
+                    CodeAnalysisRepo s = objectMapper.readValue(repo.toJson(), CodeAnalysisRepo.class);
+                    s.setId(new ObjectId(hexId));
+                    codeAnalysisRepos.add(s);
+                }
+            } catch(Exception e) {
+                return codeAnalysisRepos;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findReposToRun" + e, LoggerMaker.LogDb.RUNTIME);
+            return codeAnalysisRepos;
+        }
+
+        return codeAnalysisRepos;
+    }
+
     public Map<String, List<String>> buildHeaders() {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Authorization", Collections.singletonList(System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));

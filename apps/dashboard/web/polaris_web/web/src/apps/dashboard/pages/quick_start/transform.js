@@ -10,6 +10,7 @@ import OpenApiSource from "./components/OpenApiSource"
 import ApiInventoryFromSourceCode from "./components/ApiInventoryFromSourceCode"
 import func from "@/util/func"
 import AddOnComponenet from "./components/shared/AddOnComponenet"
+import BitBucketSource from "./components/BitBucketSource"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -53,7 +54,7 @@ const bitbucketObj = {
     text: "We recommend setting up Bitbucket if you want to connect and retrieve APIs directly from your source code hosted on Bitbucket.",
     docsUrl: 'https://docs.akto.io/traffic-connections',
     key: "Bitbucket",
-    component: <AddOnComponenet/>
+    component: <BitBucketSource/>
 }
 
 const azureObj = {
