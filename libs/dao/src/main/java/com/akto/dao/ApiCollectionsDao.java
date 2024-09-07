@@ -2,11 +2,9 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
-import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
@@ -103,14 +101,18 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
     public List<ApiCollection> fetchNonApiGroupsIds() {
         return ApiCollectionsDao.instance.findAll(
-                Filters.or(
-                        Filters.exists(ApiCollection._TYPE, false),
-                        Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString())),
+                nonApiGroupFilter(),
                 Projections.include(ApiCollection.ID));
     }
 
+    public Bson nonApiGroupFilter() {
+        return Filters.or(
+                Filters.exists(ApiCollection._TYPE, false),
+                Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
+    }
+
     public ApiCollection findByName(String name) {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(nonApiGroupFilter());
         for (ApiCollection apiCollection: apiCollections) {
             if (apiCollection.getDisplayName() == null) continue;
             if (apiCollection.getDisplayName().equalsIgnoreCase(name)) {
