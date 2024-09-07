@@ -49,6 +49,7 @@ import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;
+import com.akto.utils.user_journey.IntercomEventsUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
@@ -259,6 +260,9 @@ public class SaveTestEditorAction extends UserAction {
             addActionError("Cannot save template, specify a different test id");
             return ERROR.toUpperCase();
         }
+
+        IntercomEventsUtil.firstCustomTemplateCreatedEvent();
+
         return SUCCESS.toUpperCase();
     }
 

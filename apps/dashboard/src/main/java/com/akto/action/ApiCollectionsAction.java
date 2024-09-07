@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.akto.action.observe.InventoryAction;
+import com.akto.utils.user_journey.IntercomEventsUtil;
 import org.bson.conversions.Bson;
 
 import com.akto.DaoInit;
@@ -215,6 +216,15 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCollections.add(apiCollection);
 
         ActivitiesDao.instance.insertActivity("Collection created", "new Collection " + this.collectionName + " created");
+
+        Set<String> defaultCollectionNames = new HashSet<>();
+        defaultCollectionNames.add("vulnerable_apis");
+        defaultCollectionNames.add("juice_shop_demo");
+        defaultCollectionNames.add("Default");
+
+        if(!defaultCollectionNames.contains(collectionName)) {
+            IntercomEventsUtil.inventorySummaryEvent();
+        }
 
         return Action.SUCCESS.toUpperCase();
     }

@@ -20,7 +20,7 @@ import io.intercom.api.User;
 
 public class EventMetricsAction extends UserAction {
 
-    private static User findUserInIntercom(String userEmail) throws Exception{
+    public static User findUserInIntercom(String userEmail) throws Exception{
         String url = "https://api.intercom.io/users?email=" + userEmail;
         ObjectMapper objectMapper = new ObjectMapper();
         try {

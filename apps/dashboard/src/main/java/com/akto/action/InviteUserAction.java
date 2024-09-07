@@ -11,6 +11,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
+import com.akto.utils.user_journey.IntercomEventsUtil;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 import com.sendgrid.helpers.mail.Mail;
@@ -154,6 +155,8 @@ public class InviteUserAction extends UserAction{
             e.printStackTrace();
 //            return ERROR.toUpperCase();
         }
+
+        IntercomEventsUtil.teamInviteSentEvent();
 
         return Action.SUCCESS.toUpperCase();
     }
