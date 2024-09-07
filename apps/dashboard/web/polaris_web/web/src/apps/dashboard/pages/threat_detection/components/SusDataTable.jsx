@@ -5,6 +5,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
+import { Text } from "@shopify/polaris";
 
 const resourceName = {
     singular: 'sample',
@@ -40,6 +41,11 @@ const headers = [
         value: 'discoveredTs',
         type: CellType.TEXT,
         sortActive: true
+    },
+    {
+        text: 'Source IPs',
+        title: 'Source IPs',
+        value: 'sourceIPComponent',
     },
     {
         title: '',
@@ -85,7 +91,8 @@ function SusDataTable({ currDateRange, rowClicked }) {
                 ...x,
                 endpointComp: <GetPrettifyEndpoint method={x.method} url={x.url} isNew={false} />,
                 apiCollectionName: collectionsMap[x.apiCollectionId] || '-',
-                discoveredTs: func.prettifyEpoch(x.discovered)
+                discoveredTs: func.prettifyEpoch(x.discovered),
+                sourceIPComponent: <Text>{x?.sourceIPs ? x.sourceIPs.reduce((a, b) => a += ((a.length > 0 ? ", " : "") + b), "") : "-"}</Text>
             }
         })
         setLoading(false);

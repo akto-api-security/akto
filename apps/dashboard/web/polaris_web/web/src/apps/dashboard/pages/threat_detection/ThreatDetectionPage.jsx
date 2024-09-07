@@ -8,38 +8,39 @@ import values from "@/util/values";
 import { produce } from "immer"
 import func from "@/util/func";
 import transform from "../observe/transform";
-import SampleDataComponent from "../../components/shared/SampleDataComponent";
-import { Box, HorizontalGrid, LegacyCard } from "@shopify/polaris";
+import { HorizontalGrid } from "@shopify/polaris";
+import SampleDetails from "./components/SampleDetails";
 function ThreatDetectionPage() {
 
     const [sampleData, setSampleData] = useState([])
     const initialVal = values.ranges[3]
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
+    const [showDetails, setShowDetails] = useState(false);
     const rowClicked = (data) => {
-        let sampleData = [data.sample];
-        let commonMessages = transform.getCommonSamples(sampleData, [])
+        let tmp = [data.sample];
+        let commonMessages = transform.getCommonSamples(tmp, [])
         setSampleData(commonMessages)
+        const sameRow = func.deepComparison(commonMessages, sampleData);
+        if (!sameRow) {
+            setShowDetails(true)
+        } else {
+            setShowDetails(!showDetails)
+        }
     }
 
-    const sampleDataComponent = sampleData.length > 0 ? <Box key={"request"}>
-        <LegacyCard>
-            <SampleDataComponent
-                type={"request"}
-                sampleData={sampleData[Math.min(0, sampleData.length - 1)]}
-                minHeight={"47vh"}
-                showDiff={false}
-                isNewDiff={false}
-            />
-        </LegacyCard>
-    </Box> : <></>
-
-    const horizontalComponent = <HorizontalGrid columns={sampleData.length > 0 ? 2 : 1} gap={2}>
+    const horizontalComponent = <HorizontalGrid columns={1} gap={2}>
         <FilterComponent key={"filter-component"} />
-        {sampleDataComponent}
     </HorizontalGrid>
 
-    const components = [horizontalComponent,
-        <SusDataTable key={"sus-data-table"} currDateRange={currDateRange} rowClicked={rowClicked} />]
+    const components = [
+        horizontalComponent,
+        <SusDataTable key={"sus-data-table"}
+            currDateRange={currDateRange}
+            rowClicked={rowClicked} />,
+        <SampleDetails showDetails={showDetails}
+            setShowDetails={setShowDetails}
+            sampleData={sampleData} />
+    ]
 
     return <PageWithMultipleCards
         title={
