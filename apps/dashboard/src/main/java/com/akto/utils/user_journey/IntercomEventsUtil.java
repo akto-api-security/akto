@@ -228,7 +228,13 @@ public class IntercomEventsUtil {
 
     private static AccountSettings getAccountSettings() {
         Bson projection = Projections.include(AccountSettings.USER_JOURNEY_EVENTS);
-        return AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(), projection);
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(), projection);
+        if(accountSettings == null || accountSettings.getUserJourneyEvents() == null) {
+            accountSettings = new AccountSettings();
+            accountSettings.setUserJourneyEvents(new UserJourneyEvents());
+        }
+
+        return accountSettings;
     }
 
 }
