@@ -6294,6 +6294,9 @@
         <action name="api/addCodeAnalysisRepo" class="com.akto.action.CodeAnalysisAction" method="addCodeAnalysisRepo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">SOURCECODE_ANALYSIS</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
@@ -6313,6 +6316,9 @@
         <action name="api/deleteCodeAnalysisRepo" class="com.akto.action.CodeAnalysisAction" method="deleteCodeAnalysisRepo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">SOURCECODE_ANALYSIS</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
@@ -6332,6 +6338,9 @@
         <action name="api/fetchCodeAnalysisRepos" class="com.akto.action.CodeAnalysisAction" method="fetchCodeAnalysisRepos">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">SOURCECODE_ANALYSIS</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ</param>
@@ -6351,6 +6360,9 @@
         <action name="api/runCodeAnalysisRepo" class="com.akto.action.CodeAnalysisAction" method="runCodeAnalysisRepo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">SOURCECODE_ANALYSIS</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ</param>
