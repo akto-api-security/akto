@@ -31,6 +31,7 @@ public class AuthFilter implements Filter {
         } catch (Exception e) {
             System.out.println(e.getMessage());
             httpServletResponse.sendError(401);
+            return;
         }
         chain.doFilter(servletRequest, servletResponse);
 
