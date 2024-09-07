@@ -59,6 +59,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.upload.FileUpload;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.usage.UsageMetric;
+import com.akto.dto.user_journey.UserJourneyEvents;
 import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -100,6 +101,8 @@ import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
 import com.akto.utils.notifications.TrafficUpdates;
 import com.akto.billing.UsageMetricUtils;
+import com.akto.utils.user_journey.UserJourneyStrategy;
+import com.akto.utils.user_journey.UserJourneyStrategy.UserJourneyHierarchy;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -1797,6 +1800,48 @@ public class InitializerListener implements ServletContextListener {
         eventMetricsAction.sendEventsToAllUsersInAccount(currentEventsMetrics);
     }
 
+    public static void sendIntercomEventsByHierarchy(AccountSettings accountSettings) {
+        UserJourneyEvents userJourneyEvents = accountSettings.getUserJourneyEvents();
+        if (userJourneyEvents == null || userJourneyEvents.getUserSignup() == null) {
+            return;
+        }
+
+        UserJourneyHierarchy[] events = UserJourneyHierarchy.values();
+        int previousFailedLevel = -1;
+
+        for(UserJourneyHierarchy eventHierarchy : events) {
+            UserJourneyStrategy strategy = eventHierarchy.getStrategy();
+
+            if(previousFailedLevel != -1 && previousFailedLevel != eventHierarchy.getHierarchyLevel()) {
+                break;
+            }
+
+            boolean[] eventFlags = strategy.canSendEvent(userJourneyEvents);
+            boolean canSendEvent = false;
+            boolean isEventSent = false;
+            if(eventFlags != null) {
+                canSendEvent = eventFlags[0];
+                isEventSent = eventFlags[1];
+            }
+
+            if(!canSendEvent && !isEventSent && eventHierarchy.getRetryCount() >= UserJourneyHierarchy.MAX_RETRIES) {
+                previousFailedLevel = eventHierarchy.getHierarchyLevel();
+                continue;
+            }
+
+            if(isEventSent) continue;
+
+            if (canSendEvent) {
+                strategy.sendToIntercom(true);
+                previousFailedLevel = -1;
+            } else {
+                strategy.sendToIntercom(false);
+                eventHierarchy.setRetryCount();
+                previousFailedLevel = eventHierarchy.getHierarchyLevel();
+            }
+        }
+    }
+
     public void setUpUpdateCustomCollections() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -1813,6 +1858,15 @@ public class InitializerListener implements ServletContextListener {
                             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
                                 AccountSettingsDao.generateFilter()
                             );
+
+                            long hostNameCollectionCount = ApiCollectionsDao.instance.getMCollection().countDocuments(Filters.exists(ApiCollection.HOST_NAME));
+                            if(hostNameCollectionCount > 0) {
+                                com.akto.utils.user_journey.IntercomEventsUtil.trafficConnectorAddedEvent();
+                                com.akto.utils.user_journey.IntercomEventsUtil.inventorySummaryEvent();
+                            }
+
+                            sendIntercomEventsByHierarchy(accountSettings);
+
                             if(accountSettings != null && accountSettings.getAllowSendingEventsToIntercom()){
                                 sendEventsToIntercom() ;
                             }

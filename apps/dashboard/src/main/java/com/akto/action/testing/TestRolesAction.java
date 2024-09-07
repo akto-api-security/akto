@@ -14,6 +14,7 @@ import com.akto.dto.data_types.Predicate.Type;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.log.LoggerMaker;
+import com.akto.utils.user_journey.IntercomEventsUtil;
 import com.akto.util.Constants;
 import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.BasicDBObject;
@@ -235,6 +236,10 @@ public class TestRolesAction extends UserAction {
         TestRoles role = getRole();
         if (role == null) {
             return ERROR.toUpperCase();
+        }
+
+        if(role.getName().equals("ATTACKER_TOKEN_ALL")) {
+            IntercomEventsUtil.authTokenSetupEvent();
         }
 
         addAuthMechanism(role);

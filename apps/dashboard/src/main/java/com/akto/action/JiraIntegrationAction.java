@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.utils.user_journey.IntercomEventsUtil;
 import org.apache.commons.io.FileUtils;
 import org.bson.conversions.Bson;
 
@@ -154,6 +155,8 @@ public class JiraIntegrationAction extends UserAction {
                 ),
                 updateOptions
         );
+
+        IntercomEventsUtil.jiraIntegratedEvent();
 
         return Action.SUCCESS.toUpperCase();
     }

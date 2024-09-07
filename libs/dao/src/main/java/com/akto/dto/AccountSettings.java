@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import com.akto.dto.user_journey.UserJourneyEvents;
 import org.apache.commons.lang3.StringUtils;
 
 import com.akto.dto.type.CollectionReplaceDetails;
@@ -100,6 +101,9 @@ public class AccountSettings {
 
     public static final String ALLOW_SENDING_EVENTS_TO_INTERCOM = "allowSendingEventsToIntercom";
     private boolean allowSendingEventsToIntercom;
+
+    public static final String USER_JOURNEY_EVENTS = "userJourneyEvents";
+    private UserJourneyEvents userJourneyEvents;
 
     public AccountSettings() {
     }
@@ -393,5 +397,13 @@ public class AccountSettings {
 
     public void setAllowSendingEventsToIntercom(boolean allowSendingEventsToIntercom) {
         this.allowSendingEventsToIntercom = allowSendingEventsToIntercom;
+    }
+
+    public UserJourneyEvents getUserJourneyEvents() {
+        return userJourneyEvents;
+    }
+
+    public void setUserJourneyEvents(UserJourneyEvents userJourneyEvents) {
+        this.userJourneyEvents = userJourneyEvents;
     }
 }

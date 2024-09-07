@@ -11,6 +11,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.test_editor.Info;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
@@ -30,6 +31,7 @@ import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
+import com.akto.utils.user_journey.IntercomEventsUtil;
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
 import com.mongodb.client.model.Filters;
@@ -231,6 +233,7 @@ public class StartTestAction extends UserAction {
                     0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0, this.testIdConfig,testsCounts );
             summary.setState(TestingRun.State.SCHEDULED);
             if (metadata != null) {
+                IntercomEventsUtil.cicdScheduleTestsEvent();
                 loggerMaker.infoAndAddToDb("CICD test triggered at " + Context.now(), LogDb.DASHBOARD);
                 summary.setMetadata(metadata);
             }
@@ -242,6 +245,28 @@ public class StartTestAction extends UserAction {
         this.startTimestamp = 0;
         this.endTimestamp = 0;
         this.retrieveAllCollectionTests();
+
+        if(localTestingRun.getState().equals(State.SCHEDULED)) {
+            IntercomEventsUtil.cicdScheduleTestsEvent();
+        }
+
+        boolean isUsingCustomTemp = false;
+        List<YamlTemplate> customTemplates = YamlTemplateDao.instance.findAll(Filters.ne(YamlTemplate.AUTHOR, "AKTO"));
+
+        for(YamlTemplate customTemplate : customTemplates) {
+            if(selectedTests.contains(customTemplate.getId())) {
+                isUsingCustomTemp = true;
+                break;
+            }
+        }
+
+        if(!isUsingCustomTemp) {
+            IntercomEventsUtil.customTemplateUnusedEvent();
+        }
+
+        if(testName != null && !testName.equals("Onboarding demo test")) {
+            IntercomEventsUtil.firstTestRunEvent();
+        }
         return SUCCESS.toUpperCase();
     }
 

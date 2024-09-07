@@ -10,7 +10,6 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.test_editor.Info;
@@ -23,6 +22,7 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.utils.user_journey.IntercomEventsUtil;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
@@ -31,7 +31,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
-import org.bouncycastle.util.test.Test;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +41,6 @@ import java.util.List;
 import java.util.Map;
 
 import static com.akto.util.Constants.ID;
-import static com.akto.util.enums.GlobalEnums.*;
 
 public class IssuesAction extends UserAction {
 
@@ -121,6 +119,9 @@ public class IssuesAction extends UserAction {
                 runIssue.getId().setTestSourceConfig(config);
             }
         }
+
+        IntercomEventsUtil.issuesPageEvent();
+
         return SUCCESS.toUpperCase();
     }
 
@@ -139,6 +140,7 @@ public class IssuesAction extends UserAction {
                 ));
             }
             if (issues.isEmpty()) {
+                IntercomEventsUtil.reportExportedEvent();
                 this.testingRunResults = new ArrayList<>();
                 this.sampleDataVsCurlMap = new HashMap<>();
                 return SUCCESS.toUpperCase();
@@ -186,6 +188,7 @@ public class IssuesAction extends UserAction {
                 runResult.setTestResults(testResults);
             }
             this.sampleDataVsCurlMap = sampleDataVsCurlMap;
+            IntercomEventsUtil.reportExportedEvent();
         } catch (Exception e) {
             return ERROR.toUpperCase();
         }

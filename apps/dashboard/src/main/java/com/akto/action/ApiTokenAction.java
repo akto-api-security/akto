@@ -9,6 +9,7 @@ import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.utils.RandomString;
+import com.akto.utils.user_journey.IntercomEventsUtil;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.result.DeleteResult;
@@ -121,6 +122,8 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
             SlackWebhook newWebhook = new SlackWebhook(now, webhookUrl, 1, 1, now, getSUser().getLogin(), dashboardUrl,now,frequencyInSeconds);
             this.apiTokenId = SlackWebhooksDao.instance.insertOne(newWebhook).getInsertedId().asInt32().getValue();
         }
+
+        IntercomEventsUtil.slackIntegrationEvent();
 
         return Action.SUCCESS.toUpperCase();
     }

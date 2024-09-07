@@ -2,6 +2,7 @@ package com.akto.action;
 
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
@@ -11,6 +12,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.slack.NewUserJoiningAlert;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
+import com.akto.utils.user_journey.IntercomEventsUtil;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
 import com.akto.utils.AzureLogin;
@@ -19,8 +21,6 @@ import com.akto.utils.JWT;
 import com.akto.utils.OktaLogin;
 import com.akto.utils.sso.SsoUtils;
 import com.akto.util.DashboardMode;
-import com.akto.utils.GithubLogin;
-import com.akto.utils.JWT;
 import com.akto.utils.billing.OrganizationUtils;
 import com.auth0.Tokens;
 import com.auth0.jwk.Jwk;
@@ -29,7 +29,6 @@ import com.auth0.jwk.UrlJwkProvider;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.auth0.jwt.interfaces.JWTVerifier;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -40,7 +39,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.onelogin.saml2.Auth;
 import com.onelogin.saml2.settings.Saml2Settings;
-import com.onelogin.saml2.settings.SettingsBuilder;
 import com.opensymphony.xwork2.Action;
 import com.slack.api.Slack;
 import com.slack.api.methods.SlackApiException;
@@ -51,10 +49,6 @@ import com.slack.api.methods.response.users.UsersIdentityResponse;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.NameValuePair;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.message.BasicNameValuePair;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
 import org.bson.conversions.Bson;
@@ -64,10 +58,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 
@@ -777,6 +769,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             AktoMixpanel aktoMixpanel = new AktoMixpanel();
             aktoMixpanel.sendEvent(distinct_id, "SIGNUP_SUCCEEDED", props);
+
+            if(invitationToAccount == 0) IntercomEventsUtil.userSignupEvent();
         }
     }
 
