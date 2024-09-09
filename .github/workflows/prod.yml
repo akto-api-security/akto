@@ -89,4 +89,4 @@ jobs:
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
           cd apps/source-code-analyser
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/source-code-analyser:$IMAGE_TAG -t $ECR_REGISTRY/source-code-analyser:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG2 -t $ECR_REGISTRY/source-code-analyser:$IMAGE_TAG3 . --push
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/source-code-analyser:$IMAGE_TAG -t $ECR_REGISTRY/source-code-analyser:$IMAGE_TAG1 -t $ECR_REGISTRY/source-code-analyser:$IMAGE_TAG2 -t $ECR_REGISTRY/source-code-analyser:$IMAGE_TAG3 . --push
