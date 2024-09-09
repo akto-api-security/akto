@@ -7,6 +7,7 @@ import com.akto.dao.file.FilesDao;
 import com.akto.dao.upload.FileUploadLogsDao;
 import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.files.File;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -65,6 +66,8 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
     private String lastFetchedUrl;
     private String lastFetchedMethod;
 
+    private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
+
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     @Override
@@ -100,6 +103,59 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
             Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = sampleDataToSTI.getSingleTypeInfoMap();
             OpenAPI openAPI = Main.init(apiCollection.getDisplayName(),stiList, includeHeaders, host);
+            loggerMaker.infoAndAddToDb("Initialized openAPI", LogDb.DASHBOARD);
+
+            openAPIString = Main.convertOpenApiToJSON(openAPI);
+            loggerMaker.infoAndAddToDb("Initialize openAPI", LogDb.DASHBOARD);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e,"ERROR while downloading openApi file " + e, LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String generateOpenApiForSelectedApis() {
+        try {
+            List<Integer> apiCollectionIds = new ArrayList<>();
+            List<String> urls = new ArrayList<>();
+            List<String> methods = new ArrayList<>();
+
+            for (ApiInfo.ApiInfoKey apiInfoKey : apiInfoKeyList) {
+                apiCollectionIds.add(apiInfoKey.getApiCollectionId());
+                urls.add(apiInfoKey.getUrl());
+                methods.add(apiInfoKey.getMethod().name());
+            }
+
+            Bson filter = Filters.and(
+                    Filters.in("_id.apiCollectionId", apiCollectionIds),
+                    Filters.in("_id.url", urls),
+                    Filters.in("_id.method", methods)
+            );
+
+            List<SampleData> sampleDataList = SampleDataDao.instance.findAll(filter);
+
+            int size = sampleDataList.size();
+            loggerMaker.infoAndAddToDb("Fetched sample data list " + size, LogDb.DASHBOARD);
+
+            int limit = 100;
+            if (size < limit) {
+                lastFetchedUrl = null;
+                lastFetchedMethod = null;
+            } else {
+                SampleData last = sampleDataList.get(size-1);
+                lastFetchedUrl = last.getId().getUrl();
+                lastFetchedMethod = last.getId().getMethod().name();
+            }
+            loggerMaker.infoAndAddToDb("Fetching for " + lastFetchedUrl + " " + lastFetchedMethod, LogDb.DASHBOARD);
+
+            SampleDataToSTI sampleDataToSTI = new SampleDataToSTI();
+            sampleDataToSTI.setSampleDataToSTI(sampleDataList);
+            loggerMaker.infoAndAddToDb("Converted to STI", LogDb.DASHBOARD);
+
+            Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = sampleDataToSTI.getSingleTypeInfoMap();
+            OpenAPI openAPI = Main.init("Custom OpenAPI schema", stiList, includeHeaders, null);
             loggerMaker.infoAndAddToDb("Initialized openAPI", LogDb.DASHBOARD);
 
             openAPIString = Main.convertOpenApiToJSON(openAPI);
@@ -379,5 +435,13 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
     public void setImportType(PostmanAction.ImportType importType) {
         this.importType = importType;
+    }
+
+    public List<ApiInfo.ApiInfoKey> getApiInfoKeyList() {
+        return apiInfoKeyList;
+    }
+
+    public void setApiInfoKeyList(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
+        this.apiInfoKeyList = apiInfoKeyList;
     }
 }
