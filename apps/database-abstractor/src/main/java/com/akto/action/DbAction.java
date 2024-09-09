@@ -1864,6 +1864,17 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String insertProtectionLog() {
+        try {
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            DbLayer.insertProtectionLog(dbLog);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertProtectionLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String bulkWriteDependencyNodes() {
         try {
             loggerMaker.infoAndAddToDb("bulkWriteDependencyNodes called");

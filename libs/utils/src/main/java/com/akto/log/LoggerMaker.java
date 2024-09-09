@@ -268,6 +268,9 @@ public class LoggerMaker  {
                     BillingLogsDao.instance.insertOne(log);
                     break;
                 // Add db for db-abs
+                case THREAT_DETECTION:
+                    dataActor.insertProtectionLog(log);
+                    break;
                 default:
                     break;
             }

@@ -462,6 +462,10 @@ public class DbActor extends DataActor {
         DbLayer.insertTestingLog(log);
     }
 
+    public void insertProtectionLog(Log log) {
+        DbLayer.insertProtectionLog(log);
+    }
+
     public void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
         DbLayer.bulkWriteDependencyNodes(dependencyNodeList);
     }
