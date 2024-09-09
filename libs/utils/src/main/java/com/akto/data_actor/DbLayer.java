@@ -24,6 +24,7 @@ import org.bson.types.ObjectId;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
@@ -59,6 +60,7 @@ import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
@@ -377,6 +379,10 @@ public class DbLayer {
 
     public static void insertTestingLog(Log log) {
         LogsDao.instance.insertOne(log);
+    }
+
+    public static void insertProtectionLog(Log log) {
+        ProtectionLogsDao.instance.insertOne(log);
     }
 
     public static void modifyHybridSaasSetting(boolean isHybridSaas) {
@@ -888,5 +894,13 @@ public class DbLayer {
             loggerMaker.infoAndAddToDb("insertRuntimeMetricsData bulk write size " + metricsData.size());
             RuntimeMetricsDao.bulkInsertMetrics(bulkUpdates);
         }
+    }
+
+    public static void bulkWriteSuspectSampleData(List<WriteModel<SuspectSampleData>> writesForSingleTypeInfo) {
+        SuspectSampleDataDao.instance.getMCollection().bulkWrite(writesForSingleTypeInfo);
+    }
+
+    public static List<YamlTemplate> fetchFilterYamlTemplates() {
+        return FilterYamlTemplateDao.instance.findAll(Filters.empty());
     }
 }

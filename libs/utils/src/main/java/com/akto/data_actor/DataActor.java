@@ -230,4 +230,9 @@ public abstract class DataActor {
 
     public abstract void insertRuntimeMetricsData(BasicDBList metricsData);
 
+    public abstract void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData);
+
+    public abstract List<YamlTemplate> fetchFilterYamlTemplates();
+
+    public abstract void insertProtectionLog(Log log);
 }
