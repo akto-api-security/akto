@@ -2,6 +2,7 @@ package com.akto;
 
 import com.akto.dto.CodeAnalysisRepo;
 import com.mongodb.BasicDBObject;
+import org.apache.commons.lang3.StringUtils;
 
 public class GithubRepo extends SourceCodeAnalyserRepo{
 
@@ -26,7 +27,7 @@ public class GithubRepo extends SourceCodeAnalyserRepo{
 
     @Override
     public BasicDBObject getCodeAnalysisBody(String path) {
-        if (path == null || GITHUB_ACCESS_TOKEN == null) {
+        if (path == null || StringUtils.isEmpty(GITHUB_ACCESS_TOKEN)) {
             return null;
         }
 
@@ -39,7 +40,7 @@ public class GithubRepo extends SourceCodeAnalyserRepo{
     }
 
     public static boolean doesEnvVariablesExists() {
-        if (GITHUB_ACCESS_TOKEN == null) {
+        if (StringUtils.isEmpty(GITHUB_ACCESS_TOKEN)) {
             return false;
         }
         return true;

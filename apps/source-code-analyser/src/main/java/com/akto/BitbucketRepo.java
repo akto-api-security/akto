@@ -7,8 +7,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import de.flapdoodle.embed.process.runtime.NUMA;
-import org.apache.kafka.common.protocol.types.Field;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -40,7 +39,7 @@ public class BitbucketRepo extends SourceCodeAnalyserRepo{
 
     public static void fetchAllProjectKeys() {
         allProjectKeys.clear();
-        if (BITBUCKET_URL == null || BITBUCKET_TOKEN == null) {
+        if (StringUtils.isEmpty(BITBUCKET_URL) || StringUtils.isEmpty(BITBUCKET_TOKEN)) {
             return;
         }
         Map<String, List<String>> headers = buildHeaders(BITBUCKET_TOKEN);
@@ -71,7 +70,7 @@ public class BitbucketRepo extends SourceCodeAnalyserRepo{
 
     @Override
     public String getRepoUrl() {
-        if (BITBUCKET_URL == null || allProjectKeys.isEmpty()) {
+        if (StringUtils.isEmpty(BITBUCKET_URL) || allProjectKeys.isEmpty()) {
             return null;
         }
         String url = BITBUCKET_URL + REPO_URL;
@@ -87,7 +86,7 @@ public class BitbucketRepo extends SourceCodeAnalyserRepo{
 
     @Override
     public BasicDBObject getCodeAnalysisBody(String path) {
-        if (path == null || allProjectKeys.isEmpty() || BITBUCKET_URL == null || BITBUCKET_TOKEN == null) {
+        if (path == null || allProjectKeys.isEmpty() || StringUtils.isEmpty(BITBUCKET_URL) || StringUtils.isEmpty(BITBUCKET_TOKEN)) {
             return null;
         }
 
@@ -101,7 +100,7 @@ public class BitbucketRepo extends SourceCodeAnalyserRepo{
     }
 
     public static boolean doesEnvVariablesExists() {
-        if (BITBUCKET_TOKEN == null || BITBUCKET_URL == null) {
+        if (StringUtils.isEmpty(BITBUCKET_TOKEN) || StringUtils.isEmpty(BITBUCKET_URL)) {
             return false;
         }
         return true;

@@ -16,6 +16,7 @@ import okhttp3.ConnectionPool;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.net.ssl.X509TrustManager;
 import java.io.File;
@@ -35,7 +36,16 @@ abstract public class SourceCodeAnalyserRepo {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     public static final int MAX_BATCH_SIZE = 100;
     protected static final DataActor dataActor = DataActorFactory.fetchInstance();
-    public static final String SOURCE_CODE_ANALYSER_URL = System.getenv("SOURCE_CODE_HOST") + "/api/run-analyser";
+    public static final String SOURCE_CODE_HOST = System.getenv("SOURCE_CODE_HOST");
+    public static final String SOURCE_CODE_ANALYSER_URL;
+
+    static {
+        if (!StringUtils.isEmpty(SOURCE_CODE_HOST)) {
+            SOURCE_CODE_ANALYSER_URL = SOURCE_CODE_HOST + "/api/run-analyser";
+        } else {
+            SOURCE_CODE_ANALYSER_URL = null;
+        }
+    }
 
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
             .connectTimeout(0, TimeUnit.SECONDS)
@@ -121,6 +131,10 @@ abstract public class SourceCodeAnalyserRepo {
     }
 
     public void fetchEndpointsUsingAnalyser() {
+        if (StringUtils.isEmpty(SOURCE_CODE_ANALYSER_URL)) {
+            loggerMaker.infoAndAddToDb("No source-code-analyser url found, skipping");
+            return;
+        }
         String repositoryPath = downloadRepository();
         BasicDBObject requestBody = getCodeAnalysisBody(repositoryPath);
         if (requestBody == null) {
