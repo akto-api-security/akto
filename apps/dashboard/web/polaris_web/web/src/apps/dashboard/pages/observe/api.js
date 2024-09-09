@@ -205,12 +205,30 @@ export default {
             }
         })
     },
+    downloadOpenApiFileForSelectedApis(apiInfoKeyList) {
+        return request({
+            url: '/api/generateOpenApiForSelectedApis',
+            method: 'post',
+            data: {
+                apiInfoKeyList
+            }
+        })
+    },
     exportToPostman(apiCollectionId) {
         return request({
             url: '/api/createPostmanApi',
             method: 'post',
             data: {
                 apiCollectionId
+            }
+        })
+    },
+    exportToPostmanForSelectedApis(apiInfoKeyList) {
+        return request({
+            url: '/api/createPostmanForSelectedApi',
+            method: 'post',
+            data: {
+                apiInfoKeyList
             }
         })
     },

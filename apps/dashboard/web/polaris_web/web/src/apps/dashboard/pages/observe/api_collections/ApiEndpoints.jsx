@@ -450,6 +450,31 @@ function ApiEndpoints(props) {
         func.setToast(true, false, <div data-testid="openapi_spec_download_message">OpenAPI spec downloaded successfully</div>)
     }
 
+    async function exportOpenApiForSelectedApi() {
+        const apiInfoKeyList = selectedResourcesForPrimaryAction.map(str => {
+            const parts = str.split('###')
+
+            const method = parts[0]
+            const url = parts[1]
+            const apiCollectionId = parseInt(parts[2], 10)
+
+            return {
+                apiCollectionId: apiCollectionId,
+                method: method,
+                url: url
+            }
+        })
+        let result = await api.downloadOpenApiFileForSelectedApis(apiInfoKeyList)
+        let openApiString = result["openAPIString"]
+        let blob = new Blob([openApiString], {
+            type: "application/json",
+        });
+        const fileName = "open_api_akto.json";
+        saveAs(blob, fileName);
+
+        func.setToast(true, false, <div data-testid="openapi_spec_download_message">OpenAPI spec downloaded successfully</div>)
+    }
+
     function exportCsv(selectedResources = []) {
         const selectedResourcesSet = new Set(selectedResources)
         if (!loading) {
@@ -471,7 +496,27 @@ function ApiEndpoints(props) {
     }
 
     async function exportPostman() {
-        const result = await api.exportToPostman(apiCollectionId)
+        let result;
+        if(selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) {
+            const apiInfoKeyList = selectedResourcesForPrimaryAction.map(str => {
+                const parts = str.split('###')
+
+                const method = parts[0]
+                const url = parts[1]
+                const apiCollectionId = parseInt(parts[2], 10)
+
+                return {
+                    apiCollectionId: apiCollectionId,
+                    method: method,
+                    url: url
+                }
+            })
+
+            result = await api.exportToPostmanForSelectedApis(apiInfoKeyList)
+        } else {
+            result = await api.exportToPostman(apiCollectionId)
+        }
+
         if (result)
         func.setToast(true, false, "We have initiated export to Postman, checkout API section on your Postman app in sometime.")
     }
@@ -598,7 +643,7 @@ function ApiEndpoints(props) {
                         <VerticalStack gap={2}>
                             <Text>Export as</Text>
                                 <VerticalStack gap={1}>
-                                <div data-testid="openapi_spec_option" onClick={exportOpenApi} style={{cursor: 'pointer'}}>
+                                <div data-testid="openapi_spec_option" onClick={(selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi : exportOpenApi} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">OpenAPI spec</Text>
                                 </div>
                                 <div data-testid="postman_option" onClick={exportPostman} style={{cursor: 'pointer'}}>

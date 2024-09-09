@@ -165,6 +165,47 @@ public class PostmanAction extends UserAction {
         this.apiCollectionId = apiCollectionId;
     }
 
+
+    private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
+    public String createPostmanForSelectedApi() {
+        PostmanCredential postmanCredential = fetchPostmanCredential();
+        if (postmanCredential == null) {
+            addActionError("Please add postman credentials in settings");
+            return ERROR.toUpperCase();
+        }
+        int accountId = Context.accountId.get();
+
+        Runnable r = () -> {
+            loggerMaker.infoAndAddToDb("Starting thread to create postman for selected api", LogDb.DASHBOARD);
+            Context.accountId.set(accountId);
+
+            String apiName = "AKTO Custom Postman";
+
+            OpenApiAction openApiAction = new OpenApiAction();
+            openApiAction.setApiInfoKeyList(apiInfoKeyList);
+            String resultStatus = openApiAction.generateOpenApiForSelectedApis();
+            String openAPIString;
+
+            if(resultStatus.equals(SUCCESS.toUpperCase())) {
+                openAPIString = openApiAction.getOpenAPIString();
+            } else {
+                openAPIString = "";
+            }
+
+            Main main = new Main(postmanCredential.getApiKey());
+            try {
+                main.createApiWithSchema(postmanCredential.getWorkspaceId(), apiName, openAPIString);
+            } catch (Exception e){
+                loggerMaker.errorAndAddToDb(e,"Error while creating api in postman: " + e.getMessage(), LogDb.DASHBOARD);
+            }
+            loggerMaker.infoAndAddToDb("Successfully created api in postman", LogDb.DASHBOARD);
+        };
+
+        executorService.submit(r);
+
+        return SUCCESS.toUpperCase();
+    }
+
     private String postmanCollectionId;
     public String savePostmanCollection() {
         int userId = getSUser().getId();
@@ -780,5 +821,13 @@ public class PostmanAction extends UserAction {
 
     public void setImportType(ImportType importType) {
         this.importType = importType;
+    }
+
+    public List<ApiInfo.ApiInfoKey> getApiInfoKeyList() {
+        return apiInfoKeyList;
+    }
+
+    public void setApiInfoKeyList(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
+        this.apiInfoKeyList = apiInfoKeyList;
     }
 }
