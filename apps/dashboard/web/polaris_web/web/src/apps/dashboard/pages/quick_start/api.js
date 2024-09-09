@@ -162,11 +162,11 @@ const api = {
         })
     },
 
-    fetchCodeAnalysisRepos() {
+    fetchCodeAnalysisRepos(sourceCodeType) {
         return request({
             url: '/api/fetchCodeAnalysisRepos',
             method: 'post',
-            data: {}
+            data: {sourceCodeType}
         })
     }
 }

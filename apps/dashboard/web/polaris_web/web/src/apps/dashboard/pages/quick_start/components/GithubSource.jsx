@@ -4,7 +4,7 @@ import api from "../api";
 import func from "../../../../../util/func";
 import JsonComponent from './shared/JsonComponent'
 
-function BitBucketSource() {
+function GithubSource() {
 
     const [repoNames, setrepoNames] = useState('')
     const [projectName, setProjectName] = useState('')
@@ -24,7 +24,7 @@ function BitBucketSource() {
     const rcopyCommand = ()=>{func.copyToClipboard(runtimeSvcCommand, ref, null)}
     useEffect(()=> {
         let r = []
-        api.fetchCodeAnalysisRepos("BITBUCKET").then((resp) => {
+        api.fetchCodeAnalysisRepos("GITHUB").then((resp) => {
             resp["codeAnalysisRepos"].forEach((x) => {
                 r.push({"repo": x["repoName"], "project": x["projectName"], "lastRun": x["lastRun"], "scheduleTime": x["scheduleTime"]})
             })
@@ -69,10 +69,10 @@ function BitBucketSource() {
             codeAnalysisRepos.push({
                 "projectName": projectName,
                 "repoName": x,
-                "sourceCodeType": "BITBUCKET"
+                "sourceCodeType": "GITHUB"
             })
         })
-        api.addCodeAnalysisRepo(codeAnalysisRepos, "BITBUCKET")
+        api.addCodeAnalysisRepo(codeAnalysisRepos)
 
         setRepoList([...repoList, ...result])
         setProjectName('')
@@ -99,7 +99,7 @@ function BitBucketSource() {
     return (
         <div className='card-items'>
             <Text variant='bodyMd'>
-                Use BitBucket to import your APIs
+                Use Github to import your APIs
             </Text>
 
             <span>1. Run the below command to setup Source-code-analyser service: </span>
@@ -114,9 +114,9 @@ function BitBucketSource() {
                 primaryFooterAction={{ content: 'Save', onAction: primaryAction, disabled: !enableButton() }}
             >
                 <LegacyCard.Section>
-                    <TextField onChange={(val) => setProjectName(val)} value={projectName} helpText="Name of your Project" label="Project Name" />
+                    <TextField onChange={(val) => setProjectName(val)} value={projectName} helpText="Name of your Organisation" label="Organisation Name" />
                     <br />
-                    <TextField onChange={(val) => setrepoNames(val)} value={repoNames} label="Repo Name" helpText="This accepts comma separated values" />
+                    <TextField onChange={(val) => setrepoNames(val)} value={repoNames} label="Repository Name" helpText="This accepts comma separated values" />
                     {!isUniqueCombination() && <Text color="critical" variant="bodySm" style={{ marginTop: '8px' }}>{errorMessage}</Text>}
 
                 </LegacyCard.Section>
@@ -147,4 +147,4 @@ function BitBucketSource() {
 }
 
 
-export default BitBucketSource
+export default GithubSource
