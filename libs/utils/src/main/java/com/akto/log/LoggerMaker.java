@@ -221,7 +221,7 @@ public class LoggerMaker  {
         if(checkUpdate() && db!=null){
             switch(db){
                 case TESTING: 
-                    LogsDao.instance.insertOne(log);
+                    dataActor.insertTestingLog(log);
                     break;
                 case RUNTIME: 
                     dataActor.insertRuntimeLog(log);
@@ -234,6 +234,9 @@ public class LoggerMaker  {
                     break;
                 case BILLING:
                     BillingLogsDao.instance.insertOne(log);
+                    break;
+                case THREAT_DETECTION:
+                    dataActor.insertProtectionLog(log);
                     break;
                 default:
                     break;

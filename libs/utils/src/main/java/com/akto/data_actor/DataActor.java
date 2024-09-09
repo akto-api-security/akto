@@ -85,4 +85,7 @@ public abstract class DataActor {
 
     public abstract List<YamlTemplate> fetchFilterYamlTemplates();
 
+    public abstract void insertTestingLog(Log log);
+
+    public abstract void insertProtectionLog(Log log);
 }

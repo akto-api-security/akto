@@ -195,4 +195,12 @@ public class DbActor extends DataActor {
     public List<YamlTemplate> fetchFilterYamlTemplates() {
         return DbLayer.fetchFilterYamlTemplates();
     }
+
+    public void insertTestingLog(Log log) {
+        DbLayer.insertTestingLog(log);
+    }
+
+    public void insertProtectionLog(Log log) {
+        DbLayer.insertProtectionLog(log);
+    }
 }
