@@ -44,7 +44,11 @@ public class Main {
                 } else {
                     sourceCodeAnalyserRepo = new GithubRepo(repo);
                 }
-                sourceCodeAnalyserRepo.fetchEndpointsUsingAnalyser();
+                try {
+                    sourceCodeAnalyserRepo.fetchEndpointsUsingAnalyser();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error while fetching endpoints:" + e.getMessage());
+                }
             }
 
             Thread.sleep(SLEEP_TIME);

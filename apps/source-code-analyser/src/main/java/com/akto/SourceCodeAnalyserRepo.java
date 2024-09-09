@@ -34,7 +34,7 @@ abstract public class SourceCodeAnalyserRepo {
     abstract public BasicDBObject getCodeAnalysisBody(String path);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     public static final int MAX_BATCH_SIZE = 100;
-    private static final DataActor dataActor = DataActorFactory.fetchInstance();
+    protected static final DataActor dataActor = DataActorFactory.fetchInstance();
     public static final String SOURCE_CODE_ANALYSER_URL = System.getenv("SOURCE_CODE_HOST") + "/api/run-analyser";
 
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
@@ -43,7 +43,7 @@ abstract public class SourceCodeAnalyserRepo {
             .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
             .sslSocketFactory(CoreHTTPClient.trustAllSslSocketFactory, (X509TrustManager)CoreHTTPClient.trustAllCerts[0])
             .hostnameVerifier((hostname, session) -> true)
-            .followRedirects(false).build();
+            .followRedirects(true).build();
 
     public String downloadRepository () {
         String finalUrl = this.getRepoUrl();
@@ -98,6 +98,9 @@ abstract public class SourceCodeAnalyserRepo {
         try {
             BasicDBObject requestBody = BasicDBObject.parse(body);
             BasicDBList basicDBList = (BasicDBList) requestBody.get("codeAnalysisApisList");
+            if (basicDBList.isEmpty()) {
+                dataActor.updateRepoLastRun(repo);// No apis found skipping next runs
+            }
             List<CodeAnalysisApi> codeAnalysisApiList = new ArrayList<>();
             for (Object obj : basicDBList) {
                 BasicDBObject codeAnalysisApi = (BasicDBObject) obj;

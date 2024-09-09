@@ -975,7 +975,7 @@ public class ClientActor extends DataActor {
         obj.put("log", logObj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertRuntimeLog", "", "POST", obj.toString(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null, true);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in insertRuntimeLog", LoggerMaker.LogDb.RUNTIME);
@@ -1116,7 +1116,33 @@ public class ClientActor extends DataActor {
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/syncExtractedAPIs", "", "POST", json , headers, "");
 
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null, true);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+
+
+    }
+
+    public void updateRepoLastRun( CodeAnalysisRepo codeAnalysisRepo) {
+        Map<String, List<String>> headers = buildHeaders();
+
+        Map<String, Object> m = new HashMap<>();
+        m.put("projectName", codeAnalysisRepo.getProjectName());
+        m.put("repoName", codeAnalysisRepo.getRepoName());
+        m.put("codeAnalysisRepo",codeAnalysisRepo);
+
+        String json = gson.toJson(m);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateRepoLastRun", "", "POST", json , headers, "");
+
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null, true);
             if (response.getStatusCode() != 200) {
                 loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
                 return;
@@ -1135,7 +1161,7 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findReposToRun", "", "GET", "{}", headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null, true);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in findReposToRun", LoggerMaker.LogDb.RUNTIME);

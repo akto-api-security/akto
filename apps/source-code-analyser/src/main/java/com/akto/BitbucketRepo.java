@@ -75,7 +75,13 @@ public class BitbucketRepo extends SourceCodeAnalyserRepo{
             return null;
         }
         String url = BITBUCKET_URL + REPO_URL;
-        return url.replace("__PROJECT_KEY__", allProjectKeys.get(this.getRepoToBeAnalysed().getProjectName()))
+        String projectKey = allProjectKeys.get(this.getRepoToBeAnalysed().getProjectName());
+        if (projectKey == null) {
+            loggerMaker.infoAndAddToDb("No project with name:" + this.getRepoToBeAnalysed().getProjectName() + " exists");
+            dataActor.updateRepoLastRun(this.getRepoToBeAnalysed());
+            return null;
+        }
+        return url.replace("__PROJECT_KEY__", projectKey)
                 .replace("__REPO_NAME__",this.getRepoToBeAnalysed().getRepoName());
     }
 
