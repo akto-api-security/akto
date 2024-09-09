@@ -29,7 +29,6 @@ function UpdateConnections(props) {
 
     useEffect(()=>{
         setCurrentCardObj(null)
-        onButtonClick(obj["Source Code"][3])
     },[])
 
     const components = [
