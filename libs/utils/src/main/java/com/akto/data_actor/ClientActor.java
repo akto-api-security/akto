@@ -975,7 +975,7 @@ public class ClientActor extends DataActor {
         obj.put("log", logObj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertRuntimeLog", "", "POST", obj.toString(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null, true);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in insertRuntimeLog", LoggerMaker.LogDb.RUNTIME);
@@ -1116,7 +1116,7 @@ public class ClientActor extends DataActor {
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/syncExtractedAPIs", "", "POST", json , headers, "");
 
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null, true);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             if (response.getStatusCode() != 200) {
                 loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
                 return;
@@ -1142,7 +1142,7 @@ public class ClientActor extends DataActor {
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateRepoLastRun", "", "POST", json , headers, "");
 
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null, true);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             if (response.getStatusCode() != 200) {
                 loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
                 return;
@@ -1161,7 +1161,7 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findReposToRun", "", "GET", "{}", headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null, true);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in findReposToRun", LoggerMaker.LogDb.RUNTIME);
