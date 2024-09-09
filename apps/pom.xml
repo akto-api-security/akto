@@ -49,14 +49,25 @@
             </modules>
         </profile>
         <profile>
-            <id>source-code-analyser</id>
+            <id>api-threat-detection</id>
             <activation>
                 <file>
-                    <exists>source-code-analyser/pom.xml</exists>
+                    <exists>api-threat-detection/pom.xml</exists>
                 </file>
             </activation>
             <modules>
-                <module>source-code-analyser</module>
+                <module>api-threat-detection</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>api-threat-detection</id>
+            <activation>
+                <file>
+                    <exists>api-threat-detection/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>api-threat-detection</module>
             </modules>
         </profile>
         <profile>

@@ -68,6 +68,7 @@ import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
 import TokenValidator from "./TokenValidator"
 import { TableContextProvider } from "@/apps/dashboard/components/tables/TableContext";
 import VulnerabilityReport from "../dashboard/pages/testing/vulnerability_report/VulnerabilityReport";
+import ThreatDetectionPage from "../dashboard/pages/threat_detection/ThreatDetectionPage";
 
 import { PollingProvider } from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
@@ -168,6 +169,10 @@ const router = createBrowserRouter([
           {
             path: "quick-start",
             element: <QuickStart/>,
+          },
+          {
+            path:"threat-detection",
+            element:<ThreatDetectionPage/>
           },
         ]
       },
