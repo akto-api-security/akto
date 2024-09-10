@@ -396,6 +396,9 @@ public class DbAction extends ActionSupport {
                 if (UsageMetricCalculator.getDeactivated().contains(id.getApiCollectionId())) {
                     continue;
                 }
+                if (accountId == 1714700875 && URLMethods.Method.OPTIONS.equals(id.getMethod())) {
+                    continue;
+                }
                 if (accountId == 1721887185 && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)  && !id.getMethod().equals(Method.OPTIONS))  {
                     loggerMaker.infoAndAddToDb("auth types for endpoint from runtime " + id.getUrl() + " " + id.getMethod() + " : " + apiInfo.getAllAuthTypesFound());
                 }
@@ -460,6 +463,9 @@ public class DbAction extends ActionSupport {
                                 url = entry.getValue().toString();
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._METHOD)){
                                 method = entry.getValue().toString();
+                                if (accId == 1714700875 && URLMethods.Method.OPTIONS.equals(Method.valueOf(method))) {
+                                    ignore = true;
+                                }
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._PARAM)){
                                 param = entry.getValue().toString();
                             }
@@ -591,8 +597,8 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteSampleData() {
+        int accId = Context.accountId.get();
         if (kafkaUtils.isWriteEnabled()) {
-            int accId = Context.accountId.get();
             kafkaUtils.insertData(writesForSampleData, "bulkWriteSampleData", accId);
         } else {
             try {
@@ -618,6 +624,10 @@ public class DbAction extends ActionSupport {
 
                     String url = (String) mObj.get("url");
                     String method = (String) mObj.get("method");
+
+                    if (accId == 1714700875 && URLMethods.Method.OPTIONS.equals(Method.valueOf(method))) {
+                        continue;
+                    }
 
                     Bson filters = Filters.and(Filters.eq("_id.apiCollectionId", apiCollectionId),
                             Filters.eq("_id.bucketEndEpoch", bucketEndEpoch),
@@ -669,8 +679,8 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteSensitiveSampleData() {
+        int accId = Context.accountId.get();
         if (kafkaUtils.isWriteEnabled()) {
-            int accId = Context.accountId.get();
             kafkaUtils.insertData(writesForSensitiveSampleData, "bulkWriteSensitiveSampleData", accId);
         } else {
             try {
@@ -696,6 +706,16 @@ public class DbAction extends ActionSupport {
                             filters = Filters.and(filters, Filters.eq(entry.getKey(), val));
                         } else {
                             filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
+                            try {
+                                String key = entry.getKey();
+                                String value = (String) entry.getValue();
+                                if ("_id.method".equals(key) && accId == 1714700875
+                                        && URLMethods.Method.OPTIONS.equals(Method.valueOf(value))) {
+                                    ignore = true;
+                                    break;
+                                }
+                            } catch (Exception e){
+                            }
                         }
                     }
 
