@@ -20,6 +20,8 @@ public class RedactAlert {
 
     static final String regex = ".*\\*\\*\\*\\*.*";
     static final Pattern pattern = Pattern.compile(regex);
+    static final String connectRegex = ".*CONNECT.*";
+    static final Pattern connectPattern = Pattern.compile(connectRegex);
 
     private static final int CACHE_INTERVAL = 2 * 60;
     private static Map<Integer, Integer> lastFetchedMap = new HashMap<>();
@@ -65,10 +67,16 @@ public class RedactAlert {
     private static void checkRedactedDataAndSendAlert(List<String> data,
             int apiCollectionId, String method, String url) {
 
+        /*
+         * This condition fails if the sample only
+         * contains host request header and nothing else.
+         * This was being observed in CONNECT APIs,
+         * thus added an additional check for that.
+         */
         for (String d : data) {
-            if (!pattern.matcher(d).matches()) {
+            if (!pattern.matcher(d).matches() && !connectPattern.matcher(d).matches()) {
                 int accountId = Context.accountId.get();
-                String message = String.format("Unredacted sample data coming for account %d for API: %d %s %s",
+                String message = String.format("Un-redacted sample data coming for account %d for API: %d %s %s",
                         accountId, apiCollectionId, method, url);
                 sendToCyborgSlack(message);
             }
