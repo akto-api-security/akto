@@ -570,7 +570,16 @@ public class Main {
         Account account = dataActor.fetchActiveAccount();
         Context.accountId.set(account.getId());
 
-        AllMetrics.instance.init(instanceId);
+
+        String version = "";
+        RuntimeVersion runtimeVersion = new RuntimeVersion();
+        try {
+            version = runtimeVersion.updateVersion(AccountSettings.API_RUNTIME_VERSION, dataActor);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.getMessage(), LogDb.RUNTIME);
+        }
+
+        AllMetrics.instance.init(instanceId, version);
         loggerMaker.infoAndAddToDb("All metrics initialized", LogDb.RUNTIME);
 
         Setup setup = dataActor.fetchSetup();
@@ -581,13 +590,6 @@ public class Main {
         }
 
         isOnprem = dashboardMode.equalsIgnoreCase(DashboardMode.ON_PREM.name());
-        
-        RuntimeVersion runtimeVersion = new RuntimeVersion();
-        try {
-            runtimeVersion.updateVersion(AccountSettings.API_RUNTIME_VERSION, dataActor);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.getMessage(), LogDb.RUNTIME);
-        }
 
         initFromRuntime(account.getId());
         
