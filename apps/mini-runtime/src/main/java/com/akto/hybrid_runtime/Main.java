@@ -1,5 +1,10 @@
 package com.akto.hybrid_runtime;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -23,6 +28,8 @@ import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
+
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
@@ -109,6 +116,42 @@ public class Main {
         }
     }
 
+    private static String insertCredsRecordInKafka(String brokerUrl) {
+        File f = new File("creds.txt");
+        String instanceId = UUID.randomUUID().toString();
+        if (f.exists()) {
+            try (FileReader reader = new FileReader(f);
+                BufferedReader bufferedReader = new BufferedReader(reader)) {
+                String line;
+                while ((line = bufferedReader.readLine()) != null) {
+                    instanceId = line;
+                }
+            } catch (IOException e) {
+                loggerMaker.errorAndAddToDb("Error reading instanceId from file: " + e.getMessage());
+            }
+        } else {
+            try (FileWriter writer = new FileWriter(f)) {
+                writer.write(instanceId);
+            } catch (IOException e) {
+                loggerMaker.errorAndAddToDb("Error writing instanceId to file: " + e.getMessage());
+            }
+        }
+
+        int batchSize = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_BATCH_SIZE"));
+        int kafkaLingerMS = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_LINGER_MS"));
+        kafkaProducer = new Kafka(brokerUrl, kafkaLingerMS, batchSize);
+        BasicDBObject creds = new BasicDBObject();
+        creds.put("id", instanceId);
+        creds.put("token", System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN"));
+        creds.put("url", System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL"));
+        try {
+            kafkaProducer.send(creds.toJson(), "credentials");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error inserting creds record in kafka: " + e.getMessage());
+        }
+        return instanceId;
+    }
+
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     public static class AccountInfo {
@@ -171,6 +214,7 @@ public class Main {
             fetchAllSTI = false;
         }
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
+        String instanceId = insertCredsRecordInKafka(kafkaBrokerUrl);
 
         AccountSettings aSettings = dataActor.fetchAccountSettings();
         if (aSettings == null) {
@@ -188,7 +232,7 @@ public class Main {
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
-        initializeRuntime();
+        initializeRuntime(instanceId);
 
         String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
 
@@ -201,19 +245,22 @@ public class Main {
             }
         }, 5, 5, TimeUnit.MINUTES);
 
-        try {
-            com.akto.sql.Main.createSampleDataTable();
-            SampleDataAltDb.createIndex();
-        } catch(Exception e){
-            logger.error("Unable to connect to postgres sql db", e);
-        }
+        final boolean checkPg = aSettings != null && aSettings.isRedactPayload();
 
-        try {
-            CleanPostgres.cleanPostgresCron();
-        } catch(Exception e){
-            logger.error("Unable to clean postgres", e);
-        }
+        if (checkPg) {
+            try {
+                com.akto.sql.Main.createSampleDataTable();
+                SampleDataAltDb.createIndex();
+            } catch(Exception e){
+                logger.error("Unable to connect to postgres sql db", e);
+            }
 
+            try {
+                CleanPostgres.cleanPostgresCron();
+            } catch(Exception e){
+                logger.error("Unable to clean postgres", e);
+            }
+        }
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
@@ -275,11 +322,13 @@ public class Main {
                 }
 
 
-                AllMetrics.instance.setTotalSampleDataCount(SampleDataAltDb.totalNumberOfRecords());
-                loggerMaker.infoAndAddToDb("Total number of records in postgres: " + SampleDataAltDb.totalNumberOfRecords(), LogDb.RUNTIME);
-                long dbSizeInMb = SampleDataAltDb.getDbSizeInMb();
-                AllMetrics.instance.setPgDataSizeInMb(dbSizeInMb);
-                loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB", LogDb.RUNTIME);
+                if (checkPg) {
+                    AllMetrics.instance.setTotalSampleDataCount(SampleDataAltDb.totalNumberOfRecords());
+                    loggerMaker.infoAndAddToDb("Total number of records in postgres: " + SampleDataAltDb.totalNumberOfRecords(), LogDb.RUNTIME);
+                    long dbSizeInMb = SampleDataAltDb.getDbSizeInMb();
+                    AllMetrics.instance.setPgDataSizeInMb(dbSizeInMb);
+                    loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB", LogDb.RUNTIME);
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Failed to get total number of records from postgres");
             }
@@ -516,12 +565,12 @@ public class Main {
         }
     }
 
-    public static void initializeRuntime(){
+    public static void initializeRuntime(String instanceId){
 
         Account account = dataActor.fetchActiveAccount();
         Context.accountId.set(account.getId());
 
-        AllMetrics.instance.init();
+        AllMetrics.instance.init(instanceId);
         loggerMaker.infoAndAddToDb("All metrics initialized", LogDb.RUNTIME);
 
         Setup setup = dataActor.fetchSetup();

@@ -13,7 +13,6 @@ import okhttp3.*;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -21,8 +20,11 @@ import java.util.concurrent.TimeUnit;
 public class AllMetrics {
 
     public static final DataActor dataActor = DataActorFactory.fetchInstance();
-    public void init(){
+    private String instanceId;
+
+	public void init(String instanceId){
         int accountId = Context.accountId.get();
+        this.setInstanceId(instanceId);
 
         Organization organization = DataActorFactory.fetchInstance().fetchOrganization(accountId);
         String orgId = organization.getId();
@@ -83,7 +85,7 @@ public class AllMetrics {
                     metricsData.put("metric_id", m.metricId);
                     metricsData.put("val", metric);
                     metricsData.put("org_id", m.orgId);
-                    metricsData.put("instance_id", instance_id);
+                    metricsData.put("instance_id", this.getInstanceId());
                     metricsData.put("account_id", m.accountId);
                     metricsData.put("timestamp", Context.now());
                     list.add(metricsData);
@@ -114,7 +116,6 @@ public class AllMetrics {
 
     private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class);
 
-    private static final String instance_id = UUID.randomUUID().toString();
     private Metric runtimeKafkaRecordCount;
     private Metric runtimeKafkaRecordSize;
     private Metric runtimeProcessLatency = null;
@@ -461,4 +462,13 @@ public class AllMetrics {
             loggerMaker.infoAndAddToDb("Traffic_metrics not sent", LoggerMaker.LogDb.RUNTIME);
         }
     }
+
+    public String getInstanceId() {
+        return instanceId;
+    }
+
+    public void setInstanceId(String instanceId) {
+        this.instanceId = instanceId;
+    }
+
 }
