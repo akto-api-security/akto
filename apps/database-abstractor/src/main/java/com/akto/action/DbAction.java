@@ -388,9 +388,6 @@ public class DbAction extends ActionSupport {
 
     public String bulkWriteApiInfo() {
         int accountId = Context.accountId.get();
-        if (accountId == 1714700875) {
-            return Action.SUCCESS.toUpperCase();
-        }
         try {
             List<ApiInfo> apiInfos = new ArrayList<>();
             for (BasicDBObject obj: apiInfoList) {
@@ -428,9 +425,6 @@ public class DbAction extends ActionSupport {
     public String bulkWriteSti() {
         loggerMaker.infoAndAddToDb("bulkWriteSti called");
         int accId = Context.accountId.get();
-        if (accId == 1714700875) {
-            return Action.SUCCESS.toUpperCase();
-        }
 
         Set<Integer> ignoreHosts = new HashSet<>();
         try {
@@ -597,11 +591,6 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteSampleData() {
-        int accountId = Context.accountId.get();
-        if (accountId == 1714700875) {
-            return Action.SUCCESS.toUpperCase();
-        }
-
         if (kafkaUtils.isWriteEnabled()) {
             int accId = Context.accountId.get();
             kafkaUtils.insertData(writesForSampleData, "bulkWriteSampleData", accId);
@@ -680,11 +669,6 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteSensitiveSampleData() {
-        int accountId = Context.accountId.get();
-        if (accountId == 1714700875) {
-            return Action.SUCCESS.toUpperCase();
-        }
-
         if (kafkaUtils.isWriteEnabled()) {
             int accId = Context.accountId.get();
             kafkaUtils.insertData(writesForSensitiveSampleData, "bulkWriteSensitiveSampleData", accId);
@@ -770,11 +754,6 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteTrafficInfo() {
-        int accountId = Context.accountId.get();
-        if (accountId == 1714700875) {
-            return Action.SUCCESS.toUpperCase();
-        }
-
         if (kafkaUtils.isWriteEnabled()) {
             int accId = Context.accountId.get();
             kafkaUtils.insertData(writesForTrafficInfo, "bulkWriteTrafficInfo", accId);
@@ -819,11 +798,6 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteTrafficMetrics() {
-        int accountId = Context.accountId.get();
-        if (accountId == 1714700875) {
-            return Action.SUCCESS.toUpperCase();
-        }
-
         if (kafkaUtils.isWriteEnabled()) {
             int accId = Context.accountId.get();
             kafkaUtils.insertData(writesForTrafficMetrics, "bulkWriteTrafficMetrics", accId);
@@ -869,11 +843,6 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteSensitiveParamInfo() {
-        int accountId = Context.accountId.get();
-        if (accountId == 1714700875) {
-            return Action.SUCCESS.toUpperCase();
-        }
-
         if (kafkaUtils.isWriteEnabled()) {
             int accId = Context.accountId.get();
             kafkaUtils.insertData(writesForSensitiveParamInfo, "bulkWriteSensitiveParamInfo", accId);
