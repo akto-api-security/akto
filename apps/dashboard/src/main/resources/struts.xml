@@ -6295,7 +6295,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">SOURCECODE_ANALYSIS</param>
+                <param name="featureLabel">CODE_ANALYSIS</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
@@ -6317,7 +6317,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">SOURCECODE_ANALYSIS</param>
+                <param name="featureLabel">CODE_ANALYSIS</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
@@ -6339,7 +6339,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">SOURCECODE_ANALYSIS</param>
+                <param name="featureLabel">CODE_ANALYSIS</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
@@ -6361,7 +6361,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">SOURCECODE_ANALYSIS</param>
+                <param name="featureLabel">CODE_ANALYSIS</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
