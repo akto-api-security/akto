@@ -35,7 +35,9 @@ function GithubRow(props) {
     const [collapsibleActive, setCollapsibleActive] = useState("none")
 
     const togglePopoverActive = (e,index) => {
-        e.stopPropagation();
+        if(e.stopPropagation){
+            e.stopPropagation();
+        }
         setPopoverActive((prev) => {
             if(prev === index)
                 return -1

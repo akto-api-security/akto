@@ -227,10 +227,16 @@ function SampleData(props) {
             fixedOverflowWidgets: true 
         }
         let instance = "";
-        if(editorLanguage.includes("custom")){
+        if(editorLanguage.includes("custom_http")){
           options['theme']= "customTheme"
           editorSetup.registerLanguage()
           editorSetup.setTokenizer()
+          yamlEditorSetup.setEditorTheme()
+        }
+        if(editorLanguage.includes("custom_yaml")){
+          options['theme']= "customTheme"
+          yamlEditorSetup.registerLanguage()
+          yamlEditorSetup.setTokenizer()
           yamlEditorSetup.setEditorTheme()
         }
         if(showDiff){
