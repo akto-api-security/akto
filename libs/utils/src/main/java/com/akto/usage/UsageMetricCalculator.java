@@ -59,7 +59,8 @@ public class UsageMetricCalculator {
 
         int accountId = Context.accountId.get();
         if (lastDeactivatedFetchedMap.containsKey(accountId)
-                && (lastDeactivatedFetchedMap.get(accountId) + REFRESH_INTERVAL) >= Context.now()) {
+                && (lastDeactivatedFetchedMap.get(accountId) + REFRESH_INTERVAL) >= Context.now()
+                && deactivatedCollectionsMap.containsKey(accountId)) {
             return deactivatedCollectionsMap.get(accountId);
         }
 
