@@ -622,7 +622,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private void setupBadApisRemover() {
-        Integer[] accountIds = new Integer[]{1724877069, 1714700875};
+        Integer[] accountIds = new Integer[]{1714700875};
 
         for (int accountId: accountIds) {
             Account account = AccountsDao.instance.findOne(eq("_id", accountId));
@@ -2105,25 +2105,33 @@ public class InitializerListener implements ServletContextListener {
                     }
                 } while (!connectedToMongo);
 
-                setDashboardMode();
-                updateGlobalAktoVersion();
+                // setDashboardMode();
+                // updateGlobalAktoVersion();
 
-                AccountTask.instance.executeTask(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account account) {
-                        AccountSettingsDao.instance.getStats();
-                        Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
-                        setDashboardVersionForAccount();
-                    }
-                }, "context-initializer");
+                // AccountTask.instance.executeTask(new Consumer<Account>() {
+                //     @Override
+                //     public void accept(Account account) {
+                //         AccountSettingsDao.instance.getStats();
+                //         Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
+                //         setDashboardVersionForAccount();
+                //     }
+                // }, "context-initializer");
 
-                SingleTypeInfo.init();
+                // SingleTypeInfo.init();
 
                 int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
                     logger.info("Starting init functions and scheduling jobs at " + now);
                     setupBadApisRemover();
+                    while ((1+2)>1) {
+                        try {
+                            Thread.sleep (10000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+
 
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
