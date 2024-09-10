@@ -143,15 +143,15 @@ public class HttpRequestResponseUtils {
         return formUrlEncoded.toString();
     }
     public static String encode(String s) throws UnsupportedEncodingException {
-        return URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8.name())
-                .replaceAll("\\+", "%20")
-                .replaceAll("\\%21", "!")
-                .replaceAll("\\%27", "'")
-                .replaceAll("\\%28", "(")
-                .replaceAll("\\%29", ")")
-                .replaceAll("\\%7E", "~")
-                .replaceAll("\\%5B", "[")
-                .replaceAll("\\%5D", "]");
+        return URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8.name());
+                // .replaceAll("\\+", "%20")
+                // .replaceAll("\\%21", "!")
+                // .replaceAll("\\%27", "'")
+                // .replaceAll("\\%28", "(")
+                // .replaceAll("\\%29", ")")
+                // .replaceAll("\\%7E", "~")
+                // .replaceAll("\\%5B", "[")
+                // .replaceAll("\\%5D", "]");
     }
 
 }
