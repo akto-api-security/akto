@@ -60,17 +60,6 @@
             </modules>
         </profile>
         <profile>
-            <id>api-threat-detection</id>
-            <activation>
-                <file>
-                    <exists>api-threat-detection/pom.xml</exists>
-                </file>
-            </activation>
-            <modules>
-                <module>api-threat-detection</module>
-            </modules>
-        </profile>
-        <profile>
             <id>database-abstractor</id>
             <activation>
                 <file>

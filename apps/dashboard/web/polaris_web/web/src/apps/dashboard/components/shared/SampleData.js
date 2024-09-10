@@ -308,7 +308,7 @@ function SampleData(props) {
                 content: 'Create',
                 onAction: () => createAuthTypeHeader(selectedWord)
             }}
-            key="redact-modal"
+            key="redact-modal-2"
         >
             <Modal.Section>
                 <Text>Are you sure you want to add the header (or cookie) key: <b>{selectedWord.toLowerCase()}</b> as an auth type?</Text>
@@ -322,7 +322,7 @@ function SampleData(props) {
                 content: 'OK',
                 onAction: () => setShowErrorModal(false)
             }}
-            key="redact-modal"
+            key="redact-modal-3"
         >
             <Modal.Section>
                 <Text>Invalid auth type: <b>{(selectedWord && selectedWord.length>0) ? selectedWord.toLowerCase(): "blank"}</b></Text>
