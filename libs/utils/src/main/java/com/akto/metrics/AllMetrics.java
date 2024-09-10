@@ -1,6 +1,7 @@
 package com.akto.metrics;
 
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
@@ -20,16 +21,21 @@ import java.util.concurrent.TimeUnit;
 
 public class AllMetrics {
 
+    public static final DataActor dataActor = DataActorFactory.fetchInstance();
+    private String instanceId;
+    private String version;
     private final static int METRIC_SEND_LIMIT = 5;
 
-    public void init(LogDb module){
+    public void init(String instanceId, String version, LoggerMaker.LogDb module) {
         loggerMaker.setDb(module);
 
         String prefix = "RT_";
-        if(LogDb.THREAT_DETECTION.equals(module)){
+        if(LoggerMaker.LogDb.THREAT_DETECTION.equals(module)){
             prefix = "TD_";
         }
         int accountId = Context.accountId.get();
+        this.setInstanceId(instanceId);
+        this.setVersion(version);
 
         Organization organization = DataActorFactory.fetchInstance().fetchOrganization(accountId);
         String orgId = organization.getId();
@@ -76,7 +82,9 @@ public class AllMetrics {
                     metricsData.put("val", metric);
                     metricsData.put("org_id", m.orgId);
                     metricsData.put("instance_id", instance_id);
+                    metricsData.put("version", this.getVersion());
                     metricsData.put("account_id", m.accountId);
+                    metricsData.put("timestamp", Context.now());
                     list.add(metricsData);
                     if (list.size() >= METRIC_SEND_LIMIT) {
                         sendDataToAkto(list);
@@ -426,5 +434,21 @@ public class AllMetrics {
         } else {
             loggerMaker.infoAndAddToDb("Traffic_metrics not sent");
         }
+    }
+
+    public String getInstanceId() {
+        return instanceId;
+    }
+
+    public void setInstanceId(String instanceId) {
+        this.instanceId = instanceId;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
     }
 }
