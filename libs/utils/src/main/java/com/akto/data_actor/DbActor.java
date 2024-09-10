@@ -12,6 +12,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.model.WriteModel;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class DbActor extends DataActor {
@@ -202,5 +203,14 @@ public class DbActor extends DataActor {
 
     public void insertProtectionLog(Log log) {
         DbLayer.insertProtectionLog(log);
+    }
+    @Override
+    public List<CodeAnalysisRepo> findReposToRun() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public void syncExtractedAPIs( CodeAnalysisRepo codeAnalysisRepo, List<CodeAnalysisApi> codeAnalysisApisList, boolean isLastBatch) {
+        return;
     }
 }
