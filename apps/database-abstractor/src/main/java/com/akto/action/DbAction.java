@@ -579,7 +579,9 @@ public class DbAction extends ActionSupport {
 
                 loggerMaker.infoAndAddToDb(String.format("Consumer data: %d ignored: %d writes: %d", writesForSti.size(), ignoreCount, writes.size()));
     
-                DbLayer.bulkWriteSingleTypeInfo(writes);
+                if (writes != null && !writes.isEmpty()) {
+                    DbLayer.bulkWriteSingleTypeInfo(writes);
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSti " + e.toString());
                 return Action.ERROR.toUpperCase();
