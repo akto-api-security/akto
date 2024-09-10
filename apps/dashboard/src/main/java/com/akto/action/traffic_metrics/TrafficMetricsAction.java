@@ -149,7 +149,7 @@ public class TrafficMetricsAction extends UserAction {
             while (cursor.hasNext()) {
                 BasicDBObject basicDBObject = cursor.next();
                 BasicDBObject latestDoc = (BasicDBObject) basicDBObject.get("latestDoc");
-                runtimeMetrics.add(new RuntimeMetrics(latestDoc.getString("name"), 0, instanceId, latestDoc.getString("version"), latestDoc.getDouble("val")));
+                runtimeMetrics.add(new RuntimeMetrics(latestDoc.getString("name"), 0, instanceId, latestDoc.getDouble("val")));
             }
         }
 

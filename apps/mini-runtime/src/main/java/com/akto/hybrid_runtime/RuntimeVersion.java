@@ -9,7 +9,7 @@ import com.akto.data_actor.DataActor;
 
 public class RuntimeVersion {
 
-    public String updateVersion(String fieldName, DataActor dataActor) throws Exception {
+    public void updateVersion(String fieldName, DataActor dataActor) throws Exception {
         try (InputStream in = getClass().getResourceAsStream("/version.txt")) {
             if (in != null) {
                 BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(in));
@@ -18,7 +18,6 @@ public class RuntimeVersion {
 
                 String version = imageTag + " - " + buildTime;
                 dataActor.updateRuntimeVersion(fieldName, version);
-                return version;
             } else  {
                 throw new Exception("Input stream null");
             }
