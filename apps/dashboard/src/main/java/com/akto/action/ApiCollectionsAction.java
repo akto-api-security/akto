@@ -111,6 +111,13 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setUrlsCount(fallbackCount);
             }
 
+            /*
+             * Do not count the APIs for deactivated collections.
+             */
+            if (apiCollection.isDeactivated()) {
+                apiCollection.setUrlsCount(0);
+            }
+
             apiCollection.setUrls(new HashSet<>());
         }
         return apiCollections;
