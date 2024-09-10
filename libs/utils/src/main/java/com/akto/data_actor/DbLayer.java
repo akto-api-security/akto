@@ -877,13 +877,14 @@ public class DbLayer {
                 Map<String, Object> obj = (Map) metrics;
                 String name = (String) obj.get("metric_id");
                 String instanceId = (String) obj.get("instance_id");
+                String version = (String) obj.get("version");
                 Long tsVal = (Long) obj.get("timestamp");
                 int ts = tsVal.intValue();
                 Double val = (Double) obj.get("val");
                 if (name == null || name.length() == 0) {
                     continue;
                 }
-                runtimeMetrics = new RuntimeMetrics(name, ts, instanceId, val);
+                runtimeMetrics = new RuntimeMetrics(name, ts, instanceId, version, val);
                 bulkUpdates.add(new InsertOneModel<>(runtimeMetrics));
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "error writing bulk update " + e.getMessage());
