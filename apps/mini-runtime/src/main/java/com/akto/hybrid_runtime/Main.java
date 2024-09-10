@@ -116,7 +116,7 @@ public class Main {
         }
     }
 
-    private static void insertCredsRecordInKafka(String brokerUrl) {
+    private static String insertCredsRecordInKafka(String brokerUrl) {
         File f = new File("creds.txt");
         String instanceId = UUID.randomUUID().toString();
         if (f.exists()) {
@@ -144,7 +144,12 @@ public class Main {
         creds.put("id", instanceId);
         creds.put("token", System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN"));
         creds.put("url", System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL"));
-        kafkaProducer.send(creds.toJson(), "credentials");
+        try {
+            kafkaProducer.send(creds.toJson(), "credentials");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error inserting creds record in kafka: " + e.getMessage());
+        }
+        return instanceId;
     }
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
@@ -191,7 +196,7 @@ public class Main {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
         String topicName = getTopicName();
-        String kafkaBrokerUrl = "kafka1:19092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
+        String kafkaBrokerUrl = "localhost:29092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
             loggerMaker.infoAndAddToDb("is_kubernetes: true", LogDb.RUNTIME);
@@ -209,7 +214,7 @@ public class Main {
             fetchAllSTI = false;
         }
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
-        insertCredsRecordInKafka(kafkaBrokerUrl);
+        String instanceId = insertCredsRecordInKafka(kafkaBrokerUrl);
 
         AccountSettings aSettings = dataActor.fetchAccountSettings();
         if (aSettings == null) {
@@ -227,7 +232,7 @@ public class Main {
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
-        initializeRuntime();
+        initializeRuntime(instanceId);
 
         String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
 
@@ -560,12 +565,12 @@ public class Main {
         }
     }
 
-    public static void initializeRuntime(){
+    public static void initializeRuntime(String instanceId){
 
         Account account = dataActor.fetchActiveAccount();
         Context.accountId.set(account.getId());
 
-        AllMetrics.instance.init();
+        AllMetrics.instance.init(instanceId);
         loggerMaker.infoAndAddToDb("All metrics initialized", LogDb.RUNTIME);
 
         Setup setup = dataActor.fetchSetup();
