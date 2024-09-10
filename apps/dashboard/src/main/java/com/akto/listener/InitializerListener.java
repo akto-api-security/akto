@@ -2124,11 +2124,17 @@ public class InitializerListener implements ServletContextListener {
 
                     logger.info("Starting init functions and scheduling jobs at " + now);
                     setupBadApisRemover();
-                    while ((1+2)>1) {
+                    int counter = 0;
+                    while (true) {
                         try {
-                            Thread.sleep (10000);
+                            Thread.sleep (60000);
+                            counter++;
                         } catch (InterruptedException e) {
                             e.printStackTrace();
+                        }
+
+                        if (counter > 1440) {
+                            break;
                         }
                     }
 
