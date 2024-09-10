@@ -1685,6 +1685,11 @@ public class APICatalogSync {
     private static Set<Integer> demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
 
     private static void fillExistingAPIsInDb(SingleTypeInfo sti, BloomFilter<CharSequence> existingAPIsInDb) {
+
+        if(existingAPIsInDb==null){
+            return;
+        }
+
         if (demosAndDeactivatedCollections.contains(sti.getApiCollectionId())) {
             return;
         }
@@ -1694,7 +1699,7 @@ public class APICatalogSync {
         }
     }
 
-    private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams, BloomFilter<CharSequence> existingAPIsInDb) {
+    public static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams, BloomFilter<CharSequence> existingAPIsInDb) {
         Map<Integer, APICatalog> ret = new HashMap<>();
         
         for (SingleTypeInfo param: allParams) {
