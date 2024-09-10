@@ -118,6 +118,9 @@ public class HttpRequestResponseUtils {
     }
 
     public static String jsonToFormUrlEncoded(String requestPayload) {
+        return jsonToFormUrlEncoded(requestPayload, true);
+    }
+    public static String jsonToFormUrlEncoded(String requestPayload, boolean replaceSpecialChars) {
         JSONObject jsonObject = new JSONObject(requestPayload);
 
         StringBuilder formUrlEncoded = new StringBuilder();
@@ -126,9 +129,9 @@ public class HttpRequestResponseUtils {
         for (String key : jsonObject.keySet()) {
             // Encode the key and value, and append them to the string builder
             try {
-                formUrlEncoded.append(encode(key))
+                formUrlEncoded.append(encode(key, replaceSpecialChars))
                         .append("=")
-                        .append(encode(jsonObject.getString(key)))
+                        .append(encode(jsonObject.getString(key), replaceSpecialChars))
                         .append("&");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -142,16 +145,22 @@ public class HttpRequestResponseUtils {
 
         return formUrlEncoded.toString();
     }
-    public static String encode(String s) throws UnsupportedEncodingException {
-        return URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8.name())
-                .replaceAll("\\+", "%20")
-                .replaceAll("\\%21", "!")
-                .replaceAll("\\%27", "'")
-                .replaceAll("\\%28", "(")
-                .replaceAll("\\%29", ")")
-                .replaceAll("\\%7E", "~")
-                .replaceAll("\\%5B", "[")
-                .replaceAll("\\%5D", "]");
+    public static String encode(String s, boolean replaceSpecialChars) throws UnsupportedEncodingException {
+        String ret = URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8.name());
+
+        if (replaceSpecialChars) {
+            ret = ret.replaceAll("\\+", "%20")
+            .replaceAll("\\%21", "!")
+            .replaceAll("\\%27", "'")
+            .replaceAll("\\%28", "(")
+            .replaceAll("\\%29", ")")
+            .replaceAll("\\%7E", "~")
+            .replaceAll("\\%5B", "[")
+            .replaceAll("\\%5D", "]");
+
+        }
+
+        return ret;
     }
 
 }
