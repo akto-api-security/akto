@@ -4,7 +4,7 @@ import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import SummaryCardInfo from '../../components/shared/SummaryCardInfo';
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, Card, HorizontalGrid, HorizontalStack, Scrollable, Text, VerticalStack } from '@shopify/polaris';
+import { Box, Card, HorizontalGrid, HorizontalStack, Icon, Scrollable, Text, VerticalStack } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import transform from './transform';
 import StackedChart from '../../components/charts/StackedChart';
@@ -20,6 +20,10 @@ import NullData from './components/NullData';
 import {DashboardBanner} from './components/DashboardBanner';
 import RiskScoreTrend from './components/RiskScoreTrend';
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo';
+import SummaryCard from './new_components/SummaryCard';
+import { ArrowUpMinor, ArrowDownMinor} from '@shopify/polaris-icons';
+import TestSummaryCardsList from './new_components/TestSummaryCardsList';
+import InfoCard from './new_components/InfoCard';
 
 function HomeDashboard() {
 
@@ -95,31 +99,166 @@ function HomeDashboard() {
         fetchData()
     },[])
 
+    const generateByLineComponent = (up, val, time) => {
+        const source = up ? ArrowUpMinor : ArrowDownMinor
+        return (
+            <HorizontalStack gap={1}>
+                <Box>
+                    <Icon source={source} color='subdued'/>
+                </Box>
+                <Text color='subdued' fontWeight='medium'>{val}</Text>
+                <Text color='subdued' fontWeight='semibold'>{time}</Text>
+            </HorizontalStack>
+        )
+    }
+
     const summaryInfo = [
         {
             title: 'Total APIs',
             data: observeFunc.formatNumberWithCommas(countInfo.totalUrls),
-            variant: 'headingLg'
+            variant: 'heading2xl',
+            byLineComponent: generateByLineComponent(true, 200, "Yesterday"),
         },
         {
-            title: 'Critical endpoints',
+            title: 'Issues',
             data: observeFunc.formatNumberWithCommas(criticalUrls),
-            variant: 'headingLg'
+            variant: 'heading2xl',
+            color: 'critical',
+            byLineComponent: generateByLineComponent(false, 200, "Yesterday")
+            
         },
         {
-            title: 'Test coverage',
+            title: 'API Risk Score',
             data: countInfo.totalUrls === 0 ? "0%" : countInfo.coverage,
-            variant: 'headingLg'
+            variant: 'heading2xl',
+            color: 'critical',
+            byLineComponent: generateByLineComponent(true, 200, "Yesterday")
         },
         {
-            title: 'Sensitive in response',
+            title: 'Test Coverage',
             data: observeFunc.formatNumberWithCommas(sensitiveCount),
-            variant: 'headingLg'
+            variant: 'heading2xl',
+            color: 'warning',
+            byLineComponent: generateByLineComponent(true, 200, "Yesterday")
         }
     ]
 
     const summaryComp = (
-        <SummaryCardInfo summaryItems={summaryInfo} key="summary"/>
+        <SummaryCard summaryItems={summaryInfo}/>
+    )
+
+    const testSummaryInfo = [
+        {
+            testName: 'Test run on Juice shop collection with nothing',
+            time: '1 day ago',
+            highCount: 3,
+            mediumCount: 10,
+            lowCount: 22,
+            totalApis: 202,
+        }, 
+        {
+            testName: 'Test run on Juice shop collection with nothing',
+            time: '1 day ago',
+            highCount: 3,
+            mediumCount: 10,
+            lowCount: 22,
+            totalApis: 202,
+        }, 
+        {
+            testName: 'Test run on Juice shop collection with nothing',
+            time: '1 day ago',
+            highCount: 3,
+            mediumCount: 10,
+            lowCount: 22,
+            totalApis: 202,
+        }, 
+        {
+            testName: 'Test run on Juice shop collection with nothing',
+            time: '1 day ago',
+            highCount: 3,
+            mediumCount: 10,
+            lowCount: 22,
+            totalApis: 202,
+        }, 
+        {
+            testName: 'Test run on Juice shop collection with nothing',
+            time: '1 day ago',
+            highCount: 3,
+            mediumCount: 10,
+            lowCount: 22,
+            totalApis: 202,
+        }, 
+    ]
+
+    const testSummaryCardsList = (
+        <InfoCard 
+            component={<TestSummaryCardsList summaryItems={ testSummaryInfo}/>}
+            title="Recent Tests"
+            titleToolTip="Tests runs since last 7 days"
+            linkText="Check results"
+            linkUrl="/dashboard/testing"
+        />
+    )
+
+    const gridComponent = (
+        <HorizontalGrid gap={5} columns={2}>
+            <InfoCard 
+                component={<div>hi</div>}
+                title="Vulnerable APIs by Severity"
+                titleToolTip="Vulnerable APIs by Severity"
+                linkText="Fix critical issues"
+                linkUrl="/dashboard/issues"
+            />
+            <InfoCard 
+                component={<div>hi</div>}
+                title="Critical Unsecured APIs Over Time"
+                titleToolTip="Critical Unsecured APIs Over Time"
+                linkText="Fix critical issues"
+                linkUrl="/dashboard/issues"
+            />
+            <InfoCard 
+                component={<div>hi</div>}
+                title="Critical Findings"
+                titleToolTip="Critical Findings"
+                linkText="Fix critical issues"
+                linkUrl="/dashboard/issues"
+            />
+            <InfoCard 
+                component={<div>hi</div>}
+                title="APIs by Risk score"
+                titleToolTip="APIs by Risk score"
+                linkText="Check out"
+                linkUrl="/dashboard/observe/inventory"
+            />
+            <InfoCard 
+                component={<div>hi</div>}
+                title="APIs by Access type"
+                titleToolTip="APIs by Access type"
+                linkText="Check out"
+                linkUrl="/dashboard/observe/inventory"
+            />
+            <InfoCard 
+                component={<div>hi</div>}
+                title="APIs by Authentication"
+                titleToolTip="APIs by Authentication"
+                linkText="Check out"
+                linkUrl="/dashboard/observe/inventory"
+            />
+            <InfoCard 
+                component={<div>hi</div>}
+                title="API Type"
+                titleToolTip="API Type"
+                linkText="Check out"
+                linkUrl="/dashboard/observe/inventory"
+            />
+            <InfoCard 
+                component={<div>hi</div>}
+                title="New Domains"
+                titleToolTip="New Domains"
+                linkText="Check out"
+                linkUrl="/dashboard/observe/inventory"
+            />
+        </HorizontalGrid>
     )
 
     const defaultChartOptions = {
@@ -249,7 +388,7 @@ function HomeDashboard() {
         }
     }
 
-    const components = [summaryComp, subcategoryInfoComp, riskScoreTrendComp, sensitiveDataTrendComp,  issuesTrendComp]
+    const components = [summaryComp, testSummaryCardsList, gridComponent]
 
     const dashboardComp = (
         <div style={{display: 'flex', gap: '32px'}} key={"dashboardComp"}>
@@ -258,14 +397,6 @@ function HomeDashboard() {
                     {components.map((component) => {
                         return component
                     })}
-                </VerticalStack>
-            </div>
-            <div style={{flex: 3}}>
-                <VerticalStack gap={5}>
-                    <InitialSteps initialSteps={initialSteps}/>
-                    <ActivityTracker collections={collectionsMap} latestActivity={recentActivities} onLoadMore={handleLoadMore} showLoadMore={checkLoadMore}/>
-                    <CoverageCard coverageObj={coverageObj} collections={allCollections} collectionsMap={collectionsMap}/>
-                    <Pipeline riskScoreMap={riskScoreObj} collections={allCollections} collectionsMap={collectionsMap}/> 
                 </VerticalStack>
             </div>
         </div>
