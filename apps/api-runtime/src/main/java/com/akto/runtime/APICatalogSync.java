@@ -73,6 +73,8 @@ public class APICatalogSync {
     public static boolean mergeAsyncOutside = true;
     public BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
     public Map<String, FilterConfig> advancedFilterMap =  new HashMap<>();
+    public List<String> ignoredEndpointsList = new ArrayList<>();
+
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
     }
@@ -1462,6 +1464,9 @@ public class APICatalogSync {
                     try {
                         List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        if(accountSettings != null && accountSettings.getAllowRedundantEndpointsList().size() > 0){
+                            ignoredEndpointsList = accountSettings.getAllowRedundantEndpointsList();
+                        }
                         Boolean urlRegexMatchingEnabled = accountSettings == null || accountSettings.getUrlRegexMatchingEnabled();
                         loggerMaker.infoAndAddToDb("url regex matching enabled status is " + urlRegexMatchingEnabled, LogDb.RUNTIME);
                         for(ApiCollection apiCollection: allCollections) {
