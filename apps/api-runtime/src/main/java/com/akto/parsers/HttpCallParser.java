@@ -25,6 +25,9 @@ import com.akto.runtime.Main;
 import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.URLAggregator;
 import com.akto.runtime.parser.SampleParser;
+import com.akto.runtime.utils.Utils;
+import com.akto.test_editor.execution.VariableResolver;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.JSONUtils;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -32,8 +35,6 @@ import com.akto.util.Constants;
 import com.akto.util.DbMode;
 import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
-import com.akto.test_editor.execution.VariableResolver;
-import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import okhttp3.*;
@@ -217,7 +218,8 @@ public class HttpCallParser {
         if (accountSettings != null && accountSettings.getDefaultPayloads() != null) {
             filteredResponseParams = filterDefaultPayloads(filteredResponseParams, accountSettings.getDefaultPayloads());
         }
-        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, accountSettings);
+        Pattern regexPattern = Utils.createRegexPatternFromList(apiCatalogSync.ignoredEndpointsList);
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, apiCatalogSync.ignoredEndpointsList, regexPattern);
 
         // add advanced filters
         filteredResponseParams = applyAdvancedFilters(filteredResponseParams);
@@ -389,17 +391,7 @@ public class HttpCallParser {
 
     public static final String CONTENT_TYPE = "CONTENT-TYPE";
 
-    public boolean isRedundantEndpoint(String url, List<String> discardedUrlList){
-        StringJoiner joiner = new StringJoiner("|", ".*\\.(", ")(\\?.*)?");
-        for (String extension : discardedUrlList) {
-            if(extension.startsWith(CONTENT_TYPE)){
-                continue;
-            }
-            joiner.add(extension);
-        }
-        String regex = joiner.toString();
-
-        Pattern pattern = Pattern.compile(regex);
+    public boolean isRedundantEndpoint(String url, Pattern pattern){
         Matcher matcher = pattern.matcher(url);
         return matcher.matches();
     }
@@ -482,7 +474,7 @@ public class HttpCallParser {
         return res;
     }
 
-    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, AccountSettings accountSettings) {
+    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, List<String> redundantUrlsList, Pattern pattern) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
@@ -503,8 +495,8 @@ public class HttpCallParser {
             if (ignoreAktoFlag != null) continue;
 
             // check for garbage points here
-            if(accountSettings != null && accountSettings.getAllowRedundantEndpointsList() != null){
-                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(), accountSettings.getAllowRedundantEndpointsList())){
+            if(redundantUrlsList != null && !redundantUrlsList.isEmpty()){
+                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(), pattern)){
                     continue;
                 }
                 List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
@@ -522,7 +514,7 @@ public class HttpCallParser {
                     String method = httpResponseParam.getRequestParams().getMethod();
                     String responseBody = httpResponseParam.getPayload();
                     boolean ignore = false;
-                    for (String extension : accountSettings.getAllowRedundantEndpointsList()) {
+                    for (String extension : redundantUrlsList) {
                         if(extension.startsWith(CONTENT_TYPE)){
                             String matchContentType = extension.split(" ")[1];
                             if(isBlankResponseBodyForGET(method, allContentTypes, matchContentType, responseBody)){
