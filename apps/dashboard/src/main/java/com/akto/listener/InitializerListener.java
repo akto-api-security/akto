@@ -2072,6 +2072,7 @@ public class InitializerListener implements ServletContextListener {
         clear(TestingRunResultDao.instance, TestingRunResultDao.maxDocuments);
         clear(SuspectSampleDataDao.instance, SuspectSampleDataDao.maxDocuments);
         clear(RuntimeMetricsDao.instance, RuntimeMetricsDao.maxDocuments);
+        clear(ProtectionLogsDao.instance, ProtectionLogsDao.maxDocuments);
     }
 
     public static void clear(AccountsContextDao mCollection, int maxDocuments) {

@@ -184,16 +184,6 @@ public class DbActor extends DataActor {
         return DbLayer.fetchOrganization(accountId);
     }
 
-    @Override
-    public List<CodeAnalysisRepo> findReposToRun() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public void syncExtractedAPIs( CodeAnalysisRepo codeAnalysisRepo, List<CodeAnalysisApi> codeAnalysisApisList, boolean isLastBatch) {
-        return;
-    }
-    
     public void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData) {
         ArrayList<WriteModel<SuspectSampleData>> writes = new ArrayList<>();
         for (Object obj: writesForSuspectSampleData) {
@@ -205,5 +195,22 @@ public class DbActor extends DataActor {
 
     public List<YamlTemplate> fetchFilterYamlTemplates() {
         return DbLayer.fetchFilterYamlTemplates();
+    }
+
+    public void insertTestingLog(Log log) {
+        DbLayer.insertTestingLog(log);
+    }
+
+    public void insertProtectionLog(Log log) {
+        DbLayer.insertProtectionLog(log);
+    }
+    @Override
+    public List<CodeAnalysisRepo> findReposToRun() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public void syncExtractedAPIs( CodeAnalysisRepo codeAnalysisRepo, List<CodeAnalysisApi> codeAnalysisApisList, boolean isLastBatch) {
+        return;
     }
 }

@@ -18,6 +18,8 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.CustomDataTypeDao;
+import com.akto.dao.LogsDao;
+import com.akto.dao.ProtectionLogsDao;
 import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.RuntimeLogsDao;
 import com.akto.dao.SampleDataDao;
@@ -379,5 +381,13 @@ public class DbLayer {
 
     public static List<YamlTemplate> fetchFilterYamlTemplates() {
         return FilterYamlTemplateDao.instance.findAll(Filters.empty());
+    }
+
+    public static void insertTestingLog(Log log) {
+        LogsDao.instance.insertOne(log);
+    }
+
+    public static void insertProtectionLog(Log log) {
+        ProtectionLogsDao.instance.insertOne(log);
     }
 }
