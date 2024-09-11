@@ -41,6 +41,7 @@ function GithubSimpleTable(props) {
         treeView={props?.treeView}
         customFilters={props?.customFilters}
         showFooter={props?.showFooter}
+        setSelectedResourcesForPrimaryAction={props?.setSelectedResourcesForPrimaryAction}
     />
 
 }
