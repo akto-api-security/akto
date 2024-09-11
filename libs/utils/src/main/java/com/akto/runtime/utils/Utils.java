@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.StringJoiner;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -150,6 +152,20 @@ public class Utils {
         return new HttpResponseParams(
                 type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction
         );
+    }
+
+    public static Pattern createRegexPatternFromList(List<String> discardedUrlList){
+        StringJoiner joiner = new StringJoiner("|", ".*\\.(", ")(\\?.*)?");
+        for (String extension : discardedUrlList) {
+            if(extension.startsWith("CONTENT-TYPE")){
+                continue;
+            }
+            joiner.add(extension);
+        }
+        String regex = joiner.toString();
+
+        Pattern pattern = Pattern.compile(regex);
+        return pattern;
     }
 
 

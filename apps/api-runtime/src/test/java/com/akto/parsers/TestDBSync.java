@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.*;
@@ -25,6 +26,7 @@ import com.akto.dto.HttpResponseParams.Source;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
 import com.akto.runtime.URLAggregator;
+import com.akto.runtime.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
@@ -254,7 +256,7 @@ public class TestDBSync extends MongoBasedTest {
     @Test
     public void testFilterHttpResponseParamsEmpty() {
         HttpCallParser httpCallParser = new HttpCallParser("",0,0,0, true);
-        List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(new ArrayList<>(), null);
+        List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(new ArrayList<>(), null, null);
         assertEquals(ss.size(),0);
     }
 
@@ -278,7 +280,7 @@ public class TestDBSync extends MongoBasedTest {
         h2.requestParams.setApiCollectionId(1000);
         h2.setSource(Source.MIRRORING);
 
-        List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(Arrays.asList(h1, h2), null);
+        List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(Arrays.asList(h1, h2), null, null);
         assertEquals(ss.size(),2);
         assertEquals(h1.requestParams.getApiCollectionId(), 1000);
         assertTrue(h2.requestParams.getApiCollectionId() != 1000);
@@ -302,7 +304,7 @@ public class TestDBSync extends MongoBasedTest {
         h1.statusCode = 200;
         h1.requestParams.setApiCollectionId(vxlanId1);
 
-        List<HttpResponseParams> filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h1),null);
+        List<HttpResponseParams> filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h1),null, null);
 
         Assertions.assertEquals(filterHttpResponseParamsList.size(),1);
         Assertions.assertEquals(filterHttpResponseParamsList.get(0).requestParams.getApiCollectionId(),vxlanId1);
@@ -317,7 +319,7 @@ public class TestDBSync extends MongoBasedTest {
         h2.statusCode = 200;
         h2.requestParams.setApiCollectionId(vxlanId2);
 
-        filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h2),null);
+        filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h2),null, null);
 
         Assertions.assertEquals(filterHttpResponseParamsList.size(),1);
         Assertions.assertEquals(filterHttpResponseParamsList.get(0).requestParams.getApiCollectionId(),vxlanId2);
@@ -332,7 +334,7 @@ public class TestDBSync extends MongoBasedTest {
         h3.statusCode = 400;
         h3.requestParams.setApiCollectionId(vxlanId2);
 
-        filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h3),null);
+        filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h3),null, null);
 
         Assertions.assertEquals(filterHttpResponseParamsList.size(),0);
         ApiCollection apiCollection3 = ApiCollectionsDao.instance.findOne("_id", vxlanId3);
@@ -364,7 +366,7 @@ public class TestDBSync extends MongoBasedTest {
         h1.statusCode = 200;
         h1.setSource(Source.MIRRORING);
 
-        httpCallParser.filterHttpResponseParams(Collections.singletonList(h1),null);
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h1),null, null);
 
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),2);
@@ -390,7 +392,7 @@ public class TestDBSync extends MongoBasedTest {
         h2.statusCode = 200;
         h2.setSource(Source.MIRRORING);
 
-        httpCallParser.filterHttpResponseParams(Collections.singletonList(h2),null);
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h2),null, null);
 
         apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),3);
@@ -414,7 +416,7 @@ public class TestDBSync extends MongoBasedTest {
         h3.statusCode = 200;
         h3.setSource(Source.MIRRORING);
 
-        httpCallParser.filterHttpResponseParams(Collections.singletonList(h3),null);
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h3),null, null);
 
         apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),4);
@@ -447,7 +449,7 @@ public class TestDBSync extends MongoBasedTest {
         );
         httpCallParser.getHostNameToIdMap().put("hostRandom 1234", dupId);
 
-        httpCallParser.filterHttpResponseParams(Collections.singletonList(h4),null);
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h4),null, null);
 
         apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),6);
@@ -471,7 +473,7 @@ public class TestDBSync extends MongoBasedTest {
         h1.statusCode = 200;
 
         HttpCallParser httpCallParser = new HttpCallParser("",0,0,0, true);
-        httpCallParser.filterHttpResponseParams(Collections.singletonList(h1),null);
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h1),null, null);
 
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(), 1);
@@ -589,10 +591,11 @@ public class TestDBSync extends MongoBasedTest {
         String url5 = "test5.js.js";
 
         List<String> allowedUrlType = Arrays.asList("js");
-        assertEquals(httpCallParser.isRedundantEndpoint(url1, allowedUrlType), true);
-        assertEquals(httpCallParser.isRedundantEndpoint(url2, allowedUrlType), false);
-        assertEquals(httpCallParser.isRedundantEndpoint(url3, allowedUrlType), false);
-        assertEquals(httpCallParser.isRedundantEndpoint(url4, allowedUrlType), true);
-        assertEquals(httpCallParser.isRedundantEndpoint(url5, allowedUrlType), true);
+        Pattern pattern = Utils.createRegexPatternFromList(allowedUrlType);
+        assertEquals(httpCallParser.isRedundantEndpoint(url1, pattern), true);
+        assertEquals(httpCallParser.isRedundantEndpoint(url2, pattern), false);
+        assertEquals(httpCallParser.isRedundantEndpoint(url3, pattern), false);
+        assertEquals(httpCallParser.isRedundantEndpoint(url4, pattern), true);
+        assertEquals(httpCallParser.isRedundantEndpoint(url5, pattern), true);
     }
 }
