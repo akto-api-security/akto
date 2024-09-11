@@ -4,7 +4,7 @@ import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import SummaryCardInfo from '../../components/shared/SummaryCardInfo';
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, Card, HorizontalGrid, HorizontalStack, Icon, Scrollable, Text, VerticalStack } from '@shopify/polaris';
+import { Box, Card, Checkbox, DataTable, HorizontalGrid, HorizontalStack, Icon, Scrollable, Text, VerticalStack } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import transform from './transform';
 import StackedChart from '../../components/charts/StackedChart';
@@ -25,6 +25,7 @@ import { ArrowUpMinor, ArrowDownMinor} from '@shopify/polaris-icons';
 import TestSummaryCardsList from './new_components/TestSummaryCardsList';
 import InfoCard from './new_components/InfoCard';
 import DonutChart from '../../components/shared/DonutChart';
+import ProgressBarChart from './new_components/ProgressBarChart';
 
 function HomeDashboard() {
 
@@ -291,12 +292,33 @@ function HomeDashboard() {
         }
     }
 
+    const newDomains = ["ironman.demo.akto.io", "flash.akto.io", "app.akto.io", "cyborg.akto.io", "hulk.akto.io", "docs.akto.io"]
+
     const unsecuredAPIs = [
         {
-            "data": [[1704067200000,200], [1706745600000,100] ,[1709251200000,120], [1711929600000,110], [1714521600000,90], [1717200000000,110]],
+            "data": [[1704067200000,200], [1706745600000,100] ,[1709251200000,120], [1711929600000,110], [1714521600000,90], [1717200000000,110], [1719792000000, 120], [1722470400000, 110], [1725148800000, 100], [1727740800000, 110], [1730419200000, 120], [1733011200000, 110]],
             "color": "#E45357",
         },
     ]
+
+    const genreateDataTableRows = (collections) => {
+        return collections.map((collection, index) => ([
+            <HorizontalStack align='space-between'>
+                <HorizontalStack gap={2}>
+                    <Checkbox
+                        key={index}
+                        label={collection}
+                        checked={false}
+                        ariaDescribedBy={`checkbox-${index}`}
+                        onChange={() => {}}
+                    />
+                    <Text color='subdued'>32% test coverage</Text>
+                </HorizontalStack>
+                <Text>22</Text>
+            </HorizontalStack>
+            ]
+          ));
+    }
 
     const criticalFindingsData = [
         {
@@ -310,6 +332,15 @@ function HomeDashboard() {
             "data": [["REST",200], ["GraphQL", 0] ,["gRPC",10], ["SOAP", 0]],
             "color": "#D6BBFB",
         },
+    ]
+
+    const riskScoreData = [
+        {"badgeValue": 5, "progressValue": "20%", "text" : 20, "topColor": "#E45357", "backgroundColor": "#FFDCDD"},
+        {"badgeValue": 4, "progressValue": "40%", "text" : 40, "topColor": "#EF864C", "backgroundColor": "#FFD9C4"},
+        {"badgeValue": 3, "progressValue": "0%", "text" : 0, "topColor": "#F6C564", "backgroundColor": "#FFF1D4"},
+        {"badgeValue": 2, "progressValue": "40%", "text" : 40, "topColor": "#F5D8A1", "backgroundColor": "#FFF6E6"},
+        {"badgeValue": 1, "progressValue": "0%", "text" : 0, "topColor": "#A4E8F2", "backgroundColor": "#EBFCFF"},
+        {"badgeValue": 0, "progressValue": "0%", "text" : 0, "topColor": "#6FD1A6", "backgroundColor": "#E0FFF1"}
     ]
 
     function extractCategoryNames(data) {
@@ -383,7 +414,9 @@ function HomeDashboard() {
                 linkUrl="/dashboard/issues"
             />
             <InfoCard 
-                component={<div>hi</div>}
+                component={
+                    <ProgressBarChart data={riskScoreData}/>
+                }
                 title="APIs by Risk score"
                 titleToolTip="APIs by Risk score"
                 linkText="Check out"
@@ -436,10 +469,20 @@ function HomeDashboard() {
                 linkUrl="/dashboard/observe/inventory"
             />
             <InfoCard 
-                component={<div>hi</div>}
+                component={
+                    <DataTable
+                        columnContentTypes={[
+                            'text',
+                        ]}
+                        headings={[]}
+                        rows={genreateDataTableRows(newDomains)}
+                        hoverable={false}
+                        increasedTableDensity
+                    />
+                }
                 title="New Domains"
                 titleToolTip="New Domains"
-                linkText="Check out"
+                linkText="Increase test coverage"
                 linkUrl="/dashboard/observe/inventory"
             />
         </HorizontalGrid>
