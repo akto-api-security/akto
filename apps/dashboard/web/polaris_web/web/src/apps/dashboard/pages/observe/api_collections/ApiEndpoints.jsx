@@ -464,12 +464,12 @@ function ApiEndpoints(props) {
                 url: url
             }
         })
-        let result = await api.downloadOpenApiFileForSelectedApis(apiInfoKeyList)
+        let result = await api.downloadOpenApiFileForSelectedApis(apiInfoKeyList, apiCollectionId)
         let openApiString = result["openAPIString"]
         let blob = new Blob([openApiString], {
             type: "application/json",
         });
-        const fileName = "open_api_akto.json";
+        const fileName = "open_api_" + collectionsMap[apiCollectionId] + ".json";
         saveAs(blob, fileName);
 
         func.setToast(true, false, <div data-testid="openapi_spec_download_message">OpenAPI spec downloaded successfully</div>)
@@ -512,7 +512,7 @@ function ApiEndpoints(props) {
                 }
             })
 
-            result = await api.exportToPostmanForSelectedApis(apiInfoKeyList)
+            result = await api.exportToPostmanForSelectedApis(apiInfoKeyList, apiCollectionId)
         } else {
             result = await api.exportToPostman(apiCollectionId)
         }

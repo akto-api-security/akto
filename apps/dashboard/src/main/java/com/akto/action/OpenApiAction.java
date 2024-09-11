@@ -19,6 +19,7 @@ import com.akto.open_api.parser.Parser;
 import com.akto.open_api.parser.ParserResult;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.utils.ApiInfoKeyToSampleData;
 import com.akto.utils.GzipUtils;
 import com.akto.utils.SampleDataToSTI;
 import com.akto.utils.Utils;
@@ -76,13 +77,20 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
             ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", apiCollectionId);
             if (apiCollection == null) return ERROR.toUpperCase();
 
+            List<SampleData> sampleDataList;
+            int limit = 100;
+
+            if(apiInfoKeyList != null && !apiInfoKeyList.isEmpty()) {
+                sampleDataList = ApiInfoKeyToSampleData.convertApiInfoKeyToSampleData(apiInfoKeyList);
+            } else {
+                sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(
+                        apiCollectionId, lastFetchedUrl, lastFetchedMethod, limit, 1
+                );
+            }
+
             loggerMaker.infoAndAddToDb("Found API Collection " + apiCollection.getHostName(), LogDb.DASHBOARD);
             String host =  apiCollection.getHostName();
-
-            int limit = 100;
-            List<SampleData> sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(
-                    apiCollectionId, lastFetchedUrl, lastFetchedMethod, limit, 1
-            );
+            String apiCollectionName = apiCollection.getDisplayName();
 
             int size = sampleDataList.size();
             loggerMaker.infoAndAddToDb("Fetched sample data list " + size, LogDb.DASHBOARD);
@@ -102,60 +110,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
             loggerMaker.infoAndAddToDb("Converted to STI", LogDb.DASHBOARD);
 
             Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = sampleDataToSTI.getSingleTypeInfoMap();
-            OpenAPI openAPI = Main.init(apiCollection.getDisplayName(),stiList, includeHeaders, host);
-            loggerMaker.infoAndAddToDb("Initialized openAPI", LogDb.DASHBOARD);
-
-            openAPIString = Main.convertOpenApiToJSON(openAPI);
-            loggerMaker.infoAndAddToDb("Initialize openAPI", LogDb.DASHBOARD);
-
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e,"ERROR while downloading openApi file " + e, LogDb.DASHBOARD);
-            return ERROR.toUpperCase();
-        }
-
-        return SUCCESS.toUpperCase();
-    }
-
-    public String generateOpenApiForSelectedApis() {
-        try {
-            List<Integer> apiCollectionIds = new ArrayList<>();
-            List<String> urls = new ArrayList<>();
-            List<String> methods = new ArrayList<>();
-
-            for (ApiInfo.ApiInfoKey apiInfoKey : apiInfoKeyList) {
-                apiCollectionIds.add(apiInfoKey.getApiCollectionId());
-                urls.add(apiInfoKey.getUrl());
-                methods.add(apiInfoKey.getMethod().name());
-            }
-
-            Bson filter = Filters.and(
-                    Filters.in("_id.apiCollectionId", apiCollectionIds),
-                    Filters.in("_id.url", urls),
-                    Filters.in("_id.method", methods)
-            );
-
-            List<SampleData> sampleDataList = SampleDataDao.instance.findAll(filter);
-
-            int size = sampleDataList.size();
-            loggerMaker.infoAndAddToDb("Fetched sample data list " + size, LogDb.DASHBOARD);
-
-            int limit = 100;
-            if (size < limit) {
-                lastFetchedUrl = null;
-                lastFetchedMethod = null;
-            } else {
-                SampleData last = sampleDataList.get(size-1);
-                lastFetchedUrl = last.getId().getUrl();
-                lastFetchedMethod = last.getId().getMethod().name();
-            }
-            loggerMaker.infoAndAddToDb("Fetching for " + lastFetchedUrl + " " + lastFetchedMethod, LogDb.DASHBOARD);
-
-            SampleDataToSTI sampleDataToSTI = new SampleDataToSTI();
-            sampleDataToSTI.setSampleDataToSTI(sampleDataList);
-            loggerMaker.infoAndAddToDb("Converted to STI", LogDb.DASHBOARD);
-
-            Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = sampleDataToSTI.getSingleTypeInfoMap();
-            OpenAPI openAPI = Main.init("Custom OpenAPI schema", stiList, includeHeaders, null);
+            OpenAPI openAPI = Main.init(apiCollectionName,stiList, includeHeaders, host);
             loggerMaker.infoAndAddToDb("Initialized openAPI", LogDb.DASHBOARD);
 
             openAPIString = Main.convertOpenApiToJSON(openAPI);

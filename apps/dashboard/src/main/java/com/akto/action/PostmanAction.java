@@ -25,6 +25,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.postman.Main;
 import com.akto.util.DashboardMode;
 import com.akto.util.http_util.CoreHTTPClient;
+import com.akto.utils.ApiInfoKeyToSampleData;
 import com.akto.utils.GzipUtils;
 import com.akto.utils.SampleDataToSTI;
 import com.akto.utils.Utils;
@@ -108,6 +109,7 @@ public class PostmanAction extends UserAction {
 
 
     private int apiCollectionId;
+    private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
     public String createPostmanApi() throws Exception { // TODO: remove exception
         PostmanCredential postmanCredential = fetchPostmanCredential();
         if (postmanCredential == null) {
@@ -123,18 +125,27 @@ public class PostmanAction extends UserAction {
             if (apiCollection == null) {
                 return;
             }
-            String apiName = "AKTO " + apiCollection.getDisplayName();
 
-            List<SampleData> sampleData = SampleDataDao.instance.findAll(
-                    Filters.eq("_id.apiCollectionId", apiCollectionId)
-            );
+            List<SampleData> sampleData;
+            if(apiInfoKeyList != null && !apiInfoKeyList.isEmpty()) {
+                sampleData = ApiInfoKeyToSampleData.convertApiInfoKeyToSampleData(apiInfoKeyList);
+            } else {
+                sampleData = SampleDataDao.instance.findAll(
+                        Filters.in("collectionIds", apiCollectionId)
+                );
+            }
+
+
+            String apiName = "AKTO " + apiCollection.getDisplayName();
             String host =  apiCollection.getHostName();
+            String apiCollectionName = apiCollection.getDisplayName();
+
             SampleDataToSTI sampleDataToSTI = new SampleDataToSTI();
             sampleDataToSTI.setSampleDataToSTI(sampleData);
             Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = sampleDataToSTI.getSingleTypeInfoMap();
             OpenAPI openAPI = null;
             try {
-                openAPI = com.akto.open_api.Main.init(apiCollection.getDisplayName(),stiList, true, host);
+                openAPI = com.akto.open_api.Main.init(apiCollectionName, stiList, true, host);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e,"Error while creating open api: " + e.getMessage(), LogDb.DASHBOARD);
                 return;
@@ -163,47 +174,6 @@ public class PostmanAction extends UserAction {
 
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
-    }
-
-
-    private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
-    public String createPostmanForSelectedApi() {
-        PostmanCredential postmanCredential = fetchPostmanCredential();
-        if (postmanCredential == null) {
-            addActionError("Please add postman credentials in settings");
-            return ERROR.toUpperCase();
-        }
-        int accountId = Context.accountId.get();
-
-        Runnable r = () -> {
-            loggerMaker.infoAndAddToDb("Starting thread to create postman for selected api", LogDb.DASHBOARD);
-            Context.accountId.set(accountId);
-
-            String apiName = "AKTO Custom Postman";
-
-            OpenApiAction openApiAction = new OpenApiAction();
-            openApiAction.setApiInfoKeyList(apiInfoKeyList);
-            String resultStatus = openApiAction.generateOpenApiForSelectedApis();
-            String openAPIString;
-
-            if(resultStatus.equals(SUCCESS.toUpperCase())) {
-                openAPIString = openApiAction.getOpenAPIString();
-            } else {
-                openAPIString = "";
-            }
-
-            Main main = new Main(postmanCredential.getApiKey());
-            try {
-                main.createApiWithSchema(postmanCredential.getWorkspaceId(), apiName, openAPIString);
-            } catch (Exception e){
-                loggerMaker.errorAndAddToDb(e,"Error while creating api in postman: " + e.getMessage(), LogDb.DASHBOARD);
-            }
-            loggerMaker.infoAndAddToDb("Successfully created api in postman", LogDb.DASHBOARD);
-        };
-
-        executorService.submit(r);
-
-        return SUCCESS.toUpperCase();
     }
 
     private String postmanCollectionId;

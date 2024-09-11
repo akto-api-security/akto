@@ -205,12 +205,12 @@ export default {
             }
         })
     },
-    downloadOpenApiFileForSelectedApis(apiInfoKeyList) {
+    downloadOpenApiFileForSelectedApis(apiInfoKeyList, apiCollectionId) {
         return request({
-            url: '/api/generateOpenApiForSelectedApis',
+            url: '/api/generateOpenApiFile',
             method: 'post',
             data: {
-                apiInfoKeyList
+                apiInfoKeyList, apiCollectionId
             }
         })
     },
@@ -223,12 +223,12 @@ export default {
             }
         })
     },
-    exportToPostmanForSelectedApis(apiInfoKeyList) {
+    exportToPostmanForSelectedApis(apiInfoKeyList, apiCollectionId) {
         return request({
-            url: '/api/createPostmanForSelectedApi',
+            url: '/api/createPostmanApi',
             method: 'post',
             data: {
-                apiInfoKeyList
+                apiInfoKeyList, apiCollectionId
             }
         })
     },

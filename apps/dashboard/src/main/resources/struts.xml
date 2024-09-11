@@ -1300,26 +1300,6 @@
             </result>
         </action>
 
-        <action name="api/generateOpenApiForSelectedApis" class="com.akto.action.OpenApiAction" method="generateOpenApiForSelectedApis">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ_WRITE</param>
-            </interceptor-ref>
-
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-            </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
-
         <action name="api/deactivateCollections" class="com.akto.action.ApiCollectionsAction" method="deactivateCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1918,27 +1898,6 @@
         </action>
 
         <action name="api/createPostmanApi" class="com.akto.action.PostmanAction" method="createPostmanApi">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/createPostmanForSelectedApi" class="com.akto.action.PostmanAction" method="createPostmanForSelectedApi">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
