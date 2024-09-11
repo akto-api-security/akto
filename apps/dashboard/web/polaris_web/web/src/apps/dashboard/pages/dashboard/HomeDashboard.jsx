@@ -24,6 +24,7 @@ import SummaryCard from './new_components/SummaryCard';
 import { ArrowUpMinor, ArrowDownMinor} from '@shopify/polaris-icons';
 import TestSummaryCardsList from './new_components/TestSummaryCardsList';
 import InfoCard from './new_components/InfoCard';
+import DonutChart from '../../components/shared/DonutChart';
 
 function HomeDashboard() {
 
@@ -45,6 +46,12 @@ function HomeDashboard() {
 
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
+
+    const defaultChartOptions = {
+        "legend": {
+            enabled: false
+        },
+    }
 
     const fetchData = async() =>{
         setLoading(true)
@@ -200,24 +207,176 @@ function HomeDashboard() {
         />
     )
 
+    const severityMap = {
+        "Critical": {
+            "text": 3,
+            "color": "#E45357",
+            "filterKey": "Critical"
+        },
+        "High": {
+            "text": 2,
+            "color": "#EF864C",
+            "filterKey": "High"
+        },
+        "Medium": {
+            "text": 1,
+            "color": "#F6C564",
+            "filterKey": "Medium"
+        },
+        "Low": {
+            "text": 1,
+            "color": "#6FD1A6",
+            "filterKey": "Low"
+        }
+    }
+
+    const accessTypeMap = {
+        "Partner": {
+            "text": 3,
+            "color": "#147CF6",
+            "filterKey": "Partner"
+        },
+        "Zombie": {
+            "text": 2,
+            "color": "#22BB97",
+            "filterKey": "Zombie"
+        },
+        "Shadow": {
+            "text": 1,
+            "color": "#A278FF",
+            "filterKey": "Shadow"
+        },
+        "Internal": {
+            "text": 1,
+            "color": "#FDB33D",
+            "filterKey": "Internal"
+        },
+        "External": {
+            "text": 1,
+            "color": "#658EE2",
+            "filterKey": "External"
+        },
+        "Third Party": {
+            "text": 1,
+            "color": "#68B3D0",
+            "filterKey": "Third Party"
+        }
+    }
+
+    const authMap = {
+        "Unauthenticated": {
+            "text": 3,
+            "color": "#7F56D9",
+            "filterKey": "Unauthenticated"
+        },
+        "JWT": {
+            "text": 2,
+            "color": "#9E77ED",
+            "filterKey": "JWT"
+        },
+        "Bearer": {
+            "text": 1,
+            "color": "#B692F6",
+            "filterKey": "Bearer"
+        },
+        "Basic": {
+            "text": 1,
+            "color": "#D6BBFB",
+            "filterKey": "D6BBFB"
+        },
+        "Custom": {
+            "text": 1,
+            "color": "#E9D7FE",
+            "filterKey": "Custom"
+        }
+    }
+
+    const unsecuredAPIs = [
+        {
+            "data": [[1704067200000,200], [1706745600000,100] ,[1709251200000,120], [1711929600000,110], [1714521600000,90], [1717200000000,110]],
+            "color": "#E45357",
+        },
+    ]
+
+    const criticalFindingsData = [
+        {
+            "data": [["BOLA",200], ["BUA",100] ,["MA",120], ["Misconfig",110], ["SSRF",90]],
+            "color": "#E45357",
+        },
+    ]
+
+    const apiTypesData = [
+        {
+            "data": [["REST",200], ["GraphQL", 0] ,["gRPC",10], ["SOAP", 0]],
+            "color": "#D6BBFB",
+        },
+    ]
+
+    function extractCategoryNames(data) {
+        if (!data || !Array.isArray(data) || data.length === 0) {
+            return [];
+        }
+        
+        const findings = data[0]?.data || [];
+        return findings.map(([category]) => category);
+    }
+
     const gridComponent = (
         <HorizontalGrid gap={5} columns={2}>
             <InfoCard 
-                component={<div>hi</div>}
+                component={
+                    <ChartypeComponent data={severityMap} navUrl={"/dashboard/issues/"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true}/>
+                }
                 title="Vulnerable APIs by Severity"
                 titleToolTip="Vulnerable APIs by Severity"
                 linkText="Fix critical issues"
                 linkUrl="/dashboard/issues"
             />
             <InfoCard 
-                component={<div>hi</div>}
+                component={
+                    <StackedChart 
+                        type='column'
+                        color='#6200EA'
+                        areaFillHex="true"
+                        height="280"
+                        background-color="#ffffff"
+                        data={unsecuredAPIs}
+                        defaultChartOptions={defaultChartOptions}
+                        text="true"
+                        yAxisTitle="Number of issues"
+                        width={40}
+                        gap={10}
+                        showGridLines={true}
+                    />
+                }
                 title="Critical Unsecured APIs Over Time"
                 titleToolTip="Critical Unsecured APIs Over Time"
                 linkText="Fix critical issues"
                 linkUrl="/dashboard/issues"
             />
             <InfoCard 
-                component={<div>hi</div>}
+                component={
+                    <StackedChart 
+                        type='column'
+                        color='#6200EA'
+                        areaFillHex="true"
+                        height="280"
+                        background-color="#ffffff"
+                        data={criticalFindingsData}
+                        defaultChartOptions={defaultChartOptions}
+                        text="true"
+                        yAxisTitle="Number of issues"
+                        width={40}
+                        gap={10}
+                        showGridLines={true}
+                        customXaxis={
+                            {
+                                categories: extractCategoryNames(criticalFindingsData),
+                                crosshair: true
+                            }
+                        }
+                    />
+                }
                 title="Critical Findings"
                 titleToolTip="Critical Findings"
                 linkText="Fix critical issues"
@@ -231,21 +390,46 @@ function HomeDashboard() {
                 linkUrl="/dashboard/observe/inventory"
             />
             <InfoCard 
-                component={<div>hi</div>}
+                component={
+                    <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true}/>
+                }
                 title="APIs by Access type"
                 titleToolTip="APIs by Access type"
                 linkText="Check out"
                 linkUrl="/dashboard/observe/inventory"
             />
             <InfoCard 
-                component={<div>hi</div>}
+                component={
+                    <ChartypeComponent data={authMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true}/>
+                }
                 title="APIs by Authentication"
                 titleToolTip="APIs by Authentication"
                 linkText="Check out"
                 linkUrl="/dashboard/observe/inventory"
             />
             <InfoCard 
-                component={<div>hi</div>}
+                component={
+                    <StackedChart 
+                        type='column'
+                        color='#6200EA'
+                        areaFillHex="true"
+                        height="280"
+                        background-color="#ffffff"
+                        data={apiTypesData}
+                        defaultChartOptions={defaultChartOptions}
+                        text="true"
+                        yAxisTitle="Number of APIs"
+                        width={40}
+                        gap={10}
+                        showGridLines={true}
+                        customXaxis={
+                            {
+                                categories: extractCategoryNames(apiTypesData),
+                                crosshair: true
+                            }
+                        }
+                    />
+                }
                 title="API Type"
                 titleToolTip="API Type"
                 linkText="Check out"
@@ -260,12 +444,6 @@ function HomeDashboard() {
             />
         </HorizontalGrid>
     )
-
-    const defaultChartOptions = {
-        "legend": {
-            enabled: false
-        },
-    }
 
     const subcategoryInfoComp = (
         Object.keys(subCategoryInfo).length > 0 ? 

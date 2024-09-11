@@ -6,7 +6,7 @@ import SpinnerCentered from "../progress/SpinnerCentered";
 
 function StackedChart(props) {
 
-    const { type, height, backgroundColor, data, graphPointClick, tooltipFormatter, yAxisTitle, title, text, defaultChartOptions, areaFillHex, color, width, noGap, showGridLines } = props;
+    const { type, height, backgroundColor, data, graphPointClick, tooltipFormatter, yAxisTitle, title, text, defaultChartOptions, areaFillHex, color, width, noGap, showGridLines, customXaxis } = props;
     const chartComponentRef = useRef(null)
 
     const fillColor = {
@@ -16,6 +16,19 @@ function StackedChart(props) {
             [1, '#000000'],
         ],
     };
+
+    const xAxis = customXaxis ? customXaxis : {
+        type: 'datetime',
+        dateTimeLabelFormats: {
+            day: '%b %e',
+            month: '%b',
+        },
+        title: {
+            text: 'Date',
+        },
+        visible: text,
+        gridLineWidth: 0,
+    }
 
     const coreChartOptions = {
         chart: {
@@ -54,18 +67,7 @@ function StackedChart(props) {
                 }
             }
         },
-        xAxis: {
-            type: 'datetime',
-            dateTimeLabelFormats: {
-                day: '%b %e',
-                month: '%b',
-            },
-            title: {
-                text: 'Date',
-            },
-            visible: text,
-            gridLineWidth: 0,
-        },
+        xAxis: xAxis,
         yAxis: [
             {
                 title: {

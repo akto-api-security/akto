@@ -1,5 +1,6 @@
 import { Box, Card, HorizontalGrid, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
+import SmoothAreaChart from './SmoothChart'
 
 function SummaryCard({ summaryItems }) {
     return (
@@ -13,14 +14,17 @@ function SummaryCard({ summaryItems }) {
                                     <Text variant="headingMd">
                                         {item.title}
                                     </Text>
-                                    {item?.isComp ? item.data : <Text variant={item.variant ? item.variant : 'bodyLg'} color={item.color ? item.color : ""}>
-                                        {item.data}
-                                    </Text>
-                                    }
-                                    {item.byLineComponent ? item.byLineComponent : null}
+                                    <HorizontalGrid gap={1} columns={2}>
+                                        <VerticalStack gap={4}>
+                                            {item?.isComp ? item.data : <Text variant={item.variant ? item.variant : 'bodyLg'} color={item.color ? item.color : ""}>
+                                                {item.data}
+                                            </Text>
+                                            }
+                                            {item.byLineComponent ? item.byLineComponent : null}
+                                        </VerticalStack>
+                                        <SmoothAreaChart/>
+                                    </HorizontalGrid>
                                 </VerticalStack>
-
-                                {item.sidePanel ? item.sidePanel : null}
                             </HorizontalStack>
                         </Box>
                     ))}
