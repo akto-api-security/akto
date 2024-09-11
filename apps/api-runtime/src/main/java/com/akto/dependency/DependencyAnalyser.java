@@ -29,6 +29,7 @@ import org.bson.conversions.Bson;
 import java.util.*;
 
 import static com.akto.util.HttpRequestResponseUtils.extractValuesFromPayload;
+import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class DependencyAnalyser {
     Store valueStore; // this is to store all the values seen in response payload
@@ -131,7 +132,7 @@ public class DependencyAnalyser {
         for (String param: responseHeaders.keySet()) {
             List<String> values = responseHeaders.get(param);
             if (param.equalsIgnoreCase("set-cookie")) {
-                Map<String,String> cookieMap = AuthPolicy.parseCookie(values);
+                Map<String,String> cookieMap = parseCookie(values);
                 for (String cookieKey: cookieMap.keySet()) {
                     String cookieVal = cookieMap.get(cookieKey);
                     if (!filterValues(cookieVal)) continue;
@@ -192,7 +193,7 @@ public class DependencyAnalyser {
             List<String> values = requestHeaders.get(param);
 
             if (param.equals("cookie")) {
-                Map<String,String> cookieMap = AuthPolicy.parseCookie(values);
+                Map<String,String> cookieMap = parseCookie(values);
                 for (String cookieKey: cookieMap.keySet()) {
                     String cookieValue = cookieMap.get(cookieKey);
                     processRequestParam(cookieKey, new HashSet<>(Collections.singletonList(cookieValue)), combinedUrl, false, true, doInterCollectionMatch);

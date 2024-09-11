@@ -14,7 +14,7 @@ import com.akto.log.LoggerMaker.LogDb;
 
 public class ExecutionListBuilder {
     
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ExecutionListBuilder.class);
 
     public ExecutionOrderResp parseExecuteOperations(ExecutorNode node, List<ExecutorNode> executeOrder) {
 

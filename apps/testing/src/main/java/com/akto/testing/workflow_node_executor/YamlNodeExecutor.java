@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.testing.Main;
 import com.akto.dto.*;
 import com.akto.dto.type.URLMethods;
 import com.akto.test_editor.execution.Memory;
@@ -42,7 +41,7 @@ import com.akto.test_editor.execution.ExecutorAlgorithm;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
-import com.akto.utils.RedactSampleData;
+import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 import com.google.gson.Gson;
 
 public class YamlNodeExecutor extends NodeExecutor {
@@ -146,7 +145,7 @@ public class YamlNodeExecutor extends NodeExecutor {
             int tsAfterReq = 0;
             try {
                 tsBeforeReq = Context.nowInMillis();
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, com.akto.test_editor.Utils.SKIP_SSRF_CHECK);
                 if (apiInfoKey != null && memory != null) {
                     memory.fillResponse(testReq.getRequest(), testResponse, apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
                     memory.reset(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
@@ -160,7 +159,7 @@ public class YamlNodeExecutor extends NodeExecutor {
                 }
                 vulnerable = res.getVulnerable();
                 try {
-                    message.add(RedactSampleData.convertOriginalReqRespToString(testReq.getRequest(), testResponse));
+                    message.add(convertOriginalReqRespToString(testReq.getRequest(), testResponse));
                 } catch (Exception e) {
                     ;
                 }
