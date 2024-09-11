@@ -27,7 +27,7 @@ public class AdvancedTrafficFiltersAction extends UserAction {
 
     public String fetchAllFilterTemplates(){
         List<YamlTemplate> yamlTemplates =  AdvancedTrafficFiltersDao.instance.findAll(Filters.empty());
-        Map<String, FilterConfig> configs = FilterYamlTemplateDao.instance.fetchFilterConfig(true, yamlTemplates);
+        Map<String, FilterConfig> configs = FilterYamlTemplateDao.instance.fetchFilterConfig(true, yamlTemplates, false);
         this.templatesList = TrafficFilterUtil.getFilterTemplates(configs);
         return SUCCESS.toUpperCase();
     }
@@ -35,7 +35,7 @@ public class AdvancedTrafficFiltersAction extends UserAction {
     public String saveYamlTemplateForTrafficFilters(){
         FilterConfig filterConfig = new FilterConfig();
         try {
-            filterConfig = FilterConfigYamlParser.parseTemplate(yamlContent);
+            filterConfig = FilterConfigYamlParser.parseTemplate(yamlContent, true);
             if (filterConfig.getId() == null) {
                 throw new Exception("id field cannot be empty");
             }

@@ -11,7 +11,8 @@ import java.util.Map;
 
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
-import com.akto.runtime.policies.AuthPolicy;
+
+import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class CookieExpireFilter extends DataOperandsImpl {
     
@@ -34,7 +35,7 @@ public class CookieExpireFilter extends DataOperandsImpl {
             return new ValidationResult(false, queryVal == null ? TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + " is not set true": "no data to be matched for validation");
         }
 
-        Map<String,String> cookieMap = AuthPolicy.parseCookie(Arrays.asList(data));
+        Map<String,String> cookieMap = parseCookie(Arrays.asList(data));
 
         boolean result = queryVal;
         boolean res = false;

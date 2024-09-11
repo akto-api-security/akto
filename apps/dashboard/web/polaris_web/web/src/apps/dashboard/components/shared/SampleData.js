@@ -5,6 +5,7 @@ import "./style.css";
 import func from "@/util/func"
 import editorSetup from './customEditor';
 import yamlEditorSetup from "../../pages/test_editor/components/editor_config/editorSetup"
+import keywords from "../../pages/test_editor/components/editor_config/keywords"
 import authTypesApi from "@/apps/dashboard/pages/settings/auth_types/api";
 
 function highlightPaths(highlightPathMap, ref){
@@ -238,6 +239,7 @@ function SampleData(props) {
           yamlEditorSetup.registerLanguage()
           yamlEditorSetup.setTokenizer()
           yamlEditorSetup.setEditorTheme()
+          yamlEditorSetup.setAutoComplete(keywords)
         }
         if(showDiff){
           instance = monaco.editor.createDiffEditor(ref.current, options)

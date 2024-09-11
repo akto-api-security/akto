@@ -21,7 +21,7 @@ public class FilterYamlTemplateAction extends UserAction {
     String content;
 
     public String fetchFilterYamlTemplate() {
-        Map<String, FilterConfig> configs = FilterYamlTemplateDao.instance.fetchFilterConfig(true);
+        Map<String, FilterConfig> configs = FilterYamlTemplateDao.instance.fetchFilterConfig(true, false);
         this.templates = TrafficFilterUtil.getFilterTemplates(configs);
         return SUCCESS.toUpperCase();
     }
@@ -30,7 +30,7 @@ public class FilterYamlTemplateAction extends UserAction {
 
         FilterConfig filterConfig = new FilterConfig();
         try {
-            filterConfig = FilterConfigYamlParser.parseTemplate(content);
+            filterConfig = FilterConfigYamlParser.parseTemplate(content, false);
             if (filterConfig.getId() == null) {
                 throw new Exception("id field cannot be empty");
             }

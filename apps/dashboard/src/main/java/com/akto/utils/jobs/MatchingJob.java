@@ -64,7 +64,7 @@ public class MatchingJob {
                     @Override
                     public void accept(Account t) {
                         try {
-                            Map<String, FilterConfig> apiFilters = FilterYamlTemplateDao.instance.fetchFilterConfig(false);
+                            Map<String, FilterConfig> apiFilters = FilterYamlTemplateDao.instance.fetchFilterConfig(false, false);
                             if (apiFilters == null || apiFilters.isEmpty()) {
                                 /*
                                  * Skip running job for accounts

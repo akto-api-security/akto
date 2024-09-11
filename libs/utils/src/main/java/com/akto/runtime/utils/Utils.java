@@ -1,11 +1,29 @@
 package com.akto.runtime.utils;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.akto.dto.HttpRequestParams;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.HttpRequestResponseUtils;
+import com.akto.util.JSONUtils;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
+import com.mongodb.BasicDBObject;
+import static com.akto.dto.RawApi.convertHeaders;
+
+import static com.akto.util.HttpRequestResponseUtils.GRPC_CONTENT_TYPE;
 
 public class Utils {
     private static final Logger logger = LoggerFactory.getLogger(Utils.class);
@@ -30,4 +48,110 @@ public class Utils {
 
         return properties;
     }
+
+    public static String convertOriginalReqRespToString(OriginalHttpRequest request, OriginalHttpResponse response)  {
+        BasicDBObject req = new BasicDBObject();
+        if (request != null) {
+            req.put("url", request.getUrl());
+            req.put("method", request.getMethod());
+            req.put("type", request.getType());
+            req.put("queryParams", request.getQueryParams());
+            req.put("body", request.getBody());
+            req.put("headers", convertHeaders(request.getHeaders()));
+        }
+
+        BasicDBObject resp = new BasicDBObject();
+        if (response != null) {
+            resp.put("statusCode", response.getStatusCode());
+            resp.put("body", response.getBody());
+            resp.put("headers", convertHeaders(response.getHeaders()));
+        }
+
+        BasicDBObject ret = new BasicDBObject();
+        ret.put("request", req);
+        ret.put("response", resp);
+
+        return ret.toString();
+    }
+
+    public static Map<String,String> parseCookie(List<String> cookieList){
+        Map<String,String> cookieMap = new HashMap<>();
+        if(cookieList==null)return cookieMap;
+        for (String cookieValues : cookieList) {
+            String[] cookies = cookieValues.split(";");
+            for (String cookie : cookies) {
+                cookie=cookie.trim();
+                String[] cookieFields = cookie.split("=");
+                boolean twoCookieFields = cookieFields.length == 2;
+                if (twoCookieFields) {
+                    if(!cookieMap.containsKey(cookieFields[0])){
+                        cookieMap.put(cookieFields[0], cookieFields[1]);
+                    }
+                }
+            }
+        }
+        return cookieMap;
+    }
+
+    private static int GRPC_DEBUG_COUNTER = 50;
+
+    public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
+
+        //convert java object to JSON format
+
+        JSONObject jsonObject = JSON.parseObject(message);
+
+        String method = jsonObject.getString("method");
+        String url = jsonObject.getString("path");
+        String type = jsonObject.getString("type");
+        Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(jsonObject, "requestHeaders");
+
+        String rawRequestPayload = jsonObject.getString("requestPayload");
+        String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
+
+        if (GRPC_DEBUG_COUNTER > 0) {
+            String acceptableContentType = HttpRequestResponseUtils.getAcceptableContentType(requestHeaders);
+            if (acceptableContentType != null && rawRequestPayload.length() > 0) {
+                // only if request payload is of FORM_URL_ENCODED_CONTENT_TYPE we convert it to json
+                if (acceptableContentType.equals(GRPC_CONTENT_TYPE)) {
+                    logger.info("grpc kafka payload:" + message,LogDb.RUNTIME);
+                    GRPC_DEBUG_COUNTER--;
+                }
+            }
+        }
+
+        String apiCollectionIdStr = jsonObject.getOrDefault("akto_vxlan_id", "0").toString();
+        int apiCollectionId = 0;
+        if (NumberUtils.isDigits(apiCollectionIdStr)) {
+            apiCollectionId = NumberUtils.toInt(apiCollectionIdStr, 0);
+        }
+
+        HttpRequestParams requestParams = new HttpRequestParams(
+                method,url,type, requestHeaders, requestPayload, apiCollectionId
+        );
+
+        int statusCode = jsonObject.getInteger("statusCode");
+        String status = jsonObject.getString("status");
+        Map<String,List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(jsonObject, "responseHeaders");
+        String payload = jsonObject.getString("responsePayload");
+        payload = HttpRequestResponseUtils.rawToJsonString(payload, responseHeaders);
+        payload = JSONUtils.parseIfJsonP(payload);
+        int time = jsonObject.getInteger("time");
+        String accountId = jsonObject.getString("akto_account_id");
+        String sourceIP = jsonObject.getString("ip");
+        String destIP = jsonObject.getString("destIp");
+        String direction = jsonObject.getString("direction");
+
+        String isPendingStr = (String) jsonObject.getOrDefault("is_pending", "false");
+        boolean isPending = !isPendingStr.toLowerCase().equals("false");
+        String sourceStr = (String) jsonObject.getOrDefault("source", HttpResponseParams.Source.OTHER.name());
+        HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
+        
+        return new HttpResponseParams(
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction
+        );
+    }
+
+
+
 }
