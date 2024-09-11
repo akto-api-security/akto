@@ -24,7 +24,6 @@ import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
-import com.akto.parsers.HttpCallParser;
 import com.akto.test_editor.Utils;
 import com.akto.util.modifier.AddJWKModifier;
 import com.akto.util.modifier.AddJkuJWTModifier;
@@ -35,6 +34,8 @@ import com.akto.util.modifier.NoneAlgoJWTModifier;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+
+import static com.akto.runtime.utils.Utils.parseKafkaMessage;
 
 public class VariableResolver {
     
@@ -679,7 +680,7 @@ public class VariableResolver {
             HttpResponseParams httpResponseParams;
             HttpRequestParams httpRequestParams;
             try {
-                httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                httpResponseParams = parseKafkaMessage(sample);
                 httpRequestParams = httpResponseParams.getRequestParams();
 
                 if ("terminal_keys".equals(location)) {

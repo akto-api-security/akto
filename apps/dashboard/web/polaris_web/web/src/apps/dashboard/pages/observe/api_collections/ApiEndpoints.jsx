@@ -706,7 +706,7 @@ function ApiEndpoints(props) {
                 content: 'Enable',
                 onAction: redactCollection
             }}
-            key="redact-modal"
+            key="redact-modal-1"
         >
             <Modal.Section>
                 <Text>When enabled, existing sample payload values for this collection will be deleted, and data in all the future payloads for this collection will be redacted. Please note that your API Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.</Text>

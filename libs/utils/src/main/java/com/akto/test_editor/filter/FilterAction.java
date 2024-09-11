@@ -33,20 +33,19 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
-import com.akto.parsers.HttpCallParser;
-import com.akto.rules.TestPlugin;
-import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AuthPolicy;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.*;
 import com.akto.util.JSONUtils;
-import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
+import static com.akto.runtime.utils.Utils.parseCookie;
 import static com.akto.dto.RawApi.convertHeaders;
+import static com.akto.runtime.RuntimeUtil.createUrlTemplate;
+import static com.akto.testing.Utils.compareWithOriginalResponse;
+import static com.akto.runtime.utils.Utils.parseKafkaMessage;
 
 public final class FilterAction {
     
@@ -349,7 +348,7 @@ public final class FilterAction {
                 if (sampleRawApi == null) {
                     return new DataOperandsFilterResponse(false, null, null, null);
                 }
-                double percentageMatch = TestPlugin.compareWithOriginalResponse(origPayload, sampleRawApi.getResponse().getBody(), new HashMap<>());
+                double percentageMatch = compareWithOriginalResponse(origPayload, sampleRawApi.getResponse().getBody(), new HashMap<>());
                 val = (int) percentageMatch;
             } else if (filterActionRequest.getBodyOperand() != null && filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.PERCENTAGE_MATCH_SCHEMA.toString())) {
                 RawApi sampleRawApi = filterActionRequest.getRawApi();
@@ -431,7 +430,7 @@ public final class FilterAction {
                 if (sampleRawApi == null) {
                     return;
                 }
-                double percentageMatch = TestPlugin.compareWithOriginalResponse(payload, sampleRawApi.getResponse().getBody(), new HashMap<>());
+                double percentageMatch = compareWithOriginalResponse(payload, sampleRawApi.getResponse().getBody(), new HashMap<>());
                 val = (int) percentageMatch;
             }
         } else {
@@ -572,7 +571,7 @@ public final class FilterAction {
                 
                 if (!res && (key.equals("cookie") || key.equals("set-cookie"))) {
                     List<String> cookieList = headers.getOrDefault(key, new ArrayList<>());
-                    Map<String,String> cookieMap = AuthPolicy.parseCookie(cookieList);
+                    Map<String,String> cookieMap = parseCookie(cookieList);
                     for (String cookieKey : cookieMap.keySet()) {
                         dataOperandFilterRequest = new DataOperandFilterRequest(cookieKey, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
                         validationResult = invokeFilter(dataOperandFilterRequest);
@@ -615,7 +614,7 @@ public final class FilterAction {
 
                 if (!res && (key.equals("cookie") || key.equals("set-cookie"))) {
                     List<String> cookieList = headers.getOrDefault("cookie", new ArrayList<>());
-                    Map<String,String> cookieMap = AuthPolicy.parseCookie(cookieList);
+                    Map<String,String> cookieMap = parseCookie(cookieList);
                     for (String cookieKey : cookieMap.keySet()) {
                         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(cookieMap.get(cookieKey), filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
                         ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
@@ -1268,10 +1267,10 @@ public final class FilterAction {
         int privateCnt = 0;
         List<BasicDBObject> privateValues = new ArrayList<>();
         if (APICatalog.isTemplateUrl(url)) {
-            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, method);
+            URLTemplate urlTemplate = createUrlTemplate(url, method);
             String[] tokens = urlTemplate.getTokens();
 
-            String[] urlWithParamsTokens = APICatalogSync.createUrlTemplate(urlWithParams, method).getTokens();
+            String[] urlWithParamsTokens = createUrlTemplate(urlWithParams, method).getTokens();
             for (int i = 0;i < tokens.length; i++) {
                 if (tokens[i] == null) {
                     SingleTypeInfo singleTypeInfo = querySti(i+"", true,apiInfoKey, false, -1);
@@ -1303,7 +1302,7 @@ public final class FilterAction {
                         }
                         for (String sample: sd.getSamples()) {
                             try {
-                                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                                HttpResponseParams httpResponseParams = parseKafkaMessage(sample);
                                 String sUrl = httpResponseParams.getRequestParams().getURL();
                                 String[] sUrlTokens = sUrl.split("/");
                                 String[] origUrlTokens = urlWithParams.split("/");
@@ -1359,7 +1358,7 @@ public final class FilterAction {
                     String key = SingleTypeInfo.findLastKeyFromParam(param);
                     BasicDBObject payloadObj = new BasicDBObject();
                     try {
-                        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                        HttpResponseParams httpResponseParams = parseKafkaMessage(sample);
                         payloadObj = RequestTemplate.parseRequestPayload(httpResponseParams.getRequestParams().getPayload(), null);
                     } catch (Exception e) {
                         // TODO: handle exception

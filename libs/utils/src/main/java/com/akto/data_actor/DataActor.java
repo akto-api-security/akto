@@ -4,10 +4,7 @@ import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.dto.traffic.SampleData;
-import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo;
-import com.mongodb.client.model.WriteModel;
 
 import java.util.List;
 

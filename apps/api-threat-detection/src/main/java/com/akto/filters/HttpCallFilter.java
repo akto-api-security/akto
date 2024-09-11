@@ -28,8 +28,6 @@ import com.akto.rules.TestPlugin;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
-import com.mongodb.client.model.InsertOneModel;
-import com.mongodb.client.model.WriteModel;
 
 public class HttpCallFilter {
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallFilter.class, LogDb.THREAT_DETECTION);
@@ -64,7 +62,7 @@ public class HttpCallFilter {
         if ((lastFilterFetch + FILTER_REFRESH_INTERVAL) < now) {
             // TODO: add support for only active templates.
             List<YamlTemplate> templates = dataActor.fetchFilterYamlTemplates();
-            apiFilters = FilterYamlTemplateDao.instance.fetchFilterConfig(false, templates);
+            apiFilters = FilterYamlTemplateDao.instance.fetchFilterConfig(false, templates, false);
             lastFilterFetch = now;
         }
 
@@ -80,7 +78,7 @@ public class HttpCallFilter {
                         int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
                         responseParam.requestParams.setApiCollectionId(apiCollectionId);
                         String url = responseParam.getRequestParams().getURL();
-                        Method method = Method.valueOf(responseParam.getRequestParams().getMethod());
+                        Method method = Method.fromString(responseParam.getRequestParams().getMethod());
                         ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
                         Map<String, Object> varMap = apiFilter.resolveVarMap();
                         VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
