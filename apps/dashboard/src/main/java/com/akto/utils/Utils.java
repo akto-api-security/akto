@@ -1,8 +1,16 @@
 package com.akto.utils;
 
 import com.akto.dao.ThirdPartyAccessDao;
+import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.AccountsContextDao;
+import com.akto.dao.ApiInfoDao;
+import com.akto.dao.FilterSampleDataDao;
+import com.akto.dao.SampleDataDao;
+import com.akto.dao.SensitiveParamInfoDao;
+import com.akto.dao.SensitiveSampleDataDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.HttpResponseParams;
@@ -12,6 +20,7 @@ import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
+import com.akto.dto.traffic.Key;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.upload.FileUploadError;
 import com.akto.listener.KafkaListener;
@@ -26,7 +35,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.BulkWriteOptions;
+import com.mongodb.client.model.DeleteManyModel;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.WriteModel;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -582,6 +595,35 @@ public class Utils {
         }else{
             return 0;
         }
+    }
+
+    public static <T> void deleteApisPerDao(List<Key> toBeDeleted, AccountsContextDao<T> dao, String prefix) {
+        if (toBeDeleted == null || toBeDeleted.isEmpty()) return;
+        List<WriteModel<T>> stiList = new ArrayList<>();
+
+        for(Key key: toBeDeleted) {
+            stiList.add(new DeleteManyModel<>(Filters.and(
+                    Filters.eq(prefix + "apiCollectionId", key.getApiCollectionId()),
+                    Filters.eq(prefix + "method", key.getMethod()),
+                    Filters.eq(prefix + "url", key.getUrl())
+            )));
+        }
+
+        dao.bulkWrite(stiList, new BulkWriteOptions().ordered(false));
+    }
+
+    public static void deleteApis(List<Key> toBeDeleted) {
+
+        String id = "_id.";
+
+        deleteApisPerDao(toBeDeleted, SingleTypeInfoDao.instance, "");
+        deleteApisPerDao(toBeDeleted, ApiInfoDao.instance, id);
+        deleteApisPerDao(toBeDeleted, SampleDataDao.instance, id);
+        deleteApisPerDao(toBeDeleted, TrafficInfoDao.instance, id);
+        deleteApisPerDao(toBeDeleted, SensitiveSampleDataDao.instance, id);
+        deleteApisPerDao(toBeDeleted, SensitiveParamInfoDao.instance, "");
+        deleteApisPerDao(toBeDeleted, FilterSampleDataDao.instance, id);
+
     }
 
 }
