@@ -184,10 +184,9 @@ public class HttpCallParser {
                         FilterConfig apiFilter = apiFilterEntry.getValue();
                         String message = responseParam.getOrig();
                         RawApi rawApi = RawApi.buildFromMessage(message);
-                        int apiCollectionId = createApiCollectionId(responseParam);
-                        responseParam.requestParams.setApiCollectionId(apiCollectionId);
+                        int apiCollectionId = responseParam.requestParams.getApiCollectionId();
                         String url = responseParam.getRequestParams().getURL();
-                        Method method = Method.valueOf(responseParam.getRequestParams().getMethod());
+                        Method method = Method.fromString(responseParam.getRequestParams().getMethod());
                         ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
                         Map<String, Object> varMap = apiFilter.resolveVarMap();
                         VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {

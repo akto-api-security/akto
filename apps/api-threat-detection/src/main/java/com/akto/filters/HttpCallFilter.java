@@ -78,7 +78,7 @@ public class HttpCallFilter {
                         int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
                         responseParam.requestParams.setApiCollectionId(apiCollectionId);
                         String url = responseParam.getRequestParams().getURL();
-                        Method method = Method.valueOf(responseParam.getRequestParams().getMethod());
+                        Method method = Method.fromString(responseParam.getRequestParams().getMethod());
                         ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
                         Map<String, Object> varMap = apiFilter.resolveVarMap();
                         VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
