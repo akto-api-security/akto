@@ -18,7 +18,16 @@ function AdvancedTrafficFilters() {
 
         const fetchData = async () => {
             await trafficFiltersRequest.getAdvancedFiltersForTraffic().then((resp) => {
-                setTemplateList(resp || [])
+                if(resp !== null && resp.length > 0) {
+                    setTemplateList(resp)
+                    const currentObj = resp[0];
+                    setCurrentState(currentObj?.inactive)
+                    setCurrentId(currentObj.id)
+                    const template = {message: currentObj.content}
+                    setCurrentTemplate(template)
+                    setOgData(template)
+                }
+                
             })
         }
 
