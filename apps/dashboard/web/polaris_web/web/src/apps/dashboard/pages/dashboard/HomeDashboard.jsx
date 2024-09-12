@@ -7,6 +7,7 @@ import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCard
 import { Box, Card, Checkbox, DataTable, HorizontalGrid, HorizontalStack, Icon, Scrollable, Text, VerticalStack } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import transform from './transform';
+import testingTransform from "../testing/transform"
 import StackedChart from '../../components/charts/StackedChart';
 import ChartypeComponent from '../testing/TestRunsPage/ChartypeComponent';
 import testingApi from "../testing/api"
@@ -44,6 +45,7 @@ function HomeDashboard() {
     const [criticalUrls, setCriticalUrls] = useState(0);
     const [initialSteps, setInitialSteps] = useState({}) ;
     const [showBannerComponent, setShowBannerComponent] = useState(false)
+    const [testSummaryInfo, setTestSummaryInfo] = useState([])
 
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
@@ -54,8 +56,37 @@ function HomeDashboard() {
         },
     }
 
+    const convertSeverityArrToMap = (arr) => {
+        return Object.fromEntries(arr.map(item => [item.split(' ')[1].toLowerCase(), +item.split(' ')[0]]));
+    }
+
+    const testSummaryData = async () => {
+        const endTimestamp = func.timeNow()
+        await testingApi.fetchTestingDetails(
+            0, endTimestamp, "endTimestamp", "-1", 0, 10, null, null, ""
+          ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
+            const result = testingTransform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries);
+            const finalResult = []
+            result.forEach((x) => {
+                const severity = x["severity"]
+                const severityMap = convertSeverityArrToMap(severity)
+                finalResult.push({
+                    "testName": x["name"],
+                    "time": func.prettifyEpoch(x["run_time_epoch"]),
+                    "highCount": severityMap["high"] ? severityMap["high"] : "0" ,
+                    "mediumCount": severityMap["medium"] ? severityMap["medium"] : "0" ,
+                    "lowCount": severityMap["low"] ? severityMap["low"] : "0",
+                    "totalApis": x["total_apis"],
+                })
+            })
+
+            setTestSummaryInfo(finalResult)
+          });
+    }
+
     const fetchData = async() =>{
         setLoading(true)
+        testSummaryData()
         // all apis 
         let apiPromises = [
             observeApi.getCoverageInfoForCollections(),
@@ -155,48 +186,6 @@ function HomeDashboard() {
         <SummaryCard summaryItems={summaryInfo}/>
     )
 
-    const testSummaryInfo = [
-        {
-            testName: 'Test run on Juice shop collection with nothing',
-            time: '1 day ago',
-            highCount: 3,
-            mediumCount: 10,
-            lowCount: 22,
-            totalApis: 202,
-        }, 
-        {
-            testName: 'Test run on Juice shop collection with nothing',
-            time: '1 day ago',
-            highCount: 3,
-            mediumCount: 10,
-            lowCount: 22,
-            totalApis: 202,
-        }, 
-        {
-            testName: 'Test run on Juice shop collection with nothing',
-            time: '1 day ago',
-            highCount: 3,
-            mediumCount: 10,
-            lowCount: 22,
-            totalApis: 202,
-        }, 
-        {
-            testName: 'Test run on Juice shop collection with nothing',
-            time: '1 day ago',
-            highCount: 3,
-            mediumCount: 10,
-            lowCount: 22,
-            totalApis: 202,
-        }, 
-        {
-            testName: 'Test run on Juice shop collection with nothing',
-            time: '1 day ago',
-            highCount: 3,
-            mediumCount: 10,
-            lowCount: 22,
-            totalApis: 202,
-        }, 
-    ]
 
     const testSummaryCardsList = (
         <InfoCard 

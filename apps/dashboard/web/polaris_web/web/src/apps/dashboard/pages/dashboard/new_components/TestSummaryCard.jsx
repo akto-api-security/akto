@@ -4,10 +4,10 @@ import React from 'react'
 function TestSummaryCard({ summaryItem }) {
     return (
         <LegacyCard>
-            <Box padding={5}>
+            <Box padding={5} maxWidth='286px' minWidth='286px' minHeight='164px'>
                 <VerticalStack gap={6}>
                     <VerticalStack gap={2}>
-                        <Box maxWidth='250px'>
+                        <Box>
                             <Text variant='headingSm'>{summaryItem.testName}</Text>
                         </Box>
                         <Text variant='headingXs' color='subdued' fontWeight='regular'>{summaryItem.time}</Text>
