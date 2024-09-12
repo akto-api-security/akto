@@ -171,6 +171,35 @@ public class HttpCallParser {
         }
     }
 
+    public static boolean isValidResponseParam(HttpResponseParams responseParam, Map<String, FilterConfig> filterMap){
+        for (Entry<String, FilterConfig> apiFilterEntry : filterMap.entrySet()) {
+            try {
+                FilterConfig apiFilter = apiFilterEntry.getValue();
+                String message = responseParam.getOrig();
+                RawApi rawApi = RawApi.buildFromMessage(message);
+                int apiCollectionId = responseParam.requestParams.getApiCollectionId();
+                String url = responseParam.getRequestParams().getURL();
+                Method method = Method.fromString(responseParam.getRequestParams().getMethod());
+                ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
+                Map<String, Object> varMap = apiFilter.resolveVarMap();
+                VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
+                    {
+                        put(apiInfoKey, Arrays.asList(message));
+                    }
+                }, apiInfoKey);
+                String filterExecutionLogId = UUID.randomUUID().toString();
+                ValidationResult res = validateFilter(apiFilter.getFilter().getNode(), rawApi,
+                        apiInfoKey, varMap, filterExecutionLogId);
+                if (res.getIsValid()) {
+                    return true;
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
+                return false;
+            }
+        }
+        return false;
+    }
 
     int numberOfSyncs = 0;
 
@@ -180,34 +209,9 @@ public class HttpCallParser {
         if (filterMap != null && !filterMap.isEmpty()) {
             List<HttpResponseParams> filteredParams = new ArrayList<>();
             for (HttpResponseParams responseParam : responseParams) {
-                for (Entry<String, FilterConfig> apiFilterEntry : filterMap.entrySet()) {
-                    try {
-                        FilterConfig apiFilter = apiFilterEntry.getValue();
-                        String message = responseParam.getOrig();
-                        RawApi rawApi = RawApi.buildFromMessage(message);
-                        int apiCollectionId = responseParam.requestParams.getApiCollectionId();
-                        String url = responseParam.getRequestParams().getURL();
-                        Method method = Method.fromString(responseParam.getRequestParams().getMethod());
-                        ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
-                        Map<String, Object> varMap = apiFilter.resolveVarMap();
-                        VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
-                            {
-                                put(apiInfoKey, Arrays.asList(message));
-                            }
-                        }, apiInfoKey);
-                        String filterExecutionLogId = UUID.randomUUID().toString();
-                        ValidationResult res = validateFilter(apiFilter.getFilter().getNode(), rawApi,
-                                apiInfoKey, varMap, filterExecutionLogId);
-                        if (res.getIsValid()) {
-                            // TODO apply execution
-                            
-                            filteredParams.add(responseParam);
-                            break;
-                        }
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
-                        return responseParams;
-                    }
+                if(isValidResponseParam(responseParam, filterMap)){
+                    // TODO handle execution
+                    filteredParams.add(responseParam);
                 }
             }
             return filteredParams;
@@ -403,7 +407,7 @@ public class HttpCallParser {
 
     public static final String CONTENT_TYPE = "CONTENT-TYPE";
 
-    public boolean isRedundantEndpoint(String url, Pattern pattern){
+    public static boolean isRedundantEndpoint(String url, Pattern pattern){
         Matcher matcher = pattern.matcher(url);
         return matcher.matches();
     }
