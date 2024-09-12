@@ -176,12 +176,13 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             ...c,
             displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
             testedEndpoints: coverageMap[c.id] ? coverageMap[c.id] : 0,
-            sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
-            severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
+            sensitiveInRespTypes: sensitiveInfoMap[c.id] || [],
+            severityInfo: severityInfoMap[c.id] || {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
-            detectedTimestamp : trafficInfoMap[c.id] || 0,
-            riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0,
+            detectedTimestamp: trafficInfoMap[c.id] || 0,
+            riskScore: riskScoreMap[c.id] || 0,
             discovered: func.prettifyEpoch(c.startTs || 0),
+            deactivated: !!c.deactivated,
         }
     })
 
@@ -208,7 +209,7 @@ function ApiCollections() {
 
     // const dummyData = dummyJson;
 
-    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom']
+    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated']
 
     const { tabsInfo, selectItems } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, data)
@@ -341,23 +342,28 @@ function ApiCollections() {
 
         dataObj = convertToNewData(tmp, sensitiveInfo.sensitiveInfoMap, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap, false);
         setNormalData(dataObj.normal)
-        const summary = transform.getSummaryData(dataObj.normal)
+
+        // Separate active and deactivated collections
+        const activeCollections = dataObj.prettify.filter(c => !c.deactivated);
+        const deactivatedCollections = dataObj.prettify.filter(c => c.deactivated);
+        
+        // Calculate summary data only for active collections
+        const summary = transform.getSummaryData(activeCollections)
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
         summary.totalSensitiveEndpoints = sensitiveInfo.sensitiveUrls
         setSummaryData(summary)
 
-        
-        setCollectionsMap(func.mapCollectionIdToName(tmp))
-        const allHostNameMap = func.mapCollectionIdToHostName(tmp)
-        setHostNameMap(allHostNameMap)
-        
         tmp = {}
-        tmp.all = dataObj.prettify
-        tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
-        tmp.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
-        tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !tmp.groups.includes(x));
+        tmp.all = activeCollections
+        tmp.hostname = activeCollections.filter((c) => c.hostName !== null && c.hostName !== undefined)
+        tmp.groups = activeCollections.filter((c) => c.type === "API_GROUP")
+        tmp.custom = activeCollections.filter(x => x.hostName === null || x.hostName === undefined && x.type !== "API_GROUP")
+        tmp.deactivated = deactivatedCollections
 
         setData(tmp);
+
+        // Update the API collection store with active collection count
+        setApiCounts(activeCollections.length, deactivatedCollections.length);
     }
 
     function disambiguateLabel(key, value) {
