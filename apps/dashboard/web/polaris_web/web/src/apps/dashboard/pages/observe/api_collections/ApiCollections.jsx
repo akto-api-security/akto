@@ -182,7 +182,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             detectedTimestamp: trafficInfoMap[c.id] || 0,
             riskScore: riskScoreMap[c.id] || 0,
             discovered: func.prettifyEpoch(c.startTs || 0),
-            deactivated: !!c.deactivated,
+            deactivated: c.deactivated,
         }
     })
 
@@ -344,26 +344,22 @@ function ApiCollections() {
         setNormalData(dataObj.normal)
 
         // Separate active and deactivated collections
-        const activeCollections = dataObj.prettify.filter(c => !c.deactivated);
         const deactivatedCollections = dataObj.prettify.filter(c => c.deactivated);
         
         // Calculate summary data only for active collections
-        const summary = transform.getSummaryData(activeCollections)
+        const summary = transform.getSummaryData(dataObj.normal)
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
         summary.totalSensitiveEndpoints = sensitiveInfo.sensitiveUrls
         setSummaryData(summary)
 
         tmp = {}
-        tmp.all = activeCollections
-        tmp.hostname = activeCollections.filter((c) => c.hostName !== null && c.hostName !== undefined)
-        tmp.groups = activeCollections.filter((c) => c.type === "API_GROUP")
-        tmp.custom = activeCollections.filter(x => x.hostName === null || x.hostName === undefined && x.type !== "API_GROUP")
+        tmp.all = dataObj.prettify
+        tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
+        tmp.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
+        tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
         tmp.deactivated = deactivatedCollections
 
         setData(tmp);
-
-        // Update the API collection store with active collection count
-        setApiCounts(activeCollections.length, deactivatedCollections.length);
     }
 
     function disambiguateLabel(key, value) {
