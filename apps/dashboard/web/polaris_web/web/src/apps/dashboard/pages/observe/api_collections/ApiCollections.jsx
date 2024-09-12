@@ -179,7 +179,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
             severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
-            detectedTimestamp : trafficInfoMap[c.id] || 0,
+            detectedTimestamp: trafficInfoMap[c.id] || 0,
             riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0,
             discovered: func.prettifyEpoch(c.startTs || 0),
         }
@@ -208,7 +208,7 @@ function ApiCollections() {
 
     // const dummyData = dummyJson;
 
-    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom']
+    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated']
 
     const { tabsInfo, selectItems } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, data)
@@ -341,21 +341,26 @@ function ApiCollections() {
 
         dataObj = convertToNewData(tmp, sensitiveInfo.sensitiveInfoMap, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap, false);
         setNormalData(dataObj.normal)
+
+        // Separate active and deactivated collections
+        const deactivatedCollections = dataObj.prettify.filter(c => c.deactivated);
+        
+        // Calculate summary data only for active collections
         const summary = transform.getSummaryData(dataObj.normal)
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
         summary.totalSensitiveEndpoints = sensitiveInfo.sensitiveUrls
         setSummaryData(summary)
 
-        
         setCollectionsMap(func.mapCollectionIdToName(tmp))
         const allHostNameMap = func.mapCollectionIdToHostName(tmp)
         setHostNameMap(allHostNameMap)
-        
+
         tmp = {}
         tmp.all = dataObj.prettify
         tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
         tmp.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
-        tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !tmp.groups.includes(x));
+        tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
+        tmp.deactivated = deactivatedCollections
 
         setData(tmp);
     }
