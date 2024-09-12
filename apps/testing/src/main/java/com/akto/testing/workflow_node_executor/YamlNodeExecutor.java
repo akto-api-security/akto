@@ -1,5 +1,6 @@
 package com.akto.testing.workflow_node_executor;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -145,6 +146,16 @@ public class YamlNodeExecutor extends NodeExecutor {
             int tsAfterReq = 0;
             try {
                 tsBeforeReq = Context.nowInMillis();
+                String url = testReq.getRequest().getUrl();
+                if (url.contains("sampl-aktol-1exannwybqov-67928726")) {
+                    try {
+                        URI uri = new URI(url);
+                        String newUrl = "https://vulnerable-server.akto.io" + uri.getPath();
+                        testReq.getRequest().setUrl(newUrl);
+                    } catch (Exception e) {
+                        // TODO: handle exception
+                    }
+                }
                 testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, com.akto.test_editor.Utils.SKIP_SSRF_CHECK);
                 if (apiInfoKey != null && memory != null) {
                     memory.fillResponse(testReq.getRequest(), testResponse, apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
