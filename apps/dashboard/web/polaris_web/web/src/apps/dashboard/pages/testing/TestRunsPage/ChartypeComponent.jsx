@@ -4,7 +4,7 @@ import DonutChart from '../../../components/shared/DonutChart'
 import ConcentricCirclesChart from '../../../components/shared/ConcentricCirclesChart'
 import observeFunc from "../../observe/transform"
 
-function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navUrl, isRequest, chartOnLeft}) {
+function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navUrl, isRequest, chartOnLeft, dataTableWidth}) {
     let tableRows = []
     if(data && Object.keys(data).length > 0)
     {
@@ -41,7 +41,7 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                 <VerticalStack gap="2">
                     <Text fontWeight="semibold" variant="bodySm">{title}</Text>
                     <Scrollable style={{maxHeight: boxHeight}} focusable shadow>
-                        <Box width='260px'>
+                        <Box width={dataTableWidth ? dataTableWidth : '260px'}>
                             <DataTable headings={[]}
                                 columnContentTypes={[
                                     'text',

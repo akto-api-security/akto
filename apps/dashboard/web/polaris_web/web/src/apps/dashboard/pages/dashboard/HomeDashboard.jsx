@@ -48,6 +48,7 @@ function HomeDashboard() {
     const [testSummaryInfo, setTestSummaryInfo] = useState([])
 
     const allCollections = PersistStore(state => state.allCollections)
+    const coverageMap = PersistStore(state => state.coverageMap)
     const collectionsMap = PersistStore(state => state.collectionsMap)
 
     const defaultChartOptions = {
@@ -345,7 +346,7 @@ function HomeDashboard() {
         <HorizontalGrid gap={5} columns={2}>
             <InfoCard 
                 component={
-                    <ChartypeComponent data={severityMap} navUrl={"/dashboard/issues/"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true}/>
+                    <ChartypeComponent data={severityMap} navUrl={"/dashboard/issues/"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="230px"/>
                 }
                 title="Vulnerable APIs by Severity"
                 titleToolTip="Vulnerable APIs by Severity"
@@ -413,7 +414,7 @@ function HomeDashboard() {
             />
             <InfoCard 
                 component={
-                    <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true}/>
+                    <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="230px"/>
                 }
                 title="APIs by Access type"
                 titleToolTip="APIs by Access type"
@@ -422,7 +423,7 @@ function HomeDashboard() {
             />
             <InfoCard 
                 component={
-                    <ChartypeComponent data={authMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true}/>
+                    <ChartypeComponent data={authMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="230px"/>
                 }
                 title="APIs by Authentication"
                 titleToolTip="APIs by Authentication"
