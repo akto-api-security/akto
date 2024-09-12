@@ -177,7 +177,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
             testedEndpoints: coverageMap[c.id] ? coverageMap[c.id] : 0,
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
-            severityInfo: severityInfoMap[c.id] ? sensitiveInfoMap[c.id] : {},
+            severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
             detectedTimestamp: trafficInfoMap[c.id] || 0,
             riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0,
