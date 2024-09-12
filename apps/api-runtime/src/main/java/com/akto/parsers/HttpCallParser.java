@@ -221,8 +221,12 @@ public class HttpCallParser {
         if (accountSettings != null && accountSettings.getDefaultPayloads() != null) {
             filteredResponseParams = filterDefaultPayloads(filteredResponseParams, accountSettings.getDefaultPayloads());
         }
-        Pattern regexPattern = Utils.createRegexPatternFromList(apiCatalogSync.ignoredEndpointsList);
-        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, apiCatalogSync.ignoredEndpointsList, regexPattern);
+        List<String> redundantList = new ArrayList<>();
+        if(accountSettings !=null && !accountSettings.getAllowRedundantEndpointsList().isEmpty()){
+            redundantList = accountSettings.getAllowRedundantEndpointsList();
+        }
+        Pattern regexPattern = Utils.createRegexPatternFromList(redundantList);
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, redundantList, regexPattern);
 
         // add advanced filters
         filteredResponseParams = applyAdvancedFilters(filteredResponseParams);
