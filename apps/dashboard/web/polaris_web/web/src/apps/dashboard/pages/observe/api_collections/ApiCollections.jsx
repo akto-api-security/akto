@@ -176,13 +176,12 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             ...c,
             displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
             testedEndpoints: coverageMap[c.id] ? coverageMap[c.id] : 0,
-            sensitiveInRespTypes: sensitiveInfoMap[c.id] || [],
-            severityInfo: severityInfoMap[c.id] || {},
+            sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
+            severityInfo: severityInfoMap[c.id] ? sensitiveInfoMap[c.id] : {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
             detectedTimestamp: trafficInfoMap[c.id] || 0,
-            riskScore: riskScoreMap[c.id] || 0,
+            riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0,
             discovered: func.prettifyEpoch(c.startTs || 0),
-            deactivated: c.deactivated,
         }
     })
 
@@ -351,6 +350,10 @@ function ApiCollections() {
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
         summary.totalSensitiveEndpoints = sensitiveInfo.sensitiveUrls
         setSummaryData(summary)
+
+        setCollectionsMap(func.mapCollectionIdToName(tmp))
+        const allHostNameMap = func.mapCollectionIdToHostName(tmp)
+        setHostNameMap(allHostNameMap)
 
         tmp = {}
         tmp.all = dataObj.prettify
