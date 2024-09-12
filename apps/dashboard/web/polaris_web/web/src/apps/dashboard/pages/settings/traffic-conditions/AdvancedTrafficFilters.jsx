@@ -14,7 +14,7 @@ function AdvancedTrafficFilters() {
         const [ogData, setOgData] = useState({ message: "" })
         const [templateList, setTemplateList] = useState([])
         const [currentId, setCurrentId] = useState("")
-        const [currentState, setCurrentState] = useState(true)
+        const [currentState, setCurrentState] = useState(false)
 
         const fetchData = async () => {
             await trafficFiltersRequest.getAdvancedFiltersForTraffic().then((resp) => {
@@ -51,26 +51,28 @@ function AdvancedTrafficFilters() {
         }
 
         const changeStateOfFilter = async() => {
-            await trafficFiltersRequest.changeStateOfFilter(currentId, currentState)
+            await trafficFiltersRequest.changeStateOfFilter(currentId, !currentState)
             setCurrentState(!currentState)
             fetchData()
         }
 
         const handleSelection = (value) => {
-            let state = true
+            let state = false
             let contentObj = templateList.filter(x =>
                 x.id === value
             )[0];
             let content = contentObj.content
-            state = contentObj?.state || true
+            if(contentObj?.inactive !== undefined){
+                state = contentObj?.inactive
+            }
             setCurrentId(value)
             const temp = {message: content}
             setOgData(temp)
             setCurrentTemplate(temp)
-            setCurrentState(!state)
+            setCurrentState(state)
         }
 
-        const tooltipText= currentState ? "Mark as Deactive" : "Mark as Active"
+        const tooltipText= currentState ? "Mark as Active" : "Mark as Deactive"
 
         return(
             <LegacyCard 
@@ -103,7 +105,7 @@ function AdvancedTrafficFilters() {
                                 <HorizontalStack align="end" gap={"2"}>
                                     <Button plain monochrome disabled={currentId.length === 0} onClick={() => changeStateOfFilter()}>
                                         <Tooltip content={tooltipText} dismissOnMouseOut>
-                                            <Box><Icon source={currentState === true ? CircleCancelMajor : CircleTickMajor} /></Box>
+                                            <Box><Icon source={currentState ? CircleTickMajor : CircleCancelMajor} /></Box>
                                         </Tooltip>
                                     </Button>
                                     <Button plain destructive disabled={currentId.length === 0} onClick={() => handleDelete()}>

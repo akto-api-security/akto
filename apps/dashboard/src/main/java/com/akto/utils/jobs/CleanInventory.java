@@ -1,5 +1,9 @@
 package com.akto.utils.jobs;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -117,10 +121,9 @@ public class CleanInventory {
 
     }
     
-    public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList){
+    public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList, String filePath) throws IOException{
 
         Map<Integer, ApiCollection> apiCollectionMap = apiCollections.stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
-        // String filePath = "./samples_"+accountId+".txt";
         // BufferedWriter writer = new BufferedWriter(new FileWriter(new File(filePath)));
         List<SampleData> sampleDataList = new ArrayList<>();
         Bson filters = Filters.empty();
@@ -177,6 +180,9 @@ public class CleanInventory {
             }
 
         } while (!sampleDataList.isEmpty());
+
+        // writer.flush();
+        // writer.close();
     }
 
     public static void removeUnnecessaryEndpoints(List<ApiCollection> apiCollections){

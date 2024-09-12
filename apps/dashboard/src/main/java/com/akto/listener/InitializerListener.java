@@ -632,23 +632,29 @@ public class InitializerListener implements ServletContextListener {
                     public void accept(Account account) {
                         String shouldFilterApisFromYaml = System.getenv("DETECT_REDUNDANT_APIS_RETRO");
                         String shouldFilterOptionsAndHTMLApis = System.getenv("DETECT_OPTION_APIS_RETRO");
-                        if(shouldFilterApisFromYaml != null || shouldFilterOptionsAndHTMLApis != null){
-                            List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(),
-                                    Projections.include(Constants.ID, ApiCollection.NAME, ApiCollection.HOST_NAME));
+                        if(shouldFilterApisFromYaml == null && shouldFilterOptionsAndHTMLApis == null){
+                            return;
+                        }
+                        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(),
+                                Projections.include(Constants.ID, ApiCollection.NAME, ApiCollection.HOST_NAME));
 
-                            if(shouldFilterApisFromYaml != null && shouldFilterApisFromYaml.equalsIgnoreCase("true")){
-                                List<YamlTemplate> yamlTemplates = AdvancedTrafficFiltersDao.instance.findAll(
-                                    Filters.ne(YamlTemplate.INACTIVE, true)
-                                );
-                                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                                List<String> redundantUrlList = accountSettings.getAllowRedundantEndpointsList();
-                                CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections , yamlTemplates, redundantUrlList);
-                            }
+                        String filePath = "./samples_"+account.getId()+".txt";
 
-                            if(shouldFilterOptionsAndHTMLApis != null && shouldFilterOptionsAndHTMLApis.equalsIgnoreCase("true")){
-                                CleanInventory.removeUnnecessaryEndpoints(apiCollections);
+                        if(shouldFilterApisFromYaml != null && shouldFilterApisFromYaml.equalsIgnoreCase("true")){
+                            List<YamlTemplate> yamlTemplates = AdvancedTrafficFiltersDao.instance.findAll(
+                                Filters.ne(YamlTemplate.INACTIVE, true)
+                            );
+                            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                            List<String> redundantUrlList = accountSettings.getAllowRedundantEndpointsList();
+                            try {
+                                CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections , yamlTemplates, redundantUrlList,filePath);
+                            } catch (Exception e) {
+                                e.printStackTrace();
                             }
-                            
+                        }
+
+                        if(shouldFilterOptionsAndHTMLApis != null && shouldFilterOptionsAndHTMLApis.equalsIgnoreCase("true")){
+                            CleanInventory.removeUnnecessaryEndpoints(apiCollections);
                         }
                     }
                 }, "clean-inventory-job");

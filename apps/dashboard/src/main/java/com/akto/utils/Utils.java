@@ -597,32 +597,17 @@ public class Utils {
         }
     }
 
-    public static <T> void deleteApisPerDao(List<Key> toBeDeleted, AccountsContextDao<T> dao, String prefix) {
-        if (toBeDeleted == null || toBeDeleted.isEmpty()) return;
-        List<WriteModel<T>> stiList = new ArrayList<>();
-
-        for(Key key: toBeDeleted) {
-            stiList.add(new DeleteManyModel<>(Filters.and(
-                    Filters.eq(prefix + "apiCollectionId", key.getApiCollectionId()),
-                    Filters.eq(prefix + "method", key.getMethod()),
-                    Filters.eq(prefix + "url", key.getUrl())
-            )));
-        }
-
-        dao.bulkWrite(stiList, new BulkWriteOptions().ordered(false));
-    }
-
     public static void deleteApis(List<Key> toBeDeleted) {
 
         String id = "_id.";
 
-        deleteApisPerDao(toBeDeleted, SingleTypeInfoDao.instance, "");
-        deleteApisPerDao(toBeDeleted, ApiInfoDao.instance, id);
-        deleteApisPerDao(toBeDeleted, SampleDataDao.instance, id);
-        deleteApisPerDao(toBeDeleted, TrafficInfoDao.instance, id);
-        deleteApisPerDao(toBeDeleted, SensitiveSampleDataDao.instance, id);
-        deleteApisPerDao(toBeDeleted, SensitiveParamInfoDao.instance, "");
-        deleteApisPerDao(toBeDeleted, FilterSampleDataDao.instance, id);
+        AccountsContextDao.deleteApisPerDao(toBeDeleted, SingleTypeInfoDao.instance, "");
+        AccountsContextDao.deleteApisPerDao(toBeDeleted, ApiInfoDao.instance, id);
+        AccountsContextDao.deleteApisPerDao(toBeDeleted, SampleDataDao.instance, id);
+        AccountsContextDao.deleteApisPerDao(toBeDeleted, TrafficInfoDao.instance, id);
+        AccountsContextDao.deleteApisPerDao(toBeDeleted, SensitiveSampleDataDao.instance, id);
+        AccountsContextDao.deleteApisPerDao(toBeDeleted, SensitiveParamInfoDao.instance, "");
+        AccountsContextDao.deleteApisPerDao(toBeDeleted, FilterSampleDataDao.instance, id);
 
     }
 
