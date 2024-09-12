@@ -442,6 +442,7 @@ public class VariableResolver {
 
         List<String> result = new ArrayList<>();
         for (Object word: wordList) {
+            // TODO: handle case to use numbers as well.
             result.add(expression.replace(wordListKey, word.toString()));
         }
 
