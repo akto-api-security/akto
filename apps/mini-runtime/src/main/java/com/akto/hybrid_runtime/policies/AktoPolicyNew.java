@@ -208,6 +208,11 @@ public class AktoPolicyNew {
 
         apiInfo.setLastSeen(httpResponseParams.getTimeOrNow());
 
+        if (apiInfo.getResponseCodes() == null) apiInfo.setResponseCodes(new ArrayList<>());
+        if (!apiInfo.getResponseCodes().contains(statusCode)) apiInfo.getResponseCodes().add(statusCode);
+
+        ApiInfo.ApiType apiType = ApiInfo.findApiTypeFromResponseParams(httpResponseParams);
+        if (apiType != null) apiInfo.setApiType(apiType);
     }
 
     public PolicyCatalog getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) {

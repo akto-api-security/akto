@@ -4,6 +4,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.ApiStats;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.akto.dto.type.SingleTypeInfo;
@@ -18,6 +19,7 @@ import com.mongodb.client.model.UnwindOptions;
 import com.mongodb.client.model.Updates;
 
 import org.bson.conversions.Bson;
+import org.checkerframework.checker.units.qual.A;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -194,6 +196,18 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
             } 
         }
         return apiInfoList;
+    }
+
+    public ApiStats fetchApiInfoStats() {
+        ApiStats apiStats = new ApiStats();
+        MongoCursor<ApiInfo> cursor = instance.getMCollection().find().cursor();
+        while(cursor.hasNext()) {
+            ApiInfo apiInfo = cursor.next();
+            apiInfo.addStats(apiStats);
+        }
+
+        cursor.close();
+        return apiStats;
     }
 
     @Override

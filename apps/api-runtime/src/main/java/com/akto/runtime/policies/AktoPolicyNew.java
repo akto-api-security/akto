@@ -207,6 +207,11 @@ public class AktoPolicyNew {
 
         apiInfo.setLastSeen(httpResponseParams.getTimeOrNow());
 
+        if (apiInfo.getResponseCodes() == null) apiInfo.setResponseCodes(new ArrayList<>());
+        if (!apiInfo.getResponseCodes().contains(statusCode)) apiInfo.getResponseCodes().add(statusCode);
+
+        ApiInfo.ApiType apiType = ApiInfo.findApiTypeFromResponseParams(httpResponseParams);
+        if (apiType != null) apiInfo.setApiType(apiType);
     }
 
     public PolicyCatalog getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) {
@@ -402,6 +407,12 @@ public class AktoPolicyNew {
             subUpdates.add(Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()));
 
             subUpdates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfo.getId().getApiCollectionId())));
+
+            // response codes
+            subUpdates.add(Updates.addEachToSet(ApiInfo.RESPONSE_CODES, apiInfo.getResponseCodes()));
+
+            // api type
+            subUpdates.add(Updates.setOnInsert(ApiInfo.API_TYPE, apiInfo.getApiType()));
             
             updates.add(
                     new UpdateOneModel<>(

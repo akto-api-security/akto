@@ -204,7 +204,7 @@ public class RedactSampleData {
                 String f = fieldNames.next();
                 JsonNode fieldValue = parent.get(f);
                 if (fieldValue.isValueNode()) {
-                    if(redactAll && !(isGraphqlModified && f.equalsIgnoreCase(GraphQLUtils.QUERY))){
+                    if(redactAll && !(isGraphqlModified && f.equalsIgnoreCase(HttpResponseParams.QUERY))){
                         ((ObjectNode) parent).put(f, newValue);
                     }
                     else {

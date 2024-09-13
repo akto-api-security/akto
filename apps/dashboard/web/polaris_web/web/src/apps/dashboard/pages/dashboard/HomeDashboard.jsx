@@ -50,6 +50,62 @@ function HomeDashboard() {
     const allCollections = PersistStore(state => state.allCollections)
     const coverageMap = PersistStore(state => state.coverageMap)
     const collectionsMap = PersistStore(state => state.collectionsMap)
+    const [authMap, setAuthMap] = useState({})
+    const [apiTypesData, setApiTypesData] = useState([{"data": [], "color": "#D6BBFB"}])
+    const [riskScoreData, setRiskScoreData] = useState([])
+    const [newDomains, setNewDomains] = useState([])
+
+    const [accessTypeMap, setAccessTypeMap] = useState({
+        "Partner": {
+          "text": 0,
+          "color": "#147CF6",
+          "filterKey": "Partner"
+        },
+        "Internal": {
+          "text": 0,
+          "color": "#FDB33D",
+          "filterKey": "Internal"
+        },
+        "External": {
+          "text": 0,
+          "color": "#658EE2",
+          "filterKey": "External"
+        },
+        "Third Party": {
+          "text": 0,
+          "color": "#68B3D0",
+          "filterKey": "Third Party"
+        }
+      });
+
+
+
+
+    
+    //todo: remove
+    const apiStats = {
+        "accessTypeMap": {
+            "PUBLIC": 10,
+            "PRIVATE": 3,
+            "PARTNER": 0,
+            "THIRD_PARTY": 2
+        },
+        "apiTypeMap": {
+            "REST": 208
+        },
+        "authTypeMap": {
+            "UNAUTHENTICATED": 2,
+            "BASIC": 1,
+            "AUTHORIZATION_HEADER": 3,
+            "JWT": 1,
+            "API_TOKEN": 3,
+            "BEARER": 3,
+            "CUSTOM": 2
+        },
+        "riskScoreMap": {
+            "1": 232
+        }
+    }
 
     const defaultChartOptions = {
         "legend": {
@@ -87,7 +143,6 @@ function HomeDashboard() {
 
     const fetchData = async() =>{
         setLoading(true)
-        testSummaryData()
         // all apis 
         let apiPromises = [
             observeApi.getCoverageInfoForCollections(),
@@ -131,6 +186,13 @@ function HomeDashboard() {
         setRiskScoreObj(riskScoreMap) ;
         setSensitiveCount(sensitiveInfo.sensitiveUrls) ;
 
+        testSummaryData()
+        mapAccessTypes(apiStats)
+        mapAuthTypes(apiStats)
+        buildAuthTypesData(apiStats)
+        buildSetRiskScoreData(apiStats) //todo
+        getCollectionsWithCoverage()
+
         setLoading(false)
         
     }
@@ -150,6 +212,118 @@ function HomeDashboard() {
                 <Text color='subdued' fontWeight='semibold'>{time}</Text>
             </HorizontalStack>
         )
+    }
+
+    function mapAccessTypes(apiStats) {
+        const accessTypeMapping = {
+            "PUBLIC": "External",
+            "PRIVATE": "Internal",
+            "PARTNER": "Partner",
+            "THIRD_PARTY": "Third Party"
+        };
+
+        for (const [key, value] of Object.entries(apiStats.accessTypeMap)) {
+            const mappedKey = accessTypeMapping[key];
+            if (mappedKey && accessTypeMap[mappedKey]) {
+                accessTypeMap[mappedKey].text = value;
+            }
+        }
+        setAccessTypeMap(accessTypeMap)
+    }
+
+
+    function mapAuthTypes(apiStats) {
+        const convertKey = (key) => {
+            return key
+                .toLowerCase()
+                .replace(/(^|\s)\S/g, (letter) => letter.toUpperCase()) // Capitalize the first character after any space
+                .replace(/_/g, ' '); // Replace underscores with spaces
+        };
+
+        // Initialize colors list
+        const colors = ["#7F56D9", "#8C66E1", "#9E77ED", "#AB88F1", "#B692F6", "#D6BBFB", "#E9D7FE", "#F4EBFF"];
+
+        // Convert and sort the authTypeMap entries by value (count) in descending order
+        const sortedAuthTypes = Object.entries(apiStats.authTypeMap)
+            .map(([key, value]) => ({ key: convertKey(key), text: value }))
+            .filter(item => item.text > 0) // Filter out entries with a count of 0
+            .sort((a, b) => b.text - a.text); // Sort by count descending
+
+        // Initialize the output authMap
+        const authMap = {};
+
+        // Fill in the authMap with sorted entries and corresponding colors
+        sortedAuthTypes.forEach((item, index) => {
+            authMap[item.key] = {
+                "text": item.text,
+                "color": colors[index] || "#F4EBFF", // Assign color; default to last color if out of range
+                "filterKey": item.key
+            };
+        });
+
+        setAuthMap(authMap)
+    }
+
+
+    function buildAuthTypesData(apiStats) {
+        // Initialize the data with default values for all API types
+        const data = [
+            ["REST", apiStats.apiTypeMap.REST || 0], // Use the value from apiTypeMap or 0 if not available
+            ["GraphQL", apiStats.apiTypeMap.GRAPHQL || 0],
+            ["gRPC", apiStats.apiTypeMap.GRPC || 0],
+            ["SOAP", apiStats.apiTypeMap.SOAP || 0]
+        ];
+    
+        setApiTypesData([{data: data,color: "#D6BBFB"}])
+    }
+
+    function buildSetRiskScoreData(apiStats) {
+        const totalApisCount = transform.getCountInfo((allCollections || []), coverageMap).totalUrls
+        console.log(totalApisCount);
+
+        const sumOfRiskScores = Object.values(apiStats.riskScoreMap).reduce((acc, value) => acc + value, 0);
+
+        // Calculate the additional APIs that should be added to risk score "0"
+        const additionalAPIsForZero = totalApisCount - sumOfRiskScores;
+        apiStats.riskScoreMap["0"] = apiStats.riskScoreMap["0"] ? apiStats.riskScoreMap["0"] : 0
+        if (additionalAPIsForZero > 0) apiStats.riskScoreMap["0"] += additionalAPIsForZero;
+
+        // Prepare the result array with values from 5 to 0
+        const result = [
+            { "badgeValue": 5, "progressValue": "0%", "text": 0, "topColor": "#E45357", "backgroundColor": "#FFDCDD" },
+            { "badgeValue": 4, "progressValue": "0%", "text": 0, "topColor": "#EF864C", "backgroundColor": "#FFD9C4" },
+            { "badgeValue": 3, "progressValue": "0%", "text": 0, "topColor": "#F6C564", "backgroundColor": "#FFF1D4" },
+            { "badgeValue": 2, "progressValue": "0%", "text": 0, "topColor": "#F5D8A1", "backgroundColor": "#FFF6E6" },
+            { "badgeValue": 1, "progressValue": "0%", "text": 0, "topColor": "#A4E8F2", "backgroundColor": "#EBFCFF" },
+            { "badgeValue": 0, "progressValue": "0%", "text": 0, "topColor": "#6FD1A6", "backgroundColor": "#E0FFF1" }
+        ];
+
+        // Update progress and text based on riskScoreMap values
+        Object.keys(apiStats.riskScoreMap).forEach((key) => {
+            const badgeIndex = 5 - parseInt(key, 10);
+            const value = apiStats.riskScoreMap[key];
+            result[badgeIndex].text = value;
+            result[badgeIndex].progressValue = `${((value / totalApisCount) * 100).toFixed(2)}%`;
+        });
+
+        setRiskScoreData(result)
+    }
+
+    function getCollectionsWithCoverage() {
+        const validCollections = allCollections.filter(collection => collection.hostName !== null && collection.hostName !== undefined);
+    
+        const sortedCollections = validCollections.sort((a, b) => b.startTs - a.startTs);
+    
+        const result = sortedCollections.slice(0, 10).map(collection => {
+            const apisTested = coverageMap[collection.id] || 0;
+            return {
+                name: collection.hostName,
+                apisTested: apisTested,
+                totalApis: collection.urlsCount
+            };
+        });
+
+        setNewDomains(result)
     }
 
     const summaryInfo = [
@@ -221,68 +395,6 @@ function HomeDashboard() {
         }
     }
 
-    const accessTypeMap = {
-        "Partner": {
-            "text": 3,
-            "color": "#147CF6",
-            "filterKey": "Partner"
-        },
-        "Zombie": {
-            "text": 2,
-            "color": "#22BB97",
-            "filterKey": "Zombie"
-        },
-        "Shadow": {
-            "text": 1,
-            "color": "#A278FF",
-            "filterKey": "Shadow"
-        },
-        "Internal": {
-            "text": 1,
-            "color": "#FDB33D",
-            "filterKey": "Internal"
-        },
-        "External": {
-            "text": 1,
-            "color": "#658EE2",
-            "filterKey": "External"
-        },
-        "Third Party": {
-            "text": 1,
-            "color": "#68B3D0",
-            "filterKey": "Third Party"
-        }
-    }
-
-    const authMap = {
-        "Unauthenticated": {
-            "text": 3,
-            "color": "#7F56D9",
-            "filterKey": "Unauthenticated"
-        },
-        "JWT": {
-            "text": 2,
-            "color": "#9E77ED",
-            "filterKey": "JWT"
-        },
-        "Bearer": {
-            "text": 1,
-            "color": "#B692F6",
-            "filterKey": "Bearer"
-        },
-        "Basic": {
-            "text": 1,
-            "color": "#D6BBFB",
-            "filterKey": "D6BBFB"
-        },
-        "Custom": {
-            "text": 1,
-            "color": "#E9D7FE",
-            "filterKey": "Custom"
-        }
-    }
-
-    const newDomains = ["ironman.demo.akto.io", "flash.akto.io", "app.akto.io", "cyborg.akto.io", "hulk.akto.io", "docs.akto.io"]
 
     const unsecuredAPIs = [
         {
@@ -297,14 +409,14 @@ function HomeDashboard() {
                 <HorizontalStack gap={2}>
                     <Checkbox
                         key={index}
-                        label={collection}
+                        label={collection.name}
                         checked={false}
                         ariaDescribedBy={`checkbox-${index}`}
                         onChange={() => {}}
                     />
-                    <Text color='subdued'>32% test coverage</Text>
+                    <Text color='subdued'>{Math.floor(100.0 * collection.apisTested / collection.totalApis)}% test coverage</Text>
                 </HorizontalStack>
-                <Text>22</Text>
+                <Text>{collection.totalApis}</Text>
             </HorizontalStack>
             ]
           ));
@@ -317,21 +429,6 @@ function HomeDashboard() {
         },
     ]
 
-    const apiTypesData = [
-        {
-            "data": [["REST",200], ["GraphQL", 0] ,["gRPC",10], ["SOAP", 0]],
-            "color": "#D6BBFB",
-        },
-    ]
-
-    const riskScoreData = [
-        {"badgeValue": 5, "progressValue": "20%", "text" : 20, "topColor": "#E45357", "backgroundColor": "#FFDCDD"},
-        {"badgeValue": 4, "progressValue": "40%", "text" : 40, "topColor": "#EF864C", "backgroundColor": "#FFD9C4"},
-        {"badgeValue": 3, "progressValue": "0%", "text" : 0, "topColor": "#F6C564", "backgroundColor": "#FFF1D4"},
-        {"badgeValue": 2, "progressValue": "40%", "text" : 40, "topColor": "#F5D8A1", "backgroundColor": "#FFF6E6"},
-        {"badgeValue": 1, "progressValue": "0%", "text" : 0, "topColor": "#A4E8F2", "backgroundColor": "#EBFCFF"},
-        {"badgeValue": 0, "progressValue": "0%", "text" : 0, "topColor": "#6FD1A6", "backgroundColor": "#E0FFF1"}
-    ]
 
     function extractCategoryNames(data) {
         if (!data || !Array.isArray(data) || data.length === 0) {
