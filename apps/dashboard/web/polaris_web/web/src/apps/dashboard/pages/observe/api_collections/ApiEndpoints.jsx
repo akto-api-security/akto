@@ -430,6 +430,25 @@ function ApiEndpoints(props) {
         })
     }
 
+    function deleteApisAction() {
+        setShowDeleteApiModal(false)
+        var apiObjects = apis.map((x) => {
+            let tmp = x.split("###");
+            return {
+                method: tmp[0],
+                url: tmp[1],
+                apiCollectionId: parseInt(tmp[2])
+            }
+        }) 
+    
+    
+        api.deleteApis(apiObjects).then(resp => {
+            func.setToast(true, false, "APIs deleted successfully. Refresh to see the changes.")
+        }).catch (err => {
+            func.setToast(true, true, "There was some error deleting the APIs. Please contact support@akto.io for assistance")
+        })
+    }
+
     async function exportOpenApi() {
         let lastFetchedUrl = null;
         let lastFetchedMethod = null;
@@ -473,6 +492,13 @@ function ApiEndpoints(props) {
         saveAs(blob, fileName);
 
         func.setToast(true, false, <div data-testid="openapi_spec_download_message">OpenAPI spec downloaded successfully</div>)
+    }
+
+    function deleteApis(selectedResources){
+
+            setActionOperation(Operation.REMOVE)
+            setApis(selectedResources)
+            setShowDeleteApiModal(true);
     }
 
     function exportCsv(selectedResources = []) {
@@ -700,7 +726,8 @@ function ApiEndpoints(props) {
             setTableLoading(false)
         },200)
     }
-
+    
+    const [showDeleteApiModal, setShowDeleteApiModal] = useState(false)
     const [showApiGroupModal, setShowApiGroupModal] = useState(false)
     const [apis, setApis] = useState([])
     const [actionOperation, setActionOperation] = useState(Operation.ADD)
@@ -741,6 +768,14 @@ function ApiEndpoints(props) {
                 onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
             })
         }
+
+        if (window.USER_NAME && window.USER_NAME.endsWith("@akto.io")) {
+            ret.push({
+                content: 'Delete APIs',
+                onAction: () => deleteApis(selectedResources)
+            })
+        }
+
         return ret;
     }
 
@@ -757,6 +792,23 @@ function ApiEndpoints(props) {
         >
             <Modal.Section>
                 <Text>When enabled, existing sample payload values for this collection will be deleted, and data in all the future payloads for this collection will be redacted. Please note that your API Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.</Text>
+            </Modal.Section>
+        </Modal>
+    )
+
+    let deleteApiModal = (
+        <Modal
+            open={showDeleteApiModal}
+            onClose={() => setShowApiGroupModal(false)}
+            title="Confirm"
+            primaryAction={{
+                content: 'Yes',
+                onAction: deleteApisAction
+            }}
+            key="redact-modal-1"
+        >
+            <Modal.Section>
+                <Text>Are you sure you want to delete {(apis || []).length} API(s)?</Text>
             </Modal.Section>
         </Modal>
     )
@@ -852,7 +904,8 @@ function ApiEndpoints(props) {
                       currentApiGroupName={pageTitle}
                       fetchData={fetchData}
                   />,
-                  modal
+                  modal,
+                  deleteApiModal
             ]
         )
       ]

@@ -284,6 +284,16 @@ export default {
         })
     },
 
+    deleteApis(apiList){
+        return request({
+            url: '/api/deleteApis',
+            method: 'post',
+            data: {
+                apiList
+            }
+        })
+    },
+
     async fetchAllUrlsAndMethods (apiCollectionId) {
         const resp = await request({
             url: '/api/fetchAllUrlsAndMethods',
