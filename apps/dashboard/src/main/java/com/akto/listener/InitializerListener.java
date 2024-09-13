@@ -68,6 +68,7 @@ import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.RuntimeUtil;
+import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.stigg.StiggReporterClient;
 import com.akto.task.Cluster;
 import com.akto.telemetry.TelemetryJob;
@@ -78,6 +79,7 @@ import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.utils.jobs.JobUtils;
 import com.akto.utils.jobs.MatchingJob;
+import com.akto.utils.libs.utils.src.main.java.com.akto.runtime.policies.ApiAccessTypePolicyUtil;
 import com.akto.util.AccountTask;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.EmailAccountName;
@@ -1159,6 +1161,43 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    private void fixRetroApiAccessTypes(){
+        BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(Filters.empty());
+        if (backwardCompatibility.getFixApiAccessType() == 0) {
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                AccountSettingsDao.generateFilter()
+            );
+
+            loggerMaker.infoAndAddToDb("Picked up access type fix for account: " + accountSettings.getId());
+
+            ApiAccessTypePolicy apiAccessTypePolicy= new ApiAccessTypePolicy(accountSettings.getPrivateCidrList());
+            List<String> partnerIpList = new ArrayList<>();
+            if (accountSettings != null && accountSettings.getPartnerIpList() != null && !accountSettings.getPartnerIpList().isEmpty()) {
+                partnerIpList = accountSettings.getPartnerIpList();
+            }
+            ApiAccessTypePolicyUtil.calcApiAccessType(apiAccessTypePolicy, partnerIpList);
+            loggerMaker.infoAndAddToDb("Ended access type fix for account: " + accountSettings.getId());
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.FIX_API_ACCESS_TYPE, Context.now())
+            );
+        }
+    }
+
+    public void fixRetroApiAccessTypesScheduler(){
+        scheduler.schedule(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account account) {
+                        fixRetroApiAccessTypes();
+                    }
+                }, "fill-api-access-types");
+            }
+        }, 0, TimeUnit.SECONDS);
+        
+    }
+
     public static void dropAuthMechanismData(BackwardCompatibility authMechanismData) {
         if (authMechanismData.getAuthMechanismData() == 0) {
             AuthMechanismsDao.instance.getMCollection().drop();
@@ -1995,6 +2034,7 @@ public class InitializerListener implements ServletContextListener {
                     setUpUpdateCustomCollections();
                     setUpFillCollectionIdArrayJob();
                     setupAutomatedApiGroupsScheduler();
+                    fixRetroApiAccessTypesScheduler();
                     /*
                      * This is a temporary job.
                      * TODO: Remove this once traffic pipeline is cleaned.
