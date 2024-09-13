@@ -1,10 +1,12 @@
 package com.akto.action;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
+import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dto.test_editor.Info;
+import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.AccountSettingsDao;
@@ -22,8 +24,6 @@ import com.akto.util.IssueTrendType;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
 public class DashboardAction extends UserAction {
@@ -67,6 +67,54 @@ public class DashboardAction extends UserAction {
         this.riskScoreCountMap = riskScoreCounts;
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private List<String> severityToFetch;
+    private final Map<Integer, Map<String, Integer>> trendData = new HashMap<>();
+    public String fetchCriticalIssuesTrend(){
+        if(endTimeStamp == 0) endTimeStamp = Context.now();
+        if (severityToFetch == null || severityToFetch.isEmpty()) severityToFetch = Arrays.asList("CRITICAL", "HIGH");
+
+        Bson issuesFilter = Filters.and(
+                Filters.in(TestingRunIssues.KEY_SEVERITY, severityToFetch),
+                Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
+                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
+        );
+
+        String dayOfYearFloat = "dayOfYearFloat";
+        String dayOfYear = "dayOfYear";
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(issuesFilter));
+
+        pipeline.add(Aggregates.project(Projections.fields(
+                Projections.include(TestingRunIssues.KEY_SEVERITY, TestingRunIssues.CREATION_TIME),
+                Projections.computed(dayOfYearFloat, new BasicDBObject("$divide", new Object[]{"$" + TestingRunIssues.CREATION_TIME, 86400}))
+        )));
+
+        pipeline.add(Aggregates.project(Projections.fields(
+                Projections.include(TestingRunIssues.KEY_SEVERITY, TestingRunIssues.CREATION_TIME),
+                Projections.computed(dayOfYear, new BasicDBObject("$floor", new Object[]{"$" + dayOfYearFloat}))
+        )));
+
+        BasicDBObject groupedId = new BasicDBObject(dayOfYear, "$"+dayOfYear).append(TestingRunIssues.KEY_SEVERITY, "$"+TestingRunIssues.KEY_SEVERITY);
+        pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
+
+        MongoCursor<BasicDBObject> issuesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+
+        while(issuesCursor.hasNext()){
+            BasicDBObject basicDBObject = issuesCursor.next();
+            BasicDBObject o = (BasicDBObject) basicDBObject.get("_id");
+            int date = o.getInt(dayOfYear);
+            String severity = o.getString(TestingRunIssues.KEY_SEVERITY);
+            int count = basicDBObject.getInt("count");
+
+            Map<String, Integer> countMap = trendData.getOrDefault(date, new HashMap<>());
+            countMap.put(severity, count);
+            trendData.put(date, countMap);
+        }
+
+        return SUCCESS.toUpperCase();
     }
 
     public String fetchIssuesTrend(){
@@ -191,5 +239,12 @@ public class DashboardAction extends UserAction {
     public void setConnectionSkipped(String connectionSkipped) {
         this.connectionSkipped = connectionSkipped;
     }
-    
+
+    public void setSeverityToFetch(List<String> severityToFetch) {
+        this.severityToFetch = severityToFetch;
+    }
+
+    public Map<Integer, Map<String, Integer>> getTrendData() {
+        return trendData;
+    }
 }

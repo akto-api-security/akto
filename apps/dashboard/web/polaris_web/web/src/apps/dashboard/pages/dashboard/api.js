@@ -16,6 +16,14 @@ const api = {
         })
     },
 
+    fetchCriticalIssuesTrend: async(startTimeStamp,endTimeStamp) =>{
+        return await request({
+            url: '/api/fetchCriticalIssuesTrend',
+            method: 'post',
+            data: {startTimeStamp,endTimeStamp}
+        })
+    },
+
     fetchSubTypeCountMap(startTimestamp, endTimestamp) {
         return request({
             url: '/api/fetchSubTypeCountMap',

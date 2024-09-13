@@ -27,6 +27,7 @@ import TestSummaryCardsList from './new_components/TestSummaryCardsList';
 import InfoCard from './new_components/InfoCard';
 import DonutChart from '../../components/shared/DonutChart';
 import ProgressBarChart from './new_components/ProgressBarChart';
+import SpinnerCentered from '../../components/progress/SpinnerCentered';
 
 function HomeDashboard() {
 
@@ -54,6 +55,9 @@ function HomeDashboard() {
     const [apiTypesData, setApiTypesData] = useState([{"data": [], "color": "#D6BBFB"}])
     const [riskScoreData, setRiskScoreData] = useState([])
     const [newDomains, setNewDomains] = useState([])
+    const [criticalFindingsData, setCriticalFindingsData] = useState([])
+    const [severityMap, setSeverityMap] = useState({})
+    const [unsecuredAPIs, setUnsecuredAPIs] = useState([])
 
     const [accessTypeMap, setAccessTypeMap] = useState({
         "Partner": {
@@ -153,6 +157,7 @@ function HomeDashboard() {
             api.fetchRecentFeed(skip),
             api.getIntegratedConnections(),
             observeApi.getUserEndpoints(),
+            api.fetchCriticalIssuesTrend() // todo:
         ];
         
         let results = await Promise.allSettled(apiPromises);
@@ -165,14 +170,18 @@ function HomeDashboard() {
         let recentActivitiesResp = results[5].status === 'fulfilled' ? results[5].value : {} ;
         let connectionsInfo = results[6].status === 'fulfilled' ? results[6].value : {} ;
         let userEndpoints = results[7].status === 'fulfilled' ? results[7].value : true ;
+        let criticalIssuesTrendResp = results[8].status === 'fulfilled' ? results[8].value : {}
         setShowBannerComponent(!userEndpoints)
+
+        buildUnsecuredAPIs(criticalIssuesTrendResp)
 
         setCountInfo(transform.getCountInfo((allCollections || []), coverageInfo))
         setCoverageObj(coverageInfo)
         setRiskScoreRangeMap(riskScoreRangeMap);
         setIssuesTrendMap(transform.formatTrendData(issuesTrendResp));
         setSensitiveData(transform.getFormattedSensitiveData(sensitiveDataResp.response))
-        setSubCategoryInfo(testingFunc.convertSubIntoSubcategory(subcategoryDataResp).subCategoryMap)
+        const tempResult =  testingFunc.convertSubIntoSubcategory(subcategoryDataResp)
+        setSubCategoryInfo(tempResult.subCategoryMap)
         setRecentActivities(recentActivitiesResp.recentActivities)
         setTotalActivities(recentActivitiesResp.totalActivities)
         setInitialSteps(connectionsInfo)
@@ -192,6 +201,8 @@ function HomeDashboard() {
         buildAuthTypesData(apiStats)
         buildSetRiskScoreData(apiStats) //todo
         getCollectionsWithCoverage()
+        convertSubCategoryInfo(tempResult.subCategoryMap)
+        buildSeverityMap(tempResult.countMap)
 
         setLoading(false)
         
@@ -279,7 +290,6 @@ function HomeDashboard() {
 
     function buildSetRiskScoreData(apiStats) {
         const totalApisCount = transform.getCountInfo((allCollections || []), coverageMap).totalUrls
-        console.log(totalApisCount);
 
         const sumOfRiskScores = Object.values(apiStats.riskScoreMap).reduce((acc, value) => acc + value, 0);
 
@@ -372,36 +382,60 @@ function HomeDashboard() {
         />
     )
 
-    const severityMap = {
-        "Critical": {
-            "text": 3,
-            "color": "#E45357",
-            "filterKey": "Critical"
-        },
-        "High": {
-            "text": 2,
-            "color": "#EF864C",
-            "filterKey": "High"
-        },
-        "Medium": {
-            "text": 1,
-            "color": "#F6C564",
-            "filterKey": "Medium"
-        },
-        "Low": {
-            "text": 1,
-            "color": "#6FD1A6",
-            "filterKey": "Low"
-        }
+    function buildSeverityMap(countMap) {
+        const result = {
+            "Critical": {
+                "text": countMap.CRITICAL || 0,
+                "color": "#E45357",
+                "filterKey": "Critical"
+            },
+            "High": {
+                "text": countMap.HIGH || 0,
+                "color": "#EF864C",
+                "filterKey": "High"
+            },
+            "Medium": {
+                "text": countMap.MEDIUM || 0,
+                "color": "#F6C564",
+                "filterKey": "Medium"
+            },
+            "Low": {
+                "text": countMap.LOW || 0,
+                "color": "#6FD1A6",
+                "filterKey": "Low"
+            }
+        };
+
+        setSeverityMap(result)
     }
 
+    function buildUnsecuredAPIs(input) {
+        const CRITICAL_COLOR = "#E45357";
+        const HIGH_COLOR = "#EF864C";
+        const transformed = [];
 
-    const unsecuredAPIs = [
-        {
-            "data": [[1704067200000,200], [1706745600000,100] ,[1709251200000,120], [1711929600000,110], [1714521600000,90], [1717200000000,110], [1719792000000, 120], [1722470400000, 110], [1725148800000, 100], [1727740800000, 110], [1730419200000, 120], [1733011200000, 110]],
-            "color": "#E45357",
-        },
-    ]
+        // Initialize objects for CRITICAL and HIGH data
+        const criticalData = { data: [], color: CRITICAL_COLOR };
+        const highData = { data: [], color: HIGH_COLOR };
+
+        // Iterate through the input to populate criticalData and highData
+        for (const epoch in input) {
+            const epochMillis = Number(epoch) * 86400000; // Convert days to milliseconds
+
+            if (input[epoch].CRITICAL) {
+                criticalData.data.push([epochMillis, input[epoch].CRITICAL]);
+            }
+            if (input[epoch].HIGH) {
+                highData.data.push([epochMillis, input[epoch].HIGH]);
+            }
+        }
+
+        // Push the results to the transformed array
+        transformed.push(criticalData, highData);
+
+        setUnsecuredAPIs(transformed)
+    }
+
 
     const genreateDataTableRows = (collections) => {
         return collections.map((collection, index) => ([
@@ -422,12 +456,13 @@ function HomeDashboard() {
           ));
     }
 
-    const criticalFindingsData = [
-        {
-            "data": [["BOLA",200], ["BUA",100] ,["MA",120], ["Misconfig",110], ["SSRF",90]],
-            "color": "#E45357",
-        },
-    ]
+    function convertSubCategoryInfo(tempSubCategoryMap) {
+        const entries = Object.values(tempSubCategoryMap);
+        entries.sort((a, b) => b.text - a.text);
+        const topEntries = entries.slice(0, 5);
+        const data = topEntries.map(entry => [entry.filterKey, entry.text]);
+        setCriticalFindingsData([{"data": data, "color": "#E45357"}])
+    }
 
 
     function extractCategoryNames(data) {
@@ -713,16 +748,21 @@ function HomeDashboard() {
     const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" />: null, dashboardComp]
 
     return (
-            <PageWithMultipleCards
-                title={
-                    <Text variant='headingLg'>
-                        Home
-                    </Text>
-                }
-                isFirstPage={true}
-                components={pageComponents}
-            />
-                
+        <Box>
+            {loading ? <SpinnerCentered /> :
+                <PageWithMultipleCards
+                    title={
+                        <Text variant='headingLg'>
+                            Home
+                        </Text>
+                    }
+                    isFirstPage={true}
+                    components={pageComponents}
+                />
+            }
+
+        </Box>
+
     )
 }
 
