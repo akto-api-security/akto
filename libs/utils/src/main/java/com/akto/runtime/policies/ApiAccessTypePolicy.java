@@ -56,8 +56,7 @@ public class ApiAccessTypePolicy {
             "x-client-ip",
             "client-ip");
 
-    public void findApiAccessType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<String> partnerIpList) {
-        if (privateCidrList == null || privateCidrList.isEmpty()) return ;
+    public static List<String> getSourceIps(HttpResponseParams httpResponseParams){
         List<String> clientIps = new ArrayList<>();
         for (String header : CLIENT_IP_HEADERS) {
             List<String> headerValues = httpResponseParams.getRequestParams().getHeaders().get(header);
@@ -68,7 +67,7 @@ public class ApiAccessTypePolicy {
 
         List<String> ipList = new ArrayList<>();
         for (String ip: clientIps) {
-            String[] parts = ip.trim().split("\\s*,\\s*"); // This approach splits the string by commas and also trims any whitespaces around the individual elements. 
+            String[] parts = ip.trim().split("\\s*,\\s*"); // This approach splits the string by commas and also trims any whitespace around the individual elements. 
             ipList.addAll(Arrays.asList(parts));
         }
 
@@ -77,9 +76,14 @@ public class ApiAccessTypePolicy {
         if (sourceIP != null && !sourceIP.isEmpty() && !sourceIP.equals("null")) {
             ipList.add(sourceIP);
         }
+        return ipList;
+    }
+
+    public void findApiAccessType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<String> partnerIpList) {
+        if (privateCidrList == null || privateCidrList.isEmpty()) return ;
+        List<String> ipList = getSourceIps(httpResponseParams);
 
         String destIP = httpResponseParams.getDestIP();
-
         if (destIP != null && !destIP.isEmpty() && !destIP.equals("null")) {
             ipList.add(destIP);
         }

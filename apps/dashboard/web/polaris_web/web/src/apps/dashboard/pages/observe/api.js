@@ -205,12 +205,30 @@ export default {
             }
         })
     },
+    downloadOpenApiFileForSelectedApis(apiInfoKeyList, apiCollectionId) {
+        return request({
+            url: '/api/generateOpenApiFile',
+            method: 'post',
+            data: {
+                apiInfoKeyList, apiCollectionId
+            }
+        })
+    },
     exportToPostman(apiCollectionId) {
         return request({
             url: '/api/createPostmanApi',
             method: 'post',
             data: {
                 apiCollectionId
+            }
+        })
+    },
+    exportToPostmanForSelectedApis(apiInfoKeyList, apiCollectionId) {
+        return request({
+            url: '/api/createPostmanApi',
+            method: 'post',
+            data: {
+                apiInfoKeyList, apiCollectionId
             }
         })
     },
@@ -262,6 +280,16 @@ export default {
             method: 'post',
             data:{
                 apiCollectionId,redacted
+            }
+        })
+    },
+
+    deleteApis(apiList){
+        return request({
+            url: '/api/deleteApis',
+            method: 'post',
+            data: {
+                apiList
             }
         })
     },

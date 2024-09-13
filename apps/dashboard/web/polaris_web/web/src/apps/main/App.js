@@ -1,7 +1,6 @@
 import HomePage from "../dashboard/pages/home/HomePage"
 import TestRunsPage from "../dashboard/pages/testing/TestRunsPage/TestRunsPage";
 import SingleTestRunPage from "../dashboard/pages/testing/SingleTestRunPage/SingleTestRunPage"
-import TestRunResultPage from "../dashboard/pages/testing/TestRunResultPage/TestRunResultPage";
 import AllSensitiveData from "../dashboard/pages/observe/AllSensitiveData/AllSensitiveData";
 import ApiCollections from "../dashboard/pages/observe/api_collections/ApiCollections";
 import ApiQuery from "../dashboard/pages/observe/api_collections/APIQuery";
@@ -68,9 +67,11 @@ import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
 import TokenValidator from "./TokenValidator"
 import { TableContextProvider } from "@/apps/dashboard/components/tables/TableContext";
 import VulnerabilityReport from "../dashboard/pages/testing/vulnerability_report/VulnerabilityReport";
+import ThreatDetectionPage from "../dashboard/pages/threat_detection/ThreatDetectionPage";
 
 import { PollingProvider } from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
+import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -169,6 +170,10 @@ const router = createBrowserRouter([
             path: "quick-start",
             element: <QuickStart/>,
           },
+          {
+            path:"threat-detection",
+            element:<ThreatDetectionPage/>
+          },
         ]
       },
       {
@@ -262,6 +267,10 @@ const router = createBrowserRouter([
           {
             path: "default-payloads",
             element:<DefaultPayloads/>
+          },
+          {
+            path: 'advanced-filters',
+            element: <AdvancedTrafficFilters />
           },
           {
             path: "auth-types/details",

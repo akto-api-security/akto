@@ -7,6 +7,7 @@ import com.akto.dao.file.FilesDao;
 import com.akto.dao.upload.FileUploadLogsDao;
 import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.files.File;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -18,6 +19,7 @@ import com.akto.open_api.parser.Parser;
 import com.akto.open_api.parser.ParserResult;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.utils.ApiInfoKeyToSampleData;
 import com.akto.utils.GzipUtils;
 import com.akto.utils.SampleDataToSTI;
 import com.akto.utils.Utils;
@@ -65,6 +67,8 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
     private String lastFetchedUrl;
     private String lastFetchedMethod;
 
+    private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
+
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     @Override
@@ -73,13 +77,20 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
             ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", apiCollectionId);
             if (apiCollection == null) return ERROR.toUpperCase();
 
+            List<SampleData> sampleDataList;
+            int limit = 100;
+
+            if(apiInfoKeyList != null && !apiInfoKeyList.isEmpty()) {
+                sampleDataList = ApiInfoKeyToSampleData.convertApiInfoKeyToSampleData(apiInfoKeyList);
+            } else {
+                sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(
+                        apiCollectionId, lastFetchedUrl, lastFetchedMethod, limit, 1
+                );
+            }
+
             loggerMaker.infoAndAddToDb("Found API Collection " + apiCollection.getHostName(), LogDb.DASHBOARD);
             String host =  apiCollection.getHostName();
-
-            int limit = 100;
-            List<SampleData> sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(
-                    apiCollectionId, lastFetchedUrl, lastFetchedMethod, limit, 1
-            );
+            String apiCollectionName = apiCollection.getDisplayName();
 
             int size = sampleDataList.size();
             loggerMaker.infoAndAddToDb("Fetched sample data list " + size, LogDb.DASHBOARD);
@@ -99,7 +110,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
             loggerMaker.infoAndAddToDb("Converted to STI", LogDb.DASHBOARD);
 
             Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = sampleDataToSTI.getSingleTypeInfoMap();
-            OpenAPI openAPI = Main.init(apiCollection.getDisplayName(),stiList, includeHeaders, host);
+            OpenAPI openAPI = Main.init(apiCollectionName,stiList, includeHeaders, host);
             loggerMaker.infoAndAddToDb("Initialized openAPI", LogDb.DASHBOARD);
 
             openAPIString = Main.convertOpenApiToJSON(openAPI);
@@ -379,5 +390,13 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
     public void setImportType(PostmanAction.ImportType importType) {
         this.importType = importType;
+    }
+
+    public List<ApiInfo.ApiInfoKey> getApiInfoKeyList() {
+        return apiInfoKeyList;
+    }
+
+    public void setApiInfoKeyList(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
+        this.apiInfoKeyList = apiInfoKeyList;
     }
 }

@@ -64,8 +64,12 @@ public class LoggerMaker  {
 
     private LogDb db;
 
+    public void setDb(LogDb db) {
+        this.db = db;
+    }
+
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION
     }
 
     private static AccountSettings accountSettings = null;
@@ -217,7 +221,7 @@ public class LoggerMaker  {
         if(checkUpdate() && db!=null){
             switch(db){
                 case TESTING: 
-                    LogsDao.instance.insertOne(log);
+                    dataActor.insertTestingLog(log);
                     break;
                 case RUNTIME: 
                     dataActor.insertRuntimeLog(log);
@@ -230,6 +234,9 @@ public class LoggerMaker  {
                     break;
                 case BILLING:
                     BillingLogsDao.instance.insertOne(log);
+                    break;
+                case THREAT_DETECTION:
+                    dataActor.insertProtectionLog(log);
                     break;
                 default:
                     break;

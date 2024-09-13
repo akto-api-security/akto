@@ -7,10 +7,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.test_editor.TestEditorEnums;
-import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
@@ -23,7 +20,6 @@ import com.akto.testing.*;
 import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.util.enums.LoginFlowEnums.LoginStepTypesEnums;
-import com.akto.utils.RedactSampleData;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
@@ -35,11 +31,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
-import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
-import com.akto.util.UsageUtils;
-import com.akto.util.enums.LoginFlowEnums;
-import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -48,18 +40,17 @@ import java.net.URI;
 import org.json.JSONObject;
 
 import com.mongodb.BasicDBObject;
-import static com.akto.rules.TestPlugin.extractAllValuesFromPayload;
 import static com.akto.test_editor.Utils.bodyValuesUnchanged;
 import static com.akto.test_editor.Utils.headerValuesUnchanged;
+import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
+import static com.akto.testing.Utils.compareWithOriginalResponse;
 
 import com.mongodb.client.model.Filters;
-import org.json.JSONObject;
-import org.kohsuke.github.GHRateLimit.Record;
-import com.mongodb.client.model.Updates;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+
 
 public class Executor {
 
@@ -173,7 +164,17 @@ public class Executor {
             }
             try {
                 // follow redirects = true for now
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                String url = testReq.getRequest().getUrl();
+                if (url.contains("sampl-aktol-1exannwybqov-67928726")) {
+                    try {
+                        URI uri = new URI(url);
+                        String newUrl = "https://vulnerable-server.akto.io" + uri.getPath();
+                        testReq.getRequest().setUrl(newUrl);
+                    } catch (Exception e) {
+                        // TODO: handle exception
+                    }
+                }
+                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Utils.SKIP_SSRF_CHECK);
                 requestSent = true;
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                 TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
@@ -377,7 +378,7 @@ public class Executor {
             return null;
         }
 
-        String msg = RedactSampleData.convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
+        String msg = convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
         RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);
         boolean vulnerable = TestPlugin.validateValidator(validatorNode, rawApi, testRawApi , apiInfoKey, varMap, logId);
         if (vulnerable) {
@@ -385,7 +386,7 @@ public class Executor {
         }
         double percentageMatch = 0;
         if (rawApi.getResponse() != null && testRawApi.getResponse() != null) {
-            percentageMatch = TestPlugin.compareWithOriginalResponse(
+            percentageMatch = compareWithOriginalResponse(
                 rawApi.getResponse().getBody(), testRawApi.getResponse().getBody(), new HashMap<>()
             );
         }

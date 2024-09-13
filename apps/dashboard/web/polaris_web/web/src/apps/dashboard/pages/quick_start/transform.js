@@ -930,6 +930,12 @@ const quickStartFunc = {
             goObj, javaObj, nodejsObj, pythonObj
         ];
 
+        if(func.checkLocal()){
+            return {
+                "Manual": manual
+            }
+        }
+
         return {
             "Hybrid SaaS": hybridSaas,
             "Kubernetes": kubernetes,

@@ -1632,6 +1632,27 @@
             </result>
         </action>
 
+        <action name="api/deleteApis" class="com.akto.action.ApiCollectionsAction" method="deleteApis">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/removeApisFromCustomCollection" class="com.akto.action.ApiCollectionsAction" method="removeApisFromCustomCollection">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -6376,6 +6397,171 @@
             </result>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchFilterYamlTemplate" class="com.akto.action.threat_detection.FilterYamlTemplateAction" method="fetchFilterYamlTemplate">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/saveFilterYamlTemplate" class="com.akto.action.threat_detection.FilterYamlTemplateAction" method="saveFilterYamlTemplate">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">THREAT_DETECTION</param>
+            </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchSuspectSampleData" class="com.akto.action.threat_detection.SuspectSampleDataAction" method="fetchSuspectSampleData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchFiltersThreatTable" class="com.akto.action.threat_detection.SuspectSampleDataAction" method="fetchFilters">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/addAdvancedFiltersForTraffic" class="com.akto.action.settings.AdvancedTrafficFiltersAction" method="saveYamlTemplateForTrafficFilters">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAdvancedFiltersForTraffic" class="com.akto.action.settings.AdvancedTrafficFiltersAction" method="fetchAllFilterTemplates">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">USER_ACTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+                <param name="root">templatesList</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/deleteAdvancedFilter" class="com.akto.action.settings.AdvancedTrafficFiltersAction" method="deleteAdvancedFilter">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/changeStateOfFilter" class="com.akto.action.settings.AdvancedTrafficFiltersAction" method="changeActivityOfFilter">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 

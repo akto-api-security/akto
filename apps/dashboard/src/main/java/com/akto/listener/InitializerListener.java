@@ -16,6 +16,7 @@ import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dao.notifications.EventsMetricsDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.pii.PIISourceDao;
+import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.*;
@@ -54,10 +55,10 @@ import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.upload.FileUpload;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
@@ -76,6 +77,7 @@ import com.akto.testing.HostDNSLookup;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.utils.jobs.JobUtils;
+import com.akto.utils.jobs.MatchingJob;
 import com.akto.util.AccountTask;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.EmailAccountName;
@@ -147,6 +149,8 @@ import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 import static com.akto.task.Cluster.callDibs;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
 import static com.mongodb.client.model.Filters.eq;
+import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
+import static com.akto.utils.Utils.deleteApis;
 
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
@@ -619,6 +623,44 @@ public class InitializerListener implements ServletContextListener {
 
         return ret;
     }
+    private void cleanInventoryJobRunner() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account account) {
+                        String shouldFilterApisFromYaml = System.getenv("DETECT_REDUNDANT_APIS_RETRO");
+                        String shouldFilterOptionsAndHTMLApis = System.getenv("DETECT_OPTION_APIS_RETRO");
+                        if(shouldFilterApisFromYaml == null && shouldFilterOptionsAndHTMLApis == null){
+                            return;
+                        }
+                        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(),
+                                Projections.include(Constants.ID, ApiCollection.NAME, ApiCollection.HOST_NAME));
+
+                        String filePath = "./samples_"+account.getId()+".txt";
+
+                        if(shouldFilterApisFromYaml != null && shouldFilterApisFromYaml.equalsIgnoreCase("true")){
+                            List<YamlTemplate> yamlTemplates = AdvancedTrafficFiltersDao.instance.findAll(
+                                Filters.ne(YamlTemplate.INACTIVE, true)
+                            );
+                            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                            List<String> redundantUrlList = accountSettings.getAllowRedundantEndpointsList();
+                            try {
+                                CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections , yamlTemplates, redundantUrlList,filePath);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+
+                        if(shouldFilterOptionsAndHTMLApis != null && shouldFilterOptionsAndHTMLApis.equalsIgnoreCase("true")){
+                            CleanInventory.removeUnnecessaryEndpoints(apiCollections);
+                        }
+                    }
+                }, "clean-inventory-job");
+            }
+        }, 0, 2 , TimeUnit.HOURS);
+    }
 
     private void setUpDefaultPayloadRemover() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -696,34 +738,7 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 5, TimeUnit.MINUTES);
     }
 
-    private <T> void deleteApisPerDao(List<Key> toBeDeleted, AccountsContextDao<T> dao, String prefix) {
-        if (toBeDeleted == null || toBeDeleted.isEmpty()) return;
-        List<WriteModel<T>> stiList = new ArrayList<>();
-
-        for(Key key: toBeDeleted) {
-            stiList.add(new DeleteManyModel<>(Filters.and(
-                    Filters.eq(prefix + "apiCollectionId", key.getApiCollectionId()),
-                    Filters.eq(prefix + "method", key.getMethod()),
-                    Filters.eq(prefix + "url", key.getUrl())
-            )));
-        }
-
-        dao.bulkWrite(stiList, new BulkWriteOptions().ordered(false));
-    }
-
-    private void deleteApis(List<Key> toBeDeleted) {
-
-        String id = "_id.";
-
-        deleteApisPerDao(toBeDeleted, SingleTypeInfoDao.instance, "");
-        deleteApisPerDao(toBeDeleted, ApiInfoDao.instance, id);
-        deleteApisPerDao(toBeDeleted, SampleDataDao.instance, id);
-        deleteApisPerDao(toBeDeleted, TrafficInfoDao.instance, id);
-        deleteApisPerDao(toBeDeleted, SensitiveSampleDataDao.instance, id);
-        deleteApisPerDao(toBeDeleted, SensitiveParamInfoDao.instance, "");
-        deleteApisPerDao(toBeDeleted, FilterSampleDataDao.instance, id);
-
-    }
+    
 
     private void setUpDailyScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -856,7 +871,7 @@ public class InitializerListener implements ServletContextListener {
 
         String message = null;
         try {
-            message = RedactSampleData.convertOriginalReqRespToString(request, response);
+            message = convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
             errors.add("Failed converting sample data");
         }
@@ -1144,6 +1159,7 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    
     public static void dropAuthMechanismData(BackwardCompatibility authMechanismData) {
         if (authMechanismData.getAuthMechanismData() == 0) {
             AuthMechanismsDao.instance.getMCollection().drop();
@@ -1968,6 +1984,7 @@ public class InitializerListener implements ServletContextListener {
                     // setUpAktoMixpanelEndpointsScheduler();
                     setUpDailyScheduler();
                     setUpWebhookScheduler();
+                    cleanInventoryJobRunner();
                     setUpDefaultPayloadRemover();
                     setUpTestEditorTemplatesScheduler();
                     setUpDependencyFlowScheduler();
@@ -1984,6 +2001,8 @@ public class InitializerListener implements ServletContextListener {
                      * TODO: Remove this once traffic pipeline is cleaned.
                      */
                     CleanInventory.cleanInventoryJobRunner();
+
+                    MatchingJob.MatchingJobRunner();
 
                     int now2 = Context.now();
                     int diffNow = now2 - now;
@@ -2067,7 +2086,9 @@ public class InitializerListener implements ServletContextListener {
         clear(ActivitiesDao.instance, ActivitiesDao.maxDocuments);
         clear(BillingLogsDao.instance, BillingLogsDao.maxDocuments);
         clear(TestingRunResultDao.instance, TestingRunResultDao.maxDocuments);
+        clear(SuspectSampleDataDao.instance, SuspectSampleDataDao.maxDocuments);
         clear(RuntimeMetricsDao.instance, RuntimeMetricsDao.maxDocuments);
+        clear(ProtectionLogsDao.instance, ProtectionLogsDao.maxDocuments);
     }
 
     public static void clear(AccountsContextDao mCollection, int maxDocuments) {

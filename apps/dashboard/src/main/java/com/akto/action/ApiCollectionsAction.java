@@ -17,6 +17,7 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.ApiCollectionTestStatus;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.traffic.Key;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -28,6 +29,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
+import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -126,7 +128,7 @@ public class ApiCollectionsAction extends UserAction {
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.project(Projections.fields(
             Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE, ApiCollection._DEACTIVATED)
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE, ApiCollection._DEACTIVATED,ApiCollection.START_TS)
         )));
         MongoCursor<BasicDBObject> cursor = ApiCollectionsDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
         while(cursor.hasNext()){
@@ -138,6 +140,7 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setName(collection.getString(ApiCollection.NAME));
                 apiCollection.setHostName(collection.getString(ApiCollection.HOST_NAME));
                 apiCollection.setDeactivated(collection.getBoolean(ApiCollection._DEACTIVATED));
+                apiCollection.setStartTs(collection.getInt(ApiCollection.START_TS));
                 
                 String type = collection.getString(ApiCollection._TYPE);
                 if(type != null && type.length() > 0){
@@ -310,6 +313,31 @@ public class ApiCollectionsAction extends UserAction {
 
         return SUCCESS.toUpperCase();
     }
+
+    public String deleteApis(){
+
+        if(apiList.isEmpty()){
+            addActionError("No APIs selected");
+            return ERROR.toUpperCase();
+        }
+
+        List<Key> keys = new ArrayList<>();
+        for (ApiInfoKey apiInfoKey: apiList) {
+            keys.add(new Key(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod(), -1, 0, 0));
+        }
+
+        try {
+            com.akto.utils.Utils.deleteApis(keys);
+        } catch (Exception e) {
+            e.printStackTrace();
+            addActionError("Error deleting APIs");
+            return ERROR.toUpperCase();
+        }
+        
+        return SUCCESS.toUpperCase();
+    }
+
+
 
     public String removeApisFromCustomCollection(){
 
