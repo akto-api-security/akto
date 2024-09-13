@@ -1601,7 +1601,19 @@ public class APICatalogSync {
             updatePayload = new UpdatePayload(SingleTypeInfo.MIN_VALUE, deltaInfo.getMinValue(), "min");
             updates.add(updatePayload.toString());
 
-            if (!redactSampleData && deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
+            if (!(redactSampleData || collectionLevelRedact) && deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
+                Set<Object> updatedSampleData = new HashSet<>();
+                for (Object example : deltaInfo.getExamples()) {
+                    try{
+                        String exampleStr = (String) example;
+                        String s = RedactSampleData.redactDataTypes(exampleStr);
+                        loggerMaker.infoAndAddToDb("redacted data, updated sample is " + s, LogDb.RUNTIME);
+                        updatedSampleData.add(s);
+                    } catch (Exception e) {
+                        ;
+                    }
+                }
+                deltaInfo.setExamples(updatedSampleData);
                 ArrayList<String> sampleDataUpdates = new ArrayList<>();
                 updatePayload = new UpdatePayload(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), "pushEach");
                 AllMetrics.instance.setCyborgApiPayloadSize(updatePayload.getSize());
