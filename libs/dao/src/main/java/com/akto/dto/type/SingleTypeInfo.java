@@ -147,7 +147,6 @@ public class SingleTypeInfo {
         List<CustomDataType> nonSensitiveCustomDataType = new ArrayList<>();
         Set<String> redactedDataTypes = new HashSet<>();
         for (CustomDataType customDataType: customDataTypes) {
-            for (CustomDataType customDataType: customDataTypes) {
             newMap.put(customDataType.getName(), customDataType);
             if (customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().size()>0) {
                 sensitiveCustomDataType.add(customDataType);
