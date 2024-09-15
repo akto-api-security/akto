@@ -132,7 +132,9 @@ public class ApiCollection {
         if(this.type != null && this.type == Type.API_GROUP) return null;
         
         if(this.userSetEnvType == null){
-            if(this.hostName != null && this.hostName.matches(".*(staging|preprod|qa|demo|dev|test\\.).*")){
+            if (this.hostName != null && (this.hostName.matches(
+                    ".*(staging|preprod|qa|demo|dev|test|svc|localhost|local|intranet|lan|example|test|invalid|home|corp|priv|localdomain|localnet|network|int|private).*"))
+                    || this.hostName.contains("kubernetes") || this.hostName.contains("internal")) {
                 return ENV_TYPE.STAGING;
             }
             return null;
