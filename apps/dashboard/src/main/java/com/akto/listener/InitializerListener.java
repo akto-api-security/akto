@@ -1159,6 +1159,7 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    
     public static void dropAuthMechanismData(BackwardCompatibility authMechanismData) {
         if (authMechanismData.getAuthMechanismData() == 0) {
             AuthMechanismsDao.instance.getMCollection().drop();

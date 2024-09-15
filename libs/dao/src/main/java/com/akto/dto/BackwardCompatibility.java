@@ -88,6 +88,9 @@ public class BackwardCompatibility {
 
     private int dropSpecialCharacterApiCollections;
 
+    public static final String FIX_API_ACCESS_TYPE = "fixApiAccessType";
+    private int fixApiAccessType;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -96,7 +99,7 @@ public class BackwardCompatibility {
                                  int computeIntegratedConnections, int deleteLastCronRunInfo, int moveAuthMechanismToRole,
                                  int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
-                                 int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections) {
+                                 int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -125,6 +128,7 @@ public class BackwardCompatibility {
         this.automatedApiGroups = automatedApiGroups;
         this.addAdminRoleIfAbsent = addAdminRoleIfAbsent;
         this.dropSpecialCharacterApiCollections = dropSpecialCharacterApiCollections;
+        this.fixApiAccessType = fixApiAccessType;
     }
 
     public BackwardCompatibility() {
@@ -376,5 +380,13 @@ public class BackwardCompatibility {
 
     public void setDropSpecialCharacterApiCollections(int dropSpecialCharacterApiCollections) {
         this.dropSpecialCharacterApiCollections = dropSpecialCharacterApiCollections;
+    }
+
+    public int getFixApiAccessType() {
+        return fixApiAccessType;
+    }
+
+    public void setFixApiAccessType(int fixApiAccessType) {
+        this.fixApiAccessType = fixApiAccessType;
     }
 }
