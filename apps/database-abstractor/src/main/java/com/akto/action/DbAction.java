@@ -162,6 +162,7 @@ public class DbAction extends ActionSupport {
     List<ApiInfo.ApiInfoKey> newEps;
     String logicalGroupName;
     BasicDBList issuesIds;
+    List<YamlTemplate> activeAdvancedFilters;
 
     public BasicDBList getIssuesIds() {
         return issuesIds;
@@ -1966,6 +1967,15 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchActiveAdvancedFilters(){
+        try {
+            this.activeAdvancedFilters = DbLayer.fetchActiveFilterTemplates();
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -2862,6 +2872,14 @@ public class DbAction extends ActionSupport {
 
     public void setWritesForSuspectSampleData(List<BulkUpdates> writesForSuspectSampleData) {
         this.writesForSuspectSampleData = writesForSuspectSampleData;
+    }
+    
+    public List<YamlTemplate> getActiveAdvancedFilters() {
+        return activeAdvancedFilters;
+    }
+
+    public void setActiveAdvancedFilters(List<YamlTemplate> activeAdvancedFilters) {
+        this.activeAdvancedFilters = activeAdvancedFilters;
     }
 
 }

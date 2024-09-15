@@ -25,6 +25,7 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
@@ -902,5 +903,11 @@ public class DbLayer {
 
     public static List<YamlTemplate> fetchFilterYamlTemplates() {
         return FilterYamlTemplateDao.instance.findAll(Filters.empty());
+    }
+
+    public static List<YamlTemplate> fetchActiveFilterTemplates(){
+        return AdvancedTrafficFiltersDao.instance.findAll(
+            Filters.ne(YamlTemplate.INACTIVE, false)
+        );
     }
 }
