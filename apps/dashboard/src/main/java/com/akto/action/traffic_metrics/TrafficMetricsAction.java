@@ -126,7 +126,7 @@ public class TrafficMetricsAction extends UserAction {
     public String fetchRuntimeInstances() {
         instanceIds = new ArrayList<>();
         Bson filters = RuntimeMetricsDao.buildFilters(startTimestamp, endTimestamp);
-        runtimeMetrics = RuntimeMetricsDao.instance.findAll(filters, 0, 0, Sorts.descending("timestamp"), Projections.include("instanceId"));
+        runtimeMetrics = RuntimeMetricsDao.instance.findAll(filters, 0, 0, Sorts.descending("timestamp"));
         for (RuntimeMetrics metric: runtimeMetrics) {
             instanceIds.add(metric.getInstanceId());
         }
@@ -152,6 +152,15 @@ public class TrafficMetricsAction extends UserAction {
                 runtimeMetrics.add(new RuntimeMetrics(latestDoc.getString("name"), 0, instanceId, latestDoc.getString("version"), latestDoc.getDouble("val")));
             }
         }
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchAllRuntimeMetrics() {
+        Bson filters = RuntimeMetricsDao.buildFilters(startTimestamp, endTimestamp, instanceId);
+        runtimeMetrics = new ArrayList<>();
+
+        runtimeMetrics.addAll(RuntimeMetricsDao.instance.findAll(filters));
 
         return SUCCESS.toUpperCase();
     }
