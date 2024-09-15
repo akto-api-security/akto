@@ -149,4 +149,34 @@ public class TestApiCollectionsAction extends MongoBasedTest {
         assertEquals(4, apiCollectionMap.get(3000).getUrlsCount()); // because burp collection we use count from urls stored in set
 
     }
+
+    @Test
+    public void testTagsForCollections(){
+        ApiCollectionsDao.instance.getMCollection().drop();
+        ApiCollection collection1 = new ApiCollection();
+        collection1.setId(1);
+        collection1.setHostName("akto.demo.io");
+
+        ApiCollection collection2 = new ApiCollection();
+        collection2.setId(2);
+        collection2.setHostName("akto.svc.local");
+
+        ApiCollection collection3 = new ApiCollection();
+        collection3.setId(3);
+        collection3.setHostName("locahost:3000");
+
+        ApiCollection collection4 = new ApiCollection();
+        collection4.setId(4);
+        collection4.setHostName("akto.localnet");
+
+        ApiCollection collection5 = new ApiCollection();
+        collection5.setId(5);
+        collection5.setHostName("kubernetes-121212-akto.io");
+
+        assertEquals(ApiCollection.ENV_TYPE.STAGING, collection1.getEnvType());
+        assertEquals(ApiCollection.ENV_TYPE.STAGING, collection2.getEnvType());
+        assertNotEquals(ApiCollection.ENV_TYPE.STAGING, collection3.getEnvType());
+        assertEquals(ApiCollection.ENV_TYPE.STAGING, collection4.getEnvType());
+        assertEquals(ApiCollection.ENV_TYPE.STAGING, collection5.getEnvType());
+    }
 }
