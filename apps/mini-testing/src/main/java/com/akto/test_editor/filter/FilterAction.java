@@ -32,17 +32,15 @@ import com.akto.dto.type.URLTemplate;
 import com.akto.parsers.HttpCallParser;
 import com.akto.rules.TestPlugin;
 import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AuthPolicy;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.*;
 import com.akto.util.JSONUtils;
-import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
 
 import static com.akto.dto.RawApi.convertHeaders;
+import static com.akto.runtime.utils.Utils.parseCookie;
 
 public final class FilterAction {
     
@@ -559,7 +557,7 @@ public final class FilterAction {
                 
                 if (!res && (key.equals("cookie") || key.equals("set-cookie"))) {
                     List<String> cookieList = headers.getOrDefault(key, new ArrayList<>());
-                    Map<String,String> cookieMap = AuthPolicy.parseCookie(cookieList);
+                    Map<String,String> cookieMap = parseCookie(cookieList);
                     for (String cookieKey : cookieMap.keySet()) {
                         dataOperandFilterRequest = new DataOperandFilterRequest(cookieKey, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
                         res = invokeFilter(dataOperandFilterRequest);
@@ -596,7 +594,7 @@ public final class FilterAction {
 
                 if (!res && (key.equals("cookie") || key.equals("set-cookie"))) {
                     List<String> cookieList = headers.getOrDefault("cookie", new ArrayList<>());
-                    Map<String,String> cookieMap = AuthPolicy.parseCookie(cookieList);
+                    Map<String,String> cookieMap = parseCookie(cookieList);
                     for (String cookieKey : cookieMap.keySet()) {
                         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(cookieMap.get(cookieKey), filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
                         res = invokeFilter(dataOperandFilterRequest);

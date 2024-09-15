@@ -45,7 +45,8 @@ import static com.akto.runtime.utils.Utils.parseCookie;
 import static com.akto.dto.RawApi.convertHeaders;
 import static com.akto.runtime.RuntimeUtil.createUrlTemplate;
 import static com.akto.testing.Utils.compareWithOriginalResponse;
-import static com.akto.runtime.utils.Utils.parseKafkaMessage;
+
+import static com.akto.runtime.parser.SampleParser.parseSampleMessage;
 
 public final class FilterAction {
     
@@ -1263,7 +1264,7 @@ public final class FilterAction {
                         }
                         for (String sample: sd.getSamples()) {
                             try {
-                                HttpResponseParams httpResponseParams = parseKafkaMessage(sample);
+                                HttpResponseParams httpResponseParams = parseSampleMessage(sample);
                                 String sUrl = httpResponseParams.getRequestParams().getURL();
                                 String[] sUrlTokens = sUrl.split("/");
                                 String[] origUrlTokens = urlWithParams.split("/");
@@ -1319,7 +1320,7 @@ public final class FilterAction {
                     String key = SingleTypeInfo.findLastKeyFromParam(param);
                     BasicDBObject payloadObj = new BasicDBObject();
                     try {
-                        HttpResponseParams httpResponseParams = parseKafkaMessage(sample);
+                        HttpResponseParams httpResponseParams = parseSampleMessage(sample);
                         payloadObj = RequestTemplate.parseRequestPayload(httpResponseParams.getRequestParams().getPayload(), null);
                     } catch (Exception e) {
                         // TODO: handle exception
