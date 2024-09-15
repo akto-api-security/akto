@@ -25,7 +25,7 @@ function Metrics() {
     const [runtimeMetricsData, setRuntimeMetricsData] = useState([])
     const [showRuntimeGraph, setShowRuntimeGraph] = useState(false)
     const [graphs, setGraphs] = useState([])
-    const [runtimeFilterVal, setRuntimeFilterVal] = useState('last7days')
+    const [runtimeFilterVal, setRuntimeFilterVal] = useState('1day')
     const [loading, setLoading] = useState(false)
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
