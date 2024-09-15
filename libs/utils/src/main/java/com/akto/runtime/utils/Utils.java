@@ -12,8 +12,11 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.akto.dto.HttpRequestParams;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.RawApi;
 import com.mongodb.BasicDBObject;
 import static com.akto.dto.RawApi.convertHeaders;
 
@@ -99,6 +102,19 @@ public class Utils {
         return pattern;
     }
 
+    public static HttpResponseParams convertRawApiToHttpResponseParams(RawApi rawApi, HttpResponseParams originalHttpResponseParams){
+
+        HttpRequestParams ogRequestParams = originalHttpResponseParams.getRequestParams();
+        OriginalHttpRequest modifiedRequest = rawApi.getRequest();
+
+        ogRequestParams.setHeaders(modifiedRequest.getHeaders());
+        ogRequestParams.setUrl(modifiedRequest.getFullUrlWithParams());
+        ogRequestParams.setPayload(modifiedRequest.getBody());
+
+        originalHttpResponseParams.setRequestParams(ogRequestParams);
+
+        return originalHttpResponseParams;
+    }
 
 
 }
