@@ -137,6 +137,26 @@ const settingRequests = {
             data: {}
         })
     },
+    fetchRuntimeInstances(startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/fetchRuntimeInstances',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+    fetchRuntimeMetrics(startTimestamp, endTimestamp, instanceId) {
+        return request({
+            url: '/api/fetchAllRuntimeMetrics',
+            method: 'post',
+            data: {
+                startTimestamp, endTimestamp,
+                instanceId
+            }
+        })
+    },
     fetchTrafficMetrics(groupBy, startTimestamp, endTimestamp, names, host) {
         return request({
             url: '/api/fetchTrafficMetrics',
