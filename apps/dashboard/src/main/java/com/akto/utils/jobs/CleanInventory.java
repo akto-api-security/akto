@@ -121,7 +121,7 @@ public class CleanInventory {
 
     }
     
-    public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList, String filePath) throws IOException{
+    public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList, String filePath, boolean shouldModifyRequest) throws IOException{
 
         Map<Integer, ApiCollection> apiCollectionMap = apiCollections.stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
         // BufferedWriter writer = new BufferedWriter(new FileWriter(new File(filePath)));
@@ -158,7 +158,7 @@ public class CleanInventory {
                         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
                         isNetsparkerPresent |= sample.toLowerCase().contains("netsparker");
                         if(httpResponseParams != null){
-                            allMatchDefault =  HttpCallParser.isRedundantEndpoint(httpResponseParams.getRequestParams().getURL(), pattern) || HttpCallParser.isValidResponseParam(httpResponseParams, filterMap);
+                            allMatchDefault =  HttpCallParser.isRedundantEndpoint(httpResponseParams.getRequestParams().getURL(), pattern) || HttpCallParser.isValidResponseParam(httpResponseParams, filterMap, shouldModifyRequest);
                         }
                     }
 
