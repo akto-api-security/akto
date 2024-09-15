@@ -18,9 +18,9 @@ import com.akto.dto.CustomAuthType;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.runtime.policies.AuthPolicy;
 
 import static com.akto.dto.ApiInfo.ALL_AUTH_TYPES_FOUND;
+import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class CustomAuthUtil {
 
@@ -97,7 +97,7 @@ public class CustomAuthUtil {
                 }
                 SingleTypeInfo cookieSTI = SingleTypeInfoDao.instance.findOne(getFilters(apiInfo, true, COOKIE_LIST));
                 if(cookieSTI!=null){
-                    Map<String,String> cookieMap = AuthPolicy.parseCookie(new ArrayList<>(cookieSTI.getValues().getElements()));
+                    Map<String,String> cookieMap = parseCookie(new ArrayList<>(cookieSTI.getValues().getElements()));
                     headerAndCookieKeys.addAll(cookieMap.keySet());
                 }
 

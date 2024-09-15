@@ -35,7 +35,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
-import static com.akto.runtime.utils.Utils.parseKafkaMessage;
+import static com.akto.runtime.parser.SampleParser.parseSampleMessage;
 
 public class VariableResolver {
     
@@ -680,7 +680,7 @@ public class VariableResolver {
             HttpResponseParams httpResponseParams;
             HttpRequestParams httpRequestParams;
             try {
-                httpResponseParams = parseKafkaMessage(sample);
+                httpResponseParams = parseSampleMessage(sample);
                 httpRequestParams = httpResponseParams.getRequestParams();
 
                 if ("terminal_keys".equals(location)) {

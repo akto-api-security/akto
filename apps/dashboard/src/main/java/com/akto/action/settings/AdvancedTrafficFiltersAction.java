@@ -1,34 +1,36 @@
 package com.akto.action.settings;
 
 import java.util.List;
-import java.util.Map;
 
 import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
 import com.akto.dao.monitoring.FilterConfigYamlParser;
-import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.util.Constants;
 import com.akto.utils.TrafficFilterUtil;
-import com.mongodb.BasicDBList;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 
 public class AdvancedTrafficFiltersAction extends UserAction {
 
-    private BasicDBList templatesList;
+    private List<YamlTemplate> templatesList;
     private String yamlContent;
     private String templateId;
     private boolean inactive;
 
     public String fetchAllFilterTemplates(){
-        List<YamlTemplate> yamlTemplates =  AdvancedTrafficFiltersDao.instance.findAll(Filters.empty());
-        Map<String, FilterConfig> configs = FilterYamlTemplateDao.instance.fetchFilterConfig(true, yamlTemplates, false);
-        this.templatesList = TrafficFilterUtil.getFilterTemplates(configs);
+        List<YamlTemplate> yamlTemplates =  AdvancedTrafficFiltersDao.instance.findAll(
+            Filters.empty(),
+            Projections.include(
+                Constants.ID, YamlTemplate.AUTHOR, YamlTemplate.CONTENT, YamlTemplate.INACTIVE
+            )
+        );
+        this.templatesList = yamlTemplates;
         return SUCCESS.toUpperCase();
     }
 
@@ -74,7 +76,7 @@ public class AdvancedTrafficFiltersAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public BasicDBList getTemplatesList() {
+    public List<YamlTemplate> getTemplatesList() {
         return templatesList;
     }
 
