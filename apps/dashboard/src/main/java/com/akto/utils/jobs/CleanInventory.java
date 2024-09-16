@@ -6,6 +6,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -158,7 +159,7 @@ public class CleanInventory {
                         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
                         isNetsparkerPresent |= sample.toLowerCase().contains("netsparker");
                         if(httpResponseParams != null){
-                            allMatchDefault =  HttpCallParser.isRedundantEndpoint(httpResponseParams.getRequestParams().getURL(), pattern) || HttpCallParser.isValidResponseParam(httpResponseParams, filterMap, shouldModifyRequest);
+                            allMatchDefault =  HttpCallParser.isRedundantEndpoint(httpResponseParams.getRequestParams().getURL(), pattern) || HttpCallParser.isValidResponseParam(httpResponseParams, filterMap, new HashMap<>());
                         }
                     }
 

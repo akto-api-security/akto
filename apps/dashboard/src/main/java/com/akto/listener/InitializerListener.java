@@ -6,6 +6,7 @@ import com.akto.action.ApiCollectionsAction;
 import com.akto.action.CustomDataTypeAction;
 import com.akto.action.EventMetricsAction;
 import com.akto.action.observe.InventoryAction;
+import com.akto.action.settings.AdvancedTrafficFiltersAction;
 import com.akto.action.testing.StartTestAction;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
@@ -647,7 +648,7 @@ public class InitializerListener implements ServletContextListener {
                             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                             List<String> redundantUrlList = accountSettings.getAllowRedundantEndpointsList();
                             try {
-                                CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections , yamlTemplates, redundantUrlList,filePath);
+                                CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections , yamlTemplates, redundantUrlList,filePath, false);
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }
@@ -2354,6 +2355,25 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void addDefaultAdvancedFilters(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getAddDefaultFilters() == 0){
+            String contentAllow = "id: DEFAULT_ALLOW_FILTER\nfilter:\n    url:\n        regex: '.*'";
+            String contentBlock = "id: DEFAULT_BLOCK_FILTER\nfilter:\n    response_code:\n        gte: 400";
+
+            AdvancedTrafficFiltersAction action = new AdvancedTrafficFiltersAction();
+            action.setYamlContent(contentAllow);
+            action.saveYamlTemplateForTrafficFilters();
+
+            action.setYamlContent(contentBlock);
+            action.saveYamlTemplateForTrafficFilters();
+
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.ADD_DEFAULT_FILTERS, Context.now())
+            );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
@@ -2382,6 +2402,7 @@ public class InitializerListener implements ServletContextListener {
         disableAwsSecretPiiType(backwardCompatibility);
         makeFirstUserAdmin(backwardCompatibility);
         dropSpecialCharacterApiCollections(backwardCompatibility);
+        addDefaultAdvancedFilters(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {
