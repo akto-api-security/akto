@@ -13,6 +13,7 @@ import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.settings.DefaultPayload;
+import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.URLMethods.Method;
@@ -25,6 +26,7 @@ import com.akto.runtime.Main;
 import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.URLAggregator;
 import com.akto.runtime.utils.Utils;
+import com.akto.test_editor.execution.ParseAndExecute;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.usage.UsageMetricCalculator;
@@ -171,7 +173,7 @@ public class HttpCallParser {
         }
     }
 
-    public static boolean isValidResponseParam(HttpResponseParams responseParam, Map<String, FilterConfig> filterMap){
+    public static boolean isValidResponseParam(HttpResponseParams responseParam, Map<String, FilterConfig> filterMap, Map<String, List<ExecutorNode>> executorNodesMap){
         for (Entry<String, FilterConfig> apiFilterEntry : filterMap.entrySet()) {
             try {
                 FilterConfig apiFilter = apiFilterEntry.getValue();
@@ -191,11 +193,24 @@ public class HttpCallParser {
                 ValidationResult res = validateFilter(apiFilter.getFilter().getNode(), rawApi,
                         apiInfoKey, varMap, filterExecutionLogId);
                 if (res.getIsValid()) {
+                    // handle custom filters here
+
+                    if(apiFilter.getId().equals(FilterConfig.DEFAULT_ALLOW_FILTER)){
+                        return true;
+                    }
+
+                    if(apiFilter.getId().equals(FilterConfig.DEFAULT_BLOCK_FILTER)){
+                        return false;
+                    }
+
+                    // handle execute here
+                    RawApi modifiedApi = new ParseAndExecute().execute(executorNodesMap.getOrDefault(apiFilter.getId(), new ArrayList<>()), rawApi, apiInfoKey, varMap, filterExecutionLogId);
+                    responseParam = Utils.convertRawApiToHttpResponseParams(modifiedApi, responseParam);
                     return true;
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
-                return false;
+                return true;
             }
         }
         return false;
@@ -203,14 +218,13 @@ public class HttpCallParser {
 
     int numberOfSyncs = 0;
 
-    private List<HttpResponseParams> applyAdvancedFilters(List<HttpResponseParams> responseParams){
+    private List<HttpResponseParams> applyAdvancedFilters(List<HttpResponseParams> responseParams, Map<String, List<ExecutorNode>> executorNodesMap){
         Map<String,FilterConfig> filterMap = apiCatalogSync.advancedFilterMap;
         
         if (filterMap != null && !filterMap.isEmpty()) {
             List<HttpResponseParams> filteredParams = new ArrayList<>();
             for (HttpResponseParams responseParam : responseParams) {
-                if(isValidResponseParam(responseParam, filterMap)){
-                    // TODO handle execution
+                if(isValidResponseParam(responseParam, filterMap, executorNodesMap)){
                     filteredParams.add(responseParam);
                 }
             }
@@ -231,9 +245,7 @@ public class HttpCallParser {
         }
         Pattern regexPattern = Utils.createRegexPatternFromList(redundantList);
         filteredResponseParams = filterHttpResponseParams(filteredResponseParams, redundantList, regexPattern);
-
-        // add advanced filters
-        filteredResponseParams = applyAdvancedFilters(filteredResponseParams);
+        
 
         boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
 
@@ -502,6 +514,10 @@ public class HttpCallParser {
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, List<String> redundantUrlsList, Pattern pattern) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
+
+        // create executor nodes from filters
+        Map<String, List<ExecutorNode>> executorNodesMap = ParseAndExecute.createExecutorNodeMap(apiCatalogSync.advancedFilterMap);
+
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
@@ -558,6 +574,7 @@ public class HttpCallParser {
 
             }
 
+            applyAdvancedFilters(Arrays.asList(httpResponseParam), executorNodesMap);
             int apiCollectionId = createApiCollectionId(httpResponseParam);
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
