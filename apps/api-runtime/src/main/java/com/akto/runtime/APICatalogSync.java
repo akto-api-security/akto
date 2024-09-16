@@ -1543,7 +1543,7 @@ public class APICatalogSync {
         }
 
         List<YamlTemplate> advancedFilterTemplates = AdvancedTrafficFiltersDao.instance.findAll(Filters.ne(YamlTemplate.INACTIVE, true));
-        advancedFilterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, advancedFilterTemplates, false);
+        advancedFilterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, advancedFilterTemplates, true);
         try {
             // fetchAllSTI check added to make sure only runs in dashboard
             if (!fetchAllSTI) {

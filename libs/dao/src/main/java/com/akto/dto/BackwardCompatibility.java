@@ -91,6 +91,9 @@ public class BackwardCompatibility {
     public static final String FIX_API_ACCESS_TYPE = "fixApiAccessType";
     private int fixApiAccessType;
 
+    public static final String ADD_DEFAULT_FILTERS = "addDefaultFilters";
+    private int addDefaultFilters;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -99,7 +102,8 @@ public class BackwardCompatibility {
                                  int computeIntegratedConnections, int deleteLastCronRunInfo, int moveAuthMechanismToRole,
                                  int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
-                                 int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType) {
+                                 int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
+                                 int addDefaultFilters) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -388,5 +392,13 @@ public class BackwardCompatibility {
 
     public void setFixApiAccessType(int fixApiAccessType) {
         this.fixApiAccessType = fixApiAccessType;
+    }
+
+    public int getAddDefaultFilters() {
+        return addDefaultFilters;
+    }
+
+    public void setAddDefaultFilters(int addDefaultFilters) {
+        this.addDefaultFilters = addDefaultFilters;
     }
 }

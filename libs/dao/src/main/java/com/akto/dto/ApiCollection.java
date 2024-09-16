@@ -1,6 +1,7 @@
 package com.akto.dto;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -53,6 +54,18 @@ public class ApiCollection {
 
     private boolean matchDependencyWithOtherCollections;
     public static final String MATCH_DEPENDENCY_WITH_OTHER_COLLECTIONS = "matchDependencyWithOtherCollections";
+
+    private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
+        "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
+        "localhost", "local", "intranet", "lan", "example", "invalid", 
+        "home", "corp", "priv", "localdomain", "localnet", "network", 
+        "int", "private"
+    );
+
+    private static final List<String> ENV_KEYWORDS_WITHOUT_DOT = Arrays.asList(
+        "kubernetes", "internal"
+    );
+
 
     public enum Type {
         API_GROUP
@@ -132,8 +145,17 @@ public class ApiCollection {
         if(this.type != null && this.type == Type.API_GROUP) return null;
         
         if(this.userSetEnvType == null){
-            if(this.hostName != null && this.hostName.matches(".*(staging|preprod|qa|demo|dev|test\\.).*")){
-                return ENV_TYPE.STAGING;
+            if (this.hostName != null) {
+                for (String keyword : ENV_KEYWORDS_WITH_DOT) {
+                    if (this.hostName.contains("." + keyword)) {
+                        return ENV_TYPE.STAGING;
+                    }
+                }
+                for (String keyword : ENV_KEYWORDS_WITHOUT_DOT) {
+                    if (this.hostName.contains(keyword)) {
+                        return ENV_TYPE.STAGING;
+                    }
+                }
             }
             return null;
         }else{

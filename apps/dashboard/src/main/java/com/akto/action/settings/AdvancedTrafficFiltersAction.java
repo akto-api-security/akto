@@ -14,6 +14,7 @@ import com.akto.utils.TrafficFilterUtil;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 
 public class AdvancedTrafficFiltersAction extends UserAction {
@@ -26,6 +27,7 @@ public class AdvancedTrafficFiltersAction extends UserAction {
     public String fetchAllFilterTemplates(){
         List<YamlTemplate> yamlTemplates =  AdvancedTrafficFiltersDao.instance.findAll(
             Filters.empty(),
+            0, 100000,Sorts.descending(YamlTemplate.UPDATED_AT),
             Projections.include(
                 Constants.ID, YamlTemplate.AUTHOR, YamlTemplate.CONTENT, YamlTemplate.INACTIVE
             )
@@ -44,7 +46,11 @@ public class AdvancedTrafficFiltersAction extends UserAction {
             if (filterConfig.getFilter() == null) {
                 throw new Exception("filter field cannot be empty");
             }
-            List<Bson> updates = TrafficFilterUtil.getDbUpdateForTemplate(this.yamlContent, getSUser().getLogin());
+            String userName = "system";
+            if(getSUser() != null && !getSUser().getLogin().isEmpty()){
+                userName = getSUser().getLogin();
+            }
+            List<Bson> updates = TrafficFilterUtil.getDbUpdateForTemplate(this.yamlContent, userName);
             AdvancedTrafficFiltersDao.instance.updateOne(
                     Filters.eq(Constants.ID, filterConfig.getId()),
                     Updates.combine(updates));
