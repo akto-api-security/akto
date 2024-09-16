@@ -167,7 +167,7 @@ public class CleanInventory {
                                 List<HttpResponseParams> temp = HttpCallParser.applyAdvancedFilters(Arrays.asList(httpResponseParams), executorNodesMap, filterMap);
 
                                 if(!temp.isEmpty()){
-                                    allMatchDefault = true;
+                                    allMatchDefault = false;
                                     httpResponseParams = temp.get(0);
 
                                     // to do moving of sample data to new collections
