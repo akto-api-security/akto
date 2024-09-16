@@ -422,17 +422,6 @@ public class Main {
                         continue;
                     }
 
-                    if (UsageMetricUtils.checkActiveEndpointOverage(accountIdInt)) {
-                        int now = Context.now();
-                        int lastSent = logSentMap.getOrDefault(accountIdInt, 0);
-                        if (now - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
-                            logSentMap.put(accountIdInt, now);
-                            loggerMaker.infoAndAddToDb("Active endpoint overage detected for account " + accountIdInt
-                                    + ". Ingestion stopped " + now, LogDb.RUNTIME);
-                        }
-                        continue;
-                    }
-
                     if (!httpCallParserMap.containsKey(accountId)) {
                         HttpCallParser parser = new HttpCallParser(
                                 apiConfig.getUserIdentifier(), apiConfig.getThreshold(), apiConfig.getSync_threshold_count(),

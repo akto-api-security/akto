@@ -64,8 +64,11 @@ import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricCalculator;
+import com.akto.usage.UsageMetricHandler;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
@@ -635,6 +638,16 @@ public class DbLayer {
                 options);
     }
 
+    public static List<Integer> fetchDeactivatedCollections() {
+        return new ArrayList<>(UsageMetricCalculator.getDeactivatedLatest());
+    }
+
+    public static void updateUsage(MetricTypes metricType, int deltaUsage){
+        int accountId = Context.accountId.get();
+        UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(metricType, accountId, deltaUsage);
+        return;
+    }
+
     public static List<TestingRunResult> fetchLatestTestingRunResultBySummaryId(String summaryId, int limit, int skip) {
         ObjectId summaryObjectId = new ObjectId(summaryId);
         return TestingRunResultDao.instance
@@ -651,9 +664,21 @@ public class DbLayer {
         return TestRolesDao.instance.findAll(new BasicDBObject());
     }
 
+    public static final int SAMPLE_DATA_LIMIT = 50;
+
     public static List<SampleData> fetchSampleData(Set<Integer> apiCollectionIds, int skip) {
-        Bson filterQ = Filters.in("_id.apiCollectionId", apiCollectionIds);
-        return SampleDataDao.instance.findAll(filterQ, skip, 500, null);
+        Bson filterQ = Filters.and(
+                Filters.in("_id.apiCollectionId", apiCollectionIds),
+                // only send sample data if sample exists.
+                Filters.exists(SampleData.SAMPLES + ".0"));
+        /*
+         * Since we use only the last sample data,
+         * sending only the last sample data to send minimal data.
+         */
+        Bson projection = Projections.computed(SampleData.SAMPLES,
+                Projections.computed("$slice", Arrays.asList("$" + SampleData.SAMPLES, -1)));
+
+        return SampleDataDao.instance.findAll(filterQ, skip, SAMPLE_DATA_LIMIT, Sorts.descending(Constants.ID), projection);
     }
 
     public static TestRoles fetchTestRole(String key) {

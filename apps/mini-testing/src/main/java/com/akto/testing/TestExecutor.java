@@ -649,7 +649,11 @@ public class TestExecutor {
         String message = messages.get(messages.size() - 1);
         try {
             long start = System.currentTimeMillis();
-            String msg = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey);
+            String msg = null;
+            try {
+                msg = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey);
+            } catch (Exception e) {
+            }
             if (msg != null) {
                 message = msg;
             }

@@ -17,6 +17,8 @@ import okhttp3.*;
 import okio.BufferedSink;
 
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,11 +29,12 @@ import java.util.*;
 
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
+    private static final Logger logger = LoggerFactory.getLogger(ApiExecutor.class);
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
     
-    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext) throws Exception {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
@@ -80,7 +83,12 @@ public class ApiExecutor {
         String body;
         try {
             response = call.execute();
-            ResponseBody responseBody = response.peekBody(MAX_RESPONSE_SIZE);
+            ResponseBody responseBody = null;
+            if (nonTestingContext) {
+                responseBody = response.body();
+            } else {
+                responseBody = response.peekBody(MAX_RESPONSE_SIZE);
+            }
             if (responseBody == null) {
                 throw new Exception("Couldn't read response body");
             }
@@ -257,11 +265,16 @@ public class ApiExecutor {
 
         builder = builder.url(request.getFullUrlWithParams());
 
+        boolean nonTestingContext = false;
+        if (testingRunConfig == null) {
+            nonTestingContext = true;
+        }
+
         OriginalHttpResponse response = null;
         switch (method) {
             case GET:
             case HEAD:
-                response = getRequest(request, builder, followRedirects, debug, testLogs, skipSSRFCheck);
+                response = getRequest(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
                 break;
             case POST:
             case PUT:
@@ -270,7 +283,7 @@ public class ApiExecutor {
             case PATCH:
             case TRACK:
             case TRACE:
-                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs, skipSSRFCheck);
+                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
                 break;
             case OTHER:
                 throw new Exception("Invalid method name");
@@ -283,10 +296,37 @@ public class ApiExecutor {
         return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, false);
     }
 
+    private static final List<Integer> BACK_OFF_LIMITS = new ArrayList<>(Arrays.asList(1, 2, 5));
 
-    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck)  throws Exception{
+    public static OriginalHttpResponse sendRequestBackOff(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
+        OriginalHttpResponse response = null;
+
+        for (int limit : BACK_OFF_LIMITS) {
+            try {
+                response = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, false);
+                if (response == null) {
+                    throw new NullPointerException(String.format("Response is null"));
+                }
+                if (response.getStatusCode() != 200) {
+                    throw new Exception(String.format("Invalid response code %d", response.getStatusCode()));
+                }
+                break;
+            } catch (Exception e) {
+                logger.error("Error in sending request for api : {} , will retry after {} seconds : {}", request.getUrl(),
+                        limit, e.toString());
+                try {
+                    Thread.sleep(1000 * limit);
+                } catch (Exception f) {
+                    logger.error("Error in exponential backoff at limit {} : {}", limit, f.toString());
+                }
+            }
+        }
+        return response;
+    }
+
+    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext)  throws Exception{
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
     }
 
     public static RequestBody getFileRequestBody(String fileUrl){
@@ -331,7 +371,7 @@ public class ApiExecutor {
 
 
 
-    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
         if (headers == null) {
             headers = new HashMap<>();
@@ -348,7 +388,7 @@ public class ApiExecutor {
             Request updatedRequest = builder.build();
 
 
-            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck);
+            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
         }
 
         String contentType = request.findContentType();
@@ -364,6 +404,6 @@ public class ApiExecutor {
         RequestBody body = RequestBody.create(payload, MediaType.parse(contentType));
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
     }
 }
