@@ -1971,6 +1971,7 @@ public class DbAction extends ActionSupport {
         try {
             this.activeAdvancedFilters = DbLayer.fetchActiveFilterTemplates();
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchActiveFilterTemplates " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
