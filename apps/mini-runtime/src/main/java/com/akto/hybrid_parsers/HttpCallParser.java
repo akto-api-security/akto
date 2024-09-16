@@ -18,6 +18,7 @@ import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.settings.DefaultPayload;
+import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
@@ -27,6 +28,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.parser.SampleParser;
 import com.akto.runtime.utils.Utils;
+import com.akto.test_editor.execution.ParseAndExecute;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.hybrid_runtime.APICatalogSync;
@@ -199,41 +201,51 @@ public class HttpCallParser {
         return syncLimit;
     }
 
-    private List<HttpResponseParams> applyAdvancedFilters(List<HttpResponseParams> responseParams){
-        Map<String,FilterConfig> filterMap = apiCatalogSync.advancedFilterMap;
-        
+    private static boolean isValidResponseParam(HttpResponseParams responseParam, Map<String, FilterConfig> filterMap, Map<String, List<ExecutorNode>> executorNodesMap){
+        boolean isValidResponseParam = false;
+        String message = responseParam.getOrig();
+        RawApi rawApi = RawApi.buildFromMessage(message);
+        int apiCollectionId = responseParam.requestParams.getApiCollectionId();
+        String url = responseParam.getRequestParams().getURL();
+        Method method = Method.fromString(responseParam.getRequestParams().getMethod());
+        ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
+        for (Entry<String, FilterConfig> apiFilterEntry : filterMap.entrySet()) {
+            try {
+                FilterConfig apiFilter = apiFilterEntry.getValue();
+                Map<String, Object> varMap = apiFilter.resolveVarMap();
+                VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
+                    {
+                        put(apiInfoKey, Arrays.asList(message));
+                    }
+                }, apiInfoKey);
+                String filterExecutionLogId = UUID.randomUUID().toString();
+                ValidationResult res = validateFilter(apiFilter.getFilter().getNode(), rawApi,
+                        apiInfoKey, varMap, filterExecutionLogId);
+                if (res.getIsValid()) {
+                    // handle custom filters here
+                    if(apiFilter.getId().equals(FilterConfig.DEFAULT_BLOCK_FILTER)){
+                        return false;
+                    }
+
+                    // handle execute here
+                    RawApi modifiedApi = new ParseAndExecute().execute(executorNodesMap.getOrDefault(apiFilter.getId(), new ArrayList<>()), rawApi, apiInfoKey, varMap, filterExecutionLogId);
+                    responseParam = Utils.convertRawApiToHttpResponseParams(modifiedApi, responseParam);
+                    isValidResponseParam = true;
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
+                isValidResponseParam = true;
+            }
+        }
+        return isValidResponseParam;
+    }
+
+    private List<HttpResponseParams> applyAdvancedFilters(List<HttpResponseParams> responseParams, Map<String, List<ExecutorNode>> executorNodesMap,  Map<String,FilterConfig> filterMap){
         if (filterMap != null && !filterMap.isEmpty()) {
             List<HttpResponseParams> filteredParams = new ArrayList<>();
             for (HttpResponseParams responseParam : responseParams) {
-                for (Entry<String, FilterConfig> apiFilterEntry : filterMap.entrySet()) {
-                    try {
-                        FilterConfig apiFilter = apiFilterEntry.getValue();
-                        String message = responseParam.getOrig();
-                        RawApi rawApi = RawApi.buildFromMessage(message);
-                        int apiCollectionId = createApiCollectionId(responseParam);
-                        responseParam.requestParams.setApiCollectionId(apiCollectionId);
-                        String url = responseParam.getRequestParams().getURL();
-                        Method method = Method.valueOf(responseParam.getRequestParams().getMethod());
-                        ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
-                        Map<String, Object> varMap = apiFilter.resolveVarMap();
-                        VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
-                            {
-                                put(apiInfoKey, Arrays.asList(message));
-                            }
-                        }, apiInfoKey);
-                        String filterExecutionLogId = UUID.randomUUID().toString();
-                        ValidationResult res = validateFilter(apiFilter.getFilter().getNode(), rawApi,
-                                apiInfoKey, varMap, filterExecutionLogId);
-                        if (res.getIsValid()) {
-                            // TODO apply execution
-                            
-                            filteredParams.add(responseParam);
-                            break;
-                        }
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
-                        return responseParams;
-                    }
+                if(isValidResponseParam(responseParam, filterMap, executorNodesMap)){
+                    filteredParams.add(responseParam);
                 }
             }
             return filteredParams;
@@ -248,7 +260,6 @@ public class HttpCallParser {
             filteredResponseParams = filterDefaultPayloads(filteredResponseParams, accountSettings.getDefaultPayloads());
         }
         filteredResponseParams = filterHttpResponseParams(filteredResponseParams, accountSettings);
-        filteredResponseParams = applyAdvancedFilters(filteredResponseParams);
         boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
 
         for (int apiCollectionId: aggregatorMap.keySet()) {
@@ -531,7 +542,7 @@ public class HttpCallParser {
             redundantList = accountSettings.getAllowRedundantEndpointsList();
         }
         Pattern regexPattern = Utils.createRegexPatternFromList(redundantList);
-
+        Map<String, List<ExecutorNode>> executorNodesMap = ParseAndExecute.createExecutorNodeMap(apiCatalogSync.advancedFilterMap);
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
@@ -592,6 +603,13 @@ public class HttpCallParser {
 
             }
 
+            List<HttpResponseParams> temp = applyAdvancedFilters(Arrays.asList(httpResponseParam), executorNodesMap, apiCatalogSync.advancedFilterMap);
+            if(temp.isEmpty()){
+                continue;
+            }else{
+                httpResponseParam = temp.get(0);
+            }
+            
             int apiCollectionId = createApiCollectionId(httpResponseParam);
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);

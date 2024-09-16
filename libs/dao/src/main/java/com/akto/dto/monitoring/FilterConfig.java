@@ -25,6 +25,9 @@ public class FilterConfig {
 
     private ExecutorConfigParserResult executor;
 
+    public static final String DEFAULT_ALLOW_FILTER = "DEFAULT_ALLOW_FILTER";
+    public static final String DEFAULT_BLOCK_FILTER = "DEFAULT_BLOCK_FILTER";
+
     public FilterConfig(String id, ConfigParserResult filter, Map<String, List<String>> wordLists) {
         this.id = id;
         this.filter = filter;

@@ -1,6 +1,7 @@
 package com.akto.test_editor.execution;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -8,9 +9,11 @@ import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ExecuteAlgoObj;
 import com.akto.dto.test_editor.ExecutionOrderResp;
+import com.akto.dto.test_editor.ExecutorConfigParserResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.test_editor.Utils;
@@ -84,6 +87,28 @@ public class ParseAndExecute {
         }
 
         return copyRawApi;
+    }
+
+    public static Map<String, List<ExecutorNode>> createExecutorNodeMap (Map<String,FilterConfig> filterMap) {
+        Map<String, List<ExecutorNode>> finalMap = new HashMap<>();
+
+        if (filterMap != null && !filterMap.isEmpty()) {
+            for(Map.Entry<String,FilterConfig> iterator: filterMap.entrySet()){
+                String templateId = iterator.getKey();
+                if(templateId.equals(FilterConfig.DEFAULT_ALLOW_FILTER) || templateId.equals(FilterConfig.DEFAULT_BLOCK_FILTER)){
+                    continue;
+                }
+                ExecutorConfigParserResult nodeObj = iterator.getValue().getExecutor();
+                if(nodeObj != null && nodeObj.getIsValid()){
+                    ExecutorNode node = nodeObj.getNode();
+                    List<ExecutorNode> nodes = getExecutorNodes(node);
+
+                    finalMap.put(templateId, nodes);
+                }
+            }
+        }
+
+        return finalMap;
     }
 
 }
