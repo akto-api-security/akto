@@ -174,15 +174,16 @@ public class HttpCallParser {
     }
 
     public static boolean isValidResponseParam(HttpResponseParams responseParam, Map<String, FilterConfig> filterMap, Map<String, List<ExecutorNode>> executorNodesMap){
+        boolean isValidResponseParam = false;
+        String message = responseParam.getOrig();
+        RawApi rawApi = RawApi.buildFromMessage(message);
+        int apiCollectionId = responseParam.requestParams.getApiCollectionId();
+        String url = responseParam.getRequestParams().getURL();
+        Method method = Method.fromString(responseParam.getRequestParams().getMethod());
+        ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
         for (Entry<String, FilterConfig> apiFilterEntry : filterMap.entrySet()) {
             try {
                 FilterConfig apiFilter = apiFilterEntry.getValue();
-                String message = responseParam.getOrig();
-                RawApi rawApi = RawApi.buildFromMessage(message);
-                int apiCollectionId = responseParam.requestParams.getApiCollectionId();
-                String url = responseParam.getRequestParams().getURL();
-                Method method = Method.fromString(responseParam.getRequestParams().getMethod());
-                ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
                 Map<String, Object> varMap = apiFilter.resolveVarMap();
                 VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
                     {
@@ -194,11 +195,6 @@ public class HttpCallParser {
                         apiInfoKey, varMap, filterExecutionLogId);
                 if (res.getIsValid()) {
                     // handle custom filters here
-
-                    if(apiFilter.getId().equals(FilterConfig.DEFAULT_ALLOW_FILTER)){
-                        return true;
-                    }
-
                     if(apiFilter.getId().equals(FilterConfig.DEFAULT_BLOCK_FILTER)){
                         return false;
                     }
@@ -206,14 +202,14 @@ public class HttpCallParser {
                     // handle execute here
                     RawApi modifiedApi = new ParseAndExecute().execute(executorNodesMap.getOrDefault(apiFilter.getId(), new ArrayList<>()), rawApi, apiInfoKey, varMap, filterExecutionLogId);
                     responseParam = Utils.convertRawApiToHttpResponseParams(modifiedApi, responseParam);
-                    return true;
+                    isValidResponseParam = true;
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
-                return true;
+                isValidResponseParam = true;
             }
         }
-        return false;
+        return isValidResponseParam;
     }
 
     int numberOfSyncs = 0;
@@ -574,7 +570,12 @@ public class HttpCallParser {
 
             }
 
-            applyAdvancedFilters(Arrays.asList(httpResponseParam), executorNodesMap);
+            List<HttpResponseParams> temp = applyAdvancedFilters(Arrays.asList(httpResponseParam), executorNodesMap);
+            if(temp.isEmpty()){
+                continue;
+            }else{
+                httpResponseParam = temp.get(0);
+            }
             int apiCollectionId = createApiCollectionId(httpResponseParam);
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
