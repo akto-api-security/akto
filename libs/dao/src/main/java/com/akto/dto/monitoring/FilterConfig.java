@@ -26,6 +26,10 @@ public class FilterConfig {
     public static final String DEFAULT_ALLOW_FILTER = "DEFAULT_ALLOW_FILTER";
     public static final String DEFAULT_BLOCK_FILTER = "DEFAULT_BLOCK_FILTER";
 
+    public enum FILTER_TYPE{
+        BLOCKED , ALLOWED, MODIFIED, UNCHANGED
+    }
+
     private ExecutorConfigParserResult executor;
 
     public FilterConfig(String id, ConfigParserResult filter, Map<String, List<String>> wordLists) {
