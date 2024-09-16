@@ -214,9 +214,7 @@ public class HttpCallParser {
 
     int numberOfSyncs = 0;
 
-    private List<HttpResponseParams> applyAdvancedFilters(List<HttpResponseParams> responseParams, Map<String, List<ExecutorNode>> executorNodesMap){
-        Map<String,FilterConfig> filterMap = apiCatalogSync.advancedFilterMap;
-        
+    public static List<HttpResponseParams> applyAdvancedFilters(List<HttpResponseParams> responseParams, Map<String, List<ExecutorNode>> executorNodesMap,  Map<String,FilterConfig> filterMap){
         if (filterMap != null && !filterMap.isEmpty()) {
             List<HttpResponseParams> filteredParams = new ArrayList<>();
             for (HttpResponseParams responseParam : responseParams) {
@@ -570,7 +568,7 @@ public class HttpCallParser {
 
             }
 
-            List<HttpResponseParams> temp = applyAdvancedFilters(Arrays.asList(httpResponseParam), executorNodesMap);
+            List<HttpResponseParams> temp = applyAdvancedFilters(Arrays.asList(httpResponseParam), executorNodesMap, apiCatalogSync.advancedFilterMap);
             if(temp.isEmpty()){
                 continue;
             }else{

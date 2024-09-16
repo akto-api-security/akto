@@ -33,6 +33,7 @@ import com.akto.dto.Account;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.monitoring.FilterConfig;
+import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
@@ -42,6 +43,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
+import com.akto.test_editor.execution.ParseAndExecute;
 import com.akto.util.AccountTask;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -132,7 +134,7 @@ public class CleanInventory {
         int limit = 100;
         Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");
 
-        Map<String,FilterConfig> filterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, yamlTemplates, false);
+        Map<String,FilterConfig> filterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, yamlTemplates, true);
         Pattern pattern = createRegexPatternFromList(redundantUrlList);
         do {
             sampleDataList = SampleDataDao.instance.findAll(filters, skip, limit, sort);
@@ -159,7 +161,18 @@ public class CleanInventory {
                         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
                         isNetsparkerPresent |= sample.toLowerCase().contains("netsparker");
                         if(httpResponseParams != null){
-                            allMatchDefault =  HttpCallParser.isRedundantEndpoint(httpResponseParams.getRequestParams().getURL(), pattern) || HttpCallParser.isValidResponseParam(httpResponseParams, filterMap, new HashMap<>());
+                            allMatchDefault =  HttpCallParser.isRedundantEndpoint(httpResponseParams.getRequestParams().getURL(), pattern);
+                            if(!allMatchDefault){
+                                Map<String, List<ExecutorNode>> executorNodesMap = ParseAndExecute.createExecutorNodeMap(filterMap);
+                                List<HttpResponseParams> temp = HttpCallParser.applyAdvancedFilters(Arrays.asList(httpResponseParams), executorNodesMap, filterMap);
+
+                                if(!temp.isEmpty()){
+                                    allMatchDefault = true;
+                                    httpResponseParams = temp.get(0);
+
+                                    // to do moving of sample data to new collections
+                                }
+                            }
                         }
                     }
 
