@@ -17,6 +17,7 @@ import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.RawApi;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
@@ -168,6 +169,19 @@ public class Utils {
         return pattern;
     }
 
+    public static HttpResponseParams convertRawApiToHttpResponseParams(RawApi rawApi, HttpResponseParams originalHttpResponseParams){
+
+        HttpRequestParams ogRequestParams = originalHttpResponseParams.getRequestParams();
+        OriginalHttpRequest modifiedRequest = rawApi.getRequest();
+
+        ogRequestParams.setHeaders(modifiedRequest.getHeaders());
+        ogRequestParams.setUrl(modifiedRequest.getFullUrlWithParams());
+        ogRequestParams.setPayload(modifiedRequest.getBody());
+
+        originalHttpResponseParams.setRequestParams(ogRequestParams);
+
+        return originalHttpResponseParams;
+    }
 
 
 }
