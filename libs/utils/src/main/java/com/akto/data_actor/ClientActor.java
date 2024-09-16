@@ -3020,4 +3020,22 @@ public class ClientActor extends DataActor {
         return respList;
     }
 
+    public void insertRuntimeMetricsData(BasicDBList metricsData) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("metricsData", metricsData);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertRuntimeMetricsData", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                System.out.println("non 2xx response in insertRuntimeMetricsData");
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("error in insertRuntimeMetricsData" + e);
+            return;
+        }
+    }
+
 }

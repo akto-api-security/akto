@@ -22,6 +22,8 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.mongodb.BasicDBList;
+import com.mongodb.client.model.WriteModel;
 import com.akto.dto.usage.MetricTypes;
 
 import java.util.List;
@@ -224,5 +226,9 @@ public abstract class DataActor {
     public abstract DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand);
 
     public abstract void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList);
+    
     public abstract List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId);
+
+    public abstract void insertRuntimeMetricsData(BasicDBList metricsData);
+
 }

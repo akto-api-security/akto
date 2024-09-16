@@ -1,6 +1,7 @@
 package com.akto.metrics;
 
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
@@ -12,15 +13,20 @@ import okhttp3.*;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class AllMetrics {
 
-    public void init(){
+    public static final DataActor dataActor = DataActorFactory.fetchInstance();
+    private String instanceId;
+    private String version;
+
+	public void init(String instanceId, String version) {
         int accountId = Context.accountId.get();
+        this.setInstanceId(instanceId);
+        this.setVersion(version);
 
         Organization organization = DataActorFactory.fetchInstance().fetchOrganization(accountId);
         String orgId = organization.getId();
@@ -81,13 +87,16 @@ public class AllMetrics {
                     metricsData.put("metric_id", m.metricId);
                     metricsData.put("val", metric);
                     metricsData.put("org_id", m.orgId);
-                    metricsData.put("instance_id", instance_id);
+                    metricsData.put("instance_id", this.getInstanceId());
+                    metricsData.put("version", this.getVersion());
                     metricsData.put("account_id", m.accountId);
+                    metricsData.put("timestamp", Context.now());
                     list.add(metricsData);
 
                 }
                 if(!list.isEmpty()) {
                     sendDataToAkto(list);
+                    dataActor.insertRuntimeMetricsData(list);
                 }
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb("Error while sending metrics to akto: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
@@ -110,7 +119,6 @@ public class AllMetrics {
 
     private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class);
 
-    private static final String instance_id = UUID.randomUUID().toString();
     private Metric runtimeKafkaRecordCount;
     private Metric runtimeKafkaRecordSize;
     private Metric runtimeProcessLatency = null;
@@ -430,5 +438,47 @@ public class AllMetrics {
         } else {
             loggerMaker.infoAndAddToDb("Traffic_metrics not sent", LoggerMaker.LogDb.RUNTIME);
         }
+    }
+
+    public static void sendData(BasicDBList list){
+
+        MediaType mediaType = MediaType.parse("application/json");
+        RequestBody body = RequestBody.create(new BasicDBObject("data", list).toJson(), mediaType);
+        Request request = new Request.Builder()
+                .url(URL)
+                .method("POST", body)
+                .addHeader("Content-Type", "application/json")
+                .build();
+        Response response = null;
+        try {
+            response =  client.newCall(request).execute();
+        } catch (IOException e) {
+            loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+        } finally {
+            if (response != null) {
+                response.close();
+            }
+        }
+        if (response!= null && response.isSuccessful()) {
+            loggerMaker.infoAndAddToDb("Updated traffic_metrics", LoggerMaker.LogDb.RUNTIME);
+        } else {
+            loggerMaker.infoAndAddToDb("Traffic_metrics not sent", LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+    public String getInstanceId() {
+        return instanceId;
+    }
+
+    public void setInstanceId(String instanceId) {
+        this.instanceId = instanceId;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
     }
 }
