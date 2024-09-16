@@ -40,7 +40,7 @@ function GraphMetric(props) {
                 type: 'x'
             },
             height: `${height}px`,
-            backgroundColor,
+            backgroundColor: backgroundColor || '#ffffff',
         },
         credits:{
             enabled: false,

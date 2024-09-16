@@ -204,7 +204,6 @@ function Metrics() {
                 <GraphMetric data={element.value}  type='spline' color='#6200EA' areaFillHex="true" height="330"
                     title={nameMap.get(element.key)?.descriptionName} subtitle = {nameMap.get(element.key)?.description}
                     defaultChartOptions={defaultChartOptions}
-                    background-color="#000000"
                     text="true"
                     inputMetrics={[]}
                 />
@@ -343,6 +342,7 @@ function Metrics() {
             hideQueryField={true}
             hideContactUs={true}
             promotedBulkActions={promotedBulkActions}
+            showFooter={false}
         />
     )
 

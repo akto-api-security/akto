@@ -23,7 +23,7 @@ import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
-import com.akto.sql.SampleDataAltDb;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.utils.Utils;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
@@ -118,42 +118,6 @@ public class Main {
         }
     }
 
-    private static String insertCredsRecordInKafka(String brokerUrl) {
-        File f = new File("creds.txt");
-        String instanceId = UUID.randomUUID().toString();
-        if (f.exists()) {
-            try (FileReader reader = new FileReader(f);
-                BufferedReader bufferedReader = new BufferedReader(reader)) {
-                String line;
-                while ((line = bufferedReader.readLine()) != null) {
-                    instanceId = line;
-                }
-            } catch (IOException e) {
-                loggerMaker.errorAndAddToDb("Error reading instanceId from file: " + e.getMessage());
-            }
-        } else {
-            try (FileWriter writer = new FileWriter(f)) {
-                writer.write(instanceId);
-            } catch (IOException e) {
-                loggerMaker.errorAndAddToDb("Error writing instanceId to file: " + e.getMessage());
-            }
-        }
-
-        int batchSize = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_BATCH_SIZE"));
-        int kafkaLingerMS = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_LINGER_MS"));
-        kafkaProducer = new Kafka(brokerUrl, kafkaLingerMS, batchSize);
-        BasicDBObject creds = new BasicDBObject();
-        creds.put("id", instanceId);
-        creds.put("token", System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN"));
-        creds.put("url", System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL"));
-        try {
-            kafkaProducer.send(creds.toJson(), "credentials");
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error inserting creds record in kafka: " + e.getMessage());
-        }
-        return instanceId;
-    }
-
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     public static class AccountInfo {
@@ -216,15 +180,13 @@ public class Main {
             fetchAllSTI = false;
         }
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
-        String instanceId = insertCredsRecordInKafka(kafkaBrokerUrl);
+        String instanceId = RuntimeUtil.insertCredsRecordInKafka(kafkaBrokerUrl);
 
         AccountSettings aSettings = dataActor.fetchAccountSettings();
         if (aSettings == null) {
             loggerMaker.errorAndAddToDb("error fetch account settings, exiting process");
             System.exit(0);
         }
-
-        DataControlFetcher.init(dataActor);
 
         aSettings = dataActor.fetchAccountSettings();
 
@@ -252,23 +214,6 @@ public class Main {
         }, 5, 5, TimeUnit.MINUTES);
 
         final boolean checkPg = aSettings != null && aSettings.isRedactPayload();
-
-        if (checkPg) {
-            try {
-                com.akto.sql.Main.createSampleDataTable();
-                SampleDataAltDb.createIndex();
-            } catch(Exception e){
-                logger.error("Unable to connect to postgres sql db", e);
-            }
-
-        dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
-
-        APIConfig apiConfig = null;
-        try {
-            apiConfig = dataActor.fetchApiConfig(configName);;
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error while fetching api config " + e.getMessage(), LogDb.RUNTIME);
-        }
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
@@ -328,15 +273,6 @@ public class Main {
                         AllMetrics.instance.setKafkaBytesConsumedRate((float) val);
                     }
                 }
-
-
-                if (checkPg) {
-                    AllMetrics.instance.setTotalSampleDataCount(SampleDataAltDb.totalNumberOfRecords());
-                    loggerMaker.infoAndAddToDb("Total number of records in postgres: " + SampleDataAltDb.totalNumberOfRecords(), LogDb.RUNTIME);
-                    long dbSizeInMb = SampleDataAltDb.getDbSizeInMb();
-                    AllMetrics.instance.setPgDataSizeInMb(dbSizeInMb);
-                    loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB", LogDb.RUNTIME);
-                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Failed to get total number of records from postgres");
             }
@@ -376,9 +312,6 @@ public class Main {
                         AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
 
                         lastSyncOffset++;
-                        if (DataControlFetcher.stopIngestionFromKafka()) {
-                            continue;
-                        }
 
                         if (lastSyncOffset % 100 == 0) {
                             logger.info("Committing offset at position: " + lastSyncOffset);
@@ -601,13 +534,6 @@ public class Main {
         List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
         List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
         List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
-
-        RuntimeVersion runtimeVersion = new RuntimeVersion();
-        try {
-            runtimeVersion.updateVersion(AccountSettings.API_RUNTIME_VERSION, dataActor);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.getMessage(), LogDb.RUNTIME);
-        }
 
         SingleTypeInfo.initFromRuntime(customDataTypes, aktoDataTypes, customAuthTypes, account.getId());
 

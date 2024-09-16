@@ -1,5 +1,6 @@
 package com.akto.traffic;
 
+import java.io.*;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +10,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.akto.runtime.RuntimeUtil;
 import org.apache.commons.lang3.function.FailableFunction;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.Metric;
@@ -54,12 +56,25 @@ public class KafkaRunner {
             connected = true;
         }
 
+        String kafkaBrokerUrl = "kafka1:19092";
         if (connected) {
             loggerMaker.infoAndAddToDb(String.format("Starting module for account : %d", Context.accountId.get()));
-            AllMetrics.instance.init(module);
+            String instanceId = RuntimeUtil.insertCredsRecordInKafka(kafkaBrokerUrl);
+            String version = "";
+            try (InputStream in = KafkaRunner.class.getResourceAsStream("/version.txt")) {
+                if (in != null) {
+                    BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(in));
+                    String imageTag = bufferedReader.readLine();
+                    String buildTime = bufferedReader.readLine();
+                    version = imageTag + " - " + buildTime;
+                }
+            } catch (IOException e) {
+                loggerMaker.errorAndAddToDb("Error while trying to fetch runtime version: " + e.getMessage());
+            }
+
+            AllMetrics.instance.init(instanceId, version, module);
         }
 
-        String kafkaBrokerUrl = "kafka1:19092";
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
             loggerMaker.infoAndAddToDb("is_kubernetes: true");

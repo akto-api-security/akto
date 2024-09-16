@@ -3,51 +3,27 @@ package com.akto.data_actor;
 import java.util.*;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
+import com.akto.dao.*;
+import com.akto.dao.billing.TokensDao;
 import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
+import com.akto.dto.*;
+import com.akto.dto.billing.Tokens;
+import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.util.Constants;
+import com.mongodb.BasicDBList;
+import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import com.akto.dao.APIConfigsDao;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AccountsDao;
-import com.akto.dao.AktoDataTypeDao;
-import com.akto.dao.AnalyserLogsDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ApiInfoDao;
-import com.akto.dao.CustomAuthTypeDao;
-import com.akto.dao.CustomDataTypeDao;
-import com.akto.dao.LogsDao;
-import com.akto.dao.ProtectionLogsDao;
-import com.akto.dao.RuntimeFilterDao;
-import com.akto.dao.RuntimeLogsDao;
-import com.akto.dao.SampleDataDao;
-import com.akto.dao.SensitiveParamInfoDao;
-import com.akto.dao.SensitiveSampleDataDao;
-import com.akto.dao.SetupDao;
-import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.SuspectSampleDataDao;
-import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
-import com.akto.dto.APIConfig;
-import com.akto.dto.Account;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.AktoDataType;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.CustomAuthType;
-import com.akto.dto.CustomDataType;
-import com.akto.dto.Log;
-import com.akto.dto.SensitiveParamInfo;
-import com.akto.dto.SensitiveSampleData;
-import com.akto.dto.Setup;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -62,15 +38,6 @@ import com.akto.log.LoggerMaker;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.BulkWriteOptions;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
-import com.mongodb.client.model.WriteModel;
 
 public class DbLayer {
 
@@ -487,7 +454,7 @@ public class DbLayer {
                 Filters.eq("_id", summaryObjectId),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
-                        Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                        Updates.set(TestingRunResultSummary.STATE, TestingRun.State.COMPLETED),
                         Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
                 )
         );
@@ -518,7 +485,7 @@ public class DbLayer {
 
     public static void updateLastTestedField(int apiCollectionId, String url, String method) {
         URLMethods.Method methodEnum = URLMethods.Method.fromString(method);
-        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, methodEnum);
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, methodEnum);
         ApiInfoDao.instance.updateLastTestedField(apiInfoKey);
     }
 
@@ -545,7 +512,7 @@ public class DbLayer {
                 Filters.eq(Constants.ID, summaryObjectId),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
-                        Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                        Updates.set(TestingRunResultSummary.STATE, TestingRun.State.COMPLETED),
                         Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)),
                 options);
     }
@@ -735,17 +702,6 @@ public class DbLayer {
     public static void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         Integer accountId = Context.accountId.get();
         AccountsDao.instance.updateOne(Filters.eq("_id", accountId), Updates.set(Account.HYBRID_TESTING_ENABLED, hybridTestingEnabled));
-    }
-
-
-    public static DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand) {
-        Integer accountId = Context.accountId.get();
-        Bson updates = Updates.combine(Updates.set("postgresResult", prevResult), Updates.set("oldPostgresCommand", prevCommand));
-        return DataControlSettingsDao.instance.getMCollection().findOneAndUpdate(Filters.eq("_id", accountId), updates);
-    }
-
-    public static void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
-        DependencyAnalyserUtils.syncWithDb(dependencyNodeList);
     }
 
     public static List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {

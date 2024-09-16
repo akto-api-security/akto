@@ -5,13 +5,16 @@ import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.type.URLTemplate;
+import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.mongodb.BasicDBObject;
 
+import java.io.*;
 import java.net.URL;
 import java.util.*;
 
@@ -139,5 +142,41 @@ public class RuntimeUtil {
             }
         }
 
+    }
+
+    public static String insertCredsRecordInKafka(String brokerUrl) {
+        File f = new File("creds.txt");
+        String instanceId = UUID.randomUUID().toString();
+        if (f.exists()) {
+            try (FileReader reader = new FileReader(f);
+                 BufferedReader bufferedReader = new BufferedReader(reader)) {
+                String line;
+                while ((line = bufferedReader.readLine()) != null) {
+                    instanceId = line;
+                }
+            } catch (IOException e) {
+                loggerMaker.errorAndAddToDb("Error reading instanceId from file: " + e.getMessage());
+            }
+        } else {
+            try (FileWriter writer = new FileWriter(f)) {
+                writer.write(instanceId);
+            } catch (IOException e) {
+                loggerMaker.errorAndAddToDb("Error writing instanceId to file: " + e.getMessage());
+            }
+        }
+
+        int batchSize = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_BATCH_SIZE"));
+        int kafkaLingerMS = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_LINGER_MS"));
+        Kafka kafkaProducer = new Kafka(brokerUrl, kafkaLingerMS, batchSize);
+        BasicDBObject creds = new BasicDBObject();
+        creds.put("id", instanceId);
+        creds.put("token", System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN"));
+        creds.put("url", System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL"));
+        try {
+            kafkaProducer.send(creds.toJson(), "credentials");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error inserting creds record in kafka: " + e.getMessage());
+        }
+        return instanceId;
     }
 }
