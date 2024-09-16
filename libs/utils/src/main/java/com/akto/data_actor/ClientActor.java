@@ -3096,4 +3096,36 @@ public class ClientActor extends DataActor {
         return templates;
     }
 
+    public List<YamlTemplate> fetchActiveAdvancedFilters(){
+        Map<String, List<String>> headers = buildHeaders();
+
+        List<YamlTemplate> respList = new ArrayList<>();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchActiveAdvancedFilters", "", "POST", "", headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchActiveAdvancedFilters", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList newTemplates = (BasicDBList) payloadObj.get("activeAdvancedFilters");
+                for (Object template: newTemplates) {
+                    BasicDBObject templateObject = (BasicDBObject) template;
+                    YamlTemplate yamlTemplate = objectMapper.readValue(templateObject.toJson(), YamlTemplate.class);
+                    respList.add(yamlTemplate);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchActiveAdvancedFilters" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetching filter yaml templates" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+        return respList;
+    }
+
 }

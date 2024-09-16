@@ -490,4 +490,9 @@ public class DbActor extends DataActor {
     public List<YamlTemplate> fetchFilterYamlTemplates() {
         return DbLayer.fetchFilterYamlTemplates();
     }
+    
+    public List<YamlTemplate> fetchActiveAdvancedFilters(){
+        return DbLayer.fetchActiveFilterTemplates();
+    }
+
 }
