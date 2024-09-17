@@ -156,7 +156,7 @@ export default function LeftNav(){
               },
               window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ?
                 {
-                  label: <Text variant="bodyMd" fontWeight="medium">API Threat Detection</Text>,
+                  label: <Text variant="bodyMd" fontWeight="medium">API Runtime Threats</Text>,
                   icon: DiamondAlertMinor,
                   onClick: () => {
                     handleSelect("dashboard_threat_detection")
