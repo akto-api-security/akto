@@ -41,6 +41,7 @@ import org.json.JSONObject;
 import com.mongodb.BasicDBObject;
 import static com.akto.test_editor.Utils.bodyValuesUnchanged;
 import static com.akto.test_editor.Utils.headerValuesUnchanged;
+import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 
 
 import org.apache.commons.lang3.StringUtils;
@@ -365,7 +366,7 @@ public class Executor {
             return null;
         }
 
-        String msg = RedactSampleData.convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
+        String msg = convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
         RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);
         boolean vulnerable = TestPlugin.validateValidator(validatorNode, rawApi, testRawApi , apiInfoKey, varMap, logId);
         if (vulnerable) {

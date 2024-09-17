@@ -1,7 +1,11 @@
 package com.akto.testing;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -9,15 +13,24 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.RawApi;
+import com.akto.dto.test_editor.DataOperandsFilterResponse;
+import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.test_editor.filter.Filter;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
 
 import okhttp3.MediaType;
+
+import static com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload;;
 
 public class Utils {
 
@@ -291,5 +304,69 @@ public class Utils {
         }
     }
 
+
+    public static double compareWithOriginalResponse(String originalPayload, String currentPayload, Map<String, Boolean> comparisonExcludedKeys) {
+        if (originalPayload == null && currentPayload == null) return 100;
+        if (originalPayload == null || currentPayload == null) return 0;
+
+        String trimmedOriginalPayload = originalPayload.trim();
+        String trimmedCurrentPayload = currentPayload.trim();
+        if (trimmedCurrentPayload.equals(trimmedOriginalPayload)) return 100;
+
+        Map<String, Set<String>> originalResponseParamMap = new HashMap<>();
+        Map<String, Set<String>> currentResponseParamMap = new HashMap<>();
+        try {
+            extractAllValuesFromPayload(originalPayload, originalResponseParamMap);
+            extractAllValuesFromPayload(currentPayload, currentResponseParamMap);
+        } catch (Exception e) {
+            return 0.0;
+        }
+
+        if (originalResponseParamMap.keySet().size() == 0 && currentResponseParamMap.keySet().size() == 0) {
+            return 100.0;
+        }
+
+        Set<String> visited = new HashSet<>();
+        int matched = 0;
+        for (String k1: originalResponseParamMap.keySet()) {
+            if (visited.contains(k1) || comparisonExcludedKeys.containsKey(k1)) continue;
+            visited.add(k1);
+            Set<String> v1 = originalResponseParamMap.get(k1);
+            Set<String> v2 = currentResponseParamMap.get(k1);
+            if (Objects.equals(v1, v2)) matched +=1;
+        }
+
+        for (String k1: currentResponseParamMap.keySet()) {
+            if (visited.contains(k1) || comparisonExcludedKeys.containsKey(k1)) continue;
+            visited.add(k1);
+            Set<String> v1 = originalResponseParamMap.get(k1);
+            Set<String> v2 = currentResponseParamMap.get(k1);
+            if (Objects.equals(v1, v2)) matched +=1;
+        }
+
+        int visitedSize = visited.size();
+        if (visitedSize == 0) return 0.0;
+
+        double result = (100.0*matched)/visitedSize;
+
+        if (Double.isFinite(result)) {
+            return result;
+        } else {
+            return 0.0;
+        }
+
+    }
+
+    public static ValidationResult validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
+        if (filterNode == null) return new ValidationResult(true, "");
+        if (rawApi == null) return  new ValidationResult(true, "raw api is null");
+        return validate(filterNode, rawApi, null, apiInfoKey,"filter", varMap, logId);
+    }
+
+    private static ValidationResult validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId) {
+        Filter filter = new Filter();
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap, logId, false);
+        return new ValidationResult(dataOperandsFilterResponse.getResult(), dataOperandsFilterResponse.getValidationReason());
+    }
     
 }

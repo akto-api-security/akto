@@ -225,4 +225,6 @@ public abstract class DataActor {
 
     public abstract void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList);
     public abstract List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId);
+
+    public abstract List<YamlTemplate> fetchActiveAdvancedFilters();
 }

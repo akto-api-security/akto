@@ -141,6 +141,7 @@ import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 import static com.akto.task.Cluster.callDibs;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
 import static com.mongodb.client.model.Filters.eq;
+import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
@@ -842,7 +843,7 @@ public class InitializerListener implements ServletContextListener {
 
         String message = null;
         try {
-            message = RedactSampleData.convertOriginalReqRespToString(request, response);
+            message = convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
             errors.add("Failed converting sample data");
         }
