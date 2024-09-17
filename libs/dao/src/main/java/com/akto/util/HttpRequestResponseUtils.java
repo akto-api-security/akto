@@ -143,15 +143,21 @@ public class HttpRequestResponseUtils {
         return formUrlEncoded.toString();
     }
     public static String encode(String s) throws UnsupportedEncodingException {
-        return URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8.name())
-                .replaceAll("\\+", "%20")
-                .replaceAll("\\%21", "!")
-                .replaceAll("\\%27", "'")
-                .replaceAll("\\%28", "(")
-                .replaceAll("\\%29", ")")
-                .replaceAll("\\%7E", "~")
-                .replaceAll("\\%5B", "[")
-                .replaceAll("\\%5D", "]");
+
+        /*
+         * No need to reverse the encoding for application/x-www-form-urlencoded  
+         * Ref: https://www.w3.org/TR/html401/interact/forms.html#h-17.13.4.1
+         */
+
+        return URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8.name());
+                // .replaceAll("\\+", "%20")
+                // .replaceAll("\\%21", "!")
+                // .replaceAll("\\%27", "'")
+                // .replaceAll("\\%28", "(")
+                // .replaceAll("\\%29", ")")
+                // .replaceAll("\\%7E", "~")
+                // .replaceAll("\\%5B", "[")
+                // .replaceAll("\\%5D", "]");
     }
 
 }

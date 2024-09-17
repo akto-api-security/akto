@@ -114,16 +114,19 @@ const transform = {
     },
 
     getCountInfo: (collectionsArr, coverageObject) => {
-        let urlsCount = 0 ;
-        let coverageCount = 0 ;
-        collectionsArr.forEach((x) =>{
+        let urlsCount = 0;
+        let coverageCount = 0;
+        collectionsArr.forEach((x) => {
             if (x.hasOwnProperty('type') && x.type === 'API_GROUP') {
-                return
+                return;
             }
-
-            urlsCount += x.urlsCount;
-            coverageCount += coverageObject[x.id] || 0 ;
-        })
+            
+            // Only count active collections
+            if (!x.deactivated) {
+                urlsCount += x.urlsCount;
+                coverageCount += coverageObject[x.id] || 0;
+            }
+        });
         return {
             totalUrls: urlsCount,
             coverage: urlsCount === 0 ? "0%" : Math.ceil((coverageCount * 100) / urlsCount) + '%'

@@ -178,4 +178,8 @@ public class HttpResponseParams {
     public void setDirection(String direction) {
         this.direction = direction;
     }
+
+    public void setRequestParams(HttpRequestParams requestParams) {
+        this.requestParams = requestParams;
+    }
 }

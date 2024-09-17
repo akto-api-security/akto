@@ -457,7 +457,9 @@ const transform = {
             if (c.hasOwnProperty('type') && c.type === 'API_GROUP') {
                 return
             }
-
+            if (c.deactivated) {
+                return
+            }
             totalUrl += c.urlsCount ;
             totalTested += c.testedEndpoints;
         })

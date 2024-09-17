@@ -58,8 +58,8 @@
             <modules>
                 <module>api-threat-detection</module>
              </modules>
-            </profile>
-            <profile>
+        </profile>
+        <profile>
             <id>source-code-analyser</id>
             <activation>
                 <file>

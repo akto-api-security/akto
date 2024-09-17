@@ -170,7 +170,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         }
 
         try {
-            String mockServiceUrl = "http://sampl-aktol-1exannwybqov-67928726.ap-south-1.elb.amazonaws.com";
+            String mockServiceUrl = "https://vulnerable-server.akto.io";
             String data = convertStreamToString(InitializerListener.class.getResourceAsStream("/SampleApiData.json"));
             JSONArray dataobject = new JSONArray(data);
             for (Object obj: dataobject) {

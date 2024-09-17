@@ -451,6 +451,11 @@ public class ApiExecutor {
             if (payload == null) payload = "{}";
             payload = payload.trim();
             if (!payload.startsWith("[") && !payload.startsWith("{")) payload = "{}";
+        } else if (contentType.contains(HttpRequestResponseUtils.FORM_URL_ENCODED_CONTENT_TYPE)) {
+            if(payload.startsWith("{")) {
+                payload = HttpRequestResponseUtils.jsonToFormUrlEncoded(payload);
+                body = RequestBody.create(payload, MediaType.parse(contentType));
+            }
         } else if (contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
             try {
                 loggerMaker.infoAndAddToDb("encoding to grpc payload:" + payload, LogDb.TESTING);

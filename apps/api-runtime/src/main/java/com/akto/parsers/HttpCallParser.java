@@ -7,12 +7,17 @@ import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.*;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
+import com.akto.dto.monitoring.FilterConfig;
+import com.akto.dto.monitoring.FilterConfig.FILTER_TYPE;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.settings.DefaultPayload;
+import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
@@ -21,23 +26,24 @@ import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
 import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.URLAggregator;
+import com.akto.runtime.utils.Utils;
+import com.akto.test_editor.execution.ParseAndExecute;
+import com.akto.test_editor.execution.VariableResolver;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.DbMode;
-import com.akto.util.JSONUtils;
+import com.akto.util.Pair;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.Constants;
-import com.akto.util.HttpRequestResponseUtils;
-import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import okhttp3.*;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
-import com.alibaba.fastjson2.*;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -46,7 +52,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
-import static com.akto.util.HttpRequestResponseUtils.GRPC_CONTENT_TYPE;
+import static com.akto.testing.Utils.validateFilter;
 
 public class HttpCallParser {
     private final int sync_threshold_count;
@@ -98,65 +104,14 @@ public class HttpCallParser {
         this.sync_threshold_time = sync_threshold_time;
     }
 
-    private static int GRPC_DEBUG_COUNTER = 50;
-
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
-
-        //convert java object to JSON format
-        JSONObject jsonObject = JSON.parseObject(message);
-
-        String method = jsonObject.getString("method");
-        String url = jsonObject.getString("path");
-        String type = jsonObject.getString("type");
-        Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(jsonObject, "requestHeaders");
-
-        String rawRequestPayload = jsonObject.getString("requestPayload");
-        String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
-
-        if (GRPC_DEBUG_COUNTER > 0) {
-            String acceptableContentType = HttpRequestResponseUtils.getAcceptableContentType(requestHeaders);
-            if (acceptableContentType != null && rawRequestPayload.length() > 0) {
-                // only if request payload is of FORM_URL_ENCODED_CONTENT_TYPE we convert it to json
-                if (acceptableContentType.equals(GRPC_CONTENT_TYPE)) {
-                    loggerMaker.infoAndAddToDb("grpc kafka payload:" + message,LogDb.RUNTIME);
-                    GRPC_DEBUG_COUNTER--;
-                }
-            }
+        try {
+            return com.akto.runtime.utils.Utils.parseKafkaMessage(message);
+        } catch (Exception e) {
+            throw e;
         }
-
-        String apiCollectionIdStr = jsonObject.getOrDefault("akto_vxlan_id", "0").toString();
-        int apiCollectionId = 0;
-        if (NumberUtils.isDigits(apiCollectionIdStr)) {
-            apiCollectionId = NumberUtils.toInt(apiCollectionIdStr, 0);
-        }
-
-        HttpRequestParams requestParams = new HttpRequestParams(
-                method,url,type, requestHeaders, requestPayload, apiCollectionId
-        );
-
-        int statusCode = jsonObject.getInteger("statusCode");
-        String status = jsonObject.getString("status");
-        Map<String,List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(jsonObject, "responseHeaders");
-        String payload = jsonObject.getString("responsePayload");
-        payload = HttpRequestResponseUtils.rawToJsonString(payload, responseHeaders);
-        payload = JSONUtils.parseIfJsonP(payload);
-        int time = jsonObject.getInteger("time");
-        String accountId = jsonObject.getString("akto_account_id");
-        String sourceIP = jsonObject.getString("ip");
-        String destIP = jsonObject.getString("destIp");
-        String direction = jsonObject.getString("direction");
-
-        String isPendingStr = (String) jsonObject.getOrDefault("is_pending", "false");
-        boolean isPending = !isPendingStr.toLowerCase().equals("false");
-        String sourceStr = (String) jsonObject.getOrDefault("source", HttpResponseParams.Source.OTHER.name());
-        HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
         
-        return new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction
-        );
     }
-
-    private static final Gson gson = new Gson();
 
     public static String getHeaderValue(Map<String,List<String>> headers, String headerKey) {
         if (headers == null) return null;
@@ -220,8 +175,64 @@ public class HttpCallParser {
         }
     }
 
+    public static FILTER_TYPE isValidResponseParam(HttpResponseParams responseParam, Map<String, FilterConfig> filterMap, Map<String, List<ExecutorNode>> executorNodesMap){
+        FILTER_TYPE filterType = FILTER_TYPE.UNCHANGED;
+        String message = responseParam.getOrig();
+        RawApi rawApi = RawApi.buildFromMessage(message);
+        int apiCollectionId = responseParam.requestParams.getApiCollectionId();
+        String url = responseParam.getRequestParams().getURL();
+        Method method = Method.fromString(responseParam.getRequestParams().getMethod());
+        ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
+        for (Entry<String, FilterConfig> apiFilterEntry : filterMap.entrySet()) {
+            try {
+                FilterConfig apiFilter = apiFilterEntry.getValue();
+                Map<String, Object> varMap = apiFilter.resolveVarMap();
+                VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
+                    {
+                        put(apiInfoKey, Arrays.asList(message));
+                    }
+                }, apiInfoKey);
+                String filterExecutionLogId = UUID.randomUUID().toString();
+                ValidationResult res = validateFilter(apiFilter.getFilter().getNode(), rawApi,
+                        apiInfoKey, varMap, filterExecutionLogId);
+                if (res.getIsValid()) {
+                    // handle custom filters here
+                    if(apiFilter.getId().equals(FilterConfig.DEFAULT_BLOCK_FILTER)){
+                        return FILTER_TYPE.BLOCKED;
+                    }
+
+                    // handle execute here
+                    List<ExecutorNode> nodes = executorNodesMap.getOrDefault(apiFilter.getId(), new ArrayList<>());
+                    if(!nodes.isEmpty()){
+                        RawApi modifiedApi = new ParseAndExecute().execute(nodes, rawApi, apiInfoKey, varMap, filterExecutionLogId);
+                        responseParam = Utils.convertRawApiToHttpResponseParams(modifiedApi, responseParam);
+                        filterType = FILTER_TYPE.MODIFIED;
+                    }else{
+                        filterType = FILTER_TYPE.ALLOWED;
+                    }
+                    
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
+                filterType = FILTER_TYPE.UNCHANGED;
+            }
+        }
+        return filterType;
+    }
 
     int numberOfSyncs = 0;
+
+    public static Pair<HttpResponseParams,FILTER_TYPE> applyAdvancedFilters(HttpResponseParams responseParams, Map<String, List<ExecutorNode>> executorNodesMap,  Map<String,FilterConfig> filterMap){
+        if (filterMap != null && !filterMap.isEmpty()) {
+            FILTER_TYPE filterType = isValidResponseParam(responseParams, filterMap, executorNodesMap);
+            if(filterType.equals(FILTER_TYPE.BLOCKED)){
+                return null;
+            }else{
+                return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, filterType);
+            }
+        }
+        return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, FILTER_TYPE.UNCHANGED);
+    }
 
     public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
         // USE ONLY filteredResponseParams and not responseParams
@@ -229,7 +240,14 @@ public class HttpCallParser {
         if (accountSettings != null && accountSettings.getDefaultPayloads() != null) {
             filteredResponseParams = filterDefaultPayloads(filteredResponseParams, accountSettings.getDefaultPayloads());
         }
-        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, accountSettings);
+        List<String> redundantList = new ArrayList<>();
+        if(accountSettings !=null && !accountSettings.getAllowRedundantEndpointsList().isEmpty()){
+            redundantList = accountSettings.getAllowRedundantEndpointsList();
+        }
+        Pattern regexPattern = Utils.createRegexPatternFromList(redundantList);
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, redundantList, regexPattern);
+        
+
         boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
 
         for (int apiCollectionId: aggregatorMap.keySet()) {
@@ -402,17 +420,7 @@ public class HttpCallParser {
 
     public static final String CONTENT_TYPE = "CONTENT-TYPE";
 
-    public boolean isRedundantEndpoint(String url, List<String> discardedUrlList){
-        StringJoiner joiner = new StringJoiner("|", ".*\\.(", ")(\\?.*)?");
-        for (String extension : discardedUrlList) {
-            if(extension.startsWith(CONTENT_TYPE)){
-                continue;
-            }
-            joiner.add(extension);
-        }
-        String regex = joiner.toString();
-
-        Pattern pattern = Pattern.compile(regex);
+    public static boolean isRedundantEndpoint(String url, Pattern pattern){
         Matcher matcher = pattern.matcher(url);
         return matcher.matches();
     }
@@ -504,9 +512,13 @@ public class HttpCallParser {
         return res;
     }
 
-    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, AccountSettings accountSettings) {
+    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, List<String> redundantUrlsList, Pattern pattern) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
+
+        // create executor nodes from filters
+        Map<String, List<ExecutorNode>> executorNodesMap = ParseAndExecute.createExecutorNodeMap(apiCatalogSync.advancedFilterMap);
+
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
@@ -525,8 +537,8 @@ public class HttpCallParser {
             if (ignoreAktoFlag != null) continue;
 
             // check for garbage points here
-            if(accountSettings != null && accountSettings.getAllowRedundantEndpointsList() != null){
-                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(), accountSettings.getAllowRedundantEndpointsList())){
+            if(redundantUrlsList != null && !redundantUrlsList.isEmpty()){
+                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(), pattern)){
                     continue;
                 }
                 List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
@@ -544,7 +556,7 @@ public class HttpCallParser {
                     String method = httpResponseParam.getRequestParams().getMethod();
                     String responseBody = httpResponseParam.getPayload();
                     boolean ignore = false;
-                    for (String extension : accountSettings.getAllowRedundantEndpointsList()) {
+                    for (String extension : redundantUrlsList) {
                         if(extension.startsWith(CONTENT_TYPE)){
                             String matchContentType = extension.split(" ")[1];
                             if(isBlankResponseBodyForGET(method, allContentTypes, matchContentType, responseBody)){
@@ -563,6 +575,13 @@ public class HttpCallParser {
 
             }
 
+            Pair<HttpResponseParams,FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
+            HttpResponseParams param = temp.getFirst();
+            if(param == null){
+                continue;
+            }else{
+                httpResponseParam = param;
+            }
             int apiCollectionId = createApiCollectionId(httpResponseParam);
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
