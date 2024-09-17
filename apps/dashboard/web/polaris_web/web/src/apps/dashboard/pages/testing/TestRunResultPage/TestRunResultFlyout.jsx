@@ -162,7 +162,7 @@ function TestRunResultFlyout(props) {
     const ValuesTab = {
         id: 'values',
         content: "Values",
-        component: (!(selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 && func.showTestSampleData(selectedTestRunResult))) && selectedTestRunResult.testResults &&
+        component: func.showTestSampleData(selectedTestRunResult) && selectedTestRunResult.testResults &&
         <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
             key="Sample values"
             heading={"Attempt"}
