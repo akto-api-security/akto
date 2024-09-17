@@ -226,7 +226,7 @@ public class HttpCallParser {
         if (filterMap != null && !filterMap.isEmpty()) {
             FILTER_TYPE filterType = isValidResponseParam(responseParams, filterMap, executorNodesMap);
             if(filterType.equals(FILTER_TYPE.BLOCKED)){
-                return null;
+                return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(null, filterType);
             }else{
                 return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, filterType);
             }
