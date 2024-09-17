@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 
 import com.akto.action.observe.InventoryAction;
 import com.akto.dto.*;
+import com.akto.util.Pair;
 import org.bson.conversions.Bson;
 
 import com.akto.DaoInit;
@@ -120,9 +121,16 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private ApiStats apiStats;
+    private ApiStats apiStatsStart;
+    private ApiStats apiStatsEnd;
+    private int startTimestamp;
+    private int endTimestamp;
     public String fetchApiStats() {
-        apiStats = ApiInfoDao.instance.fetchApiInfoStats();
+        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+        Bson filter = Filters.nin("_id.apiCollectionId", Arrays.asList(RuntimeListener.LLM_API_COLLECTION_ID, RuntimeListener.VULNERABLE_API_COLLECTION_ID, juiceshopCollection.getId()));
+        Pair<ApiStats, ApiStats> result = ApiInfoDao.instance.fetchApiInfoStats(filter, startTimestamp, endTimestamp);
+        apiStatsStart = result.getFirst();
+        apiStatsEnd = result.getSecond();
         return SUCCESS.toUpperCase();
     }
 
@@ -755,7 +763,19 @@ public class ApiCollectionsAction extends UserAction {
         this.response = response;
     }
 
-    public ApiStats getApiStats() {
-        return apiStats;
+    public ApiStats getApiStatsEnd() {
+        return apiStatsEnd;
+    }
+
+    public ApiStats getApiStatsStart() {
+        return apiStatsStart;
+    }
+
+    public void setStartTimestamp(int startTimestamp) {
+        this.startTimestamp = startTimestamp;
+    }
+
+    public void setEndTimestamp(int endTimestamp) {
+        this.endTimestamp = endTimestamp;
     }
 }

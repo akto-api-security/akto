@@ -2,11 +2,13 @@ package com.akto.action;
 
 import java.util.*;
 
-import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dto.test_editor.Info;
-import com.akto.dto.test_editor.YamlTemplate;
+
+import com.akto.dao.HistoricalDataDao;
+import com.akto.dto.HistoricalData;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.*;
+import org.bouncycastle.util.test.Test;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.AccountSettingsDao;
@@ -69,16 +71,58 @@ public class DashboardAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private long totalIssuesCount = 0;
+    private long oldOpenCount = 0;
+    public String findTotalIssues() {
+        if (startTimeStamp == 0) startTimeStamp = Context.now() - 24 * 7 * 60 * 60;
+        totalIssuesCount = TestingRunIssuesDao.instance.count(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.OPEN));
+
+        // issues that have been created till start timestamp
+        oldOpenCount = TestingRunIssuesDao.instance.count(
+                Filters.and(
+                        Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp),
+                        Filters.ne(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.IGNORED)
+                )
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
+
+    private List<HistoricalData> finalHistoricalData = new ArrayList<>();
+    private List<HistoricalData> initialHistoricalData = new ArrayList<>();
+    public String fetchHistoricalData() {
+        if (endTimeStamp != 0) {
+            this.finalHistoricalData = HistoricalDataDao.instance.findAll(
+                    Filters.and(
+                            Filters.gte(HistoricalData.TIME, endTimeStamp),
+                            Filters.lte(HistoricalData.TIME, endTimeStamp + 24 * 60 * 60)
+                    )
+            );
+        }
+
+        this.initialHistoricalData = HistoricalDataDao.instance.findAll(
+                Filters.and(
+                        Filters.gte(HistoricalData.TIME, startTimeStamp),
+                        Filters.lte(HistoricalData.TIME, startTimeStamp + 24 * 60 * 60)
+                )
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
     private List<String> severityToFetch;
-    private final Map<Integer, Map<String, Integer>> trendData = new HashMap<>();
+    private final Map<Integer, Integer> trendData = new HashMap<>();
     public String fetchCriticalIssuesTrend(){
         if(endTimeStamp == 0) endTimeStamp = Context.now();
         if (severityToFetch == null || severityToFetch.isEmpty()) severityToFetch = Arrays.asList("CRITICAL", "HIGH");
-
+        
+        List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED);
         Bson issuesFilter = Filters.and(
                 Filters.in(TestingRunIssues.KEY_SEVERITY, severityToFetch),
                 Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
-                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
+                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allowedStatus)
         );
 
         String dayOfYearFloat = "dayOfYearFloat";
@@ -87,17 +131,14 @@ public class DashboardAction extends UserAction {
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(issuesFilter));
 
-        pipeline.add(Aggregates.project(Projections.fields(
-                Projections.include(TestingRunIssues.KEY_SEVERITY, TestingRunIssues.CREATION_TIME),
-                Projections.computed(dayOfYearFloat, new BasicDBObject("$divide", new Object[]{"$" + TestingRunIssues.CREATION_TIME, 86400}))
-        )));
+        pipeline.add(Aggregates.project(Projections.computed(dayOfYearFloat, new BasicDBObject("$divide", new Object[]{"$" + TestingRunIssues.CREATION_TIME, 86400}))));
 
-        pipeline.add(Aggregates.project(Projections.fields(
-                Projections.include(TestingRunIssues.KEY_SEVERITY, TestingRunIssues.CREATION_TIME),
-                Projections.computed(dayOfYear, new BasicDBObject("$floor", new Object[]{"$" + dayOfYearFloat}))
-        )));
+        pipeline.add(Aggregates.project(Projections.computed(dayOfYear, new BasicDBObject("$floor", new Object[]{"$" + dayOfYearFloat}))));
 
-        BasicDBObject groupedId = new BasicDBObject(dayOfYear, "$"+dayOfYear).append(TestingRunIssues.KEY_SEVERITY, "$"+TestingRunIssues.KEY_SEVERITY);
+        BasicDBObject groupedId = new BasicDBObject(dayOfYear, "$"+dayOfYear)
+                                                    .append("url", "$_id.apiInfoKey.url")
+                                                    .append("method", "$_id.apiInfoKey.method")
+                                                    .append("apiCollectionId", "$_id.apiInfoKey.apiCollectionId");
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
 
         MongoCursor<BasicDBObject> issuesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -106,12 +147,8 @@ public class DashboardAction extends UserAction {
             BasicDBObject basicDBObject = issuesCursor.next();
             BasicDBObject o = (BasicDBObject) basicDBObject.get("_id");
             int date = o.getInt(dayOfYear);
-            String severity = o.getString(TestingRunIssues.KEY_SEVERITY);
-            int count = basicDBObject.getInt("count");
-
-            Map<String, Integer> countMap = trendData.getOrDefault(date, new HashMap<>());
-            countMap.put(severity, count);
-            trendData.put(date, countMap);
+            int count = trendData.getOrDefault(date,0);
+            trendData.put(date, count+1);
         }
 
         return SUCCESS.toUpperCase();
@@ -244,7 +281,23 @@ public class DashboardAction extends UserAction {
         this.severityToFetch = severityToFetch;
     }
 
-    public Map<Integer, Map<String, Integer>> getTrendData() {
+    public Map<Integer, Integer> getTrendData() {
         return trendData;
+    }
+
+    public long getTotalIssuesCount() {
+        return totalIssuesCount;
+    }
+
+    public long getOldOpenCount() {
+        return oldOpenCount;
+    }
+
+    public List<HistoricalData> getFinalHistoricalData() {
+        return finalHistoricalData;
+    }
+
+    public List<HistoricalData> getInitialHistoricalData() {
+        return initialHistoricalData;
     }
 }

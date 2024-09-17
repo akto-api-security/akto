@@ -2,7 +2,8 @@ import React from 'react';
 import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 
-function SmoothAreaChart() {
+function SmoothAreaChart({tickPositions}) {
+    console.log(tickPositions);
     const chartOptions = {
         chart: {
             type: 'areaspline',
@@ -28,10 +29,10 @@ function SmoothAreaChart() {
                 },
                 align: 'right'
             },
-            tickPositions: [160, 165, 170, 175],
+            tickPositions: tickPositions,
             gridLineWidth: 0,
             opposite: true,
-            max: 175,
+            max: Math.max(...tickPositions),
             endOnTick: false,
             visible: false
         },
@@ -61,7 +62,7 @@ function SmoothAreaChart() {
         series: [
             {
                 type: 'areaspline',
-                data: [160, 170, 162, 175, 170],
+                data: tickPositions,
                 fillColor: {
                     linearGradient: {
                         x1: 0,
@@ -79,7 +80,7 @@ function SmoothAreaChart() {
             },
             {
                 type: 'areaspline',
-                data: [160, 170, 162, 175, 170],
+                data: tickPositions,
                 fillColor: 'transparent',
                 lineWidth: 2,
                 lineColor: 'rgba(150,150,255,1)',

@@ -205,6 +205,10 @@ public class AktoPolicyNew {
             }
         }
 
+        if (apiInfo.getDiscoveredTimestamp() == 0) {
+            apiInfo.setDiscoveredTimestamp(httpResponseParams.getTimeOrNow());
+        }
+
         apiInfo.setLastSeen(httpResponseParams.getTimeOrNow());
 
         if (apiInfo.getResponseCodes() == null) apiInfo.setResponseCodes(new ArrayList<>());
@@ -402,6 +406,9 @@ public class AktoPolicyNew {
                     subUpdates.add(Updates.set(ApiInfo.VIOLATIONS + "." + customKey, violationsMap.get(customKey)));
                 }
             }
+
+            // discovered timestamp
+            subUpdates.add(Updates.setOnInsert(ApiInfo.DISCOVERED_TIMESTAMP, apiInfo.getDiscoveredTimestamp()));
 
             // last seen
             subUpdates.add(Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()));

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useReducer, useState } from 'react'
 import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
@@ -28,12 +28,16 @@ import InfoCard from './new_components/InfoCard';
 import DonutChart from '../../components/shared/DonutChart';
 import ProgressBarChart from './new_components/ProgressBarChart';
 import SpinnerCentered from '../../components/progress/SpinnerCentered';
+import SmoothAreaChart from './new_components/SmoothChart'
+import DateRangeFilter from '../../components/layouts/DateRangeFilter';
+import values from "@/util/values";
+import { produce } from 'immer';
 
 function HomeDashboard() {
 
     const [riskScoreRangeMap, setRiskScoreRangeMap] = useState({});
     const [issuesTrendMap, setIssuesTrendMap] = useState({trend: [], allSubCategories: []});
-    const [loading, setLoading] = useState(false) ;
+    const [loading, setLoading] = useState(true) ;
     const [countInfo, setCountInfo] = useState({totalUrls: 0, coverage: '0%'})
     const [riskScoreObj, setRiskScoreObj]= useState({}) ;
     const [sensitiveCount, setSensitiveCount]= useState([]) ;
@@ -58,12 +62,26 @@ function HomeDashboard() {
     const [criticalFindingsData, setCriticalFindingsData] = useState([])
     const [severityMap, setSeverityMap] = useState({})
     const [unsecuredAPIs, setUnsecuredAPIs] = useState([])
+    const [totalIssuesCount, setTotalIssuesCount] = useState(0)
+    const [oldIssueCount, setOldIssueCount] = useState(0)
+    const [apiRiskScore, setApiRiskScore] = useState(0)
+    const [testCoverage, setTestCoverage] = useState(0)
+    const [totalAPIs, setTotalAPIs] = useState(0)
+    const [oldTotalApis, setOldTotalApis] = useState(0)
+    const [oldTestCoverage, setOldTestCoverage] = useState(0)
+    const [oldRiskScore, setOldRiskScore] = useState(0)
+    const [startTimestamp, setStartTimestamp] = useState(1726573131)
+    const [endTimestamp, setEndTimestamp] = useState(1726574978)
+
+    const initialVal = values.ranges[1]
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
 
     const [accessTypeMap, setAccessTypeMap] = useState({
         "Partner": {
           "text": 0,
           "color": "#147CF6",
-          "filterKey": "Partner"
+          "filterKey": "Partner",
+          "component": (<div>hi</div>)
         },
         "Internal": {
           "text": 0,
@@ -83,33 +101,8 @@ function HomeDashboard() {
       });
 
 
-
-
-    
-    //todo: remove
-    const apiStats = {
-        "accessTypeMap": {
-            "PUBLIC": 10,
-            "PRIVATE": 3,
-            "PARTNER": 0,
-            "THIRD_PARTY": 2
-        },
-        "apiTypeMap": {
-            "REST": 208
-        },
-        "authTypeMap": {
-            "UNAUTHENTICATED": 2,
-            "BASIC": 1,
-            "AUTHORIZATION_HEADER": 3,
-            "JWT": 1,
-            "API_TOKEN": 3,
-            "BEARER": 3,
-            "CUSTOM": 2
-        },
-        "riskScoreMap": {
-            "1": 232
-        }
-    }
+    const initialHistoricalData = []
+    const finalHistoricalData = []
 
     const defaultChartOptions = {
         "legend": {
@@ -138,6 +131,7 @@ function HomeDashboard() {
                     "mediumCount": severityMap["medium"] ? severityMap["medium"] : "0" ,
                     "lowCount": severityMap["low"] ? severityMap["low"] : "0",
                     "totalApis": x["total_apis"],
+                    "link": x["nextUrl"]
                 })
             })
 
@@ -157,7 +151,10 @@ function HomeDashboard() {
             api.fetchRecentFeed(skip),
             api.getIntegratedConnections(),
             observeApi.getUserEndpoints(),
-            api.fetchCriticalIssuesTrend() // todo:
+            api.fetchCriticalIssuesTrend(), // todo:
+            api.findTotalIssues(startTimestamp, endTimestamp),
+            api.fetchApiStats(startTimestamp, endTimestamp),
+            api.fetchEndpointsCount(startTimestamp, endTimestamp)
         ];
         
         let results = await Promise.allSettled(apiPromises);
@@ -171,6 +168,10 @@ function HomeDashboard() {
         let connectionsInfo = results[6].status === 'fulfilled' ? results[6].value : {} ;
         let userEndpoints = results[7].status === 'fulfilled' ? results[7].value : true ;
         let criticalIssuesTrendResp = results[8].status === 'fulfilled' ? results[8].value : {}
+        let findTotalIssuesResp = results[9].status === 'fulfilled' ? results[9].value : {}
+        let apisStatsResp = results[10].status === 'fulfilled' ? results[10].value : {}
+        let fetchEndpointsCountResp = results[11].status === 'fulfilled' ? results[11].value : {}
+
         setShowBannerComponent(!userEndpoints)
 
         buildUnsecuredAPIs(criticalIssuesTrendResp)
@@ -195,37 +196,104 @@ function HomeDashboard() {
         setRiskScoreObj(riskScoreMap) ;
         setSensitiveCount(sensitiveInfo.sensitiveUrls) ;
 
+        buildMetrics(apisStatsResp.apiStatsEnd)
         testSummaryData()
-        mapAccessTypes(apiStats)
-        mapAuthTypes(apiStats)
-        buildAuthTypesData(apiStats)
-        buildSetRiskScoreData(apiStats) //todo
+        mapAccessTypes(apisStatsResp)
+        mapAuthTypes(apisStatsResp)
+        buildAuthTypesData(apisStatsResp.apiStatsEnd)
+        buildSetRiskScoreData(apisStatsResp.apiStatsEnd) //todo
         getCollectionsWithCoverage()
         convertSubCategoryInfo(tempResult.subCategoryMap)
-        buildSeverityMap(tempResult.countMap)
+        buildSeverityMap(apisStatsResp.apiStatsEnd)
+        buildIssuesSummary(findTotalIssuesResp)
+        
+        const fetchHistoricalDataResp = {"finalHistoricalData": finalHistoricalData, "initialHistoricalData": initialHistoricalData}
+        buildDeltaInfo(fetchHistoricalDataResp)
+
+        buildEndpointsCount(fetchEndpointsCountResp)
 
         setLoading(false)
-        
     }
 
     useEffect(()=>{
         fetchData()
     },[])
 
-    const generateByLineComponent = (up, val, time) => {
-        const source = up ? ArrowUpMinor : ArrowDownMinor
+    function buildIssuesSummary(findTotalIssuesResp) {
+        setTotalIssuesCount(findTotalIssuesResp.totalIssuesCount)
+        setOldIssueCount(findTotalIssuesResp.oldOpenCount)
+    }
+
+    function buildEndpointsCount(fetchEndpointsCountResp) {
+        let newCount = fetchEndpointsCountResp.newCount
+        let oldCount = fetchEndpointsCountResp.oldCount
+
+        setTotalAPIs(newCount)
+        setOldTotalApis(oldCount)
+    }
+
+    function buildMetrics(apiStats) {
+        const totalRiskScore = apiStats.totalRiskScore
+        const totalAPIs = apiStats.totalAPIs
+
+        const apisTestedInLookBackPeriod = apiStats.apisTestedInLookBackPeriod
+
+        const tempRiskScore = totalRiskScore / totalAPIs
+        setApiRiskScore(parseFloat(tempRiskScore.toFixed(2)))
+
+        const testCoverage = 100 * apisTestedInLookBackPeriod / totalAPIs
+        setTestCoverage(parseFloat(testCoverage.toFixed(2)))
+    }
+
+    function buildDeltaInfo(deltaInfo) {
+        const initialHistoricalData = deltaInfo.initialHistoricalData
+    
+        let totalApis = 0
+        let totalRiskScore = 0
+        let totalTestedApis = 0
+        initialHistoricalData.forEach((x) => {
+            totalApis += x.totalApis
+            totalRiskScore += x.riskScore
+            totalTestedApis += x.apisTested
+        })
+
+        const tempRiskScore = totalAPIs ? (totalRiskScore / totalApis).toFixed(2) : 0
+        setOldRiskScore(parseFloat(tempRiskScore))
+        const tempTestCoverate = totalAPIs ? (100 * totalTestedApis / totalApis).toFixed(2) : 0
+        setOldTestCoverage(parseFloat(tempTestCoverate))
+    }
+
+    const generateByLineComponent = (val, time) => {
+        const source = val > 0 ? ArrowUpMinor : ArrowDownMinor
         return (
             <HorizontalStack gap={1}>
                 <Box>
                     <Icon source={source} color='subdued'/>
                 </Box>
-                <Text color='subdued' fontWeight='medium'>{val}</Text>
+                <Text color='subdued' fontWeight='medium'>{Math.abs(val)}</Text>
                 <Text color='subdued' fontWeight='semibold'>{time}</Text>
             </HorizontalStack>
         )
     }
 
+    function generateChangeComponent(val, invertColor) {
+        const source = val > 0 ? ArrowUpMinor : ArrowDownMinor
+        if (val === 0) return null
+        const color = !invertColor && val > 0 ? "success" : "critical"
+        return (
+            <HorizontalStack>
+                <Icon source={source} color={color}/>
+                <div className='custom-color'>
+                    <Text color={color}>{Math.abs(val)}</Text>
+                </div>
+            </HorizontalStack>
+        )
+    }
+
     function mapAccessTypes(apiStats) {
+        const apiStatsEnd = apiStats.apiStatsEnd
+        const apiStatsStart = apiStats.apiStatsStart
+
         const accessTypeMapping = {
             "PUBLIC": "External",
             "PRIVATE": "Internal",
@@ -233,10 +301,11 @@ function HomeDashboard() {
             "THIRD_PARTY": "Third Party"
         };
 
-        for (const [key, value] of Object.entries(apiStats.accessTypeMap)) {
+        for (const [key, value] of Object.entries(apiStatsEnd.accessTypeMap)) {
             const mappedKey = accessTypeMapping[key];
             if (mappedKey && accessTypeMap[mappedKey]) {
                 accessTypeMap[mappedKey].text = value;
+                accessTypeMap[mappedKey].dataTableComponent = generateChangeComponent((value - apiStatsStart.accessTypeMap[key]), false);
             }
         }
         setAccessTypeMap(accessTypeMap)
@@ -244,6 +313,8 @@ function HomeDashboard() {
 
 
     function mapAuthTypes(apiStats) {
+        const apiStatsEnd = apiStats.apiStatsEnd
+        const apiStatsStart = apiStats.apiStatsStart
         const convertKey = (key) => {
             return key
                 .toLowerCase()
@@ -255,20 +326,22 @@ function HomeDashboard() {
         const colors = ["#7F56D9", "#8C66E1", "#9E77ED", "#AB88F1", "#B692F6", "#D6BBFB", "#E9D7FE", "#F4EBFF"];
 
         // Convert and sort the authTypeMap entries by value (count) in descending order
-        const sortedAuthTypes = Object.entries(apiStats.authTypeMap)
-            .map(([key, value]) => ({ key: convertKey(key), text: value }))
+        const sortedAuthTypes = Object.entries(apiStatsEnd.authTypeMap)
+            .map(([key, value]) => ({ key: key, text: value }))
             .filter(item => item.text > 0) // Filter out entries with a count of 0
             .sort((a, b) => b.text - a.text); // Sort by count descending
 
         // Initialize the output authMap
         const authMap = {};
 
+
         // Fill in the authMap with sorted entries and corresponding colors
         sortedAuthTypes.forEach((item, index) => {
-            authMap[item.key] = {
+            authMap[convertKey(item.key)] = {
                 "text": item.text,
                 "color": colors[index] || "#F4EBFF", // Assign color; default to last color if out of range
-                "filterKey": item.key
+                "filterKey": convertKey(item.key),
+                "dataTableComponent": apiStatsStart && apiStatsStart.authTypeMap && apiStatsStart.authTypeMap[item.key] ? generateChangeComponent((item.text - apiStatsStart.authTypeMap[item.key]), false) : null
             };
         });
 
@@ -289,7 +362,7 @@ function HomeDashboard() {
     }
 
     function buildSetRiskScoreData(apiStats) {
-        const totalApisCount = transform.getCountInfo((allCollections || []), coverageMap).totalUrls
+        const totalApisCount = apiStats.totalAPIs
 
         const sumOfRiskScores = Object.values(apiStats.riskScoreMap).reduce((acc, value) => acc + value, 0);
 
@@ -339,31 +412,35 @@ function HomeDashboard() {
     const summaryInfo = [
         {
             title: 'Total APIs',
-            data: observeFunc.formatNumberWithCommas(countInfo.totalUrls),
+            data: totalAPIs,
             variant: 'heading2xl',
-            byLineComponent: generateByLineComponent(true, 200, "Yesterday"),
+            byLineComponent: generateByLineComponent((totalAPIs - oldTotalApis), "Yesterday"),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTotalApis, totalAPIs]}/>)
         },
         {
             title: 'Issues',
-            data: observeFunc.formatNumberWithCommas(criticalUrls),
+            data: observeFunc.formatNumberWithCommas(totalIssuesCount),
             variant: 'heading2xl',
             color: 'critical',
-            byLineComponent: generateByLineComponent(false, 200, "Yesterday")
+            byLineComponent: generateByLineComponent( (totalIssuesCount - oldIssueCount), "Yesterday"),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldIssueCount, totalIssuesCount]}/>)
             
         },
         {
             title: 'API Risk Score',
-            data: countInfo.totalUrls === 0 ? "0%" : countInfo.coverage,
+            data: apiRiskScore,
             variant: 'heading2xl',
-            color: 'critical',
-            byLineComponent: generateByLineComponent(true, 200, "Yesterday")
+            color: apiRiskScore > 2.5 ? 'critical' : 'warning',
+            byLineComponent: generateByLineComponent((apiRiskScore - oldRiskScore).toFixed(2), "Yesterday"),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldRiskScore, apiRiskScore]}/>)
         },
         {
             title: 'Test Coverage',
-            data: observeFunc.formatNumberWithCommas(sensitiveCount),
+            data: testCoverage + "%",
             variant: 'heading2xl',
-            color: 'warning',
-            byLineComponent: generateByLineComponent(true, 200, "Yesterday")
+            color: testCoverage > 80 ? 'success' : 'warning',
+            byLineComponent: generateByLineComponent((testCoverage-oldTestCoverage).toFixed(2), "Yesterday"),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTestCoverage, testCoverage]}/>)
         }
     ]
 
@@ -382,12 +459,14 @@ function HomeDashboard() {
         />
     )
 
-    function buildSeverityMap(countMap) {
+    function buildSeverityMap(apiStats) {
+        const countMap = apiStats.criticalMap;
+
         const result = {
             "Critical": {
                 "text": countMap.CRITICAL || 0,
                 "color": "#E45357",
-                "filterKey": "Critical"
+                "filterKey": "Critical",
             },
             "High": {
                 "text": countMap.HIGH || 0,
@@ -411,27 +490,19 @@ function HomeDashboard() {
 
     function buildUnsecuredAPIs(input) {
         const CRITICAL_COLOR = "#E45357";
-        const HIGH_COLOR = "#EF864C";
         const transformed = [];
 
         // Initialize objects for CRITICAL and HIGH data
         const criticalData = { data: [], color: CRITICAL_COLOR };
-        const highData = { data: [], color: HIGH_COLOR };
 
         // Iterate through the input to populate criticalData and highData
         for (const epoch in input) {
             const epochMillis = Number(epoch) * 86400000; // Convert days to milliseconds
-
-            if (input[epoch].CRITICAL) {
-                criticalData.data.push([epochMillis, input[epoch].CRITICAL]);
-            }
-            if (input[epoch].HIGH) {
-                highData.data.push([epochMillis, input[epoch].HIGH]);
-            }
+            criticalData.data.push([epochMillis, input[epoch]]);
         }
 
         // Push the results to the transformed array
-        transformed.push(criticalData, highData);
+        transformed.push(criticalData);
 
         setUnsecuredAPIs(transformed)
     }
@@ -441,13 +512,14 @@ function HomeDashboard() {
         return collections.map((collection, index) => ([
             <HorizontalStack align='space-between'>
                 <HorizontalStack gap={2}>
-                    <Checkbox
+                    {/* <Checkbox
                         key={index}
                         label={collection.name}
                         checked={false}
                         ariaDescribedBy={`checkbox-${index}`}
                         onChange={() => {}}
-                    />
+                    /> */}
+                    <Text>{collection.name}</Text>
                     <Text color='subdued'>{Math.floor(100.0 * collection.apisTested / collection.totalApis)}% test coverage</Text>
                 </HorizontalStack>
                 <Text>{collection.totalApis}</Text>
@@ -474,11 +546,15 @@ function HomeDashboard() {
         return findings.map(([category]) => category);
     }
 
+
     const gridComponent = (
         <HorizontalGrid gap={5} columns={2}>
             <InfoCard 
                 component={
-                    <ChartypeComponent data={severityMap} navUrl={"/dashboard/issues/"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="230px"/>
+                    <ChartypeComponent 
+                        data={severityMap}
+                        navUrl={"/dashboard/issues/"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}
+                    />
                 }
                 title="Vulnerable APIs by Severity"
                 titleToolTip="Vulnerable APIs by Severity"
@@ -546,7 +622,7 @@ function HomeDashboard() {
             />
             <InfoCard 
                 component={
-                    <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="230px"/>
+                    <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}/>
                 }
                 title="APIs by Access type"
                 titleToolTip="APIs by Access type"
@@ -555,7 +631,7 @@ function HomeDashboard() {
             />
             <InfoCard 
                 component={
-                    <ChartypeComponent data={authMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="230px"/>
+                    <ChartypeComponent data={authMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}/>
                 }
                 title="APIs by Authentication"
                 titleToolTip="APIs by Authentication"
@@ -753,11 +829,12 @@ function HomeDashboard() {
                 <PageWithMultipleCards
                     title={
                         <Text variant='headingLg'>
-                            Home
+                            API Security Posture
                         </Text>
                     }
                     isFirstPage={true}
                     components={pageComponents}
+                    primaryAction={<DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>}
                 />
             }
 

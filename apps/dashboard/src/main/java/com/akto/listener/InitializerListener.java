@@ -1975,6 +1975,7 @@ public class InitializerListener implements ServletContextListener {
                     }, "context-initializer-secondary");
 
                     crons.trafficAlertsScheduler();
+                    crons.insertHistoricalData();
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
                         setupUsageSyncScheduler();

@@ -16,6 +16,30 @@ const api = {
         })
     },
 
+    findTotalIssues: async(startTimeStamp,endTimeStamp) =>{
+        return await request({
+            url: '/api/findTotalIssues',
+            method: 'post',
+            data: {startTimeStamp,endTimeStamp}
+        })
+    },
+
+    fetchEndpointsCount: async(startTimeStamp,endTimeStamp) =>{
+        return await request({
+            url: '/api/fetchEndpointsCount',
+            method: 'post',
+            data: {startTimeStamp,endTimeStamp}
+        })
+    },
+
+    fetchApiStats: async(startTimestamp,endTimestamp) =>{
+        return await request({
+            url: '/api/fetchApiStats',
+            method: 'post',
+            data: {startTimestamp,endTimestamp}
+        })
+    },
+
     fetchCriticalIssuesTrend: async(startTimeStamp,endTimeStamp) =>{
         return await request({
             url: '/api/fetchCriticalIssuesTrend',

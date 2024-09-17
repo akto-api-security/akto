@@ -1,6 +1,9 @@
 .dashboard {
     overflow-x: hidden;
 }
+.custom-color .Polaris-Text--success {
+    color: rgb(0, 127, 95) !important;
+}
 
 .aktoButton {
     z-index: 518;

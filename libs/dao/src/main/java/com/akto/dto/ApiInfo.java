@@ -52,6 +52,9 @@ public class ApiInfo {
     public static final String RESPONSE_CODES = "responseCodes";
     private List<Integer> responseCodes;
 
+    public static final String DISCOVERED_TIMESTAMP = "discoveredTimestamp";
+    private int discoveredTimestamp;
+
     public enum ApiType {
         REST, GRAPHQL, GRPC, SOAP
     }
@@ -182,9 +185,15 @@ public class ApiInfo {
             if (isGrpcContentType(contentType)) return ApiType.GRPC;
         }
 
-        String requestBody = requestParams.getPayload();
-        if (requestBody.startsWith("{") && requestBody.endsWith("}")) return ApiType.REST;
-        return null;
+        return ApiType.REST;
+
+        // String requestBody = requestParams.getPayload();
+        // String responseBody = responseParams.getPayload();
+        // boolean requestBodyIsJson = (requestBody.startsWith("{") && requestBody.endsWith("}")) || (requestBody.startsWith("[") && requestBody.endsWith("]"));
+        // boolean responseBodyIsJson = (responseBody.startsWith("{") && responseBody.endsWith("}")) || (responseBody.startsWith("[") && responseBody.endsWith("]"));
+
+        // if (requestBodyIsJson || responseBodyIsJson) return ApiType.REST;
+        // return null;
     }
 
     public ApiInfo(HttpResponseParams httpResponseParams) {
@@ -286,7 +295,8 @@ public class ApiInfo {
     }
 
     public void addStats(ApiStats apiStats) {
-        List<ApiInfo.AuthType> actualAuthTypes = this.getActualAuthType();
+        this.calculateActualAuth();
+        List<ApiInfo.AuthType> actualAuthTypes = this.actualAuthType;
         if (actualAuthTypes != null && !actualAuthTypes.isEmpty()) apiStats.addAuthType(actualAuthTypes.get(0));
 
         apiStats.addRiskScore(Math.round(this.riskScore));
@@ -294,6 +304,15 @@ public class ApiInfo {
         apiStats.addAccessType(this.findActualAccessType());
 
         apiStats.addApiType(this.apiType);
+    }
+
+    public String findSeverity() {
+        if (this.severityScore >= 1000) return "CRTICAL";
+        if (this.severityScore >= 100) return "HIGH";
+        if (this.severityScore >= 10) return "MEDIUM";
+        if (this.severityScore > 1) return "LOW";
+
+        return null;
     }
 
     @Override
@@ -417,5 +436,13 @@ public class ApiInfo {
 
     public void setResponseCodes(List<Integer> responseCodes) {
         this.responseCodes = responseCodes;
+    }
+
+    public int getDiscoveredTimestamp() {
+        return discoveredTimestamp;
+    }
+
+    public void setDiscoveredTimestamp(int discoveredTimestamp) {
+        this.discoveredTimestamp = discoveredTimestamp;
     }
 }

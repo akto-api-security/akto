@@ -6514,6 +6514,25 @@
             </result>
         </action>
 
+        <action name="api/fetchHistoricalData" class="com.akto.action.DashboardAction" method="fetchHistoricalData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/fetchCriticalIssuesTrend" class="com.akto.action.DashboardAction" method="fetchCriticalIssuesTrend">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -6521,7 +6540,9 @@
                 <param name="featureLabel">ISSUES</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
-
+            <result name="SUCCESS"  type="json">
+                <param name="root">trendData</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -6542,7 +6563,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS"  type="json">
-                <param name="root">trendData</param>
+                <param name="root">templatesList</param>
             </result>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
@@ -6594,6 +6615,45 @@
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/findTotalIssues" class="com.akto.action.DashboardAction" method="findTotalIssues">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ISSUES</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+        <action name="api/fetchEndpointsCount" class="com.akto.action.observe.InventoryAction" method="fetchEndpointsCount">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"   type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
             </result>
         </action>
 

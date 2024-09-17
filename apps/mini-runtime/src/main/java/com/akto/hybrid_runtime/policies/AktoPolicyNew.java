@@ -206,6 +206,10 @@ public class AktoPolicyNew {
             }
         }
 
+        if (apiInfo.getDiscoveredTimestamp() == 0) {
+            apiInfo.setDiscoveredTimestamp(httpResponseParams.getTimeOrNow());
+        }
+
         apiInfo.setLastSeen(httpResponseParams.getTimeOrNow());
 
         if (apiInfo.getResponseCodes() == null) apiInfo.setResponseCodes(new ArrayList<>());
