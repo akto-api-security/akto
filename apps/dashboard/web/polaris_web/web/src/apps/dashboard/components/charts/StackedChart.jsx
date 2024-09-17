@@ -6,7 +6,7 @@ import SpinnerCentered from "../progress/SpinnerCentered";
 
 function StackedChart(props) {
 
-    const { type, height, backgroundColor, data, graphPointClick, tooltipFormatter, yAxisTitle, title, text, defaultChartOptions, areaFillHex, color, width, noGap, showGridLines, customXaxis } = props;
+    const { type, height, backgroundColor, data, graphPointClick, tooltipFormatter, yAxisTitle, title, text, defaultChartOptions, areaFillHex, color, width, noGap, showGridLines, customXaxis, exportingDisabled} = props;
     const chartComponentRef = useRef(null)
 
     const fillColor = {
@@ -39,6 +39,9 @@ function StackedChart(props) {
         },
         credits: {
             enabled: false,
+        },
+        exporting: {
+            enabled: !exportingDisabled
         },
         title: {
             text: title,

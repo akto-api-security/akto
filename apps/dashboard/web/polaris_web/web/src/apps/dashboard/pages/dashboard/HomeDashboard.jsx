@@ -341,7 +341,7 @@ function HomeDashboard() {
                 "text": item.text,
                 "color": colors[index] || "#F4EBFF", // Assign color; default to last color if out of range
                 "filterKey": convertKey(item.key),
-                "dataTableComponent": apiStatsStart && apiStatsStart.authTypeMap && apiStatsStart.authTypeMap[item.key] ? generateChangeComponent((item.text - apiStatsStart.authTypeMap[item.key]), false) : null
+                "dataTableComponent": apiStatsStart && apiStatsStart.authTypeMap && apiStatsStart.authTypeMap[item.key] ? generateChangeComponent((item.text - apiStatsStart.authTypeMap[item.key]), item.key === "UNAUTHENTICATED") : null
             };
         });
 
@@ -576,6 +576,7 @@ function HomeDashboard() {
                         width={40}
                         gap={10}
                         showGridLines={true}
+                        exportingDisabled={true}
                     />
                 }
                 title="Critical Unsecured APIs Over Time"
@@ -659,6 +660,7 @@ function HomeDashboard() {
                                 crosshair: true
                             }
                         }
+                        exportingDisabled={true}
                     />
                 }
                 title="API Type"
@@ -786,6 +788,7 @@ function HomeDashboard() {
                         width={30}
                         gap={10}
                         showGridLines={true}
+                        exportingDisabled={true}
                     />
                 </VerticalStack>
             </VerticalStack>
