@@ -214,7 +214,6 @@ const gcpObj = {
     icon: '/public/gcp.svg',
     label: 'GCP Mirroring',
     text: 'This setup only takes ten minutes. Once you connect GCP, Akto will process GCP traffic to create an API Inventory in real time.',
-    badge: "Recommended",
     docsUrl: 'https://docs.akto.io/traffic-connections/google-cloud-gcp',
     key: "GCP",
     component: <BannerComponent title="Setup using GCP Mirroring" docsUrl="https://docs.akto.io/traffic-connections/google-cloud-gcp"
@@ -243,7 +242,6 @@ const kongObj = {
 const kubernetesObj = {
     icon: '/public/kubernetes.svg',
     label: 'Kubernetes Daemonset',
-    badge: "Recommended",
     text: 'You can deploy Akto in Kubernetes and collect traffic through a daemonset on your Kubernetes configuration.',
     docsUrl: 'https://docs.akto.io/traffic-connections/kubernetes',
     key: "KUBERNETES",
@@ -308,6 +306,7 @@ const apiInventoryFromSourceCodeObj = {
 const ebpfObj = {
     icon: '/public/ebpf.svg',
     label: 'eBPF',
+    badge: "Recommended",
     text: 'Akto-eBPF setup is recommended for mTLS systems when TLS termination happens at a proxy.',
     docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf',
     key: "EBPF",
