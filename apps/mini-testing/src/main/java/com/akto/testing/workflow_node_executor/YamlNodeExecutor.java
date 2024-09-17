@@ -45,8 +45,9 @@ import com.akto.test_editor.execution.ExecutorAlgorithm;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
-import com.akto.utils.RedactSampleData;
 import com.google.gson.Gson;
+
+import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 
 public class YamlNodeExecutor extends NodeExecutor {
     
@@ -163,7 +164,7 @@ public class YamlNodeExecutor extends NodeExecutor {
                 }
                 vulnerable = res.getVulnerable();
                 try {
-                    message.add(RedactSampleData.convertOriginalReqRespToString(testReq.getRequest(), testResponse));
+                    message.add(convertOriginalReqRespToString(testReq.getRequest(), testResponse));
                 } catch (Exception e) {
                     ;
                 }

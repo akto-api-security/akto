@@ -468,4 +468,8 @@ public class DbActor extends DataActor {
         return DbLayer.fetchLatestEndpointsForTesting(startTimestamp, endTimestamp, apiCollectionId);
     }
 
+    public List<YamlTemplate> fetchActiveAdvancedFilters(){
+        return DbLayer.fetchActiveFilterTemplates();
+    }
+
 }

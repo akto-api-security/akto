@@ -7,11 +7,15 @@ import java.util.regex.Pattern;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dto.*;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
+import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.sql.SampleDataAlt;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -62,6 +66,7 @@ public class APICatalogSync {
     public static boolean mergeAsyncOutside = true;
     public int lastStiFetchTs = 0;
     public BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
+    public Map<String, FilterConfig> advancedFilterMap =  new HashMap<>();
 
     private static DataActor dataActor = DataActorFactory.fetchInstance();
 
@@ -1104,6 +1109,9 @@ public class APICatalogSync {
         for (SensitiveParamInfo sensitiveParamInfo: sensitiveParamInfos) {
             this.sensitiveParamInfoBooleanMap.put(sensitiveParamInfo, false);
         }
+
+        List<YamlTemplate> advancedFilterTemplates = dataActor.fetchActiveAdvancedFilters();
+        advancedFilterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, advancedFilterTemplates, true);
 
         try {
             loggerMaker.infoAndAddToDb("Started clearing values in db ", LogDb.RUNTIME);

@@ -16,11 +16,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
-import com.mongodb.BasicDBObject;
 
 import java.util.*;
 
 import static com.akto.dto.RawApi.convertHeaders;
+import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class RedactSampleData {
     static ObjectMapper mapper = new ObjectMapper();
@@ -43,7 +43,7 @@ public class RedactSampleData {
     public static String redactCookie(Map<String, List<String>> headers, String header) {
         String cookie = "";
         List<String> cookieList = headers.getOrDefault(header, new ArrayList<>());
-        Map<String, String> cookieMap = AuthPolicy.parseCookie(cookieList);
+        Map<String, String> cookieMap = parseCookie(cookieList);
         for (String cookieKey : cookieMap.keySet()) {
             cookie += cookieKey + "=" + redactValue + ";";
         }
@@ -186,32 +186,6 @@ public class RedactSampleData {
         }
 
     }
-
-    public static String convertOriginalReqRespToString(OriginalHttpRequest request, OriginalHttpResponse response)  {
-        BasicDBObject req = new BasicDBObject();
-        if (request != null) {
-            req.put("url", request.getUrl());
-            req.put("method", request.getMethod());
-            req.put("type", request.getType());
-            req.put("queryParams", request.getQueryParams());
-            req.put("body", request.getBody());
-            req.put("headers", convertHeaders(request.getHeaders()));
-        }
-
-        BasicDBObject resp = new BasicDBObject();
-        if (response != null) {
-            resp.put("statusCode", response.getStatusCode());
-            resp.put("body", response.getBody());
-            resp.put("headers", convertHeaders(response.getHeaders()));
-        }
-
-        BasicDBObject ret = new BasicDBObject();
-        ret.put("request", req);
-        ret.put("response", resp);
-
-        return ret.toString();
-    }
-
     public static String convertHttpRespToOriginalString(HttpResponseParams httpResponseParams) throws JsonProcessingException {
         Map<String,Object> m = new HashMap<>();
         HttpRequestParams httpRequestParams = httpResponseParams.getRequestParams();
