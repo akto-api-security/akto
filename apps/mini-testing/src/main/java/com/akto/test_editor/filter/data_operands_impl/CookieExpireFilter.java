@@ -10,7 +10,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import com.akto.dto.test_editor.DataOperandFilterRequest;
-import com.akto.runtime.policies.AuthPolicy;
+import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class CookieExpireFilter extends DataOperandsImpl {
     
@@ -33,7 +33,7 @@ public class CookieExpireFilter extends DataOperandsImpl {
             return false;
         }
 
-        Map<String,String> cookieMap = AuthPolicy.parseCookie(Arrays.asList(data));
+        Map<String,String> cookieMap = parseCookie(Arrays.asList(data));
 
         boolean result = queryVal;
         boolean res = false;
