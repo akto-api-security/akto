@@ -213,4 +213,9 @@ public class DbActor extends DataActor {
     public void syncExtractedAPIs( CodeAnalysisRepo codeAnalysisRepo, List<CodeAnalysisApi> codeAnalysisApisList, boolean isLastBatch) {
         return;
     }
+
+    @Override
+    public void updateRepoLastRun(CodeAnalysisRepo codeAnalysisRepo) {
+        return;
+    }
 }

@@ -18,6 +18,7 @@ import com.akto.dao.*;
 import com.akto.dto.*;
 import com.opensymphony.xwork2.ActionSupport;
 import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.bson.types.Code;
 import org.bson.types.ObjectId;
 import org.checkerframework.checker.units.qual.s;
@@ -62,6 +63,12 @@ public class CodeAnalysisAction extends ActionSupport {
             return ERROR.toUpperCase();
         }
 
+        if (codeAnalysisRepo == null) {
+            loggerMaker.errorAndAddToDb("Code analysis repo is null", LogDb.DASHBOARD);
+            addActionError("Code analysis repo is null");
+            return ERROR.toUpperCase();
+        }
+
         // Ensure batch size is not exceeded
         if (codeAnalysisApisList.size() > MAX_BATCH_SIZE) {
             String errorMsg = "Code analysis api's sync batch size exceeded. Max Batch size: " + MAX_BATCH_SIZE + " Batch size: " + codeAnalysisApisList.size();
@@ -69,15 +76,6 @@ public class CodeAnalysisAction extends ActionSupport {
             addActionError(errorMsg);
             return ERROR.toUpperCase();
         }
-
-        // update codeAnalysisRepo
-        CodeAnalysisRepoDao.instance.updateOneNoUpsert(
-                Filters.and(
-                        Filters.eq(CodeAnalysisRepo.REPO_NAME, repoName),
-                        Filters.eq(CodeAnalysisRepo.PROJECT_NAME, projectName)
-                ),
-                Updates.set(CodeAnalysisRepo.LAST_RUN, Context.now())
-        );
 
         // populate code analysis api map
         Map<String, CodeAnalysisApi> codeAnalysisApisMap = new HashMap<>();
@@ -272,7 +270,24 @@ public class CodeAnalysisAction extends ActionSupport {
         loggerMaker.infoAndAddToDb("Source code endpoints count: " + codeAnalysisApisMap.size(), LogDb.DASHBOARD);
 
         if (isLastBatch) {//Remove scheduled state from codeAnalysisRepo
-            CodeAnalysisRepoDao.instance.updateOne(Filters.eq("_id", codeAnalysisRepo.getId()), Updates.set(CodeAnalysisRepo.LAST_RUN, Context.now()));
+            Bson sourceCodeFilter;
+            if (this.codeAnalysisRepo.getSourceCodeType() == CodeAnalysisRepo.SourceCodeType.BITBUCKET) {
+                sourceCodeFilter = Filters.or(
+                        Filters.eq(CodeAnalysisRepo.SOURCE_CODE_TYPE, this.codeAnalysisRepo.getSourceCodeType()),
+                        Filters.exists(CodeAnalysisRepo.SOURCE_CODE_TYPE, false)
+
+                );
+            } else {
+                sourceCodeFilter = Filters.eq(CodeAnalysisRepo.SOURCE_CODE_TYPE, this.codeAnalysisRepo.getSourceCodeType());
+            }
+
+            Bson filters = Filters.and(
+                    Filters.eq(CodeAnalysisRepo.REPO_NAME, this.codeAnalysisRepo.getRepoName()),
+                    Filters.eq(CodeAnalysisRepo.PROJECT_NAME, this.codeAnalysisRepo.getProjectName()),
+                    sourceCodeFilter
+            );
+
+            CodeAnalysisRepoDao.instance.updateOneNoUpsert(filters, Updates.set(CodeAnalysisRepo.LAST_RUN, Context.now()));
             loggerMaker.infoAndAddToDb("Updated last run for project:" + codeAnalysisRepo.getProjectName() + " repo:" + codeAnalysisRepo.getRepoName(), LogDb.DASHBOARD);
         }
 
@@ -289,6 +304,34 @@ public class CodeAnalysisAction extends ActionSupport {
 
 
     List<CodeAnalysisRepo> reposToRun = new ArrayList<>();
+    public String updateRepoLastRun() {
+        Bson sourceCodeFilter;
+        if (codeAnalysisRepo == null) {
+            loggerMaker.errorAndAddToDb("Code analysis repo is null", LogDb.DASHBOARD);
+            addActionError("Code analysis repo is null");
+            return ERROR.toUpperCase();
+        }
+
+        if (this.codeAnalysisRepo.getSourceCodeType() == CodeAnalysisRepo.SourceCodeType.BITBUCKET) {
+            sourceCodeFilter = Filters.or(
+                    Filters.eq(CodeAnalysisRepo.SOURCE_CODE_TYPE, this.codeAnalysisRepo.getSourceCodeType()),
+                    Filters.exists(CodeAnalysisRepo.SOURCE_CODE_TYPE, false)
+
+            );
+        } else {
+            sourceCodeFilter = Filters.eq(CodeAnalysisRepo.SOURCE_CODE_TYPE, this.codeAnalysisRepo.getSourceCodeType());
+        }
+
+        Bson filters = Filters.and(
+                Filters.eq(CodeAnalysisRepo.REPO_NAME, this.codeAnalysisRepo.getRepoName()),
+                Filters.eq(CodeAnalysisRepo.PROJECT_NAME, this.codeAnalysisRepo.getProjectName()),
+                sourceCodeFilter
+        );
+
+        CodeAnalysisRepoDao.instance.updateOneNoUpsert(filters, Updates.set(CodeAnalysisRepo.LAST_RUN, Context.now()));
+        loggerMaker.infoAndAddToDb("Updated last run for project:" + codeAnalysisRepo.getProjectName() + " repo:" + codeAnalysisRepo.getRepoName(), LogDb.DASHBOARD);
+        return SUCCESS.toUpperCase();
+    }
     public String findReposToRun() {
         reposToRun = CodeAnalysisRepoDao.instance.findAll(
                 Filters.expr(
