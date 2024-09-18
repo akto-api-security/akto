@@ -5,7 +5,7 @@ const CustomProgressBar = ({ progress, topColor, backgroundColor, borderRadius, 
     width: '100%',
     backgroundColor: backgroundColor || '#e0e0e0',
     borderRadius: borderRadius || '5px',
-    height: height || '20px',
+    height: height || '16px',
     overflow: 'hidden',
   };
 
