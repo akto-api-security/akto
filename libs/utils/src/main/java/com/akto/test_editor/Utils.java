@@ -15,15 +15,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.bouncycastle.jce.provider.JDKDSASigner.stdDSA;
-
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo.ApiAccessType;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.UrlModifierPayload;
+import com.akto.test_editor.execution.Operations;
 import com.akto.util.Constants;
+import com.akto.util.DashboardMode;
 import com.akto.util.JSONUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -36,7 +38,7 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
-import static com.akto.rules.TestPlugin.extractAllValuesFromPayload;
+import static com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload;
 import okhttp3.*;
 
 public class Utils {
@@ -44,6 +46,8 @@ public class Utils {
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final JsonFactory factory = mapper.getFactory();
     private static final Gson gson = new Gson();
+
+    public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
 
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
         .writeTimeout(5, TimeUnit.SECONDS)
@@ -859,5 +863,99 @@ public class Utils {
         }
         return val;
     }
+
+    public static ExecutorSingleOperationResp modifySampleDataUtil(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, ApiInfo.ApiInfoKey apiInfoKey){
+        switch (operationType.toLowerCase()) {
+            case "add_body_param":
+                Object epochVal = Utils.getEpochTime(value);
+                if (epochVal != null) {
+                    value = epochVal;
+                }
+                return Operations.addBody(rawApi, key.toString(), value);
+            case "modify_body_param":
+                epochVal = Utils.getEpochTime(value);
+                if (epochVal != null) {
+                    value = epochVal;
+                }
+                return Operations.modifyBodyParam(rawApi, key.toString(), value);
+            case "delete_graphql_field":
+                return Operations.deleteGraphqlField(rawApi, key == null ? "": key.toString());
+            case "add_graphql_field":
+                return Operations.addGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
+            case "add_unique_graphql_field":
+                return Operations.addUniqueGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
+            case "modify_graphql_field":
+                return Operations.modifyGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
+            case "delete_body_param":
+                return Operations.deleteBodyParam(rawApi, key.toString());
+            case "replace_body":
+                String newPayload = rawApi.getRequest().getBody();
+                if (key instanceof Map) {
+                    Map<String, Map<String, String>> regexReplace = (Map) key;
+                    String payload = rawApi.getRequest().getBody();
+                    Map<String, String> regexInfo = regexReplace.get("regex_replace");
+                    String regex = regexInfo.get("regex");
+                    String replaceWith = regexInfo.get("replace_with");
+                    newPayload = Utils.applyRegexModifier(payload, regex, replaceWith);
+                } else {
+                    newPayload = key.toString();
+                }
+                return Operations.replaceBody(rawApi, newPayload);
+            case "add_header":
+                if (value.equals("${akto_header}")) {
+                    BasicDBObject tokenResponse = OrganizationsDao.getBillingTokenForAuth();
+                    if(tokenResponse.getString("token") != null){
+                        value = tokenResponse.getString("token");
+                    }else{
+                        return new ExecutorSingleOperationResp(false, tokenResponse.getString("error"));
+                    }
+                }
+                epochVal = Utils.getEpochTime(value);
+                if (epochVal != null) {
+                    value = epochVal;
+                }
+
+                return Operations.addHeader(rawApi, key.toString(), value.toString());
+            case "modify_header":
+                String keyStr = key.toString();
+                String valStr = value.toString();
+                epochVal = Utils.getEpochTime(valStr);
+                if (epochVal != null) {
+                    valStr = epochVal.toString();
+                }
+                return Operations.modifyHeader(rawApi, keyStr, valStr);
+            case "delete_header":
+                return Operations.deleteHeader(rawApi, key.toString());
+            case "add_query_param":
+                epochVal = Utils.getEpochTime(value);
+                if (epochVal != null) {
+                    value = epochVal;
+                }
+                return Operations.addQueryParam(rawApi, key.toString(), value);
+            case "modify_query_param":
+                epochVal = Utils.getEpochTime(value);
+                if (epochVal != null) {
+                    value = epochVal;
+                }
+                return Operations.modifyQueryParam(rawApi, key.toString(), value);
+            case "delete_query_param":
+                return Operations.deleteQueryParam(rawApi, key.toString());
+            case "modify_url":
+                String newUrl = null;
+                UrlModifierPayload urlModifierPayload = Utils.fetchUrlModifyPayload(key.toString());
+                if (urlModifierPayload != null) {
+                    newUrl = Utils.buildNewUrl(urlModifierPayload, rawApi.getRequest().getUrl());
+                } else {
+                    newUrl = key.toString();
+                }
+                return Operations.modifyUrl(rawApi, newUrl);
+            case "modify_method":
+                return Operations.modifyMethod(rawApi, key.toString());
+            default:
+                return new ExecutorSingleOperationResp(false, "invalid operationType");
+        }
+            
+    }
+
 
 }

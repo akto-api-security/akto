@@ -15,7 +15,6 @@ import com.akto.runtime.RelationshipSync;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.filter.Filter;
 import com.akto.testing.StatusCodeAnalyser;
-import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -27,6 +26,8 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 
 
 public abstract class TestPlugin {
@@ -144,7 +145,7 @@ public abstract class TestPlugin {
     public TestResult buildFailedTestResultWithOriginalMessage(String originalMessage, TestResult.TestError testError, OriginalHttpRequest request, TestInfo testInfo) {
         String message = null;
         try {
-            message = RedactSampleData.convertOriginalReqRespToString(request, null);
+            message = convertOriginalReqRespToString(request, null);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while converting testRequest object to string : " + e, LogDb.TESTING);
         }
@@ -165,11 +166,11 @@ public abstract class TestPlugin {
         List<String> errors = new ArrayList<>();
         String message = null;
         try {
-            message = RedactSampleData.convertOriginalReqRespToString(request, response);
+            message = convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
             // TODO:
             logger.error("Error while converting OriginalHttpRequest to string", e);
-            message = RedactSampleData.convertOriginalReqRespToString(new OriginalHttpRequest(), new OriginalHttpResponse());
+            message = convertOriginalReqRespToString(new OriginalHttpRequest(), new OriginalHttpResponse());
             errors.add(TestResult.TestError.FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING.getMessage());
         }
 
