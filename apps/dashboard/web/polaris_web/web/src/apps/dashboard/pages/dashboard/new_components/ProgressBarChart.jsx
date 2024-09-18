@@ -6,8 +6,8 @@ function ProgressBarChart({ data }) {
     const generateRows = (data) => {
         return data.map((item) => [
             <HorizontalStack gap={2} style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ maxWidth: '24px', display: 'flex', alignItems: 'center' }}>
-                    <Badge size="small" status="critical">{item.badgeValue}</Badge>
+                <div style={{ maxWidth: '24px', display: 'flex', alignItems: 'center'}} className='custom-badge-color'>
+                    <Badge size="small" status={item["badgeColor"]} >{item.badgeValue}</Badge>
                 </div>
                 <div style={{ flexGrow: 1 }}>
                     <CustomProgressBar
