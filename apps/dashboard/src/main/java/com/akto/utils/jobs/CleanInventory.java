@@ -6,7 +6,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -126,7 +125,7 @@ public class CleanInventory {
 
     }
     
-    public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList, String filePath, boolean shouldModifyRequest) throws IOException{
+    public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList, String filePath, boolean shouldDeleteRequest) throws IOException{
 
         Map<Integer, ApiCollection> apiCollectionMap = apiCollections.stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
         // BufferedWriter writer = new BufferedWriter(new FileWriter(new File(filePath)));
@@ -158,7 +157,7 @@ public class CleanInventory {
                     }
 
                     
-                    boolean allMatchDefault = false;
+                    boolean allMatchDefault = true;
                     boolean isNetsparkerPresent = false;
                     boolean movingApi = false;
                     for (String sample : samples) {
@@ -201,11 +200,12 @@ public class CleanInventory {
             }
 
             String shouldDelete = System.getenv("DELETE_REDUNDANT_APIS");
-            if ( shouldDelete != null && shouldDelete.equalsIgnoreCase("true")) {
+            if (shouldDeleteRequest || (shouldDelete != null && shouldDelete.equalsIgnoreCase("true"))) {
+                logger.info("starting deletion of apis");
                 deleteApis(toBeDeleted);
             }
 
-            String shouldMove = System.getenv("MOVE_REDUNDANT_APIS");
+            // String shouldMove = System.getenv("MOVE_REDUNDANT_APIS");
 
         } while (!sampleDataList.isEmpty());
 
@@ -213,7 +213,7 @@ public class CleanInventory {
         // writer.close();
     }
 
-    public static void removeUnnecessaryEndpoints(List<ApiCollection> apiCollections){
+    public static void removeUnnecessaryEndpoints(List<ApiCollection> apiCollections,  boolean shouldDeleteRequest){
         try {
             for (ApiCollection apiCollection: apiCollections) {
                 List<Key> toBeDeleted = new ArrayList<>();
@@ -271,7 +271,8 @@ public class CleanInventory {
                 }
 
                 String shouldDelete = System.getenv("DELETE_REDUNDANT_APIS");
-                if ( shouldDelete != null && shouldDelete.equalsIgnoreCase("true")) {
+                if (shouldDeleteRequest || (shouldDelete != null && shouldDelete.equalsIgnoreCase("true"))) {
+                    logger.info("starting deletion of apis");
                     deleteApis(toBeDeleted);
                 }
             }
