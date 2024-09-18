@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import FlyLayout from '../../../components/layouts/FlyLayout'
 import func from '@/util/func'
 import transform from '../transform'
@@ -22,7 +22,7 @@ function TestRunResultFlyout(props) {
     const [popoverActive, setPopoverActive] = useState(false)
     // modify testing run result and headers
     const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
-    const fetchApiInfo = async(apiInfoKey) => {
+    const fetchApiInfo = useCallback( async(apiInfoKey) => {
         let apiInfo = {}
         if(apiInfoKey !== null){
             await api.fetchEndpoint(apiInfoKey).then((res) => {
@@ -46,7 +46,7 @@ function TestRunResultFlyout(props) {
             })
             setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam))
         }
-    }
+    },[issueDetails])
 
     const navigate = useNavigate()
 
@@ -54,7 +54,7 @@ function TestRunResultFlyout(props) {
        if(issueDetails && Object.keys(issueDetails).length > 0){       
             fetchApiInfo(issueDetails.id.apiInfoKey)
        }
-    },[selectedTestRunResult,issueDetails])
+    },[issueDetails?.id?.apiInfoKey])
 
     function ignoreAction(ignoreReason){
         issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason ).then((res) => {
