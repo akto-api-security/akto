@@ -192,11 +192,11 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 function ApiCollections() {
 
     const navigate = useNavigate();
-    const [data, setData] = useState({'groups':[]})
+    const [data, setData] = useState({'hostname':[]})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
-    const [selectedTab, setSelectedTab] = useState("groups")
-    const [selected, setSelected] = useState(2)
+    const [selectedTab, setSelectedTab] = useState("hostname")
+    const [selected, setSelected] = useState(1)
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
@@ -269,10 +269,16 @@ function ApiCollections() {
         dataObj = convertToNewData(tmp, {}, {}, {}, {}, {}, true);
         let res = {}
         res.all = dataObj.prettify
-        res.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
-        res.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
-        res.custom = res.all.filter(x => !res.hostname.includes(x) && !res.groups.includes(x));
+        res.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined && !c.deactivated)
+        res.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated)
+        res.custom = res.all.filter(x => !res.hostname.includes(x) && !x.deactivated && !res.groups.includes(x));
         setData(res);
+        if (res.hostname.length === 0) {
+            setTimeout(() => {
+                setSelectedTab("custom");
+                setSelected(3);
+            },[100])
+        }
 
         let envTypeObj = {}
         tmp.forEach((c) => {
@@ -357,11 +363,10 @@ function ApiCollections() {
 
         tmp = {}
         tmp.all = dataObj.prettify
-        tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
-        tmp.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
+        tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined && !c.deactivated)
+        tmp.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated)
         tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
         tmp.deactivated = deactivatedCollections
-
         setData(tmp);
     }
 
