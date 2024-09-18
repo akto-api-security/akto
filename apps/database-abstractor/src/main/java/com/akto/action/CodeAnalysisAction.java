@@ -63,6 +63,12 @@ public class CodeAnalysisAction extends ActionSupport {
             return ERROR.toUpperCase();
         }
 
+        if (codeAnalysisRepo == null) {
+            loggerMaker.errorAndAddToDb("Code analysis repo is null", LogDb.DASHBOARD);
+            addActionError("Code analysis repo is null");
+            return ERROR.toUpperCase();
+        }
+
         // Ensure batch size is not exceeded
         if (codeAnalysisApisList.size() > MAX_BATCH_SIZE) {
             String errorMsg = "Code analysis api's sync batch size exceeded. Max Batch size: " + MAX_BATCH_SIZE + " Batch size: " + codeAnalysisApisList.size();
