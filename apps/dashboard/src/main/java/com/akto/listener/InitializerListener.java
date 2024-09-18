@@ -635,6 +635,10 @@ public class InitializerListener implements ServletContextListener {
                         boolean detectRedundantUrls = accountSettings.getAllowFilterLogs();
                         String shouldFilterApisFromYaml = System.getenv("DETECT_REDUNDANT_APIS_RETRO");
                         String shouldFilterOptionsAndHTMLApis = System.getenv("DETECT_OPTION_APIS_RETRO");
+
+                        String shouldDelete = System.getenv("DELETE_REDUNDANT_APIS");
+                        boolean shouldDeleteApis = accountSettings.getAllowDeletionOfUrls() || (shouldDelete != null && shouldDelete.equalsIgnoreCase("true"));
+
                         if(!detectRedundantUrls && shouldFilterApisFromYaml == null && shouldFilterOptionsAndHTMLApis == null){
                             return;
                         }
@@ -649,14 +653,14 @@ public class InitializerListener implements ServletContextListener {
                             );
                             List<String> redundantUrlList = accountSettings.getAllowRedundantEndpointsList();
                             try {
-                                CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections , yamlTemplates, redundantUrlList,filePath, accountSettings.getAllowDeletionOfUrls());
+                                CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections , yamlTemplates, redundantUrlList,filePath, shouldDeleteApis);
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }
                         }
 
                         if(shouldFilterOptionsAndHTMLApis != null && shouldFilterOptionsAndHTMLApis.equalsIgnoreCase("true")){
-                            CleanInventory.removeUnnecessaryEndpoints(apiCollections, accountSettings.getAllowDeletionOfUrls());
+                            CleanInventory.removeUnnecessaryEndpoints(apiCollections, shouldDeleteApis);
                         }
                     }
                 }, "clean-inventory-job");
