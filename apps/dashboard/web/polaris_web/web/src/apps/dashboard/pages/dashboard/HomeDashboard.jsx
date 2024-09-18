@@ -71,12 +71,21 @@ function HomeDashboard() {
     const [oldTotalApis, setOldTotalApis] = useState(0)
     const [oldTestCoverage, setOldTestCoverage] = useState(0)
     const [oldRiskScore, setOldRiskScore] = useState(0)
-    const [startTimestamp, setStartTimestamp] = useState(1726573131)
-    const [endTimestamp, setEndTimestamp] = useState(1726574978)
+    const initialStartTimestamp = func.timeNow() - 60 * 60 * 24
+    const initialEndTimestamp = func.timeNow()
     const [showTestingComponents, setShowTestingComponents] = useState(false)
 
-    const initialVal = values.ranges[1]
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
+    const tempVal = { alias: "custom", title : "Custom" ,  period : {since: new Date(initialStartTimestamp*1000), until: new Date(initialEndTimestamp*1000)} }
+
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), tempVal);
+
+    console.log(currDateRange);
+    const getTimeEpoch = (key) => {
+        return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
+    }
+
+    const startTimestamp = getTimeEpoch("since")
+    const endTimestamp = getTimeEpoch("until")
 
     const [accessTypeMap, setAccessTypeMap] = useState({
         "Partner": {
@@ -220,7 +229,7 @@ function HomeDashboard() {
 
     useEffect(()=>{
         fetchData()
-    },[])
+    },[startTimestamp, endTimestamp])
 
     function buildIssuesSummary(findTotalIssuesResp) {
         setTotalIssuesCount(findTotalIssuesResp.totalIssuesCount)
