@@ -384,12 +384,12 @@ public class AccountSettings {
     public List<String> getAllowRedundantEndpointsList() {
         if(this.allowRedundantEndpointsList == null) {
             List<String> ignoreUrlTypesList = Arrays.asList(
-                "htm","html", "css", "js",   // Web formats
+                "htm","html", "css", "js", "js.map",   // Web formats
                 "jpg", "jpeg", "png", "gif", "svg", "webp",  // Image formats
                 "mp4", "webm", "ogg", "ogv", "avi", "mov",  // Video formats
                 "mp3", "wav", "oga",  // Audio formats
                 "woff", "woff2", "ttf", "otf", // Font formats
-                "pptx", "json" // file formats
+                "pptx", "json", "ico" // file formats
             );
             return ignoreUrlTypesList;
         }

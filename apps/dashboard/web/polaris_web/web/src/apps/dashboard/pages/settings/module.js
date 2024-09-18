@@ -27,6 +27,7 @@ const urlOptionsList = [
     title: 'JS files',
     options: [
       {value: 'js', label: '.js'},
+      {value: 'js.map', label: '.js.map'}
     ],
   },
   {
@@ -38,6 +39,7 @@ const urlOptionsList = [
       {value: 'gif', label: '.gif'},
       {value: 'svg', label: '.svg'},
       {value: 'webp', label: '.webp'},
+      {value: 'ico', label: '.ico'}
     ],
   },
   {
