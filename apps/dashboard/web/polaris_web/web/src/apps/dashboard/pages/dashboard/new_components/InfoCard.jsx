@@ -2,11 +2,11 @@ import { Box, Card, HorizontalStack, Link, VerticalStack } from '@shopify/polari
 import React from 'react';
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 
-function InfoCard({component, title, titleToolTip, linkText, linkUrl}) {
+function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight}) {
     return (
-        <Card padding={2} key="info">
-            <Box padding={2} paddingInlineStart={4} paddingInlineEnd={4}>
-                <VerticalStack gap={4}>
+        <Card padding={5} key="info">
+            <Box  minHeight={minHeight ? minHeight : "100%"}>
+                <VerticalStack gap={5} align='center'>
                     <HorizontalStack align='space-between'>
                         <TitleWithInfo
                             tooltipContent={titleToolTip}

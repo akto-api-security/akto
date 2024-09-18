@@ -32,6 +32,7 @@ import SmoothAreaChart from './new_components/SmoothChart'
 import DateRangeFilter from '../../components/layouts/DateRangeFilter';
 import values from "@/util/values";
 import { produce } from 'immer';
+import EmptyCard from './new_components/EmptyCard';
 
 function HomeDashboard() {
 
@@ -72,6 +73,7 @@ function HomeDashboard() {
     const [oldRiskScore, setOldRiskScore] = useState(0)
     const [startTimestamp, setStartTimestamp] = useState(1726573131)
     const [endTimestamp, setEndTimestamp] = useState(1726574978)
+    const [showTestingComponents, setShowTestingComponents] = useState(false)
 
     const initialVal = values.ranges[1]
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
@@ -136,6 +138,7 @@ function HomeDashboard() {
             })
 
             setTestSummaryInfo(finalResult)
+            setShowTestingComponents(finalResult && finalResult.length > 0)
           });
     }
 
@@ -449,15 +452,15 @@ function HomeDashboard() {
     )
 
 
-    const testSummaryCardsList = (
+    const testSummaryCardsList = showTestingComponents ? (
         <InfoCard 
             component={<TestSummaryCardsList summaryItems={ testSummaryInfo}/>}
             title="Recent Tests"
             titleToolTip="Tests runs since last 7 days"
-            linkText="Check results"
+            linkText="Increase test coverage"
             linkUrl="/dashboard/testing"
         />
-    )
+    ) : null
 
     function buildSeverityMap(apiStats) {
         const countMap = apiStats.criticalMap;
@@ -546,44 +549,46 @@ function HomeDashboard() {
         return findings.map(([category]) => category);
     }
 
+    const vulnerableApisBySeverityComponent = !showTestingComponents? <EmptyCard title="Vulnerable APIs by Severity"/> : <InfoCard 
+        component={
+            <div style={{marginTop: "20px"}}>
+                <ChartypeComponent 
+                    data={severityMap}
+                    navUrl={"/dashboard/issues/"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}
+                />
+            </div>
+        }
+        title="Vulnerable APIs by Severity"
+        titleToolTip="Vulnerable APIs by Severity"
+        linkText="Fix critical issues"
+        linkUrl="/dashboard/issues"
+    />
 
-    const gridComponent = (
-        <HorizontalGrid gap={5} columns={2}>
-            <InfoCard 
-                component={
-                    <ChartypeComponent 
-                        data={severityMap}
-                        navUrl={"/dashboard/issues/"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}
-                    />
-                }
-                title="Vulnerable APIs by Severity"
-                titleToolTip="Vulnerable APIs by Severity"
-                linkText="Fix critical issues"
-                linkUrl="/dashboard/issues"
+    const criticalUnsecuredAPIsOverTime = !showTestingComponents ? <EmptyCard title="Critical Unsecured APIs Over Time" /> : <InfoCard 
+        component={
+            <StackedChart 
+                type='column'
+                color='#6200EA'
+                areaFillHex="true"
+                height="280"
+                background-color="#ffffff"
+                data={unsecuredAPIs}
+                defaultChartOptions={defaultChartOptions}
+                text="true"
+                yAxisTitle="Number of issues"
+                width={40}
+                gap={10}
+                showGridLines={true}
+                exportingDisabled={true}
             />
-            <InfoCard 
-                component={
-                    <StackedChart 
-                        type='column'
-                        color='#6200EA'
-                        areaFillHex="true"
-                        height="280"
-                        background-color="#ffffff"
-                        data={unsecuredAPIs}
-                        defaultChartOptions={defaultChartOptions}
-                        text="true"
-                        yAxisTitle="Number of issues"
-                        width={40}
-                        gap={10}
-                        showGridLines={true}
-                        exportingDisabled={true}
-                    />
-                }
-                title="Critical Unsecured APIs Over Time"
-                titleToolTip="Critical Unsecured APIs Over Time"
-                linkText="Fix critical issues"
-                linkUrl="/dashboard/issues"
-            />
+        }
+        title="Critical Unsecured APIs Over Time"
+        titleToolTip="Critical Unsecured APIs Over Time"
+        linkText="Fix critical issues"
+        linkUrl="/dashboard/issues"
+    />
+
+    const criticalFindings = !showTestingComponents ? <EmptyCard title="Critical Findings"/> :
             <InfoCard 
                 component={
                     <StackedChart 
@@ -613,24 +618,30 @@ function HomeDashboard() {
                 linkText="Fix critical issues"
                 linkUrl="/dashboard/issues"
             />
-            <InfoCard 
-                component={
-                    <ProgressBarChart data={riskScoreData}/>
-                }
-                title="APIs by Risk score"
-                titleToolTip="APIs by Risk score"
-                linkText="Check out"
-                linkUrl="/dashboard/observe/inventory"
-            />
-            <InfoCard 
-                component={
-                    <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}/>
-                }
-                title="APIs by Access type"
-                titleToolTip="APIs by Access type"
-                linkText="Check out"
-                linkUrl="/dashboard/observe/inventory"
-            />
+
+    const apisByRiskscoreComponent = <InfoCard 
+        component={
+            <div style={{marginTop: "20px"}}>
+                <ProgressBarChart data={riskScoreData}/>
+            </div>
+        }
+        title="APIs by Risk score"
+        titleToolTip="APIs by Risk score"
+        linkText="Check out"
+        linkUrl="/dashboard/observe/inventory"
+    />
+
+    const apisByAccessTypeComponent = <InfoCard 
+        component={
+            <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}/>
+        }
+        title="APIs by Access type"
+        titleToolTip="APIs by Access type"
+        linkText="Check out"
+        linkUrl="/dashboard/observe/inventory"
+    />
+
+    const apisByAuthTypeComponent = 
             <InfoCard 
                 component={
                     <ChartypeComponent data={authMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}/>
@@ -640,52 +651,63 @@ function HomeDashboard() {
                 linkText="Check out"
                 linkUrl="/dashboard/observe/inventory"
             />
-            <InfoCard 
-                component={
-                    <StackedChart 
-                        type='column'
-                        color='#6200EA'
-                        areaFillHex="true"
-                        height="280"
-                        background-color="#ffffff"
-                        data={apiTypesData}
-                        defaultChartOptions={defaultChartOptions}
-                        text="true"
-                        yAxisTitle="Number of APIs"
-                        width={40}
-                        gap={10}
-                        showGridLines={true}
-                        customXaxis={
-                            {
-                                categories: extractCategoryNames(apiTypesData),
-                                crosshair: true
-                            }
-                        }
-                        exportingDisabled={true}
-                    />
+    
+    const apisByTypeComponent = <InfoCard 
+        component={
+            <StackedChart 
+                type='column'
+                color='#6200EA'
+                areaFillHex="true"
+                height="280"
+                background-color="#ffffff"
+                data={apiTypesData}
+                defaultChartOptions={defaultChartOptions}
+                text="true"
+                yAxisTitle="Number of APIs"
+                width={40}
+                gap={10}
+                showGridLines={true}
+                customXaxis={
+                    {
+                        categories: extractCategoryNames(apiTypesData),
+                        crosshair: true
+                    }
                 }
-                title="API Type"
-                titleToolTip="API Type"
-                linkText="Check out"
-                linkUrl="/dashboard/observe/inventory"
+                exportingDisabled={true}
             />
-            <InfoCard 
-                component={
-                    <DataTable
-                        columnContentTypes={[
-                            'text',
-                        ]}
-                        headings={[]}
-                        rows={genreateDataTableRows(newDomains)}
-                        hoverable={false}
-                        increasedTableDensity
-                    />
-                }
-                title="New Domains"
-                titleToolTip="New Domains"
-                linkText="Increase test coverage"
-                linkUrl="/dashboard/observe/inventory"
+        }
+        title="API Type"
+        titleToolTip="API Type"
+        linkText="Check out"
+        linkUrl="/dashboard/observe/inventory"
+    />
+
+    const newDomainsComponent = <InfoCard 
+        component={
+            <DataTable
+                columnContentTypes={[
+                    'text',
+                ]}
+                headings={[]}
+                rows={genreateDataTableRows(newDomains)}
+                hoverable={false}
+                increasedTableDensity
             />
+        }
+        title="New Domains"
+        titleToolTip="New Domains"
+        linkText="Increase test coverage"
+        linkUrl="/dashboard/observe/inventory"
+        minHeight="344px"
+    />
+
+    const gridComponents = showTestingComponents ? 
+        [criticalUnsecuredAPIsOverTime, vulnerableApisBySeverityComponent, criticalFindings, apisByRiskscoreComponent, apisByAccessTypeComponent, apisByAuthTypeComponent, apisByTypeComponent, newDomainsComponent] :
+        [apisByRiskscoreComponent, apisByAccessTypeComponent, apisByAuthTypeComponent, apisByTypeComponent, newDomainsComponent, criticalUnsecuredAPIsOverTime, vulnerableApisBySeverityComponent, criticalFindings]
+
+    const gridComponent = (
+        <HorizontalGrid gap={5} columns={2}>
+            {gridComponents}
         </HorizontalGrid>
     )
 

@@ -6,7 +6,7 @@ function TestSummaryCard({ summaryItem }) {
         <LegacyCard>
             <div style={{cursor: 'pointer'}} onClick={() => window.open(summaryItem.link, "_blank")}>
                 <Box padding={5} maxWidth='286px' minWidth='286px' minHeight='164px'>
-                    <VerticalStack gap={6}>
+                    <VerticalStack gap={8}>
                         <VerticalStack gap={2}>
                             <Box>
                                 <Text variant='headingSm'>{summaryItem.testName}</Text>
