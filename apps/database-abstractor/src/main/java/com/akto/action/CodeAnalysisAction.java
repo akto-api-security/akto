@@ -306,6 +306,12 @@ public class CodeAnalysisAction extends ActionSupport {
     List<CodeAnalysisRepo> reposToRun = new ArrayList<>();
     public String updateRepoLastRun() {
         Bson sourceCodeFilter;
+        if (codeAnalysisRepo == null) {
+            loggerMaker.errorAndAddToDb("Code analysis repo is null", LogDb.DASHBOARD);
+            addActionError("Code analysis repo is null");
+            return ERROR.toUpperCase();
+        }
+
         if (this.codeAnalysisRepo.getSourceCodeType() == CodeAnalysisRepo.SourceCodeType.BITBUCKET) {
             sourceCodeFilter = Filters.or(
                     Filters.eq(CodeAnalysisRepo.SOURCE_CODE_TYPE, this.codeAnalysisRepo.getSourceCodeType()),
