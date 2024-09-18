@@ -6,7 +6,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -126,7 +125,7 @@ public class CleanInventory {
 
     }
     
-    public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList, String filePath, boolean shouldModifyRequest) throws IOException{
+    public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList, String filePath, boolean shouldDeleteRequest) throws IOException{
 
         Map<Integer, ApiCollection> apiCollectionMap = apiCollections.stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
         // BufferedWriter writer = new BufferedWriter(new FileWriter(new File(filePath)));
@@ -158,26 +157,27 @@ public class CleanInventory {
                     }
 
                     
-                    boolean allMatchDefault = false;
+                    boolean isRedundant = false;
+                    boolean isAllowedFromTemplate = false;
                     boolean isNetsparkerPresent = false;
                     boolean movingApi = false;
                     for (String sample : samples) {
                         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
                         isNetsparkerPresent |= sample.toLowerCase().contains("netsparker");
                         if(httpResponseParams != null){
-                            allMatchDefault =  HttpCallParser.isRedundantEndpoint(httpResponseParams.getRequestParams().getURL(), pattern);
-                            if(!allMatchDefault){
+                            isRedundant =  HttpCallParser.isRedundantEndpoint(httpResponseParams.getRequestParams().getURL(), pattern);
+                            if(!isRedundant){
                                 Map<String, List<ExecutorNode>> executorNodesMap = ParseAndExecute.createExecutorNodeMap(filterMap);
                                 Pair<HttpResponseParams,FILTER_TYPE> temp = HttpCallParser.applyAdvancedFilters(httpResponseParams, executorNodesMap, filterMap);
                                 HttpResponseParams param = temp.getFirst();
+                                FILTER_TYPE filterType = temp.getSecond();
 
                                 if(param != null){
-                                    allMatchDefault = false;
-                                    if(temp.getSecond().equals(FILTER_TYPE.MODIFIED)){
+                                    if(filterType.equals(FILTER_TYPE.MODIFIED)){
                                         movingApi = true;
+                                    }else if(filterType.equals(FILTER_TYPE.ALLOWED)){
+                                        isAllowedFromTemplate = true;
                                     }
-                                }else{
-                                    allMatchDefault = true;
                                 }
                             }
                         }
@@ -188,24 +188,23 @@ public class CleanInventory {
                         logger.info("[BadApisUpdater] Updating bad from template API: " + sampleData.getId(), LogDb.DASHBOARD);
                     }
 
-                    else if (allMatchDefault) {                                
+                    else if (isRedundant || !isAllowedFromTemplate) {                                
                         // writer.write(sampleData.toString());
                         toBeDeleted.add(sampleData.getId());                                
                         logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad API from template: " + sampleData.getId(), LogDb.DASHBOARD);
                     } else {
-                        logger.info("[BadApisRemover] " + isNetsparkerPresent + " Keeping bad API from template: " + sampleData.getId(), LogDb.DASHBOARD);
+                        logger.info("[BadApisRemover] " + isNetsparkerPresent + " Keeping API from template: " + sampleData.getId(), LogDb.DASHBOARD);
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("[BadApisRemover] Couldn't delete an api for default payload: " + sampleData.getId() + e.getMessage(), LogDb.DASHBOARD);
                 }
             }
-
-            String shouldDelete = System.getenv("DELETE_REDUNDANT_APIS");
-            if ( shouldDelete != null && shouldDelete.equalsIgnoreCase("true")) {
+            if (shouldDeleteRequest) {
+                logger.info("starting deletion of apis");
                 deleteApis(toBeDeleted);
             }
 
-            String shouldMove = System.getenv("MOVE_REDUNDANT_APIS");
+            // String shouldMove = System.getenv("MOVE_REDUNDANT_APIS");
 
         } while (!sampleDataList.isEmpty());
 
@@ -213,7 +212,7 @@ public class CleanInventory {
         // writer.close();
     }
 
-    public static void removeUnnecessaryEndpoints(List<ApiCollection> apiCollections){
+    public static void removeUnnecessaryEndpoints(List<ApiCollection> apiCollections,  boolean shouldDeleteRequest){
         try {
             for (ApiCollection apiCollection: apiCollections) {
                 List<Key> toBeDeleted = new ArrayList<>();
@@ -270,8 +269,9 @@ public class CleanInventory {
                     }
                 }
 
-                String shouldDelete = System.getenv("DELETE_REDUNDANT_APIS");
-                if ( shouldDelete != null && shouldDelete.equalsIgnoreCase("true")) {
+                
+                if (shouldDeleteRequest) {
+                    logger.info("starting deletion of apis");
                     deleteApis(toBeDeleted);
                 }
             }
