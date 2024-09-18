@@ -18,11 +18,11 @@ import PersistStore from '../../../main/PersistStore';
 import Pipeline from './components/Pipeline';
 import ActivityTracker from './components/ActivityTracker';
 import NullData from './components/NullData';
-import {DashboardBanner} from './components/DashboardBanner';
+import { DashboardBanner } from './components/DashboardBanner';
 import RiskScoreTrend from './components/RiskScoreTrend';
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo';
 import SummaryCard from './new_components/SummaryCard';
-import { ArrowUpMinor, ArrowDownMinor} from '@shopify/polaris-icons';
+import { ArrowUpMinor, ArrowDownMinor } from '@shopify/polaris-icons';
 import TestSummaryCardsList from './new_components/TestSummaryCardsList';
 import InfoCard from './new_components/InfoCard';
 import DonutChart from '../../components/shared/DonutChart';
@@ -37,19 +37,19 @@ import EmptyCard from './new_components/EmptyCard';
 function HomeDashboard() {
 
     const [riskScoreRangeMap, setRiskScoreRangeMap] = useState({});
-    const [issuesTrendMap, setIssuesTrendMap] = useState({trend: [], allSubCategories: []});
-    const [loading, setLoading] = useState(true) ;
-    const [countInfo, setCountInfo] = useState({totalUrls: 0, coverage: '0%'})
-    const [riskScoreObj, setRiskScoreObj]= useState({}) ;
-    const [sensitiveCount, setSensitiveCount]= useState([]) ;
-    const [sensitiveData, setSensitiveData] = useState({request: {}, response: {}})
+    const [issuesTrendMap, setIssuesTrendMap] = useState({ trend: [], allSubCategories: [] });
+    const [loading, setLoading] = useState(true);
+    const [countInfo, setCountInfo] = useState({ totalUrls: 0, coverage: '0%' })
+    const [riskScoreObj, setRiskScoreObj] = useState({});
+    const [sensitiveCount, setSensitiveCount] = useState([]);
+    const [sensitiveData, setSensitiveData] = useState({ request: {}, response: {} })
     const [subCategoryInfo, setSubCategoryInfo] = useState({});
     const [coverageObj, setCoverageObj] = useState({})
     const [recentActivities, setRecentActivities] = useState([])
     const [totalActivities, setTotalActivities] = useState(0)
     const [skip, setSkip] = useState(0)
     const [criticalUrls, setCriticalUrls] = useState(0);
-    const [initialSteps, setInitialSteps] = useState({}) ;
+    const [initialSteps, setInitialSteps] = useState({});
     const [showBannerComponent, setShowBannerComponent] = useState(false)
     const [testSummaryInfo, setTestSummaryInfo] = useState([])
 
@@ -57,7 +57,7 @@ function HomeDashboard() {
     const coverageMap = PersistStore(state => state.coverageMap)
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const [authMap, setAuthMap] = useState({})
-    const [apiTypesData, setApiTypesData] = useState([{"data": [], "color": "#D6BBFB"}])
+    const [apiTypesData, setApiTypesData] = useState([{ "data": [], "color": "#D6BBFB" }])
     const [riskScoreData, setRiskScoreData] = useState([])
     const [newDomains, setNewDomains] = useState([])
     const [criticalFindingsData, setCriticalFindingsData] = useState([])
@@ -75,7 +75,7 @@ function HomeDashboard() {
     const initialEndTimestamp = func.timeNow()
     const [showTestingComponents, setShowTestingComponents] = useState(false)
 
-    const tempVal = { alias: "custom", title : "Custom" ,  period : {since: new Date(initialStartTimestamp*1000), until: new Date(initialEndTimestamp*1000)} }
+    const tempVal = { alias: "custom", title: "Custom", period: { since: new Date(initialStartTimestamp * 1000), until: new Date(initialEndTimestamp * 1000) } }
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), tempVal);
 
@@ -89,27 +89,27 @@ function HomeDashboard() {
 
     const [accessTypeMap, setAccessTypeMap] = useState({
         "Partner": {
-          "text": 0,
-          "color": "#147CF6",
-          "filterKey": "Partner",
-          "component": (<div>hi</div>)
+            "text": 0,
+            "color": "#147CF6",
+            "filterKey": "Partner",
+            "component": (<div>hi</div>)
         },
         "Internal": {
-          "text": 0,
-          "color": "#FDB33D",
-          "filterKey": "Internal"
+            "text": 0,
+            "color": "#FDB33D",
+            "filterKey": "Internal"
         },
         "External": {
-          "text": 0,
-          "color": "#658EE2",
-          "filterKey": "External"
+            "text": 0,
+            "color": "#658EE2",
+            "filterKey": "External"
         },
         "Third Party": {
-          "text": 0,
-          "color": "#68B3D0",
-          "filterKey": "Third Party"
+            "text": 0,
+            "color": "#68B3D0",
+            "filterKey": "Third Party"
         }
-      });
+    });
 
 
     const initialHistoricalData = []
@@ -129,7 +129,7 @@ function HomeDashboard() {
         const endTimestamp = func.timeNow()
         await testingApi.fetchTestingDetails(
             0, endTimestamp, "endTimestamp", "-1", 0, 10, null, null, ""
-          ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
+        ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
             const result = testingTransform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries);
             const finalResult = []
             result.forEach((x) => {
@@ -138,8 +138,8 @@ function HomeDashboard() {
                 finalResult.push({
                     "testName": x["name"],
                     "time": func.prettifyEpoch(x["run_time_epoch"]),
-                    "highCount": severityMap["high"] ? severityMap["high"] : "0" ,
-                    "mediumCount": severityMap["medium"] ? severityMap["medium"] : "0" ,
+                    "highCount": severityMap["high"] ? severityMap["high"] : "0",
+                    "mediumCount": severityMap["medium"] ? severityMap["medium"] : "0",
                     "lowCount": severityMap["low"] ? severityMap["low"] : "0",
                     "totalApis": x["total_apis"],
                     "link": x["nextUrl"]
@@ -148,18 +148,18 @@ function HomeDashboard() {
 
             setTestSummaryInfo(finalResult)
             setShowTestingComponents(finalResult && finalResult.length > 0)
-          });
+        });
     }
 
-    const fetchData = async() =>{
+    const fetchData = async () => {
         setLoading(true)
         // all apis 
         let apiPromises = [
             observeApi.getCoverageInfoForCollections(),
             api.getRiskScoreRangeMap(),
             api.getIssuesTrend((func.timeNow() - func.recencyPeriod), func.timeNow()),
-            api.fetchSubTypeCountMap(0 , func.timeNow()),
-            testingApi.getSummaryInfo(0 , func.timeNow()),
+            api.fetchSubTypeCountMap(0, func.timeNow()),
+            testingApi.getSummaryInfo(0, func.timeNow()),
             api.fetchRecentFeed(skip),
             api.getIntegratedConnections(),
             observeApi.getUserEndpoints(),
@@ -168,17 +168,17 @@ function HomeDashboard() {
             api.fetchApiStats(startTimestamp, endTimestamp),
             api.fetchEndpointsCount(startTimestamp, endTimestamp)
         ];
-        
+
         let results = await Promise.allSettled(apiPromises);
 
         let coverageInfo = results[0].status === 'fulfilled' ? results[0].value : {};
         let riskScoreRangeMap = results[1].status === 'fulfilled' ? results[1].value : {};
         let issuesTrendResp = results[2].status === 'fulfilled' ? results[2].value : {};
-        let sensitiveDataResp = results[3].status === 'fulfilled' ? results[3].value : {} ;
-        let subcategoryDataResp = results[4].status === 'fulfilled' ? results[4].value : {} ;
-        let recentActivitiesResp = results[5].status === 'fulfilled' ? results[5].value : {} ;
-        let connectionsInfo = results[6].status === 'fulfilled' ? results[6].value : {} ;
-        let userEndpoints = results[7].status === 'fulfilled' ? results[7].value : true ;
+        let sensitiveDataResp = results[3].status === 'fulfilled' ? results[3].value : {};
+        let subcategoryDataResp = results[4].status === 'fulfilled' ? results[4].value : {};
+        let recentActivitiesResp = results[5].status === 'fulfilled' ? results[5].value : {};
+        let connectionsInfo = results[6].status === 'fulfilled' ? results[6].value : {};
+        let userEndpoints = results[7].status === 'fulfilled' ? results[7].value : true;
         let criticalIssuesTrendResp = results[8].status === 'fulfilled' ? results[8].value : {}
         let findTotalIssuesResp = results[9].status === 'fulfilled' ? results[9].value : {}
         let apisStatsResp = results[10].status === 'fulfilled' ? results[10].value : {}
@@ -193,7 +193,7 @@ function HomeDashboard() {
         setRiskScoreRangeMap(riskScoreRangeMap);
         setIssuesTrendMap(transform.formatTrendData(issuesTrendResp));
         setSensitiveData(transform.getFormattedSensitiveData(sensitiveDataResp.response))
-        const tempResult =  testingFunc.convertSubIntoSubcategory(subcategoryDataResp)
+        const tempResult = testingFunc.convertSubIntoSubcategory(subcategoryDataResp)
         setSubCategoryInfo(tempResult.subCategoryMap)
         setRecentActivities(recentActivitiesResp.recentActivities)
         setTotalActivities(recentActivitiesResp.totalActivities)
@@ -204,9 +204,9 @@ function HomeDashboard() {
         const endpoints = riskScoreObj.criticalUrls;
         setCriticalUrls(endpoints)
 
-        const sensitiveInfo = await observeFunc.fetchSensitiveInfo() ;
-        setRiskScoreObj(riskScoreMap) ;
-        setSensitiveCount(sensitiveInfo.sensitiveUrls) ;
+        const sensitiveInfo = await observeFunc.fetchSensitiveInfo();
+        setRiskScoreObj(riskScoreMap);
+        setSensitiveCount(sensitiveInfo.sensitiveUrls);
 
         buildMetrics(apisStatsResp.apiStatsEnd)
         testSummaryData()
@@ -218,8 +218,8 @@ function HomeDashboard() {
         convertSubCategoryInfo(tempResult.subCategoryMap)
         buildSeverityMap(apisStatsResp.apiStatsEnd)
         buildIssuesSummary(findTotalIssuesResp)
-        
-        const fetchHistoricalDataResp = {"finalHistoricalData": finalHistoricalData, "initialHistoricalData": initialHistoricalData}
+
+        const fetchHistoricalDataResp = { "finalHistoricalData": finalHistoricalData, "initialHistoricalData": initialHistoricalData }
         buildDeltaInfo(fetchHistoricalDataResp)
 
         buildEndpointsCount(fetchEndpointsCountResp)
@@ -227,9 +227,9 @@ function HomeDashboard() {
         setLoading(false)
     }
 
-    useEffect(()=>{
+    useEffect(() => {
         fetchData()
-    },[startTimestamp, endTimestamp])
+    }, [startTimestamp, endTimestamp])
 
     function buildIssuesSummary(findTotalIssuesResp) {
         setTotalIssuesCount(findTotalIssuesResp.totalIssuesCount)
@@ -259,7 +259,7 @@ function HomeDashboard() {
 
     function buildDeltaInfo(deltaInfo) {
         const initialHistoricalData = deltaInfo.initialHistoricalData
-    
+
         let totalApis = 0
         let totalRiskScore = 0
         let totalTestedApis = 0
@@ -280,7 +280,7 @@ function HomeDashboard() {
         return (
             <HorizontalStack gap={1}>
                 <Box>
-                    <Icon source={source} color='subdued'/>
+                    <Icon source={source} color='subdued' />
                 </Box>
                 <Text color='subdued' fontWeight='medium'>{Math.abs(val)}</Text>
                 <Text color='subdued' fontWeight='semibold'>{time}</Text>
@@ -294,7 +294,7 @@ function HomeDashboard() {
         const color = !invertColor && val > 0 ? "success" : "critical"
         return (
             <HorizontalStack>
-                <Icon source={source} color={color}/>
+                <Icon source={source} color={color} />
                 <div className='custom-color'>
                     <Text color={color}>{Math.abs(val)}</Text>
                 </div>
@@ -369,8 +369,8 @@ function HomeDashboard() {
             ["gRPC", apiStats.apiTypeMap.GRPC || 0],
             ["SOAP", apiStats.apiTypeMap.SOAP || 0]
         ];
-    
-        setApiTypesData([{data: data,color: "#D6BBFB"}])
+
+        setApiTypesData([{ data: data, color: "#D6BBFB" }])
     }
 
     function buildSetRiskScoreData(apiStats) {
@@ -387,9 +387,9 @@ function HomeDashboard() {
         const result = [
             { "badgeValue": 5, "progressValue": "0%", "text": 0, "topColor": "#E45357", "backgroundColor": "#FFDCDD", "badgeColor": "critical" },
             { "badgeValue": 4, "progressValue": "0%", "text": 0, "topColor": "#EF864C", "backgroundColor": "#FFD9C4", "badgeColor": "attention" },
-            { "badgeValue": 3, "progressValue": "0%", "text": 0, "topColor": "#F6C564", "backgroundColor": "#FFF1D4", "badgeColor": "warning"  },
-            { "badgeValue": 2, "progressValue": "0%", "text": 0, "topColor": "#F5D8A1", "backgroundColor": "#FFF6E6", "badgeColor": "info"  },
-            { "badgeValue": 1, "progressValue": "0%", "text": 0, "topColor": "#A4E8F2", "backgroundColor": "#EBFCFF", "badgeColor": "new"  },
+            { "badgeValue": 3, "progressValue": "0%", "text": 0, "topColor": "#F6C564", "backgroundColor": "#FFF1D4", "badgeColor": "warning" },
+            { "badgeValue": 2, "progressValue": "0%", "text": 0, "topColor": "#F5D8A1", "backgroundColor": "#FFF6E6", "badgeColor": "info" },
+            { "badgeValue": 1, "progressValue": "0%", "text": 0, "topColor": "#A4E8F2", "backgroundColor": "#EBFCFF", "badgeColor": "new" },
             { "badgeValue": 0, "progressValue": "0%", "text": 0, "topColor": "#6FD1A6", "backgroundColor": "#E0FFF1", "badgeColor": "success" }
         ];
 
@@ -406,9 +406,9 @@ function HomeDashboard() {
 
     function getCollectionsWithCoverage() {
         const validCollections = allCollections.filter(collection => collection.hostName !== null && collection.hostName !== undefined);
-    
+
         const sortedCollections = validCollections.sort((a, b) => b.startTs - a.startTs);
-    
+
         const result = sortedCollections.slice(0, 10).map(collection => {
             const apisTested = coverageMap[collection.id] || 0;
             return {
@@ -427,16 +427,16 @@ function HomeDashboard() {
             data: totalAPIs,
             variant: 'heading2xl',
             byLineComponent: generateByLineComponent((totalAPIs - oldTotalApis), "Yesterday"),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTotalApis, totalAPIs]}/>)
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTotalApis, totalAPIs]} />)
         },
         {
             title: 'Issues',
             data: observeFunc.formatNumberWithCommas(totalIssuesCount),
             variant: 'heading2xl',
             color: 'critical',
-            byLineComponent: generateByLineComponent( (totalIssuesCount - oldIssueCount), "Yesterday"),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldIssueCount, totalIssuesCount]}/>)
-            
+            byLineComponent: generateByLineComponent((totalIssuesCount - oldIssueCount), "Yesterday"),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldIssueCount, totalIssuesCount]} />)
+
         },
         {
             title: 'API Risk Score',
@@ -444,26 +444,26 @@ function HomeDashboard() {
             variant: 'heading2xl',
             color: apiRiskScore > 2.5 ? 'critical' : 'warning',
             byLineComponent: generateByLineComponent((apiRiskScore - oldRiskScore).toFixed(2), "Yesterday"),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldRiskScore, apiRiskScore]}/>)
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldRiskScore, apiRiskScore]} />)
         },
         {
             title: 'Test Coverage',
             data: testCoverage + "%",
             variant: 'heading2xl',
             color: testCoverage > 80 ? 'success' : 'warning',
-            byLineComponent: generateByLineComponent((testCoverage-oldTestCoverage).toFixed(2), "Yesterday"),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTestCoverage, testCoverage]}/>)
+            byLineComponent: generateByLineComponent((testCoverage - oldTestCoverage).toFixed(2), "Yesterday"),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTestCoverage, testCoverage]} />)
         }
     ]
 
     const summaryComp = (
-        <SummaryCard summaryItems={summaryInfo}/>
+        <SummaryCard summaryItems={summaryInfo} />
     )
 
 
     const testSummaryCardsList = showTestingComponents ? (
-        <InfoCard 
-            component={<TestSummaryCardsList summaryItems={ testSummaryInfo}/>}
+        <InfoCard
+            component={<TestSummaryCardsList summaryItems={testSummaryInfo} />}
             title="Recent Tests"
             titleToolTip="Tests runs since last 7 days"
             linkText="Increase test coverage"
@@ -536,8 +536,8 @@ function HomeDashboard() {
                 </HorizontalStack>
                 <Text>{collection.totalApis}</Text>
             </HorizontalStack>
-            ]
-          ));
+        ]
+        ));
     }
 
     function convertSubCategoryInfo(tempSubCategoryMap) {
@@ -545,7 +545,7 @@ function HomeDashboard() {
         entries.sort((a, b) => b.text - a.text);
         const topEntries = entries.slice(0, 5);
         const data = topEntries.map(entry => [entry.filterKey, entry.text]);
-        setCriticalFindingsData([{"data": data, "color": "#E45357"}])
+        setCriticalFindingsData([{ "data": data, "color": "#E45357" }])
     }
 
 
@@ -553,15 +553,15 @@ function HomeDashboard() {
         if (!data || !Array.isArray(data) || data.length === 0) {
             return [];
         }
-        
+
         const findings = data[0]?.data || [];
         return findings.map(([category]) => category);
     }
 
-    const vulnerableApisBySeverityComponent = !showTestingComponents? <EmptyCard title="Vulnerable APIs by Severity"/> : <InfoCard 
+    const vulnerableApisBySeverityComponent = !showTestingComponents ? <EmptyCard title="Vulnerable APIs by Severity" /> : <InfoCard
         component={
-            <div style={{marginTop: "20px"}}>
-                <ChartypeComponent 
+            <div style={{ marginTop: "20px" }}>
+                <ChartypeComponent
                     data={severityMap}
                     navUrl={"/dashboard/issues/"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}
                 />
@@ -573,9 +573,9 @@ function HomeDashboard() {
         linkUrl="/dashboard/issues"
     />
 
-    const criticalUnsecuredAPIsOverTime = !showTestingComponents ? <EmptyCard title="Critical Unsecured APIs Over Time" /> : <InfoCard 
+    const criticalUnsecuredAPIsOverTime = !showTestingComponents ? <EmptyCard title="Critical Unsecured APIs Over Time" /> : <InfoCard
         component={
-            <StackedChart 
+            <StackedChart
                 type='column'
                 color='#6200EA'
                 areaFillHex="true"
@@ -597,41 +597,41 @@ function HomeDashboard() {
         linkUrl="/dashboard/issues"
     />
 
-    const criticalFindings = !showTestingComponents ? <EmptyCard title="Critical Findings"/> :
-            <InfoCard 
-                component={
-                    <StackedChart 
-                        type='column'
-                        color='#6200EA'
-                        areaFillHex="true"
-                        height="280"
-                        background-color="#ffffff"
-                        data={criticalFindingsData}
-                        defaultChartOptions={defaultChartOptions}
-                        text="true"
-                        yAxisTitle="Number of issues"
-                        width={40}
-                        gap={10}
-                        showGridLines={true}
-                        customXaxis={
-                            {
-                                categories: extractCategoryNames(criticalFindingsData),
-                                crosshair: true
-                            }
+    const criticalFindings = !showTestingComponents ? <EmptyCard title="Critical Findings" /> :
+        <InfoCard
+            component={
+                <StackedChart
+                    type='column'
+                    color='#6200EA'
+                    areaFillHex="true"
+                    height="280"
+                    background-color="#ffffff"
+                    data={criticalFindingsData}
+                    defaultChartOptions={defaultChartOptions}
+                    text="true"
+                    yAxisTitle="Number of issues"
+                    width={40}
+                    gap={10}
+                    showGridLines={true}
+                    customXaxis={
+                        {
+                            categories: extractCategoryNames(criticalFindingsData),
+                            crosshair: true
                         }
-                        exportingDisabled={true}
-                    />
-                }
-                title="Critical Findings"
-                titleToolTip="Critical Findings"
-                linkText="Fix critical issues"
-                linkUrl="/dashboard/issues"
-            />
+                    }
+                    exportingDisabled={true}
+                />
+            }
+            title="Critical Findings"
+            titleToolTip="Critical Findings"
+            linkText="Fix critical issues"
+            linkUrl="/dashboard/issues"
+        />
 
-    const apisByRiskscoreComponent = <InfoCard 
+    const apisByRiskscoreComponent = <InfoCard
         component={
-            <div style={{marginTop: "20px"}}>
-                <ProgressBarChart data={riskScoreData}/>
+            <div style={{ marginTop: "20px" }}>
+                <ProgressBarChart data={riskScoreData} />
             </div>
         }
         title="APIs by Risk score"
@@ -640,9 +640,9 @@ function HomeDashboard() {
         linkUrl="/dashboard/observe/inventory"
     />
 
-    const apisByAccessTypeComponent = <InfoCard 
+    const apisByAccessTypeComponent = <InfoCard
         component={
-            <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}/>
+            <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} />
         }
         title="APIs by Access type"
         titleToolTip="APIs by Access type"
@@ -650,20 +650,20 @@ function HomeDashboard() {
         linkUrl="/dashboard/observe/inventory"
     />
 
-    const apisByAuthTypeComponent = 
-            <InfoCard 
-                component={
-                    <ChartypeComponent data={authMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}/>
-                }
-                title="APIs by Authentication"
-                titleToolTip="APIs by Authentication"
-                linkText="Check out"
-                linkUrl="/dashboard/observe/inventory"
-            />
-    
-    const apisByTypeComponent = <InfoCard 
+    const apisByAuthTypeComponent =
+        <InfoCard
+            component={
+                <ChartypeComponent data={authMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} />
+            }
+            title="APIs by Authentication"
+            titleToolTip="APIs by Authentication"
+            linkText="Check out"
+            linkUrl="/dashboard/observe/inventory"
+        />
+
+    const apisByTypeComponent = <InfoCard
         component={
-            <StackedChart 
+            <StackedChart
                 type='column'
                 color='#6200EA'
                 areaFillHex="true"
@@ -691,7 +691,7 @@ function HomeDashboard() {
         linkUrl="/dashboard/observe/inventory"
     />
 
-    const newDomainsComponent = <InfoCard 
+    const newDomainsComponent = <InfoCard
         component={
             <DataTable
                 columnContentTypes={[
@@ -710,7 +710,7 @@ function HomeDashboard() {
         minHeight="344px"
     />
 
-    const gridComponents = showTestingComponents ? 
+    const gridComponents = showTestingComponents ?
         [criticalUnsecuredAPIsOverTime, vulnerableApisBySeverityComponent, criticalFindings, apisByRiskscoreComponent, apisByAccessTypeComponent, apisByAuthTypeComponent, apisByTypeComponent, newDomainsComponent] :
         [apisByRiskscoreComponent, apisByAccessTypeComponent, apisByAuthTypeComponent, apisByTypeComponent, newDomainsComponent, criticalUnsecuredAPIsOverTime, vulnerableApisBySeverityComponent, criticalFindings]
 
@@ -721,20 +721,20 @@ function HomeDashboard() {
     )
 
     const subcategoryInfoComp = (
-        Object.keys(subCategoryInfo).length > 0 ? 
+        Object.keys(subCategoryInfo).length > 0 ?
             <Card key="subcategoryTrend">
                 <VerticalStack gap={5}>
                     <TitleWithInfo
                         titleText={"Issues by category"}
                         tooltipContent={"Testing run issues present in dashboard categorised by subcategory of tests."}
-                        textProps={{variant: "headingMd"}}
+                        textProps={{ variant: "headingMd" }}
                     />
-                    <ChartypeComponent navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'200px'}/>
+                    <ChartypeComponent navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'200px'} />
                 </VerticalStack>
             </Card>
 
-        : <NullData text={"Issues by category"} url={"/dashboard/observe/inventory"} urlText={"to run a test on a collection."} description={"No test categories found."} key={"subcategoryTrend"}/>
-     )
+            : <NullData text={"Issues by category"} url={"/dashboard/observe/inventory"} urlText={"to run a test on a collection."} description={"No test categories found."} key={"subcategoryTrend"} />
+    )
 
     const riskScoreRanges = [
         {
@@ -757,75 +757,75 @@ function HomeDashboard() {
         }
     ]
     const riskScoreTrendComp = (
-        <RiskScoreTrend  key={"risk-score-trend"} riskScoreRangeMap={riskScoreRangeMap} riskScoreRanges={riskScoreRanges} />
+        <RiskScoreTrend key={"risk-score-trend"} riskScoreRangeMap={riskScoreRangeMap} riskScoreRanges={riskScoreRanges} />
     )
 
     const sensitiveDataTrendComp = (
-        (!sensitiveData || (!(sensitiveData.request) && !(sensitiveData.response))) ? 
-        <NullData text={"Sensitive Data"} url={"/dashboard/observe/inventory"} urlText={"to create a collection and upload traffic in it."} description={"No sensitive data found."} key={"sensitiveNullTrend"}/>
-        :
-        <Card key="sensitiveTrend">
-            <VerticalStack gap={5}>
-                <TitleWithInfo
-                    titleText={"Sensitive data"}
-                    tooltipContent={"Count of endpoints per data type."}
-                    textProps={{variant: "headingMd"}}
-                    docsUrl={"https://docs.akto.io/api-inventory/concepts/sensitive-data"}
-                />
-                <HorizontalGrid gap={5} columns={2}>
-                    <ChartypeComponent navUrl={"/dashboard/observe/sensitive/"} isRequest={true} data={sensitiveData.request} title={"Request"} isNormal={true} boxHeight={'100px'}/>
-                    <ChartypeComponent navUrl={"/dashboard/observe/sensitive/"} data={sensitiveData.response} title={"Response"} isNormal={true} boxHeight={'100px'}/>
-                </HorizontalGrid>
-            </VerticalStack>
-        </Card>
+        (!sensitiveData || (!(sensitiveData.request) && !(sensitiveData.response))) ?
+            <NullData text={"Sensitive Data"} url={"/dashboard/observe/inventory"} urlText={"to create a collection and upload traffic in it."} description={"No sensitive data found."} key={"sensitiveNullTrend"} />
+            :
+            <Card key="sensitiveTrend">
+                <VerticalStack gap={5}>
+                    <TitleWithInfo
+                        titleText={"Sensitive data"}
+                        tooltipContent={"Count of endpoints per data type."}
+                        textProps={{ variant: "headingMd" }}
+                        docsUrl={"https://docs.akto.io/api-inventory/concepts/sensitive-data"}
+                    />
+                    <HorizontalGrid gap={5} columns={2}>
+                        <ChartypeComponent navUrl={"/dashboard/observe/sensitive/"} isRequest={true} data={sensitiveData.request} title={"Request"} isNormal={true} boxHeight={'100px'} />
+                        <ChartypeComponent navUrl={"/dashboard/observe/sensitive/"} data={sensitiveData.response} title={"Response"} isNormal={true} boxHeight={'100px'} />
+                    </HorizontalGrid>
+                </VerticalStack>
+            </Card>
     )
 
     const issuesTrendComp = (
-        (issuesTrendMap.allSubCategories.length > 0 && issuesTrendMap.trend.length > 0) ? 
-        <Card key="issuesTrend">
-            <VerticalStack gap={5}>
-                <TitleWithInfo
-                    titleText={"Issues timeline"}
-                    tooltipContent={"Count of issues per category against the time they were last seen"}
-                    textProps={{variant: "headingMd"}}
-                />
-                <VerticalStack gap={3}>
-                    <HorizontalStack align="end">
-                        <Scrollable style={{ width: '350px' }} shadow>
-                            <Box maxWidth="50%">
-                                    <div style={{display: 'flex', gap: '12px', cursor:'pointer'}}>
-                                        {issuesTrendMap.allSubCategories.map((x,index)=>{
-                                            return(
-                                                <div style={{display: 'flex', gap: '8px', alignItems: 'center'}} key={index}>
-                                                    <div style={{background: func.getColorForCharts(x), borderRadius: '50%', height:'8px', width: '8px'}}/>
+        (issuesTrendMap.allSubCategories.length > 0 && issuesTrendMap.trend.length > 0) ?
+            <Card key="issuesTrend">
+                <VerticalStack gap={5}>
+                    <TitleWithInfo
+                        titleText={"Issues timeline"}
+                        tooltipContent={"Count of issues per category against the time they were last seen"}
+                        textProps={{ variant: "headingMd" }}
+                    />
+                    <VerticalStack gap={3}>
+                        <HorizontalStack align="end">
+                            <Scrollable style={{ width: '350px' }} shadow>
+                                <Box maxWidth="50%">
+                                    <div style={{ display: 'flex', gap: '12px', cursor: 'pointer' }}>
+                                        {issuesTrendMap.allSubCategories.map((x, index) => {
+                                            return (
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }} key={index}>
+                                                    <div style={{ background: func.getColorForCharts(x), borderRadius: '50%', height: '8px', width: '8px' }} />
                                                     <Text variant="bodySm">{x}</Text>
                                                 </div>
-                                                )
-                                            })}
+                                            )
+                                        })}
                                     </div>
-                                
-                            </Box>
-                        </Scrollable>
-                    </HorizontalStack>
-                    <StackedChart 
-                        type='column'
-                        color='#6200EA'
-                        areaFillHex="true"
-                        height="280"
-                        background-color="#ffffff"
-                        data={issuesTrendMap.trend}
-                        defaultChartOptions={defaultChartOptions}
-                        text="true"
-                        yAxisTitle="Number of issues"
-                        width={30}
-                        gap={10}
-                        showGridLines={true}
-                        exportingDisabled={true}
-                    />
+
+                                </Box>
+                            </Scrollable>
+                        </HorizontalStack>
+                        <StackedChart
+                            type='column'
+                            color='#6200EA'
+                            areaFillHex="true"
+                            height="280"
+                            background-color="#ffffff"
+                            data={issuesTrendMap.trend}
+                            defaultChartOptions={defaultChartOptions}
+                            text="true"
+                            yAxisTitle="Number of issues"
+                            width={30}
+                            gap={10}
+                            showGridLines={true}
+                            exportingDisabled={true}
+                        />
+                    </VerticalStack>
                 </VerticalStack>
-            </VerticalStack>
-        </Card>
-        :  <NullData text={"Issues timeline."} url={"/dashboard/observe/inventory"} urlText={"to run a test on a collection."} description={"No issues found."} key={"issuesTrend"}/>
+            </Card>
+            : <NullData text={"Issues timeline."} url={"/dashboard/observe/inventory"} urlText={"to run a test on a collection."} description={"No issues found."} key={"issuesTrend"} />
     )
 
     const checkLoadMore = () => {
@@ -833,10 +833,10 @@ function HomeDashboard() {
         return calledActivitiesYet < totalActivities;
     }
 
-    const handleLoadMore = async() => {
-        if(checkLoadMore()){
+    const handleLoadMore = async () => {
+        if (checkLoadMore()) {
             await api.fetchRecentFeed(skip + 1).then((resp) => {
-                setRecentActivities([...recentActivities,...resp.recentActivities])
+                setRecentActivities([...recentActivities, ...resp.recentActivities])
             })
             setSkip(skip + 1);
         }
@@ -845,8 +845,8 @@ function HomeDashboard() {
     const components = [summaryComp, testSummaryCardsList, gridComponent]
 
     const dashboardComp = (
-        <div style={{display: 'flex', gap: '32px'}} key={"dashboardComp"}>
-            <div style={{flex: 7}}>
+        <div style={{ display: 'flex', gap: '32px' }} key={"dashboardComp"}>
+            <div style={{ flex: 7 }}>
                 <VerticalStack gap={4}>
                     {components.map((component) => {
                         return component
@@ -856,7 +856,7 @@ function HomeDashboard() {
         </div>
     )
 
-    const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" />: null, dashboardComp]
+    const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : null, dashboardComp]
 
     return (
         <Box>
@@ -869,7 +869,7 @@ function HomeDashboard() {
                     }
                     isFirstPage={true}
                     components={pageComponents}
-                    primaryAction={<DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>}
+                    primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
                 />
             }
 
