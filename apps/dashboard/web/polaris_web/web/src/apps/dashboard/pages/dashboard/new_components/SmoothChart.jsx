@@ -7,7 +7,8 @@ function SmoothAreaChart({tickPositions}) {
     const chartOptions = {
         chart: {
             type: 'areaspline',
-            height: "80"
+            height: "80",
+            width: "150"
         },
         credits:{
             enabled: false,

@@ -2,13 +2,12 @@ import { Box, Card, HorizontalGrid, HorizontalStack, Text, VerticalStack } from 
 import React from 'react'
 
 function SummaryCard({ summaryItems }) {
-    console.log(summaryItems);
     return (
         <Card padding={0} key="info">
-            <Box padding={2} paddingInlineStart={4} paddingInlineEnd={4}>
+            <Box padding={3} paddingInlineStart={5} paddingInlineEnd={5}>
                 <HorizontalGrid columns={summaryItems.length} gap={4}>
                     {summaryItems.map((item, index) => (
-                        <Box borderInlineEndWidth={index < (summaryItems.length - 1) ? "1" : ""} key={index} paddingBlockStart={1} paddingBlockEnd={1} borderColor="transparent">
+                        <Box borderInlineEndWidth={index < (summaryItems.length - 1) ? "1" : ""} key={index} borderColor="transparent">
                             <HorizontalStack>
                                 <VerticalStack gap="4">
                                     <Text variant="headingMd">
