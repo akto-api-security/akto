@@ -97,14 +97,14 @@ function AdvancedTrafficFilters() {
                         placeholder={"Search existing filters"}
                         optionsList={templateList && templateList.map(x => {
                             return {
-                                label: x.id,
+                                label: x.id === "DEFAULT_BLOCK_FILTER" ? "DEFAULT_IGNORE_FILTER" : x.id,
                                 value: x.id
                             }
                         })}
                         setSelected={(value) => {
                             handleSelection(value)
                         }}
-                        value={currentId}
+                        value={currentId === "DEFAULT_BLOCK_FILTER" ? "DEFAULT_IGNORE_FILTER" : currentId }
                     />
                 </LegacyCard.Section>
                 <LegacyCard.Section flush>

@@ -6,7 +6,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +32,7 @@ import com.akto.dto.Account;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.monitoring.FilterConfig;
+import com.akto.dto.monitoring.FilterConfig.FILTER_TYPE;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.Key;
@@ -45,6 +45,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.test_editor.execution.ParseAndExecute;
 import com.akto.util.AccountTask;
+import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -124,7 +125,7 @@ public class CleanInventory {
 
     }
     
-    public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList, String filePath, boolean shouldModifyRequest) throws IOException{
+    public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList, String filePath, boolean shouldDeleteRequest) throws IOException{
 
         Map<Integer, ApiCollection> apiCollectionMap = apiCollections.stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
         // BufferedWriter writer = new BufferedWriter(new FileWriter(new File(filePath)));
@@ -140,6 +141,7 @@ public class CleanInventory {
             sampleDataList = SampleDataDao.instance.findAll(filters, skip, limit, sort);
             skip += limit;
             List<Key> toBeDeleted = new ArrayList<>();
+            List<Key> toMove = new ArrayList<>();
             for(SampleData sampleData: sampleDataList) {
                 try {
                     List<String> samples = sampleData.getSamples();
@@ -155,43 +157,54 @@ public class CleanInventory {
                     }
 
                     
-                    boolean allMatchDefault = true;
+                    boolean isRedundant = false;
+                    boolean isAllowedFromTemplate = false;
                     boolean isNetsparkerPresent = false;
+                    boolean movingApi = false;
                     for (String sample : samples) {
                         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
                         isNetsparkerPresent |= sample.toLowerCase().contains("netsparker");
                         if(httpResponseParams != null){
-                            allMatchDefault =  HttpCallParser.isRedundantEndpoint(httpResponseParams.getRequestParams().getURL(), pattern);
-                            if(!allMatchDefault){
+                            isRedundant =  HttpCallParser.isRedundantEndpoint(httpResponseParams.getRequestParams().getURL(), pattern);
+                            if(!isRedundant){
                                 Map<String, List<ExecutorNode>> executorNodesMap = ParseAndExecute.createExecutorNodeMap(filterMap);
-                                List<HttpResponseParams> temp = HttpCallParser.applyAdvancedFilters(Arrays.asList(httpResponseParams), executorNodesMap, filterMap);
+                                Pair<HttpResponseParams,FILTER_TYPE> temp = HttpCallParser.applyAdvancedFilters(httpResponseParams, executorNodesMap, filterMap);
+                                HttpResponseParams param = temp.getFirst();
+                                FILTER_TYPE filterType = temp.getSecond();
 
-                                if(!temp.isEmpty()){
-                                    allMatchDefault = true;
-                                    httpResponseParams = temp.get(0);
-
-                                    // to do moving of sample data to new collections
+                                if(param != null){
+                                    if(filterType.equals(FILTER_TYPE.MODIFIED)){
+                                        movingApi = true;
+                                    }else if(filterType.equals(FILTER_TYPE.ALLOWED)){
+                                        isAllowedFromTemplate = true;
+                                    }
                                 }
                             }
                         }
                     }
 
-                    if (allMatchDefault) {                                
+                    if(movingApi){
+                        toMove.add(sampleData.getId());
+                        logger.info("[BadApisUpdater] Updating bad from template API: " + sampleData.getId(), LogDb.DASHBOARD);
+                    }
+
+                    else if (isRedundant || !isAllowedFromTemplate) {                                
                         // writer.write(sampleData.toString());
                         toBeDeleted.add(sampleData.getId());                                
-                        logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad API: " + sampleData.getId(), LogDb.DASHBOARD);
+                        logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad API from template: " + sampleData.getId(), LogDb.DASHBOARD);
                     } else {
-                        logger.info("[BadApisRemover] " + isNetsparkerPresent + " Keeping bad API: " + sampleData.getId(), LogDb.DASHBOARD);
+                        logger.info("[BadApisRemover] " + isNetsparkerPresent + " Keeping API from template: " + sampleData.getId(), LogDb.DASHBOARD);
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("[BadApisRemover] Couldn't delete an api for default payload: " + sampleData.getId() + e.getMessage(), LogDb.DASHBOARD);
                 }
             }
-
-            String shouldDelete = System.getenv("DELETE_REDUNDANT_APIS");
-            if ( shouldDelete != null && shouldDelete.equalsIgnoreCase("true")) {
+            if (shouldDeleteRequest) {
+                logger.info("starting deletion of apis");
                 deleteApis(toBeDeleted);
             }
+
+            // String shouldMove = System.getenv("MOVE_REDUNDANT_APIS");
 
         } while (!sampleDataList.isEmpty());
 
@@ -199,7 +212,7 @@ public class CleanInventory {
         // writer.close();
     }
 
-    public static void removeUnnecessaryEndpoints(List<ApiCollection> apiCollections){
+    public static void removeUnnecessaryEndpoints(List<ApiCollection> apiCollections,  boolean shouldDeleteRequest){
         try {
             for (ApiCollection apiCollection: apiCollections) {
                 List<Key> toBeDeleted = new ArrayList<>();
@@ -256,8 +269,9 @@ public class CleanInventory {
                     }
                 }
 
-                String shouldDelete = System.getenv("DELETE_REDUNDANT_APIS");
-                if ( shouldDelete != null && shouldDelete.equalsIgnoreCase("true")) {
+                
+                if (shouldDeleteRequest) {
+                    logger.info("starting deletion of apis");
                     deleteApis(toBeDeleted);
                 }
             }

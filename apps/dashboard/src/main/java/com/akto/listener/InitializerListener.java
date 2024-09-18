@@ -631,9 +631,15 @@ public class InitializerListener implements ServletContextListener {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account account) {
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        boolean detectRedundantUrls = accountSettings.getAllowFilterLogs();
                         String shouldFilterApisFromYaml = System.getenv("DETECT_REDUNDANT_APIS_RETRO");
                         String shouldFilterOptionsAndHTMLApis = System.getenv("DETECT_OPTION_APIS_RETRO");
-                        if(shouldFilterApisFromYaml == null && shouldFilterOptionsAndHTMLApis == null){
+
+                        String shouldDelete = System.getenv("DELETE_REDUNDANT_APIS");
+                        boolean shouldDeleteApis = accountSettings.getAllowDeletionOfUrls() || (shouldDelete != null && shouldDelete.equalsIgnoreCase("true"));
+
+                        if(!detectRedundantUrls && shouldFilterApisFromYaml == null && shouldFilterOptionsAndHTMLApis == null){
                             return;
                         }
                         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(),
@@ -641,21 +647,20 @@ public class InitializerListener implements ServletContextListener {
 
                         String filePath = "./samples_"+account.getId()+".txt";
 
-                        if(shouldFilterApisFromYaml != null && shouldFilterApisFromYaml.equalsIgnoreCase("true")){
+                        if((detectRedundantUrls || shouldFilterApisFromYaml != null && shouldFilterApisFromYaml.equalsIgnoreCase("true"))){
                             List<YamlTemplate> yamlTemplates = AdvancedTrafficFiltersDao.instance.findAll(
                                 Filters.ne(YamlTemplate.INACTIVE, true)
                             );
-                            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                             List<String> redundantUrlList = accountSettings.getAllowRedundantEndpointsList();
                             try {
-                                CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections , yamlTemplates, redundantUrlList,filePath, false);
+                                CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections , yamlTemplates, redundantUrlList,filePath, shouldDeleteApis);
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }
                         }
 
                         if(shouldFilterOptionsAndHTMLApis != null && shouldFilterOptionsAndHTMLApis.equalsIgnoreCase("true")){
-                            CleanInventory.removeUnnecessaryEndpoints(apiCollections);
+                            CleanInventory.removeUnnecessaryEndpoints(apiCollections, shouldDeleteApis);
                         }
                     }
                 }, "clean-inventory-job");
