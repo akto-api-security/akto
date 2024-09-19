@@ -131,8 +131,8 @@ public class Main {
                 loggerMaker.errorAndAddToDb("Error writing instanceId to file: " + e.getMessage());
             }
         }
-        int batchSize = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_BATCH_SIZE"));
-        int kafkaLingerMS = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_LINGER_MS"));
+        int batchSize = Integer.parseInt(System.getenv("AKTO_TRAFFIC_BATCH_SIZE"));
+        int kafkaLingerMS = Integer.parseInt(System.getenv("AKTO_TRAFFIC_BATCH_TIME_SECS"));
         kafkaProducer = new Kafka(brokerUrl, kafkaLingerMS, batchSize);
         BasicDBObject creds = new BasicDBObject();
         creds.put("id", instanceId);
