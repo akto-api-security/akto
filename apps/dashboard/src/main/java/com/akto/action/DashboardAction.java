@@ -6,6 +6,7 @@ import java.util.*;
 import com.akto.dao.HistoricalDataDao;
 import com.akto.dto.HistoricalData;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.listener.RuntimeListener;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.*;
 import org.bouncycastle.util.test.Test;
@@ -13,14 +14,17 @@ import org.bson.conversions.Bson;
 
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ActivitiesDao;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Activity;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.IssueTrendType;
 import com.mongodb.BasicDBList;
@@ -71,15 +75,40 @@ public class DashboardAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
     private long totalIssuesCount = 0;
     private long oldOpenCount = 0;
     public String findTotalIssues() {
-        if (startTimeStamp == 0) startTimeStamp = Context.now() - 24 * 7 * 60 * 60;
-        totalIssuesCount = TestingRunIssuesDao.instance.count(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.OPEN));
+        Set<Integer> demoCollections = new HashSet<>();
+        demoCollections.addAll(deactivatedCollections);
+        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
+        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+
+        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
+
+
+        if (startTimeStamp == 0) startTimeStamp = Context.now() - 24 * 1 * 60 * 60;
+        // totoal issues count = issues that were created before endtimestamp and are either still open or fixed but last updated is after endTimestamp
+        totalIssuesCount = TestingRunIssuesDao.instance.count(
+            Filters.and(
+                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
+                Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
+                Filters.or(
+                    Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.OPEN),
+                    Filters.and(
+                        Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.FIXED),
+                        Filters.lte(TestingRunIssues.LAST_UPDATED, endTimeStamp)
+                    )
+                )
+            )       
+        );
 
         // issues that have been created till start timestamp
         oldOpenCount = TestingRunIssuesDao.instance.count(
                 Filters.and(
+                        Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
                         Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp),
                         Filters.ne(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.IGNORED)
                 )
@@ -116,13 +145,22 @@ public class DashboardAction extends UserAction {
     public String fetchCriticalIssuesTrend(){
         if(endTimeStamp == 0) endTimeStamp = Context.now();
         if (severityToFetch == null || severityToFetch.isEmpty()) severityToFetch = Arrays.asList("CRITICAL", "HIGH");
+
+        Set<Integer> demoCollections = new HashSet<>();
+        demoCollections.addAll(deactivatedCollections);
+        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
+        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+
+        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
         
         List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED);
         Bson issuesFilter = Filters.and(
                 Filters.in(TestingRunIssues.KEY_SEVERITY, severityToFetch),
                 Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allowedStatus)
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allowedStatus),
+                Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections)
         );
 
         String dayOfYearFloat = "dayOfYearFloat";

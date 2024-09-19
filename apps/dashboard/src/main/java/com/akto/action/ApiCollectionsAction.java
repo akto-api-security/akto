@@ -32,6 +32,7 @@ import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.dto.ApiCollection.ENV_TYPE;
 import com.akto.util.Constants;
@@ -121,13 +122,22 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
     private ApiStats apiStatsStart;
     private ApiStats apiStatsEnd;
     private int startTimestamp;
     private int endTimestamp;
     public String fetchApiStats() {
+        Set<Integer> demoCollections = new HashSet<>();
+        demoCollections.addAll(deactivatedCollections);
+        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
+        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+
         ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
-        Bson filter = Filters.nin("_id.apiCollectionId", Arrays.asList(RuntimeListener.LLM_API_COLLECTION_ID, RuntimeListener.VULNERABLE_API_COLLECTION_ID, juiceshopCollection.getId()));
+        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
+
+        Bson filter = Filters.nin("_id.apiCollectionId", demoCollections);
         Pair<ApiStats, ApiStats> result = ApiInfoDao.instance.fetchApiInfoStats(filter, startTimestamp, endTimestamp);
         apiStatsStart = result.getFirst();
         apiStatsEnd = result.getSecond();

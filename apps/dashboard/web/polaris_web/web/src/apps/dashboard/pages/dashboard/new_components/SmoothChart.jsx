@@ -3,7 +3,6 @@ import HighchartsReact from 'highcharts-react-official';
 import Highcharts from 'highcharts';
 
 function SmoothAreaChart({tickPositions}) {
-    console.log(tickPositions);
     const chartOptions = {
         chart: {
             type: 'areaspline',

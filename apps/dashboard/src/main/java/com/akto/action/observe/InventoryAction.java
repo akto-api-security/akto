@@ -84,7 +84,7 @@ public class InventoryAction extends UserAction {
         demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
 
         ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
-        demoCollections.add(juiceshopCollection.getId());
+        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
         
         newCount = SingleTypeInfoDao.instance.fetchEndpointsCount(0, endTimestamp, demoCollections);
         oldCount = SingleTypeInfoDao.instance.fetchEndpointsCount(0, startTimestamp, demoCollections);

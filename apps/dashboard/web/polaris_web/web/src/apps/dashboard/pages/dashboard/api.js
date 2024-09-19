@@ -24,11 +24,11 @@ const api = {
         })
     },
 
-    fetchEndpointsCount: async(startTimeStamp,endTimeStamp) =>{
+    fetchEndpointsCount: async(startTimestamp,endTimestamp) =>{
         return await request({
             url: '/api/fetchEndpointsCount',
             method: 'post',
-            data: {startTimeStamp,endTimeStamp}
+            data: {startTimestamp,endTimestamp}
         })
     },
 

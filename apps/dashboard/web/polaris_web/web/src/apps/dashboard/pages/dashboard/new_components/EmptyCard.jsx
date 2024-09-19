@@ -1,9 +1,8 @@
 
 import {  Card, VerticalStack, Text, Icon, Box, Avatar, HorizontalStack, Link} from '@shopify/polaris';
-import {AnalyticsMajor} from '@shopify/polaris-icons';
 import React from 'react';
 
-function EmptyCard({ title }) {
+function EmptyCard({ title, subTitleComponent }) {
     return (
         <Card padding={4} key="info">
             <div style={{width: "60%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", margin: "auto", minHeight: "344px"}}>
@@ -16,7 +15,7 @@ function EmptyCard({ title }) {
                         </Box>
                     </HorizontalStack>
                     <Text fontWeight='semibold' variant='headingLg' alignment='center'>{title}</Text>
-                    <Text alignment='center' color='subdued'>There’s no data to show. <Link url="/dashboard/observe">Run test</Link> to get data populated. </Text>
+                    {subTitleComponent}
                 </VerticalStack>
             </div>
         </Card>

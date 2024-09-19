@@ -3,7 +3,7 @@ import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Scrollable, Text, VerticalStack } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import testingTransform from "../testing/transform"
 import StackedChart from '../../components/charts/StackedChart';
@@ -38,6 +38,7 @@ function HomeDashboard() {
     const [newDomains, setNewDomains] = useState([])
     const [criticalFindingsData, setCriticalFindingsData] = useState([])
     const [severityMap, setSeverityMap] = useState({})
+    const [severityMapEmpty, setSeverityMapEmpty] = useState(true)
     const [unsecuredAPIs, setUnsecuredAPIs] = useState([])
     const [totalIssuesCount, setTotalIssuesCount] = useState(0)
     const [oldIssueCount, setOldIssueCount] = useState(0)
@@ -67,7 +68,6 @@ function HomeDashboard() {
             "text": 0,
             "color": "#147CF6",
             "filterKey": "Partner",
-            "component": (<div>hi</div>)
         },
         "Internal": {
             "text": 0,
@@ -177,29 +177,57 @@ function HomeDashboard() {
     }, [startTimestamp, endTimestamp])
 
     function buildIssuesSummary(findTotalIssuesResp) {
-        setTotalIssuesCount(findTotalIssuesResp.totalIssuesCount)
-        setOldIssueCount(findTotalIssuesResp.oldOpenCount)
+        if (findTotalIssuesResp && findTotalIssuesResp.totalIssuesCount) {
+            setTotalIssuesCount(findTotalIssuesResp.totalIssuesCount)
+        } else {
+            setTotalIssuesCount(0)
+        }
+
+        if (findTotalIssuesResp && findTotalIssuesResp.oldOpenCount){
+            setOldIssueCount(findTotalIssuesResp.oldOpenCount)
+        } else {
+            setOldIssueCount(0)
+        }
     }
 
     function buildEndpointsCount(fetchEndpointsCountResp) {
         let newCount = fetchEndpointsCountResp.newCount
         let oldCount = fetchEndpointsCountResp.oldCount
 
-        setTotalAPIs(newCount)
-        setOldTotalApis(oldCount)
+        if (newCount) {
+            setTotalAPIs(newCount)
+        } else {
+            setTotalAPIs(0)
+        }
+
+        if (oldCount) {
+            setOldTotalApis(oldCount)
+        } else {
+            setOldTotalApis(0)
+        }
     }
 
     function buildMetrics(apiStats) {
+        if (!apiStats) return;
+
         const totalRiskScore = apiStats.totalRiskScore
         const totalAPIs = apiStats.totalAPIs
 
         const apisTestedInLookBackPeriod = apiStats.apisTestedInLookBackPeriod
 
-        const tempRiskScore = totalRiskScore / totalAPIs
-        setApiRiskScore(parseFloat(tempRiskScore.toFixed(2)))
+        if (totalAPIs && totalAPIs > 0 && totalRiskScore) {
+            const tempRiskScore = totalRiskScore / totalAPIs
+            setApiRiskScore(parseFloat(tempRiskScore.toFixed(2)))
+        } else {
+            setApiRiskScore(0)
+        }
 
-        const testCoverage = 100 * apisTestedInLookBackPeriod / totalAPIs
-        setTestCoverage(parseFloat(testCoverage.toFixed(2)))
+        if (totalAPIs && totalAPIs > 0 && apisTestedInLookBackPeriod) {
+            const testCoverage = 100 * apisTestedInLookBackPeriod / totalAPIs
+            setTestCoverage(parseFloat(testCoverage.toFixed(2)))
+        } else {
+            setTestCoverage(0)
+        }
     }
 
     function buildDeltaInfo(deltaInfo) {
@@ -221,6 +249,10 @@ function HomeDashboard() {
     }
 
     const generateByLineComponent = (val, time) => {
+        if (!val || isNaN(val)) return null
+        if (val === 0 ) {
+            return <Text>No change in {time}</Text>
+        }
         const source = val > 0 ? ArrowUpMinor : ArrowDownMinor
         return (
             <HorizontalStack gap={1}>
@@ -234,11 +266,12 @@ function HomeDashboard() {
     }
 
     function generateChangeComponent(val, invertColor) {
+        if (!val) return null
         const source = val > 0 ? ArrowUpMinor : ArrowDownMinor
         if (val === 0) return null
         const color = !invertColor && val > 0 ? "success" : "critical"
         return (
-            <HorizontalStack>
+            <HorizontalStack wrap={false}>
                 <Icon source={source} color={color} />
                 <div className='custom-color'>
                     <Text color={color}>{Math.abs(val)}</Text>
@@ -247,7 +280,10 @@ function HomeDashboard() {
         )
     }
 
+    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
+
     function mapAccessTypes(apiStats) {
+        if (!apiStats) return
         const apiStatsEnd = apiStats.apiStatsEnd
         const apiStatsStart = apiStats.apiStatsStart
 
@@ -371,7 +407,7 @@ function HomeDashboard() {
             title: 'Total APIs',
             data: totalAPIs,
             variant: 'heading2xl',
-            byLineComponent: generateByLineComponent((totalAPIs - oldTotalApis), "Yesterday"),
+            byLineComponent: generateByLineComponent((totalAPIs - oldTotalApis), func.timeDifference(startTimestamp, endTimestamp)),
             smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTotalApis, totalAPIs]} />)
         },
         {
@@ -379,16 +415,15 @@ function HomeDashboard() {
             data: observeFunc.formatNumberWithCommas(totalIssuesCount),
             variant: 'heading2xl',
             color: 'critical',
-            byLineComponent: generateByLineComponent((totalIssuesCount - oldIssueCount), "Yesterday"),
+            byLineComponent: generateByLineComponent((totalIssuesCount - oldIssueCount), func.timeDifference(startTimestamp, endTimestamp)),
             smoothChartComponent: (<SmoothAreaChart tickPositions={[oldIssueCount, totalIssuesCount]} />)
-
         },
         {
             title: 'API Risk Score',
             data: apiRiskScore,
             variant: 'heading2xl',
             color: apiRiskScore > 2.5 ? 'critical' : 'warning',
-            byLineComponent: generateByLineComponent((apiRiskScore - oldRiskScore).toFixed(2), "Yesterday"),
+            byLineComponent: generateByLineComponent((apiRiskScore - oldRiskScore).toFixed(2), func.timeDifference(startTimestamp, endTimestamp)),
             smoothChartComponent: (<SmoothAreaChart tickPositions={[oldRiskScore, apiRiskScore]} />)
         },
         {
@@ -396,7 +431,7 @@ function HomeDashboard() {
             data: testCoverage + "%",
             variant: 'heading2xl',
             color: testCoverage > 80 ? 'success' : 'warning',
-            byLineComponent: generateByLineComponent((testCoverage - oldTestCoverage).toFixed(2), "Yesterday"),
+            byLineComponent: generateByLineComponent((testCoverage - oldTestCoverage).toFixed(2), func.timeDifference(startTimestamp, endTimestamp)),
             smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTestCoverage, testCoverage]} />)
         }
     ]
@@ -417,7 +452,7 @@ function HomeDashboard() {
     ) : null
 
     function buildSeverityMap(apiStats) {
-        const countMap = apiStats.criticalMap;
+        const countMap = apiStats ? apiStats.criticalMap : {};
 
         const result = {
             "Critical": {
@@ -443,6 +478,9 @@ function HomeDashboard() {
         };
 
         setSeverityMap(result)
+
+        const allZero = Object.values(result).every(item => item.text === 0);
+        setSeverityMapEmpty(allZero)
     }
 
     function buildUnsecuredAPIs(input) {
@@ -496,12 +534,13 @@ function HomeDashboard() {
         return findings.map(([category]) => category);
     }
 
-    const vulnerableApisBySeverityComponent = !showTestingComponents ? <EmptyCard title="Vulnerable APIs by Severity" /> : <InfoCard
+    const vulnerableApisBySeverityComponent = !severityMapEmpty ? <InfoCard
         component={
             <div style={{ marginTop: "20px" }}>
                 <ChartypeComponent
                     data={severityMap}
                     navUrl={"/dashboard/issues/"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}
+                    pieInnerSize="50%"
                 />
             </div>
         }
@@ -509,9 +548,9 @@ function HomeDashboard() {
         titleToolTip="Vulnerable APIs by Severity"
         linkText="Fix critical issues"
         linkUrl="/dashboard/issues"
-    />
+    /> : <EmptyCard title="Vulnerable APIs by Severity" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No vulnerable APIs found</Text>: runTestEmptyCardComponent}/>
 
-    const criticalUnsecuredAPIsOverTime = !showTestingComponents ? <EmptyCard title="Critical Unsecured APIs Over Time" /> : <InfoCard
+    const criticalUnsecuredAPIsOverTime = (unsecuredAPIs && unsecuredAPIs.length > 0 && unsecuredAPIs[0].data && unsecuredAPIs[0].data.length > 0) ? <InfoCard
         component={
             <StackedChart
                 type='column'
@@ -533,9 +572,9 @@ function HomeDashboard() {
         titleToolTip="Critical Unsecured APIs Over Time"
         linkText="Fix critical issues"
         linkUrl="/dashboard/issues"
-    />
+    /> : <EmptyCard title="Critical Unsecured APIs Over Time" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Unsecured APIs found</Text>: runTestEmptyCardComponent} />
 
-    const criticalFindings = !showTestingComponents ? <EmptyCard title="Critical Findings" /> :
+    const criticalFindings = (criticalFindingsData && criticalFindingsData.length > 0 && criticalFindingsData[0].data && criticalFindingsData[0].data.length > 0) ?
         <InfoCard
             component={
                 <StackedChart
@@ -564,7 +603,7 @@ function HomeDashboard() {
             titleToolTip="Critical Findings"
             linkText="Fix critical issues"
             linkUrl="/dashboard/issues"
-        />
+        /> : <EmptyCard title="Critical Findings" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Critical findings found</Text>: runTestEmptyCardComponent} />
 
     const apisByRiskscoreComponent = <InfoCard
         component={
@@ -580,7 +619,7 @@ function HomeDashboard() {
 
     const apisByAccessTypeComponent = <InfoCard
         component={
-            <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} />
+            <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%" />
         }
         title="APIs by Access type"
         titleToolTip="APIs by Access type"
@@ -591,7 +630,9 @@ function HomeDashboard() {
     const apisByAuthTypeComponent =
         <InfoCard
             component={
-                <ChartypeComponent data={authMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} />
+                <div style={{ marginTop: showTestingComponents ? '0px' : '20px' }}>
+                    <ChartypeComponent data={authMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%"/>
+                </div>
             }
             title="APIs by Authentication"
             titleToolTip="APIs by Authentication"
@@ -631,15 +672,17 @@ function HomeDashboard() {
 
     const newDomainsComponent = <InfoCard
         component={
-            <DataTable
-                columnContentTypes={[
-                    'text',
-                ]}
-                headings={[]}
-                rows={genreateDataTableRows(newDomains)}
-                hoverable={false}
-                increasedTableDensity
-            />
+            <Scrollable style={{ height: "320px" }} shadow>
+                <DataTable
+                    columnContentTypes={[
+                        'text',
+                    ]}
+                    headings={[]}
+                    rows={genreateDataTableRows(newDomains)}
+                    hoverable={false}
+                    increasedTableDensity
+                />
+            </Scrollable>
         }
         title="New Domains"
         titleToolTip="New Domains"
@@ -672,7 +715,7 @@ function HomeDashboard() {
         </div>
     )
 
-    const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : null, dashboardComp]
+    const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : dashboardComp]
 
     return (
         <Box>
