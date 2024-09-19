@@ -380,8 +380,12 @@ function HomeDashboard() {
         Object.keys(apiStats.riskScoreMap).forEach((key) => {
             const badgeIndex = 5 - parseInt(key, 10);
             const value = apiStats.riskScoreMap[key];
-            result[badgeIndex].text = value;
-            result[badgeIndex].progressValue = `${((value / totalApisCount) * 100).toFixed(2)}%`;
+            result[badgeIndex].text = value ? value : 0;
+            if (!totalApisCount || totalApisCount === 0) {
+                result[badgeIndex].progressValue = `0%`;
+            } else {
+                result[badgeIndex].progressValue = `${((value / totalApisCount) * 100).toFixed(2)}%`;
+            }
         });
 
         setRiskScoreData(result)
