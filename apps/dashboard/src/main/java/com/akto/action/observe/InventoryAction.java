@@ -73,6 +73,32 @@ public class InventoryAction extends UserAction {
         return recentEndpoints;
     }
 
+    long newCount = 0;
+    long oldCount = 0;
+    public String fetchEndpointsCount() {
+        if (endTimestamp == 0) endTimestamp = Context.now();
+
+        Set<Integer> demoCollections = new HashSet<>();
+        demoCollections.addAll(deactivatedCollections);
+        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
+        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+
+        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
+        
+        newCount = SingleTypeInfoDao.instance.fetchEndpointsCount(0, endTimestamp, demoCollections);
+        oldCount = SingleTypeInfoDao.instance.fetchEndpointsCount(0, startTimestamp, demoCollections);
+        return SUCCESS.toUpperCase();
+    }
+
+    public long getNewCount() {
+        return newCount;
+    }
+
+    public long getOldCount() {
+        return oldCount;
+    }
+
     private String hostName;
     private List<BasicDBObject> endpoints;
     public String fetchEndpointsBasedOnHostName() {
