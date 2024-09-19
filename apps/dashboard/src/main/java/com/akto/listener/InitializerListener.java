@@ -1925,12 +1925,6 @@ public class InitializerListener implements ServletContextListener {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         logger.info("MONGO URI " + mongoURI);
 
-        try {
-            readAndSaveBurpPluginVersion();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
         boolean runJobFunctions = JobUtils.getRunJobFunctions();
         boolean runJobFunctionsAnyway = JobUtils.getRunJobFunctionsAnyway();
 
@@ -1953,18 +1947,6 @@ public class InitializerListener implements ServletContextListener {
                     }
                 } while (!connectedToMongo);
 
-                setDashboardMode();
-                updateGlobalAktoVersion();
-
-                AccountTask.instance.executeTask(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account account) {
-                        AccountSettingsDao.instance.getStats();
-                        Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
-                        setDashboardVersionForAccount();
-                    }
-                }, "context-initializer");
-
                 SingleTypeInfo.init();
 
                 int now = Context.now();
@@ -1975,57 +1957,22 @@ public class InitializerListener implements ServletContextListener {
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
                         public void accept(Account account) {
-                            runInitializerFunctions();
+                            try {
+                                backFillDiscovered();
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+
+                            try {
+                                backFillStatusCodeType();
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
                         }
                     }, "context-initializer-secondary");
 
-                    crons.trafficAlertsScheduler();
-                    crons.insertHistoricalData();
-                    if (DashboardMode.isMetered()) {
-                        setupUsageScheduler();
-                        setupUsageSyncScheduler();
-                    }
-                    trimCappedCollections();
-                    setUpPiiAndTestSourcesScheduler();
-                    setUpTrafficAlertScheduler();
-                    // setUpAktoMixpanelEndpointsScheduler();
-                    setUpDailyScheduler();
-                    setUpWebhookScheduler();
-                    cleanInventoryJobRunner();
-                    setUpDefaultPayloadRemover();
-                    setUpTestEditorTemplatesScheduler();
-                    setUpDependencyFlowScheduler();
-                    tokenGeneratorCron.tokenGeneratorScheduler();
-                    crons.deleteTestRunsScheduler();
-                    updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                    syncCronInfo.setUpUpdateCronScheduler();
-                    updateApiGroupsForAccounts();
-                    setUpUpdateCustomCollections();
-                    setUpFillCollectionIdArrayJob();
-                    setupAutomatedApiGroupsScheduler();
-                    /*
-                     * This is a temporary job.
-                     * TODO: Remove this once traffic pipeline is cleaned.
-                     */
-                    CleanInventory.cleanInventoryJobRunner();
-
-                    MatchingJob.MatchingJobRunner();
-
-                    int now2 = Context.now();
-                    int diffNow = now2 - now;
-                    logger.info(String.format("Completed init functions and scheduling jobs at %d , time taken : %d", now2, diffNow));
                 } else {
                     logger.info("Skipping init functions and scheduling jobs at " + now);
-                }
-                // setUpAktoMixpanelEndpointsScheduler();
-                //fetchGithubZip();
-                if(isSaas){
-                    try {
-                        Auth0.getInstance();
-                        loggerMaker.infoAndAddToDb("Auth0 initialized", LogDb.DASHBOARD);
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
-                    }
                 }
             }
         }, 0, TimeUnit.SECONDS);
@@ -2560,8 +2507,6 @@ public class InitializerListener implements ServletContextListener {
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
 
-            backFillDiscovered();
-            backFillStatusCodeType();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,"error while setting up dashboard: " + e.toString(), LogDb.DASHBOARD);
         }
