@@ -58,13 +58,12 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: akto-api-security
           REGISTRY_ALIAS: p7q3h0z2
-          IMAGE_TAG: kafkalatest
-          IMAGE_TAG2: latest
+          IMAGE_TAG: cyborg_test
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
           cd apps/database-abstractor
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-database-abstractor:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-database-abstractor:$IMAGE_TAG2 . --push
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-database-abstractor:$IMAGE_TAG . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG"
 
       - name: DockerHub login
@@ -79,10 +78,9 @@ jobs:
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG: kafkalatest
-          IMAGE_TAG2: latest
+          IMAGE_TAG: cyborg_test
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
           cd apps/database-abstractor
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG2 . --push
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG . --push
