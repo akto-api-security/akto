@@ -125,7 +125,7 @@ public class CleanInventory {
 
     }
     
-    public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList, String filePath, boolean shouldDeleteRequest) throws IOException{
+    public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList, String filePath, boolean shouldDeleteRequest, boolean saveLogsToDB) throws IOException{
 
         Map<Integer, ApiCollection> apiCollectionMap = apiCollections.stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
         // BufferedWriter writer = new BufferedWriter(new FileWriter(new File(filePath)));
@@ -185,15 +185,32 @@ public class CleanInventory {
 
                     if(movingApi){
                         toMove.add(sampleData.getId());
-                        logger.info("[BadApisUpdater] Updating bad from template API: " + sampleData.getId(), LogDb.DASHBOARD);
+                        if(saveLogsToDB){
+                            loggerMaker.infoAndAddToDb("Filter passed, modify sample data of API: " + sampleData.getId(), LogDb.DASHBOARD);
+                        }else{
+                            logger.info("[BadApisUpdater] Updating bad from template API: " + sampleData.getId(), LogDb.DASHBOARD);
+                        }
                     }
 
                     else if (isRedundant || !isAllowedFromTemplate) {                                
                         // writer.write(sampleData.toString());
-                        toBeDeleted.add(sampleData.getId());                                
-                        logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad API from template: " + sampleData.getId(), LogDb.DASHBOARD);
+                        toBeDeleted.add(sampleData.getId());  
+                        if(saveLogsToDB){
+                            loggerMaker.infoAndAddToDb(
+                                "Filter passed, deleting bad api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
+                            );
+                        }else{
+                            logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad API from template: " + sampleData.getId(), LogDb.DASHBOARD);
+                        }           
                     } else {
-                        logger.info("[BadApisRemover] " + isNetsparkerPresent + " Keeping API from template: " + sampleData.getId(), LogDb.DASHBOARD);
+                        if(saveLogsToDB){
+                            loggerMaker.infoAndAddToDb(
+                                "Filter did not pass, keeping api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
+                            );
+                        }else{
+                            logger.info("[BadApisRemover] " + isNetsparkerPresent + " Keeping API from template: " + sampleData.getId(), LogDb.DASHBOARD);
+                        } 
+                        
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("[BadApisRemover] Couldn't delete an api for default payload: " + sampleData.getId() + e.getMessage(), LogDb.DASHBOARD);
