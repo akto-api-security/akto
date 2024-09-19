@@ -4,6 +4,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.akto.action.observe.InventoryAction;
+import com.akto.dto.*;
+import com.akto.util.Pair;
 import org.bson.conversions.Bson;
 
 import com.akto.DaoInit;
@@ -12,16 +14,13 @@ import com.akto.dao.*;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.ApiCollection;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.usage.MetricTypes;
-import com.akto.dto.ApiCollectionTestStatus;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.Key;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
@@ -33,9 +32,8 @@ import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.ApiCollection.ENV_TYPE;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
@@ -122,6 +120,28 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
         return Action.SUCCESS.toUpperCase();
+    }
+
+    Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
+    private ApiStats apiStatsStart;
+    private ApiStats apiStatsEnd;
+    private int startTimestamp;
+    private int endTimestamp;
+    public String fetchApiStats() {
+        Set<Integer> demoCollections = new HashSet<>();
+        demoCollections.addAll(deactivatedCollections);
+        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
+        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+
+        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
+
+        Bson filter = Filters.nin("_id.apiCollectionId", demoCollections);
+        Pair<ApiStats, ApiStats> result = ApiInfoDao.instance.fetchApiInfoStats(filter, startTimestamp, endTimestamp);
+        apiStatsStart = result.getFirst();
+        apiStatsEnd = result.getSecond();
+        return SUCCESS.toUpperCase();
     }
 
     public String fetchAllCollectionsBasic() {
@@ -751,5 +771,21 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setResponse(BasicDBObject response) {
         this.response = response;
+    }
+
+    public ApiStats getApiStatsEnd() {
+        return apiStatsEnd;
+    }
+
+    public ApiStats getApiStatsStart() {
+        return apiStatsStart;
+    }
+
+    public void setStartTimestamp(int startTimestamp) {
+        this.startTimestamp = startTimestamp;
+    }
+
+    public void setEndTimestamp(int endTimestamp) {
+        this.endTimestamp = endTimestamp;
     }
 }

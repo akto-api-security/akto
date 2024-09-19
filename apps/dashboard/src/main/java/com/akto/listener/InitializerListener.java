@@ -1980,6 +1980,7 @@ public class InitializerListener implements ServletContextListener {
                     }, "context-initializer-secondary");
 
                     crons.trafficAlertsScheduler();
+                    crons.insertHistoricalData();
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
                         setupUsageSyncScheduler();
@@ -2324,6 +2325,114 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void backFillDiscovered() {
+
+        long count = ApiInfoDao.instance.count(Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false));
+        if (count == 0) {
+            loggerMaker.infoAndAddToDb("No need to backFillDiscovered");
+            return;
+        }
+
+        loggerMaker.infoAndAddToDb("Running back fill discovered");
+
+        List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
+        ObjectId id = null;
+        Bson sort = Sorts.ascending("_id");
+        do {
+            Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
+            Bson idFilter = id == null ? Filters.empty() : Filters.gt("_id", id);
+            singleTypeInfos = SingleTypeInfoDao.instance.findAll(Filters.gt("_id", idFilter), 0, 100_000, sort, Projections.include(SingleTypeInfo._TIMESTAMP, SingleTypeInfo._URL, SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._METHOD));
+            for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+                id = singleTypeInfo.getId();
+                ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(singleTypeInfo.getApiCollectionId(), singleTypeInfo.getUrl(), Method.fromString(singleTypeInfo.getMethod()));
+                ApiInfo apiInfo = apiInfoMap.getOrDefault(apiInfoKey, new ApiInfo(apiInfoKey));
+                if (apiInfo.getDiscoveredTimestamp() == 0 || apiInfo.getDiscoveredTimestamp() > singleTypeInfo.getTimestamp()) {
+                    apiInfo.setDiscoveredTimestamp(singleTypeInfo.getTimestamp());
+                }
+                apiInfoMap.put(apiInfoKey, apiInfo);
+            }
+
+            List<WriteModel<ApiInfo>> updates = new ArrayList<>();
+            for (ApiInfo apiInfo: apiInfoMap.values()) {
+                updates.add(
+                        new UpdateOneModel<>(
+                                ApiInfoDao.getFilter(apiInfo.getId()),
+                                Updates.min(ApiInfo.DISCOVERED_TIMESTAMP, apiInfo.getDiscoveredTimestamp()),
+                                new UpdateOptions().upsert(false)
+                        )
+                );
+            }
+            if (!updates.isEmpty()) ApiInfoDao.instance.getMCollection().bulkWrite(updates);
+
+        } while (!singleTypeInfos.isEmpty());
+
+        loggerMaker.infoAndAddToDb("Finished running back fill discovered");
+    }
+
+    private static void backFillStatusCodeType() {
+        long count = ApiInfoDao.instance.count(Filters.exists(ApiInfo.API_TYPE, false));
+        if (count == 0) {
+            loggerMaker.infoAndAddToDb("No need to run backFillStatusCodeType");
+            return;
+        }
+
+        loggerMaker.infoAndAddToDb("Running backFillStatusCodeType");
+
+        List<SampleData> sampleDataList = new ArrayList<>();
+        Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");
+        int skip = 0;
+        do {
+            sampleDataList = SampleDataDao.instance.findAll(Filters.empty(), skip, 100, sort);
+            skip += sampleDataList.size();
+            List<ApiInfo> apiInfoList = new ArrayList<>();
+            for (SampleData sampleData: sampleDataList) {
+                Key id = sampleData.getId();
+                List<String> samples = sampleData.getSamples();
+                if (samples == null || samples.isEmpty()) continue;
+                ApiInfo apiInfo = new ApiInfo(new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()));
+                apiInfo.setResponseCodes(new ArrayList<>());
+                for (String sample: samples) {
+                    try {
+                        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+
+                        int statusCode = httpResponseParams.getStatusCode();
+                        if (!apiInfo.getResponseCodes().contains(statusCode)) {
+                            apiInfo.getResponseCodes().add(statusCode);
+                        }
+
+                        ApiInfo.ApiType apiType = ApiInfo.findApiTypeFromResponseParams(httpResponseParams);
+                        apiInfo.setApiType(apiType);
+                    } catch (Exception e) {
+                        continue;
+                    }
+                }
+                apiInfoList.add(apiInfo);
+            }
+
+            List<WriteModel<ApiInfo>> updates = new ArrayList<>();
+            for (ApiInfo apiInfo: apiInfoList) {
+                List<Bson> subUpdates = new ArrayList<>();
+
+                // response codes
+                subUpdates.add(Updates.addEachToSet(ApiInfo.RESPONSE_CODES, apiInfo.getResponseCodes()));
+
+                // api type
+                subUpdates.add(Updates.set(ApiInfo.API_TYPE, apiInfo.getApiType()));
+                updates.add(
+                        new UpdateOneModel<>(
+                                ApiInfoDao.getFilter(apiInfo.getId()),
+                                Updates.combine(subUpdates),
+                                new UpdateOptions().upsert(false)
+                        )
+                );
+            }
+            if (!updates.isEmpty()) ApiInfoDao.instance.getMCollection().bulkWrite(updates);
+
+        } while (!sampleDataList.isEmpty());
+
+        loggerMaker.infoAndAddToDb("Finished running backFillStatusCodeType");
+    }
+
     private static void dropLastCronRunInfoField(BackwardCompatibility backwardCompatibility){
         if(backwardCompatibility.getDeleteLastCronRunInfo() == 0){
             AccountSettingsDao.instance.updateOne(Filters.empty(), Updates.unset(AccountSettings.LAST_UPDATED_CRON_INFO));
@@ -2451,6 +2560,9 @@ public class InitializerListener implements ServletContextListener {
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
+
+            backFillDiscovered();
+            backFillStatusCodeType();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,"error while setting up dashboard: " + e.toString(), LogDb.DASHBOARD);
         }

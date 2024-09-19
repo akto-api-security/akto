@@ -4,7 +4,9 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.ApiStats;
 import com.akto.util.Constants;
+import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
@@ -18,6 +20,7 @@ import com.mongodb.client.model.UnwindOptions;
 import com.mongodb.client.model.Updates;
 
 import org.bson.conversions.Bson;
+import org.checkerframework.checker.units.qual.A;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -194,6 +197,42 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
             } 
         }
         return apiInfoList;
+    }
+
+    public Pair<ApiStats,ApiStats> fetchApiInfoStats(Bson collectionFilter, int startTimestamp, int endTimestamp) {
+        ApiStats apiStatsStart = new ApiStats(startTimestamp);
+        ApiStats apiStatsEnd = new ApiStats(endTimestamp);
+
+        int totalApis = 0;
+        int apisTestedInLookBackPeriod = 0;
+        float totalRiskScore = 0;
+
+        // we need only end timestamp filter because data needs to be till end timestamp while start timestamp is for calculating delta
+        Bson filter = Filters.and(collectionFilter, Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp));
+        MongoCursor<ApiInfo> cursor = instance.getMCollection().find(filter).cursor();
+
+        while(cursor.hasNext()) {
+            ApiInfo apiInfo = cursor.next();
+            if (apiInfo.getDiscoveredTimestamp() <= startTimestamp) {
+                apiInfo.addStats(apiStatsStart);
+                apiStatsStart.setTotalAPIs(apiStatsStart.getTotalAPIs()+1);
+                apiStatsStart.setTotalRiskScore(apiStatsStart.getTotalRiskScore() + apiInfo.getRiskScore());
+            }
+
+            apiInfo.addStats(apiStatsEnd);
+            totalApis += 1;
+            totalRiskScore += apiInfo.getRiskScore();
+            if (apiInfo.getLastTested() > (Context.now() - 30 * 24 * 60 * 60)) apisTestedInLookBackPeriod += 1;
+            String severity = apiInfo.findSeverity();
+            apiStatsEnd.addSeverityCount(severity);
+        }
+        cursor.close();
+
+        apiStatsEnd.setTotalAPIs(totalApis);
+        apiStatsEnd.setApisTestedInLookBackPeriod(apisTestedInLookBackPeriod);
+        apiStatsEnd.setTotalRiskScore(totalRiskScore);
+
+        return new Pair<>(apiStatsStart, apiStatsEnd);
     }
 
     @Override

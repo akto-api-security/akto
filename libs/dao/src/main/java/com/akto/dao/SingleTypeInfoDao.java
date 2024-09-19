@@ -668,6 +668,45 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return finalArrList;
     }
 
+    public long fetchEndpointsCount(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections) {
+        List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
+        nonHostApiCollectionIds.addAll(deactivatedCollections);
+
+        Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
+        Bson filterQWithTs = Filters.and(
+                Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
+                Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
+                Filters.nin(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
+                hostFilterQ
+        );
+
+        long count = SingleTypeInfoDao.instance.count(filterQWithTs);
+
+        nonHostApiCollectionIds.removeAll(deactivatedCollections);
+
+        if (nonHostApiCollectionIds.size() > 0){
+            List<Bson> pipeline = new ArrayList<>();
+
+            pipeline.add(Aggregates.match(Filters.in("apiCollectionId", nonHostApiCollectionIds)));
+
+            BasicDBObject groupedId = 
+                new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                .append("url", "$url")
+                .append("method", "$method");
+            pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp")));
+            pipeline.add(Aggregates.match(Filters.gte("startTs", startTimestamp)));
+            pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
+            pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+            MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+            while(endpointsCursor.hasNext()) {
+                count += 1;
+                endpointsCursor.next();
+            }
+        }
+
+        return count;
+    }
+
     public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections){
         List<BasicDBObject> endpoints = new ArrayList<>();
         List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
