@@ -1,8 +1,6 @@
 package com.akto.utils.crons;
 
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.*;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -17,6 +15,7 @@ import com.akto.dto.HistoricalData;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 
+import com.akto.task.Cluster;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -37,6 +36,8 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
+
+import static com.akto.task.Cluster.callDibs;
 
 public class Crons {
 
@@ -135,12 +136,11 @@ public class Crons {
     }
 
     public void insertHistoricalData() {
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run(){
+        Runnable task = new Runnable() {
+            public void run() {
                 AccountTask.instance.executeTaskHybridAccounts(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        // todo: dibs
                         int currentTime = Context.now();
                         Map<Integer, HistoricalData> historicalDataMap = new HashMap<>();
                         MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection().find().cursor();
@@ -150,8 +150,8 @@ public class Crons {
                             List<Integer> collectionIds = apiInfo.getCollectionIds();
                             float riskScore = apiInfo.getRiskScore();
 
-                            for (Integer collectionId: collectionIds) {
-                                HistoricalData historicalData = historicalDataMap.getOrDefault(collectionId, new HistoricalData(collectionId, 0,0,0, currentTime));
+                            for (Integer collectionId : collectionIds) {
+                                HistoricalData historicalData = historicalDataMap.getOrDefault(collectionId, new HistoricalData(collectionId, 0, 0, 0, currentTime));
                                 historicalData.setTotalApis(historicalData.getTotalApis() + 1);
                                 historicalData.setRiskScore(historicalData.getRiskScore() + riskScore);
 
@@ -169,6 +169,24 @@ public class Crons {
                     }
                 }, "historical-data-scheduler");
             }
-        }, 0,1, TimeUnit.DAYS);
+        };
+
+        long initialDelay = calculateInitialDelay();
+        long period = TimeUnit.DAYS.toMillis(1); // 24 hours period
+
+        scheduler.scheduleAtFixedRate(task, initialDelay, period, TimeUnit.MILLISECONDS);
     }
+
+    private static long calculateInitialDelay() {
+        ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+        ZonedDateTime nextRun = now.withHour(23).withMinute(59).withSecond(0).withNano(0);
+
+        if (now.isAfter(nextRun)) {
+            nextRun = nextRun.plusDays(1); // Schedule for the next day
+        }
+
+        return Duration.between(now, nextRun).toMillis();
+    }
+
+
 }
