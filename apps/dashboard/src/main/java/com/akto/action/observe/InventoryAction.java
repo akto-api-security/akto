@@ -345,14 +345,36 @@ public class InventoryAction extends UserAction {
     }
 
     public String fetchApiInfosFromSTIs(){
-        List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0);
+        ApiCollection collection = ApiCollectionsDao.instance.findOne(
+            Filters.in(Constants.ID, apiCollectionId),
+            Projections.include(ApiCollection.HOST_NAME)
+        );
+        if(collection == null){
+            addActionError("No such collection exists");
+            return Action.ERROR.toUpperCase();
+        }
+        List<BasicDBObject> list = new ArrayList<>();
+        if(collection.getHostName() == null || collection.getHostName().isEmpty()){
+            Bson filter = Filters.and(
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
+                Filters.nin(SingleTypeInfo._COLLECTION_IDS, deactivatedCollections)
+            );
+            list = ApiCollectionsDao.fetchEndpointsInCollection(filter, 0, -1, Utils.DELTA_PERIOD_VALUE);
+        }else{
+            list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0);
+        }
+         
         response = new BasicDBObject();
         response.put("list", list);
         return Action.SUCCESS.toUpperCase();
     }
 
     public String fetchApiInfosForCollection(){
-        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(
+            Filters.and(
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
+                Filters.nin(SingleTypeInfo._COLLECTION_IDS, deactivatedCollections)
+            ));
         for(ApiInfo apiInfo: apiInfos){
             apiInfo.calculateActualAuth();
         }
@@ -413,7 +435,10 @@ public class InventoryAction extends UserAction {
             filterCustomSensitiveParams.add(Filters.eq("sensitive", true));
             
             if (apiCollectionId != -1) {
-                Bson apiCollectionIdFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
+                Bson apiCollectionIdFilter = Filters.and(
+                    Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
+                    Filters.nin(SingleTypeInfo._COLLECTION_IDS, deactivatedCollections)
+                );
                 filterCustomSensitiveParams.add(apiCollectionIdFilter);
             }
 

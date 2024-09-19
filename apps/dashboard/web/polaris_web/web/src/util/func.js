@@ -1544,7 +1544,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return key.replace(/[\s/]+/g, '_').toLowerCase();
   },
   showTestSampleData(selectedTestRunResult){
-
+    if(selectedTestRunResult?.vulnerable === true){
+      return true;
+    }
     let skipList = [
       "skipping execution",
       "deactivated"

@@ -133,6 +133,7 @@ function SingleTestRunPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const resultId = searchParams.get("result")
   const collectionsMap = PersistStore(state => state.collectionsMap)
+  // const { currentTestsObj } = usePolling()
 
   function fillData(data, key){
     setTestRunResults((prev) => {
@@ -248,8 +249,6 @@ function SingleTestRunPage() {
     }
     loadData();
   }, [subCategoryMap])
-
-  // console.log("rest in peace")
 
   useEffect(() => {
     if (resultId === null || resultId.length === 0) {
@@ -433,7 +432,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
 
   const progress = useMemo(() => {
     return currentTestObj.testsInitiated === 0 ? 0 : Math.floor((currentTestObj.testsInsertedInDb * 100) / currentTestObj.testsInitiated);
-}, [currentTestObj]);
+}, [currentTestObj.testingRunId]);
 
 const runningTestsComp = useMemo(() => (
     currentTestObj.testingRunId !== -1 ? (

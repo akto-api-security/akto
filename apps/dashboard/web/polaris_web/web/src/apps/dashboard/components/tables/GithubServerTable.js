@@ -262,7 +262,7 @@ function GithubServerTable(props) {
   
 
   const {selectedResources, allResourcesSelected, handleSelectionChange } =
-    useIndexResourceState(fullDataIds, {
+    useIndexResourceState(fullDataIds!== undefined ? fullDataIds : data , {
       resourceIDResolver,
     });
 

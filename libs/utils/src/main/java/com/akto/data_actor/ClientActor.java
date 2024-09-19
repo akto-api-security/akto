@@ -1207,6 +1207,32 @@ public class ClientActor extends DataActor {
 
     }
 
+    public void updateRepoLastRun( CodeAnalysisRepo codeAnalysisRepo) {
+        Map<String, List<String>> headers = buildHeaders();
+
+        Map<String, Object> m = new HashMap<>();
+        m.put("projectName", codeAnalysisRepo.getProjectName());
+        m.put("repoName", codeAnalysisRepo.getRepoName());
+        m.put("codeAnalysisRepo",codeAnalysisRepo);
+
+        String json = gson.toJson(m);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateRepoLastRun", "", "POST", json , headers, "");
+
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+
+
+    }
+
     public List<CodeAnalysisRepo> findReposToRun()  {
         List<CodeAnalysisRepo> codeAnalysisRepos = new ArrayList<>();
 

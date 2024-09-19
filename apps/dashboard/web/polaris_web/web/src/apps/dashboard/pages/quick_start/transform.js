@@ -11,6 +11,7 @@ import ApiInventoryFromSourceCode from "./components/ApiInventoryFromSourceCode"
 import func from "@/util/func"
 import AddOnComponenet from "./components/shared/AddOnComponenet"
 import BitBucketSource from "./components/BitBucketSource"
+import GithubSource from "./components/GithubSource"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -36,7 +37,7 @@ const githubObj = {
     text: "We recommend setting up GitHub if you want to connect and retrieve APIs directly from your source code hosted on GitHub.",
     docsUrl: 'https://docs.akto.io/traffic-connections',
     key: "GitHub",
-    component: <AddOnComponenet/>
+    component: <GithubSource/>
 }
 
 const gitlabObj = {

@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.akto.dao.*;
 import com.akto.dto.*;
+import org.bson.conversions.Bson;
 import org.bson.types.Code;
 import org.bson.types.ObjectId;
 import org.checkerframework.checker.units.qual.s;
@@ -44,7 +45,7 @@ public class CodeAnalysisAction extends UserAction {
     private String projectDir;
     private String apiCollectionName;
     private List<CodeAnalysisApi> codeAnalysisApisList;
-
+    private CodeAnalysisRepo.SourceCodeType sourceCodeType;
     public static final int MAX_BATCH_SIZE = 100;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class);
@@ -326,7 +327,8 @@ public class CodeAnalysisAction extends UserAction {
             updates.add(new UpdateOneModel<>(
                 Filters.and(
                         Filters.eq(CodeAnalysisRepo.REPO_NAME, c.getRepoName()),
-                        Filters.eq(CodeAnalysisRepo.PROJECT_NAME, c.getProjectName())
+                        Filters.eq(CodeAnalysisRepo.PROJECT_NAME, c.getProjectName()),
+                        Filters.eq(CodeAnalysisRepo.SOURCE_CODE_TYPE, c.getSourceCodeType())
                 ),
                 Updates.combine(
                         Updates.setOnInsert(CodeAnalysisRepo.LAST_RUN, 0),
@@ -378,7 +380,20 @@ public class CodeAnalysisAction extends UserAction {
 
     List<CodeAnalysisRepo> codeAnalysisRepos;
     public String fetchCodeAnalysisRepos() {
-        codeAnalysisRepos = CodeAnalysisRepoDao.instance.findAll(new BasicDBObject());
+        if (sourceCodeType == null) {
+            sourceCodeType = CodeAnalysisRepo.SourceCodeType.BITBUCKET;
+        }
+        Bson filters;
+        if (sourceCodeType == CodeAnalysisRepo.SourceCodeType.BITBUCKET) {
+            filters = Filters.or(
+                    Filters.eq(CodeAnalysisRepo.SOURCE_CODE_TYPE, sourceCodeType),
+                    Filters.exists(CodeAnalysisRepo.SOURCE_CODE_TYPE, false)
+
+            );
+        } else {
+            filters = Filters.eq(CodeAnalysisRepo.SOURCE_CODE_TYPE, sourceCodeType);
+        }
+        codeAnalysisRepos = CodeAnalysisRepoDao.instance.findAll(filters);
         return SUCCESS.toUpperCase();
     }
 
@@ -417,5 +432,13 @@ public class CodeAnalysisAction extends UserAction {
 
     public void setCodeAnalysisRepos(List<CodeAnalysisRepo> codeAnalysisRepos) {
         this.codeAnalysisRepos = codeAnalysisRepos;
+    }
+
+    public CodeAnalysisRepo.SourceCodeType getSourceCodeType() {
+        return sourceCodeType;
+    }
+
+    public void setSourceCodeType(CodeAnalysisRepo.SourceCodeType sourceCodeType) {
+        this.sourceCodeType = sourceCodeType;
     }
 }
