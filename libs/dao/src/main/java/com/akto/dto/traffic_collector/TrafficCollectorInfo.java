@@ -9,14 +9,17 @@ public class TrafficCollectorInfo {
     private int startTime;
     public static final String  LAST_HEARTBEAT = "lastHeartbeat";
     private int lastHeartbeat;
+    public static final String VERSION = "version";
+    private String version;
 
     public TrafficCollectorInfo() {}
 
-    public TrafficCollectorInfo(String id, String runtimeId, int startTime, int lastHeartbeat) {
+    public TrafficCollectorInfo(String id, String runtimeId, int startTime, int lastHeartbeat, String version) {
         this.id = id;
         this.runtimeId = runtimeId;
         this.startTime = startTime;
         this.lastHeartbeat = lastHeartbeat;
+        this.version = version;
     }
 
     public String getId() {
@@ -49,5 +52,13 @@ public class TrafficCollectorInfo {
 
     public void setRuntimeId(String runtimeId) {
         this.runtimeId = runtimeId;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
     }
 }

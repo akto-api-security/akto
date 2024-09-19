@@ -47,13 +47,14 @@ public class TrafficCollectorInfoDao extends AccountsContextDao<TrafficCollector
     }
 
 
-    public void updateHeartbeat(String id, String runtimeId) {
+    public void updateHeartbeat(String id, String runtimeId, String version) {
         instance.updateOne(
                 Filters.eq("_id", id),
                 Updates.combine(
                         Updates.set(TrafficCollectorInfo.LAST_HEARTBEAT, Context.now()),
                         Updates.setOnInsert(TrafficCollectorInfo.START_TIME, Context.now()),
-                        Updates.setOnInsert(TrafficCollectorInfo.RUNTIME_ID, runtimeId)
+                        Updates.setOnInsert(TrafficCollectorInfo.RUNTIME_ID, runtimeId),
+                        Updates.set(TrafficCollectorInfo.VERSION, version)
                 )
         );
     }
