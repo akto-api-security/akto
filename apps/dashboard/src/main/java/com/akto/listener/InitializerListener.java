@@ -653,7 +653,7 @@ public class InitializerListener implements ServletContextListener {
                             );
                             List<String> redundantUrlList = accountSettings.getAllowRedundantEndpointsList();
                             try {
-                                CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections , yamlTemplates, redundantUrlList,filePath, shouldDeleteApis);
+                                CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections , yamlTemplates, redundantUrlList,filePath, shouldDeleteApis, false);
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }
