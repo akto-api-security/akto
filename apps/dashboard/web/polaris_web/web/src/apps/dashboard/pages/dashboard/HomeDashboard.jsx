@@ -22,6 +22,7 @@ import SmoothAreaChart from './new_components/SmoothChart'
 import DateRangeFilter from '../../components/layouts/DateRangeFilter';
 import { produce } from 'immer';
 import EmptyCard from './new_components/EmptyCard';
+import TooltipText from '../../components/shared/TooltipText';
 
 function HomeDashboard() {
 
@@ -507,8 +508,10 @@ function HomeDashboard() {
         return collections.map((collection, index) => ([
             <HorizontalStack align='space-between'>
                 <HorizontalStack gap={2}>
-                    <Text>{collection.name}</Text>
-                    <Text color='subdued'>{Math.floor(100.0 * collection.apisTested / collection.totalApis)}% test coverage</Text>
+                    <Box maxWidth='287px'>
+                        <TooltipText tooltip={collection.name} text={collection.name}/>
+                    </Box>
+                    <Text variant='bodySm' color='subdued'>{Math.floor(100.0 * collection.apisTested / collection.totalApis)}% test coverage</Text>
                 </HorizontalStack>
                 <Text>{collection.totalApis}</Text>
             </HorizontalStack>
