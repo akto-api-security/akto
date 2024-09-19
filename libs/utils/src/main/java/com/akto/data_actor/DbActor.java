@@ -27,6 +27,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
+import com.mongodb.BasicDBList;
 import com.mongodb.client.model.WriteModel;
 
 import java.util.ArrayList;
@@ -470,6 +471,10 @@ public class DbActor extends DataActor {
 
     public List<YamlTemplate> fetchActiveAdvancedFilters(){
         return DbLayer.fetchActiveFilterTemplates();
+    }
+
+    public void insertRuntimeMetricsData(BasicDBList metricsData) {
+        DbLayer.insertRuntimeMetricsData(metricsData);
     }
 
 }

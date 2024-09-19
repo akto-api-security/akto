@@ -1,6 +1,8 @@
 package com.akto.metrics;
 
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
@@ -12,13 +14,13 @@ import okhttp3.*;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class AllMetrics {
 
+    public static final DataActor dataActor = DataActorFactory.fetchInstance();
     private String instanceId;
     private String version;
 
@@ -95,6 +97,7 @@ public class AllMetrics {
                 }
                 if(!list.isEmpty()) {
                     sendDataToAkto(list);
+                    dataActor.insertRuntimeMetricsData(list);
                 }
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb("Error while sending metrics to akto: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
@@ -414,6 +417,32 @@ public class AllMetrics {
     }
 
     public static void sendDataToAkto(BasicDBList list){
+        MediaType mediaType = MediaType.parse("application/json");
+        RequestBody body = RequestBody.create(new BasicDBObject("data", list).toJson(), mediaType);
+        Request request = new Request.Builder()
+                .url(URL)
+                .method("POST", body)
+                .addHeader("Content-Type", "application/json")
+                .build();
+        Response response = null;
+        try {
+            response =  client.newCall(request).execute();
+        } catch (IOException e) {
+            loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+        } finally {
+            if (response != null) {
+                response.close();
+            }
+        }
+        if (response!= null && response.isSuccessful()) {
+            loggerMaker.infoAndAddToDb("Updated traffic_metrics", LoggerMaker.LogDb.RUNTIME);
+        } else {
+            loggerMaker.infoAndAddToDb("Traffic_metrics not sent", LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+    public static void sendData(BasicDBList list){
+
         MediaType mediaType = MediaType.parse("application/json");
         RequestBody body = RequestBody.create(new BasicDBObject("data", list).toJson(), mediaType);
         Request request = new Request.Builder()

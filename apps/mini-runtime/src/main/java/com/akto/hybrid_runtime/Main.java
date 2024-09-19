@@ -1,6 +1,10 @@
 package com.akto.hybrid_runtime;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -25,6 +29,7 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
@@ -413,6 +418,17 @@ public class Main {
 
                     if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
                         loggerMaker.infoAndAddToDb("STI count is greater than 20M, skipping", LogDb.RUNTIME);
+                        continue;
+                    }
+
+                    if (UsageMetricUtils.checkActiveEndpointOverage(accountIdInt)) {
+                        int now = Context.now();
+                        int lastSent = logSentMap.getOrDefault(accountIdInt, 0);
+                        if (now - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
+                            logSentMap.put(accountIdInt, now);
+                            loggerMaker.infoAndAddToDb("Active endpoint overage detected for account " + accountIdInt
+                                    + ". Ingestion stopped " + now, LogDb.RUNTIME);
+                        }
                         continue;
                     }
 
