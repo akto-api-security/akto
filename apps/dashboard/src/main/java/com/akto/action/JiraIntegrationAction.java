@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.bson.conversions.Bson;
@@ -67,7 +68,11 @@ public class JiraIntegrationAction extends UserAction {
     private final String CREATE_ISSUE_ENDPOINT = "/rest/api/3/issue";
     private final String ATTACH_FILE_ENDPOINT = "/attachments";
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
-    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
+            .connectTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .build();
 
     public String testIntegration() {
 
@@ -104,11 +109,15 @@ public class JiraIntegrationAction extends UserAction {
                 for (Object projObj: projects) {
                     BasicDBObject obj = (BasicDBObject) projObj;
                     String key = obj.getString("key");
-                    loggerMaker.errorAndAddToDb("evaluating issuetype for project key " + key + " ,actualProjId " + projId, LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.infoAndAddToDb("evaluating issuetype for project key " + key + " ,actualProjId " + projId, LoggerMaker.LogDb.DASHBOARD);
+                    if (issueType!=null) {
+                        break;
+                    }
+
                     if (!key.equalsIgnoreCase(projId)) {
                         continue;
                     }
-                    loggerMaker.errorAndAddToDb("evaluating issuetype for project key " + key + ", project json obj " + obj, LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.infoAndAddToDb("evaluating issuetype for project key " + key + ", project json obj " + obj, LoggerMaker.LogDb.DASHBOARD);
                     BasicDBList issueTypes = (BasicDBList) obj.get("issuetypes");
                     issueType = determineIssueType(issueTypes, "TASK");
                     loggerMaker.infoAndAddToDb("evaluated issue type for TASK type " + issueType, LoggerMaker.LogDb.DASHBOARD);
