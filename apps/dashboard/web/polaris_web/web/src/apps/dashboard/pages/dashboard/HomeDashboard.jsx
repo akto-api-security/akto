@@ -23,6 +23,7 @@ import DateRangeFilter from '../../components/layouts/DateRangeFilter';
 import { produce } from 'immer';
 import EmptyCard from './new_components/EmptyCard';
 import TooltipText from '../../components/shared/TooltipText';
+import transform from '../observe/transform';
 
 function HomeDashboard() {
 
@@ -406,7 +407,7 @@ function HomeDashboard() {
     const summaryInfo = [
         {
             title: 'Total APIs',
-            data: totalAPIs,
+            data: transform.formatNumberWithCommas(totalAPIs),
             variant: 'heading2xl',
             byLineComponent: generateByLineComponent((totalAPIs - oldTotalApis), func.timeDifference(startTimestamp, endTimestamp)),
             smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTotalApis, totalAPIs]} />)
