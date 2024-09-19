@@ -19,8 +19,13 @@ import java.util.concurrent.TimeUnit;
 
 public class AllMetrics {
 
-    public void init(){
+    private String instanceId;
+    private String version;
+
+    public void init(String instanceId, String version){
         int accountId = Context.accountId.get();
+        this.setInstanceId(instanceId);
+        this.setVersion(version);
 
         Organization organization = DataActorFactory.fetchInstance().fetchOrganization(accountId);
         String orgId = organization.getId();
@@ -81,8 +86,10 @@ public class AllMetrics {
                     metricsData.put("metric_id", m.metricId);
                     metricsData.put("val", metric);
                     metricsData.put("org_id", m.orgId);
-                    metricsData.put("instance_id", instance_id);
+                    metricsData.put("instance_id", this.getInstanceId());
+                    metricsData.put("version", this.getVersion());
                     metricsData.put("account_id", m.accountId);
+                    metricsData.put("timestamp", Context.now());
                     list.add(metricsData);
 
                 }
@@ -110,7 +117,6 @@ public class AllMetrics {
 
     private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class);
 
-    private static final String instance_id = UUID.randomUUID().toString();
     private Metric runtimeKafkaRecordCount;
     private Metric runtimeKafkaRecordSize;
     private Metric runtimeProcessLatency = null;
@@ -430,5 +436,21 @@ public class AllMetrics {
         } else {
             loggerMaker.infoAndAddToDb("Traffic_metrics not sent", LoggerMaker.LogDb.RUNTIME);
         }
+    }
+
+    public String getInstanceId() {
+        return instanceId;
+    }
+
+    public void setInstanceId(String instanceId) {
+        this.instanceId = instanceId;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
     }
 }
