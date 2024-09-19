@@ -2303,7 +2303,21 @@ public class InitializerListener implements ServletContextListener {
             for (ApiInfo apiInfo: apiInfoMap.values()) {
                 updates.add(
                         new UpdateOneModel<>(
-                                ApiInfoDao.getFilter(apiInfo.getId()),
+                                Filters.and(
+                                    ApiInfoDao.getFilter(apiInfo.getId()),
+                                    Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false)
+                                ),
+                                Updates.set(ApiInfo.DISCOVERED_TIMESTAMP, apiInfo.getDiscoveredTimestamp()),
+                                new UpdateOptions().upsert(false)
+                        )
+                );
+
+                updates.add(
+                        new UpdateOneModel<>(
+                                Filters.and(
+                                    ApiInfoDao.getFilter(apiInfo.getId()),
+                                    Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, true)
+                                ),
                                 Updates.min(ApiInfo.DISCOVERED_TIMESTAMP, apiInfo.getDiscoveredTimestamp()),
                                 new UpdateOptions().upsert(false)
                         )
