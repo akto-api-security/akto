@@ -1,5 +1,6 @@
 import { Badge, Box, Button, Card, HorizontalGrid, HorizontalStack, LegacyCard, Link, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
+import TooltipText from '../../../components/shared/TooltipText'
 
 function TestSummaryCard({ summaryItem }) {
     return (
@@ -8,8 +9,8 @@ function TestSummaryCard({ summaryItem }) {
                 <Box padding={5} maxWidth='286px' minWidth='286px' minHeight='164px'>
                     <VerticalStack gap={8}>
                         <VerticalStack gap={2}>
-                            <Box>
-                                <Text variant='headingSm'>{summaryItem.testName}</Text>
+                            <Box maxWidth='260px'>
+                                <TooltipText tooltip={summaryItem.testName} text={summaryItem.testName} textProps={{fontWeight: "semibold"}}/>
                             </Box>
                             <Text variant='headingXs' color='subdued' fontWeight='regular'>{summaryItem.time}</Text>
                         </VerticalStack>

@@ -11,7 +11,7 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
         Object.keys(data).forEach((key,index)=>{
             let comp = [
                 (
-                    <Box width='22vw'>
+                    <Box >
                         <div style={{display: "flex", gap: "8px", alignItems: "center"}} key={index}>
                             <span style={{background: data[key]?.color, borderRadius: "50%", width: "8px", height: "8px"}} />
                             <Text>{key}</Text>
@@ -55,6 +55,7 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                                 rows={tableRows}
                                 increasedTableDensity
                                 truncate
+                                hoverable={false}
                             />
                         </Box>
                     </Scrollable>

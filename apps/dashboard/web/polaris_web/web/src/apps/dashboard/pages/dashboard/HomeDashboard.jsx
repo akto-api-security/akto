@@ -704,15 +704,11 @@ function HomeDashboard() {
     const components = [summaryComp, testSummaryCardsList, gridComponent]
 
     const dashboardComp = (
-        <div style={{ display: 'flex', gap: '32px' }} key={"dashboardComp"}>
-            <div style={{ flex: 7 }}>
-                <VerticalStack gap={4}>
-                    {components.map((component) => {
-                        return component
-                    })}
-                </VerticalStack>
-            </div>
-        </div>
+        <VerticalStack gap={4}>
+            {components.map((component) => {
+                return component
+            })}
+        </VerticalStack>
     )
 
     const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : dashboardComp]
