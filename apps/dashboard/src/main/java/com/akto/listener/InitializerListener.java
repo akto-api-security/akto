@@ -2362,7 +2362,7 @@ public class InitializerListener implements ServletContextListener {
                         )
                 );
             }
-            ApiInfoDao.instance.getMCollection().bulkWrite(updates);
+            if (!updates.isEmpty()) ApiInfoDao.instance.getMCollection().bulkWrite(updates);
 
         } while (!singleTypeInfos.isEmpty());
 
@@ -2383,6 +2383,7 @@ public class InitializerListener implements ServletContextListener {
         int skip = 0;
         do {
             sampleDataList = SampleDataDao.instance.findAll(Filters.empty(), skip, 100, sort);
+            skip += sampleDataList.size();
             List<ApiInfo> apiInfoList = new ArrayList<>();
             for (SampleData sampleData: sampleDataList) {
                 Key id = sampleData.getId();
@@ -2425,7 +2426,7 @@ public class InitializerListener implements ServletContextListener {
                         )
                 );
             }
-            ApiInfoDao.instance.getMCollection().bulkWrite(updates);
+            if (!updates.isEmpty()) ApiInfoDao.instance.getMCollection().bulkWrite(updates);
 
         } while (!sampleDataList.isEmpty());
 
