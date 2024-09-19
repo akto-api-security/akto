@@ -2341,7 +2341,7 @@ public class InitializerListener implements ServletContextListener {
         do {
             Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
             Bson idFilter = id == null ? Filters.empty() : Filters.gt("_id", id);
-            singleTypeInfos = SingleTypeInfoDao.instance.findAll(Filters.gt("_id", idFilter), 0, 100_000, sort, Projections.include(SingleTypeInfo._TIMESTAMP, SingleTypeInfo._URL, SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._METHOD));
+            singleTypeInfos = SingleTypeInfoDao.instance.findAll(idFilter, 0, 100_000, sort, Projections.include(SingleTypeInfo._TIMESTAMP, SingleTypeInfo._URL, SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._METHOD));
             for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
                 id = singleTypeInfo.getId();
                 ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(singleTypeInfo.getApiCollectionId(), singleTypeInfo.getUrl(), Method.fromString(singleTypeInfo.getMethod()));
