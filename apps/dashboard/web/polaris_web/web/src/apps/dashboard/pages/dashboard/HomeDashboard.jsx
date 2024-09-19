@@ -22,6 +22,8 @@ import SmoothAreaChart from './new_components/SmoothChart'
 import DateRangeFilter from '../../components/layouts/DateRangeFilter';
 import { produce } from 'immer';
 import EmptyCard from './new_components/EmptyCard';
+import TooltipText from '../../components/shared/TooltipText';
+import transform from '../observe/transform';
 
 function HomeDashboard() {
 
@@ -378,15 +380,19 @@ function HomeDashboard() {
         Object.keys(apiStats.riskScoreMap).forEach((key) => {
             const badgeIndex = 5 - parseInt(key, 10);
             const value = apiStats.riskScoreMap[key];
-            result[badgeIndex].text = value;
-            result[badgeIndex].progressValue = `${((value / totalApisCount) * 100).toFixed(2)}%`;
+            result[badgeIndex].text = value ? value : 0;
+            if (!totalApisCount || totalApisCount === 0) {
+                result[badgeIndex].progressValue = `0%`;
+            } else {
+                result[badgeIndex].progressValue = `${((value / totalApisCount) * 100).toFixed(2)}%`;
+            }
         });
 
         setRiskScoreData(result)
     }
 
     function getCollectionsWithCoverage() {
-        const validCollections = allCollections.filter(collection => collection.hostName !== null && collection.hostName !== undefined);
+        const validCollections = allCollections.filter(collection => collection.hostName !== null && collection.hostName !== undefined && !collection.deactivated);
 
         const sortedCollections = validCollections.sort((a, b) => b.startTs - a.startTs);
 
@@ -405,7 +411,7 @@ function HomeDashboard() {
     const summaryInfo = [
         {
             title: 'Total APIs',
-            data: totalAPIs,
+            data: transform.formatNumberWithCommas(totalAPIs),
             variant: 'heading2xl',
             byLineComponent: generateByLineComponent((totalAPIs - oldTotalApis), func.timeDifference(startTimestamp, endTimestamp)),
             smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTotalApis, totalAPIs]} />)
@@ -507,8 +513,10 @@ function HomeDashboard() {
         return collections.map((collection, index) => ([
             <HorizontalStack align='space-between'>
                 <HorizontalStack gap={2}>
-                    <Text>{collection.name}</Text>
-                    <Text color='subdued'>{Math.floor(100.0 * collection.apisTested / collection.totalApis)}% test coverage</Text>
+                    <Box maxWidth='287px'>
+                        <TooltipText tooltip={collection.name} text={collection.name}/>
+                    </Box>
+                    <Text variant='bodySm' color='subdued'>{(collection.totalApis === 0 ? 0 : Math.floor(100.0 * collection.apisTested / collection.totalApis))}% test coverage</Text>
                 </HorizontalStack>
                 <Text>{collection.totalApis}</Text>
             </HorizontalStack>
