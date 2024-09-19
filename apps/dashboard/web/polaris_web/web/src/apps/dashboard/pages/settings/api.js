@@ -164,6 +164,20 @@ const settingRequests = {
             data: {groupBy, startTimestamp, endTimestamp, names, host}
         })
     },
+    fetchTrafficCollectorInfos(startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/fetchTrafficCollectorInfos',
+            method: 'post',
+            data: {startTimestamp, endTimestamp}
+        })
+    },
+    fetchTrafficCollectorMetrics(instanceId, startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/fetchTrafficCollectorMetrics',
+            method: 'post',
+            data: {instanceId, startTimestamp, endTimestamp}
+        })
+    },
 
     addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections) {
         return request({

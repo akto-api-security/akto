@@ -1,8 +1,12 @@
 package com.akto.action.traffic_metrics;
 
 import com.akto.action.UserAction;
+import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
+import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
+import com.akto.dto.traffic_collector.TrafficCollectorInfo;
+import com.akto.dto.traffic_collector.TrafficCollectorMetrics;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.mongodb.BasicDBObject;
@@ -170,6 +174,30 @@ public class TrafficMetricsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    TrafficCollectorMetrics trafficCollectorMetrics;
+    public String fetchTrafficCollectorMetrics() {
+        Bson filters = Filters.and(
+                Filters.gte("bucketStartEpoch", startTimestamp),
+                Filters.lte("bucketStartEpoch", endTimestamp),
+                Filters.in("_id", instanceId)
+        );
+        trafficCollectorMetrics = TrafficCollectorMetricsDao.instance.findOne(filters);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    List<TrafficCollectorInfo> trafficCollectorInfos;
+    public String fetchTrafficCollectorInfos() {
+        trafficCollectorInfos = new ArrayList<>();
+        Bson filters = Filters.and(
+                Filters.gte("startTime", startTimestamp),
+                Filters.lte("startTime", endTimestamp)
+        );
+        trafficCollectorInfos = TrafficCollectorInfoDao.instance.findAll(filters);
+
+        return SUCCESS.toUpperCase();
+    }
+
     public void setStartTimestamp(int startTimestamp) {
         this.startTimestamp = startTimestamp;
     }
@@ -226,5 +254,21 @@ public class TrafficMetricsAction extends UserAction {
 	public void setInstanceId(String instanceId) {
 		this.instanceId = instanceId;
 	}
+
+    public List<TrafficCollectorInfo> getTrafficCollectorInfos() {
+        return trafficCollectorInfos;
+    }
+
+    public void setTrafficCollectorInfos(List<TrafficCollectorInfo> trafficCollectorInfos) {
+        this.trafficCollectorInfos = trafficCollectorInfos;
+    }
+
+    public TrafficCollectorMetrics getTrafficCollectorMetrics() {
+        return trafficCollectorMetrics;
+    }
+
+    public void setTrafficCollectorMetrics(TrafficCollectorMetrics trafficCollectorMetrics) {
+        this.trafficCollectorMetrics = trafficCollectorMetrics;
+    }
 
 }

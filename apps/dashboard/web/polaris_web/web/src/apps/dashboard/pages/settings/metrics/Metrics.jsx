@@ -22,9 +22,13 @@ function Metrics() {
     const [currentHost, setCurrentHost] = useState(null)
 
     const [runtimeMetricsData, setRuntimeMetricsData] = useState([])
-    const [showRuntimeGraph, setShowRuntimeGraph] = useState(false)
-    const [graphs, setGraphs] = useState([])
+    const [collectorMetricsData, setCollectorMetricsData] = useState([])
+    const [showFlyout, setShowFlyout] = useState(false)
+    const [currentFlyoutType, setCurrentFlyoutType] = useState(null)
+    const [runtimeGraphs, setRuntimeGraphs] = useState([])
+    const [collectorGraphs, setCollectorGraphs] = useState([])
     const [runtimeFilterVal, setRuntimeFilterVal] = useState('1day')
+    const [trafficCollectorFilterVal, setTrafficCollectorFilterVal] = useState('1day')
     const [loading, setLoading] = useState(false)
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
@@ -83,6 +87,9 @@ function Metrics() {
     useEffect(() => {
         getRuntimeMetrics()
     }, [runtimeFilterVal])
+    useEffect(() => {
+        getTrafficCollectorMetrics()
+    }, [trafficCollectorFilterVal])
 
     useEffect(()=>{
         getGraphData(startTime,endTime)
@@ -160,7 +167,7 @@ function Metrics() {
         "rt_kafka_bytes_consumed_rate": "Kafka Bytes Consumed Rate"
     }
 
-    const runtimeFilterOptionsValueMap = {
+    const metricsTimeFilterOptionsMap = {
         "15minutes": Math.floor((Date.now() - (15 * 60 * 1000)) / 1000),
         "30minutes": Math.floor((Date.now() - (30 * 60 * 1000)) / 1000),
         "1hour": Math.floor(Date.now() / 1000) - 3600,
@@ -172,7 +179,7 @@ function Metrics() {
 
     const getRuntimeMetrics = async () => {
         const currentEpoch = Math.floor(Date.now() / 1000)
-        let runtimeRes = await settingFunctions.fetchRuntimeInstances(runtimeFilterOptionsValueMap[runtimeFilterVal], currentEpoch)
+        let runtimeRes = await settingFunctions.fetchRuntimeInstances(metricsTimeFilterOptionsMap[runtimeFilterVal], currentEpoch)
 
         const uniqueInstanceIds = new Set(runtimeRes.instanceIds)
         const runtimeMetrics = runtimeRes.runtimeMetrics
@@ -216,7 +223,25 @@ function Metrics() {
 
         setRuntimeMetricsData(groupedData)
     }
-    const runtimeFilterOptions = [
+
+    const getTrafficCollectorMetrics = async () => {
+        const currentEpoch = Math.floor(Date.now() / 1000)
+        const res = await settingFunctions.fetchTrafficCollectorInfos(metricsTimeFilterOptionsMap[trafficCollectorFilterVal], currentEpoch)
+
+        const trafficCollectorMetricRes = res.map(metrix => {
+            return {
+                "id": metrix.id,
+                "runtimeId": metrix.runtimeId,
+                "version": metrix.version,
+                "lastHeartbeat": func.prettifyEpoch(metrix.lastHeartbeat),
+                "startTime": func.prettifyEpoch(metrix.startTime)
+            }
+        })
+
+        setCollectorMetricsData(trafficCollectorMetricRes)
+    }
+
+    const metricsTimeFilterOptions = [
         { label: '15 Minutes ago', value: '15minutes' },
         { label: '30 Minutes ago', value: '30minutes' },
         { label: '1 hour ago', value: '1hour' },
@@ -255,27 +280,52 @@ function Metrics() {
         setLoading(true)
         const currentEpoch = Math.floor(Date.now() / 1000)
         const instanceId = data.id
-        const runtimeMetricsRes = await settingFunctions.fetchRuntimeMetrics(runtimeFilterOptionsValueMap[runtimeFilterVal], currentEpoch, instanceId)
+        const runtimeMetricsRes = await settingFunctions.fetchRuntimeMetrics(metricsTimeFilterOptionsMap[runtimeFilterVal], currentEpoch, instanceId)
 
         const valuesByName = getRuntimeValuesByName(runtimeMetricsRes)
 
-        setShowRuntimeGraph(true)
         const componentsArray = []
 
         Object.entries(valuesByName).forEach(([name, values]) => {
             const readableName = runtimeMetricsNameMap[name.toLowerCase()]
             const valuesWithMissingTimestamp = fillMissingTimestamps(values)
 
-            const component = runtimeGraphContainer(valuesWithMissingTimestamp, readableName)
+            const component = metricsGraphContainer(valuesWithMissingTimestamp, readableName)
             componentsArray.push(<Divider />)
             componentsArray.push(component)
         })
 
-        setGraphs(componentsArray)
+        setRuntimeGraphs(componentsArray)
+        setCurrentFlyoutType("runtime")
+        setShowFlyout(true)
 
         setTimeout(() => {
             setLoading(false)
         }, 100);
+    }
+
+    const handleOnTrafficCollectorRowClick = async (data) => {
+        setLoading(true)
+
+        const id = data.id
+        const currentEpoch = Math.floor(Date.now() / 1000)
+        const res = await settingFunctions.fetchTrafficCollectorMetrics(id, metricsTimeFilterOptionsMap[trafficCollectorFilterVal], currentEpoch)
+
+        const requestsCountMap = Object.entries(res.requestsCountMapPerMinute || []).map(([timestamp, value]) => {
+            return [parseInt(timestamp) * 60, value]
+        })
+
+        const dataWithDefaultVal = fillMissingTimestamps(requestsCountMap)
+
+        const graph = metricsGraphContainer(dataWithDefaultVal, "Traffic Collector")
+
+        setCollectorGraphs([graph])
+        setCurrentFlyoutType("collector");
+        setShowFlyout(true);
+
+        setTimeout(() => {
+            setLoading(false)
+        }, 100)
     }
 
     const getRuntimeValuesByName = (data) => {
@@ -297,7 +347,7 @@ function Metrics() {
         return valueByName;
     }
 
-    const headers = [
+    const runtimeHeaders = [
         { title: "Instance ID", text: "Instance ID", value: "id", showFilter: false },
         { title: "Heartbeat", text: "Heartbeat", value: "heartbeat", showFilter: false },
         { title: "Start Time", text: "Start Time", value: "startTime", showFilter: false },
@@ -311,6 +361,14 @@ function Metrics() {
         { title: "Kafka Bytes Consumed Rate", text: "Kafka Bytes Consumed Rate", value: "rt_kafka_bytes_consumed_rate", showFilter: false },
     ]
 
+    const collectorHeaders = [
+        { title: "ID", text: "ID", value: "id", showFilter: false },
+        { title: "Runtime ID", text: "Runtime ID", value: "runtimeId", showFilter: false },
+        { title: "Heartbeat", text: "Heartbeat", value: "lastHeartbeat", showFilter: false },
+        { title: "Start Time", text: "Start Time", value: "startTime", showFilter: false },
+        { title: "Runtime Version", text: "Runtime Version", value: "version", showFilter: false },
+    ]
+
     const promotedBulkActions = (selectedResources) => {
         const actions = [
             {
@@ -322,11 +380,11 @@ function Metrics() {
         return actions;
     }
 
-    const runtimeTableContainer = (
+    const metricsTableContainer = (type, data, onRowClick, headers) => (
         <GithubSimpleTable
-            key={"runtime-metrics-container"}
+            key={`${type}-metrics-container`}
             pageLimit={50}
-            data={runtimeMetricsData}
+            data={data}
             resourceName={{
                 singular: 'metric',
                 plural: 'metrics',
@@ -334,7 +392,7 @@ function Metrics() {
             filters={[]}
             useNewRow={true}
             condensedHeight={true}
-            onRowClick={handleOnRuntimeRowClick}
+            onRowClick={onRowClick}
             selectable={true}
             headers={headers}
             headings={headers}
@@ -345,19 +403,19 @@ function Metrics() {
         />
     )
 
-    const processChartData = (data) => {
+    const processChartData = (name, data) => {
         return [
             {
                 data: data,
                 color: "#AEE9D1",
-                name: "Runtime Values"
+                name: `${name} Values`
             },
         ]
     }
 
-    const runtimeGraphContainer = (data, title) => (
+    const metricsGraphContainer = (data, title) => (
         <LegacyCard.Section>
-            <GraphMetric data={processChartData(data)} type='spline' color='#6200EA' areaFillHex="true" height="330"
+            <GraphMetric data={processChartData("Runtime", data)} type='spline' color='#6200EA' areaFillHex="true" height="330"
                 title={title}
                 defaultChartOptions={defaultChartOptions}
                 background-color="#000000"
@@ -367,17 +425,36 @@ function Metrics() {
         </LegacyCard.Section>
     )
 
+    const flyoutTitle = currentFlyoutType === "runtime"
+        ? "Runtime Metrics Details"
+        : "Traffic Collector Metrics Details";
+
+    const flyoutComponents = currentFlyoutType === "runtime"
+        ? runtimeGraphs
+        : collectorGraphs;
+
     return (
         <Page title='Metrics' divider fullWidth>
             <LegacyCard>
                 <LegacyCard.Section>
                     <LegacyCard.Header title="Traffic Processors">
-                        <Dropdown menuItems={runtimeFilterOptions} initial= {runtimeFilterVal} selected={(val) => setRuntimeFilterVal(val)} />
+                        <Dropdown menuItems={metricsTimeFilterOptions} initial= {runtimeFilterVal} selected={(val) => setRuntimeFilterVal(val)} />
                     </LegacyCard.Header>
                 </LegacyCard.Section>
                 <Divider />
-                { runtimeTableContainer }
+                { metricsTableContainer("processor", runtimeMetricsData, handleOnRuntimeRowClick, runtimeHeaders) }
             </LegacyCard>
+
+            <LegacyCard>
+                <LegacyCard.Section>
+                    <LegacyCard.Header title="Traffic Collector">
+                        <Dropdown menuItems={metricsTimeFilterOptions} initial={trafficCollectorFilterVal} selected={(val) => setTrafficCollectorFilterVal(val)} />
+                    </LegacyCard.Header>
+                </LegacyCard.Section>
+                <Divider />
+                { metricsTableContainer("collector", collectorMetricsData, handleOnTrafficCollectorRowClick, collectorHeaders) }
+            </LegacyCard>
+
             <LegacyCard >
                 <LegacyCard.Section>
                     <LegacyCard.Header title="Metrics">
@@ -390,13 +467,15 @@ function Metrics() {
                 {graphContainer}
             </LegacyCard>
             
-            <FlyLayout
-                title="Runtime Metrics Details"
-                show={showRuntimeGraph}
-                setShow={setShowRuntimeGraph}
-                components={graphs}
-                loading={loading}
-            />
+            {showFlyout && (
+                <FlyLayout
+                    title={flyoutTitle}
+                    show={showFlyout}
+                    setShow={setShowFlyout}
+                    components={flyoutComponents}
+                    loading={loading}
+                />
+            )}
         </Page>
     )
 }

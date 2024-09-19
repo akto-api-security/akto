@@ -249,6 +249,20 @@ const settingFunctions = {
       })
       return trafficData
     },
+    fetchTrafficCollectorInfos: async function(startTimestamp, endTimestamp) {
+      let res = []
+      await settingRequests.fetchTrafficCollectorInfos(startTimestamp, endTimestamp).then((resp) => {
+        res = resp
+      })
+      return res
+    },
+    fetchTrafficCollectorMetrics: async function(id, startTimestamp, endTimestamp) {
+      let res = []
+      await settingRequests.fetchTrafficCollectorMetrics(id, startTimestamp, endTimestamp).then((resp) => {
+        res = resp
+      })
+      return res
+    },
     testJiraIntegration: async function(userEmail, apiToken, baseUrl, projId){
       let issueType = ""
       await settingRequests.testJiraIntegration(userEmail, apiToken, baseUrl, projId).then((resp)=>{
