@@ -511,7 +511,7 @@ function HomeDashboard() {
                     <Box maxWidth='287px'>
                         <TooltipText tooltip={collection.name} text={collection.name}/>
                     </Box>
-                    <Text variant='bodySm' color='subdued'>{Math.floor(100.0 * collection.apisTested / collection.totalApis)}% test coverage</Text>
+                    <Text variant='bodySm' color='subdued'>{(collection.totalApis === 0 ? 0 : Math.floor(100.0 * collection.apisTested / collection.totalApis))}% test coverage</Text>
                 </HorizontalStack>
                 <Text>{collection.totalApis}</Text>
             </HorizontalStack>
