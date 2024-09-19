@@ -12,7 +12,7 @@ const Logs = () => {
     const [ logs, setLogs ] = useState({
         startTime: null,
         endTime: null,
-        logGroup: '',
+        logGroup: 'DASHBOARD',
         logData: []
     })
     const [ loading, setLoading ] = useState(false)
@@ -103,7 +103,7 @@ const Logs = () => {
             <div style={{ display: "grid", gridTemplateColumns: "auto max-content", gap: "10px"}}>
                 <Dropdown
                     menuItems={logGroupOptions}
-                    initial="Select log group"
+                    initial="Dashboard"
                     selected={handleSelectLogGroup}
                     />
                 <ButtonGroup segmented>

@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -347,6 +348,47 @@ public class AdminSettingsAction extends UserAction {
             return ERROR.toUpperCase();
         }
         
+    }
+
+    private boolean updateFiltersFlag;
+    private String permissionValue;
+
+    Map<String,Boolean> advancedFilterPermission;
+
+    
+
+    public String getAdvancedFilterFlagsForAccount(){
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        advancedFilterPermission = new HashMap<>();
+        advancedFilterPermission.put(AccountSettings.ALLOW_FILTER_LOGS, accountSettings.getAllowFilterLogs());
+        advancedFilterPermission.put(AccountSettings.ALLOW_DELETION_OF_REDUNDANT_URLS, accountSettings.getAllowDeletionOfUrls());
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String updatePermissionsForAdvancedFilters(){
+        if(this.permissionValue.equals(AccountSettings.ALLOW_DELETION_OF_REDUNDANT_URLS) || this.permissionValue.equals(AccountSettings.ALLOW_FILTER_LOGS)){
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(this.permissionValue, this.updateFiltersFlag)
+            );
+            return SUCCESS.toUpperCase();
+        }else{
+            addActionError("invalid permission");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public void setUpdateFiltersFlag(boolean updateFiltersFlag) {
+        this.updateFiltersFlag = updateFiltersFlag;
+    }
+
+    public void setPermissionValue(String permissionValue) {
+        this.permissionValue = permissionValue;
+    }
+
+    public Map<String, Boolean> getAdvancedFilterPermission() {
+        return advancedFilterPermission;
     }
 
     public AccountSettings getAccountSettings() {
