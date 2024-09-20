@@ -44,6 +44,7 @@ public class DictionaryFilter {
         return dictFilter.mightContain(word);
     }
 
+    // Return false if any non-empty word in the array is not contained in the dictionary.
     private static boolean wordsChecker(String[] words) {
         for(String seg : words) {
             if(!seg.isEmpty() && !dictFilter.mightContain(seg.toUpperCase())) return false;
