@@ -2,6 +2,8 @@ package com.akto.dto.filter;
 
 import org.bson.types.ObjectId;
 
+import java.util.Objects;
+
 public class MergedUrls {
     private ObjectId id;
 
@@ -20,6 +22,19 @@ public class MergedUrls {
         this.url = url;
         this.method = method;
         this.apiCollectionId = apiCollectionId;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        MergedUrls that = (MergedUrls) o;
+        return apiCollectionId == that.apiCollectionId && Objects.equals(url, that.url) && Objects.equals(method, that.method);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(url, method, apiCollectionId);
     }
 
     public ObjectId getId() {
