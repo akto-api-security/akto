@@ -309,7 +309,7 @@ function Metrics() {
 
         const id = data.id
         const currentEpoch = Math.floor(Date.now() / 1000)
-        const res = await settingFunctions.fetchTrafficCollectorMetrics(id, metricsTimeFilterOptionsMap[trafficCollectorFilterVal], currentEpoch)
+        const res = await settingFunctions.fetchTrafficCollectorMetrics(id, metricsTimeFilterOptionsMap[trafficCollectorFilterVal]/86400, currentEpoch/86400)
 
         const requestsCountMap = Object.entries(res.requestsCountMapPerMinute).map(([timestamp, value]) => {
             const epochInMilliSeconds = parseInt(timestamp)*60*1000
