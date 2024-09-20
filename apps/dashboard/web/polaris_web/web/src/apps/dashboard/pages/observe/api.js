@@ -329,6 +329,15 @@ export default {
         })
         return resp
     },
+
+    async loadRecentApiInfos (startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/loadRecentApiInfos',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
     async fetchSensitiveParamsForEndpoints (urls) {
         const resp = await request({
             url: '/api/fetchSensitiveParamsForEndpoints',
