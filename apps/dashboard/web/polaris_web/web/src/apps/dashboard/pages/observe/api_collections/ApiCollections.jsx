@@ -175,12 +175,12 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         return{
             ...c,
             displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
-            testedEndpoints: coverageMap[c.id] ? coverageMap[c.id] : 0,
+            testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] ? coverageMap[c.id] : 0),
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
             severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
-            detectedTimestamp: trafficInfoMap[c.id] || 0,
-            riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0,
+            detectedTimestamp: c.urlsCount === 0 ? 0 : (trafficInfoMap[c.id] || 0),
+            riskScore: c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] ? riskScoreMap[c.id] : 0),
             discovered: func.prettifyEpoch(c.startTs || 0),
         }
     })
@@ -352,7 +352,7 @@ function ApiCollections() {
 
         // Separate active and deactivated collections
         const deactivatedCollections = dataObj.prettify.filter(c => c.deactivated).map((c)=>{
-            if(c.type !== "API_GROUP" && deactivatedCountInfo.hasOwnProperty(c.id)){
+            if(deactivatedCountInfo.hasOwnProperty(c.id)){
                 c.urlsCount = deactivatedCountInfo[c.id]
             }
             return c
