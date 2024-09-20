@@ -295,6 +295,7 @@ function ApiCollections() {
         let apiPromises = [
             api.getCoverageInfoForCollections(),
             api.getLastTrafficSeen(),
+            collectionApi.fetchCountForHostnameDeactivatedCollections()
         ];
         if(shouldCallHeavyApis){
             apiPromises = [
@@ -307,30 +308,31 @@ function ApiCollections() {
         let coverageInfo = results[0].status === 'fulfilled' ? results[0].value : {};
         // let coverageInfo = dummyData.coverageMap
         let trafficInfo = results[1].status === 'fulfilled' ? results[1].value : {};
+        let deactivatedCountInfo = results[2].status === 'fulfilled' ? results[2].value : {};
 
         let riskScoreObj = lastFetchedResp
         let sensitiveInfo = lastFetchedSensitiveResp
         let severityObj = lastFetchedSeverityResp
 
         if(shouldCallHeavyApis){
-            if(results[2]?.status === "fulfilled"){
-                const res = results[2].value
+            if(results[3]?.status === "fulfilled"){
+                const res = results[3].value
                 riskScoreObj = {
                     criticalUrls: res.criticalEndpointsCount,
                     riskScoreMap: res.riskScoreOfCollectionsMap
                 } 
             }
 
-            if(results[3]?.status === "fulfilled"){
-                const res = results[3].value
+            if(results[4]?.status === "fulfilled"){
+                const res = results[4].value
                 sensitiveInfo ={ 
                     sensitiveUrls: res.sensitiveUrlsInResponse,
                     sensitiveInfoMap: res.sensitiveSubtypesInCollection
                 }
             }
 
-            if(results[4]?.status === "fulfilled"){
-                const res = results[4].value
+            if(results[5]?.status === "fulfilled"){
+                const res = results[5].value
                 severityObj = res
             }
 
@@ -349,7 +351,12 @@ function ApiCollections() {
         setNormalData(dataObj.normal)
 
         // Separate active and deactivated collections
-        const deactivatedCollections = dataObj.prettify.filter(c => c.deactivated);
+        const deactivatedCollections = dataObj.prettify.filter(c => c.deactivated).map((c)=>{
+            if(c.type !== "API_GROUP" && deactivatedCountInfo.hasOwnProperty(c.id)){
+                c.urlsCount = deactivatedCountInfo[c.id]
+            }
+            return c
+        });
         
         // Calculate summary data only for active collections
         const summary = transform.getSummaryData(dataObj.normal)

@@ -26,9 +26,6 @@ import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.usage.MetricTypes;
-import com.akto.dto.usage.UsageMetric;
-import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -78,10 +75,10 @@ public class ApiCollectionsAction extends UserAction {
 
     boolean redacted;
     
-    public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections) {
+    public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
 	int tsRandom = Context.now();
 	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD); 
-        Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
+        Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(filter);
 	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);     
 
         for (ApiCollection apiCollection: apiCollections) {
@@ -93,11 +90,7 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setUrlsCount(count);
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
                 if (count == null) {
-                    List<Bson> filters = SingleTypeInfoDao.filterForHostHostHeaderRaw();
-                    filters.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
-                    count = (int) SingleTypeInfoDao.instance.count(
-                            Filters.and(filters)
-                    );
+                    count = fallbackCount;
                 }
                 apiCollection.setUrlsCount(count);
             } else {
@@ -116,9 +109,35 @@ public class ApiCollectionsAction extends UserAction {
         return apiCollections;
     }
 
+    private Map<Integer, Integer> deactivatedHostnameCountMap;
+
+    public String getCountForHostnameDeactivatedCollections(){
+        this.deactivatedHostnameCountMap = new HashMap<>();
+        if(deactivatedCollections == null || deactivatedCollections.isEmpty()){
+            return SUCCESS.toUpperCase();
+        }
+        Bson filter = Filters.and(Filters.exists(ApiCollection.HOST_NAME), Filters.in(Constants.ID, deactivatedCollections));
+        List<ApiCollection> hCollections = ApiCollectionsDao.instance.findAll(filter, Projections.include(Constants.ID));
+        List<Integer> deactivatedIds = new ArrayList<>();
+        for(ApiCollection collection : hCollections){
+            if(deactivatedCollections.contains(collection.getId())){
+                deactivatedIds.add(collection.getId());
+            }
+        }
+
+        if(deactivatedIds.isEmpty()){
+            return SUCCESS.toUpperCase();
+        }
+
+        this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(
+            Filters.in(SingleTypeInfo._COLLECTION_IDS, deactivatedIds)
+        );
+        return SUCCESS.toUpperCase();
+    }
+
     public String fetchAllCollections() {
         this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
-        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
+        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.empty());
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -178,7 +197,7 @@ public class ApiCollectionsAction extends UserAction {
             }   
         }
 
-        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
+        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -599,7 +618,7 @@ public class ApiCollectionsAction extends UserAction {
 
     public String deactivateCollections() {
         this.apiCollections = filterCollections(this.apiCollections, false);
-        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
+        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections,Filters.empty());
         int deltaUsage = (-1) * this.apiCollections.stream().mapToInt(apiCollection -> apiCollection.getUrlsCount()).sum();
         List<Integer> apiCollectionIds = reduceApiCollectionToId(this.apiCollections);
         ApiCollectionsDao.instance.updateMany(Filters.in(Constants.ID, apiCollectionIds),
@@ -613,7 +632,7 @@ public class ApiCollectionsAction extends UserAction {
         if (this.apiCollections.isEmpty()) {
             return Action.SUCCESS.toUpperCase();
         }
-        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections);
+        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections,Filters.empty());
 
         int accountId = Context.accountId.get();
         FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.ACTIVE_ENDPOINTS);
@@ -787,5 +806,9 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setEndTimestamp(int endTimestamp) {
         this.endTimestamp = endTimestamp;
+    }
+
+    public Map<Integer, Integer> getDeactivatedHostnameCountMap() {
+        return deactivatedHostnameCountMap;
     }
 }
