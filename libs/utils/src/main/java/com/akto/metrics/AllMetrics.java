@@ -25,12 +25,16 @@ public class AllMetrics {
     private String version;
 
     public void init(String instanceId, String version){
+        loggerMaker.infoAndAddToDb("start init");
         int accountId = Context.accountId.get();
         this.setInstanceId(instanceId);
         this.setVersion(version);
 
         Organization organization = DataActorFactory.fetchInstance().fetchOrganization(accountId);
         String orgId = organization.getId();
+
+        loggerMaker.infoAndAddToDb("Org id: " + orgId);
+        loggerMaker.infoAndAddToDb("Version: " + version);
 
         runtimeKafkaRecordCount = new SumMetric("RT_KAFKA_RECORD_COUNT", 60, accountId, orgId);
         runtimeKafkaRecordSize = new SumMetric("RT_KAFKA_RECORD_SIZE", 60, accountId, orgId);
@@ -95,9 +99,15 @@ public class AllMetrics {
                     list.add(metricsData);
 
                 }
+
+                loggerMaker.infoAndAddToDb("List is empty: " + list.isEmpty(), LoggerMaker.LogDb.RUNTIME);
+
                 if(!list.isEmpty()) {
+                    loggerMaker.infoAndAddToDb("starting sendDataToAkto", LoggerMaker.LogDb.RUNTIME);
                     sendDataToAkto(list);
+                    loggerMaker.infoAndAddToDb("finished sendDataToAkto", LoggerMaker.LogDb.RUNTIME);
                     dataActor.insertRuntimeMetricsData(list);
+                    loggerMaker.infoAndAddToDb("finished insertRuntimeMetricsData", LoggerMaker.LogDb.RUNTIME);
                 }
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb("Error while sending metrics to akto: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
