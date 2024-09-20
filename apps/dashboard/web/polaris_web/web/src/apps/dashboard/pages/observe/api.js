@@ -43,6 +43,13 @@ export default {
             }
         })
     },
+    resetSampleData() {
+        return request({
+            url: '/api/resetSampleData',
+            method: 'post',
+            data: {}
+        })
+    },
     async fetchSampleData(url, apiCollectionId, method) {
         const resp = await request({
             url: '/api/fetchSampleData',
