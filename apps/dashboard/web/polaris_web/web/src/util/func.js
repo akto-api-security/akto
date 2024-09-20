@@ -57,6 +57,29 @@ const func = {
   prettifyShort(num) {
     return new Intl.NumberFormat( 'en-US', { maximumFractionDigits: 1,notation: "compact" , compactDisplay: "short" }).format(num)
   },
+
+
+
+  timeDifference(startTimestamp, endTimestamp) {
+    const diffMs = endTimestamp - startTimestamp;
+
+    // Convert seconds to days
+    const days = diffMs / (60 * 60 * 24);
+
+    if (days <= 1) {
+        return "yesterday";
+    } else if (days < 7) {
+        const dayCount = Math.ceil(days);
+        return `in ${dayCount} day${dayCount === 1 ? '' : 's'}`;
+    } else if (days < 30) {
+        const weekCount = Math.ceil(days / 7);
+        return `in ${weekCount} week${weekCount === 1 ? '' : 's'}`;
+    } else {
+        const monthCount = Math.ceil(days / 30);
+        return `in ${monthCount} month${monthCount === 1 ? '' : 's'}`;
+    }
+  },
+
 prettifyEpoch(epoch) {
     if(epoch === 0){
       return "Never" ;
@@ -321,7 +344,7 @@ prettifyEpoch(epoch) {
   },
   epochToDateTime(timestamp) {
     var date = new Date(timestamp * 1000);
-    return date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+    return date.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
   },
 
   getListOfHosts(apiCollections) {
@@ -1521,7 +1544,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return key.replace(/[\s/]+/g, '_').toLowerCase();
   },
   showTestSampleData(selectedTestRunResult){
-
+    if(selectedTestRunResult?.vulnerable === true){
+      return true;
+    }
     let skipList = [
       "skipping execution",
       "deactivated"

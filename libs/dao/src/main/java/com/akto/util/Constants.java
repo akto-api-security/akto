@@ -21,4 +21,6 @@ public class Constants {
     public static final String AKTO_NODE_ID = "x-akto-node";
     public static final String AKTO_REMOVE_AUTH= "x-akto-remove-auth";
 
+    public static final String UNDERSCORE = "_";
+
 }

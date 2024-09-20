@@ -137,8 +137,6 @@ const sortOptions = [
 ];
 
 function ApiEndpoints(props) {
-
-    console.log("apiEndpoint called")
     const { endpointListFromConditions, sensitiveParamsForQuery, isQueryPage } = props
     const params = useParams()
     const location = useLocation()
@@ -160,6 +158,7 @@ function ApiEndpoints(props) {
     const [endpointData, setEndpointData] = useState({"all":[]})
     const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
+    const [selectedResourcesForPrimaryAction, setSelectedResourcesForPrimaryAction] = useState([])
     const [loading, setLoading] = useState(true)
     const [apiDetail, setApiDetail] = useState({})
     const [exportOpen, setExportOpen] = useState(false)
@@ -431,6 +430,25 @@ function ApiEndpoints(props) {
         })
     }
 
+    function deleteApisAction() {
+        setShowDeleteApiModal(false)
+        var apiObjects = apis.map((x) => {
+            let tmp = x.split("###");
+            return {
+                method: tmp[0],
+                url: tmp[1],
+                apiCollectionId: parseInt(tmp[2])
+            }
+        }) 
+    
+    
+        api.deleteApis(apiObjects).then(resp => {
+            func.setToast(true, false, "APIs deleted successfully. Refresh to see the changes.")
+        }).catch (err => {
+            func.setToast(true, true, "There was some error deleting the APIs. Please contact support@akto.io for assistance")
+        })
+    }
+
     async function exportOpenApi() {
         let lastFetchedUrl = null;
         let lastFetchedMethod = null;
@@ -449,6 +467,38 @@ function ApiEndpoints(props) {
             if (!lastFetchedUrl || !lastFetchedMethod) break;
         }
         func.setToast(true, false, <div data-testid="openapi_spec_download_message">OpenAPI spec downloaded successfully</div>)
+    }
+
+    async function exportOpenApiForSelectedApi() {
+        const apiInfoKeyList = selectedResourcesForPrimaryAction.map(str => {
+            const parts = str.split('###')
+
+            const method = parts[0]
+            const url = parts[1]
+            const apiCollectionId = parseInt(parts[2], 10)
+
+            return {
+                apiCollectionId: apiCollectionId,
+                method: method,
+                url: url
+            }
+        })
+        let result = await api.downloadOpenApiFileForSelectedApis(apiInfoKeyList, apiCollectionId)
+        let openApiString = result["openAPIString"]
+        let blob = new Blob([openApiString], {
+            type: "application/json",
+        });
+        const fileName = "open_api_" + collectionsMap[apiCollectionId] + ".json";
+        saveAs(blob, fileName);
+
+        func.setToast(true, false, <div data-testid="openapi_spec_download_message">OpenAPI spec downloaded successfully</div>)
+    }
+
+    function deleteApis(selectedResources){
+
+            setActionOperation(Operation.REMOVE)
+            setApis(selectedResources)
+            setShowDeleteApiModal(true);
     }
 
     function exportCsv(selectedResources = []) {
@@ -472,7 +522,27 @@ function ApiEndpoints(props) {
     }
 
     async function exportPostman() {
-        const result = await api.exportToPostman(apiCollectionId)
+        let result;
+        if(selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) {
+            const apiInfoKeyList = selectedResourcesForPrimaryAction.map(str => {
+                const parts = str.split('###')
+
+                const method = parts[0]
+                const url = parts[1]
+                const apiCollectionId = parseInt(parts[2], 10)
+
+                return {
+                    apiCollectionId: apiCollectionId,
+                    method: method,
+                    url: url
+                }
+            })
+
+            result = await api.exportToPostmanForSelectedApis(apiInfoKeyList, apiCollectionId)
+        } else {
+            result = await api.exportToPostman(apiCollectionId)
+        }
+
         if (result)
         func.setToast(true, false, "We have initiated export to Postman, checkout API section on your Postman app in sometime.")
     }
@@ -599,13 +669,13 @@ function ApiEndpoints(props) {
                         <VerticalStack gap={2}>
                             <Text>Export as</Text>
                                 <VerticalStack gap={1}>
-                                <div data-testid="openapi_spec_option" onClick={exportOpenApi} style={{cursor: 'pointer'}}>
+                                <div data-testid="openapi_spec_option" onClick={(selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi : exportOpenApi} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">OpenAPI spec</Text>
                                 </div>
                                 <div data-testid="postman_option" onClick={exportPostman} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">Postman</Text>
                                 </div>
-                                <div data-testid="csv_option" onClick={exportCsv} style={{cursor: 'pointer'}}>
+                                <div data-testid="csv_option" onClick={() =>exportCsv()} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">CSV</Text>
                                 </div>
                             </VerticalStack>
@@ -644,6 +714,7 @@ function ApiEndpoints(props) {
                 runTestFromOutside={runTests}
                 closeRunTest={() => setRunTests(false)}
                 disabled={showEmptyScreen}
+                selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
             />
         </HorizontalStack>
     )
@@ -655,7 +726,8 @@ function ApiEndpoints(props) {
             setTableLoading(false)
         },200)
     }
-
+    
+    const [showDeleteApiModal, setShowDeleteApiModal] = useState(false)
     const [showApiGroupModal, setShowApiGroupModal] = useState(false)
     const [apis, setApis] = useState([])
     const [actionOperation, setActionOperation] = useState(Operation.ADD)
@@ -696,6 +768,14 @@ function ApiEndpoints(props) {
                 onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
             })
         }
+
+        if (window.USER_NAME && window.USER_NAME.endsWith("@akto.io")) {
+            ret.push({
+                content: 'Delete APIs',
+                onAction: () => deleteApis(selectedResources)
+            })
+        }
+
         return ret;
     }
 
@@ -708,10 +788,27 @@ function ApiEndpoints(props) {
                 content: 'Enable',
                 onAction: redactCollection
             }}
-            key="redact-modal"
+            key="redact-modal-1"
         >
             <Modal.Section>
                 <Text>When enabled, existing sample payload values for this collection will be deleted, and data in all the future payloads for this collection will be redacted. Please note that your API Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.</Text>
+            </Modal.Section>
+        </Modal>
+    )
+
+    let deleteApiModal = (
+        <Modal
+            open={showDeleteApiModal}
+            onClose={() => setShowApiGroupModal(false)}
+            title="Confirm"
+            primaryAction={{
+                content: 'Yes',
+                onAction: deleteApisAction
+            }}
+            key="redact-modal-1"
+        >
+            <Modal.Section>
+                <Text>Are you sure you want to delete {(apis || []).length} API(s)?</Text>
             </Modal.Section>
         </Modal>
     )
@@ -748,6 +845,7 @@ function ApiEndpoints(props) {
         selectable={true}
         promotedBulkActions={promotedBulkActions}
         loading={tableLoading || loading}
+        setSelectedResourcesForPrimaryAction={setSelectedResourcesForPrimaryAction}
     />,
     <ApiDetails
         key="api-details"
@@ -806,7 +904,8 @@ function ApiEndpoints(props) {
                       currentApiGroupName={pageTitle}
                       fetchData={fetchData}
                   />,
-                  modal
+                  modal,
+                  deleteApiModal
             ]
         )
       ]

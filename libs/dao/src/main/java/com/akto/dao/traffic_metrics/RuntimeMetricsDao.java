@@ -8,9 +8,7 @@ import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
-import com.akto.dto.type.URLMethods;
 import com.akto.util.DbMode;
-import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.WriteModel;
@@ -32,27 +30,13 @@ public class RuntimeMetricsDao extends AccountsContextDao<RuntimeMetrics> {
     }
 
     public void createIndicesIfAbsent() {
-        boolean exists = false;
+        
         String dbName = Context.accountId.get()+"";
-        MongoDatabase db = clients[0].getDatabase(dbName);
-        for (String col: db.listCollectionNames()){
-            if (getCollName().equalsIgnoreCase(col)){
-                exists = true;
-                break;
-            }
-        };
-
-        if (!exists) {
-            db.createCollection(getCollName());
+        CreateCollectionOptions createCollectionOptions = new CreateCollectionOptions();
+        if (DbMode.allowCappedCollections()) {
+            createCollectionOptions = new CreateCollectionOptions().capped(true).maxDocuments(maxDocuments).sizeInBytes(sizeInBytes);
         }
-
-        if (!exists) {
-            if (DbMode.allowCappedCollections()) {
-                db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(maxDocuments).sizeInBytes(sizeInBytes));
-            } else {
-                db.createCollection(getCollName());
-            }
-        }
+        createCollectionIfAbsent(dbName, getCollName(), createCollectionOptions);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[] { "timestamp" }, true);

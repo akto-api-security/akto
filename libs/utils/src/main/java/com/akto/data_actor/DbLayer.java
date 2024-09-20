@@ -18,6 +18,8 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.CustomDataTypeDao;
+import com.akto.dao.LogsDao;
+import com.akto.dao.ProtectionLogsDao;
 import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.RuntimeLogsDao;
 import com.akto.dao.SampleDataDao;
@@ -25,9 +27,12 @@ import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.SetupDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.SuspectSampleDataDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.APIConfig;
 import com.akto.dto.Account;
@@ -43,7 +48,9 @@ import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.Setup;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
@@ -368,4 +375,19 @@ public class DbLayer {
         return OrganizationsDao.instance.findOne(Filters.eq(Organization.ACCOUNTS, accountId));
     }
 
+    public static void bulkWriteSuspectSampleData(List<WriteModel<SuspectSampleData>> writesForSingleTypeInfo) {
+        SuspectSampleDataDao.instance.getMCollection().bulkWrite(writesForSingleTypeInfo);
+    }
+
+    public static List<YamlTemplate> fetchFilterYamlTemplates() {
+        return FilterYamlTemplateDao.instance.findAll(Filters.empty());
+    }
+
+    public static void insertTestingLog(Log log) {
+        LogsDao.instance.insertOne(log);
+    }
+
+    public static void insertProtectionLog(Log log) {
+        ProtectionLogsDao.instance.insertOne(log);
+    }
 }

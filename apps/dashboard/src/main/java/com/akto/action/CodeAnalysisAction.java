@@ -13,25 +13,17 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import com.akto.dao.*;
+import com.akto.dto.*;
+import org.bson.conversions.Bson;
 import org.bson.types.Code;
 import org.bson.types.ObjectId;
 import org.checkerframework.checker.units.qual.s;
 import org.json.JSONObject;
 
 import com.akto.action.observe.Utils;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.CodeAnalysisApiInfoDao;
-import com.akto.dao.CodeAnalysisCollectionDao;
-import com.akto.dao.RBACDao;
-import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.CodeAnalysisApi;
-import com.akto.dto.CodeAnalysisApiInfo;
-import com.akto.dto.CodeAnalysisApiLocation;
-import com.akto.dto.CodeAnalysisCollection;
-import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
@@ -53,7 +45,7 @@ public class CodeAnalysisAction extends UserAction {
     private String projectDir;
     private String apiCollectionName;
     private List<CodeAnalysisApi> codeAnalysisApisList;
-
+    private CodeAnalysisRepo.SourceCodeType sourceCodeType;
     public static final int MAX_BATCH_SIZE = 100;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class);
@@ -325,6 +317,87 @@ public class CodeAnalysisAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String addCodeAnalysisRepo() {
+        if (codeAnalysisRepos == null || codeAnalysisRepos.isEmpty()) {
+            addActionError("Can't add empty repo");
+            return ERROR.toUpperCase();
+        }
+        List<WriteModel<CodeAnalysisRepo>> updates = new ArrayList<>();
+        for (CodeAnalysisRepo c: codeAnalysisRepos) {
+            updates.add(new UpdateOneModel<>(
+                Filters.and(
+                        Filters.eq(CodeAnalysisRepo.REPO_NAME, c.getRepoName()),
+                        Filters.eq(CodeAnalysisRepo.PROJECT_NAME, c.getProjectName()),
+                        Filters.eq(CodeAnalysisRepo.SOURCE_CODE_TYPE, c.getSourceCodeType())
+                ),
+                Updates.combine(
+                        Updates.setOnInsert(CodeAnalysisRepo.LAST_RUN, 0),
+                        Updates.setOnInsert(CodeAnalysisRepo.SCHEDULE_TIME, Context.now())
+                ),
+                new UpdateOptions().upsert(true)
+            ));
+        }
+
+        CodeAnalysisRepoDao.instance.getMCollection().bulkWrite(updates);
+        return SUCCESS.toUpperCase();
+    }
+
+    public String runCodeAnalysisRepo() {
+        if (codeAnalysisRepos == null || codeAnalysisRepos.isEmpty()) {
+            addActionError("Can't run empty repo");
+            return ERROR.toUpperCase();
+        }
+        List<WriteModel<CodeAnalysisRepo>> updates = new ArrayList<>();
+        for (CodeAnalysisRepo c: codeAnalysisRepos) {
+            updates.add(new UpdateOneModel<>(
+                    Filters.and(
+                            Filters.eq(CodeAnalysisRepo.REPO_NAME, c.getRepoName()),
+                            Filters.eq(CodeAnalysisRepo.PROJECT_NAME, c.getProjectName())
+                    ),
+                    Updates.set(CodeAnalysisRepo.SCHEDULE_TIME, Context.now()),
+                    new UpdateOptions().upsert(false)
+            ));
+        }
+
+        CodeAnalysisRepoDao.instance.getMCollection().bulkWrite(updates);
+        return SUCCESS.toUpperCase();
+    }
+
+    CodeAnalysisRepo codeAnalysisRepo;
+    public String deleteCodeAnalysisRepo() {
+        if (codeAnalysisRepo == null) {
+            addActionError("Can't delete null repo");
+            return ERROR.toUpperCase();
+        }
+        CodeAnalysisRepoDao.instance.deleteAll(
+                Filters.and(
+                        Filters.eq(CodeAnalysisRepo.REPO_NAME, codeAnalysisRepo.getRepoName()),
+                        Filters.eq(CodeAnalysisRepo.PROJECT_NAME, codeAnalysisRepo.getProjectName())
+                )
+        );
+        return SUCCESS.toUpperCase();
+    }
+
+    List<CodeAnalysisRepo> codeAnalysisRepos;
+    public String fetchCodeAnalysisRepos() {
+        if (sourceCodeType == null) {
+            sourceCodeType = CodeAnalysisRepo.SourceCodeType.BITBUCKET;
+        }
+        Bson filters;
+        if (sourceCodeType == CodeAnalysisRepo.SourceCodeType.BITBUCKET) {
+            filters = Filters.or(
+                    Filters.eq(CodeAnalysisRepo.SOURCE_CODE_TYPE, sourceCodeType),
+                    Filters.exists(CodeAnalysisRepo.SOURCE_CODE_TYPE, false)
+
+            );
+        } else {
+            filters = Filters.eq(CodeAnalysisRepo.SOURCE_CODE_TYPE, sourceCodeType);
+        }
+        codeAnalysisRepos = CodeAnalysisRepoDao.instance.findAll(filters);
+        return SUCCESS.toUpperCase();
+    }
+
+
     public String getProjectDir() {
         return projectDir;
     }
@@ -347,5 +420,25 @@ public class CodeAnalysisAction extends UserAction {
 
     public void setCodeAnalysisApisList(List<CodeAnalysisApi> codeAnalysisApisList) {
         this.codeAnalysisApisList = codeAnalysisApisList;
+    }
+
+    public void setCodeAnalysisRepo(CodeAnalysisRepo codeAnalysisRepo) {
+        this.codeAnalysisRepo = codeAnalysisRepo;
+    }
+
+    public List<CodeAnalysisRepo> getCodeAnalysisRepos() {
+        return codeAnalysisRepos;
+    }
+
+    public void setCodeAnalysisRepos(List<CodeAnalysisRepo> codeAnalysisRepos) {
+        this.codeAnalysisRepos = codeAnalysisRepos;
+    }
+
+    public CodeAnalysisRepo.SourceCodeType getSourceCodeType() {
+        return sourceCodeType;
+    }
+
+    public void setSourceCodeType(CodeAnalysisRepo.SourceCodeType sourceCodeType) {
+        this.sourceCodeType = sourceCodeType;
     }
 }

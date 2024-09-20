@@ -313,9 +313,14 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
                     BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
                 }
                 InitializerListener.setBackwardCompatibilities(backwardCompatibility);
+                loggerMaker.infoAndAddToDb("start create indices", LogDb.DASHBOARD);
                 DaoInit.createIndices();
+
+                loggerMaker.infoAndAddToDb("start run time filters", LogDb.DASHBOARD);
                 Main.insertRuntimeFilters();
+
                 RuntimeListener.initialiseDemoCollections();
+                loggerMaker.infoAndAddToDb("created juiceshop", LogDb.DASHBOARD);
                 service.submit(() ->{
                     Context.accountId.set(newAccountId);
                     loggerMaker.infoAndAddToDb("updating vulnerable api's collection for new account " + newAccountId, LogDb.DASHBOARD);

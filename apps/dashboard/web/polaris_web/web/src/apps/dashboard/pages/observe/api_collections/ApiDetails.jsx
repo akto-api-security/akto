@@ -242,7 +242,7 @@ function ApiDetails(props) {
         ,
         <LayoutWithTabs
             key="tabs"
-            tabs={[SchemaTab, ValuesTab, DependencyTab]}
+            tabs={[ValuesTab, SchemaTab, DependencyTab]}
             currTab={() => { }}
         />
     ]

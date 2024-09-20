@@ -35,7 +35,9 @@ function GithubRow(props) {
     const [collapsibleActive, setCollapsibleActive] = useState("none")
 
     const togglePopoverActive = (e,index) => {
-        e.stopPropagation();
+        if(e.stopPropagation){
+            e.stopPropagation();
+        }
         setPopoverActive((prev) => {
             if(prev === index)
                 return -1
@@ -199,7 +201,7 @@ function GithubRow(props) {
                 <Box maxWidth={treeView ? "180px": ''} >
                     <HorizontalStack align={treeView ? "start" : "end"} wrap={false} gap={"2"}>
                         <Box><Icon source={iconSource} /></Box>
-                        {treeView ? <Text variant='headingSm'>{value}</Text> : null} 
+                        {treeView ? value : null} 
                     </HorizontalStack>
                 </Box>
             </IndexTable.Cell>

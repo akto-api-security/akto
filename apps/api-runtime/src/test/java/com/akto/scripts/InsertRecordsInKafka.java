@@ -7,6 +7,7 @@ import com.akto.dto.KafkaHealthMetric;
 import com.akto.dto.traffic.SampleData;
 import com.akto.kafka.Kafka;
 import com.akto.runtime.Main;
+import com.akto.runtime.utils.Utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
@@ -155,7 +156,7 @@ public class InsertRecordsInKafka {
     }
 
     public static void checkKafkaQueueSize(String topicName, String groupIdConfig, String kafkaBrokerUrl) {
-        Properties properties = Main.configProperties(kafkaBrokerUrl, groupIdConfig, 1000);
+        Properties properties = Utils.configProperties(kafkaBrokerUrl, groupIdConfig, 1000);
         Consumer<String, String> consumer = new KafkaConsumer<>(properties);
         consumer.subscribe(Collections.singleton(topicName));
         ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(10000));

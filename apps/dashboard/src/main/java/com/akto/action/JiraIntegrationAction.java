@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.bson.conversions.Bson;
@@ -32,12 +33,14 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
+import okhttp3.Call;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 public class JiraIntegrationAction extends UserAction {
 
@@ -65,23 +68,39 @@ public class JiraIntegrationAction extends UserAction {
     private final String CREATE_ISSUE_ENDPOINT = "/rest/api/3/issue";
     private final String ATTACH_FILE_ENDPOINT = "/attachments";
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
-    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
+            .connectTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .build();
 
     public String testIntegration() {
 
         String url = baseUrl + META_ENDPOINT;
         String authHeader = Base64.getEncoder().encodeToString((userEmail + ":" + apiToken).getBytes());
-
-        Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
-        OriginalHttpRequest request = new OriginalHttpRequest(url, "", "GET", null, headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-            String responsePayload = response.getBody();
-            loggerMaker.errorAndAddToDb("triggered meta api for test integration step, requestbody " + request.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode() + " ,url " + url, LoggerMaker.LogDb.DASHBOARD);
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("error while testing jira integration, url not accessible", LoggerMaker.LogDb.DASHBOARD);
+
+            Request.Builder builder = new Request.Builder();
+            builder.addHeader("Authorization", "Basic " + authHeader);
+            builder = builder.url(url);
+            Request okHttpRequest = builder.build();
+            Call call = client.newCall(okHttpRequest);
+            Response response = null;
+            String responsePayload = null;
+            try {
+                response = call.execute();
+                responsePayload = response.body().string();
+                loggerMaker.errorAndAddToDb("error while testing jira integration, received null response", LoggerMaker.LogDb.DASHBOARD);
+                if (responsePayload == null) {
+                    return Action.ERROR.toUpperCase();
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error while testing jira integration, error making call" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
                 return Action.ERROR.toUpperCase();
+            } finally {
+                if (response != null) {
+                    response.close();
+                }
             }
             BasicDBObject payloadObj;
             try {
@@ -90,11 +109,15 @@ public class JiraIntegrationAction extends UserAction {
                 for (Object projObj: projects) {
                     BasicDBObject obj = (BasicDBObject) projObj;
                     String key = obj.getString("key");
-                    loggerMaker.errorAndAddToDb("evaluating issuetype for project key " + key + " ,actualProjId " + projId, LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.infoAndAddToDb("evaluating issuetype for project key " + key + " ,actualProjId " + projId, LoggerMaker.LogDb.DASHBOARD);
+                    if (issueType!=null) {
+                        break;
+                    }
+
                     if (!key.equalsIgnoreCase(projId)) {
                         continue;
                     }
-                    loggerMaker.errorAndAddToDb("evaluating issuetype for project key " + key + ", project json obj " + obj, LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.infoAndAddToDb("evaluating issuetype for project key " + key + ", project json obj " + obj, LoggerMaker.LogDb.DASHBOARD);
                     BasicDBList issueTypes = (BasicDBList) obj.get("issuetypes");
                     issueType = determineIssueType(issueTypes, "TASK");
                     loggerMaker.infoAndAddToDb("evaluated issue type for TASK type " + issueType, LoggerMaker.LogDb.DASHBOARD);
@@ -112,11 +135,11 @@ public class JiraIntegrationAction extends UserAction {
                     return Action.ERROR.toUpperCase();
                 }
             } catch(Exception e) {
-                return null;
+                return Action.ERROR.toUpperCase();
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error while testing jira integration, " + e, LoggerMaker.LogDb.DASHBOARD);
-            return null;
+            return Action.ERROR.toUpperCase();
         }
 
         return Action.SUCCESS.toUpperCase();
@@ -244,10 +267,10 @@ public class JiraIntegrationAction extends UserAction {
                 jiraTicketUrl = jiraIntegration.getBaseUrl() + "/browse/" + jiraTicketKey;
             } catch(Exception e) {
                 loggerMaker.errorAndAddToDb(e, "error making jira issue url " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
-                return null;
+                return Action.ERROR.toUpperCase();
             }
         } catch(Exception e) {
-            return null;
+            return Action.ERROR.toUpperCase();
         }
 
         UpdateOptions updateOptions = new UpdateOptions();

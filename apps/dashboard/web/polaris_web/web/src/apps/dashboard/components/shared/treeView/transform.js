@@ -1,5 +1,7 @@
+import { Badge, Box, HorizontalStack } from "@shopify/polaris";
 import transform from "../../../pages/observe/transform";
 import PrettifyChildren from "./PrettifyChildren";
+import TooltipText from "../TooltipText";
 
 const treeViewFunc = {
     pruneTree(tree, branchFieldSplitter, reverse) {
@@ -199,7 +201,13 @@ const treeViewFunc = {
             return{
                 ...c,
                 id: c.apiCollectionIds || c.id,
-                displayNameComp: c?.isTerminal ? c.displayName: c.level,
+                displayNameComp: c?.isTerminal ? c.displayName: (
+                        <HorizontalStack gap={"1"} align="space-between" wrap={false}>
+                            <Box maxWidth="180px">
+                                <TooltipText tooltip={c.level} text={c.level} textProps={{variant: 'headingSm'}} />
+                            </Box>
+                            <Badge size="small" status="new">{c?.apiCollectionIds?.length}</Badge>
+                        </HorizontalStack>),
                 ...transform.convertToPrettifyData(c),
                 makeTree: (data) => <PrettifyChildren data={data?.children} headers={headers} />
             }

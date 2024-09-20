@@ -20,7 +20,7 @@ import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import com.akto.runtime.policies.ApiAccessTypePolicy;
 
 import java.util.*;
 
@@ -206,8 +206,17 @@ public class AktoPolicyNew {
             }
         }
 
+        if (apiInfo.getDiscoveredTimestamp() == 0) {
+            apiInfo.setDiscoveredTimestamp(httpResponseParams.getTimeOrNow());
+        }
+
         apiInfo.setLastSeen(httpResponseParams.getTimeOrNow());
 
+        if (apiInfo.getResponseCodes() == null) apiInfo.setResponseCodes(new ArrayList<>());
+        if (!apiInfo.getResponseCodes().contains(statusCode)) apiInfo.getResponseCodes().add(statusCode);
+
+        ApiInfo.ApiType apiType = ApiInfo.findApiTypeFromResponseParams(httpResponseParams);
+        if (apiType != null) apiInfo.setApiType(apiType);
     }
 
     public PolicyCatalog getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) {

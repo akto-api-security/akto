@@ -747,6 +747,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     throw new IllegalStateException("The account doesn't exist.");
                 }
             } else {
+
+                // insert rbac entry here
+                RBACDao.instance.insertOne(
+                    new RBAC(user.getId(), invitedRole, accountId)
+                );
+
                 LoginAction.loginUser(user, servletResponse, true, servletRequest);
                 servletResponse.sendRedirect("/dashboard/observe/inventory");
                 return;

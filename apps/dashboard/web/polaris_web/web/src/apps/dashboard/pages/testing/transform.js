@@ -294,6 +294,7 @@ const transform = {
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
       obj['apiCollectionId'] = apiCollectionId
       obj['userEmail'] = data.userEmail
+      obj['total_apis'] = testingRunResultSummary.totalApis
       if(prettified){
         
         const prettifiedTest={

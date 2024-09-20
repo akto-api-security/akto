@@ -70,6 +70,7 @@ function TestRunResultPage(props) {
   const [infoState, setInfoState] = useState([])
   const [loading, setLoading] = useState(true);
   const [showDetails, setShowDetails] = useState(true)
+  const collectionsMap = PersistStore(state => state.collectionsMap)
 
   const useFlyout = location.pathname.includes("test-editor") ? false : true
 
@@ -141,8 +142,26 @@ function TestRunResultPage(props) {
       return
     }
     let url = issueDetails.id.apiInfoKey.url
-    let pathname = "Endpoint - " + new URL(url).pathname;
-    let host =  "Host - " + new URL(url).host
+    let pathname = "Endpoint - ";
+    try {
+      if (url.startsWith("http")) {
+        pathname += new URL(url).pathname;
+      } else {
+        pathname += url;
+      }
+    } catch (err) {
+      pathname += url;
+    }
+    let host = "Host - ";
+    try {
+      if (url.startsWith("http")) {
+        host += new URL(url).host;
+      } else {
+        host += collectionsMap[issueDetails.id.apiInfoKey.apiCollectionId] !== null ? collectionsMap[issueDetails.id.apiInfoKey.apiCollectionId] : " ";
+      }
+    } catch (err) {
+      host += collectionsMap[issueDetails.id.apiInfoKey.apiCollectionId] !== null ? collectionsMap[issueDetails.id.apiInfoKey.apiCollectionId] : " ";
+    }
     // break into host and path
     let description = "Description - " + getDescriptionText(true)
     
