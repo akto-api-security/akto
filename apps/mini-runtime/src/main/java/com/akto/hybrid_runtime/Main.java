@@ -22,6 +22,7 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.util.DashboardMode;
+import com.akto.util.filter.DictionaryFilter;
 import com.google.gson.Gson;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.Metric;
@@ -145,6 +146,7 @@ public class Main {
         if (topicName == null) {
             topicName = "akto.api.logs";
         }
+        DictionaryFilter.readDictionaryBinary();
         return topicName;
     }
 
@@ -183,6 +185,7 @@ public class Main {
         aSettings = dataActor.fetchAccountSettings();
 
         //DaoInit.init(new ConnectionString(mongoURI));
+        DictionaryFilter.readDictionaryBinary();
 
         loggerMaker.infoAndAddToDb("Runtime starting at " + Context.now() + "....", LogDb.RUNTIME);
 

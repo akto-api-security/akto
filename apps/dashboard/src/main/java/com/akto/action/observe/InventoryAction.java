@@ -4,12 +4,14 @@ import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiCollection.ENV_TYPE;
 import com.akto.dto.ApiCollection.Type;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CodeAnalysisApiInfo.CodeAnalysisApiInfoKey;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.dto.type.URLMethods.Method;
@@ -722,6 +724,19 @@ public class InventoryAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        try {
+            MergedUrlsDao.instance.updateOne(Filters.and(
+                    Filters.eq(MergedUrls.URL, url),
+                    Filters.eq(MergedUrls.METHOD, method),
+                    Filters.eq(MergedUrls.API_COLLECTION_ID, apiCollectionId)
+            ), Updates.combine(
+                    Updates.set(MergedUrls.URL, url),
+                    Updates.set(MergedUrls.METHOD, method),
+                    Updates.set(MergedUrls.API_COLLECTION_ID, apiCollectionId)
+            ));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while saving merged url in DB: " + e.getMessage(), LogDb.DASHBOARD);
+        }
 
         SampleData sampleData = SampleDataDao.instance.fetchSampleDataForApi(apiCollectionId, url, urlMethod);
         List<String> samples = sampleData.getSamples();
