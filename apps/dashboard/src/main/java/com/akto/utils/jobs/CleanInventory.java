@@ -43,6 +43,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.test_editor.execution.ParseAndExecute;
 import com.akto.util.AccountTask;
 import com.akto.util.Pair;
@@ -174,7 +175,11 @@ public class CleanInventory {
 
                                 if(param != null){
                                     if(filterType.equals(FILTER_TYPE.MODIFIED)){
-                                        movingApi = true;
+                                        if(RuntimeUtil.isSampleDataKeyModified(sampleData, httpResponseParams)){
+                                            movingApi = true;
+                                        }else{
+                                            isAllowedFromTemplate = true;
+                                        }
                                     }else if(filterType.equals(FILTER_TYPE.ALLOWED)){
                                         isAllowedFromTemplate = true;
                                     }
@@ -218,10 +223,8 @@ public class CleanInventory {
             }
             if (shouldDeleteRequest) {
                 logger.info("starting deletion of apis");
-                deleteApis(toBeDeleted);
+                deleteApis(toBeDeleted); 
             }
-
-            // String shouldMove = System.getenv("MOVE_REDUNDANT_APIS");
 
         } while (!sampleDataList.isEmpty());
 

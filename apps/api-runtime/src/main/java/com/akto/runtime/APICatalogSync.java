@@ -1368,32 +1368,7 @@ public class APICatalogSync {
     }
 
     public static URLTemplate createUrlTemplate(String url, Method method) {
-        String[] tokens = trimAndSplit(url);
-        SuperType[] types = new SuperType[tokens.length];
-        for(int i = 0; i < tokens.length; i ++ ) {
-            String token = tokens[i];
-
-            if (token.equals(SuperType.STRING.name())) {
-                tokens[i] = null;
-                types[i] = SuperType.STRING;
-            } else if (token.equals(SuperType.INTEGER.name())) {
-                tokens[i] = null;
-                types[i] = SuperType.INTEGER;
-            } else if (token.equals(SuperType.OBJECT_ID.name())) {
-                tokens[i] = null;
-                types[i] = SuperType.OBJECT_ID;
-            } else if (token.equals(SuperType.FLOAT.name())) {
-                tokens[i] = null;
-                types[i] = SuperType.FLOAT;
-            } else {
-                types[i] = null;
-            }
-
-        }
-
-        URLTemplate urlTemplate = new URLTemplate(tokens, types, method);
-
-        return urlTemplate;
+        return URLTemplate.createUrlTemplate(url, method);
     }
 
     public static void clearValuesInDB() {

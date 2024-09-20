@@ -1,7 +1,12 @@
 package com.akto.runtime;
 
+import com.akto.dto.ApiInfo;
+import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.settings.DefaultPayload;
+import com.akto.dto.traffic.Key;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.type.URLTemplate;
@@ -139,5 +144,23 @@ public class RuntimeUtil {
             }
         }
 
+    }
+
+    public static boolean isSampleDataKeyModified(SampleData sampleData, HttpResponseParams httpResponseParams){
+        Key sampleKey = sampleData.getId();
+        ApiInfoKey apiInfoKeyFromRequestParams = new ApiInfo(httpResponseParams).getId();
+
+        if(sampleKey.getApiCollectionId() == apiInfoKeyFromRequestParams.getApiCollectionId()){
+            URLTemplate urlTemplate = URLTemplate.createUrlTemplate(sampleKey.getUrl(), sampleKey.getMethod());
+            
+        }else{
+            return true;
+        }
+
+        
+        // URLTemplate urlTemplate = URLTemplate.createUrlTemplate(sampleKey.getUrl(), sampleKey.getMethod());
+        // apiInfoKeyFromRequestParams.setMethod(urlTemplate.getMethod());
+        // apiInfoKeyFromRequestParams.setUrl(urlTemplate.getTemplateString());
+        return false;
     }
 }
