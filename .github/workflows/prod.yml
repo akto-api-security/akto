@@ -31,6 +31,8 @@ jobs:
           node-version: '17'
 
       - name: mvn package command
+        env:
+          IMAGE_TAG: collector_testing
         run: mvn package -Dakto-image-tag=$IMAGE_TAG -Dakto-build-time=$(eval "date +%s")
 
       - name: Configure AWS Credentials
