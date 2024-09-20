@@ -64,7 +64,7 @@ public class TrafficUpdates {
 
     public List<TrafficMetricsAlert> filterTrafficMetricsAlertsList(List<TrafficMetricsAlert> trafficMetricsAlertList) {
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.getMetaAll();
-        Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
+        Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(Filters.empty());
         Set<String> allowedHosts = new HashSet<>();
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();

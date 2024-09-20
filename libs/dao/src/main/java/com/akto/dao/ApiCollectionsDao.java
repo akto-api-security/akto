@@ -137,11 +137,15 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         return apiCollectionIds;
     }
 
-    public Map<Integer, Integer> buildEndpointsCountToApiCollectionMap() {
+    public Map<Integer, Integer> buildEndpointsCountToApiCollectionMap(Bson filter) {
         Map<Integer, Integer> countMap = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
 
-        pipeline.add(Aggregates.match(SingleTypeInfoDao.filterForHostHeader(0, false)));
+        pipeline.add(Aggregates.match(Filters.and(
+                SingleTypeInfoDao.filterForHostHeader(0, false),
+                filter
+            )
+        ));
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, "$" + SingleTypeInfo._COLLECTION_IDS);
         pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count",1)));

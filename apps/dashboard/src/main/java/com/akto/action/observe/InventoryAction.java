@@ -421,10 +421,25 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String loadRecentApiInfos(){
+        Bson filter = Filters.and(
+            Filters.nin(ApiInfo.ID_API_COLLECTION_ID,deactivatedCollections),
+            Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, startTimestamp),
+            Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp)
+        );
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter);
+        for(ApiInfo info: apiInfos){
+            info.calculateActualAuth();
+        }
+        response = new BasicDBObject();
+        response.put("apiInfoList", apiInfos);
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String loadRecentEndpoints() {
         List<BasicDBObject> list = fetchRecentEndpoints(startTimestamp, endTimestamp);
-        attachTagsInAPIList(list);
-        attachAPIInfoListInResponse(list, -1);
+        response = new BasicDBObject();
+        response.put("endpoints", list);
         return Action.SUCCESS.toUpperCase();
     }
 
