@@ -40,6 +40,7 @@ import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.*;
@@ -70,6 +71,14 @@ public class Main {
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
 
+    private static Map<String, Integer> emptyCountIssuesMap = new HashMap<>();
+
+    static {
+        emptyCountIssuesMap.put(Severity.HIGH.toString(), 0);
+        emptyCountIssuesMap.put(Severity.MEDIUM.toString(), 0);
+        emptyCountIssuesMap.put(Severity.LOW.toString(), 0);
+    }
+
     private static TestingRunResultSummary createTRRSummaryIfAbsent(TestingRun testingRun, int start){
         ObjectId testingRunId = new ObjectId(testingRun.getHexId());
 
@@ -81,7 +90,8 @@ public class Main {
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
                         Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start),
-                        Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, 0)
+                        Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, 0),
+                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, emptyCountIssuesMap)
                 ),
                 new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER)
         );
@@ -373,6 +383,7 @@ public class Main {
                                 trrs.setStartTimestamp(start);
                                 trrs.setState(State.RUNNING);
                                 trrs.setTestResultsCount(0);
+                                trrs.setCountIssues(emptyCountIssuesMap);
                                 TestingRunResultSummariesDao.instance.insertOne(trrs);
                                 summaryId = trrs.getId();
                             } else {
