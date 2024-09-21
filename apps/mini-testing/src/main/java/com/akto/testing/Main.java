@@ -1,5 +1,6 @@
 package com.akto.testing;
 
+import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
@@ -114,6 +115,7 @@ public class Main {
 
     public static void main(String[] args) throws InterruptedException {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
+        dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
         setupRateLimitWatcher(accountSettings);
 
         if (!SKIP_SSRF_CHECK) {

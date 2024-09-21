@@ -633,7 +633,7 @@ public class TestExecutor {
             messages.addAll(SampleDataAltDb.findSamplesByApiInfoKey(apiInfoKey));
         } catch (Exception e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
+            //e.printStackTrace();
         }
 
         if (messages == null || messages.isEmpty()){
