@@ -10,6 +10,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -145,6 +146,7 @@ public class DbAction extends ActionSupport {
     String logicalGroupName;
     BasicDBList issuesIds;
     List<YamlTemplate> activeAdvancedFilters;
+    Set<MergedUrls> mergedUrls;
 
     public BasicDBList getIssuesIds() {
         return issuesIds;
@@ -1654,6 +1656,15 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchMergedUrls() {
+        try {
+            this.mergedUrls = DbLayer.fetchMergedUrls();
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -2540,4 +2551,11 @@ public class DbAction extends ActionSupport {
         this.activeAdvancedFilters = activeAdvancedFilters;
     }
 
+    public Set<MergedUrls> getMergedUrls() {
+        return mergedUrls;
+    }
+
+    public void setMergedUrls(Set<MergedUrls> mergedUrls) {
+        this.mergedUrls = mergedUrls;
+    }
 }

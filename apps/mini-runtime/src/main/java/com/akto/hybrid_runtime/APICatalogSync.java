@@ -7,7 +7,6 @@ import java.util.regex.Pattern;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dto.*;
@@ -1155,7 +1154,7 @@ public class APICatalogSync {
             loggerMaker.infoAndAddToDb("Error while clearing values in db: " + e.getMessage(), LogDb.RUNTIME);
         }
 
-        mergedUrls = MergedUrlsDao.instance.getMergedUrls();
+        mergedUrls = dataActor.fetchMergedUrls();
 
         aktoPolicyNew.buildFromDb(fetchAllSTI);
     }
