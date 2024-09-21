@@ -165,6 +165,7 @@ public class DbAction extends ActionSupport {
     BasicDBList issuesIds;
     List<YamlTemplate> activeAdvancedFilters;
     Set<MergedUrls> mergedUrls;
+    List<TestingRunResultSummary> currentlyRunningTests;
 
     public BasicDBList getIssuesIds() {
         return issuesIds;
@@ -1988,6 +1989,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchStatusOfTests(){
+        try {
+            this.currentlyRunningTests = DbLayer.fetchStatusOfTests();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchStatusOfTests " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -2900,5 +2911,13 @@ public class DbAction extends ActionSupport {
 
     public void setMergedUrls(Set<MergedUrls> mergedUrls) {
         this.mergedUrls = mergedUrls;
+    }
+
+    public List<TestingRunResultSummary> getCurrentlyRunningTests() {
+        return currentlyRunningTests;
+    }
+
+    public void setCurrentlyRunningTests(List<TestingRunResultSummary> currentlyRunningTests) {
+        this.currentlyRunningTests = currentlyRunningTests;
     }
 }

@@ -240,4 +240,6 @@ public abstract class DataActor {
     public abstract List<YamlTemplate> fetchActiveAdvancedFilters();
 
     public abstract Set<MergedUrls> fetchMergedUrls();
+
+    public abstract List<TestingRunResultSummary> fetchStatusOfTests();
 }

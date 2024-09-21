@@ -916,4 +916,16 @@ public class DbLayer {
     public static Set<MergedUrls> fetchMergedUrls() {
         return MergedUrlsDao.instance.getMergedUrls();
     }
+
+    public static List<TestingRunResultSummary> fetchStatusOfTests() {
+        int timeFilter = Context.now() - 30 * 60;
+        List<TestingRunResultSummary> currentRunningTests = TestingRunResultSummariesDao.instance.findAll(
+            Filters.gte(TestingRunResultSummary.START_TIMESTAMP, timeFilter),
+            Projections.include("_id", TestingRunResultSummary.STATE, TestingRunResultSummary.TESTING_RUN_ID) 
+        );
+        for (TestingRunResultSummary summary: currentRunningTests) {
+            summary.setTestingRunHexId(summary.getTestingRunId().toHexString());
+        }
+        return currentRunningTests;
+    }
 }
