@@ -126,5 +126,40 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
         return sampleDataList;
     }
 
+    public List<SampleData> fetchSampleDataPaginated(String lastFetchedUrl,
+                                                     String lastFetchedMethod, int limit) {
+       Bson filters = Filters.empty();
+
+        if (lastFetchedUrl != null && lastFetchedMethod != null) {
+            Bson f1 = Filters.gt("_id.url", lastFetchedUrl);
+            Bson f2 = Filters.and(
+                    Filters.eq("_id.url", lastFetchedUrl),
+                    Filters.gt("_id.method", lastFetchedMethod)
+            );
+
+            filters = Filters.or(f1, f2);
+        }
+
+        Bson sort = Sorts.ascending("_id.url", "_id.method");
+
+        MongoCursor<SampleData> cursor = SampleDataDao.instance.getMCollection()
+                .find(Filters.and(filters))
+                .skip(0)
+                .limit(limit)
+                .sort(sort)
+                .cursor();
+
+        List<SampleData> sampleDataList = new ArrayList<>();
+
+        while (cursor.hasNext()) {
+            SampleData sampleData = cursor.next();
+            sampleDataList.add(sampleData);
+        }
+
+        cursor.close();
+
+        return sampleDataList;
+    }
+
 
 }

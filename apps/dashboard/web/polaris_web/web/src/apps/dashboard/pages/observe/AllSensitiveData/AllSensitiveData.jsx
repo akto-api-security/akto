@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, Modal } from "@shopify/polaris"
+import { Text, Button, Modal, HorizontalStack } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState } from "react"
 import func from "@/util/func"
@@ -160,6 +160,17 @@ function AllSensitiveData() {
         const activePrompts = dashboardFunc.getPrompts(requestObj)
         setPrompts(activePrompts)
     }
+
+    function resetSampleData(){
+        api.resetSampleData();
+    }
+
+    const secondaryActionsComp = (
+        <HorizontalStack gap={"2"}>
+            { (func.checkOnPrem() && window.USER_NAME.contains("razorpay")) ? <Button onClick={resetSampleData}>Reset Sample Data</Button> : <></>}
+            <Button onClick={displayGPT}>Ask AktoGPT</Button>
+        </HorizontalStack>
+    )
     
     return (
         <PageWithMultipleCards
@@ -171,7 +182,7 @@ function AllSensitiveData() {
                 />
             }
             primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
-            secondaryActions={<Button onClick={displayGPT}>Ask AktoGPT</Button>}
+            secondaryActions={secondaryActionsComp}
             isFirstPage={true}
             components={[
                 <GithubSimpleTable
