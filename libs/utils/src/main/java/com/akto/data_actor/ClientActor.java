@@ -3134,7 +3134,7 @@ public class ClientActor extends DataActor {
         List<TestingRunResultSummary> result = new ArrayList<>();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStatusOfTests", "", "GET", null, headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in fetchStatusOfTests", LoggerMaker.LogDb.RUNTIME);
