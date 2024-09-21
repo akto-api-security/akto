@@ -167,7 +167,7 @@ function AllSensitiveData() {
 
     const secondaryActionsComp = (
         <HorizontalStack gap={"2"}>
-            { (func.checkOnPrem() && window.USER_NAME.contains("razorpay")) ? <Button onClick={resetSampleData}>Reset Custom Data</Button> : <></>}
+            { (func.checkOnPrem() && window.USER_NAME.contains("razorpay")) ? <Button onClick={resetSampleData}>Reset Sample Data</Button> : <></>}
             <Button onClick={displayGPT}>Ask AktoGPT</Button>
         </HorizontalStack>
     )
