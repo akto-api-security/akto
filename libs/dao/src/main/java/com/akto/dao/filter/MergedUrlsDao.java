@@ -26,6 +26,8 @@ public class MergedUrlsDao extends AccountsContextDao<MergedUrls> {
             mergedUrls.add(mergedUrlsObj);
         }
 
+        cursor.close();
+
         return mergedUrls;
     }
 
