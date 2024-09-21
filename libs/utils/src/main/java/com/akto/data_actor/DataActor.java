@@ -3,6 +3,7 @@ package com.akto.data_actor;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -237,4 +238,6 @@ public abstract class DataActor {
     public abstract void insertProtectionLog(Log log);
     
     public abstract List<YamlTemplate> fetchActiveAdvancedFilters();
+
+    public abstract Set<MergedUrls> fetchMergedUrls();
 }
