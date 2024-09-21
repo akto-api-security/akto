@@ -237,4 +237,6 @@ public abstract class DataActor {
     public abstract void insertProtectionLog(Log log);
     
     public abstract List<YamlTemplate> fetchActiveAdvancedFilters();
+
+    public abstract List<TestingRunResultSummary> fetchStatusOfTests();
 }
