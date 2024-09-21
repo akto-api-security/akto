@@ -1117,7 +1117,7 @@ public class APICatalogSync {
             loggerMaker.infoAndAddToDb("Error while clearing values in db: " + e.getMessage(), LogDb.RUNTIME);
         }
 
-        mergedUrls = MergedUrlsDao.instance.getMergedUrls();
+        mergedUrls = dataActor.fetchMergedUrls();
 
         aktoPolicyNew.buildFromDb(fetchAllSTI);
     }

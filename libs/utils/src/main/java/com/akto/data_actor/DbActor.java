@@ -2,6 +2,7 @@ package com.akto.data_actor;
 
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.SampleData;
@@ -14,6 +15,7 @@ import com.mongodb.client.model.WriteModel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 public class DbActor extends DataActor {
 
@@ -217,5 +219,9 @@ public class DbActor extends DataActor {
     @Override
     public void updateRepoLastRun(CodeAnalysisRepo codeAnalysisRepo) {
         return;
+    }
+
+    public Set<MergedUrls> fetchMergedUrls() {
+        return DbLayer.fetchMergedUrls();
     }
 }
