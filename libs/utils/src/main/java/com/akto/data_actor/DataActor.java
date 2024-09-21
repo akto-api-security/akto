@@ -227,4 +227,6 @@ public abstract class DataActor {
     public abstract List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId);
 
     public abstract List<YamlTemplate> fetchActiveAdvancedFilters();
+
+    public abstract List<TestingRunResultSummary> fetchStatusOfTests();
 }

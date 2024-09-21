@@ -472,4 +472,8 @@ public class DbActor extends DataActor {
         return DbLayer.fetchActiveFilterTemplates();
     }
 
+    public List<TestingRunResultSummary> fetchStatusOfTests() {
+        return DbLayer.fetchStatusOfTests();
+    }
+
 }
