@@ -1982,7 +1982,7 @@ public class DbAction extends ActionSupport {
         try {
             this.currentlyRunningTests = DbLayer.fetchStatusOfTests();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in insertActivity " + e.toString());
+            loggerMaker.errorAndAddToDb(e, "Error in fetchStatusOfTests " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
