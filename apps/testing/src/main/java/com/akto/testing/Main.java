@@ -80,7 +80,8 @@ public class Main {
                 ),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
-                        Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start)
+                        Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start),
+                        Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, 0)
                 ),
                 new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER)
         );
@@ -371,6 +372,7 @@ public class Main {
                                 trrs.setId(new ObjectId());
                                 trrs.setStartTimestamp(start);
                                 trrs.setState(State.RUNNING);
+                                trrs.setTestResultsCount(0);
                                 TestingRunResultSummariesDao.instance.insertOne(trrs);
                                 summaryId = trrs.getId();
                             } else {
