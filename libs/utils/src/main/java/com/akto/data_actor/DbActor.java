@@ -500,4 +500,8 @@ public class DbActor extends DataActor {
         return DbLayer.fetchMergedUrls();
     }
 
+    public List<TestingRunResultSummary> fetchStatusOfTests() {
+        return DbLayer.fetchStatusOfTests();
+    }
+
 }

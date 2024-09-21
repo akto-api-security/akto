@@ -3163,4 +3163,39 @@ public class ClientActor extends DataActor {
         return new HashSet<>(respList);
     }
 
+    public List<TestingRunResultSummary> fetchStatusOfTests() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<TestingRunResultSummary> result = new ArrayList<>();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStatusOfTests", "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb( "non 2xx response in fetchStatusOfTests", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList tests = (BasicDBList) payloadObj.get("currentlyRunningTests");
+                for (Object test: tests) {
+                    BasicDBObject obj = (BasicDBObject) test;
+                    obj.remove("id");
+                    obj.remove("testingRunId");
+                    TestingRunResultSummary res = objectMapper.readValue(obj.toJson(), TestingRunResultSummary.class);
+                    res.setId(new ObjectId(obj.getString("hexId")));
+                    res.setTestingRunId(new ObjectId(obj.getString("testingRunHexId")));
+                    result.add(res);
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchStatusOfTests" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+
+            return result;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchStatusOfTests" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
 }
