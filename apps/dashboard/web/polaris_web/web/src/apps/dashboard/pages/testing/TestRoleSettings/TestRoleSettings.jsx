@@ -48,7 +48,7 @@ function TestRoleSettings() {
     const [searchParams] = useSearchParams();
     const systemRole = searchParams.get("system")
 
-    const isDataInState = location?.state != undefined && Object.keys(location?.state).length > 0
+    const isDataInState = location.state && location?.state !== undefined && Object.keys(location?.state).length > 0
     const isDataInSearch = searchParams.get("name")
     const isNew = !isDataInState && !isDataInSearch
     const pageTitle = isNew ? "Add test role" : "Configure test role"
@@ -82,9 +82,7 @@ function TestRoleSettings() {
     }
     useEffect(() => {
         if (!isNew) {
-
             let newItems = initialItems
-
             if (isDataInState) {
                 newItems = location.state
                 setInitialItems(location.state);
@@ -127,7 +125,6 @@ function TestRoleSettings() {
     }
 
     const saveAction = async (updatedAuth=false, authWithCondLists = null) => {
-        setRefresh(!refresh)
         let andConditions = transform.filterContainsConditions(conditions, 'AND')
         let orConditions = transform.filterContainsConditions(conditions, 'OR')
         if (!(andConditions || orConditions) || roleName.length == 0) {
@@ -158,6 +155,9 @@ function TestRoleSettings() {
                 }
             }
         }
+        setTimeout(() => {
+            setRefresh(!refresh)
+        },200)
     }
 
     const handleTextChange = (val) => {
