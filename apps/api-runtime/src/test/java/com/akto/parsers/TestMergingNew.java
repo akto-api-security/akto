@@ -15,6 +15,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
 import com.akto.types.CappedSet;
+import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.RedactSampleData;
 import com.google.api.client.util.Charsets;
 import com.google.common.hash.BloomFilter;
@@ -25,6 +26,8 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.util.*;
@@ -35,6 +38,14 @@ import static com.akto.runtime.APICatalogSync.tryMergeURLsInCollection;
 import static org.junit.Assert.*;
 
 public class TestMergingNew extends MongoBasedTest {
+
+    @Before
+    public void initMain() {
+        DictionaryFilter.readDictionaryBinary();
+    }
+
+
+
 
     public void testInitializer(){
         Map<String, AktoDataType> aktoDataTypeMap = new HashMap<>();
@@ -94,6 +105,82 @@ public class TestMergingNew extends MongoBasedTest {
         assertEquals(0, getStaticURLsSize(parser));
 
     }
+
+    @Test
+    public void testStringMerging() {
+        testInitializer();
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
+
+        String baseUrl = "/api/";
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+        List<String> urls = Arrays.asList(
+                baseUrl + "demo",
+                baseUrl + "cat",
+                baseUrl + "OSHE2CNS",
+                baseUrl + "2HOIWNJK",
+                baseUrl + "31a1a7c5-b4e3-47f5-8579-f7fc044c6a98",
+                baseUrl + "tree"
+        );
+
+        for (String c : urls) {
+            HttpResponseParams resp = createSampleParams("user1", c);
+            responseParams.add(resp);
+        }
+
+        parser.syncFunction(responseParams, false, true, null);
+        parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
+        APICatalogSync.mergeUrlsAndSave(123, true, false, parser.apiCatalogSync.existingAPIsInDb);
+        parser.apiCatalogSync.buildFromDB(true, true);
+        Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        Map<URLStatic, RequestTemplate> strictUrlMap = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods();
+
+
+        assertEquals(1, urlTemplateMap.size());
+        assertEquals(3, strictUrlMap.size());
+    }
+
+    @Test
+    public void testEnglishWordsUrlTestString() {
+        testInitializer();
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
+        String url = "/link/";
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+        List<String> urls = new ArrayList<>();
+        for (String x: Arrays.asList(
+                "apple", "banana", "cat", "dog", "elephant", "flower", "guitar", "house",
+                "island", "jungle", "kite", "lemon", "mountain", "night", "ocean", "piano",
+                "queen", "river", "sun", "tree", "umbrella", "village", "whale", "xylophone",
+                "yacht", "zebra", "bird", "clock", "desert", "engine", "forest", "garden",
+                "honey", "igloo", "jacket", "kangaroo", "lamp", "mirror", "notebook", "orange",
+                "pencil", "quilt", "rain", "star", "telephone", "uniform", "violin", "window",
+                "yellow", "zipper"
+        )) {
+            urls.add(url+x);
+        }
+        for (String c: urls) {
+            HttpResponseParams resp = createSampleParams("user1", c);
+            responseParams.add(resp);
+        }
+
+        parser.syncFunction(responseParams.subList(0,23), false, true, null);
+        parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
+        assertEquals(23, getStaticURLsSize(parser));
+
+        parser.syncFunction(responseParams.subList(23,28), false, true, null);
+        parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
+        APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
+        parser.apiCatalogSync.buildFromDB(false, true);
+        assertEquals(28, getStaticURLsSize(parser));
+
+        parser.syncFunction(responseParams.subList(28,33), false, true, null);
+        parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
+        assertEquals(33, getStaticURLsSize(parser));
+    }
+
 
     public int getStaticURLsSize(HttpCallParser parser) {
         Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods();

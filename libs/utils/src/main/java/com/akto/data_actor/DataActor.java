@@ -2,11 +2,13 @@ package com.akto.data_actor;
 
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 
 import java.util.List;
+import java.util.Set;
 
 public abstract class DataActor {
 
@@ -89,4 +91,6 @@ public abstract class DataActor {
 
     public abstract void syncExtractedAPIs( CodeAnalysisRepo codeAnalysisRepo   , List<CodeAnalysisApi> codeAnalysisApisList, boolean isLastBatch);
     public abstract void updateRepoLastRun( CodeAnalysisRepo codeAnalysisRepo);
+
+    public abstract Set<MergedUrls> fetchMergedUrls();
 }

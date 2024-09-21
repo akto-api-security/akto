@@ -14,6 +14,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.util.JSONUtils;
 import com.akto.utils.AktoCustomException;
+import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -266,6 +267,103 @@ public class CustomDataTypeAction extends UserAction{
             });
         }
 
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String resetSampleData(){
+        try {
+            int limit = 30;
+            List<SampleData> sampleDataList = new ArrayList<>();
+            loggerMaker.infoAndAddToDb("triggered sample data redaction cron", LogDb.DASHBOARD);
+            String lastFetchedUrl = null;
+            String lastFetchedMethod = null;
+            while (true) {
+                ArrayList<WriteModel<SampleData>> bulkUpdatesForSampleData = new ArrayList<>();
+                sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(lastFetchedUrl, lastFetchedMethod, limit);
+                if (sampleDataList == null || sampleDataList.size() == 0) {
+                    break;
+                }
+
+                loggerMaker.infoAndAddToDb("Read " + sampleDataList.size() + " samples", LogDb.DASHBOARD);
+
+                for (SampleData sd: sampleDataList) {
+                    lastFetchedUrl = sd.getId().getUrl();
+                    lastFetchedMethod = sd.getId().getMethod().name();
+                    List<String> samples = sd.getSamples();
+                    if (samples == null || samples.size() == 0) {
+                        continue;
+                    }
+                    List<String> newSamples = new ArrayList<>();
+                    for (String sample: samples) {
+                        newSamples.add(RedactSampleData.redactIfRequired(sample, false, false));
+                    }
+                    Bson bson = Updates.combine(
+                        Updates.set("samples", newSamples)
+                    );
+                    Bson filters = Filters.and(
+                        Filters.eq("_id.url", sd.getId().getUrl()),
+                        Filters.eq("_id.method", sd.getId().getMethod()),
+                        Filters.eq("_id.apiCollectionId", sd.getId().getApiCollectionId())
+                    );
+                    bulkUpdatesForSampleData.add(
+                        new UpdateOneModel<>(
+                                filters,
+                                bson
+                        )
+                    );
+                }
+                if (bulkUpdatesForSampleData.size() > 0) {
+                    SampleDataDao.instance.getMCollection().bulkWrite(bulkUpdatesForSampleData);
+                }
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in redact data sd " + e.toString(), LogDb.DASHBOARD);
+        }
+
+        try {
+            int limit = 30;
+            List<SensitiveSampleData> sampleDataList = new ArrayList<>();
+            int skip = 0;
+            while (true) {
+                ArrayList<WriteModel<SensitiveSampleData>> bulkUpdatesForSensitiveSampleData = new ArrayList<>();
+                sampleDataList = SensitiveSampleDataDao.instance.findAll(Filters.empty(), skip, limit, null);
+                if (sampleDataList == null || sampleDataList.size() == 0) {
+                    break;
+                }
+                loggerMaker.infoAndAddToDb("Read " + sampleDataList.size() + " sensitive samples", LogDb.DASHBOARD);
+                skip+=limit;
+                for (SensitiveSampleData sd: sampleDataList) {
+                    List<String> samples = sd.getSampleData();
+                    if (samples == null || samples.size() == 0) {
+                        continue;
+                    }
+                    List<String> newSamples = new ArrayList<>();
+                    for (String sample: samples) {
+                        newSamples.add(RedactSampleData.redactIfRequired(sample, false, false));
+                    }
+                    Bson sensitiveSampleBson = Updates.combine(
+                        Updates.set("sampleData", newSamples)
+                    );
+                    Bson filters = Filters.and(
+                        Filters.eq("_id.url", sd.getId().getUrl()),
+                        Filters.eq("_id.method", sd.getId().getMethod()),
+                        Filters.eq("_id.apiCollectionId", sd.getId().getApiCollectionId())
+                    );
+                    bulkUpdatesForSensitiveSampleData.add(
+                        new UpdateOneModel<>(
+                                filters,
+                                sensitiveSampleBson
+                        )
+                    );
+                }
+                if (bulkUpdatesForSensitiveSampleData.size() > 0) {
+                    SensitiveSampleDataDao.instance.getMCollection().bulkWrite(bulkUpdatesForSensitiveSampleData);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in redact data ssd " + e.toString(), LogDb.DASHBOARD);
+        }
         return Action.SUCCESS.toUpperCase();
     }
 

@@ -61,29 +61,40 @@ function ApiChanges() {
         })
     }
 
+    async function fetchData() {
+        let apiCollection, apiCollectionUrls, apiInfoList;
+        let apiPromises = [
+            api.loadRecentEndpoints(startTimestamp, endTimestamp),
+            api.loadRecentApiInfos(startTimestamp, endTimestamp),
+            api.fetchNewParametersTrend(startTimestamp, endTimestamp)
+        ];
+        let results = await Promise.allSettled(apiPromises);
+        let endpointsFromStiResp = results[0].status === 'fulfilled' ? results[0].value : {"endpoints": []}
+        let endpointsFromApiInfos = results[1].status === 'fulfilled' ? results[1].value : {"apiInfoList" : []}
+        let parametersResp = results[2].status === 'fulfilled' ? results[2].value : {}
+
+        apiCollection = endpointsFromStiResp.endpoints.map(x => { return { ...x._id, startTs: x.startTs } })
+        apiCollectionUrls = endpointsFromStiResp.endpoints.map(x => x._id.url)
+        apiInfoList = endpointsFromApiInfos.apiInfoList
+        
+        await api.fetchSensitiveParamsForEndpoints(apiCollectionUrls).then(allSensitiveFields => {
+            let sensitiveParams = allSensitiveFields.data.endpoints
+            setSensitiveParams([...sensitiveParams]);
+            apiCollection = transform.fillSensitiveParams(sensitiveParams, apiCollection);
+        })
+
+        let data = func.mergeApiInfoAndApiCollection(apiCollection, apiInfoList, collectionsMap);
+        const prettifiedData = transform.prettifyEndpointsData(data)
+        setNewEndpoints({prettify: prettifiedData, normal: data});
+
+        const trendObj = transform.findNewParametersCountTrend(parametersResp, startTimestamp, endTimestamp)
+        setNewParametersCount(trendObj.count)
+        setParametersTrend(trendObj.trend)
+
+        setLoading(false);
+    }
+
     useEffect(() => {
-        async function fetchData() {
-            let apiCollection, apiCollectionUrls, apiInfoList;
-            await api.loadRecentEndpoints(startTimestamp, endTimestamp).then((res) => {
-                apiCollection = res.data.endpoints.map(x => { return { ...x._id, startTs: x.startTs } })
-                apiCollectionUrls = res.data.endpoints.map(x => x._id.url)
-                apiInfoList = res.data.apiInfoList
-            })
-            await api.fetchSensitiveParamsForEndpoints(apiCollectionUrls).then(allSensitiveFields => {
-                let sensitiveParams = allSensitiveFields.data.endpoints
-                setSensitiveParams([...sensitiveParams]);
-                apiCollection = transform.fillSensitiveParams(sensitiveParams, apiCollection);
-            })
-            let data = func.mergeApiInfoAndApiCollection(apiCollection, apiInfoList, collectionsMap);
-            const prettifiedData = transform.prettifyEndpointsData(data)
-            setNewEndpoints({prettify: prettifiedData, normal: data});
-            await api.fetchNewParametersTrend(startTimestamp, endTimestamp).then((resp) => {
-                const trendObj = transform.findNewParametersCountTrend(resp, startTimestamp, endTimestamp)
-                setNewParametersCount(trendObj.count)
-                setParametersTrend(trendObj.trend)
-            })
-            setLoading(false);
-        }
         if (allCollections.length > 0) {
             fetchData();
         }

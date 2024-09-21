@@ -719,7 +719,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 Filters.nin(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
                 hostFilterQ
         );
-        List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 1_000, Sorts.descending("timestamp"), Projections.exclude("values"));
+        List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 20_000, Sorts.descending("timestamp"), Projections.exclude("values"));
         for(SingleTypeInfo sti: latestHosts) {
             BasicDBObject id = 
                 new BasicDBObject("apiCollectionId", sti.getApiCollectionId())

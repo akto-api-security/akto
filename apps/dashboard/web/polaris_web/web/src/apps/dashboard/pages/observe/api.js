@@ -43,6 +43,13 @@ export default {
             }
         })
     },
+    resetSampleData() {
+        return request({
+            url: '/api/resetSampleData',
+            method: 'post',
+            data: {}
+        })
+    },
     async fetchSampleData(url, apiCollectionId, method) {
         const resp = await request({
             url: '/api/fetchSampleData',
@@ -324,6 +331,15 @@ export default {
     async loadRecentEndpoints (startTimestamp, endTimestamp) {
         const resp = await request({
             url: '/api/loadRecentEndpoints',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+
+    async loadRecentApiInfos (startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/loadRecentApiInfos',
             method: 'post',
             data: { startTimestamp, endTimestamp }
         })

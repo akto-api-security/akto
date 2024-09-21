@@ -1,11 +1,10 @@
 package com.akto.data_actor;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
+import com.akto.dao.filter.MergedUrlsDao;
+import com.akto.dto.filter.MergedUrls;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -389,5 +388,9 @@ public class DbLayer {
 
     public static void insertProtectionLog(Log log) {
         ProtectionLogsDao.instance.insertOne(log);
+    }
+
+    public static Set<MergedUrls> fetchMergedUrls() {
+        return MergedUrlsDao.instance.getMergedUrls();
     }
 }

@@ -77,6 +77,7 @@ import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
+import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.jobs.JobUtils;
 import com.akto.utils.jobs.MatchingJob;
 import com.akto.util.AccountTask;
@@ -1914,6 +1915,7 @@ public class InitializerListener implements ServletContextListener {
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         setSubdomain();
+        DictionaryFilter.readDictionaryBinary();
 
         String https = System.getenv("AKTO_HTTPS_FLAG");
         if (Objects.equals(https, "true")) {

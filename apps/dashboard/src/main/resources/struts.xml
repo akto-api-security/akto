@@ -865,6 +865,27 @@
             </result>
         </action>
 
+        <action name="api/loadRecentApiInfos" class="com.akto.action.observe.InventoryAction" method="loadRecentApiInfos">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"   type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/fetchNewParametersTrend" class="com.akto.action.observe.InventoryAction" method="fetchNewParametersTrend">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1468,6 +1489,26 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>  
+
+        <action name="api/getCountForHostnameDeactivatedCollections" class="com.akto.action.ApiCollectionsAction" method="getCountForHostnameDeactivatedCollections">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+                <param name="root">deactivatedHostnameCountMap</param>
             </result>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
@@ -2466,6 +2507,26 @@
         </action>
 
         <action name="api/saveAktoDataType" class="com.akto.action.CustomDataTypeAction" method="saveAktoDataType">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">SENSITIVE_DATA</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/resetSampleData" class="com.akto.action.CustomDataTypeAction" method="resetSampleData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
