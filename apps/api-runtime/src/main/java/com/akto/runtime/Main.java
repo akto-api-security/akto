@@ -16,6 +16,7 @@ import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
+import com.akto.util.filter.DictionaryFilter;
 import com.akto.util.AccountTask;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
@@ -174,6 +175,8 @@ public class Main {
             fetchAllSTI = false;
         }
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
+
+        DictionaryFilter.readDictionaryBinary();
 
         if (topicName == null) topicName = "akto.api.logs";
 
