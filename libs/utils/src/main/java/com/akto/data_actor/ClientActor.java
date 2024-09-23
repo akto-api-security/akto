@@ -1,6 +1,7 @@
 package com.akto.data_actor;
 
 import com.akto.DaoInit;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.testing.ApiExecutor;
 import com.auth0.jwt.JWT;
@@ -3088,6 +3089,41 @@ public class ClientActor extends DataActor {
         }
         return respList;
     }
+
+    public Set<MergedUrls> fetchMergedUrls() {
+        Map<String, List<String>> headers = buildHeaders();
+
+        List<MergedUrls> respList = new ArrayList<>();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchMergedUrls", "", "POST", "", headers, "");
+
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchMergedUrls", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList newUrls = (BasicDBList) payloadObj.get("mergedUrls");
+                for (Object url: newUrls) {
+                    BasicDBObject urlObj = (BasicDBObject) url;
+                    MergedUrls mergedUrl = objectMapper.readValue(urlObj.toJson(), MergedUrls.class);
+                    respList.add(mergedUrl);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchMergedUrls" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetching merged urls: " + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+
+        return new HashSet<>(respList);
+    }
+    
 
     public List<TestingRunResultSummary> fetchStatusOfTests() {
         Map<String, List<String>> headers = buildHeaders();

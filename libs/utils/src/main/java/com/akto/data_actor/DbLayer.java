@@ -12,9 +12,11 @@ import java.util.Set;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
+import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.dependency_analyser.DependencyAnalyserUtils;
 import com.akto.dto.*;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -889,5 +891,9 @@ public class DbLayer {
             summary.setTestingRunHexId(summary.getTestingRunId().toHexString());
         }
         return currentRunningTests;
+    }
+
+    public static Set<MergedUrls> fetchMergedUrls() {
+        return MergedUrlsDao.instance.getMergedUrls();
     }
 }
