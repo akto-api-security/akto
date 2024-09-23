@@ -51,10 +51,11 @@ public class TestTrafficUpdates extends MongoBasedTest {
         TrafficMetricsDao.instance.insertMany(trafficMetricsList);
 
         TrafficUpdates trafficUpdates = new TrafficUpdates(60*60*24*lookBackPeriod);
-        trafficUpdates.populateTrafficDetails(TrafficUpdates.AlertType.FILTERED_REQUESTS_RUNTIME, new ArrayList<>());
+        trafficUpdates.populateTrafficDetails(TrafficUpdates.AlertType.FILTERED_REQUESTS_RUNTIME, Arrays.asList("host0", "host3"));
 
         List<TrafficMetricsAlert>  trafficMetricsAlertList = TrafficMetricsAlertsDao.instance.findAll(new BasicDBObject());
-        assertEquals(10, trafficMetricsAlertList.size());
+        // 10 - 2 = 8 because two hosts have been deactivated
+        assertEquals(8, trafficMetricsAlertList.size());
         for (TrafficMetricsAlert trafficMetricsAlert: trafficMetricsAlertList) {
             assertTrue( trafficMetricsAlert.getLastDbUpdateTs() - maxH * 3600 < 5); // max 5 seconds difference
             assertEquals(0, trafficMetricsAlert.getLastOutgoingTrafficTs());
