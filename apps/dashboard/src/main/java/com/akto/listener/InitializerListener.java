@@ -75,6 +75,7 @@ import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.util.filter.DictionaryFilter;
@@ -210,10 +211,22 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         try {
+                            Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
+                            List<String> deactivatedHosts = new ArrayList<>();
+                            if (deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
+                                List<ApiCollection> metaForIds = ApiCollectionsDao.instance.getMetaForIds(new ArrayList<>(deactivatedCollections));
+                                for (ApiCollection apiCollection: metaForIds) {
+                                    String host = apiCollection.getHostName();
+                                    if (host != null) deactivatedHosts.add(host);
+                                }
+                            }
+
+
                             // look back period 6 days
                             loggerMaker.infoAndAddToDb("starting traffic alert scheduler", LoggerMaker.LogDb.DASHBOARD);
                             TrafficUpdates trafficUpdates = new TrafficUpdates(60*60*24*6);
-                            trafficUpdates.populate();
+                            trafficUpdates.populate(deactivatedHosts);
 
                             List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
                             if (listWebhooks == null || listWebhooks.isEmpty()) {
@@ -233,7 +246,7 @@ public class InitializerListener implements ServletContextListener {
                             loggerMaker.infoAndAddToDb("threshold seconds: " + thresholdSeconds, LoggerMaker.LogDb.DASHBOARD);
 
                             if (thresholdSeconds > 0) {
-                                trafficUpdates.sendAlerts(webhook.getWebhook(),webhook.getDashboardUrl()+"/dashboard/settings#Metrics", thresholdSeconds);
+                                trafficUpdates.sendAlerts(webhook.getWebhook(),webhook.getDashboardUrl()+"/dashboard/settings#Metrics", thresholdSeconds, deactivatedHosts);
                             }
                         } catch (Exception e) {
                             loggerMaker.errorAndAddToDb(e,"Error while running traffic alerts: " + e.getMessage(), LogDb.DASHBOARD);

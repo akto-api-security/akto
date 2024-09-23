@@ -39,17 +39,7 @@ public class TrafficUpdates {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TrafficUpdates.class);
 
-    public void populate() {
-        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
-
-        List<String> deactivatedHosts = new ArrayList<>();
-        if (deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
-            List<ApiCollection> metaForIds = ApiCollectionsDao.instance.getMetaForIds(new ArrayList<>(deactivatedCollections));
-            for (ApiCollection apiCollection: metaForIds) {
-                String host = apiCollection.getHostName();
-                if (host != null) deactivatedHosts.add(host);
-            }
-        }
+    public void populate(List<String> deactivatedHosts) {
 
         loggerMaker.infoAndAddToDb("Starting populateTrafficDetails for " + AlertType.OUTGOING_REQUESTS_MIRRORING, LoggerMaker.LogDb.DASHBOARD);
         populateTrafficDetails(AlertType.OUTGOING_REQUESTS_MIRRORING, deactivatedHosts);
@@ -60,9 +50,9 @@ public class TrafficUpdates {
         loggerMaker.infoAndAddToDb("Finished populateTrafficDetails for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
     }
 
-    public void sendAlerts(String webhookUrl, String metricsUrl, int thresholdSeconds) {
-
-        List<TrafficMetricsAlert> trafficMetricsAlertList = TrafficMetricsAlertsDao.instance.findAll(new BasicDBObject());
+    public void sendAlerts(String webhookUrl, String metricsUrl, int thresholdSeconds, List<String> deactivatedHosts) {
+        Bson filter = deactivatedHosts != null && !deactivatedHosts.isEmpty() ? Filters.nin(TrafficMetricsAlert.HOST, deactivatedHosts) : Filters.empty();
+        List<TrafficMetricsAlert> trafficMetricsAlertList = TrafficMetricsAlertsDao.instance.findAll(filter);
         List<TrafficMetricsAlert> filteredTrafficMetricsAlertsList = filterTrafficMetricsAlertsList(trafficMetricsAlertList);
         loggerMaker.infoAndAddToDb("filteredTrafficMetricsAlertsList: " + filteredTrafficMetricsAlertsList.size(), LoggerMaker.LogDb.DASHBOARD);
 
