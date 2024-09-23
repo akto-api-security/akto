@@ -100,6 +100,9 @@ public class CustomAuthUtil {
                     try {
                         HttpResponseParams httpResponseParams = SampleParser.parseSampleMessage(sample);
                         AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+                        if (id.getApiCollectionId() == -86954493) {
+                            loggerMaker.infoAndAddToDb("auth types sample data processed: url " + id.getUrl() + " authtypes: " + apiInfo.getAllAuthTypesFound(), LogDb.DASHBOARD);
+                        }
                         sampleProcessed = true;
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Unable to parse sample data for custom auth setup job");
@@ -116,6 +119,9 @@ public class CustomAuthUtil {
                             loggerMaker.infoAndAddToDb("Headers for " + apiInfo.getId().toString() + ": " + httpResponseParams.requestParams.getHeaders() ,LogDb.DASHBOARD);
                         }
                         AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+                        if (id.getApiCollectionId() == -86954493) {
+                            loggerMaker.infoAndAddToDb("auth types sample data unprocessed: url " + id.getUrl() + " authtypes: " + apiInfo.getAllAuthTypesFound(), LogDb.DASHBOARD);
+                        }
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Unable to parse STIs for custom auth setup job");
