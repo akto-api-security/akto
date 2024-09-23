@@ -91,7 +91,7 @@ public class ClientActor extends DataActor {
     private static final Gson gson = new Gson();
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     private static final Logger logger = LoggerFactory.getLogger(ClientActor.class);
-    public static final String CYBORG_URL = "http://localhost:82";
+    public static final String CYBORG_URL = "https://cyborg.akto.io";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
     private static AccountSettings accSettings;
 
@@ -2937,7 +2937,7 @@ public class ClientActor extends DataActor {
     public void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
-        obj.put("isHybridSaas", hybridTestingEnabled);
+        obj.put("hybridTestingEnabled", hybridTestingEnabled);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/modifyTestingSetting", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -3001,12 +3001,12 @@ public class ClientActor extends DataActor {
     public static final String AUTHORIZATION = "Authorization";
 
     public static String getAuthToken() {
-        return "abc"; //System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        return System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
     }
 
     public static boolean checkAccount() {
         try {
-            String token = "abc";//System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
             DecodedJWT jwt = JWT.decode(token);
             String payload = jwt.getPayload();
             byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
