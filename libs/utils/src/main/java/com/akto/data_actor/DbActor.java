@@ -6,6 +6,7 @@ import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -486,6 +487,10 @@ public class DbActor extends DataActor {
 
     public List<TestingRunResultSummary> fetchStatusOfTests() {
         return DbLayer.fetchStatusOfTests();
+    }
+    
+    public Set<MergedUrls> fetchMergedUrls() {
+        return DbLayer.fetchMergedUrls();
     }
 
 }
