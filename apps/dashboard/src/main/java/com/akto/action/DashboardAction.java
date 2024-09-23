@@ -253,15 +253,24 @@ public class DashboardAction extends UserAction {
     private String username;
     private String organization;
     public String updateUsernameAndOrganization() {
+        if(username.trim().isEmpty()) {
+            addActionError("Username cannot be empty");
+            return Action.ERROR.toUpperCase();
+        }
         User user = UsersDao.instance.updateOne(Filters.in(User.LOGIN, email), Updates.combine(
-                Updates.set(User.NAME, username),
+                Updates.set(User.NAME, username.trim()),
                 Updates.set(User.NAME_LAST_UPDATE, Context.now())
         ));
         RBAC.Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
 
         if(currentRoleForUser.equals(RBAC.Role.ADMIN)) {
+            if(organization.trim().isEmpty()) {
+                addActionError("Organization cannot be empty");
+                return Action.ERROR.toUpperCase();
+            }
+
             OrganizationsDao.instance.updateOne(Filters.in(Organization.ADMIN_EMAIL, email), Updates.combine(
-                    Updates.set(Organization.NAME, organization),
+                    Updates.set(Organization.NAME, organization.trim()),
                     Updates.set(Organization.NAME_LAST_UPDATE, Context.now())
             ));
         }

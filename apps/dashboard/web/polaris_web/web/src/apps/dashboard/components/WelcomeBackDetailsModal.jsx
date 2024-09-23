@@ -11,7 +11,7 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
 
     const handleWelcomeBackDetails = async () => {
         if(!isAdmin && organization.length > 0) return
-        if(!username || (isAdmin && !organization)) {
+        if(username.trim().length === 0 || (isAdmin && organization.trim().length === 0)) {
             func.setToast(true, true, "Please enter all details.")
             return
         }
