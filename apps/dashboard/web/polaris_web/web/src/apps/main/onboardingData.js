@@ -321,13 +321,14 @@ const learnMoreObject = {
                 content:"Understanding Role Permissions",
                 value:"https://docs.akto.io/account/understanding-role-permissions"
             },
-        ],
+        ]
+    },
     dashboard_settings_about:{
         docsLink: [
             {
                 content:"How to Add Private CIDRs list",
                 value:"https://docs.akto.io/api-inventory/how-to/add-private-cidrs-list"
-            }
+            },
             {
                 content:"How to Configure Third parties IPs list",
                 value:"https://docs.akto.io/api-inventory/how-to/configure-access-types"
@@ -381,6 +382,7 @@ const learnMoreObject = {
                 value:"https://docs.akto.io/api-inventory/concepts/advanced-filter-option"
             }
         ],
+    },
     dashboard_settings_tags:{
         docsLink: [
             {
@@ -586,7 +588,7 @@ const learnMoreObject = {
             {
                 content:"How to add a new test library",
                 value:"https://docs.akto.io/test-editor/how-to/add-a-new-test-library"
-            }
+            },
             {
                 content:"How to edit built in test",
                 value:"https://docs.akto.io/test-editor/writing-custom-tests"
@@ -602,6 +604,7 @@ const learnMoreObject = {
                 value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
             }
         ]
+    },
     dashboard_settings_billing:{
         docsLink: [
             {
@@ -653,7 +656,7 @@ const learnMoreObject = {
                 value: "https://www.youtube.com/watch?v=4BIBra9J0Ek"
             }
         ]
-    },
+    }
 }
 
 export { HOMEDASHBOARD_VIDEO_LENGTH, HOMEDASHBOARD_VIDEO_URL, HOMEDASHBOARD_VIDEO_THUMBNAIL,
