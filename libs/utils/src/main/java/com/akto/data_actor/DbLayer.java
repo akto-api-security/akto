@@ -636,6 +636,19 @@ public class DbLayer {
                 options);
     }
 
+    public static TestingRunResultSummary updateIssueCountAndStateInSummary(String summaryId, Map<String, Integer> totalCountIssues, String state) {
+        ObjectId summaryObjectId = new ObjectId(summaryId);
+        FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
+        options.returnDocument(ReturnDocument.AFTER);
+        return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                Filters.eq(Constants.ID, summaryObjectId),
+                Updates.combine(
+                        Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+                        Updates.set(TestingRunResultSummary.STATE, state),
+                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)),
+                options);
+    }
+
     public static List<Integer> fetchDeactivatedCollections() {
         return new ArrayList<>(UsageMetricCalculator.getDeactivatedLatest());
     }

@@ -146,6 +146,7 @@ public class DbAction extends ActionSupport {
     BasicDBList issuesIds;
     List<YamlTemplate> activeAdvancedFilters;
     List<TestingRunResultSummary> currentlyRunningTests;
+    String state;
 
     public BasicDBList getIssuesIds() {
         return issuesIds;
@@ -1664,6 +1665,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String updateIssueCountAndStateInSummary(){
+        try {
+            trrs = DbLayer.updateIssueCountAndStateInSummary(summaryId, totalCountIssues, state);
+            trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -2556,6 +2567,14 @@ public class DbAction extends ActionSupport {
 
     public void setCurrentlyRunningTests(List<TestingRunResultSummary> currentlyRunningTests) {
         this.currentlyRunningTests = currentlyRunningTests;
+    }
+
+    public String getState() {
+        return state;
+    }
+
+    public void setState(String state) {
+        this.state = state;
     }
 
 }
