@@ -51,7 +51,7 @@ public class TestTrafficUpdates extends MongoBasedTest {
         TrafficMetricsDao.instance.insertMany(trafficMetricsList);
 
         TrafficUpdates trafficUpdates = new TrafficUpdates(60*60*24*lookBackPeriod);
-        trafficUpdates.populateTrafficDetails(TrafficUpdates.AlertType.FILTERED_REQUESTS_RUNTIME);
+        trafficUpdates.populateTrafficDetails(TrafficUpdates.AlertType.FILTERED_REQUESTS_RUNTIME, new ArrayList<>());
 
         List<TrafficMetricsAlert>  trafficMetricsAlertList = TrafficMetricsAlertsDao.instance.findAll(new BasicDBObject());
         assertEquals(10, trafficMetricsAlertList.size());

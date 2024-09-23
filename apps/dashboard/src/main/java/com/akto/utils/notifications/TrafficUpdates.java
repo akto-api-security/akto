@@ -11,11 +11,13 @@ import com.akto.dto.traffic_metrics.TrafficMetricsAlert;
 import com.akto.log.LoggerMaker;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.runtime.Main;
+import com.akto.usage.UsageMetricCalculator;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.slack.api.Slack;
+import org.apache.commons.collections.ArrayStack;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -38,12 +40,23 @@ public class TrafficUpdates {
     private static final LoggerMaker loggerMaker = new LoggerMaker(TrafficUpdates.class);
 
     public void populate() {
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
+        List<String> deactivatedHosts = new ArrayList<>();
+        if (deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
+            List<ApiCollection> metaForIds = ApiCollectionsDao.instance.getMetaForIds(new ArrayList<>(deactivatedCollections));
+            for (ApiCollection apiCollection: metaForIds) {
+                String host = apiCollection.getHostName();
+                if (host != null) deactivatedHosts.add(host);
+            }
+        }
+
         loggerMaker.infoAndAddToDb("Starting populateTrafficDetails for " + AlertType.OUTGOING_REQUESTS_MIRRORING, LoggerMaker.LogDb.DASHBOARD);
-        populateTrafficDetails(AlertType.OUTGOING_REQUESTS_MIRRORING);
+        populateTrafficDetails(AlertType.OUTGOING_REQUESTS_MIRRORING, deactivatedHosts);
         loggerMaker.infoAndAddToDb("Finished populateTrafficDetails for " + AlertType.OUTGOING_REQUESTS_MIRRORING, LoggerMaker.LogDb.DASHBOARD);
 
         loggerMaker.infoAndAddToDb("Starting populateTrafficDetails for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
-        populateTrafficDetails(AlertType.FILTERED_REQUESTS_RUNTIME);
+        populateTrafficDetails(AlertType.FILTERED_REQUESTS_RUNTIME, deactivatedHosts);
         loggerMaker.infoAndAddToDb("Finished populateTrafficDetails for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
     }
 
@@ -84,7 +97,7 @@ public class TrafficUpdates {
         return filteredTrafficMetricsAlertsList;
     }
 
-    public void populateTrafficDetails(AlertType alertType) {
+    public void populateTrafficDetails(AlertType alertType, List<String> deactivatedHosts) {
 
         TrafficMetrics.Name name;
         switch (alertType) {
@@ -104,10 +117,15 @@ public class TrafficUpdates {
         // we want to bring only last 3 days data to find traffic alerts. More efficient than getting all traffic.
         int time = (Context.now() - lookBackPeriod) / (60*60*24);
 
-        Bson filter = Filters.and(
-                Filters.eq("_id." + TrafficMetrics.Key.NAME, name.toString()),
-                Filters.gte("_id."+TrafficMetrics.Key.BUCKET_START_EPOCH, time)
-        );
+        List<Bson> filters = new ArrayList<>();
+        filters.add(Filters.eq("_id." + TrafficMetrics.Key.NAME, name.toString()));
+        filters.add(Filters.gte("_id."+TrafficMetrics.Key.BUCKET_START_EPOCH, time));
+
+        if (deactivatedHosts != null && !deactivatedHosts.isEmpty()) {
+            filters.add(Filters.nin("_id."+ TrafficMetrics.Key.HOST, deactivatedHosts));
+        }
+
+        Bson filter = Filters.and(filters);
 
         Document idExpression = new Document("host", "$_id.host");
         pipeline.add(Aggregates.match(filter));
