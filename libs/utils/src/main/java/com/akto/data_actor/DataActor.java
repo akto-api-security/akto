@@ -164,6 +164,8 @@ public abstract class DataActor {
 
     public abstract TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues);
 
+    public abstract TestingRunResultSummary updateIssueCountAndStateInSummary(String summaryId, Map<String, Integer> totalCountIssues, String state);
+
     public abstract List<TestingRunResult> fetchLatestTestingRunResultBySummaryId(String summaryId, int limit, int skip);
 
     public abstract List<TestRoles> fetchTestRoles();
@@ -229,5 +231,7 @@ public abstract class DataActor {
 
     public abstract List<YamlTemplate> fetchActiveAdvancedFilters();
 
+    public abstract List<TestingRunResultSummary> fetchStatusOfTests();
+    
     public abstract Set<MergedUrls> fetchMergedUrls();
 }

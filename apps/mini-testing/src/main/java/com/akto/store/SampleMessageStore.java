@@ -77,6 +77,9 @@ public class SampleMessageStore {
                 samples = SampleDataAltDb.findSamplesByApiInfoKey(apiInfoKey);
             } catch (Exception e) {
             }
+            if (samples == null) {
+                samples = new ArrayList<>();
+            }
             AllMetrics.instance.setMultipleSampleDataFetchLatency(System.currentTimeMillis() - start);
             for(String message: samples){
                 messages.add(RawApi.buildFromMessage(message));

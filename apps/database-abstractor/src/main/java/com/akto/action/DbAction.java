@@ -146,7 +146,8 @@ public class DbAction extends ActionSupport {
     String logicalGroupName;
     BasicDBList issuesIds;
     List<YamlTemplate> activeAdvancedFilters;
-    Set<MergedUrls> mergedUrls;
+    List<TestingRunResultSummary> currentlyRunningTests;
+    String state;
 
     public BasicDBList getIssuesIds() {
         return issuesIds;
@@ -1656,9 +1657,19 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String fetchMergedUrls() {
+    public String fetchStatusOfTests(){
         try {
-            this.mergedUrls = DbLayer.fetchMergedUrls();
+            this.currentlyRunningTests = DbLayer.fetchStatusOfTests();
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateIssueCountAndStateInSummary(){
+        try {
+            trrs = DbLayer.updateIssueCountAndStateInSummary(summaryId, totalCountIssues, state);
+            trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -2551,11 +2562,20 @@ public class DbAction extends ActionSupport {
         this.activeAdvancedFilters = activeAdvancedFilters;
     }
 
-    public Set<MergedUrls> getMergedUrls() {
-        return mergedUrls;
+    public List<TestingRunResultSummary> getCurrentlyRunningTests() {
+        return currentlyRunningTests;
     }
 
-    public void setMergedUrls(Set<MergedUrls> mergedUrls) {
-        this.mergedUrls = mergedUrls;
+    public void setCurrentlyRunningTests(List<TestingRunResultSummary> currentlyRunningTests) {
+        this.currentlyRunningTests = currentlyRunningTests;
     }
+
+    public String getState() {
+        return state;
+    }
+
+    public void setState(String state) {
+        this.state = state;
+    }
+
 }

@@ -1,6 +1,7 @@
 
 package com.akto.testing;
 
+import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.data_actor.DataActor;
@@ -15,6 +16,7 @@ import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
+import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -229,17 +231,23 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("Waiting...", LogDb.TESTING);
 
         try {
-            boolean awaitResult = latch.await(maxRunTime, TimeUnit.SECONDS);
-            loggerMaker.infoAndAddToDb("Await result: " + awaitResult, LogDb.TESTING);
-
-            if (!awaitResult) { // latch countdown didn't reach 0
-                for (Future<Void> future : futureTestingRunResults) {
-                    future.cancel(true);
-                }
-                loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
+            //boolean awaitResult = latch.await(maxRunTime, TimeUnit.SECONDS);
+            int waitTs = Context.now();
+            while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
+                && (Context.now() - waitTs < maxRunTime)) {
+                    loggerMaker.infoAndAddToDb("waiting for tests to finish", LogDb.TESTING);
+                    Thread.sleep(10000);
             }
+            loggerMaker.infoAndAddToDb("test is completed", LogDb.TESTING);
+            //awaitResult = latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId);
+            //loggerMaker.infoAndAddToDb("Await result: " + awaitResult, LogDb.TESTING);
 
-        } catch (InterruptedException e) {
+            for (Future<Void> future : futureTestingRunResults) {
+                future.cancel(true);
+            }
+            loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
+
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
@@ -254,6 +262,8 @@ public class TestExecutor {
         totalCountIssues.put(Severity.HIGH.toString(), 0);
         totalCountIssues.put(Severity.MEDIUM.toString(), 0);
         totalCountIssues.put(Severity.LOW.toString(), 0);
+
+        State updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
 
         int skip = 0;
         int limit = 1000;
@@ -277,7 +287,7 @@ public class TestExecutor {
 
         } while (fetchMore);
 
-        TestingRunResultSummary testingRunResultSummary = dataActor.updateIssueCountInSummary(summaryId.toHexString(), totalCountIssues);
+        TestingRunResultSummary testingRunResultSummary = dataActor.updateIssueCountAndStateInSummary(summaryId.toHexString(), totalCountIssues, updatedState.toString());
         // GithubUtils.publishGithubComments(testingRunResultSummary);
 
         loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
@@ -460,14 +470,13 @@ public class TestExecutor {
 
         Context.accountId.set(accountId);
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
-
         try {
             startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, maxRunTime);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
         }
-
         latch.countDown();
+        loggerMaker.infoAndAddToDb("DONE FINAL: " + latch.getCount(), LogDb.TESTING);
         return null;
     }
 
@@ -559,31 +568,36 @@ public class TestExecutor {
 
         int countSuccessfulTests = 0;
         for (String testSubCategory: testSubCategories) {
-            if (Context.now() - startTime > timeToKill) {
-                loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
-                return;
-            }
-            List<TestingRunResult> testingRunResults = new ArrayList<>();
+            if(GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId)){
+                if (Context.now() - startTime > timeToKill) {
+                    loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
+                    return;
+                }
+                List<TestingRunResult> testingRunResults = new ArrayList<>();
 
-            TestConfig testConfig = testConfigMap.get(testSubCategory);
-            
-            if (testConfig == null) continue;
-            TestingRunResult testingRunResult = null;
-            if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
-                continue;
-            }
-            try {
-                testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
-                e.printStackTrace();
-            }
-            if (testingRunResult != null) {
-                testingRunResults.add(testingRunResult);
-                countSuccessfulTests++;
-            }
+                TestConfig testConfig = testConfigMap.get(testSubCategory);
+                
+                if (testConfig == null) continue;
+                TestingRunResult testingRunResult = null;
+                if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
+                    continue;
+                }
+                try {
+                    testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
+                    e.printStackTrace();
+                }
+                if (testingRunResult != null) {
+                    testingRunResults.add(testingRunResult);
+                    countSuccessfulTests++;
+                }
 
-            insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
+                insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
+            }else{
+                logger.info("Test stopped for id: " + testRunId.toString());
+                break;
+            }
         }
         if(countSuccessfulTests > 0){
             dataActor.updateLastTestedField(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().toString());
@@ -633,7 +647,7 @@ public class TestExecutor {
             messages.addAll(SampleDataAltDb.findSamplesByApiInfoKey(apiInfoKey));
         } catch (Exception e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
+            //e.printStackTrace();
         }
 
         if (messages == null || messages.isEmpty()){
