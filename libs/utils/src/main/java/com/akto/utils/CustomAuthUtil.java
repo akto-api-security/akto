@@ -83,6 +83,10 @@ public class CustomAuthUtil {
         loggerMaker.infoAndAddToDb("Read " + apiInfos.size() + " api infos for custom auth types " + customAuthTypes.size(), LogDb.DASHBOARD);
         for (ApiInfo apiInfo : apiInfos) {
 
+            if (apiInfo.getId().getApiCollectionId() == -86954493) {
+                loggerMaker.infoAndAddToDb("initial auth types " + apiInfo.getId().getUrl() + " authtypes: " + apiInfo.getAllAuthTypesFound(), LogDb.DASHBOARD);
+            }
+
             Set<Set<ApiInfo.AuthType>> authTypes = apiInfo.getAllAuthTypesFound();
             authTypes.remove(new HashSet<>());
             authTypes.remove(unauthenticatedTypes);
