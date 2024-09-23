@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { LegacyCard, HorizontalGrid, TextField, Divider, Collapsible, LegacyStack, Button, FormLayout, HorizontalStack, Tooltip, Icon, Text, VerticalStack, Modal } from '@shopify/polaris'
+import { LegacyCard, HorizontalGrid, TextField, Divider, Collapsible, LegacyStack, Button, FormLayout, HorizontalStack, Tooltip, Icon, Text, VerticalStack, Modal, Box } from '@shopify/polaris'
 import { useLocation, useNavigate } from 'react-router-dom'
 import TestRolesConditionsPicker from '../../../components/TestRolesConditionsPicker';
 import func from "@/util/func";
@@ -14,6 +14,7 @@ import ParamsCard from './ParamsCard';
 import JsonRecording from '../user_config/JsonRecording';
 import Dropdown from '../../../components/layouts/Dropdown';
 import { useSearchParams } from 'react-router-dom';
+import TestingStore from '../testingStore';
 
 const selectOptions = [
     {
@@ -68,8 +69,10 @@ function TestRoleSettings() {
         { label: "Login Step Builder", value: "LOGIN_STEP_BUILDER" },
         { label: "JSON Recording", value: "RECORDED_FLOW" },
     ]
-
+    const [advancedHeaderSettingsOpen, setAdvancedHeaderSettingsOpen] = useState(false)
     const [refresh, setRefresh] = useState(false)
+    const setAuthMechanism = TestingStore.getState().setAuthMechanism
+    const [editableDoc, setEditableDocs] = useState(-1)
 
     function getAuthWithCondList() {
         return  initialItems?.authWithCondList
@@ -177,6 +180,18 @@ function TestRoleSettings() {
         }))
     }
 
+    const handleOpenEdit = (authObj,index) => {
+        setAuthMechanism(authObj.authMechanism)
+        const headerKVPairs = authObj.headerKVPairs || {}
+
+        if(Object.keys(headerKVPairs).length > 0){
+            setAdvancedHeaderSettingsOpen(true)
+        }
+        setShowAuthComponent(true)
+        setHardcodedOpen(true)
+        setEditableDocs(index)
+    }
+
     const handleDeleteAuth = async() => {
         const resp = await api.deleteAuthFromRole(initialItems.name,deletedIndex)
         setShowAuthDeleteModal(false)
@@ -250,7 +265,7 @@ function TestRoleSettings() {
     )
 
     const savedParamComponent = (
-        getAuthWithCondList() ?
+        getAuthWithCondList() !== undefined && getAuthWithCondList().length > 0 ?
         <LegacyCard title={<Text variant="headingMd">Configured auth details</Text>} key={"savedAuth"}>
             <br/>
             <Divider />
@@ -258,7 +273,7 @@ function TestRoleSettings() {
                 <VerticalStack gap={6}>
                     {getAuthWithCondList().map((authObj,index)=> {
                         return(
-                            <ParamsCard dataObj={authObj} key={JSON.stringify(authObj)} handleDelete={() => {setDeletedIndex(index); setShowAuthDeleteModal(true)}}/>
+                            <ParamsCard showEdit={() => handleOpenEdit(authObj, index)} dataObj={authObj} key={JSON.stringify(authObj)} handleDelete={() => {setDeletedIndex(index); setShowAuthDeleteModal(true)}}/>
                         )
                     })}
                 </VerticalStack>
@@ -301,7 +316,11 @@ function TestRoleSettings() {
         if(hardcodedOpen){
             const automationType = "HardCoded";
             const authParamData = [{key: hardCodeAuthInfo.authHeaderKey, value: hardCodeAuthInfo.authHeaderValue, where: "HEADER"}]
-            resp = await api.addAuthToRole(initialItems.name, apiCond, authParamData, automationType, null)
+            if(editableDoc > -1){
+                resp = await api.updateAuthInRole(initialItems.name, editableDoc, authParamData, automationType)
+            }else{
+                resp = await api.addAuthToRole(initialItems.name, apiCond, authParamData, automationType, null)
+            }
             
         }else{
             const automationType = "LOGIN_REQUEST";
@@ -326,43 +345,6 @@ function TestRoleSettings() {
 
     const authCard = (
             <LegacyCard title="Authentication details" key="auth" secondaryFooterActions={[{content: 'Cancel' ,destructive: true, onAction: handleCancel}]} primaryFooterAction={{content: <div data-testid="save_token_details_button">Save</div>, onAction: handleSaveAuthMechanism}}>
-                <LegacyCard.Section title="Header details">
-                    <div>
-                        <Text variant="headingMd">Api header conditions</Text>
-                        <br />
-                        <FormLayout>
-                            <FormLayout.Group>
-                            <TextField
-                                id={"auth-header-key-field"}
-                                label={(
-                                    <HorizontalStack gap="2">
-                                        <Text>Header key</Text>
-                                        <Tooltip content="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization" dismissOnMouseOut width="wide" preferredPosition="below">
-                                            <Icon source={InfoMinor} color="base" />
-                                        </Tooltip>
-                                    </HorizontalStack>
-                                )}
-                                value={headerKey}
-                                onChange={setHeaderKey}
-                                />
-                            <TextField 
-                                id={"auth-header-value-field"}
-                                label={(
-                                    <HorizontalStack gap="2">
-                                        <Text>Header value</Text>
-                                        <Tooltip content="Please enter the value of the auth token." dismissOnMouseOut width="wide" preferredPosition="below">
-                                            <Icon source={InfoMinor} color="base" />
-                                        </Tooltip>
-                                    </HorizontalStack>
-                                )}
-                                value={headerValue}
-                                onChange={setHeaderValue}
-                                />
-                            </FormLayout.Group>
-                        </FormLayout>
-                        <br />
-                    </div>
-                </LegacyCard.Section>
                 <LegacyCard.Section title="Token details">
                     <LegacyStack vertical>
                         <Button
@@ -416,7 +398,53 @@ function TestRoleSettings() {
                         </Collapsible>
                     </LegacyStack>
                 </LegacyCard.Section>
-
+                <LegacyCard.Section title="More settings">
+                    <VerticalStack gap={"2"}>
+                        <Box>
+                            <Button disclosure={advancedHeaderSettingsOpen ? "up" : "down"} onClick={() => setAdvancedHeaderSettingsOpen(!advancedHeaderSettingsOpen)}>
+                                Advanced Settings
+                            </Button>
+                        </Box>
+                        <Collapsible
+                            open={advancedHeaderSettingsOpen}
+                            transition={{ duration: '300ms', timingFunction: 'ease-in-out' }}
+                        >
+                            <VerticalStack gap={"2"}>
+                                <Text variant="headingMd">Api header conditions</Text>
+                                <FormLayout>
+                                    <FormLayout.Group>
+                                    <TextField
+                                        id={"auth-header-key-field"}
+                                        label={(
+                                            <HorizontalStack gap="2">
+                                                <Text>Header key</Text>
+                                                <Tooltip content="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization" dismissOnMouseOut width="wide" preferredPosition="below">
+                                                    <Icon source={InfoMinor} color="base" />
+                                                </Tooltip>
+                                            </HorizontalStack>
+                                        )}
+                                        value={headerKey}
+                                        onChange={setHeaderKey}
+                                        />
+                                    <TextField 
+                                        id={"auth-header-value-field"}
+                                        label={(
+                                            <HorizontalStack gap="2">
+                                                <Text>Header value</Text>
+                                                <Tooltip content="Please enter the value of the auth token." dismissOnMouseOut width="wide" preferredPosition="below">
+                                                    <Icon source={InfoMinor} color="base" />
+                                                </Tooltip>
+                                            </HorizontalStack>
+                                        )}
+                                        value={headerValue}
+                                        onChange={setHeaderValue}
+                                        />
+                                    </FormLayout.Group>
+                                </FormLayout>
+                            </VerticalStack>
+                        </Collapsible>
+                    </VerticalStack>
+                </LegacyCard.Section>
             </LegacyCard>
     )
 
