@@ -3,8 +3,10 @@ package com.akto.action;
 import java.util.*;
 
 
-import com.akto.dao.HistoricalDataDao;
-import com.akto.dto.HistoricalData;
+import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dto.*;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.listener.RuntimeListener;
 import com.akto.util.enums.GlobalEnums;
@@ -12,16 +14,8 @@ import com.mongodb.client.model.*;
 import org.bouncycastle.util.test.Test;
 import org.bson.conversions.Bson;
 
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.ActivitiesDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.Activity;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
@@ -255,6 +249,26 @@ public class DashboardAction extends UserAction {
         }
     }
 
+    private String email;
+    private String username;
+    private String organization;
+    public String updateUsernameAndOrganization() {
+        User user = UsersDao.instance.updateOne(Filters.in(User.LOGIN, email), Updates.combine(
+                Updates.set(User.NAME, username),
+                Updates.set(User.NAME_LAST_UPDATE, Context.now())
+        ));
+        RBAC.Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
+
+        if(currentRoleForUser.equals(RBAC.Role.ADMIN)) {
+            OrganizationsDao.instance.updateOne(Filters.in(Organization.ADMIN_EMAIL, email), Updates.combine(
+                    Updates.set(Organization.NAME, organization),
+                    Updates.set(Organization.NAME_LAST_UPDATE, Context.now())
+            ));
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public Map<Integer, Integer> getRiskScoreCountMap() {
         return riskScoreCountMap;
     }
@@ -337,5 +351,29 @@ public class DashboardAction extends UserAction {
 
     public List<HistoricalData> getInitialHistoricalData() {
         return initialHistoricalData;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getOrganization() {
+        return organization;
+    }
+
+    public void setOrganization(String organization) {
+        this.organization = organization;
     }
 }

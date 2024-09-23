@@ -12,6 +12,7 @@ public class Organization {
     @BsonId
     private String id;
     public static final String ID = "_id";
+    public static final String NAME = "name";
     private String name;
     private String adminEmail;
     public static final String ADMIN_EMAIL = "adminEmail";
@@ -43,6 +44,9 @@ public class Organization {
     private boolean expired;
 
     public static final int NO_SYNC_PERIOD = 60 * 60 * 24 * 3; // 3 days.
+
+    public static final String NAME_LAST_UPDATE = "nameLastUpdate";
+    private int nameLastUpdate;
 
     public Organization() { }
 
@@ -164,5 +168,13 @@ public class Organization {
 
     public void setTestTelemetryEnabled(boolean testTelemetryEnabled) {
         this.testTelemetryEnabled = testTelemetryEnabled;
+    }
+
+    public int getNameLastUpdate() {
+        return nameLastUpdate;
+    }
+
+    public void setNameLastUpdate(int nameLastUpdate) {
+        this.nameLastUpdate = nameLastUpdate;
     }
 }
