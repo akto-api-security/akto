@@ -8,9 +8,11 @@ import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.runtime.Main;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
+import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.utils.libs.utils.src.main.java.com.akto.runtime.policies.ApiAccessTypePolicyUtil;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
@@ -45,10 +47,18 @@ public class AdminSettingsAction extends UserAction {
     private static final String CIDR_REGEX = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/(3[0-2]|[12]?[0-9])$";
     private static final Pattern CIDR_PATTERN = Pattern.compile(CIDR_REGEX);
 
+    Account currentAccount;
+
     @Override
     public String execute() throws Exception {
         accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         organization = OrganizationsDao.instance.findOne(Filters.empty());
+        if(Context.accountId.get() != null && Context.accountId.get() != -1){
+            currentAccount = AccountsDao.instance.findOne(
+                Filters.eq(Constants.ID, Context.accountId.get()),
+                Projections.include("name", "timezone")
+            );
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -379,6 +389,35 @@ public class AdminSettingsAction extends UserAction {
         }
     }
 
+    public String modifyAccountPermission;
+    public String modifiedValueForAccount;
+
+    public String modifyAccountSettings () {
+        if(modifyAccountPermission.equals("name") || modifyAccountPermission.equals("timezone")){
+            if(Context.accountId.get() != null && Context.accountId.get() != 0){
+                AccountsDao.instance.updateOne(
+                    Filters.eq(Constants.ID, Context.accountId.get()),
+                    Updates.set(modifyAccountPermission, modifiedValueForAccount)
+                );
+                return SUCCESS.toUpperCase();
+            }else{
+                addActionError("Account id cannot be null");
+                return ERROR.toUpperCase();
+            }
+        }else{
+            addActionError("Permission not modifiable");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public void setModifyAccountPermission(String modifyAccountPermission) {
+        this.modifyAccountPermission = modifyAccountPermission;
+    }
+
+    public void setModifiedValueForAccount(String modifiedValueForAccount) {
+        this.modifiedValueForAccount = modifiedValueForAccount;
+    }
+
     public void setUpdateFiltersFlag(boolean updateFiltersFlag) {
         this.updateFiltersFlag = updateFiltersFlag;
     }
@@ -483,4 +522,12 @@ public class AdminSettingsAction extends UserAction {
     public void setAllowRedundantEndpointsList(List<String> allowRedundantEndpointsList) {
         this.allowRedundantEndpointsList = allowRedundantEndpointsList;
     }   
+
+    public Account getCurrentAccount() {
+        return currentAccount;
+    }
+
+    public void setCurrentAccount(Account currentAccount) {
+        this.currentAccount = currentAccount;
+    }
 }
