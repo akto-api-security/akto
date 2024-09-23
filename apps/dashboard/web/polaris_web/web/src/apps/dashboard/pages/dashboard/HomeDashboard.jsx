@@ -451,7 +451,7 @@ function HomeDashboard() {
         <InfoCard
             component={<TestSummaryCardsList summaryItems={testSummaryInfo} />}
             title="Recent Tests"
-            titleToolTip="Tests runs since last 7 days"
+            titleToolTip="View details of recent API security tests, APIs tested and number of issues found of last 7 days."
             linkText="Increase test coverage"
             linkUrl="/dashboard/testing"
         />
@@ -553,7 +553,7 @@ function HomeDashboard() {
             </div>
         }
         title="Vulnerable APIs by Severity"
-        titleToolTip="Vulnerable APIs by Severity"
+        titleToolTip="Breakdown of vulnerable APIs categorized by severity level (Critical, High, Medium, Low). Click to see details for each category."
         linkText="Fix critical issues"
         linkUrl="/dashboard/issues"
     /> : <EmptyCard title="Vulnerable APIs by Severity" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No vulnerable APIs found</Text>: runTestEmptyCardComponent}/>
@@ -577,7 +577,7 @@ function HomeDashboard() {
             />
         }
         title="Critical Unsecured APIs Over Time"
-        titleToolTip="Critical Unsecured APIs Over Time"
+        titleToolTip="Chart showing the number of critical unsecured APIs detected each month over the past year. Helps track security trends over time."
         linkText="Fix critical issues"
         linkUrl="/dashboard/issues"
     /> : <EmptyCard title="Critical Unsecured APIs Over Time" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Unsecured APIs found</Text>: runTestEmptyCardComponent} />
@@ -608,7 +608,7 @@ function HomeDashboard() {
                 />
             }
             title="Critical Findings"
-            titleToolTip="Critical Findings"
+            titleToolTip="Overview of the most critical security issues detected, including the number of issues and APIs affected for each type of vulnerability."
             linkText="Fix critical issues"
             linkUrl="/dashboard/issues"
         /> : <EmptyCard title="Critical Findings" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Critical findings found</Text>: runTestEmptyCardComponent} />
@@ -620,7 +620,7 @@ function HomeDashboard() {
             </div>
         }
         title="APIs by Risk score"
-        titleToolTip="APIs by Risk score"
+        titleToolTip="Distribution of APIs based on their calculated risk scores. Higher scores indicate greater potential security risks."
         linkText="Check out"
         linkUrl="/dashboard/observe/inventory"
     />
@@ -630,7 +630,7 @@ function HomeDashboard() {
             <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%" />
         }
         title="APIs by Access type"
-        titleToolTip="APIs by Access type"
+        titleToolTip="Categorization of APIs based on their access permissions and intended usage (Partner, Internal, External, etc.)."
         linkText="Check out"
         linkUrl="/dashboard/observe/inventory"
     />
@@ -643,7 +643,7 @@ function HomeDashboard() {
                 </div>
             }
             title="APIs by Authentication"
-            titleToolTip="APIs by Authentication"
+            titleToolTip="Breakdown of APIs by the authentication methods they use, including unauthenticated APIs which may pose security risks."
             linkText="Check out"
             linkUrl="/dashboard/observe/inventory"
         />
@@ -673,7 +673,7 @@ function HomeDashboard() {
             />
         }
         title="API Type"
-        titleToolTip="API Type"
+        titleToolTip="Distribution of APIs by their architectural style or protocol (e.g., REST, GraphQL, gRPC, SOAP)."
         linkText="Check out"
         linkUrl="/dashboard/observe/inventory"
     />
@@ -693,7 +693,7 @@ function HomeDashboard() {
             </Scrollable>
         }
         title="New Domains"
-        titleToolTip="New Domains"
+        titleToolTip="Recently discovered or added domains containing APIs. Shows test coverage for each new domain."
         linkText="Increase test coverage"
         linkUrl="/dashboard/observe/inventory"
         minHeight="344px"
