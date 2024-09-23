@@ -81,13 +81,13 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         while (cursor.hasNext()) {
             TestingRunResult testingRunResult = cursor.next();
 
-            List<String> errors = null;
+            List<String> errors = new ArrayList<>();
             List<GenericTestResult> testResults = testingRunResult.getTestResults();
             if (testResults != null && !testResults.isEmpty()) {
                 GenericTestResult genericTestResult = testResults.get(0);
                 if (genericTestResult instanceof TestResult) {
                     TestResult testResult = (TestResult) genericTestResult;
-                    errors = testResult.getErrors();
+                    if (testResult.getErrors() != null) errors = testResult.getErrors();
                 }
             }
             testingRunResult.setErrorsList(errors);
