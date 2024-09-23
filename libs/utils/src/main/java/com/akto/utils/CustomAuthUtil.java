@@ -115,21 +115,22 @@ public class CustomAuthUtil {
             }
                 
             if (!sampleProcessed) {
-                List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(getFilters(apiInfo));
-                try {
-                    if(list!=null && !list.isEmpty()){
-                        HttpResponseParams httpResponseParams = createResponseParamsFromSTI(list);
-                        if (printLogs && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)) {
-                            loggerMaker.infoAndAddToDb("Headers for " + apiInfo.getId().toString() + ": " + httpResponseParams.requestParams.getHeaders() ,LogDb.DASHBOARD);
-                        }
-                        AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
-                        if (id.getApiCollectionId() == -86954493) {
-                            loggerMaker.infoAndAddToDb("auth types sample data unprocessed: url " + id.getUrl() + " authtypes: " + apiInfo.getAllAuthTypesFound(), LogDb.DASHBOARD);
-                        }
-                    }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Unable to parse STIs for custom auth setup job");
-                }
+                continue;
+                // List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(getFilters(apiInfo));
+                // try {
+                //     if(list!=null && !list.isEmpty()){
+                //         HttpResponseParams httpResponseParams = createResponseParamsFromSTI(list);
+                //         if (printLogs && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)) {
+                //             loggerMaker.infoAndAddToDb("Headers for " + apiInfo.getId().toString() + ": " + httpResponseParams.requestParams.getHeaders() ,LogDb.DASHBOARD);
+                //         }
+                //         AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+                //         if (id.getApiCollectionId() == -86954493) {
+                //             loggerMaker.infoAndAddToDb("auth types sample data unprocessed: url " + id.getUrl() + " authtypes: " + apiInfo.getAllAuthTypesFound(), LogDb.DASHBOARD);
+                //         }
+                //     }
+                // } catch (Exception e) {
+                //     loggerMaker.errorAndAddToDb(e, "Unable to parse STIs for custom auth setup job");
+                // }
             }
 
             if (printLogs && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)) {
