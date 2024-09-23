@@ -517,7 +517,8 @@ public class StartTestAction extends UserAction {
             addActionError("Invalid test summary id");
             return ERROR.toUpperCase();
         }
-        loggerMaker.infoAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId + " queryMode="+queryMode);
+        if (testingRunResultSummaryHexId != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
+        if (queryMode != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
         List<Bson> testingRunResultFilters = new ArrayList<>();
 
         testingRunResultFilters.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
