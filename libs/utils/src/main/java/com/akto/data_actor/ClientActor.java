@@ -91,7 +91,7 @@ public class ClientActor extends DataActor {
     private static final Gson gson = new Gson();
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     private static final Logger logger = LoggerFactory.getLogger(ClientActor.class);
-    public static final String CYBORG_URL = "https://cyborg.akto.io";
+    public static final String CYBORG_URL = "http://localhost:82";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
     private static AccountSettings accSettings;
 
@@ -2006,6 +2006,39 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public TestingRunResultSummary updateIssueCountAndStateInSummary(String summaryId, Map<String, Integer> totalCountIssues, String state) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("summaryId", summaryId);
+        obj.put("totalCountIssues", totalCountIssues);
+        obj.put("state", state);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateIssueCountAndStateInSummary", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateIssueCountAndStateInSummary", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject testingRunResultSummary = (BasicDBObject) payloadObj.get("trrs");
+                testingRunResultSummary.remove("id");
+                testingRunResultSummary.remove("testingRunId");
+                TestingRunResultSummary res = objectMapper.readValue(testingRunResultSummary.toJson(), TestingRunResultSummary.class);
+                res.setId(new ObjectId(testingRunResultSummary.getString("hexId")));
+                res.setTestingRunId(new ObjectId(testingRunResultSummary.getString("testingRunHexId")));
+                return res;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateIssueCountAndStateInSummary" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
     public List<TestingRunResult> fetchLatestTestingRunResultBySummaryId(String summaryId, int limit, int skip) {
         Map<String, List<String>> headers = buildHeaders();
         List<TestingRunResult> testingRunResultList = new ArrayList<>();
@@ -2968,12 +3001,12 @@ public class ClientActor extends DataActor {
     public static final String AUTHORIZATION = "Authorization";
 
     public static String getAuthToken() {
-        return System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        return "abc"; //System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
     }
 
     public static boolean checkAccount() {
         try {
-            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+            String token = "abc";//System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
             DecodedJWT jwt = JWT.decode(token);
             String payload = jwt.getPayload();
             byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
