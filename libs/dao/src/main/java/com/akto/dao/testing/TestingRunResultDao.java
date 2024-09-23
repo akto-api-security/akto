@@ -4,6 +4,7 @@ import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.util.Constants;
@@ -63,8 +64,7 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
                         TestingRunResult.START_TIMESTAMP,
                         TestingRunResult.END_TIMESTAMP,
                         TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID
-                ),
-                Projections.computed(TestingRunResult.ERRORS_LIST,Projections.computed("$arrayElemAt", Arrays.asList("$testResults.errors", 0)))
+                )
             );
 
         return fetchLatestTestingRunResult(filters, limit, 0, projections);
@@ -80,6 +80,18 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         while (cursor.hasNext()) {
             TestingRunResult testingRunResult = cursor.next();
+
+            List<String> errors = new ArrayList<>();
+            List<GenericTestResult> testResults = testingRunResult.getTestResults();
+            if (testResults != null && !testResults.isEmpty()) {
+                GenericTestResult genericTestResult = testResults.get(0);
+                if (genericTestResult instanceof TestResult) {
+                    TestResult testResult = (TestResult) genericTestResult;
+                    if (testResult.getErrors() != null) errors = testResult.getErrors();
+                }
+            }
+            testingRunResult.setErrorsList(errors);
+
             testingRunResult.setHexId(testingRunResult.getId().toHexString());
             testingRunResults.add(testingRunResult);
         }
