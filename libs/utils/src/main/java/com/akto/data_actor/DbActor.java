@@ -1,5 +1,7 @@
 package com.akto.data_actor;
 
+import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
@@ -15,6 +17,7 @@ import com.akto.dto.testing.AccessMatrixUrlToRole;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
@@ -28,6 +31,11 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.util.Constants;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.ReturnDocument;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
 import java.util.ArrayList;
@@ -407,6 +415,10 @@ public class DbActor extends DataActor {
         return DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues);
     }
 
+    public TestingRunResultSummary updateIssueCountAndStateInSummary(String summaryId, Map<String, Integer> totalCountIssues, String state) {
+        return DbLayer.updateIssueCountAndStateInSummary(summaryId, totalCountIssues, state);
+    }
+
     public List<Integer> fetchDeactivatedCollections() {
         return DbLayer.fetchDeactivatedCollections();
     }
@@ -473,6 +485,10 @@ public class DbActor extends DataActor {
         return DbLayer.fetchActiveFilterTemplates();
     }
 
+    public List<TestingRunResultSummary> fetchStatusOfTests() {
+        return DbLayer.fetchStatusOfTests();
+    }
+    
     public Set<MergedUrls> fetchMergedUrls() {
         return DbLayer.fetchMergedUrls();
     }

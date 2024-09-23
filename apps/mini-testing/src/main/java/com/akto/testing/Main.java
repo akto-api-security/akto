@@ -1,6 +1,8 @@
 package com.akto.testing;
 
+import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
+import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -114,6 +116,7 @@ public class Main {
 
     public static void main(String[] args) throws InterruptedException {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
+        dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
         setupRateLimitWatcher(accountSettings);
 
         if (!SKIP_SSRF_CHECK) {
@@ -148,6 +151,7 @@ public class Main {
         Map<Integer, Integer> logSentMap = new HashMap<>();
 
         Context.accountId.set(accountSettings.getId());
+        GetRunningTestsStatus.getRunningTests().getStatusOfRunningTests();
 
         while (true) {
             int accountId = accountSettings.getId();
@@ -180,7 +184,7 @@ public class Main {
                     dataActor.updateTestRunResultSummaryNoUpsert(trrs.getId().toHexString());
                     loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
                 }
-                return;
+                continue;
             }
 
             loggerMaker.infoAndAddToDb("Starting test for accountID: " + accountId);
@@ -293,7 +297,9 @@ public class Main {
                 scheduleTs = testingRun.getScheduleTimestamp() + 5 * 60;
             }
 
-            dataActor.updateTestingRunAndMarkCompleted(testingRun.getId().toHexString(), scheduleTs);
+            if(GetRunningTestsStatus.getRunningTests().isTestRunning(testingRun.getId())){
+                dataActor.updateTestingRunAndMarkCompleted(testingRun.getId().toHexString(), scheduleTs);
+            }
 
             if(summaryId != null && testingRun.getTestIdConfig() != 1){
                 TestExecutor.updateTestSummary(summaryId);
