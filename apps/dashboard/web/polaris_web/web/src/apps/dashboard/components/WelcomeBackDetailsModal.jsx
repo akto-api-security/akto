@@ -48,14 +48,16 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
                         autoComplete="off"
                     />
 
-                    <TextField
-                        label="Organization"
-                        disabled={!isAdmin}
-                        value={organization}
-                        placeholder="Acme Inc"
-                        onChange={setOrganization}
-                        autoComplete="off"
-                    />
+                    {
+                        isAdmin && <TextField
+                            label="Organization"
+                            disabled={!isAdmin}
+                            value={organization}
+                            placeholder="Acme Inc"
+                            onChange={setOrganization}
+                            autoComplete="off"
+                        />
+                    }
                 </LegacyStack>
             </Modal.Section>
         </Modal>
