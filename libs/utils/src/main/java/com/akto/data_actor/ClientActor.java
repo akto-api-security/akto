@@ -2005,6 +2005,39 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public TestingRunResultSummary updateIssueCountAndStateInSummary(String summaryId, Map<String, Integer> totalCountIssues, String state) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("summaryId", summaryId);
+        obj.put("totalCountIssues", totalCountIssues);
+        obj.put("state", state);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateIssueCountAndStateInSummary", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateIssueCountAndStateInSummary", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject testingRunResultSummary = (BasicDBObject) payloadObj.get("trrs");
+                testingRunResultSummary.remove("id");
+                testingRunResultSummary.remove("testingRunId");
+                TestingRunResultSummary res = objectMapper.readValue(testingRunResultSummary.toJson(), TestingRunResultSummary.class);
+                res.setId(new ObjectId(testingRunResultSummary.getString("hexId")));
+                res.setTestingRunId(new ObjectId(testingRunResultSummary.getString("testingRunHexId")));
+                return res;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateIssueCountAndStateInSummary" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
     public List<TestingRunResult> fetchLatestTestingRunResultBySummaryId(String summaryId, int limit, int skip) {
         Map<String, List<String>> headers = buildHeaders();
         List<TestingRunResult> testingRunResultList = new ArrayList<>();
