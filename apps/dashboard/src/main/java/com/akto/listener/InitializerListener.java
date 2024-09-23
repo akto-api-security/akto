@@ -1968,6 +1968,13 @@ public class InitializerListener implements ServletContextListener {
                     }
                 } while (!connectedToMongo);
 
+                if (DashboardMode.isOnPremDeployment()) {
+                    int oldAccId = Context.accountId.get();
+                    Context.accountId.set(1_000_000);
+                    loggerMaker.infoAndAddToDb("Dashboard started at " + Context.now());
+                    Context.accountId.set(oldAccId);
+                }
+
                 setDashboardMode();
                 updateGlobalAktoVersion();
 

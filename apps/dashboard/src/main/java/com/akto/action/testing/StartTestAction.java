@@ -70,7 +70,7 @@ public class StartTestAction extends UserAction {
     private Map<ObjectId, TestingRunResultSummary> latestTestingRunResultSummaries;
     private Map<String, String> sampleDataVsCurlMap;
     private String overriddenTestAppUrl;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class, LogDb.DASHBOARD);
     private TestingRunType testingRunType;
     private String searchString;
     private boolean continuousTesting;
@@ -517,6 +517,8 @@ public class StartTestAction extends UserAction {
             addActionError("Invalid test summary id");
             return ERROR.toUpperCase();
         }
+        if (testingRunResultSummaryHexId != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
+        if (queryMode != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
         List<Bson> testingRunResultFilters = new ArrayList<>();
 
         testingRunResultFilters.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
@@ -568,8 +570,12 @@ public class StartTestAction extends UserAction {
             this.errorEnums.put(TestError.NO_API_REQUEST, TestError.NO_API_REQUEST.getMessage());
         }
 
-        this.testingRunResults = TestingRunResultDao.instance
-                .fetchLatestTestingRunResult(Filters.and(testingRunResultFilters));
+        try {
+            this.testingRunResults = TestingRunResultDao.instance
+                    .fetchLatestTestingRunResult(Filters.and(testingRunResultFilters));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResult: " + e);
+        }
 
         return SUCCESS.toUpperCase();
     }
