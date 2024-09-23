@@ -211,7 +211,7 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         try {
-                            Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+                            Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivatedLatest();
 
                             List<String> deactivatedHosts = new ArrayList<>();
                             if (deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
