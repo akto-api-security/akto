@@ -25,7 +25,7 @@ function TestSummaryCard({ summaryItem }) {
                             </VerticalStack>
                             <VerticalStack gap={2}>
                                 <Text color='subdued' variant='headingXs' fontWeight='semibold'>APIs Tested</Text>
-                                <Text variant='headingSm' fontWeight='medium'>{summaryItem.totalApis}</Text>
+                                <Text variant='headingSm' fontWeight='medium'>{transform.formatNumberWithCommas(summaryItem.totalApis)}</Text>
                             </VerticalStack>
                         </HorizontalStack>
 
