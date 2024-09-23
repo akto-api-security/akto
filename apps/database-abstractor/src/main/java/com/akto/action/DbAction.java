@@ -2005,6 +2005,7 @@ public class DbAction extends ActionSupport {
             trrs = DbLayer.updateIssueCountAndStateInSummary(summaryId, totalCountIssues, state);
             trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateIssueCountAndStateInSummary " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -2668,7 +2669,7 @@ public class DbAction extends ActionSupport {
         this.totalApiCount = totalApiCount;
     }
 
-    public boolean isHybridTestingEnabled() {
+    public boolean getHybridTestingEnabled() {
         return hybridTestingEnabled;
     }
 
