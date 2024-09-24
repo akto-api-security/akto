@@ -94,7 +94,7 @@ public class ProfileAction extends UserAction {
         }
 
         BasicDBList listDashboards = new BasicDBList();
-        Account currAccount = AccountsDao.instance.findOne(Filters.eq(Constants.ID, sessionAccId),Projections.include("name"));
+        Account currAccount = AccountsDao.instance.findOne(Filters.eq(Constants.ID, sessionAccId),Projections.include("name", "timezone"));
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         boolean showOnboarding = accountSettings == null ? true : accountSettings.isShowOnboarding();
