@@ -132,20 +132,23 @@ public class ProfileAction extends UserAction {
         } catch (Exception e) {
         }
 
-        long countUser = UsersDao.instance.count(Filters.and(
-                Filters.gt(User.NAME_LAST_UPDATE, 0),
-                Filters.in("login", username)
-        ));
+        Organization organization = OrganizationsDao.instance.findOne(
+                Filters.in(Organization.ACCOUNTS, sessionAccId)
+        );
 
-        Organization org = OrganizationsDao.instance.findOne(Filters.and(
-                Filters.in(Organization.ACCOUNTS, sessionAccId),
-                Filters.gt(Organization.NAME_LAST_UPDATE, 0)
-        ));
-        boolean shouldAskWelcomeBackDetails = DashboardMode.isMetered() && (countUser == 0 || (userRole.getName().equals(RBAC.Role.ADMIN.getName()) && org == null));
+        String userActualName = "";
+        if(user.getNameLastUpdate() > 0) {
+            userActualName = user.getName();
+        }
+
+        String orgName = "";
+        if(organization != null && organization.getNameLastUpdate() > 0) {
+            orgName = organization.getName();
+        }
 
         userDetails.append("accounts", accounts)
                 .append("username",username)
-                .append("userFullName", user.getName())
+                .append("userFullName", userActualName)
                 .append("avatar", "dummy")
                 .append("activeAccount", sessionAccId)
                 .append("dashboardMode", DashboardMode.getDashboardMode())
@@ -157,11 +160,7 @@ public class ProfileAction extends UserAction {
                 .append("jiraIntegrated", jiraIntegrated)
                 .append("userRole", userRole.toString().toUpperCase())
                 .append("currentTimeZone", timeZone)
-                .append("shouldAskWelcomeBackDetails", shouldAskWelcomeBackDetails);
-
-        if(org != null) {
-            userDetails.append("organizationName", org.getName());
-        }
+                .append("organizationName", orgName);
 
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));
@@ -169,9 +168,6 @@ public class ProfileAction extends UserAction {
 
         // only external API calls have non-null "utility"
         if (DashboardMode.isMetered() &&  utility == null) {
-            Organization organization = OrganizationsDao.instance.findOne(
-                    Filters.in(Organization.ACCOUNTS, sessionAccId)
-            );
             if(organization == null){
                 loggerMaker.infoAndAddToDb("Org not found for user: " + username + " acc: " + sessionAccId + ", creating it now!", LoggerMaker.LogDb.DASHBOARD);
                 InitializerListener.createOrg(sessionAccId);

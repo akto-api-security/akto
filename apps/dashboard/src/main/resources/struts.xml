@@ -5858,10 +5858,9 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS"  type="json">
-                <param name="root">successfullyUpdated</param>
             </result>
             <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
+                <param name="status">422</param>
             </result>
         </action>
         <action name="api/provisionSubscription" class="com.akto.action.billing.UsageAction" method="provisionSubscription">
