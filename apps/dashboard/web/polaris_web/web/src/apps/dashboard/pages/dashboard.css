@@ -188,3 +188,12 @@
 .form-class .Polaris-Label{
     color: #202223 !important;
 }
+
+.welcome-back-modal-title {
+    width: 95%;
+    position: absolute;
+    z-index: 2;
+    background: white;
+    margin-top: -20px;
+    padding-block: 10px;
+}

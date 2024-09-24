@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 
 import com.akto.dao.*;
@@ -252,16 +253,23 @@ public class DashboardAction extends UserAction {
     private String email;
     private String username;
     private String organization;
-    private static final String USERNAME_REGEX = "^[\\w\\s-]{1,}$";
-    private static final String ORG_NAME_REGEX = "^[\\w\\s.&-]{1,}$";
+    boolean successfullyUpdated;
     public String updateUsernameAndOrganization() {
+        Pattern usernamePattern = Pattern.compile("^[\\w\\s-]{1,}$");
+        Pattern organizationPattern = Pattern.compile("^[\\w\\s.&-]{1,}$");
+
+        this.setUsername(username.trim());
+        this.setOrganization(organization.trim());
+
         if(username.trim().isEmpty()) {
             addActionError("Username cannot be empty");
+            successfullyUpdated = false;
             return Action.ERROR.toUpperCase();
         }
 
-        if(!username.matches(USERNAME_REGEX)) {
+        if(!usernamePattern.matcher(username).matches()) {
             addActionError("Username is not valid");
+            successfullyUpdated = false;
             return Action.ERROR.toUpperCase();
         }
 
@@ -274,11 +282,13 @@ public class DashboardAction extends UserAction {
         if(currentRoleForUser.getName().equals(RBAC.Role.ADMIN.getName())) {
             if(organization.trim().isEmpty()) {
                 addActionError("Organization cannot be empty");
+                successfullyUpdated = false;
                 return Action.ERROR.toUpperCase();
             }
 
-            if(!organization.matches(ORG_NAME_REGEX)) {
+            if(!organizationPattern.matcher(organization).matches()) {
                 addActionError("Organization is not valid");
+                successfullyUpdated = false;
                 return Action.ERROR.toUpperCase();
             }
 
@@ -288,6 +298,7 @@ public class DashboardAction extends UserAction {
             ));
         }
 
+        successfullyUpdated = true;
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -397,5 +408,13 @@ public class DashboardAction extends UserAction {
 
     public void setOrganization(String organization) {
         this.organization = organization;
+    }
+
+    public boolean isSuccessfullyUpdated() {
+        return successfullyUpdated;
+    }
+
+    public void setSuccessfullyUpdated(boolean successfullyUpdated) {
+        this.successfullyUpdated = successfullyUpdated;
     }
 }

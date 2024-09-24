@@ -12,7 +12,7 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
     const handleWelcomeBackDetails = async () => {
         if(!isAdmin && organization.length > 0) return
 
-        const nameReg = /^[\w\s.&-]{1,}$/;
+        const nameReg = /^[\w\s-]{1,}$/;
         const orgReg = /^[\w\s.&-]{1,}$/;
         if(!nameReg.test(username.trim()) || (isAdmin && !orgReg.test(organization.trim()))) {
             func.setToast(true, true, "Please enter valid details.")
@@ -21,20 +21,21 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
 
         const email = window.USER_NAME
 
-        await homeRequests.updateUsernameAndOrganization(email ,username, organization)
+        const isUpdated = await homeRequests.updateUsernameAndOrganization(email ,username, organization)
 
-        setModalToggle(false)
+        if(isUpdated) {
+            setModalToggle(false)
+        }
     }
 
     return (
         <Modal
             size="small"
             open={modalToggle}
-            title="Welcome back"
-            onClose={() => {func.setToast(true, false, "You cannot skip this process.")}}
+            title={<div className='welcome-back-modal-title'>Welcome back</div>}
             primaryAction={{
                 content: 'Save',
-                onAction: handleWelcomeBackDetails
+                onAction: () => handleWelcomeBackDetails()
             }}
         >
             <Modal.Section>
