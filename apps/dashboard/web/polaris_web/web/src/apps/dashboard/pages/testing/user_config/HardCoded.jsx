@@ -18,14 +18,14 @@ function HardCoded({showOnlyApi, extractInformation, setInformation}) {
     const [hasChanges, setHasChanges] = useState(false)
 
     useEffect(() => {
-        if (authMechanism && authMechanism.type === "HARDCODED") {
+        if (authMechanism && authMechanism?.type.toUpperCase() === "HARDCODED") {
             const authParam = authMechanism.authParams[0]
             setUserConfig({
                 authHeaderKey: authParam.key,
                 authHeaderValue: authParam.value
             })
         }
-    }, [])
+    }, [authMechanism])
 
     useEffect(()=> {
         if(extractInformation){
