@@ -69,8 +69,9 @@
                     window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
                     window.JIRA_INTEGRATED ='${requestScope.jiraIntegrated}'
                     window.USER_ROLE ='${requestScope.userRole}'
-                    window.SHOULD_ASK_WELCOME_DETAILS ='${requestScope.shouldAskWelcomeBackDetails}'
                     window.TIME_ZONE = '${requestScope.currentTimeZone}'
+                    window.USER_FULL_NAME = '${requestScope.userFullName}'
+                    window.ORGANIZATION_NAME = '${requestScope.organizationName}'
 
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
                     window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');

@@ -253,52 +253,45 @@ public class DashboardAction extends UserAction {
     private String email;
     private String username;
     private String organization;
-    boolean successfullyUpdated;
+    private final Pattern usernamePattern = Pattern.compile("^[\\w\\s-]{1,}$");
+    private final Pattern organizationPattern = Pattern.compile("^[\\w\\s.&-]{1,}$");
     public String updateUsernameAndOrganization() {
-        Pattern usernamePattern = Pattern.compile("^[\\w\\s-]{1,}$");
-        Pattern organizationPattern = Pattern.compile("^[\\w\\s.&-]{1,}$");
-
         this.setUsername(username.trim());
         this.setOrganization(organization.trim());
 
-        if(username.trim().isEmpty()) {
+        if(username.isEmpty()) {
             addActionError("Username cannot be empty");
-            successfullyUpdated = false;
             return Action.ERROR.toUpperCase();
         }
 
         if(!usernamePattern.matcher(username).matches()) {
             addActionError("Username is not valid");
-            successfullyUpdated = false;
             return Action.ERROR.toUpperCase();
         }
 
         User user = UsersDao.instance.updateOne(Filters.in(User.LOGIN, email), Updates.combine(
-                Updates.set(User.NAME, username.trim()),
+                Updates.set(User.NAME, username),
                 Updates.set(User.NAME_LAST_UPDATE, Context.now())
         ));
         RBAC.Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
 
         if(currentRoleForUser.getName().equals(RBAC.Role.ADMIN.getName())) {
-            if(organization.trim().isEmpty()) {
+            if(organization.isEmpty()) {
                 addActionError("Organization cannot be empty");
-                successfullyUpdated = false;
                 return Action.ERROR.toUpperCase();
             }
 
             if(!organizationPattern.matcher(organization).matches()) {
                 addActionError("Organization is not valid");
-                successfullyUpdated = false;
                 return Action.ERROR.toUpperCase();
             }
 
             OrganizationsDao.instance.updateOneNoUpsert(Filters.in(Organization.ACCOUNTS, Context.accountId.get()), Updates.combine(
-                    Updates.set(Organization.NAME, organization.trim()),
+                    Updates.set(Organization.NAME, organization),
                     Updates.set(Organization.NAME_LAST_UPDATE, Context.now())
             ));
         }
 
-        successfullyUpdated = true;
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -408,13 +401,5 @@ public class DashboardAction extends UserAction {
 
     public void setOrganization(String organization) {
         this.organization = organization;
-    }
-
-    public boolean isSuccessfullyUpdated() {
-        return successfullyUpdated;
-    }
-
-    public void setSuccessfullyUpdated(boolean successfullyUpdated) {
-        this.successfullyUpdated = successfullyUpdated;
     }
 }

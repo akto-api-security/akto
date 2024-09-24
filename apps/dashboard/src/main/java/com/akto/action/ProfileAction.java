@@ -132,19 +132,23 @@ public class ProfileAction extends UserAction {
         } catch (Exception e) {
         }
 
-        long countUser = UsersDao.instance.count(Filters.and(
-                Filters.exists(User.NAME_LAST_UPDATE),
-                Filters.in("login", username)
-        ));
+        Organization organization = OrganizationsDao.instance.findOne(
+                Filters.in(Organization.ACCOUNTS, sessionAccId)
+        );
 
-        long countOrg = OrganizationsDao.instance.count(Filters.and(
-                Filters.in(Organization.ACCOUNTS, sessionAccId),
-                Filters.exists(Organization.NAME_LAST_UPDATE)
-        ));
-        boolean shouldAskWelcomeBackDetails = countUser == 0 || (userRole.getName().equals(RBAC.Role.ADMIN.getName()) && countOrg == 0);
+        String userActualName = "";
+        if(user.getNameLastUpdate() > 0) {
+            userActualName = user.getName();
+        }
+
+        String orgName = "";
+        if(organization != null && organization.getNameLastUpdate() > 0) {
+            orgName = organization.getName();
+        }
 
         userDetails.append("accounts", accounts)
                 .append("username",username)
+                .append("userFullName", userActualName)
                 .append("avatar", "dummy")
                 .append("activeAccount", sessionAccId)
                 .append("dashboardMode", DashboardMode.getDashboardMode())
@@ -156,7 +160,7 @@ public class ProfileAction extends UserAction {
                 .append("jiraIntegrated", jiraIntegrated)
                 .append("userRole", userRole.toString().toUpperCase())
                 .append("currentTimeZone", timeZone)
-                .append("shouldAskWelcomeBackDetails", shouldAskWelcomeBackDetails);
+                .append("organizationName", orgName);
 
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));
@@ -164,9 +168,6 @@ public class ProfileAction extends UserAction {
 
         // only external API calls have non-null "utility"
         if (DashboardMode.isMetered() &&  utility == null) {
-            Organization organization = OrganizationsDao.instance.findOne(
-                    Filters.in(Organization.ACCOUNTS, sessionAccId)
-            );
             if(organization == null){
                 loggerMaker.infoAndAddToDb("Org not found for user: " + username + " acc: " + sessionAccId + ", creating it now!", LoggerMaker.LogDb.DASHBOARD);
                 InitializerListener.createOrg(sessionAccId);

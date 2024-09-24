@@ -4,10 +4,10 @@ import func from '@/util/func'
 import homeRequests from "../pages/home/api"
 
 const WelcomeBackDetailsModal = ({ isAdmin }) => {
-    const [modalToggle, setModalToggle] = useState(window.SHOULD_ASK_WELCOME_DETAILS === 'true')
-    
-    const [username, setUsername] = useState("")
-    const [organization, setOrganization] = useState("")
+    const [modalToggle, setModalToggle] = useState(true)
+
+    const [username, setUsername] = useState(window.USER_FULL_NAME)
+    const [organization, setOrganization] = useState(window.ORGANIZATION_NAME)
 
     const handleWelcomeBackDetails = async () => {
         if(!isAdmin && organization.length > 0) return
@@ -21,11 +21,13 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
 
         const email = window.USER_NAME
 
-        const isUpdated = await homeRequests.updateUsernameAndOrganization(email ,username, organization)
-
-        if(isUpdated) {
-            setModalToggle(false)
-        }
+        homeRequests.updateUsernameAndOrganization(email ,username, organization).then((resp) => {
+            try {
+                setModalToggle(false)
+            } catch (error) {
+                func.setToast(true, true, "Invalid username or organization name")
+            }
+        })
     }
 
     return (
@@ -47,6 +49,7 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
                     <TextField
                         label="Name"
                         value={username}
+                        disabled={window.USER_FULL_NAME.length !== 0}
                         placeholder="Joe doe"
                         onChange={setUsername}
                         autoComplete="off"
@@ -55,7 +58,7 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
                     {
                         isAdmin && <TextField
                             label="Organization name"
-                            disabled={!isAdmin}
+                            disabled={!isAdmin || window.ORGANIZATION_NAME.length !== 0}
                             value={organization}
                             placeholder="Acme Inc"
                             onChange={setOrganization}
