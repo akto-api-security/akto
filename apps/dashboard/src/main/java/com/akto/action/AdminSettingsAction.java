@@ -392,7 +392,7 @@ public class AdminSettingsAction extends UserAction {
     public String accountPermission;
     public String modifiedValueForAccount;
 
-    public String accountSettings () {
+    public String modifyAccountSettings () {
         if(accountPermission.equals("name") || accountPermission.equals("timezone")){
             if(Context.accountId.get() != null && Context.accountId.get() != 0){
                 AccountsDao.instance.updateOne(
