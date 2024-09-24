@@ -252,24 +252,37 @@ public class DashboardAction extends UserAction {
     private String email;
     private String username;
     private String organization;
+    private static final String USERNAME_REGEX = "^[\\w\\s-]{1,}$";
+    private static final String ORG_NAME_REGEX = "^[\\w\\s.&-]{1,}$";
     public String updateUsernameAndOrganization() {
         if(username.trim().isEmpty()) {
             addActionError("Username cannot be empty");
             return Action.ERROR.toUpperCase();
         }
+
+        if(!username.matches(USERNAME_REGEX)) {
+            addActionError("Username is not valid");
+            return Action.ERROR.toUpperCase();
+        }
+
         User user = UsersDao.instance.updateOne(Filters.in(User.LOGIN, email), Updates.combine(
                 Updates.set(User.NAME, username.trim()),
                 Updates.set(User.NAME_LAST_UPDATE, Context.now())
         ));
         RBAC.Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
 
-        if(currentRoleForUser.equals(RBAC.Role.ADMIN)) {
+        if(currentRoleForUser.getName().equals(RBAC.Role.ADMIN.getName())) {
             if(organization.trim().isEmpty()) {
                 addActionError("Organization cannot be empty");
                 return Action.ERROR.toUpperCase();
             }
 
-            OrganizationsDao.instance.updateOne(Filters.in(Organization.ADMIN_EMAIL, email), Updates.combine(
+            if(!organization.matches(ORG_NAME_REGEX)) {
+                addActionError("Organization is not valid");
+                return Action.ERROR.toUpperCase();
+            }
+
+            OrganizationsDao.instance.updateOneNoUpsert(Filters.in(Organization.ACCOUNTS, Context.accountId.get()), Updates.combine(
                     Updates.set(Organization.NAME, organization.trim()),
                     Updates.set(Organization.NAME_LAST_UPDATE, Context.now())
             ));

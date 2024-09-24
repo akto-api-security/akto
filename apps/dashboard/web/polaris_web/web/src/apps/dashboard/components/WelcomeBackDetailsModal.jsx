@@ -1,4 +1,4 @@
-import { LegacyStack, Modal, Text, TextField } from '@shopify/polaris'
+import { Modal, Text, TextField, VerticalStack } from '@shopify/polaris'
 import React, { useState } from 'react'
 import func from '@/util/func'
 import homeRequests from "../pages/home/api"
@@ -11,8 +11,11 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
 
     const handleWelcomeBackDetails = async () => {
         if(!isAdmin && organization.length > 0) return
-        if(username.trim().length === 0 || (isAdmin && organization.trim().length === 0)) {
-            func.setToast(true, true, "Please enter all details.")
+
+        const nameReg = /^[\w\s.&-]{1,}$/;
+        const orgReg = /^[\w\s.&-]{1,}$/;
+        if(!nameReg.test(username.trim()) || (isAdmin && !orgReg.test(organization.trim()))) {
+            func.setToast(true, true, "Please enter valid details.")
             return
         }
 
@@ -35,7 +38,7 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
             }}
         >
             <Modal.Section>
-                <LegacyStack vertical>
+                <VerticalStack gap={4}>
                     <Text variant="bodyMd" color="subdued">
                         Tell us more about yourself.
                     </Text>
@@ -50,7 +53,7 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
 
                     {
                         isAdmin && <TextField
-                            label="Organization"
+                            label="Organization name"
                             disabled={!isAdmin}
                             value={organization}
                             placeholder="Acme Inc"
@@ -58,7 +61,7 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
                             autoComplete="off"
                         />
                     }
-                </LegacyStack>
+                </VerticalStack>
             </Modal.Section>
         </Modal>
     )

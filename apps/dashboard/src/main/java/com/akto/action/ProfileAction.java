@@ -138,10 +138,10 @@ public class ProfileAction extends UserAction {
         ));
 
         long countOrg = OrganizationsDao.instance.count(Filters.and(
-                Filters.exists(Organization.NAME_LAST_UPDATE),
-                Filters.in(Organization.ADMIN_EMAIL, username)
+                Filters.in(Organization.ACCOUNTS, sessionAccId),
+                Filters.exists(Organization.NAME_LAST_UPDATE)
         ));
-        boolean shouldAskWelcomeBackDetails = countUser == 0 || (userRole.equals(RBAC.Role.ADMIN) && countOrg == 0);
+        boolean shouldAskWelcomeBackDetails = countUser == 0 || (userRole.getName().equals(RBAC.Role.ADMIN.getName()) && countOrg == 0);
 
         userDetails.append("accounts", accounts)
                 .append("username",username)
