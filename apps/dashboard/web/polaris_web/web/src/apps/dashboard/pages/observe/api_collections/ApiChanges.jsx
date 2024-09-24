@@ -76,6 +76,12 @@ function ApiChanges() {
         apiCollection = endpointsFromStiResp.endpoints.map(x => { return { ...x._id, startTs: x.startTs } })
         apiCollectionUrls = endpointsFromStiResp.endpoints.map(x => x._id.url)
         apiInfoList = endpointsFromApiInfos.apiInfoList
+
+        const trendObj = transform.findNewParametersCountTrend(parametersResp, startTimestamp, endTimestamp)
+        setNewParametersCount(trendObj.count)
+        setParametersTrend(trendObj.trend)
+
+        setLoading(false);
         
         await api.fetchSensitiveParamsForEndpoints(apiCollectionUrls).then(allSensitiveFields => {
             let sensitiveParams = allSensitiveFields.data.endpoints
@@ -86,12 +92,6 @@ function ApiChanges() {
         let data = func.mergeApiInfoAndApiCollection(apiCollection, apiInfoList, collectionsMap);
         const prettifiedData = transform.prettifyEndpointsData(data)
         setNewEndpoints({prettify: prettifiedData, normal: data});
-
-        const trendObj = transform.findNewParametersCountTrend(parametersResp, startTimestamp, endTimestamp)
-        setNewParametersCount(trendObj.count)
-        setParametersTrend(trendObj.trend)
-
-        setLoading(false);
     }
 
     useEffect(() => {
