@@ -141,10 +141,11 @@ public class ProfileAction extends UserAction {
                 Filters.in(Organization.ACCOUNTS, sessionAccId),
                 Filters.exists(Organization.NAME_LAST_UPDATE)
         ));
-        boolean shouldAskWelcomeBackDetails = countUser == 0 || (userRole.getName().equals(RBAC.Role.ADMIN.getName()) && countOrg == 0);
+        boolean shouldAskWelcomeBackDetails = DashboardMode.isMetered() && (countUser == 0 || (userRole.getName().equals(RBAC.Role.ADMIN.getName()) && countOrg == 0));
 
         userDetails.append("accounts", accounts)
                 .append("username",username)
+                .append("userFullName", user.getName())
                 .append("avatar", "dummy")
                 .append("activeAccount", sessionAccId)
                 .append("dashboardMode", DashboardMode.getDashboardMode())

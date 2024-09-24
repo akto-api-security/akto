@@ -6,7 +6,9 @@ import homeRequests from "../pages/home/api"
 const WelcomeBackDetailsModal = ({ isAdmin }) => {
     const [modalToggle, setModalToggle] = useState(window.SHOULD_ASK_WELCOME_DETAILS === 'true')
     
-    const [username, setUsername] = useState("")
+    const hasUsername = window.USER_FULL_NAME !== window.USER_NAME
+
+    const [username, setUsername] = useState(hasUsername ? window.USER_FULL_NAME : "")
     const [organization, setOrganization] = useState("")
 
     const handleWelcomeBackDetails = async () => {
@@ -47,6 +49,7 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
                     <TextField
                         label="Name"
                         value={username}
+                        disabled={hasUsername}
                         placeholder="Joe doe"
                         onChange={setUsername}
                         autoComplete="off"
