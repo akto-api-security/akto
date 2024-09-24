@@ -137,11 +137,11 @@ public class ProfileAction extends UserAction {
                 Filters.in("login", username)
         ));
 
-        long countOrg = OrganizationsDao.instance.count(Filters.and(
+        Organization org = OrganizationsDao.instance.findOne(Filters.and(
                 Filters.in(Organization.ACCOUNTS, sessionAccId),
                 Filters.gt(Organization.NAME_LAST_UPDATE, 0)
         ));
-        boolean shouldAskWelcomeBackDetails = DashboardMode.isMetered() && (countUser == 0 || (userRole.getName().equals(RBAC.Role.ADMIN.getName()) && countOrg == 0));
+        boolean shouldAskWelcomeBackDetails = DashboardMode.isMetered() && (countUser == 0 || (userRole.getName().equals(RBAC.Role.ADMIN.getName()) && org == null));
 
         userDetails.append("accounts", accounts)
                 .append("username",username)
@@ -158,6 +158,10 @@ public class ProfileAction extends UserAction {
                 .append("userRole", userRole.toString().toUpperCase())
                 .append("currentTimeZone", timeZone)
                 .append("shouldAskWelcomeBackDetails", shouldAskWelcomeBackDetails);
+
+        if(org != null) {
+            userDetails.append("organizationName", org.getName());
+        }
 
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));

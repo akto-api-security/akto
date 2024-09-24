@@ -9,7 +9,7 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
     const hasUsername = window.USER_FULL_NAME !== window.USER_NAME
 
     const [username, setUsername] = useState(hasUsername ? window.USER_FULL_NAME : "")
-    const [organization, setOrganization] = useState("")
+    const [organization, setOrganization] = useState(window.ORGANIZATION_NAME)
 
     const handleWelcomeBackDetails = async () => {
         if(!isAdmin && organization.length > 0) return
@@ -58,7 +58,7 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
                     {
                         isAdmin && <TextField
                             label="Organization name"
-                            disabled={!isAdmin}
+                            disabled={!isAdmin || window.ORGANIZATION_NAME}
                             value={organization}
                             placeholder="Acme Inc"
                             onChange={setOrganization}
