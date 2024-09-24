@@ -114,6 +114,10 @@ public class ProfileAction extends UserAction {
         if(currAccount != null && !currAccount.getName().isEmpty() && !currAccount.getName().equals("My account")){
             accountName = currAccount.getName();
         }
+        String timeZone = "US/Pacific";
+        if(currAccount != null && !currAccount.getTimezone().isEmpty()){
+            timeZone = currAccount.getTimezone();
+        }
         String dashboardVersion = accountSettings.getDashboardVersion();
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
@@ -140,7 +144,7 @@ public class ProfileAction extends UserAction {
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name())
                 .append("jiraIntegrated", jiraIntegrated)
                 .append("userRole", userRole.toString().toUpperCase())
-                .append("currentTimeZone", currAccount.getTimezone());
+                .append("currentTimeZone", timeZone);
 
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));
