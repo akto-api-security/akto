@@ -288,7 +288,8 @@ public class ExportSampleDataAction extends UserAction {
             boolean squareBracesCond = payload.startsWith("[") && payload.endsWith("]");
             if (curlyBracesCond || squareBracesCond) {
                 if (!Objects.equals(httpRequestParams.getMethod(), "GET")) {
-                    builder.append("-d '").append(payload).append("' \\\n  ");
+                    String escapedPayload = payload.replace("'", "'\\''");
+                    builder.append("-d '").append(escapedPayload).append("' \\\n  ");
                 } else {
                     JsonParser jp = factory.createParser(payload);
                     JsonNode node = mapper.readTree(jp);
