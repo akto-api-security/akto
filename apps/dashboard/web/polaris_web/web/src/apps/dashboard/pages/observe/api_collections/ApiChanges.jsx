@@ -81,17 +81,20 @@ function ApiChanges() {
         setNewParametersCount(trendObj.count)
         setParametersTrend(trendObj.trend)
 
+        let data = func.mergeApiInfoAndApiCollection(apiCollection, apiInfoList, collectionsMap);
+        let prettifiedData = transform.prettifyEndpointsData(data)
+        setNewEndpoints({prettify: prettifiedData, normal: data});
+
         setLoading(false);
         
         await api.fetchSensitiveParamsForEndpoints(apiCollectionUrls).then(allSensitiveFields => {
             let sensitiveParams = allSensitiveFields.data.endpoints
             setSensitiveParams([...sensitiveParams]);
             apiCollection = transform.fillSensitiveParams(sensitiveParams, apiCollection);
+            data = func.mergeApiInfoAndApiCollection(apiCollection, apiInfoList, collectionsMap);
+            prettifiedData = transform.prettifyEndpointsData(data)
+            setNewEndpoints({prettify: prettifiedData, normal: data});
         })
-
-        let data = func.mergeApiInfoAndApiCollection(apiCollection, apiInfoList, collectionsMap);
-        const prettifiedData = transform.prettifyEndpointsData(data)
-        setNewEndpoints({prettify: prettifiedData, normal: data});
     }
 
     useEffect(() => {
