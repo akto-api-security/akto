@@ -112,7 +112,7 @@ function TestRunResultFlyout(props) {
                 <Popover.Section>
                     <VerticalStack gap={"4"}>
                         <Text variant="headingSm">Create</Text>
-                        <Button plain monochrome removeUnderline onClick={()=>{createJiraTicket(issueDetails)}} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>
+                        <Button plain monochrome removeUnderline onClick={()=>{createJiraTicket(issueDetails); setPopoverActive(false)}} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>
                             <HorizontalStack gap={"2"}>
                                 <Avatar shape="square" size="extraSmall" source="/public/logo_jira.svg"/>
                                 <Text>Jira Ticket</Text>
@@ -125,7 +125,7 @@ function TestRunResultFlyout(props) {
                         <Text variant="headingSm">Ignore</Text>
                         {issuesActions.map((issue, index) => {
                             return(
-                                <div style={{cursor: 'pointer'}} onClick={() => issue.onAction()} key={index}>
+                                <div style={{cursor: 'pointer'}} onClick={() => {issue.onAction(); setPopoverActive(false)}} key={index}>
                                     {issue.content}
                                 </div>
                             )
