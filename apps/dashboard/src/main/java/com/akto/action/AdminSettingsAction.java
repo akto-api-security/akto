@@ -399,6 +399,12 @@ public class AdminSettingsAction extends UserAction {
                     Filters.eq(Constants.ID, Context.accountId.get()),
                     Updates.set(modifyAccountPermission, modifiedValueForAccount)
                 );
+                if(modifyAccountPermission.equals("name")){
+                    UsersDao.instance.updateManyNoUpsert(
+                        Filters.exists(User.ACCOUNTS + "." + Context.accountId.get()),
+                        Updates.set(User.ACCOUNTS + "." + Context.accountId.get() + ".name", modifiedValueForAccount)
+                    );
+                }
                 return SUCCESS.toUpperCase();
             }else{
                 addActionError("Account id cannot be null");
