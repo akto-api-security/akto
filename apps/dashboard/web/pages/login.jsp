@@ -69,6 +69,7 @@
                     window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
                     window.JIRA_INTEGRATED ='${requestScope.jiraIntegrated}'
                     window.USER_ROLE ='${requestScope.userRole}'
+                    window.SHOULD_ASK_WELCOME_DETAILS ='${requestScope.shouldAskWelcomeBackDetails}'
                     window.TIME_ZONE = '${requestScope.currentTimeZone}'
 
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'

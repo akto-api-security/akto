@@ -13,6 +13,7 @@ import ConfirmationModal from "../components/shared/ConfirmationModal";
 import AlertsBanner from "./AlertsBanner";
 import dashboardFunc from "./transform";
 import homeRequests from "./home/api";
+import WelcomeBackDetailsModal from "../components/WelcomeBackDetailsModal";
 
 function Dashboard() {
 
@@ -168,6 +169,7 @@ function Dashboard() {
         <div className="dashboard">
         <Frame>
             <Outlet />
+            {window.SHOULD_ASK_WELCOME_DETAILS === 'true' ? <WelcomeBackDetailsModal isAdmin={window.USER_ROLE === 'ADMIN'} /> : <></>}
             {toastMarkup}
             {ConfirmationModalMarkup}
             {displayItems.length > 0 ? <div className="alerts-banner">

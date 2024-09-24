@@ -1,10 +1,13 @@
 package com.akto.action;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 
-import com.akto.dao.HistoricalDataDao;
-import com.akto.dto.HistoricalData;
+import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dto.*;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.listener.RuntimeListener;
 import com.akto.util.enums.GlobalEnums;
@@ -12,16 +15,8 @@ import com.mongodb.client.model.*;
 import org.bouncycastle.util.test.Test;
 import org.bson.conversions.Bson;
 
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.ActivitiesDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.Activity;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
@@ -255,6 +250,58 @@ public class DashboardAction extends UserAction {
         }
     }
 
+    private String email;
+    private String username;
+    private String organization;
+    boolean successfullyUpdated;
+    public String updateUsernameAndOrganization() {
+        Pattern usernamePattern = Pattern.compile("^[\\w\\s-]{1,}$");
+        Pattern organizationPattern = Pattern.compile("^[\\w\\s.&-]{1,}$");
+
+        this.setUsername(username.trim());
+        this.setOrganization(organization.trim());
+
+        if(username.trim().isEmpty()) {
+            addActionError("Username cannot be empty");
+            successfullyUpdated = false;
+            return Action.ERROR.toUpperCase();
+        }
+
+        if(!usernamePattern.matcher(username).matches()) {
+            addActionError("Username is not valid");
+            successfullyUpdated = false;
+            return Action.ERROR.toUpperCase();
+        }
+
+        User user = UsersDao.instance.updateOne(Filters.in(User.LOGIN, email), Updates.combine(
+                Updates.set(User.NAME, username.trim()),
+                Updates.set(User.NAME_LAST_UPDATE, Context.now())
+        ));
+        RBAC.Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
+
+        if(currentRoleForUser.getName().equals(RBAC.Role.ADMIN.getName())) {
+            if(organization.trim().isEmpty()) {
+                addActionError("Organization cannot be empty");
+                successfullyUpdated = false;
+                return Action.ERROR.toUpperCase();
+            }
+
+            if(!organizationPattern.matcher(organization).matches()) {
+                addActionError("Organization is not valid");
+                successfullyUpdated = false;
+                return Action.ERROR.toUpperCase();
+            }
+
+            OrganizationsDao.instance.updateOneNoUpsert(Filters.in(Organization.ACCOUNTS, Context.accountId.get()), Updates.combine(
+                    Updates.set(Organization.NAME, organization.trim()),
+                    Updates.set(Organization.NAME_LAST_UPDATE, Context.now())
+            ));
+        }
+
+        successfullyUpdated = true;
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public Map<Integer, Integer> getRiskScoreCountMap() {
         return riskScoreCountMap;
     }
@@ -337,5 +384,37 @@ public class DashboardAction extends UserAction {
 
     public List<HistoricalData> getInitialHistoricalData() {
         return initialHistoricalData;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getOrganization() {
+        return organization;
+    }
+
+    public void setOrganization(String organization) {
+        this.organization = organization;
+    }
+
+    public boolean isSuccessfullyUpdated() {
+        return successfullyUpdated;
+    }
+
+    public void setSuccessfullyUpdated(boolean successfullyUpdated) {
+        this.successfullyUpdated = successfullyUpdated;
     }
 }

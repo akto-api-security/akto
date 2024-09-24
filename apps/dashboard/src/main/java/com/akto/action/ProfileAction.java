@@ -132,6 +132,17 @@ public class ProfileAction extends UserAction {
         } catch (Exception e) {
         }
 
+        long countUser = UsersDao.instance.count(Filters.and(
+                Filters.exists(User.NAME_LAST_UPDATE),
+                Filters.in("login", username)
+        ));
+
+        long countOrg = OrganizationsDao.instance.count(Filters.and(
+                Filters.in(Organization.ACCOUNTS, sessionAccId),
+                Filters.exists(Organization.NAME_LAST_UPDATE)
+        ));
+        boolean shouldAskWelcomeBackDetails = countUser == 0 || (userRole.getName().equals(RBAC.Role.ADMIN.getName()) && countOrg == 0);
+
         userDetails.append("accounts", accounts)
                 .append("username",username)
                 .append("avatar", "dummy")
@@ -144,7 +155,8 @@ public class ProfileAction extends UserAction {
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name())
                 .append("jiraIntegrated", jiraIntegrated)
                 .append("userRole", userRole.toString().toUpperCase())
-                .append("currentTimeZone", timeZone);
+                .append("currentTimeZone", timeZone)
+                .append("shouldAskWelcomeBackDetails", shouldAskWelcomeBackDetails);
 
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));
