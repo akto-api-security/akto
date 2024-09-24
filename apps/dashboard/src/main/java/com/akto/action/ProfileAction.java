@@ -133,13 +133,13 @@ public class ProfileAction extends UserAction {
         }
 
         long countUser = UsersDao.instance.count(Filters.and(
-                Filters.exists(User.NAME_LAST_UPDATE),
+                Filters.gt(User.NAME_LAST_UPDATE, 0),
                 Filters.in("login", username)
         ));
 
         long countOrg = OrganizationsDao.instance.count(Filters.and(
                 Filters.in(Organization.ACCOUNTS, sessionAccId),
-                Filters.exists(Organization.NAME_LAST_UPDATE)
+                Filters.gt(Organization.NAME_LAST_UPDATE, 0)
         ));
         boolean shouldAskWelcomeBackDetails = DashboardMode.isMetered() && (countUser == 0 || (userRole.getName().equals(RBAC.Role.ADMIN.getName()) && countOrg == 0));
 
