@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, HorizontalStack, Scrollable, TextField, Tag, Form } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, HorizontalStack, Scrollable, TextField, Tag, Form, Tooltip } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
@@ -115,7 +115,9 @@ function About() {
                 <TextField 
                     disabled={window.USER_ROLE !== 'ADMIN'} 
                     connectedRight={(
-                        <Button disabled={window.USER_ROLE !== 'ADMIN'} icon={FileFilledMinor} onClick={() => handleSaveSettings("name", accountName)} />
+                        <Tooltip content="Save account name" dismissOnMouseOut>
+                            <Button disabled={window.USER_ROLE !== 'ADMIN'} icon={FileFilledMinor} onClick={() => handleSaveSettings("name", accountName)} />
+                        </Tooltip>
                     )} 
                     onChange={setAccountName} 
                     value={accountName}

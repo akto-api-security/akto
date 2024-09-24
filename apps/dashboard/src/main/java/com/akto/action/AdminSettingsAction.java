@@ -53,7 +53,7 @@ public class AdminSettingsAction extends UserAction {
     public String execute() throws Exception {
         accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         organization = OrganizationsDao.instance.findOne(Filters.empty());
-        if(Context.accountId.get() != null && Context.accountId.get() != -1){
+        if(Context.accountId.get() != null && Context.accountId.get() != 0){
             currentAccount = AccountsDao.instance.findOne(
                 Filters.eq(Constants.ID, Context.accountId.get()),
                 Projections.include("name", "timezone")
@@ -389,17 +389,17 @@ public class AdminSettingsAction extends UserAction {
         }
     }
 
-    public String modifyAccountPermission;
+    public String accountPermission;
     public String modifiedValueForAccount;
 
-    public String modifyAccountSettings () {
-        if(modifyAccountPermission.equals("name") || modifyAccountPermission.equals("timezone")){
+    public String accountSettings () {
+        if(accountPermission.equals("name") || accountPermission.equals("timezone")){
             if(Context.accountId.get() != null && Context.accountId.get() != 0){
                 AccountsDao.instance.updateOne(
                     Filters.eq(Constants.ID, Context.accountId.get()),
-                    Updates.set(modifyAccountPermission, modifiedValueForAccount)
+                    Updates.set(accountPermission, modifiedValueForAccount)
                 );
-                if(modifyAccountPermission.equals("name")){
+                if(accountPermission.equals("name")){
                     UsersDao.instance.updateManyNoUpsert(
                         Filters.exists(User.ACCOUNTS + "." + Context.accountId.get()),
                         Updates.set(User.ACCOUNTS + "." + Context.accountId.get() + ".name", modifiedValueForAccount)
@@ -416,8 +416,8 @@ public class AdminSettingsAction extends UserAction {
         }
     }
 
-    public void setModifyAccountPermission(String modifyAccountPermission) {
-        this.modifyAccountPermission = modifyAccountPermission;
+    public void setAccountPermission(String accountPermission) {
+        this.accountPermission = accountPermission;
     }
 
     public void setModifiedValueForAccount(String modifiedValueForAccount) {

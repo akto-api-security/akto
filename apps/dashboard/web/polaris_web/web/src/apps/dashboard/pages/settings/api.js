@@ -439,12 +439,12 @@ const settingRequests = {
             }
         });
     },
-    updateAccountSettings(modifyAccountPermission,modifiedValueForAccount){
+    updateAccountSettings(accountPermission,modifiedValueForAccount){
         return request({
             url: '/api/modifyAccountSettings',
             method: "post",
             data: {
-                modifyAccountPermission, modifiedValueForAccount
+                accountPermission, modifiedValueForAccount
             }
         })
     }
