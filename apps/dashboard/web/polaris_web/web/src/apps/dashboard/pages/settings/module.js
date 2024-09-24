@@ -175,13 +175,17 @@ const settingFunctions = {
       const loginInfo = await this.fetchLoginInfo()
       let arr = []
       let resp = {}
+      let accountSettingsDetails = {}
       await settingRequests.fetchAdminSettings().then((response)=>{
         resp = JSON.parse(JSON.stringify(response.accountSettings))
         let respOrgStr = "-"
         if (response.organization) {
             let respOrg = JSON.parse(JSON.stringify(response.organization))
-            respOrgStr = respOrg.id + " (" + respOrg.adminEmail + ")"
+            respOrgStr = respOrg.id + " (" 
+            + respOrg.adminEmail + ")"
         }
+
+        accountSettingsDetails=response.currentAccount
 
         if(window.IS_SAAS === "true"){
           arr = [
@@ -217,7 +221,7 @@ const settingFunctions = {
           ]
         }
       })
-      return {arr,resp}
+      return {arr,resp, accountSettingsDetails}
     },
 
 

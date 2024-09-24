@@ -438,6 +438,15 @@ const settingRequests = {
                 userRole
             }
         });
+    },
+    updateAccountSettings(accountPermission,modifiedValueForAccount){
+        return request({
+            url: '/api/modifyAccountSettings',
+            method: "post",
+            data: {
+                accountPermission, modifiedValueForAccount
+            }
+        })
     }
 }
 

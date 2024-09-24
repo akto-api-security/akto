@@ -29,6 +29,7 @@ import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 
 import io.micrometer.core.instrument.util.StringUtils;
@@ -93,7 +94,7 @@ public class ProfileAction extends UserAction {
         }
 
         BasicDBList listDashboards = new BasicDBList();
-
+        Account currAccount = AccountsDao.instance.findOne(Filters.eq(Constants.ID, sessionAccId),Projections.include("name"));
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         boolean showOnboarding = accountSettings == null ? true : accountSettings.isShowOnboarding();
@@ -110,6 +111,13 @@ public class ProfileAction extends UserAction {
 
         EmailAccountName emailAccountName = new EmailAccountName(username); // username is the email id of the current user
         String accountName = emailAccountName.getAccountName();
+        if(currAccount != null && !currAccount.getName().isEmpty() && !currAccount.getName().equals("My account")){
+            accountName = currAccount.getName();
+        }
+        String timeZone = "US/Pacific";
+        if(currAccount != null && !currAccount.getTimezone().isEmpty()){
+            timeZone = currAccount.getTimezone();
+        }
         String dashboardVersion = accountSettings.getDashboardVersion();
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
@@ -135,7 +143,8 @@ public class ProfileAction extends UserAction {
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name())
                 .append("jiraIntegrated", jiraIntegrated)
-                .append("userRole", userRole.toString().toUpperCase());
+                .append("userRole", userRole.toString().toUpperCase())
+                .append("currentTimeZone", timeZone);
 
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));

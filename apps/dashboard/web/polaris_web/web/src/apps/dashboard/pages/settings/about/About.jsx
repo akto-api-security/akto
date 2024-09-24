@@ -1,10 +1,10 @@
-import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, HorizontalStack, Scrollable, TextField, Tag, Form } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, HorizontalStack, Scrollable, TextField, Tag, Form, Tooltip } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import settingRequests from '../api'
-import { DeleteMajor } from "@shopify/polaris-icons"
+import { DeleteMajor, FileFilledMinor } from "@shopify/polaris-icons"
 import TooltipText from "../../../components/shared/TooltipText"
 import { isIP } from "is-ip"
 import isCidr from "is-cidr"
@@ -37,6 +37,8 @@ function About() {
     const [enableTelemetry, setEnableTelemetry] = useState(false)
     const [privateCidrList, setPrivateCidrList] = useState([])
     const [partnerIpsList, setPartnerIpsList] = useState([])
+    const [accountName, setAccountName] = useState('')
+    const [currentTimeZone, setCurrentTimeZone] = useState('')
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
@@ -46,7 +48,12 @@ function About() {
     const isOnPrem = window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'on_prem'
 
     async function fetchDetails(){
-        const {arr, resp} = await settingFunctions.fetchAdminInfo()
+        const {arr, resp, accountSettingsDetails} = await settingFunctions.fetchAdminInfo()
+        if(accountSettingsDetails?.timezone === 'US/Pacific'){
+            accountSettingsDetails.timezone = 'America/Los_Angeles';
+        }
+        setCurrentTimeZone(accountSettingsDetails?.timezone)
+        setAccountName(accountSettingsDetails?.name)
         setSetuptype(resp.setupType)
         setRedactPayload(resp.redactPayload)
         setNewMerging(resp.urlRegexMatchingEnabled)
@@ -79,8 +86,51 @@ function About() {
         )
     }
 
+    const handleSaveSettings = async(type, value) =>{
+        await settingRequests.updateAccountSettings(type, value).then((res) => {
+            func.setToast(true, false, `${func.toSentenceCase(type)} updated successfully.`)
+        })
+    }
+
+    const timezonesAvailable = [
+        { label: "Pacific Standard Time (PST) UTC-08:00", value: "America/Los_Angeles" },
+        { label: "Mountain Standard Time (MST) UTC-07:00", value: "America/Denver" },
+        { label: "Central Standard Time (CST) UTC-06:00", value: "America/Chicago" },
+        { label: "Eastern Standard Time (EST) UTC-05:00", value: "America/New_York" },
+        { label: "Atlantic Standard Time (AST) UTC-04:00", value: "America/Halifax" },
+        { label: "Greenwich Mean Time (GMT) UTC+00:00", value: "Etc/GMT" },
+        { label: "Central European Time (CET) UTC+01:00", value: "Europe/Berlin" },
+        { label: "Eastern European Time (EET) UTC+02:00", value: "Europe/Kiev" },
+        { label: "Moscow Standard Time (MSK) UTC+03:00", value: "Europe/Moscow" },
+        { label: "India Standard Time (IST) UTC+05:30", value: "Asia/Kolkata" },
+        { label: "China Standard Time (CST) UTC+08:00", value: "Asia/Shanghai" },
+        { label: "Japan Standard Time (JST) UTC+09:00", value: "Asia/Tokyo" },
+        { label: "Australian Eastern Standard Time (AEST) UTC+10:00", value: "Australia/Sydney" },
+        { label: "New Zealand Standard Time (NZST) UTC+12:00", value: "Pacific/Auckland" }
+      ];
+
     const infoComponent = (
-        <VerticalStack gap={5}>
+        <VerticalStack gap={4}>
+            <HorizontalGrid columns={"2"} gap={"3"}>
+                <TextField 
+                    disabled={window.USER_ROLE !== 'ADMIN'} 
+                    connectedRight={(
+                        <Tooltip content="Save account name" dismissOnMouseOut>
+                            <Button disabled={window.USER_ROLE !== 'ADMIN'} icon={FileFilledMinor} onClick={() => handleSaveSettings("name", accountName)} />
+                        </Tooltip>
+                    )} 
+                    onChange={setAccountName} 
+                    value={accountName}
+                    label={"Account name"}
+                />
+                <DropdownSearch
+                    placeholder="Select timezone"
+                    label="Select timezone"
+                    optionsList={timezonesAvailable}
+                    setSelected={(val) => {handleSaveSettings("timezone", val); setCurrentTimeZone(val)}}
+                    value={currentTimeZone}
+                />
+            </HorizontalGrid>
             {objArr.map((item)=>(
                 <Box key={item.title} >
                     <VerticalStack gap={1}>
