@@ -137,8 +137,8 @@ public class ProfileAction extends UserAction {
         );
 
         String userActualName = "";
-        if(user.getNameLastUpdate() > 0) {
-            userActualName = user.getName();
+        if(userFromDB.getNameLastUpdate() > 0) {
+            userActualName = userFromDB.getName();
         }
 
         String orgName = "";
@@ -200,7 +200,6 @@ public class ProfileAction extends UserAction {
             }
 
             userDetails.append("organizationId", organizationId);
-            userDetails.append("organizationName", organization.getName());
             userDetails.append("stiggIsOverage", isOverage);
             BasicDBObject stiggFeatureWiseAllowed = new BasicDBObject();
             for (String key : featureWiseAllowed.keySet()) {

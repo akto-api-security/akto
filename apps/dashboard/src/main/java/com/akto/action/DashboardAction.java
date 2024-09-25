@@ -269,7 +269,12 @@ public class DashboardAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        User user = UsersDao.instance.updateOne(Filters.in(User.LOGIN, email), Updates.combine(
+        if(username.length() > 24) {
+            addActionError("Username can't be longer than 24 characters");
+            return Action.ERROR.toUpperCase();
+        }
+
+        User user = UsersDao.instance.updateOneNoUpsert(Filters.in(User.LOGIN, email), Updates.combine(
                 Updates.set(User.NAME, username),
                 Updates.set(User.NAME_LAST_UPDATE, Context.now())
         ));
@@ -283,6 +288,11 @@ public class DashboardAction extends UserAction {
 
             if(!organizationPattern.matcher(organization).matches()) {
                 addActionError("Organization is not valid");
+                return Action.ERROR.toUpperCase();
+            }
+
+            if(organization.length() > 24) {
+                addActionError("Organization name can't be longer than 24 characters");
                 return Action.ERROR.toUpperCase();
             }
 
