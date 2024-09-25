@@ -19,7 +19,7 @@ public class RuntimeFilter {
     private String customFieldName;
 
     public enum UseCase {
-        AUTH_TYPE, SET_CUSTOM_FIELD, DETERMINE_API_ACCESS_TYPE
+        AUTH_TYPE, SET_CUSTOM_FIELD, DETERMINE_API_ACCESS_TYPE, DETERMINE_AGENT_TYPE
     }
 
     public enum Operator {
