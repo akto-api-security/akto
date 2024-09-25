@@ -6,6 +6,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -134,6 +135,7 @@ public class CleanInventory {
         int skip = 0;
         int limit = 100;
         Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");
+        Map<Integer,Integer> collectionWiseDeletionCountMap = new HashMap<>();
 
         Map<String,FilterConfig> filterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, yamlTemplates, true);
         Pattern pattern = createRegexPatternFromList(redundantUrlList);
@@ -173,17 +175,30 @@ public class CleanInventory {
                                 FILTER_TYPE filterType = temp.getSecond();
 
                                 if(param != null){
+                                    // comes when Filter_Block is not valid {Remaining => Unchanged, Modified, Allowed}
                                     if(filterType.equals(FILTER_TYPE.MODIFIED)){
+                                        // filter passed and modified
                                         movingApi = true;
+                                        break;
                                     }else if(filterType.equals(FILTER_TYPE.ALLOWED)){
+                                        // filter passed and not modified
                                         isAllowedFromTemplate = true;
+                                    }else if(filterMap.size() == 1){
+                                        // filter failed and id was default_delete
+                                        String key = filterMap.entrySet().iterator().next().getKey();
+                                        if(key.equals("DEFAULT_BLOCK_FILTER")){
+                                            isAllowedFromTemplate = true;
+                                        }
                                     }
+                                }else{
+                                    break;
                                 }
                             }
                         }
                     }
 
                     if(movingApi){
+                        // any 1 of the sample is modifiable, we print this block
                         toMove.add(sampleData.getId());
                         if(saveLogsToDB){
                             loggerMaker.infoAndAddToDb("Filter passed, modify sample data of API: " + sampleData.getId(), LogDb.DASHBOARD);
@@ -194,6 +209,9 @@ public class CleanInventory {
 
                     else if (isRedundant || !isAllowedFromTemplate) {                                
                         // writer.write(sampleData.toString());
+                        // if api falls under redundant url and if block filter is passed or none of the filter from any of the filters is passed, we print this block
+                        int initialCount = collectionWiseDeletionCountMap.getOrDefault(sampleData.getId().getApiCollectionId(), 0);
+                        collectionWiseDeletionCountMap.put(sampleData.getId().getApiCollectionId(),initialCount + 1);
                         toBeDeleted.add(sampleData.getId());  
                         if(saveLogsToDB){
                             loggerMaker.infoAndAddToDb(
@@ -203,6 +221,7 @@ public class CleanInventory {
                             logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad API from template: " + sampleData.getId(), LogDb.DASHBOARD);
                         }           
                     } else {
+                        // other cases like: => filter from advanced filter is passed || filter from block filter fails
                         if(saveLogsToDB){
                             loggerMaker.infoAndAddToDb(
                                 "Filter did not pass, keeping api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
@@ -224,6 +243,16 @@ public class CleanInventory {
             // String shouldMove = System.getenv("MOVE_REDUNDANT_APIS");
 
         } while (!sampleDataList.isEmpty());
+
+        for(Map.Entry<Integer,Integer> iterator: collectionWiseDeletionCountMap.entrySet()){
+            int collId = iterator.getKey();
+            int deletionCount = iterator.getValue();
+            String name = apiCollectionMap.get(collId).getDisplayName();
+
+            if(saveLogsToDB){
+                loggerMaker.infoAndAddToDb("Total apis deleted from collection: " + name + " are: " + deletionCount, LogDb.DASHBOARD);
+            }
+        }
 
         // writer.flush();
         // writer.close();
