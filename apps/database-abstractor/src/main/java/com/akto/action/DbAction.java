@@ -28,8 +28,10 @@ import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
+import com.akto.dto.testing.YamlNodeDetails;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
@@ -224,7 +226,7 @@ public class DbAction extends ActionSupport {
     TestRoles testRole;
     List<TestRoles> testRoles;
     Map<ObjectId, TestingRunResultSummary> testingRunResultSummaryMap;
-    TestingRunResult testingRunResult;
+    BasicDBObject testingRunResult;
     Tokens token;
     WorkflowTest workflowTest;
     List<YamlTemplate> yamlTemplates;
@@ -1568,15 +1570,15 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String fetchTestingRunResults() {
-        try {
-            testingRunResult = DbLayer.fetchTestingRunResults(filterForRunResult);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in fetchTestingRunResults " + e.toString());
-            return Action.ERROR.toUpperCase();
-        }
-        return Action.SUCCESS.toUpperCase();
-    }
+    // public String fetchTestingRunResults() {
+    //     try {
+    //         testingRunResult = DbLayer.fetchTestingRunResults(filterForRunResult);
+    //     } catch (Exception e) {
+    //         loggerMaker.errorAndAddToDb(e, "Error in fetchTestingRunResults " + e.toString());
+    //         return Action.ERROR.toUpperCase();
+    //     }
+    //     return Action.SUCCESS.toUpperCase();
+    // }
 
     public String fetchToken() {
         try {
@@ -1693,6 +1695,29 @@ public class DbAction extends ActionSupport {
 
     public String insertTestingRunResults() {
         try {
+
+            Map<String, WorkflowNodeDetails> data = new HashMap<>();
+            try {
+                Map<String, BasicDBObject> x = (Map) (((Map) this.testingRunResult.get("workflowTest"))
+                        .get("mapNodeIdToWorkflowNodeDetails"));
+                for (String tmp : x.keySet()) {
+                    ((Map) x.get(tmp)).remove("authMechanism");
+                    data.put(tmp, objectMapper.convertValue(x.get(tmp), YamlNodeDetails.class));
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails" + e.toString());
+                e.printStackTrace();
+            }
+            TestingRunResult testingRunResult = objectMapper.readValue(this.testingRunResult.toJson(), TestingRunResult.class);
+
+            try {
+                if (!data.isEmpty()) {
+                    testingRunResult.getWorkflowTest().setMapNodeIdToWorkflowNodeDetails(data);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails2" + e.toString());
+                e.printStackTrace();
+            }
 
             if(testingRunResult.getSingleTestResults()!=null){
                 testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getSingleTestResults()));
@@ -2789,11 +2814,11 @@ public class DbAction extends ActionSupport {
         this.testingRunResultSummaryMap = testingRunResultSummaryMap;
     }
 
-    public TestingRunResult getTestingRunResult() {
+    public BasicDBObject getTestingRunResult() {
         return testingRunResult;
     }
 
-    public void setTestingRunResult(TestingRunResult testingRunResult) {
+    public void setTestingRunResult(BasicDBObject testingRunResult) {
         this.testingRunResult = testingRunResult;
     }
 
