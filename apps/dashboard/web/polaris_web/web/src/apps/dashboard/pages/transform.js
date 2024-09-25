@@ -200,7 +200,7 @@ const dashboardFunc = {
         if (match && match[1]) {
             const epochTime = Number(match[1]);
             const date = new Date(epochTime * 1000);
-            const formattedDate = date.toLocaleString();
+            const formattedDate = date.toLocaleString('en-US',{timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE});
             const result = input.replace(match[0], formattedDate);
             return result;
         } else {

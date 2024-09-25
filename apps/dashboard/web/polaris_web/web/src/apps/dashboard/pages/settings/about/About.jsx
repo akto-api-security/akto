@@ -49,7 +49,7 @@ function About() {
 
     async function fetchDetails(){
         const {arr, resp, accountSettingsDetails} = await settingFunctions.fetchAdminInfo()
-        if(accountSettingsDetails?.timezone === 'US/Pacific'){
+        if(accountSettingsDetails?.timezone === 'Us/Pacific'){
             accountSettingsDetails.timezone = 'America/Los_Angeles';
         }
         setCurrentTimeZone(accountSettingsDetails?.timezone)
