@@ -175,7 +175,7 @@ public class CleanInventory {
                                 if(param != null){
                                     if(filterType.equals(FILTER_TYPE.MODIFIED)){
                                         movingApi = true;
-                                    }else if(filterType.equals(FILTER_TYPE.ALLOWED)){
+                                    }else if(filterType.equals(FILTER_TYPE.ALLOWED) || filterType.equals(FILTER_TYPE.UNCHANGED)){
                                         isAllowedFromTemplate = true;
                                     }
                                 }
