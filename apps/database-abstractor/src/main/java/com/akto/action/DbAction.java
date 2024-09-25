@@ -1704,6 +1704,7 @@ public class DbAction extends ActionSupport {
                         .get("mapNodeIdToWorkflowNodeDetails"));
                 for (String tmp : x.keySet()) {
                     ((Map) x.get(tmp)).remove("authMechanism");
+                    ((Map) x.get(tmp)).remove("customAuthTypes");
                     data.put(tmp, objectMapper.convertValue(x.get(tmp), YamlNodeDetails.class));
                 }
             } catch (Exception e) {
