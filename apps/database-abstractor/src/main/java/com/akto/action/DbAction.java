@@ -1570,15 +1570,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    // public String fetchTestingRunResults() {
-    //     try {
-    //         testingRunResult = DbLayer.fetchTestingRunResults(filterForRunResult);
-    //     } catch (Exception e) {
-    //         loggerMaker.errorAndAddToDb(e, "Error in fetchTestingRunResults " + e.toString());
-    //         return Action.ERROR.toUpperCase();
-    //     }
-    //     return Action.SUCCESS.toUpperCase();
-    // }
+    public String fetchTestingRunResults() {
+        try {
+            // testingRunResult = DbLayer.fetchTestingRunResults(filterForRunResult);
+            loggerMaker.errorAndAddToDb("API called fetchTestingRunResults");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchTestingRunResults " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
 
     public String fetchToken() {
         try {
