@@ -10,14 +10,6 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
     const [organization, setOrganization] = useState(window.ORGANIZATION_NAME)
 
     const handleWelcomeBackDetails = async () => {
-        if(username.length > 24) {
-            func.setToast(true, true, "Username can't be longer than 24 characters")
-            return
-        }
-        if(organization.length > 24) {
-            func.setToast(true, true, "Organization name can't be longer than 24 characters")
-            return
-        }
 
         const nameReg = /^[\w\s-]{1,}$/;
         const orgReg = /^[\w\s.&-]{1,}$/;
@@ -60,6 +52,10 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
                         placeholder="Joe doe"
                         onChange={setUsername}
                         autoComplete="off"
+                        maxLength="24"
+                        suffix={(
+                            <Text>{username.length}/24</Text>
+                        )}
                     />
 
                     {
@@ -70,6 +66,10 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
                             placeholder="Acme Inc"
                             onChange={setOrganization}
                             autoComplete="off"
+                            maxLength={"24"}
+                            suffix={(
+                                <Text>{organization.length}/24</Text>
+                            )}
                         />
                     }
                 </VerticalStack>
