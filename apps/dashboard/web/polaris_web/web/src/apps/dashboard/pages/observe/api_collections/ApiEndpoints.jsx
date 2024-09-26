@@ -124,6 +124,13 @@ headers.push({
     showFilter: true,
 })
 
+headers.push({
+    text: 'Response codes',
+    value: 'responseCodes',
+    filterKey: 'responseCodes',
+    showFilter: true,
+})
+
 
 const sortOptions = [
     { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore', columnIndex: 2},
