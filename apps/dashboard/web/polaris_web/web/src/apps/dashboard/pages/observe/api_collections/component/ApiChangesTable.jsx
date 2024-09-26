@@ -113,7 +113,7 @@ function ApiChangesTable(props) {
       selected={selected}
       onSelect={handleSelectedTab}
       mode={IndexFiltersMode.Default}
-      headings={tableDataObj.headers}
+      headings={tableDataObj.headings}
       useNewRow={true}
       condensedHeight={true}
       tableTabs={tableTabs}
