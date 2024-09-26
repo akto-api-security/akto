@@ -139,7 +139,7 @@ function HybridSaasSource() {
     return (
         <div className='card-items'>
             <Text variant='bodyMd'>
-                Use our hybrid saas setup, add more text.
+                Seamlessly deploy Akto with our hybrid setup and start viewing your API traffic in few minutes.
             </Text>
             {hybridSaasComponent}
 
