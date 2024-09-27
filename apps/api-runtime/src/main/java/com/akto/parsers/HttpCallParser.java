@@ -577,7 +577,7 @@ public class HttpCallParser {
 
             Pair<HttpResponseParams,FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
             HttpResponseParams param = temp.getFirst();
-            if(param == null){
+            if(param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)){
                 continue;
             }else{
                 httpResponseParam = param;
