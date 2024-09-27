@@ -231,7 +231,7 @@ public class HttpCallParser {
                 return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, filterType);
             }
         }
-        return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, FILTER_TYPE.UNCHANGED);
+        return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, FILTER_TYPE.ERROR);
     }
 
     public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
