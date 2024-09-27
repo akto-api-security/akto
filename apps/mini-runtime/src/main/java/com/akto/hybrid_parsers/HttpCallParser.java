@@ -242,7 +242,7 @@ public class HttpCallParser {
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
-                filterType = FILTER_TYPE.UNCHANGED;
+                filterType = FILTER_TYPE.ERROR;
             }
         }
         return filterType;
@@ -613,7 +613,7 @@ public class HttpCallParser {
 
             Pair<HttpResponseParams,FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
             HttpResponseParams param = temp.getFirst();
-            if(param == null){
+            if(param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)){
                 continue;
             }else{
                 httpResponseParam = param;

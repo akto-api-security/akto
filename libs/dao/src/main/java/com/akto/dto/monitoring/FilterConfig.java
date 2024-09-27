@@ -29,7 +29,7 @@ public class FilterConfig {
     public static final String DEFAULT_BLOCK_FILTER = "DEFAULT_BLOCK_FILTER";
 
     public enum FILTER_TYPE{
-        BLOCKED , ALLOWED, MODIFIED, UNCHANGED
+        BLOCKED , ALLOWED, MODIFIED, UNCHANGED, ERROR
     }
 
     public FilterConfig(String id, ConfigParserResult filter, Map<String, List<String>> wordLists) {
