@@ -214,7 +214,7 @@ public class HttpCallParser {
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
-                filterType = FILTER_TYPE.UNCHANGED;
+                filterType = FILTER_TYPE.ERROR;
             }
         }
         return filterType;
