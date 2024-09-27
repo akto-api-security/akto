@@ -214,7 +214,7 @@ public class HttpCallParser {
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
-                filterType = FILTER_TYPE.UNCHANGED;
+                filterType = FILTER_TYPE.ERROR;
             }
         }
         return filterType;
@@ -231,7 +231,7 @@ public class HttpCallParser {
                 return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, filterType);
             }
         }
-        return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, FILTER_TYPE.UNCHANGED);
+        return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, FILTER_TYPE.ERROR);
     }
 
     public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
@@ -577,7 +577,7 @@ public class HttpCallParser {
 
             Pair<HttpResponseParams,FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
             HttpResponseParams param = temp.getFirst();
-            if(param == null){
+            if(param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)){
                 continue;
             }else{
                 httpResponseParam = param;

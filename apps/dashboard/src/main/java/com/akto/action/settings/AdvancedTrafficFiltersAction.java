@@ -101,7 +101,7 @@ public class AdvancedTrafficFiltersAction extends UserAction {
             }
 
             List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
-                Filters.empty(), Projections.include(ApiCollection.HOST_NAME));
+                Filters.empty(), Projections.include(ApiCollection.HOST_NAME, ApiCollection.NAME));
             YamlTemplate yamlTemplate = new YamlTemplate(filterConfig.getId(), Context.now(), getSUser().getLogin(), Context.now(), this.yamlContent, null);
 
             CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections,Arrays.asList(yamlTemplate),new ArrayList<>() , "", false, true);
