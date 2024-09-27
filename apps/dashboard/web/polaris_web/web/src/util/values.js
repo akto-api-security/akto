@@ -71,4 +71,6 @@ const ranges = [
     }
 ];
 
-export default { today, yesterday, ranges, yesterdayDayEnd, todayDayEnd };
+const skipList = ["GENERIC", "TRUE", "FALSE","INTEGER_32", "INTEGER_64", "NULL", "OTHER", "DICT", "FLOAT"]
+
+export default { today, yesterday, ranges, yesterdayDayEnd, todayDayEnd , skipList};

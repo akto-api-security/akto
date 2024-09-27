@@ -13,6 +13,7 @@ import transform from "../transform";
 import ApiDependency from "./ApiDependency";
 import RunTest from "./RunTest";
 import PersistStore from "../../../../main/PersistStore";
+import values from "@/util/values";
 
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 
@@ -41,8 +42,6 @@ function ApiDetails(props) {
         }
         return "warning"
     }
-
-    const skipList = ["GENERIC", "TRUE", "FALSE","INTEGER_32", "INTEGER_64", "NULL", "OTHER", "DICT", "FLOAT"]
 
     const fetchData = async () => {
         if (showDetails) {
@@ -95,7 +94,7 @@ function ApiDetails(props) {
 
                     try {
                         resp.data.params?.forEach(x => {
-                            if (!skipList.includes(x.subTypeString) && !x?.savedAsSensitive && !x?.sensitive) {
+                            if (!values?.skipList.includes(x.subTypeString) && !x?.savedAsSensitive && !x?.sensitive) {
                                 x.nonSensitiveDataType = true
                             }
                         })
