@@ -407,7 +407,7 @@ function ApiEndpoints(props) {
         })
     }
 
-
+    
 
     function handleRefresh() {
         fetchData()
@@ -860,7 +860,6 @@ function ApiEndpoints(props) {
         setShowDetails={setShowDetails}
         apiDetail={apiDetail}
         headers={transform.getDetailsHeaders()}
-        getStatus={() => { return "warning" }}
         isGptActive={isGptActive}
     />,
     ]
@@ -899,7 +898,6 @@ function ApiEndpoints(props) {
                       setShowDetails={setShowDetails}
                       apiDetail={apiDetail}
                       headers={transform.getDetailsHeaders()}
-                      getStatus={() => { return "warning" }}
                       isGptActive={isGptActive}
                   />,
                   <ApiGroupModal

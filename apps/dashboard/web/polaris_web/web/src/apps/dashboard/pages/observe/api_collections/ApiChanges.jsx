@@ -146,7 +146,6 @@ function ApiChanges() {
             setShowDetails={setShowDetails}
             apiDetail={apiDetail}
             headers={tableHeaders}
-            getStatus={() => { return "warning" }}
         />
     )
 
