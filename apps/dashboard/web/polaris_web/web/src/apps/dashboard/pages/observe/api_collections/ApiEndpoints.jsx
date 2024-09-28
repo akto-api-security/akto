@@ -893,15 +893,6 @@ function ApiEndpoints(props) {
                           </Modal.Section>
                       </Modal>
                   </div>,
-                  <ApiDetails
-                      key="details"
-                      showDetails={showDetails && apiDetail && Object.keys(apiDetail).length > 0}
-                      setShowDetails={setShowDetails}
-                      apiDetail={apiDetail}
-                      headers={transform.getDetailsHeaders()}
-                      getStatus={() => { return "warning" }}
-                      isGptActive={isGptActive}
-                  />,
                   <ApiGroupModal
                       key="api-group-modal"
                       showApiGroupModal={showApiGroupModal}

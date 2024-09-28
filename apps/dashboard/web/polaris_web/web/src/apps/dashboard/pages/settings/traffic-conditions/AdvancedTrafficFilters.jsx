@@ -183,7 +183,7 @@ function AdvancedTrafficFilters() {
             <Modal
                 open={modalActive}
                 onClose={() => setModalActive(false)}
-                primaryAction={{content: 'Save', onAction: () => handleSave(currentTemplate)}}
+                primaryAction={{content: 'Save', onAction: () => {handleSave(currentTemplate); setModalActive(false)}}}
                 secondaryActions={window.IS_SAAS !== "true" ? [{content: 'Dry run', onAction: () => handleDryRun(currentTemplate)}]: []}
                 title={"Add advanced filters"}
             >

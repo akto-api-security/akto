@@ -9,9 +9,12 @@ import com.akto.dto.data_types.Predicate;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.usage.UsageMetric;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
+import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.utils.AktoCustomException;
 import com.akto.utils.RedactSampleData;
@@ -899,6 +902,53 @@ public class CustomDataTypeAction extends UserAction{
         return SUCCESS.toUpperCase();
 
     }
+    
+    BasicDBObject response;
+
+    public String getCountOfApiVsDataType(){
+        this.response = new BasicDBObject();
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
+                                    .append(SingleTypeInfo._URL, "$url")
+                                    .append(SingleTypeInfo._METHOD, "$method");
+        Bson customFilter = Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculator.getDeactivated());
+
+        List<String> sensitiveSubtypes = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+        sensitiveSubtypes.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+        List<String> sensitiveSubtypesInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+
+        sensitiveSubtypes.addAll(sensitiveSubtypesInRequest);
+        List<Bson> pipeline = SingleTypeInfoDao.instance.generateFilterForSubtypes(sensitiveSubtypes, groupedId, false, customFilter);
+
+        try {
+            MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+            Map<String,Integer> countOfApisVsDataType = new HashMap<>();
+            Map<String,Set<Integer>> apiCollectionsMap = new HashMap<>();
+            int count = 0;
+            while (cursor.hasNext()) {
+                count++;
+                BasicDBObject bDbObject = cursor.next();
+                BasicDBObject id = (BasicDBObject) bDbObject.get(Constants.ID);
+                List<String> subTypes = (List<String>) bDbObject.get("subTypes");
+                for(String subType: subTypes){
+                    int initialCount = countOfApisVsDataType.getOrDefault(subType, 0);
+                    Set<Integer> collSet = apiCollectionsMap.getOrDefault(subType, new HashSet<>());
+                    countOfApisVsDataType.put(subType, initialCount + 1);
+                    collSet.add(id.getInt(SingleTypeInfo._API_COLLECTION_ID));
+                    apiCollectionsMap.put(subType, collSet);
+                }
+            }
+            response.put("countMap", countOfApisVsDataType);
+            response.put("totalApisCount", count);
+            response.put("apiCollectionsMap", apiCollectionsMap);
+        } catch (Exception e) {
+            addActionError("Error in fetching subtypes count");
+            return ERROR.toUpperCase();
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
+    
 
     public void setActive(boolean active) {
         this.active = active;
@@ -934,5 +984,9 @@ public class CustomDataTypeAction extends UserAction{
 
     public void setRedacted(boolean redacted) {
         this.redacted = redacted;
+    }
+
+    public BasicDBObject getResponse() {
+        return response;
     }
 }

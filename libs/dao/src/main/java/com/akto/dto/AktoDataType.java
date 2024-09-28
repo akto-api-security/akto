@@ -3,6 +3,7 @@ package com.akto.dto;
 import java.util.List;
 
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.enums.GlobalEnums.Severity;
 
 public class AktoDataType {
     private String name;
@@ -15,6 +16,12 @@ public class AktoDataType {
     private boolean redacted;
     public static final String SAMPLE_DATA_FIXED = "sampleDataFixed";
     private boolean sampleDataFixed;
+
+    public static final String CATEGORIES_LIST = "categoriesList";
+    private List<String> categoriesList;
+
+    public static final String DATA_TYPE_PRIORITY = "dataTypePriority";
+    private Severity dataTypePriority;
 
     public AktoDataType() {
     }
@@ -73,5 +80,19 @@ public class AktoDataType {
 
     public void setSampleDataFixed(boolean sampleDataFixed) {
         this.sampleDataFixed = sampleDataFixed;
+    }
+
+    public Severity getDataTypePriority() {
+        return dataTypePriority;
+    }
+    public void setDataTypePriority(Severity dataTypePriority) {
+        this.dataTypePriority = dataTypePriority;
+    }
+
+    public List<String> getCategoriesList() {
+        return categoriesList;
+    }
+    public void setCategoriesList(List<String> categoriesList) {
+        this.categoriesList = categoriesList;
     }
 }

@@ -733,5 +733,12 @@ export default {
                 apiCollectionId: apiInfoKey.apiCollectionId
             }
         })
+    },
+    fetchCountMapOfApis(){
+        return request({
+            url: "/api/fetchCountMapOfApis",
+            method: "post",
+            data: {}
+        })
     }
 }
