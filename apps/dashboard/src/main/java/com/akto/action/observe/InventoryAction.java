@@ -331,7 +331,7 @@ public class InventoryAction extends UserAction {
                 CodeAnalysisApi codeAnalysisApi = new CodeAnalysisApi(
                     codeAnalysisApiInfoKey.getMethod(),
                     codeAnalysisApiInfoKey.getEndpoint(),
-                    codeAnalysisApiInfo.getLocation()
+                    codeAnalysisApiInfo.getLocation(), "", ""
                 );
                 codeAnalysisApisMap.put(codeAnalysisApi.generateCodeAnalysisApisMapKey(), codeAnalysisApi);
             }
@@ -650,6 +650,17 @@ public class InventoryAction extends UserAction {
         );
 
         List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filters);
+
+
+        Bson filtersForCodeAnalysisSTIs = Filters.and(
+            Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+            Filters.eq(SingleTypeInfo._URL, url),  
+            Filters.eq(SingleTypeInfo._METHOD, method)
+        );
+        List<SingleTypeInfo> codeAnalysisSTIs = CodeAnalysisSingleTypeInfoDao.instance.findAll(filtersForCodeAnalysisSTIs);
+        if (!codeAnalysisSTIs.isEmpty()) {
+            list.addAll(codeAnalysisSTIs);
+        }
 
         response = new BasicDBObject();
         response.put("data", new BasicDBObject("params", list));

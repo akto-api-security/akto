@@ -2,45 +2,30 @@ package com.akto.action;
 
 
 import java.net.URI;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
 
 import com.akto.dao.*;
 import com.akto.dto.*;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.types.CappedSet;
 import com.opensymphony.xwork2.ActionSupport;
 import org.bson.Document;
 import org.bson.conversions.Bson;
-import org.bson.types.Code;
 import org.bson.types.ObjectId;
-import org.checkerframework.checker.units.qual.s;
-import org.json.JSONObject;
 
 import com.akto.dao.context.Context;
-import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dto.RBAC.Role;
-import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
-import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.mixpanel.AktoMixpanel;
-import com.akto.util.DashboardMode;
-import com.akto.util.EmailAccountName;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
+
+import static com.akto.util.HttpRequestResponseUtils.extractValuesFromPayload;
+import static com.akto.util.HttpRequestResponseUtils.generateSTIsFromPayload;
 
 public class CodeAnalysisAction extends ActionSupport {
 
@@ -162,7 +147,7 @@ public class CodeAnalysisAction extends ActionSupport {
                 CodeAnalysisApi newCodeAnalysisApi = new CodeAnalysisApi(
                         codeAnalysisApi.getMethod(),
                         trafficApiEndpointAktoTemplateStrToOriginalMap.get(codeAnalysisApiEndpointAktoTemplateStr),
-                        codeAnalysisApi.getLocation());
+                        codeAnalysisApi.getLocation(), codeAnalysisApi.getRequestBody(), codeAnalysisApi.getResponseBody());
 
                 tempCodeAnalysisApisMap.remove(codeAnalysisApiKey);
                 tempCodeAnalysisApisMap.put(newCodeAnalysisApi.generateCodeAnalysisApisMapKey(), newCodeAnalysisApi);
@@ -199,7 +184,7 @@ public class CodeAnalysisAction extends ActionSupport {
                         CodeAnalysisApi newCodeAnalysisApi = new CodeAnalysisApi(
                                 trafficApiMethod,
                                 trafficApiEndpoint,
-                                codeAnalysisApi.getLocation());
+                                codeAnalysisApi.getLocation(), codeAnalysisApi.getRequestBody(), codeAnalysisApi.getResponseBody());
 
                         tempCodeAnalysisApisMap.put(newCodeAnalysisApi.generateCodeAnalysisApisMapKey(), newCodeAnalysisApi);
                         break;
@@ -236,8 +221,11 @@ public class CodeAnalysisAction extends ActionSupport {
             return ERROR.toUpperCase();
         }
 
+        int now = Context.now();
+
         if (codeAnalysisCollectionId != null) {
             List<WriteModel<CodeAnalysisApiInfo>> bulkUpdates = new ArrayList<>();
+            List<WriteModel<SingleTypeInfo>> bulkUpdatesSTI = new ArrayList<>();
 
             for(Map.Entry<String, CodeAnalysisApi> codeAnalysisApiEntry: codeAnalysisApisMap.entrySet()) {
                 CodeAnalysisApi codeAnalysisApi = codeAnalysisApiEntry.getValue();
@@ -253,6 +241,30 @@ public class CodeAnalysisAction extends ActionSupport {
                                 new UpdateOptions().upsert(true)
                         )
                 );
+
+                String requestBody = codeAnalysisApi.getRequestBody();
+                String responseBody = codeAnalysisApi.getResponseBody();
+
+                List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
+                singleTypeInfos.addAll(generateSTIsFromPayload(apiCollection.getId(), codeAnalysisApi.getEndpoint(), codeAnalysisApi.getMethod(), requestBody, -1));
+                singleTypeInfos.addAll(generateSTIsFromPayload(apiCollection.getId(), codeAnalysisApi.getEndpoint(), codeAnalysisApi.getMethod(), responseBody, 200));
+
+                Bson update = Updates.combine(Updates.max(SingleTypeInfo.LAST_SEEN, now), Updates.setOnInsert("timestamp", now));
+
+                for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+                    bulkUpdatesSTI.add(
+                            new UpdateOneModel<>(
+                                    SingleTypeInfoDao.createFilters(singleTypeInfo),
+                                    update,
+                                    new UpdateOptions().upsert(true)
+                            )
+                    );
+                }
+
+            }
+
+            if (!bulkUpdatesSTI.isEmpty()) {
+                CodeAnalysisSingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesSTI);
             }
 
             if (bulkUpdates.size() > 0) {
