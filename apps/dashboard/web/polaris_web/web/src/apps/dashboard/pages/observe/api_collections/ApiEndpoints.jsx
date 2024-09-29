@@ -241,9 +241,12 @@ function ApiEndpoints() {
                     endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={false} />,
                     method: method,
                     endpoint: endpoint,
+                    apiCollectionId: apiCollectionId,
                     codeAnalysisEndpoint: true,
                     sourceLocation: location.filePath, 
                     sourceLocationComp: <SourceLocation location={location} />,
+                    parameterisedEndpoint: method + " " + endpoint,
+                    apiCollectionName: collectionsMap[apiCollectionId]
                 }
             })
         }
@@ -307,9 +310,6 @@ function ApiEndpoints() {
     }
 
     function handleRowClick(data) {
-        // Don't show api details for Code analysis endpoints
-        if (data.codeAnalysisEndpoint) 
-            return
         
         let tmp = { ...data, endpointComp: "", sensitiveTagsComp: "" }
         
