@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Button, Modal, HorizontalStack, IndexFiltersMode, Text, Badge, Thumbnail } from "@shopify/polaris"
+import { Button, Modal, HorizontalStack, IndexFiltersMode, Text, Badge, Thumbnail, HorizontalGrid } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState } from "react"
 import func from "@/util/func"
@@ -14,6 +14,8 @@ import transform from "../transform"
 import ShowListInBadge from "../../../components/shared/ShowListInBadge"
 import PersistStore from "../../../../main/PersistStore"
 import SummaryCard from "../../dashboard/new_components/SummaryCard"
+import InfoCard from "../../dashboard/new_components/InfoCard"
+import ChartypeComponent from "../../testing/TestRunsPage/ChartypeComponent"
 
 const headers = [
     {
@@ -80,6 +82,7 @@ const resourceName = {
   };
 
 const severityOrder = {'CRITICAL': 4 ,'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };  
+const colorsArr = ["#7F56D9", "#9E77ED", "#B692F6", "#D6BBFB", "#E9D7FE"];
 
 const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiCollectionsMap) => {
     const priorityText =  type?.dataTypePriority || "-"
@@ -115,7 +118,9 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
         : "-" ,
         response: (countMap['RESPONSE'] && countMap['RESPONSE'][type.name]) || 0,
         request: (countMap['REQUEST'] && countMap['REQUEST'][type.name]) || 0,
-        active: type?.active !== undefined ?  type.active : true
+        active: type?.active !== undefined ?  type.active : true,
+        nextUrl: "/dashboard/observe/sensitive/"+type.name,
+        isCustomType: type?.creatorId > 0
     }
 }
 
@@ -133,6 +138,7 @@ function AllSensitiveData() {
         totalActive: 0,
         totalCategories: 0
     })
+    const [countMap, setCountMap] = useState({})
 
     const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
@@ -147,7 +153,7 @@ function AllSensitiveData() {
         return [{
             items: [{
                 content: 'Edit',
-                onAction: () => navigate("/dashboard/observe/data-types", {state: {name: item.subType, dataObj: mapData[item.subType], type: item.isCustomType ? 'Custom' : 'Akto'}}),
+                onAction: () => setTimeout(() =>navigate("/dashboard/observe/data-types", {state: {name: item.subType, dataObj: mapData[item.subType], type: item.isCustomType ? 'Custom' : 'Akto'}}),[0]),
             }]
         }]
     }
@@ -185,17 +191,32 @@ function AllSensitiveData() {
         let totalSensitive = 0;
         const categoriesSet = new Set()
 
+        let countOfSubtypes = []
+
         const tempArr = dataTypesArr.map((type) => {
             subtypeToNameMap[type.name] = type
             if(type.sensitiveAlways || (type?.sensitivePosition || []).length > 0){
                 totalSensitive++
             }
             (type?.categoriesList || []).forEach(x => {categoriesSet.add(x)})
+            if(dataTypesVsApisCount?.countMap?.[type.name] && dataTypesVsApisCount?.countMap?.[type.name] !== undefined){
+                countOfSubtypes.push({key: [type?.name] , value: dataTypesVsApisCount?.countMap?.[type.name]})
+            }
             return convertToDataTypesData(type, collectionsMap, reqResCountMap, dataTypesVsApisCount?.apiCollectionsMap || {})
         })
         temp.all = tempArr
         temp.enabled = tempArr.filter((x) => x.active === true)
         temp.disabled = tempArr.filter((x) => x.active === false)
+        let finalCountMap = {}
+        countOfSubtypes.sort((a,b) =>{
+            return b['value'] - a['value']
+        }).slice(0,5).forEach((x, index) => {
+            finalCountMap[x.key]= {
+                color: colorsArr[index],
+                text: x['value']
+            }
+        })
+        setCountMap(finalCountMap)
         setData(temp)
         setMapData(subtypeToNameMap)
         const summaryObj = {
@@ -253,11 +274,32 @@ function AllSensitiveData() {
         </HorizontalStack>
     )
 
+    const graphComponents = (
+        <HorizontalGrid key={"graphs"} gap={"5"} columns={2}>
+            <InfoCard
+                title={"Top 5 sensitive datatype"}
+                titleToolTip={"Numbers of APIs having the corresponding data type in request or response"}
+                component={
+                    <ChartypeComponent
+                        data={countMap}
+                        isNormal={true} 
+                        boxHeight={'250px'} 
+                        chartOnLeft={true} 
+                        dataTableWidth="250px" 
+                        boxPadding={0}
+                        pieInnerSize="50%"
+                    />
+                }
+            />
+        </HorizontalGrid>
+    )
+
     const componentsArr = [
         <SummaryCard
             key={"summaryInfo"}
             summaryItems={summaryInfoData}
          />,
+         graphComponents,
         <GithubSimpleTable
             key="table"
             data={data[selectedTab]} 
