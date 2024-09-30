@@ -6596,6 +6596,23 @@
             <result name="SUCCESS"  type="json">
             </result>
         </action>
+
+        <action name="api/fetchAllHistoricalData" class="com.akto.action.ApiCollectionsAction" method="fetchAllHistoricalData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+                <param name="root">historicalData</param>
+            </result>
+        </action>
         <action name="api/addAdvancedFiltersForTraffic" class="com.akto.action.settings.AdvancedTrafficFiltersAction" method="saveYamlTemplateForTrafficFilters">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

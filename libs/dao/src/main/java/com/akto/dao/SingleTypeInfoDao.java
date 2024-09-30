@@ -2,6 +2,10 @@ package com.akto.dao;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 import com.akto.dao.context.Context;
@@ -668,7 +672,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return finalArrList;
     }
 
-    public long fetchEndpointsCount(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections) {
+    public List<Integer> fetchEndpointsCount(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections) {
         List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
         nonHostApiCollectionIds.addAll(deactivatedCollections);
 
@@ -680,7 +684,9 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 hostFilterQ
         );
 
-        long count = SingleTypeInfoDao.instance.count(filterQWithTs);
+//        long count = SingleTypeInfoDao.instance.count(filterQWithTs);
+
+        List<Integer> timeUnitCountMap = new ArrayList<>();
 
         nonHostApiCollectionIds.removeAll(deactivatedCollections);
 
@@ -689,7 +695,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
             pipeline.add(Aggregates.match(Filters.in("apiCollectionId", nonHostApiCollectionIds)));
 
-            BasicDBObject groupedId = 
+            BasicDBObject groupedId =
                 new BasicDBObject("apiCollectionId", "$apiCollectionId")
                 .append("url", "$url")
                 .append("method", "$method");
@@ -697,14 +703,69 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             pipeline.add(Aggregates.match(Filters.gte("startTs", startTimestamp)));
             pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
             pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+
+            LocalDate startDate = Instant.ofEpochSecond(startTimestamp)
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDate();
+            LocalDate endDate = Instant.ofEpochSecond(endTimestamp)
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDate();
+            long daysBetween = ChronoUnit.DAYS.between(startDate, endDate);
+
+            if (daysBetween <= 30) {
+                Bson addFieldsStage = Aggregates.addFields(
+                        new Field<>("day", new BasicDBObject("$dateToString",
+                                new BasicDBObject("format", "%Y-%m-%d")
+                                        .append("date", new BasicDBObject("$toDate",
+                                                new BasicDBObject("$multiply", Arrays.asList(
+                                                        new BasicDBObject("$toLong", "$timestamp"), 1000
+                                                ))
+                                        ))
+                        ))
+                );
+                Bson groupStage = Aggregates.group("$day", Accumulators.sum("count", 1));
+                Bson sortStage = Aggregates.sort(new BasicDBObject("_id", 1));
+                pipeline.add(addFieldsStage);
+                pipeline.add(groupStage);
+                pipeline.add(sortStage);
+            } else if (daysBetween <= 210) {
+                Bson addFieldsStage = Aggregates.addFields(
+                        new Field<>("week", new BasicDBObject("$week", new BasicDBObject("$toDate",
+                                new BasicDBObject("$multiply", Arrays.asList(
+                                        new BasicDBObject("$toLong", "$timestamp"), 1000
+                                ))
+                            ))
+                        ));
+                Bson groupStage = Aggregates.group("$week", Accumulators.sum("count", 1));
+                Bson sortStage = Aggregates.sort(new BasicDBObject("_id", 1));
+                pipeline.add(addFieldsStage);
+                pipeline.add(groupStage);
+                pipeline.add(sortStage);
+            } else {
+                Bson addFieldsStage = Aggregates.addFields(
+                        new Field<>("month", new BasicDBObject("$month", new BasicDBObject("$toDate",
+                                new BasicDBObject("$multiply", Arrays.asList(
+                                        new BasicDBObject("$toLong", "$timestamp"), 1000
+                                ))
+                            ))
+                        ));
+                Bson groupStage = Aggregates.group("$month", Accumulators.sum("count", 1));
+                Bson sortStage = Aggregates.sort(new BasicDBObject("_id", 1));
+                pipeline.add(addFieldsStage);
+                pipeline.add(groupStage);
+                pipeline.add(sortStage);
+            }
+
             MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
             while(endpointsCursor.hasNext()) {
-                count += 1;
-                endpointsCursor.next();
+                BasicDBObject doc = endpointsCursor.next();
+                if(doc.isEmpty()) continue;
+                timeUnitCountMap.add(doc.getInt("count"));
             }
+            endpointsCursor.close();
         }
 
-        return count;
+        return timeUnitCountMap;
     }
 
     public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections){
