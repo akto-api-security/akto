@@ -101,6 +101,9 @@ public class ApiCollectionsAction extends UserAction {
                 if (apiCollectionId == 0 && count != null) {
                     fallbackCount = count;
                 }
+                if (count != null && count > 0) {
+                    fallbackCount = count;
+                }
                 apiCollection.setUrlsCount(fallbackCount);
             }
 

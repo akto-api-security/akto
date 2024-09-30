@@ -207,7 +207,8 @@ public class CodeAnalysisAction extends ActionSupport {
                     Updates.combine(
                             Updates.setOnInsert(CodeAnalysisCollection.ID, codeAnalysisCollectionId),
                             Updates.setOnInsert(CodeAnalysisCollection.NAME, apiCollectionName),
-                            Updates.set(CodeAnalysisCollection.PROJECT_DIR, projectDir)
+                            Updates.set(CodeAnalysisCollection.PROJECT_DIR, projectDir),
+                            Updates.setOnInsert(CodeAnalysisCollection.API_COLLECTION_ID, apiCollection.getId())
                     )
             );
 
