@@ -237,7 +237,9 @@ public class CodeAnalysisAction extends ActionSupport {
                                 Filters.eq(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
                                 Updates.combine(
                                         Updates.setOnInsert(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
-                                        Updates.set(CodeAnalysisApiInfo.LOCATION, codeAnalysisApi.getLocation())
+                                        Updates.set(CodeAnalysisApiInfo.LOCATION, codeAnalysisApi.getLocation()),
+                                        Updates.setOnInsert(CodeAnalysisApiInfo.DISCOVERED_TS, now),
+                                        Updates.set(CodeAnalysisApiInfo.LAST_SEEN_TS, now)
                                 ),
                                 new UpdateOptions().upsert(true)
                         )

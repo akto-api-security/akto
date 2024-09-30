@@ -319,7 +319,7 @@ public class InventoryAction extends UserAction {
         codeAnalysisCollectionInfo.put("codeAnalysisCollection", codeAnalysisCollection);
 
         // Fetch code analysis endpoints
-        Map<String, CodeAnalysisApi> codeAnalysisApisMap = new HashMap<>();
+        Map<String, CodeAnalysisApiInfo> codeAnalysisApisMap = new HashMap<>();
         if (codeAnalysisCollection != null) {
             List<CodeAnalysisApiInfo> codeAnalysisApiInfoList = CodeAnalysisApiInfoDao.instance.findAll(
                     Filters.eq("_id.codeAnalysisCollectionId", codeAnalysisCollection.getId()
@@ -328,12 +328,7 @@ public class InventoryAction extends UserAction {
             
             for(CodeAnalysisApiInfo codeAnalysisApiInfo: codeAnalysisApiInfoList) {
                 CodeAnalysisApiInfoKey codeAnalysisApiInfoKey = codeAnalysisApiInfo.getId();
-                CodeAnalysisApi codeAnalysisApi = new CodeAnalysisApi(
-                    codeAnalysisApiInfoKey.getMethod(),
-                    codeAnalysisApiInfoKey.getEndpoint(),
-                    codeAnalysisApiInfo.getLocation(), "", ""
-                );
-                codeAnalysisApisMap.put(codeAnalysisApi.generateCodeAnalysisApisMapKey(), codeAnalysisApi);
+                codeAnalysisApisMap.put(codeAnalysisApiInfoKey.getMethod() + " " + codeAnalysisApiInfoKey.getEndpoint(), codeAnalysisApiInfo);
             }
         }
         codeAnalysisCollectionInfo.put("codeAnalysisApisMap", codeAnalysisApisMap);
