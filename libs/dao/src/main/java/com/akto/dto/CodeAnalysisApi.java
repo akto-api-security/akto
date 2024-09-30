@@ -5,14 +5,18 @@ public class CodeAnalysisApi {
     private String method;
     private String endpoint;
     private CodeAnalysisApiLocation location;
+    private String requestBody;
+    private String responseBody;
 
     public CodeAnalysisApi() {
     }
 
-    public CodeAnalysisApi(String method, String endpoint, CodeAnalysisApiLocation location) {
+    public CodeAnalysisApi(String method, String endpoint, CodeAnalysisApiLocation location, String requestBody, String responseBody) {
         this.method = method;
         this.endpoint = endpoint;
         this.location = location;
+        this.requestBody = requestBody;
+        this.responseBody = responseBody;
     }
 
     @Override
@@ -50,5 +54,21 @@ public class CodeAnalysisApi {
 
     public void setLocation(CodeAnalysisApiLocation location) {
         this.location = location;
+    }
+
+    public String getRequestBody() {
+        return requestBody;
+    }
+
+    public void setRequestBody(String requestBody) {
+        this.requestBody = requestBody;
+    }
+
+    public String getResponseBody() {
+        return responseBody;
+    }
+
+    public void setResponseBody(String responseBody) {
+        this.responseBody = responseBody;
     }
 }

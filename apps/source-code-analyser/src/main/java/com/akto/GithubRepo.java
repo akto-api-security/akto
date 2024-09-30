@@ -7,8 +7,12 @@ import org.apache.commons.lang3.StringUtils;
 public class GithubRepo extends SourceCodeAnalyserRepo{
 
     private static final String GITHUB_URL = "https://api.github.com/repos/__ORGANISATION__/__REPOSITORY__/zipball/master";
+    private static final String GITHUB_URL_MAIN = "https://api.github.com/repos/__ORGANISATION__/__REPOSITORY__/zipball/main";
     private static final String GITHUB_ACCESS_TOKEN = System.getenv("GITHUB_ACCESS_TOKEN");
-
+    private boolean checkForMain = false;
+    public void setCheckForMain(boolean checkForMain) {
+        this.checkForMain = checkForMain;
+    }
     public GithubRepo(CodeAnalysisRepo repo) {
         super(repo);
     }
@@ -20,9 +24,12 @@ public class GithubRepo extends SourceCodeAnalyserRepo{
 
     @Override
     public String getRepoUrl() {
-        String finalUrl = GITHUB_URL.replace("__ORGANISATION__", this.getRepoToBeAnalysed().getProjectName())
+        if (checkForMain) {
+            return GITHUB_URL_MAIN.replace("__ORGANISATION__", this.getRepoToBeAnalysed().getProjectName())
+                    .replace("__REPOSITORY__", this.getRepoToBeAnalysed().getRepoName());
+        }
+        return GITHUB_URL.replace("__ORGANISATION__", this.getRepoToBeAnalysed().getProjectName())
                 .replace("__REPOSITORY__", this.getRepoToBeAnalysed().getRepoName());
-        return finalUrl;
     }
 
     @Override
