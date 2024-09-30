@@ -2,10 +2,6 @@ package com.akto.dao;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 import com.akto.dao.context.Context;
@@ -704,13 +700,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
             pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
 
-            LocalDate startDate = Instant.ofEpochSecond(startTimestamp)
-                    .atZone(ZoneId.systemDefault())
-                    .toLocalDate();
-            LocalDate endDate = Instant.ofEpochSecond(endTimestamp)
-                    .atZone(ZoneId.systemDefault())
-                    .toLocalDate();
-            long daysBetween = ChronoUnit.DAYS.between(startDate, endDate);
+            long daysBetween = (endTimestamp - startTimestamp) / (24 * 3600);
 
             if (daysBetween <= 30) {
                 Bson addFieldsStage = Aggregates.addFields(
@@ -729,31 +719,9 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 pipeline.add(groupStage);
                 pipeline.add(sortStage);
             } else if (daysBetween <= 210) {
-                Bson addFieldsStage = Aggregates.addFields(
-                        new Field<>("week", new BasicDBObject("$week", new BasicDBObject("$toDate",
-                                new BasicDBObject("$multiply", Arrays.asList(
-                                        new BasicDBObject("$toLong", "$timestamp"), 1000
-                                ))
-                            ))
-                        ));
-                Bson groupStage = Aggregates.group("$week", Accumulators.sum("count", 1));
-                Bson sortStage = Aggregates.sort(new BasicDBObject("_id", 1));
-                pipeline.add(addFieldsStage);
-                pipeline.add(groupStage);
-                pipeline.add(sortStage);
+                addFieldsGroupAndSort(pipeline, "week");
             } else {
-                Bson addFieldsStage = Aggregates.addFields(
-                        new Field<>("month", new BasicDBObject("$month", new BasicDBObject("$toDate",
-                                new BasicDBObject("$multiply", Arrays.asList(
-                                        new BasicDBObject("$toLong", "$timestamp"), 1000
-                                ))
-                            ))
-                        ));
-                Bson groupStage = Aggregates.group("$month", Accumulators.sum("count", 1));
-                Bson sortStage = Aggregates.sort(new BasicDBObject("_id", 1));
-                pipeline.add(addFieldsStage);
-                pipeline.add(groupStage);
-                pipeline.add(sortStage);
+                addFieldsGroupAndSort(pipeline, "month");
             }
 
             MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -766,6 +734,24 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         }
 
         return timeUnitCountMap;
+    }
+
+    private void addFieldsGroupAndSort(List<Bson> pipeline, String period) {
+        Bson addFieldsStage = Aggregates.addFields(
+                new Field<>(period, new BasicDBObject("$" + period, new BasicDBObject("$toDate",
+                        new BasicDBObject("$multiply", Arrays.asList(
+                                new BasicDBObject("$toLong", "$timestamp"), 1000
+                        ))
+                )))
+        );
+
+        Bson groupStage = Aggregates.group("$" + period, Accumulators.sum("count", 1));
+
+        Bson sortStage = Aggregates.sort(new BasicDBObject("_id", 1));
+
+        pipeline.add(addFieldsStage);
+        pipeline.add(groupStage);
+        pipeline.add(sortStage);
     }
 
     public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections){

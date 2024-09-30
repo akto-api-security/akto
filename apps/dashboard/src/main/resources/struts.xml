@@ -6597,7 +6597,7 @@
             </result>
         </action>
 
-        <action name="api/fetchAllHistoricalData" class="com.akto.action.ApiCollectionsAction" method="fetchAllHistoricalData">
+        <action name="api/fetchAllHistoricalData" class="com.akto.action.DashboardAction" method="fetchAllHistoricalData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
