@@ -1,9 +1,5 @@
 package com.akto.action;
 
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -17,6 +13,7 @@ import com.akto.listener.RuntimeListener;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.*;
 import org.bouncycastle.util.test.Test;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.context.Context;
@@ -80,38 +77,25 @@ public class DashboardAction extends UserAction {
     private long oldOpenCount = 0;
     List<Integer> totalIssuesCountDayWise;
     public String findTotalIssues() {
-        Set<Integer> demoCollections = new HashSet<>();
-        demoCollections.addAll(deactivatedCollections);
-        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
-        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
-
-        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
-        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
-
+        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
 
         if (startTimeStamp == 0) startTimeStamp = Context.now() - 24 * 1 * 60 * 60;
         // totoal issues count = issues that were created before endtimestamp and are either still open or fixed but last updated is after endTimestamp
         totalIssuesCount = TestingRunIssuesDao.instance.count(
             Filters.and(
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
-                Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
-                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.OPEN))       
+                notIncludedCollections,
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.OPEN))
             );
 
-        LocalDate startDate = Instant.ofEpochSecond(startTimeStamp)
-                .atZone(ZoneId.systemDefault())
-                .toLocalDate();
-        LocalDate endDate = Instant.ofEpochSecond(endTimeStamp)
-                .atZone(ZoneId.systemDefault())
-                .toLocalDate();
-        long daysBetween = ChronoUnit.DAYS.between(startDate, endDate)+1;
+        long daysBetween = (endTimeStamp - startTimeStamp) / (24 * 3600);
 
         totalIssuesCountDayWise = new ArrayList<>();
         List<Bson> pipeline = new ArrayList<>();
         Bson matchStage = Aggregates.match(Filters.and(
                 Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
-                Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
+                notIncludedCollections,
                 Filters.or(
                         Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"),
                         Filters.and(
@@ -167,8 +151,8 @@ public class DashboardAction extends UserAction {
 
         oldOpenCount = TestingRunIssuesDao.instance.count(
                 Filters.and(
-                        Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
-                        Filters.lt(TestingRunIssues.CREATION_TIME, startTimeStamp),
+                        notIncludedCollections,
+                        Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp),
                         Filters.ne(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.IGNORED)
                 )
         );
@@ -176,6 +160,55 @@ public class DashboardAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    List<HistoricalData> historicalData;
+    public String fetchAllHistoricalData() {
+        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated("apiCollectionId");
+
+        long daysBetween = (endTimeStamp - startTimeStamp) / (24 * 3600);
+
+        List<Bson> pipeline = new ArrayList<>();
+
+        Bson filter = Filters.and(
+                Filters.gte("time", startTimeStamp),
+                Filters.lte("time", endTimeStamp),
+                notIncludedCollections
+        );
+        pipeline.add(Aggregates.match(filter));
+
+        historicalData = new ArrayList<>();
+
+        if(daysBetween > 30 && daysBetween <= 210) {
+            addGroupAndProjectStages(pipeline, "week");
+        } else if(daysBetween > 210) {
+            addGroupAndProjectStages(pipeline, "month");
+        }
+
+        MongoCursor<HistoricalData> cursor = HistoricalDataDao.instance.getMCollection().aggregate(pipeline, HistoricalData.class).cursor();
+        while(cursor.hasNext()) {
+            historicalData.add(cursor.next());
+        }
+        cursor.close();
+
+        return SUCCESS.toUpperCase();
+    }
+
+    private void addGroupAndProjectStages(List<Bson> pipeline, String dateUnit) {
+        Bson groupStage = Aggregates.group(
+                new Document(dateUnit, new Document("$" + dateUnit, new Document("$toDate", new Document("$multiply", Arrays.asList("$time", 1000))))),
+                Accumulators.avg("avgTotalApis", "$totalApis"),
+                Accumulators.avg("avgRiskScore", "$riskScore"),
+                Accumulators.avg("avgApisTested", "$apisTested")
+        );
+
+        Bson projectStage = Aggregates.project(new Document(dateUnit, "$" + dateUnit)
+                .append("totalApis", new Document("$round", "$avgTotalApis"))
+                .append("riskScore", new Document("$round", "$avgRiskScore"))
+                .append("apisTested", new Document("$round", "$avgApisTested"))
+        );
+
+        pipeline.add(groupStage);
+        pipeline.add(projectStage);
+    }
 
     private List<HistoricalData> finalHistoricalData = new ArrayList<>();
     private List<HistoricalData> initialHistoricalData = new ArrayList<>();
@@ -478,5 +511,9 @@ public class DashboardAction extends UserAction {
 
     public List<Integer> getTotalIssuesCountDayWise() {
         return totalIssuesCountDayWise;
+    }
+
+    public List<HistoricalData> getHistoricalData() {
+        return historicalData;
     }
 }

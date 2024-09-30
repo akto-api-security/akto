@@ -32,11 +32,11 @@ const api = {
         })
     },
 
-    fetchAllHistoricalData: async(startTimestamp, endTimestamp) => {
+    fetchAllHistoricalData: async(startTimeStamp, endTimeStamp) => {
         return await request({
             url: '/api/fetchAllHistoricalData',
             method: 'post',
-            data: {startTimestamp, endTimestamp}
+            data: {startTimeStamp, endTimeStamp}
         })
     },
 
