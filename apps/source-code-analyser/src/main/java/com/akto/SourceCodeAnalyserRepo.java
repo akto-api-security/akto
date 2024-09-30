@@ -136,6 +136,11 @@ abstract public class SourceCodeAnalyserRepo {
             return;
         }
         String repositoryPath = downloadRepository();
+        if (repositoryPath == null && this instanceof GithubRepo) {
+            //check for main branch instead of master
+            ((GithubRepo) this).setCheckForMain(true);
+            repositoryPath = downloadRepository();
+        }
         BasicDBObject requestBody = getCodeAnalysisBody(repositoryPath);
         if (requestBody == null) {
             loggerMaker.infoAndAddToDb("No requestbody found, skipping");
