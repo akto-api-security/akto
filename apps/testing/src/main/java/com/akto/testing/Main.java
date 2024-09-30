@@ -128,9 +128,11 @@ public class Main {
         return ret;
     }
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
+    private static final int DEFAULT_DELTA_IGNORE_TIME = 2*60*60;
 
-    private static TestingRun findPendingTestingRun() {
-        int delta = Context.now() - 20*60;
+    private static TestingRun findPendingTestingRun(int userDeltaTime) {
+        int deltaPeriod = userDeltaTime == 0 ? DEFAULT_DELTA_IGNORE_TIME : userDeltaTime;
+        int delta = Context.now() - deltaPeriod;
 
         Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
                 Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
@@ -150,11 +152,12 @@ public class Main {
                 Filters.or(filter1,filter2), update);
     }
 
-    private static TestingRunResultSummary findPendingTestingRunResultSummary() {
+    private static TestingRunResultSummary findPendingTestingRunResultSummary(int userDeltaTime) {
 
         // if you change this delta, update this delta in method getCurrentRunningTestsSummaries
         int now = Context.now();
-        int delta = now - 20*60;
+        int deltaPeriod = userDeltaTime == 0 ? DEFAULT_DELTA_IGNORE_TIME : userDeltaTime;
+        int delta = now - deltaPeriod;
 
         Bson filter1 = Filters.and(
             Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
@@ -254,14 +257,16 @@ public class Main {
         while (true) {
             AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
                 int accountId = account.getId();
-
+                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                    Filters.eq(Constants.ID, accountId), Projections.include(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES)
+                );
                 int start = Context.now();
-                TestingRunResultSummary trrs = findPendingTestingRunResultSummary();
+                TestingRunResultSummary trrs = findPendingTestingRunResultSummary(accountSettings.getTimeForScheduledSummaries());
                 boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
                 TestingRun testingRun;
                 ObjectId summaryId = null;
                 if (trrs == null) {
-                    testingRun = findPendingTestingRun();
+                    testingRun = findPendingTestingRun(accountSettings.getTimeForScheduledSummaries());
                 } else {
                     summaryId = trrs.getId();
                     loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);

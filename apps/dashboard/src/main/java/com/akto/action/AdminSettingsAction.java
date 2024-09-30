@@ -416,6 +416,15 @@ public class AdminSettingsAction extends UserAction {
         }
     }
 
+    private int deltaTimeForScheduledSummaries;
+
+    public String updateDeltaTimeForIgnoringSummaries () {
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES, this.deltaTimeForScheduledSummaries));
+        return SUCCESS.toUpperCase();
+    }
+
     public void setAccountPermission(String accountPermission) {
         this.accountPermission = accountPermission;
     }
@@ -535,5 +544,9 @@ public class AdminSettingsAction extends UserAction {
 
     public void setCurrentAccount(Account currentAccount) {
         this.currentAccount = currentAccount;
+    }
+
+    public void setDeltaTimeForScheduledSummaries(int deltaTimeForScheduledSummaries) {
+        this.deltaTimeForScheduledSummaries = deltaTimeForScheduledSummaries;
     }
 }
