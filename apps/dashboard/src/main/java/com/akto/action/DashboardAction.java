@@ -1,5 +1,9 @@
 package com.akto.action;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -74,6 +78,7 @@ public class DashboardAction extends UserAction {
 
     private long totalIssuesCount = 0;
     private long oldOpenCount = 0;
+    List<Integer> totalIssuesCountDayWise;
     public String findTotalIssues() {
         Set<Integer> demoCollections = new HashSet<>();
         demoCollections.addAll(deactivatedCollections);
@@ -93,11 +98,77 @@ public class DashboardAction extends UserAction {
                 Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.OPEN))       
             );
 
-        // issues that have been created till start timestamp
+        LocalDate startDate = Instant.ofEpochSecond(startTimeStamp)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate();
+        LocalDate endDate = Instant.ofEpochSecond(endTimeStamp)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate();
+        long daysBetween = ChronoUnit.DAYS.between(startDate, endDate)+1;
+
+        totalIssuesCountDayWise = new ArrayList<>();
+        List<Bson> pipeline = new ArrayList<>();
+        Bson matchStage = Aggregates.match(Filters.and(
+                Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
+                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
+                Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
+                Filters.or(
+                        Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"),
+                        Filters.and(
+                                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "FIXED"),
+                                Filters.lte(TestingRunIssues.LAST_UPDATED, endTimeStamp)
+                        )
+                )
+        ));
+        pipeline.add(matchStage);
+
+        if (daysBetween <= 30) {
+            Bson addFieldsStage = Aggregates.addFields(
+                    new Field<>("day", new BasicDBObject("$dateToString",
+                            new BasicDBObject("format", "%Y-%m-%d")
+                                    .append("date", new BasicDBObject("$toDate",
+                                            new BasicDBObject("$multiply", Arrays.asList("$creationTime", 1000))))
+                    ))
+            );
+            Bson groupStage = Aggregates.group("$day", Accumulators.sum("totalIssues", 1));
+            Bson sortStage = Aggregates.sort(new BasicDBObject("_id", 1));
+            pipeline.add(addFieldsStage);
+            pipeline.add(groupStage);
+            pipeline.add(sortStage);
+        } else if (daysBetween <= 210) {
+            Bson addFieldsStage = Aggregates.addFields(
+                    new Field<>("week", new BasicDBObject("$week", new BasicDBObject("$toDate",
+                            new BasicDBObject("$multiply", Arrays.asList("$creationTime", 1000))))
+            ));
+            Bson groupStage = Aggregates.group("$week", Accumulators.sum("totalIssues", 1));
+            Bson sortStage = Aggregates.sort(new BasicDBObject("_id", 1));
+            pipeline.add(addFieldsStage);
+            pipeline.add(groupStage);
+            pipeline.add(sortStage);
+        } else {
+            Bson addFieldsStage = Aggregates.addFields(
+                    new Field<>("month", new BasicDBObject("$month", new BasicDBObject("$toDate",
+                            new BasicDBObject("$multiply", Arrays.asList("$creationTime", 1000))))
+            ));
+            Bson groupStage = Aggregates.group("$month", Accumulators.sum("totalIssues", 1));
+            Bson sortStage = Aggregates.sort(new BasicDBObject("_id", 1));
+            pipeline.add(addFieldsStage);
+            pipeline.add(groupStage);
+            pipeline.add(sortStage);
+        }
+
+        MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while (cursor.hasNext()) {
+            BasicDBObject document = cursor.next();
+            if(document.isEmpty()) continue;
+            totalIssuesCountDayWise.add(document.getInt("totalIssues"));
+        }
+        cursor.close();
+
         oldOpenCount = TestingRunIssuesDao.instance.count(
                 Filters.and(
                         Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
-                        Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp),
+                        Filters.lt(TestingRunIssues.CREATION_TIME, startTimeStamp),
                         Filters.ne(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.IGNORED)
                 )
         );
@@ -403,5 +474,9 @@ public class DashboardAction extends UserAction {
 
     public void setOrganization(String organization) {
         this.organization = organization;
+    }
+
+    public List<Integer> getTotalIssuesCountDayWise() {
+        return totalIssuesCountDayWise;
     }
 }

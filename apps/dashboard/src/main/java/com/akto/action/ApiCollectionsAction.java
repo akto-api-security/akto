@@ -1,11 +1,16 @@
 package com.akto.action;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import com.akto.action.observe.InventoryAction;
 import com.akto.dto.*;
 import com.akto.util.Pair;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import com.akto.DaoInit;
@@ -165,6 +170,76 @@ public class ApiCollectionsAction extends UserAction {
         apiStatsStart = result.getFirst();
         apiStatsEnd = result.getSecond();
         return SUCCESS.toUpperCase();
+    }
+
+    List<HistoricalData> historicalData;
+    public String fetchAllHistoricalData() {
+        Set<Integer> demoCollections = new HashSet<>(deactivatedCollections);
+        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
+        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+
+        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
+
+        LocalDate startDate = Instant.ofEpochSecond(startTimestamp)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate();
+        LocalDate endDate = Instant.ofEpochSecond(endTimestamp)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate();
+        long daysBetween = ChronoUnit.DAYS.between(startDate, endDate);
+
+        List<Bson> pipeline = new ArrayList<>();
+
+        Bson filter = Filters.and(
+                Filters.gte("time", startTimestamp),
+                Filters.lte("time", endTimestamp),
+                Filters.nin("apiCollectionId", demoCollections)
+        );
+        pipeline.add(Aggregates.match(filter));
+
+        historicalData = new ArrayList<>();
+
+        if (daysBetween <= 30) {
+        } else if (daysBetween <= 210) {
+            Bson groupStage = Aggregates.group(
+                    new Document("week", new Document("$week", new Document("$toDate", new Document("$multiply", Arrays.asList("$time", 1000))))),
+                    Accumulators.avg("avgTotalApis", "$totalApis"),
+                    Accumulators.avg("avgRiskScore", "$riskScore"),
+                    Accumulators.avg("avgApisTested", "$apisTested")
+            );
+
+            Bson projectStage = Aggregates.project(new Document("week", "$week")
+                    .append("totalApis", new Document("$round", "$avgTotalApis"))
+                    .append("riskScore", new Document("$round", "$avgRiskScore"))
+                    .append("apisTested", new Document("$round", "$avgApisTested")));
+
+            pipeline.add(groupStage);
+            pipeline.add(projectStage);
+        } else {
+            Bson groupStage = Aggregates.group(
+                    new Document("month", new Document("$month", new Document("$toDate", new Document("$multiply", Arrays.asList("$time", 1000))))),
+                    Accumulators.avg("avgTotalApis", "$totalApis"),
+                    Accumulators.avg("avgRiskScore", "$riskScore"),
+                    Accumulators.avg("avgApisTested", "$apisTested")
+            );
+
+            Bson projectStage = Aggregates.project(new Document("month", "$month")
+                    .append("totalApis", new Document("$round", "$avgTotalApis"))
+                    .append("riskScore", new Document("$round", "$avgRiskScore"))
+                    .append("apisTested", new Document("$round", "$avgApisTested")));
+
+            pipeline.add(groupStage);
+            pipeline.add(projectStage);
+        }
+
+        MongoCursor<HistoricalData> cursor = HistoricalDataDao.instance.getMCollection().aggregate(pipeline, HistoricalData.class).cursor();
+        while(cursor.hasNext()) {
+            historicalData.add(cursor.next());
+        }
+        cursor.close();
+
+        return "SUCCESS";
     }
 
     public String fetchAllCollectionsBasic() {
@@ -828,5 +903,9 @@ public class ApiCollectionsAction extends UserAction {
 
     public Map<Integer, Integer> getDeactivatedHostnameCountMap() {
         return deactivatedHostnameCountMap;
+    }
+
+    public List<HistoricalData> getHistoricalData() {
+        return historicalData;
     }
 }
