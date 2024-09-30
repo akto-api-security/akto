@@ -49,7 +49,7 @@ public class HttpRequestResponseUtils {
         if (val == null) return SingleTypeInfo.GENERIC;
         if (val.equalsIgnoreCase("short") || val.equalsIgnoreCase("int")) return  SingleTypeInfo.INTEGER_32;
         if (val.equalsIgnoreCase("long")) return  SingleTypeInfo.INTEGER_64;
-        if (val.equalsIgnoreCase("float")) return  SingleTypeInfo.FLOAT;
+        if (val.equalsIgnoreCase("float") || val.equalsIgnoreCase("double")) return  SingleTypeInfo.FLOAT;
         if (val.equalsIgnoreCase("boolean")) return  SingleTypeInfo.TRUE;
 
         return SingleTypeInfo.GENERIC;
