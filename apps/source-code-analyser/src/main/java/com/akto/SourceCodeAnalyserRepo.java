@@ -61,7 +61,7 @@ abstract public class SourceCodeAnalyserRepo {
         if (finalUrl == null || token == null) {
             return null;
         }
-        String outputFilePath = repoToBeAnalysed.getRepoName()+ ".zip"; // The local file where the repository will be saved
+        String outputFilePath = System.getenv("DOCKER_VOLUME") + repoToBeAnalysed.getRepoName()+ ".zip"; // The local file where the repository will be saved
         File file = new File(outputFilePath);
 
         Request.Builder builder = new Request.Builder();
