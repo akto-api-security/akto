@@ -24,6 +24,7 @@ function Webhook() {
         newEndpointCollections: [],
         newSensitiveEndpointCollections: [],
         frequencyInSeconds: 900,
+        batchSize: 20,
         result: []
     }
     const navigate = useNavigate()
@@ -76,7 +77,8 @@ function Webhook() {
                 selectedWebhookOptions: customWebhookFindId.selectedWebhookOptions,
                 newEndpointCollections: customWebhookFindId.newEndpointCollections,
                 newSensitiveEndpointCollections: customWebhookFindId.newSensitiveEndpointCollections,
-                frequencyInSeconds: customWebhookFindId.frequencyInSeconds
+                frequencyInSeconds: customWebhookFindId.frequencyInSeconds,
+                batchSize: customWebhookFindId.batchSize
             })
 
             let webhookBody = customWebhookFindId.body;
@@ -105,7 +107,8 @@ function Webhook() {
         { "title": "New sensitive endpoint", "value": "NEW_SENSITIVE_ENDPOINT", "collectionSelection": true, "collectionStateField": "newSensitiveEndpointCollections" },
         { "title": "New sensitive endpoint count", "value": "NEW_SENSITIVE_ENDPOINT_COUNT", "collectionSelection": false },
         { "title": "New sensitive parameter count", "value": "NEW_SENSITIVE_PARAMETER_COUNT", "collectionSelection": false },
-        { "title": "New parameter count", "value": "NEW_PARAMETER_COUNT", "collectionSelection": false }
+        { "title": "New parameter count", "value": "NEW_PARAMETER_COUNT", "collectionSelection": false },
+        { "title": "API threat payloads", "value": "API_THREAT_PAYLOADS", "collectionSelection": false }
     ]
 
     const intervals = [
@@ -115,6 +118,15 @@ function Webhook() {
         { "name": "6 hours", "value": 21600 },
         { "name": "12 hours", "value": 43200 },
         { "name": "24 hours", "value": 86400 }
+    ]
+
+    const batchSizes = [
+        { "name": "1 payload", "value": 1 },
+        { "name": "10 payloads", "value": 10 },
+        { "name": "20 payloads", "value": 20 },
+        { "name": "50 payloads", "value": 50 },
+        { "name": "100 payloads", "value": 100 },
+        { "name": "200 payloads", "value": 200 },
     ]
 
     const tabs = [
@@ -172,6 +184,7 @@ function Webhook() {
         const newEndpointCollections = showOptions ? webhook.newEndpointCollections : null
         const newSensitiveEndpointCollections = showOptions ? webhook.newSensitiveEndpointCollections : null
         const frequencyInSeconds = webhook.frequencyInSeconds
+        const batchSize = webhook.batchSize
 
         if (webhookName === "") {
             setToastConfig({ isActive: true, isError: true, message: "Webhook name required" })
@@ -183,10 +196,10 @@ function Webhook() {
         }
 
         if (webhookId) {
-            await settingRequests.updateCustomWebhook(parseInt(webhookId), webhookName, url, queryParams, method, headers, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections)
+            await settingRequests.updateCustomWebhook(parseInt(webhookId), webhookName, url, queryParams, method, headers, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize)
             setToastConfig({ isActive: true, isError: false, message: "Webhook updated successfully!" })
         } else {
-            await settingRequests.addCustomWebhook(webhookName, url, queryParams, method, headers, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections)
+            await settingRequests.addCustomWebhook(webhookName, url, queryParams, method, headers, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize)
             setToastConfig({ isActive: true, isError: false, message: "Webhook created successfully!" })
             navigate(-1)
         }
@@ -301,6 +314,26 @@ function Webhook() {
                         </span>
                     ))}
                 </div>
+                <br />
+                {webhook.selectedWebhookOptions && webhook.selectedWebhookOptions.includes("API_THREAT_PAYLOADS") ? (
+                    <>
+                        <Divider />
+                        <div style={{ paddingTop: "10px" }}>
+                            <Text variant="headingMd">Batch size for threat payloads</Text>
+                            <br />
+                            {batchSizes.map(batchSize => (
+                                <span key={batchSize.name} style={{ padding: "10px" }}>
+                                    <Button
+                                        pressed={webhook.batchSize === batchSize.value}
+                                        onClick={() => updateWebhookState("batchSize", batchSize.value)}
+                                    >
+                                        {batchSize.name
+                                        }</Button>
+                                </span>
+                            ))}
+                        </div>
+                    </>) : null
+                }
             </LegacyCard.Section>
         </LegacyCard>
     )

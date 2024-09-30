@@ -38,6 +38,7 @@ public class WebhookAction extends UserAction {
     private List<CustomWebhook> customWebhooks;
     private List<String> newEndpointCollections;
     private List<String> newSensitiveEndpointCollections;
+    private int batchSize;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -85,6 +86,9 @@ public class WebhookAction extends UserAction {
             String userEmail = getSUser().getLogin();
             if (userEmail == null) return ERROR.toUpperCase();
             CustomWebhook customWebhook = new CustomWebhook(now,webhookName,url,headerString,queryParams,body,method,frequencyInSeconds,userEmail,now,now,0,activeStatus, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections);
+            if (batchSize > 0) {
+                customWebhook.setBatchSize(batchSize);
+            }
             CustomWebhooksDao.instance.insertOne(customWebhook);
             fetchCustomWebhooks();
         }
@@ -143,6 +147,10 @@ public class WebhookAction extends UserAction {
                 Updates.set(CustomWebhook.NEW_ENDPOINT_COLLECTIONS, newEndpointCollections),
                 Updates.set(CustomWebhook.NEW_SENSITIVE_ENDPOINT_COLLECTIONS, newSensitiveEndpointCollections)
             );
+
+            if (batchSize > 0) {
+                updates = Updates.combine(updates, Updates.set(CustomWebhook.BATCH_SIZE, batchSize));
+            }
 
             CustomWebhooksDao.instance.updateOne(Filters.eq("_id",id), updates);
             fetchCustomWebhooks();
@@ -335,5 +343,13 @@ public class WebhookAction extends UserAction {
 
     public void setCustomWebhookId(int customWebhookId) {
         this.customWebhookId = customWebhookId;
+    }
+
+    public int getBatchSize() {
+        return batchSize;
+    }
+
+    public void setBatchSize(int batchSize) {
+        this.batchSize = batchSize;
     }
 }
