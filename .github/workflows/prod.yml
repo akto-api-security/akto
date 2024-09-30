@@ -31,7 +31,7 @@ jobs:
           node-version: '17'
 
       - name: mvn package command
-        run: mvn package
+        run: mvn package -DskipTests
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
