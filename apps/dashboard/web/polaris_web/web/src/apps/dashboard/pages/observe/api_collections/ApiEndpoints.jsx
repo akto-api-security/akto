@@ -234,7 +234,8 @@ function ApiEndpoints() {
             })
 
             shadowApis = Object.entries(shadowApis).map(([ codeAnalysisApiKey, codeAnalysisApi ]) => {
-                const { method, endpoint, location } = codeAnalysisApi
+                const {id, lastSeenTs, discoveredTs, location,  } = codeAnalysisApi
+                const { method, endpoint} = id
 
                 return {
                     id: codeAnalysisApiKey,
@@ -246,7 +247,9 @@ function ApiEndpoints() {
                     sourceLocation: location.filePath, 
                     sourceLocationComp: <SourceLocation location={location} />,
                     parameterisedEndpoint: method + " " + endpoint,
-                    apiCollectionName: collectionsMap[apiCollectionId]
+                    apiCollectionName: collectionsMap[apiCollectionId],
+                    last_seen: func.prettifyEpoch(lastSeenTs),
+                    added: func.prettifyEpoch(discoveredTs)
                 }
             })
         }
