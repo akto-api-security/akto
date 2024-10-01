@@ -165,7 +165,7 @@ function Dashboard() {
 
     },[])
 
-    const shouldShowWelcomeBackModal = !func.checkLocal() && (window?.USER_FULL_NAME?.length === 0 || (window.USER_ROLE === 'ADMIN' && window.ORGANIZATION_NAME?.length === 0))
+    const shouldShowWelcomeBackModal = !func.checkLocal() && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
 
     return (
         <div className="dashboard">

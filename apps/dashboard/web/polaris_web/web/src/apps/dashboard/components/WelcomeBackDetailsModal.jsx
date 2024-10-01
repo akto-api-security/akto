@@ -18,9 +18,7 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
             return
         }
 
-        const email = window.USER_NAME
-
-        homeRequests.updateUsernameAndOrganization(email ,username, organization).then((resp) => {
+        homeRequests.updateUsernameAndOrganization(username, organization).then((resp) => {
             try {
                 setModalToggle(false)
             } catch (error) {
