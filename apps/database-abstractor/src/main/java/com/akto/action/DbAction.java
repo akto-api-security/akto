@@ -1700,12 +1700,16 @@ public class DbAction extends ActionSupport {
 
             Map<String, WorkflowNodeDetails> data = new HashMap<>();
             try {
-                Map<String, BasicDBObject> x = (Map) (((Map) this.testingRunResult.get("workflowTest"))
-                        .get("mapNodeIdToWorkflowNodeDetails"));
-                for (String tmp : x.keySet()) {
-                    ((Map) x.get(tmp)).remove("authMechanism");
-                    ((Map) x.get(tmp)).remove("customAuthTypes");
-                    data.put(tmp, objectMapper.convertValue(x.get(tmp), YamlNodeDetails.class));
+                if (this.testingRunResult != null && this.testingRunResult.get("workflowTest") != null) {
+                    Map<String, BasicDBObject> x = (Map) (((Map) this.testingRunResult.get("workflowTest"))
+                            .get("mapNodeIdToWorkflowNodeDetails"));
+                    if (x != null) {
+                        for (String tmp : x.keySet()) {
+                            ((Map) x.get(tmp)).remove("authMechanism");
+                            ((Map) x.get(tmp)).remove("customAuthTypes");
+                            data.put(tmp, objectMapper.convertValue(x.get(tmp), YamlNodeDetails.class));
+                        }
+                    }
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails" + e.toString());
@@ -2030,6 +2034,10 @@ public class DbAction extends ActionSupport {
 
     public String updateIssueCountAndStateInSummary(){
         try {
+            if (summaryId != null) {
+                ObjectId summaryObjectId = new ObjectId(summaryId);
+                totalCountIssues = TestExecutor.calcTotalCountIssues(summaryObjectId);
+            }
             trrs = DbLayer.updateIssueCountAndStateInSummary(summaryId, totalCountIssues, state);
             trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
         } catch (Exception e) {
