@@ -273,7 +273,7 @@ public class DashboardAction extends UserAction {
 
         User userFromSession = getSUser();
         if (userFromSession == null) {
-            addActionError("Username can't be longer than 24 characters");
+            addActionError("Invalid user");
             return Action.ERROR.toUpperCase();
         }
 
