@@ -196,8 +196,14 @@ const handleRedirect = () => {
     navigate("/dashboard/observe/data-types")
 }
 
+const handleReset = async () => {
+    await api.resetDataTypeRetro(subType)
+    func.setToast(true, false, "Resetting data types")
+}
+
 const primaryActions = (
     <HorizontalStack gap={"2"}>
+        <Button id={"reset-data-type"} onClick={handleReset}>Reset</Button>
         <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
         <Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>
     </HorizontalStack>

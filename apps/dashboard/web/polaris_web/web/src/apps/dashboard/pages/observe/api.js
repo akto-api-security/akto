@@ -733,5 +733,15 @@ export default {
                 apiCollectionId: apiInfoKey.apiCollectionId
             }
         })
+    },
+    resetDataTypeRetro(name){
+        return request({
+            url: '/api/resetDataTypeRetro',
+            method: 'post',
+            data: {
+                name: name,
+            }
+        })
     }
+
 }
