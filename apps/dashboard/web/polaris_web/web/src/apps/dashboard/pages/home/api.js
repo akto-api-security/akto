@@ -30,11 +30,11 @@ const homeRequests = {
             data: {}
         })
     },
-    updateUsernameAndOrganization: async(email, username, organization) => {
+    updateUsernameAndOrganization: async(username, organization) => {
         return await request({
             url: 'api/updateUsernameAndOrganization',
             method: 'post',
-            data: {email, username, organization}
+            data: { username, organization}
         })
     }
 }
