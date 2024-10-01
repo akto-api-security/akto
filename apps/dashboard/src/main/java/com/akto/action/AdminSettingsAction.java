@@ -419,6 +419,14 @@ public class AdminSettingsAction extends UserAction {
     private int deltaTimeForScheduledSummaries;
 
     public String updateDeltaTimeForIgnoringSummaries () {
+        if(this.deltaTimeForScheduledSummaries <= 1200){
+            addActionError("Value cannot be less than 20 minutes");
+            return ERROR.toUpperCase();
+        }
+        if(this.deltaTimeForScheduledSummaries >= 14400){
+            addActionError("Value cannot be greater than 4 hours");
+            return ERROR.toUpperCase();
+        }
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES, this.deltaTimeForScheduledSummaries));

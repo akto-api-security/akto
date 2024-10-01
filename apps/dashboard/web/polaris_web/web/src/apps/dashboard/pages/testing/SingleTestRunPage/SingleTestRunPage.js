@@ -218,14 +218,27 @@ function SingleTestRunPage() {
   async function fetchData(setData) {
     let localSelectedTestRun = {}
     await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest, testingRunType }) => {
-      if(testingRun==undefined){
+      if(testingRun===undefined){
         return {};
       }
 
-      if(testingRun.testIdConfig == 1){
+      if(testingRun.testIdConfig === 1){
         setWorkflowTest(workflowTest);
       }
       let cicd = testingRunType === "CI_CD";
+      const timeNow = func.timeNow()
+      const defaultIgnoreTime = LocalStore.getState().defaultIgnoreSummaryTime
+      testingRunResultSummaries.sort((a,b) => {
+        const isAWithinTimeAndRunning = (timeNow - defaultIgnoreTime <= a.startTimestamp) && a.state === 'RUNNING';
+        const isBWithinTimeAndRunning = (timeNow - defaultIgnoreTime <= b.startTimestamp) && b.state === 'RUNNING';
+
+        if (isAWithinTimeAndRunning && isBWithinTimeAndRunning) {
+            return b.startTimestamp - a.startTimestamp;
+        }
+        if (isAWithinTimeAndRunning) return -1;
+        if (isBWithinTimeAndRunning) return 1;
+        return b.startTimestamp - a.startTimestamp;
+      })
       localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0], cicd, false);
 
       if(setData){
@@ -306,7 +319,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
       case "FAIL":
         return "Test execution has failed during run";
       default:
-        return "";
+        return "No summary for test exists";
     }
   }
 

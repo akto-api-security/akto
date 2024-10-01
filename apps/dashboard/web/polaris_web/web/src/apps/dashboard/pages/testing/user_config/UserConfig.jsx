@@ -13,6 +13,7 @@ import Dropdown from "../../../components/layouts/Dropdown";
 import settingRequests from "../../settings/api";
 import TestCollectionConfiguration from '../configurations/TestCollectionConfiguration'
 import InfoCard from "../../dashboard/new_components/InfoCard";
+import LocalStore from "../../../../main/LocalStorageStore";
 
 function UserConfig() {
 
@@ -44,6 +45,7 @@ function UserConfig() {
             setInitialLimit(resp.accountSettings.globalRateLimit);
             const val = resp?.accountSettings?.timeForScheduledSummaries === undefined || resp?.accountSettings?.timeForScheduledSummaries === 0 ? (120*60) : resp?.accountSettings?.timeForScheduledSummaries
             setInitialDeltaTime(val/60)
+            LocalStore.getState().setDefaultIgnoreSummaryTime(val)
         })
 
         await api.fetchScript().then((resp)=> {
@@ -97,6 +99,7 @@ function UserConfig() {
 
     const handleUpdateDeltaTime = async(limit) => {
         setInitialDeltaTime(limit);
+        LocalStore.getState().setDefaultIgnoreSummaryTime(limit * 60)
         await api.updateDeltaTimeForSummaries(limit * 60);
         setToastConfig({ isActive: true, isError: false, message: `Ignore time updated successfully` })
     }
