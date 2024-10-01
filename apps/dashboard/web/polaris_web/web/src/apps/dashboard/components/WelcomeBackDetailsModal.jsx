@@ -6,8 +6,8 @@ import homeRequests from "../pages/home/api"
 const WelcomeBackDetailsModal = ({ isAdmin }) => {
     const [modalToggle, setModalToggle] = useState(true)
 
-    const [username, setUsername] = useState(window.USER_FULL_NAME)
-    const [organization, setOrganization] = useState(window.ORGANIZATION_NAME)
+    const [username, setUsername] = useState(window.USER_FULL_NAME || "")
+    const [organization, setOrganization] = useState(window.ORGANIZATION_NAME || "")
 
     const handleWelcomeBackDetails = async () => {
 
@@ -18,9 +18,7 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
             return
         }
 
-        const email = window.USER_NAME
-
-        homeRequests.updateUsernameAndOrganization(email ,username, organization).then((resp) => {
+        homeRequests.updateUsernameAndOrganization(username, organization).then((resp) => {
             try {
                 setModalToggle(false)
             } catch (error) {
