@@ -97,7 +97,7 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
         avatarComp: <Thumbnail source={func.getSensitiveIcons(type.name)} size="extraSmall"/>,
         priorityVal: priorityText.length > 1 ? severityOrder[priorityText] : 0,
         priorityText: priorityText,
-        priorityComp: priorityText.length > 1 ? <Badge status={transform.getColor(priorityText)}>{priorityText}</Badge> : "-",
+        priorityComp: priorityText.length > 1 ? <Badge status={transform.getColor(priorityText)}>{func.toSentenceCase(priorityText)}</Badge> : "-",
         categoriesArr: categoriesList,
         categoryComp: categoriesList.length > 0 ?  (
             <ShowListInBadge 
@@ -139,6 +139,12 @@ function AllSensitiveData() {
         totalCategories: 0
     })
     const [countMap, setCountMap] = useState({})
+    const [severityCountMap, setSeverityCountMap] = useState({
+        "CRITICAL": 0,
+        "HIGH": 0,
+        "MEDIUM": 0,
+        "LOW": 0,
+    })
 
     const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
@@ -192,6 +198,12 @@ function AllSensitiveData() {
         const categoriesSet = new Set()
 
         let countOfSubtypes = []
+        let subTypesSeverityCountMap={
+            "CRITICAL": 0,
+            "HIGH": 0,
+            "MEDIUM": 0,
+            "LOW": 0,
+        }
 
         const tempArr = dataTypesArr.map((type) => {
             subtypeToNameMap[type.name] = type
@@ -201,6 +213,10 @@ function AllSensitiveData() {
             (type?.categoriesList || []).forEach(x => {categoriesSet.add(x)})
             if(dataTypesVsApisCount?.countMap?.[type.name] && dataTypesVsApisCount?.countMap?.[type.name] !== undefined){
                 countOfSubtypes.push({key: [type?.name] , value: dataTypesVsApisCount?.countMap?.[type.name]})
+                if(type?.dataTypePriority !== undefined && type?.dataTypePriority?.length > 0){
+                    subTypesSeverityCountMap[type?.dataTypePriority] += dataTypesVsApisCount?.countMap?.[type.name];
+                }
+                
             }
             return convertToDataTypesData(type, collectionsMap, reqResCountMap, dataTypesVsApisCount?.apiCollectionsMap || {})
         })
@@ -219,6 +235,7 @@ function AllSensitiveData() {
         setCountMap(finalCountMap)
         setData(temp)
         setMapData(subtypeToNameMap)
+        setSeverityCountMap(subTypesSeverityCountMap)
         const summaryObj = {
             totalAPIs: dataTypesVsApisCount?.totalApisCount || 0,
             totalActive: temp.enabled.length,
@@ -277,6 +294,11 @@ function AllSensitiveData() {
     const graphComponents = (
         <HorizontalGrid key={"graphs"} gap={"5"} columns={2}>
             <InfoCard
+                title={"APIs by Sensitive data severity"}
+                titleToolTip={"Number of APIs per each category"}
+                component={""}
+            />
+            <InfoCard
                 title={"Top 5 sensitive datatype"}
                 titleToolTip={"Numbers of APIs having the corresponding data type in request or response"}
                 component={
@@ -317,6 +339,7 @@ function AllSensitiveData() {
             tableTabs={tableTabs}
             onSelect={(val) => setSelected(val)}
             selected={selected}
+            lastColumnSticky={true}
         />,
         <Modal key="modal" large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
             <Modal.Section flush>

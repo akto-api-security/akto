@@ -4,7 +4,7 @@ import React from 'react'
 function ShowListInBadge({itemsArr, maxWidth, status, maxItems}) {
     return (
         <Box maxWidth={maxWidth}>
-            <HorizontalStack gap={"1"}>
+            <HorizontalStack gap={"1"} wrap={false}>
                 {itemsArr.slice(0,maxItems).map((item, index) => {
                     return(
                         <Badge key={index + item} size="medium" status={status}>{item}</Badge>

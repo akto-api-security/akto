@@ -33,6 +33,18 @@ public class AktoDataType {
         this.redacted = redacted;
         this.sampleDataFixed = sampleDataFixed;
     }
+
+    public AktoDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition,int timestamp, IgnoreData ignoreData, boolean redacted, boolean sampleDataFixed, List<String> categoriesList, Severity severity) {
+        this.name = name;
+        this.sensitiveAlways = sensitiveAlways;
+        this.sensitivePosition = sensitivePosition;
+        this.ignoreData = ignoreData;
+        this.redacted = redacted;
+        this.sampleDataFixed = sampleDataFixed;
+        this.categoriesList = categoriesList;
+        this.dataTypePriority = severity;
+    }
+
     public String getName() {
         return name;
     }

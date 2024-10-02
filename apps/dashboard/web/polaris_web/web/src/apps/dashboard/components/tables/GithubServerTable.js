@@ -407,6 +407,7 @@ function GithubServerTable(props) {
                 sortColumnIndex={activeColumnSort.columnIndex}
                 sortDirection={activeColumnSort.sortDirection}
                 onSort={handleSort}
+                lastColumnSticky={props?.lastColumnSticky || false}
               >
                 {rowMarkup}
               </IndexTable>

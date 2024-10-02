@@ -90,6 +90,7 @@ import com.akto.util.DbMode;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.UsageUtils;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -196,7 +197,7 @@ public class InitializerListener implements ServletContextListener {
         try {
             FileTime fileTime = Files.getLastModifiedTime(new File(filePath).toPath());
             if(fileTime.toMillis()/1000l >= (Context.now()-THREE_HOURS)){
-                return false;
+                return true;
             }
         } catch (Exception e){
             return true;
@@ -518,6 +519,7 @@ public class InitializerListener implements ServletContextListener {
 
     public static void executePIISourceFetch() {
         List<PIISource> piiSources = PIISourceDao.instance.findAll("active", true);
+        Map<String, CustomDataType> customDataTypesMap = new HashMap<>();
         for (PIISource piiSource : piiSources) {
             String id = piiSource.getId();
             Map<String, PIIType> currTypes = piiSource.getMapNameToPIIType();
@@ -534,10 +536,11 @@ public class InitializerListener implements ServletContextListener {
             BasicDBList dataTypes = (BasicDBList) (fileObj.get("types"));
             Bson findQ = Filters.eq("_id", id);
 
-            List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
-            Map<String, CustomDataType> customDataTypesMap = new HashMap<>();
-            for (CustomDataType customDataType : customDataTypes) {
-                customDataTypesMap.put(customDataType.getName(), customDataType);
+            if(customDataTypesMap.isEmpty()){
+                List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
+                for (CustomDataType customDataType : customDataTypes) {
+                    customDataTypesMap.put(customDataType.getName(), customDataType);
+                }
             }
 
             List<Bson> piiUpdates = new ArrayList<>();
@@ -1453,14 +1456,14 @@ public class InitializerListener implements ServletContextListener {
             List<AktoDataType> aktoDataTypes = new ArrayList<>();
             int now = Context.now();
             IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
-            aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("PHONE_NUMBER", true, Collections.emptyList(), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("UUID", false, Collections.emptyList(), now, ignoreData, false, true));
+            aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true, Arrays.asList("AUTHENTICATION","TOKEN"), Severity.HIGH));
+            aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.MEDIUM));
+            aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("FINANCIAL","PII"), Severity.MEDIUM));
+            aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.HIGH ));
+            aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.LOW));
+            aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true, Arrays.asList("DEVICE IDENTIFIER"), Severity.HIGH));
+            aktoDataTypes.add(new AktoDataType("PHONE_NUMBER", true, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("PII"), Severity.MEDIUM));
+            aktoDataTypes.add(new AktoDataType("UUID", false, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("IDENTIFIER"),Severity.MEDIUM));
             AktoDataTypeDao.instance.getMCollection().drop();
             AktoDataTypeDao.instance.insertMany(aktoDataTypes);
 
