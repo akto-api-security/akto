@@ -13,6 +13,7 @@ import transform from "../transform";
 import ApiDependency from "./ApiDependency";
 import RunTest from "./RunTest";
 import PersistStore from "../../../../main/PersistStore";
+import values from "@/util/values";
 
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 
@@ -29,6 +30,18 @@ function ApiDetails(props) {
     const [badgeActive, setBadgeActive] = useState(false)
     const [showMoreActions, setShowMoreActions] = useState(false)
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
+
+    const statusFunc = getStatus ? getStatus : (x) => {
+        try {
+            if (paramList && paramList.length > 0 &&
+                paramList.filter(x => x?.nonSensitiveDataType).map(x => x.subTypeString).includes(x)) {
+                return "info"
+            }
+        } catch (e) {
+
+        }
+        return "warning"
+    }
 
     const fetchData = async () => {
         if (showDetails) {
@@ -77,8 +90,16 @@ function ApiDetails(props) {
                                 resp.data.params[index].subType = JSON.parse(JSON.stringify(resp.data.params[index].subType))
                             }
                         }
-
                     })
+
+                    try {
+                        resp.data.params?.forEach(x => {
+                            if (!values?.skipList.includes(x.subTypeString) && !x?.savedAsSensitive && !x?.sensitive) {
+                                x.nonSensitiveDataType = true
+                            }
+                        })
+                    } catch (e){
+                    }
                     setParamList(resp.data.params)
                 })
             })
@@ -190,6 +211,17 @@ function ApiDetails(props) {
         method: apiDetail.method,
         endpoint: apiDetail.endpoint
     }
+
+    try {
+        newData['nonSensitiveTags'] = [...new Set(paramList.filter(x => x?.nonSensitiveDataType).map(x => x.subTypeString))]
+    } catch (e){
+    }
+    try {
+        newData['sensitiveTags'] = apiDetail?.sensitiveTags && apiDetail?.sensitiveTags.length > 0 ? apiDetail?.sensitiveTags : 
+        [...new Set(paramList.filter(x => x?.savedAsSensitive || x?.sensitive).map(x => x.subTypeString))]
+    } catch (e){
+    }
+
     const headingComp = (
         <div style={{ display: "flex", justifyContent: "space-between" }} key="heading">
             <div style={{ display: "flex", gap: '8px' }}>
@@ -197,7 +229,7 @@ function ApiDetails(props) {
                     width="32vw"
                     data={newData}
                     headers={headers}
-                    getStatus={getStatus}
+                    getStatus={statusFunc}
                     isBadgeClickable={true}
                     badgeClicked={badgeClicked}
                 />

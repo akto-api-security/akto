@@ -740,5 +740,15 @@ export default {
             method: "post",
             data: {}
         })
+    },
+    resetDataTypeRetro(name){
+        return request({
+            url: '/api/resetDataTypeRetro',
+            method: 'post',
+            data: {
+                name: name,
+            }
+        })
     }
+
 }

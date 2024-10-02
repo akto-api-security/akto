@@ -9,13 +9,14 @@ import com.akto.dto.data_types.Predicate;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.usage.UsageMetric;
+import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
+import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.akto.utils.AktoCustomException;
 import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -43,7 +44,7 @@ import static com.akto.dto.type.SingleTypeInfo.subTypeMap;
 import static com.akto.utils.Utils.extractJsonResponse;
 
 public class CustomDataTypeAction extends UserAction{
-    private static LoggerMaker loggerMaker = new LoggerMaker(CustomDataTypeAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(CustomDataTypeAction.class, LogDb.DASHBOARD);
 
     private static final ExecutorService service = Executors.newFixedThreadPool(1);
     private boolean createNew;
@@ -510,6 +511,112 @@ public class CustomDataTypeAction extends UserAction{
     private long totalSampleDataCount;
     private long currentProcessed;
     private static final int pageSize = 1000;
+
+    public String resetDataTypeRetro() {
+        customDataType = CustomDataTypeDao.instance.findOne(CustomDataType.NAME, name);
+        aktoDataType = AktoDataTypeDao.instance.findOne(AktoDataType.NAME, name);
+
+        if (customDataType == null && aktoDataType == null) {
+            addActionError("Data type does not exist");
+            return ERROR.toUpperCase();
+        }
+
+        /*
+         * we find all samples which contain the data type 
+         * and re-run runtime on the samples.
+         */
+
+        int accountId = Context.accountId.get();
+        service.submit(() -> {
+            Context.accountId.set(accountId);
+            loggerMaker.infoAndAddToDb("Triggered a job to recalculate data types");
+            int skip = 0;
+            final int LIMIT = 100;
+            final int BATCH_SIZE = 200;
+            List<SampleData> sampleDataList = new ArrayList<>();
+            Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");    
+            List<HttpResponseParams> responses = new ArrayList<>();
+            this.customSubTypeMatches = new ArrayList<>();
+            do {
+                sampleDataList = SampleDataDao.instance.findAll(Filters.empty(), skip, LIMIT, sort);
+                skip += LIMIT;
+                for(SampleData sampleData : sampleDataList){
+                    List<String> samples = sampleData.getSamples();
+                    Set<String> foundSet = new HashSet<>();
+                    for (String sample: samples) {
+                        Key apiKey = sampleData.getId();
+                        try {
+                            HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+                            boolean skip1=false, skip2=false, skip3=false, skip4=false;
+                            try {
+                                skip1 = forHeaders(httpResponseParams.getHeaders(), customDataType, apiKey);
+                                skip2 = forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, apiKey);
+                            } catch (Exception e) {
+                            }
+                            try {
+                                skip3 = forPayload(httpResponseParams.getPayload(), customDataType, apiKey);
+                                skip4 = forPayload(httpResponseParams.requestParams.getPayload(), customDataType, apiKey);
+                            } catch (Exception e) {
+                            }
+                            String key = skip1 + " " + skip2 + " " + skip3 + " " + skip4 + " " + sampleData.getId().toString();
+                            if ((skip1 || skip2 || skip3 || skip4) && !foundSet.contains(key)) {
+                                foundSet.add(key);
+                                responses.add(httpResponseParams);
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+                if (sampleDataList != null) {
+                    loggerMaker.infoAndAddToDb("Read sampleData to recalculate data types " + sampleDataList.size());
+                }
+
+                if (!responses.isEmpty() && responses.size() >= BATCH_SIZE) {
+                    loggerMaker.infoAndAddToDb(
+                            "Starting processing responses to recalculate data types " + responses.size());
+                    SingleTypeInfo.fetchCustomDataTypes(accountId);
+                    AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
+                    if (info == null) {
+                        info = new AccountHTTPCallParserAktoPolicyInfo();
+                        HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                        info.setHttpCallParser(callParser);
+                        RuntimeListener.accountHTTPParserMap.put(accountId, info);
+                    }
+                    AccountSettings accountSettings = AccountSettingsDao.instance
+                            .findOne(AccountSettingsDao.generateFilter());
+                    responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, accountSettings);
+                    info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
+                    info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
+                    loggerMaker.infoAndAddToDb("Processed responses to recalculate data types " + responses.size());
+                    responses.clear();
+                }
+
+            }while(sampleDataList!=null && !sampleDataList.isEmpty());
+
+            if (!responses.isEmpty()) {
+                loggerMaker.infoAndAddToDb("Starting processing responses to recalculate data types " + responses.size());
+                SingleTypeInfo.fetchCustomDataTypes(accountId);
+                AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
+                if (info == null) {
+                    info = new AccountHTTPCallParserAktoPolicyInfo();
+                    HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                    info.setHttpCallParser(callParser);
+                    RuntimeListener.accountHTTPParserMap.put(accountId, info);
+                }
+                AccountSettings accountSettings = AccountSettingsDao.instance
+                        .findOne(AccountSettingsDao.generateFilter());
+                responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, accountSettings);
+                info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
+                info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
+                loggerMaker.infoAndAddToDb("Processed responses to recalculate data types " + responses.size());
+            }
+            loggerMaker.infoAndAddToDb("Finished a job to recalculate data types");
+        });
+
+        return SUCCESS.toUpperCase();
+    }
+
     public String reviewCustomDataType() {
         customSubTypeMatches = new ArrayList<>();
         CustomDataType customDataType;

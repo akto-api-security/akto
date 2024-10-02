@@ -112,6 +112,11 @@ const apiDetailsHeaders = [
         value: "parameterisedEndpoint",
         itemOrder: 1,
         component: (data) => CopyEndpoint(data)
+    },
+    {
+        text: 'Non-Sensitive Params',
+        value: 'nonSensitiveTags',
+        itemOrder: 4,
     }
 ]
 

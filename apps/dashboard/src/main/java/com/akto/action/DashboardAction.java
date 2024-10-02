@@ -250,19 +250,16 @@ public class DashboardAction extends UserAction {
         }
     }
 
-    private String email;
     private String username;
     private String organization;
     private final Pattern usernamePattern = Pattern.compile("^[\\w\\s-]{1,}$");
     private final Pattern organizationPattern = Pattern.compile("^[\\w\\s.&-]{1,}$");
     public String updateUsernameAndOrganization() {
-        this.setUsername(username.trim());
-        this.setOrganization(organization.trim());
-
-        if(username.isEmpty()) {
+        if(username == null || username.trim().isEmpty()) {
             addActionError("Username cannot be empty");
             return Action.ERROR.toUpperCase();
         }
+        this.setUsername(username.trim());
 
         if(!usernamePattern.matcher(username).matches()) {
             addActionError("Username is not valid");
@@ -274,17 +271,27 @@ public class DashboardAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
+        User userFromSession = getSUser();
+        if (userFromSession == null) {
+            addActionError("Invalid user");
+            return Action.ERROR.toUpperCase();
+        }
+
+        String email = userFromSession.getLogin();
+
         User user = UsersDao.instance.updateOneNoUpsert(Filters.in(User.LOGIN, email), Updates.combine(
                 Updates.set(User.NAME, username),
                 Updates.set(User.NAME_LAST_UPDATE, Context.now())
         ));
         RBAC.Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
 
-        if(currentRoleForUser.getName().equals(RBAC.Role.ADMIN.getName())) {
-            if(organization.isEmpty()) {
+        if(currentRoleForUser != null && currentRoleForUser.getName().equals(RBAC.Role.ADMIN.getName())) {
+            if(organization == null || organization.trim().isEmpty()) {
                 addActionError("Organization cannot be empty");
                 return Action.ERROR.toUpperCase();
             }
+
+            setOrganization(organization.trim());
 
             if(!organizationPattern.matcher(organization).matches()) {
                 addActionError("Organization is not valid");
@@ -387,14 +394,6 @@ public class DashboardAction extends UserAction {
 
     public List<HistoricalData> getInitialHistoricalData() {
         return initialHistoricalData;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
     }
 
     public String getUsername() {

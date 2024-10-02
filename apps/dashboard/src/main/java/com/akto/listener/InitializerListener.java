@@ -56,6 +56,7 @@ import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.upload.FileUpload;
 import com.akto.dto.type.URLMethods;
@@ -850,26 +851,88 @@ public class InitializerListener implements ServletContextListener {
         }
 
         ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp(), webhook.getNewEndpointCollections(), webhook.getNewSensitiveEndpointCollections(), true);
-        if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
-            return;
+
+        boolean sendApiThreats = false;
+        List<SuspectSampleData> suspectSampleData = new ArrayList<>();
+        for (WebhookOptions option : webhook.getSelectedWebhookOptions()) {
+            if (WebhookOptions.API_THREAT_PAYLOADS.equals(option)) {
+                // Fetch one record to see if data exists
+                suspectSampleData = SuspectSampleDataDao.instance.findAll(
+                        Filters.and(
+                                Filters.gte(SuspectSampleData._DISCOVERED, webhook.getLastSentTimestamp()),
+                                Filters.lt(SuspectSampleData._DISCOVERED, now)),
+                        0, 1, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID),
+                        Projections.exclude(SuspectSampleData._SAMPLE));
+                if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
+                    sendApiThreats = true;
+                }
+                break;
+            }
         }
 
-        List<String> errors = new ArrayList<>();
+        if ((ci == null ||
+                (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() +
+                        ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0)
+                && (suspectSampleData == null || suspectSampleData.isEmpty())) {
+            return;
+        }
 
         Map<String, Object> valueMap = new HashMap<>();
 
         createBodyForWebhook(webhook);
 
-        valueMap.put("AKTO.changes_info.newSensitiveEndpoints", ci.newSensitiveParamsObject);
-        valueMap.put("AKTO.changes_info.newSensitiveEndpointsCount", ci.newSensitiveParams.size());
+        if (ci != null) {
+            valueMap.put("AKTO.changes_info.newSensitiveEndpoints", ci.newSensitiveParamsObject);
+            valueMap.put("AKTO.changes_info.newSensitiveEndpointsCount", ci.newSensitiveParams.size());
+            
+            valueMap.put("AKTO.changes_info.newEndpoints", ci.newEndpointsLast7DaysObject);
+            valueMap.put("AKTO.changes_info.newEndpointsCount", ci.newEndpointsLast7Days.size());
+            
+            valueMap.put("AKTO.changes_info.newSensitiveParametersCount", ci.recentSentiiveParams);
+            valueMap.put("AKTO.changes_info.newParametersCount", ci.newParamsInExistingEndpoints);
+        }
 
-        valueMap.put("AKTO.changes_info.newEndpoints", ci.newEndpointsLast7DaysObject);
-        valueMap.put("AKTO.changes_info.newEndpointsCount", ci.newEndpointsLast7Days.size());
+        if(sendApiThreats){
 
-        valueMap.put("AKTO.changes_info.newSensitiveParametersCount", ci.recentSentiiveParams);
-        valueMap.put("AKTO.changes_info.newParametersCount", ci.newParamsInExistingEndpoints);
+            final int DATA_LIMIT = webhook.getBatchSize() > 0 ? webhook.getBatchSize() : 50;
+            int skip = 0;
+            final int lastSentTimestamp = webhook.getLastSentTimestamp();
 
-        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+            do {
+                try {
+                    suspectSampleData = SuspectSampleDataDao.instance.findAll(
+                            Filters.and(
+                                    Filters.gte(SuspectSampleData._DISCOVERED, lastSentTimestamp),
+                                    Filters.lt(SuspectSampleData._DISCOVERED, now)),
+                            skip, DATA_LIMIT, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID));
+
+                    if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
+                        valueMap.put("AKTO.changes_info.apiThreatPayloads", suspectSampleData);
+                        actuallySendWebhook(webhook, valueMap, now);
+                    }
+                    skip += DATA_LIMIT;
+                    valueMap.clear();
+
+                    if ((suspectSampleData != null && suspectSampleData.size() < DATA_LIMIT) ||
+                    // In case of a dry run / run once, we only want to send data once.
+                            webhook.getFrequencyInSeconds() == 0) {
+                        break;
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error in sending webhook API data " + e.getMessage(),
+                            LogDb.DASHBOARD);
+                }
+
+            } while(suspectSampleData != null && !suspectSampleData.isEmpty());
+
+        } else {
+            actuallySendWebhook(webhook, valueMap, now);
+        }
+
+    }
+
+    private static void actuallySendWebhook(CustomWebhook webhook, Map<String, Object> valueMap, int now){
+        List<String> errors = new ArrayList<>();
         String payload = null;
 
         try {
@@ -1972,10 +2035,8 @@ public class InitializerListener implements ServletContextListener {
                 } while (!connectedToMongo);
 
                 if (DashboardMode.isOnPremDeployment()) {
-                    int oldAccId = Context.accountId.get();
                     Context.accountId.set(1_000_000);
                     loggerMaker.infoAndAddToDb("Dashboard started at " + Context.now());
-                    Context.accountId.set(oldAccId);
                 }
 
                 setDashboardMode();

@@ -121,4 +121,18 @@ public class SuspectSampleData {
         this.filterId = filterId;
     }
 
+    @Override
+    public String toString() {
+        return "{" +
+                " \"apiCollectionId\":\"" + getApiCollectionId() + "\"" +
+                ", \"url\":\"" + getUrl() + "\"" +
+                ", \"method\":\"" + getMethod() + "\"" +
+                ", \"matchingUrl\":\"" + (getMatchingUrl() != null ? getMatchingUrl() : "/") + "\"" +
+                ", \"discovered\":\"" + getDiscovered() + "\"" +
+                ", \"filter\":\"" + getFilterId() + "\"" +
+                ", \"IPs\":\"" + (getSourceIPs() !=null ? getSourceIPs() : "[]" )+ "\"" +
+                ", \"sample\":" + getSample() +
+                "}";
+    }
+
 }
