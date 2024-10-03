@@ -73,10 +73,10 @@ const headers = [
 ] 
 
 const sortOptions = [
-    { label: 'Sensitive in Response', value: 'response asc', directionLabel: 'Highest', sortKey: 'response', columnIndex: 6},
-    { label: 'Sensitive in Response', value: 'response desc', directionLabel: 'Lowest', sortKey: 'response', columnIndex: 6},
-    { label: 'Sensitive in Request', value: 'request asc', directionLabel: 'Highest', sortKey: 'request', columnIndex: 7},
-    { label: 'Sensitive in Request', value: 'request desc', directionLabel: 'Lowest', sortKey: 'request', columnIndex: 7},
+    { label: 'Sensitive in Response', value: 'response asc', directionLabel: 'Highest', sortKey: 'response', columnIndex: 5},
+    { label: 'Sensitive in Response', value: 'response desc', directionLabel: 'Lowest', sortKey: 'response', columnIndex: 5},
+    { label: 'Sensitive in Request', value: 'request asc', directionLabel: 'Highest', sortKey: 'request', columnIndex: 6},
+    { label: 'Sensitive in Request', value: 'request desc', directionLabel: 'Lowest', sortKey: 'request', columnIndex: 6},
     { label: 'Priority', value: 'priorityVal asc', directionLabel: 'Highest', sortKey: 'priorityVal', columnIndex: 1},
     { label: 'Priority', value: 'priorityVal desc', directionLabel: 'Lowest', sortKey: 'priorityVal', columnIndex: 1},
 ];
