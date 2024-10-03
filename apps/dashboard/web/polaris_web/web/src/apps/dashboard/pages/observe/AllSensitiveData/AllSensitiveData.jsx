@@ -26,7 +26,8 @@ const headers = [
         filterKey: "priorityText",
         value: "priorityComp",
         sortActive: true,
-        sortKey: "priorityVal"
+        sortKey: "priorityVal",
+        showFilter: true,
     },
     {
         title: "",
@@ -41,9 +42,10 @@ const headers = [
     },
     {
         title: "Domains",
-        text: "Domains",
+        text: "Collection name",
         value: "domainsComp",
-        filterKey: "domainsArr"
+        filterKey: "domainsArrName",
+        showFilter: true,
     },
     {
         title: "API response",
@@ -59,9 +61,10 @@ const headers = [
     },
     {
         title: "Datatype tags",
-        text: "Category",
+        text: "Tags",
         value: "categoryComp",
-        filterKey: "categoriesArr"
+        filterKey: "categoriesArr",
+        showFilter: true,
     },
     {
         title: '',
@@ -112,6 +115,7 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
             />) 
         : "-" ,
         domainsArr: domainsArr,
+        domainsArrName: domainsArr.map(x => collectionsMap[x]),
         domainsComp: domainsArr.length > 0 ? (
             <ShowListInBadge 
                 itemsArr={domainsArr.map(x => collectionsMap[x])}
