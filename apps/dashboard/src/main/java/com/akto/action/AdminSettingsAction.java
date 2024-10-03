@@ -419,11 +419,11 @@ public class AdminSettingsAction extends UserAction {
     private int deltaTimeForScheduledSummaries;
 
     public String updateDeltaTimeForIgnoringSummaries () {
-        if(this.deltaTimeForScheduledSummaries <= 1200){
+        if(this.deltaTimeForScheduledSummaries < 1200){
             addActionError("Value cannot be less than 20 minutes");
             return ERROR.toUpperCase();
         }
-        if(this.deltaTimeForScheduledSummaries >= 14400){
+        if(this.deltaTimeForScheduledSummaries > 14400){
             addActionError("Value cannot be greater than 4 hours");
             return ERROR.toUpperCase();
         }
