@@ -1,7 +1,6 @@
 package com.akto.action;
 
 
-import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -17,16 +16,17 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.akto.utils.AktoCustomException;
 import com.akto.utils.RedactSampleData;
+import com.akto.utils.Utils;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -61,6 +61,10 @@ public class CustomDataTypeAction extends UserAction{
     private String valueOperator;
     private List<ConditionFromUser> valueConditionFromUsers;
     private boolean redacted;
+
+    private String iconString;
+    private List<String> categoriesList;
+    private Severity dataTypePriority;
 
     public static class ConditionFromUser {
         Predicate.Type type;
@@ -200,7 +204,10 @@ public class CustomDataTypeAction extends UserAction{
                     Updates.set(CustomDataType.TIMESTAMP,Context.now()),
                     Updates.set(CustomDataType.ACTIVE,active),
                     Updates.set(CustomDataType.REDACTED,customDataType.isRedacted()),
-                    Updates.set(CustomDataType.SAMPLE_DATA_FIXED,customDataType.isSampleDataFixed())
+                    Updates.set(CustomDataType.SAMPLE_DATA_FIXED,customDataType.isSampleDataFixed()),
+                    Updates.set(AktoDataType.CATEGORIES_LIST, customDataType.getCategoriesList()),
+                    Updates.set(AktoDataType.DATA_TYPE_PRIORITY, customDataType.getDataTypePriority()),
+                    Updates.set(CustomDataType.ICON_STRING, customDataType.getIconString())
                 ),
                 options
             );
@@ -253,7 +260,8 @@ public class CustomDataTypeAction extends UserAction{
                 Updates.set("sensitivePosition",sensitivePositions),
                 Updates.set("timestamp",Context.now()),
                 Updates.set("redacted",redacted),
-                Updates.set(AktoDataType.SAMPLE_DATA_FIXED, !redacted)
+                Updates.set(AktoDataType.SAMPLE_DATA_FIXED, !redacted),
+                Updates.set(AktoDataType.CATEGORIES_LIST, Utils.getUniqueValuesOfList(categoriesList))
             ),
             options
         );
@@ -813,8 +821,13 @@ public class CustomDataTypeAction extends UserAction{
         }
 
         IgnoreData ignoreData = new IgnoreData();
-        return new CustomDataType(name, sensitiveAlways, sensitivePositions, userId,
+        CustomDataType dataType = new CustomDataType(name, sensitiveAlways, sensitivePositions, userId,
                 true,keyConditions,valueConditions, mainOperator,ignoreData, redacted, !redacted);
+        
+        dataType.setCategoriesList(Utils.getUniqueValuesOfList(categoriesList));
+        dataType.setIconString(iconString);
+        dataType.setDataTypePriority(dataTypePriority);
+        return dataType;
     }
 
     public void setCreateNew(boolean createNew) {
@@ -1098,4 +1111,17 @@ public class CustomDataTypeAction extends UserAction{
     public BasicDBObject getResponse() {
         return response;
     }
+
+    public void setIconString(String iconString) {
+        this.iconString = iconString;
+    }
+
+    public void setCategoriesList(List<String> categoriesList) {
+        this.categoriesList = categoriesList;
+    }
+
+    public void setDataTypePriority(Severity dataTypePriority) {
+        this.dataTypePriority = dataTypePriority;
+    }
+
 }

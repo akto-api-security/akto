@@ -102,7 +102,10 @@ const func = {
             sensitivePosition: sensitiveObj.sensitivePosition,
             valueConditionFromUsers: valueArr,
             valueOperator: state.valueConditions.operator,
-            redacted: state.redacted
+            redacted: state.redacted,
+            iconString: state?.iconString?.displayName,
+            categoriesList: state?.categoriesList,
+            dataTypePriority: state?.priority ? state.priority.toUpperCase() : ""
         }
 
         return finalObj

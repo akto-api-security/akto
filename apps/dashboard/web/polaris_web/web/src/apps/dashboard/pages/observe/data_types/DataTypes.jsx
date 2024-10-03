@@ -137,7 +137,7 @@ function DataTypes() {
 
   const location = useLocation();
   const navigate = useNavigate();
-  const isNew = location?.state === undefined || Object.keys(location?.state).length === 0
+  const isNew = location.state === null || location?.state === undefined || Object.keys(location?.state).length === 0
   const pageTitle = (isNew || (location?.state?.regexObj)) ? "Add data type" : "Configure data type"
   const currObj = location?.state?.regexObj ? transform.getRegexObj(location?.state?.regexObj) : transform.initialObj
   const initialState = pageTitle === "Add data type" ? isNew ? transform.initialObj : currObj : transform.fillInitialState(location.state);
@@ -163,6 +163,7 @@ function DataTypes() {
       let obj = {
         name: currState.name,
         redacted:currState.redacted,
+        categoriesList: currState?.categoriesList || [],
         ...transform.convertToSensitiveData(currState.sensitiveState),
         
       }
@@ -178,17 +179,22 @@ function DataTypes() {
     else {
       let payloadObj = transform.convertDataForCustomPayload(currState)
       api.saveCustomDataType(payloadObj).then((response) => {
-        if (pageTitle === "Add data type") {
-          func.setToast(true, false, "Data type added successfully");
-        } else {
-          func.setToast(true, false, "Data type updated successfully");
+        try {
+          if (pageTitle === "Add data type") {
+            func.setToast(true, false, "Data type added successfully");
+          } else {
+            func.setToast(true, false, "Data type updated successfully");
+          }
+          setChange(false);
+          navigate(null,
+            {
+              state: { name: response.customDataType.name, dataObj: response.customDataType, type: "Custom" },
+              replace: true
+            })
+        } catch (error) {
+          func.setToast(true, true, "Error in saving data type.")
         }
-        setChange(false);
-        navigate(null,
-          {
-            state: { name: response.customDataType.name, dataObj: response.customDataType, type: "Custom" },
-            replace: true
-          })
+        
       })
     }
   }
@@ -197,11 +203,31 @@ function DataTypes() {
     dispatchCurrState({type:"update", obj:obj})
   }
 
+  const handleTagsChange = (tagValue, type) =>{
+    const initialSet = new Set(currState.categoriesList);
+    if(type === 'add'){
+      if(initialSet.has(tagValue)){
+        func.setToast(true, true, 'Tag with this value already exists for the data type')
+        return;
+      }else{
+        setTagValue('')
+        initialSet.add(tagValue)
+      }
+    }else{
+      initialSet.delete(tagValue)
+    }
+    handleChange({categoriesList: [...initialSet]})
+  }
+
   const errorMessage = isNew ? func.nameValidationFunc(currState.name) : ""
   const columnsForGrid = currState.dataType === 'Custom' ? 3 : 2
   let displayIcons = defaultIcons
-  if(!defaultIcons.includes(initialState.iconString)){
-    displayIcons.push(initialState.iconString)
+  let currIconString = initialState.iconString
+  if(typeof(currIconString) === 'string'){
+    currIconString = func.getIconFromString(initialState.iconString)
+  }
+  if(currIconString !== null && !defaultIcons.includes(currIconString)){
+    displayIcons.push(currIconString)
   }
   const descriptionCard = (
     <LegacyCard title="Details" key="desc">
@@ -220,6 +246,7 @@ function DataTypes() {
                 initial={currState.active} label="Active" />
               : null}
             <Dropdown
+              disabled={currState.dataType !== 'Custom'}
               menuItems={severityItems}
               initial={currState.priority}
               selected={(val) => {handleChange({priority: val})}}
@@ -229,20 +256,20 @@ function DataTypes() {
 
           <HorizontalGrid gap={"4"} columns={['twoThirds', 'oneThird']}>
             <VerticalStack gap={"2"}>
-                <Form onSubmit={() => console.log(tagValue)}>
+                <Form onSubmit={() => handleTagsChange(tagValue, 'add')}>
                     <TextField onChange={setTagValue} value={tagValue} label={<Text color="subdued" fontWeight="medium" variant="bodySm">Datatype Tags</Text>}/>
                 </Form>
                 <HorizontalStack gap={"2"}>
                     {currState.categoriesList && currState.categoriesList.length > 0 && currState.categoriesList.map((tag, index) => {
                         return(
-                            <Tag key={index} onRemove={() => console.log(tag)}>
+                            <Tag key={index} onRemove={() => handleTagsChange(tagValue, 'remove')}>
                                 <Text>{tag}</Text>
                             </Tag>
                         )
                     })}
                 </HorizontalStack>
             </VerticalStack>
-            <Box>
+            {currState.dataType === 'Custom' && <Box>
               <Text variant="bodyMd">
                 Choose Icon
               </Text>
@@ -250,13 +277,13 @@ function DataTypes() {
                 {displayIcons.map((icon, index) => {
                   return(
                     <div className="tag-button" key={index}>
-                      <Button monochrome icon={icon} onClick={() => console.log("hey")} pressed={currState.iconString === icon} />
+                      <Button monochrome icon={icon} onClick={() => handleChange({iconString: icon})} pressed={(currState?.iconString === icon || currState?.iconString === icon?.displayName)} />
                     </div>
                   )
                 })}
                 
               </HorizontalStack>
-            </Box>
+            </Box>}
           </HorizontalGrid>
         </VerticalStack>
         

@@ -1,10 +1,7 @@
 import {
-  CalendarMinor,
-  ClockMinor,
-  CircleAlertMajor,
-  DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor, EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,
-  PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, ReceiptMajor, MobileMajor, CalendarTimeMinor
-
+  CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
+  EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
+  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
@@ -16,6 +13,12 @@ import { tokens } from "@shopify/polaris-tokens"
 import PersistStore from '../apps/main/PersistStore';
 
 import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
+
+const iconsUsedMap = {
+  CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
+  EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
+  ReceiptMajor, MobileMajor, CalendarTimeMinor,LocationMajor, IdentityCardFilledMajor, CalendarMajor
+}
 
 const func = {
   setToast (isActive, isError, message) {
@@ -1621,6 +1624,12 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   getAktoSeverities(){
     return ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
   },
+
+  getIconFromString(iconString){
+    if(iconsUsedMap[iconString] !== undefined){
+      return iconsUsedMap[iconString]
+    } return null
+  }
 }
 
 export default func

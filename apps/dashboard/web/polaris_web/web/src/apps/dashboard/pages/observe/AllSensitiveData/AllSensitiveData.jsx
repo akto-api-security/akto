@@ -92,11 +92,13 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
 
     const domainsArr = subtypeToApiCollectionsMap[type.name] || []
 
+    const iconSource = (type?.iconString !== undefined && type?.iconString?.length> 0) ? func.getIconFromString(type?.iconString) : func.getSensitiveIcons(type.name)
+
     return {
         id: type.name,
         nameComp: <Text fontWeight="medium">{type.name}</Text>,
         subType: type.name,
-        avatarComp: <Thumbnail source={func.getSensitiveIcons(type.name)} size="extraSmall"/>,
+        avatarComp: <Thumbnail source={iconSource} size="extraSmall"/>,
         priorityVal: priorityText.length > 1 ? severityOrder[priorityText] : 0,
         priorityText: priorityText,
         priorityComp: priorityText.length > 1 ? <Badge status={transform.getColor(priorityText, true)}>{func.toSentenceCase(priorityText)}</Badge> : "-",
