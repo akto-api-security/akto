@@ -621,7 +621,6 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static List<Bson> getCustomDataTypeUpdates(CustomDataType existingCDT, CustomDataType newCDT){
-
         List<Bson> ret = new ArrayList<>();
 
         if(!Conditions.areEqual(existingCDT.getKeyConditions(), newCDT.getKeyConditions())){
@@ -633,7 +632,7 @@ public class InitializerListener implements ServletContextListener {
         if(existingCDT.getOperator()!=newCDT.getOperator()){
             ret.add(Updates.set(CustomDataType.OPERATOR, newCDT.getOperator()));
         }
-        if((existingCDT.getDataTypePriority() == null && newCDT.getDataTypePriority() != null) || !existingCDT.getDataTypePriority().equals(newCDT.getDataTypePriority())){
+        if(!(newCDT.getDataTypePriority() == null || existingCDT.getDataTypePriority() == null || existingCDT.getDataTypePriority().equals(existingCDT.getDataTypePriority()))){
             ret.add(
                 Updates.set(AktoDataType.DATA_TYPE_PRIORITY, newCDT.getDataTypePriority())
             );
