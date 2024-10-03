@@ -16,6 +16,8 @@ import PersistStore from "../../../../main/PersistStore"
 import SummaryCard from "../../dashboard/new_components/SummaryCard"
 import InfoCard from "../../dashboard/new_components/InfoCard"
 import ChartypeComponent from "../../testing/TestRunsPage/ChartypeComponent"
+import BarGraph from "../../../components/charts/BarGraph"
+import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 
 const headers = [
     {
@@ -38,12 +40,6 @@ const headers = [
         filterKey: "subType",
     },
     {
-        title: "Category",
-        text: "Category",
-        value: "categoryComp",
-        filterKey: "categoriesArr"
-    },
-    {
         title: "Domains",
         text: "Domains",
         value: "domainsComp",
@@ -60,6 +56,12 @@ const headers = [
         text: "API request",
         value: "request",
         sortActive: true
+    },
+    {
+        title: "Datatype tags",
+        text: "Category",
+        value: "categoryComp",
+        filterKey: "categoriesArr"
     },
     {
         title: '',
@@ -97,7 +99,7 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
         avatarComp: <Thumbnail source={func.getSensitiveIcons(type.name)} size="extraSmall"/>,
         priorityVal: priorityText.length > 1 ? severityOrder[priorityText] : 0,
         priorityText: priorityText,
-        priorityComp: priorityText.length > 1 ? <Badge status={transform.getColor(priorityText)}>{func.toSentenceCase(priorityText)}</Badge> : "-",
+        priorityComp: priorityText.length > 1 ? <Badge status={transform.getColor(priorityText, true)}>{func.toSentenceCase(priorityText)}</Badge> : "-",
         categoriesArr: categoriesList,
         categoryComp: categoriesList.length > 0 ?  (
             <ShowListInBadge 
@@ -139,15 +141,11 @@ function AllSensitiveData() {
         totalCategories: 0
     })
     const [countMap, setCountMap] = useState({})
-    const [severityCountMap, setSeverityCountMap] = useState({
-        "CRITICAL": 0,
-        "HIGH": 0,
-        "MEDIUM": 0,
-        "LOW": 0,
-    })
+    const [severityCountMap, setSeverityCountMap] = useState([])
 
-    const [selectedTab, setSelectedTab] = useState("all")
-    const [selected, setSelected] = useState(0)
+    const [selectedTab, setSelectedTab] = useState("enabled")
+    const [selected, setSelected] = useState(1)
+    const [loading, setLoading] = useState(false)
 
     const definedTableTabs = ["All", "Enabled", "Disabled"]
 
@@ -177,7 +175,21 @@ function AllSensitiveData() {
         navigate("/dashboard/observe/data-types")
     }
 
+    const convertToGraphData = (severityMap) => {
+        let dataArr = []
+        Object.keys(severityMap).forEach((x) => {
+            const color = transform.getColorForSensitiveData(x)
+            let text = func.toSentenceCase(x)
+            const value =  severityMap[x]
+            dataArr.push({
+                text, value, color
+            })
+        })
+        return dataArr
+    }
+
     const fetchData = async() => {
+        setLoading(true)
         let temp = {}
         const promises = [
             api.fetchDataTypes(),
@@ -232,10 +244,11 @@ function AllSensitiveData() {
                 text: x['value']
             }
         })
+        setLoading(false)
         setCountMap(finalCountMap)
         setData(temp)
         setMapData(subtypeToNameMap)
-        setSeverityCountMap(subTypesSeverityCountMap)
+        setSeverityCountMap(convertToGraphData(subTypesSeverityCountMap))
         const summaryObj = {
             totalAPIs: dataTypesVsApisCount?.totalApisCount || 0,
             totalActive: temp.enabled.length,
@@ -263,7 +276,7 @@ function AllSensitiveData() {
             variant: 'heading2xl',
         },
         {
-            title: 'Total Categories',
+            title: 'Total Datatype Tags',
             data: transform.formatNumberWithCommas(summaryInfo.totalCategories),
             variant: 'heading2xl',
         }
@@ -296,7 +309,23 @@ function AllSensitiveData() {
             <InfoCard
                 title={"APIs by Sensitive data severity"}
                 titleToolTip={"Number of APIs per each category"}
-                component={""}
+                component={
+                    <BarGraph
+                        data={severityCountMap}
+                        areaFillHex="true"
+                        height={"280px"}
+                        defaultChartOptions={{
+                            "legend": {
+                                enabled: false
+                            },
+                        }}
+                        showYAxis={true}
+                        yAxisTitle="Number of APIs"
+                        barWidth={100}
+                        barGap={12}
+                        showGridLines={true}
+                    />
+                }
             />
             <InfoCard
                 title={"Top 5 sensitive datatype"}
@@ -360,7 +389,9 @@ function AllSensitiveData() {
             primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
             secondaryActions={secondaryActionsComp}
             isFirstPage={true}
-            components={componentsArr}
+            components={
+                loading ? [<SpinnerCentered key={"spinner"}/>] : componentsArr
+            }
         />
 
     )

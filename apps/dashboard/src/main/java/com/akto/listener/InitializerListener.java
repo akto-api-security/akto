@@ -198,7 +198,7 @@ public class InitializerListener implements ServletContextListener {
         try {
             FileTime fileTime = Files.getLastModifiedTime(new File(filePath).toPath());
             if(fileTime.toMillis()/1000l >= (Context.now()-THREE_HOURS)){
-                return true;
+                return false;
             }
         } catch (Exception e){
             return true;
@@ -327,6 +327,8 @@ public class InitializerListener implements ServletContextListener {
                         try {
                             executePIISourceFetch();
                         } catch (Exception e) {
+                            e.printStackTrace();
+                            loggerMaker.errorAndAddToDb("Error in fetching PII sources: " +  e.getMessage());
                         }
                     }
                 }, "pii-scheduler");
@@ -561,9 +563,29 @@ public class InitializerListener implements ServletContextListener {
 
                 if (currTypes.containsKey(piiKey) &&
                         (currTypes.get(piiKey).equals(piiType) &&
-                                dt.getBoolean(PIISource.ACTIVE, true))) {
+                                dt.getBoolean(PIISource.ACTIVE, true))
+                        && existingCDT.getDataTypePriority() != null
+                        && (existingCDT.getCategoriesList() != null && !existingCDT.getCategoriesList().isEmpty())
+                ) {
                     continue;
                 } else {
+                    Severity dtSeverity = null;
+                    List<String> categoriesList = null;
+                    categoriesList = (List<String>) dt.get(AktoDataType.TAGS_LIST);
+                    if(dt.getString(AktoDataType.DATA_TYPE_PRIORITY) != null){
+                        try {
+                            dtSeverity = Severity.valueOf(dt.getString(AktoDataType.DATA_TYPE_PRIORITY));
+                            newCDT.setDataTypePriority(dtSeverity);
+                           
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            loggerMaker.errorAndAddToDb("Invalid severity of dataType " + piiKey);
+                        }
+                        
+                    }
+                    if(categoriesList != null){
+                        newCDT.setCategoriesList(categoriesList);
+                    }
                     if (!dt.getBoolean(PIISource.ACTIVE, true)) {
                         if (currTypes.getOrDefault(piiKey, null) != null || piiSource.getLastSynced() == 0) {
                             piiUpdates.add(Updates.unset(PIISource.MAP_NAME_TO_PII_TYPE + "." + piiKey));
@@ -610,6 +632,16 @@ public class InitializerListener implements ServletContextListener {
         }
         if(existingCDT.getOperator()!=newCDT.getOperator()){
             ret.add(Updates.set(CustomDataType.OPERATOR, newCDT.getOperator()));
+        }
+        if((existingCDT.getDataTypePriority() == null && newCDT.getDataTypePriority() != null) || !existingCDT.getDataTypePriority().equals(newCDT.getDataTypePriority())){
+            ret.add(
+                Updates.set(AktoDataType.DATA_TYPE_PRIORITY, newCDT.getDataTypePriority())
+            );
+        }
+        if((existingCDT.getCategoriesList() == null || existingCDT.getCategoriesList().isEmpty()) && newCDT.getCategoriesList() != null){
+            ret.add(
+                Updates.set(AktoDataType.CATEGORIES_LIST, newCDT.getCategoriesList())
+            );
         }
 
         if (!ret.isEmpty()) {

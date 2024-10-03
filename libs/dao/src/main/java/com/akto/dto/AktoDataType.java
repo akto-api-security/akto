@@ -18,6 +18,7 @@ public class AktoDataType {
     private boolean sampleDataFixed;
 
     public static final String CATEGORIES_LIST = "categoriesList";
+    public static final String TAGS_LIST = "tagsLists";
     private List<String> categoriesList;
 
     public static final String DATA_TYPE_PRIORITY = "dataTypePriority";

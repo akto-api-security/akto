@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { LegacyCard, HorizontalGrid, TextField, VerticalStack, Text } from '@shopify/polaris'
+import { LegacyCard, HorizontalGrid, TextField, VerticalStack, Text, Form, HorizontalStack, Tag, Button, Box } from '@shopify/polaris'
 import Dropdown from '../../../components/layouts/Dropdown'
 import "./DataTypes.css"
 import ConditionsPicker from '../../../components/ConditionsPicker'
@@ -11,6 +11,9 @@ import {produce} from "immer"
 import DetailsPage from '../../../components/DetailsPage'
 import InformationBannerComponent from '../../quick_start/components/shared/InformationBannerComponent'
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
+import { EmailMajor, CreditCardMajor, IdentityCardFilledMajor, PhoneMajor, CalendarMajor, LocationMajor, KeyMajor } from "@shopify/polaris-icons"
+
+const severitiesArr = func.getAktoSeverities()
 
 const statusItems = [
   {
@@ -24,6 +27,8 @@ const statusItems = [
     value: "false",
   }
 ]
+
+const severityItems = severitiesArr.map((x) => {return{value: x, label: func.toSentenceCase(x), id: func.toSentenceCase(x)}})
 
 const operatorOptions = [
   {
@@ -90,6 +95,8 @@ const requestItems = [
   }
 ]
 
+const defaultIcons = [ EmailMajor, CreditCardMajor, IdentityCardFilledMajor, PhoneMajor, CalendarMajor, LocationMajor, KeyMajor]
+
 function conditionStateReducer(draft, action) {
   try {
     switch (action.type) {
@@ -130,21 +137,18 @@ function DataTypes() {
 
   const location = useLocation();
   const navigate = useNavigate();
-  const isNew = location?.state == undefined || Object.keys(location?.state).length == 0
+  const isNew = location?.state === undefined || Object.keys(location?.state).length === 0
   const pageTitle = (isNew || (location?.state?.regexObj)) ? "Add data type" : "Configure data type"
   const currObj = location?.state?.regexObj ? transform.getRegexObj(location?.state?.regexObj) : transform.initialObj
   const initialState = pageTitle === "Add data type" ? isNew ? transform.initialObj : currObj : transform.fillInitialState(location.state);
 
-  const [currState, dispatchCurrState] = useReducer(produce((draft, action) => conditionStateReducer(draft, action)), currObj);
+  const [currState, dispatchCurrState] = useReducer(produce((draft, action) => conditionStateReducer(draft, action)), initialState);
   const [change, setChange] = useState(false)
+  const [tagValue, setTagValue] = useState('')
   const resetFunc =()=>{
     dispatchCurrState({type:"update", obj:initialState})
     setChange(false)
   }
-
-  useEffect(() => {
-      resetFunc()
-  },[])
 
   useEffect(() => {
     if (func.deepComparison(currState, initialState)) {
@@ -155,7 +159,6 @@ function DataTypes() {
   }, [currState])
 
   const saveAction = async () => {
-    console.log(currState)
     if (currState.dataType === 'Akto') {
       let obj = {
         name: currState.name,
@@ -194,23 +197,69 @@ function DataTypes() {
     dispatchCurrState({type:"update", obj:obj})
   }
 
-  const errorMessage = func.nameValidationFunc(currState.name)
+  const errorMessage = isNew ? func.nameValidationFunc(currState.name) : ""
+  const columnsForGrid = currState.dataType === 'Custom' ? 3 : 2
+  let displayIcons = defaultIcons
+  if(!defaultIcons.includes(initialState.iconString)){
+    displayIcons.push(initialState.iconString)
+  }
   const descriptionCard = (
     <LegacyCard title="Details" key="desc">
       <LegacyCard.Section>
-        <HorizontalGrid gap="4" columns={2}>
-          <TextField id={"name-field"} label="Name" helpText="Name the data type"
-            value={currState.name} placeholder='NEW_CUSTOM_DATA_TYPE'
-            {...pageTitle === "Add data type" ? {onChange: (val) => handleChange({name: val})} : {}}
-            requiredIndicator={true}
-            {...errorMessage.length > 0 ? {error: errorMessage} : {}}
+        <VerticalStack gap={"5"}>
+          <HorizontalGrid gap="4" columns={columnsForGrid}>
+            <TextField id={"name-field"} label="Name" helpText="Name the data type"
+              value={currState.name} placeholder='NEW_CUSTOM_DATA_TYPE'
+              {...pageTitle === "Add data type" ? {onChange: (val) => handleChange({name: val})} : {}}
+              requiredIndicator={true}
+              {...errorMessage.length > 0 ? {error: errorMessage} : {}}
+              />
+            {currState.dataType === 'Custom' ?
+              <Dropdown id={"active-dropdown"} menuItems={statusItems}
+                selected={(val) => { handleChange({ active: val }) }}
+                initial={currState.active} label="Active" />
+              : null}
+            <Dropdown
+              menuItems={severityItems}
+              initial={currState.priority}
+              selected={(val) => {handleChange({priority: val})}}
+              label={"Select severity of data type"}
             />
-          {currState.dataType === 'Custom' ?
-            <Dropdown id={"active-dropdown"} menuItems={statusItems}
-              selected={(val) => { handleChange({ active: val }) }}
-              initial={currState.active} label="Active" />
-            : null}
-        </HorizontalGrid>
+          </HorizontalGrid>
+
+          <HorizontalGrid gap={"4"} columns={['twoThirds', 'oneThird']}>
+            <VerticalStack gap={"2"}>
+                <Form onSubmit={() => console.log(tagValue)}>
+                    <TextField onChange={setTagValue} value={tagValue} label={<Text color="subdued" fontWeight="medium" variant="bodySm">Datatype Tags</Text>}/>
+                </Form>
+                <HorizontalStack gap={"2"}>
+                    {currState.categoriesList && currState.categoriesList.length > 0 && currState.categoriesList.map((tag, index) => {
+                        return(
+                            <Tag key={index} onRemove={() => console.log(tag)}>
+                                <Text>{tag}</Text>
+                            </Tag>
+                        )
+                    })}
+                </HorizontalStack>
+            </VerticalStack>
+            <Box>
+              <Text variant="bodyMd">
+                Choose Icon
+              </Text>
+              <HorizontalStack gap={2}>
+                {displayIcons.map((icon, index) => {
+                  return(
+                    <div className="tag-button" key={index}>
+                      <Button monochrome icon={icon} onClick={() => console.log("hey")} pressed={currState.iconString === icon} />
+                    </div>
+                  )
+                })}
+                
+              </HorizontalStack>
+            </Box>
+          </HorizontalGrid>
+        </VerticalStack>
+        
       </LegacyCard.Section>
     </LegacyCard>
   )

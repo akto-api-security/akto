@@ -2,7 +2,7 @@ import {
   CalendarMinor,
   ClockMinor,
   CircleAlertMajor,
-  DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor, InviteMinor, CreditCardMajor, IdentityCardMajor, LocationsMinor,
+  DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor, EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,
   PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, ReceiptMajor, MobileMajor, CalendarTimeMinor
 
 } from '@shopify/polaris-icons';
@@ -1333,7 +1333,7 @@ mapCollectionIdToHostName(apiCollections){
         case "JWT":
           return KeyMajor;
         case "EMAIL":
-          return InviteMinor;
+          return EmailMajor;
         case "CREDIT_CARD":
           return CreditCardMajor;
         case "SSN":
@@ -1617,7 +1617,10 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
   sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
-  }
+  },
+  getAktoSeverities(){
+    return ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
+  },
 }
 
 export default func
