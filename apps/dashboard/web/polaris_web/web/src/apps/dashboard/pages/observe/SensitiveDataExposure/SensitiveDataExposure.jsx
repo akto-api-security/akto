@@ -12,18 +12,20 @@ import DateRangeFilter from "../../../components/layouts/DateRangeFilter"
 import GetPrettifyEndpoint from "../GetPrettifyEndpoint";
 import TooltipText from "../../../components/shared/TooltipText";
 
-const headers = [
+const headings = [
     {
         text: "Endpoint",
         value: "endpointComp",
         title: "Api endpoints",
         textValue: "endpoint",
+        filterKey: 'endpoint'
     },
     {
         title: 'Key & Value',
         value: 'keyValueComp',
         text: 'Key & Value',
         textValue: 'keyValue',
+        filterKey: 'keyValue'
     },
     {
         title: 'Detected in',
@@ -34,6 +36,7 @@ const headers = [
         text: "Collection",
         value: "collection",
         title: 'Collection',
+        filterKey: 'apiCollectionId'
     },
     {
         title: 'Discovered',
@@ -43,6 +46,12 @@ const headers = [
         sortKey: 'timestamp'
     }
 ]
+
+let headers = JSON.parse(JSON.stringify(headings))
+headers.push({
+    text: 'collectionIds',
+    filterKey: 'collectionIds',
+})
 
 const sortOptions = [
     { label: 'Discovered time', value: 'timestamp asc', directionLabel: 'Newest', sortKey: 'timestamp', columnIndex:5 },
@@ -122,6 +131,7 @@ const convertDataIntoTableFormat = (endpoint, apiCollectionMap) => {
     temp["paramLocation"] = endpoint.responseCode < 0 ? "Request" : "Response"
     temp['keyValue'] = key + ": " + value
     temp['endpointComp'] = <GetPrettifyEndpoint key={id} method={endpoint.method} url={endpoint.url} />
+    temp["call"] = endpoint.responseCode < 0 ? "Request" : "Response"
     temp['keyValueComp'] = (
         <Badge key={id} status="critical" size="slim">
             <Box maxWidth="270px">
@@ -234,7 +244,7 @@ const primaryActions = (
                 useNewRow={true}
                 condensedHeight={true}
                 pageLimit={20}
-                headings={headers}
+                headings={headings}
             />
         ]}
         />
