@@ -206,7 +206,7 @@ public class StartTestAction extends UserAction {
             }
             this.testIdConfig = 0;
         } else {
-            if(this.metadata.isEmpty()){
+            if(this.metadata == null || this.metadata.isEmpty()){
                 TestingRunDao.instance.updateOne(
                     Filters.eq(Constants.ID, localTestingRun.getId()),
                     Updates.combine(
