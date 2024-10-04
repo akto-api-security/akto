@@ -58,7 +58,6 @@ const func = {
           initialObj.active = dataObj.active.toString()
           initialObj.operator= dataObj.operator
           initialObj.creatorId= dataObj.creatorId
-          initialObj.creatorId= dataObj.creatorId
           initialObj.skipDataTypeTestTemplateMapping = dataObj.skipDataTypeTestTemplateMapping
         }
         if(dataObj.keyConditions){

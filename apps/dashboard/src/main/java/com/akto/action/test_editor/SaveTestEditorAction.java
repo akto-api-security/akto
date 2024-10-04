@@ -290,7 +290,7 @@ public class SaveTestEditorAction extends UserAction {
         }
 
         try {
-            if (!"dynamic_severity".equals(testConfig.getInfo().getSeverity())) {
+            if (!TestConfig.DYNAMIC_SEVERITY.equals(testConfig.getInfo().getSeverity())) {
                 GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity());
             }
         } catch (Exception e) {
