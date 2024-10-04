@@ -433,5 +433,12 @@ export default {
             method: 'post',
             data: {testScript:{id, javascript}}
         })
+    },
+    updateDeltaTimeForSummaries(deltaTimeForScheduledSummaries){
+        return request({
+            url: '/api/updateIgnoreTimeForSummaries',
+            method: 'post',
+            data: {deltaTimeForScheduledSummaries}
+        })
     }
 }

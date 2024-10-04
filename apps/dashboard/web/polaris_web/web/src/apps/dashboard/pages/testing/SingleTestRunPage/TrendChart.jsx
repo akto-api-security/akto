@@ -341,7 +341,7 @@ function TrendChart(props) {
                 </Collapsible>
             </LegacyCard.Section>
             <LegacyCard.Section>
-                <SummaryTable testingRunResultSummaries={testingRunResultSummaries} />
+                <SummaryTable setSummary={setSummary} testingRunResultSummaries={testingRunResultSummaries} />
             </LegacyCard.Section>
         </LegacyCard>
     )
