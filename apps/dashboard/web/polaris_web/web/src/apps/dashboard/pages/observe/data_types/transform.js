@@ -57,6 +57,9 @@ const func = {
         if(type === 'Custom'){
           initialObj.active = dataObj.active.toString()
           initialObj.operator= dataObj.operator
+          initialObj.creatorId= dataObj.creatorId
+          initialObj.creatorId= dataObj.creatorId
+          initialObj.skipDataTypeTestTemplateMapping = dataObj.skipDataTypeTestTemplateMapping
         }
         if(dataObj.keyConditions){
           initialObj.keyConditions = dataObj.keyConditions
@@ -95,7 +98,8 @@ const func = {
             sensitivePosition: sensitiveObj.sensitivePosition,
             valueConditionFromUsers: valueArr,
             valueOperator: state.valueConditions.operator,
-            redacted: state.redacted
+            redacted: state.redacted,
+            skipDataTypeTestTemplateMapping: state.skipDataTypeTestTemplateMapping
         }
 
         return finalObj

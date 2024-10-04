@@ -24,6 +24,7 @@ import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
@@ -251,6 +252,7 @@ public class Main {
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
 
+        SingleTypeInfo.init();
         while (true) {
             AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
                 int accountId = account.getId();

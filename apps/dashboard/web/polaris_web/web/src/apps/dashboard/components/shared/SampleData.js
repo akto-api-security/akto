@@ -265,6 +265,7 @@ function SampleData(props) {
           });
           
         }
+        instance.updateOptions({ tabSize: 2 })
         setInstance(instance)
 
     }
