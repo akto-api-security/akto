@@ -1,5 +1,6 @@
 package com.akto.dto.testing;
 
+import com.akto.dto.ApiCollection;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
@@ -206,5 +207,14 @@ public class TestingRun {
             ", name='" + getName() + "'" +
             "}";
     }
+
+    public static String findTestType(TestingRun testingRun, TestingRunResultSummary trrs) {
+        String testType = "ONE_TIME";
+        if(testingRun.getPeriodInSeconds()>0) testType = "SCHEDULED DAILY";
+        if (trrs.getMetadata() != null) testType = "CI_CD";
+        return testType;
+    }
+
+
 
 }
