@@ -1548,7 +1548,10 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void addAktoDataTypes(BackwardCompatibility backwardCompatibility) {
-        if (backwardCompatibility.getAddAktoDataTypes() == 0) {
+        List<AktoDataType> dataTypes = AktoDataTypeDao.instance.findAll(
+            Filters.exists(AktoDataType.DATA_TYPE_PRIORITY,true)
+        );
+        if (backwardCompatibility.getAddAktoDataTypes() == 0 || dataTypes == null || dataTypes.isEmpty()) {
             List<AktoDataType> aktoDataTypes = new ArrayList<>();
             int now = Context.now();
             IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
