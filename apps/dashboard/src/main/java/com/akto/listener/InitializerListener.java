@@ -328,11 +328,17 @@ public class InitializerListener implements ServletContextListener {
                             executePIISourceFetch();
                         } catch (Exception e) {
                         }
-                        try {
-                            executeDataTypeToTemplate();
-                        } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e, "Error in executeDataTypeToTemplate " + e.toString());
-                        }
+                        /*
+                         * This job updates the test templates based on data types.
+                         * Since this may cause a significant load on db on first release,
+                         * commenting this.
+                         * TODO: uncomment this later.
+                         */
+                        // try {
+                        //     executeDataTypeToTemplate();
+                        // } catch (Exception e) {
+                        //     loggerMaker.errorAndAddToDb(e, "Error in executeDataTypeToTemplate " + e.toString());
+                        // }
                     }
                 }, "pii-scheduler");
             }

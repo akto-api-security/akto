@@ -32,17 +32,23 @@ public class TemplateMapper {
     private static final LoggerMaker loggerMaker = new LoggerMaker(TemplateMapper.class, LogDb.DASHBOARD);
     public void createTestTemplateForCustomDataType(CustomDataType dataType) {
 
+        if (dataType == null) {
+            return;
+        }
+
+        /*
+         * If a user has explicitly marked the data type
+         * to be skipped from test template creation.
+         */
         if (dataType.isSkipDataTypeTestTemplateMapping()) {
             return;
         }
 
         Set<SingleTypeInfo.Position> positions = getSensitivePositions(dataType.isSensitiveAlways(),
                 dataType.getSensitivePosition());
-        if (positions == null || positions.isEmpty()) {
-            return;
-        }
 
-        boolean inactive = !dataType.isActive();
+        boolean inactive = getInactivity(!dataType.isActive(), dataType.isSensitiveAlways(),
+                dataType.getSensitivePosition());
         String filter = "";
         String currentDepthTabs = TAB;
         String name = dataType.getName();
@@ -60,11 +66,9 @@ public class TemplateMapper {
     public void createTestTemplateForAktoDataType(AktoDataType dataType) {
         Set<SingleTypeInfo.Position> positions = getSensitivePositions(dataType.isSensitiveAlways(),
                 dataType.getSensitivePosition());
-        if (positions == null || positions.isEmpty()) {
-            return;
-        }
-
-        boolean inactive = false;
+                
+        boolean inactive = getInactivity(false, dataType.isSensitiveAlways(),
+                dataType.getSensitivePosition());
         String filter = "";
         String currentDepthTabs = TAB;
         String name = dataType.getName();
@@ -225,6 +229,19 @@ public class TemplateMapper {
         return positionKey;
     }
 
+    private boolean getInactivity(boolean defaultInactivity, boolean isSensitiveAlways,
+            List<SingleTypeInfo.Position> sensitivePositions) {
+
+        /*
+         * If not sensitive anywhere, mark as inactive.
+         */
+        if (!isSensitiveAlways && (sensitivePositions == null || sensitivePositions.isEmpty())) {
+            return true;
+        }
+
+        return defaultInactivity;
+    }
+
     private Set<SingleTypeInfo.Position> getSensitivePositions(boolean isSensitiveAlways,
             List<SingleTypeInfo.Position> sensitivePositions) {
         Set<SingleTypeInfo.Position> positions = new HashSet<>();
@@ -238,6 +255,17 @@ public class TemplateMapper {
             for (SingleTypeInfo.Position position : sensitivePositions) {
                 positions.add(position);
             }
+        }
+        if (positions == null || positions.isEmpty()) {
+            /*
+             * In case a datatype is not defined as sensitive,
+             * Then create a test with all positions but mark as inactive.
+             */
+            positions = new HashSet<>();
+            positions.add(SingleTypeInfo.Position.REQUEST_HEADER); 
+            positions.add(SingleTypeInfo.Position.REQUEST_PAYLOAD);
+            positions.add(SingleTypeInfo.Position.RESPONSE_HEADER);
+            positions.add(SingleTypeInfo.Position.RESPONSE_PAYLOAD);
         }
         return positions;
     }
