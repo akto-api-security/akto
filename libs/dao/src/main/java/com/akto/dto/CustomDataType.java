@@ -3,6 +3,8 @@ package com.akto.dto;
 import com.akto.dao.context.Context;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.enums.GlobalEnums.Severity;
+
 import io.swagger.v3.oas.models.media.StringSchema;
 import org.bson.types.ObjectId;
 
@@ -37,6 +39,11 @@ public class CustomDataType {
 
     public static final String SKIP_DATA_TYPE_TEST_TEMPLATE_MAPPING = "skipDataTypeTestTemplateMapping";
     private boolean skipDataTypeTestTemplateMapping;
+    private Severity dataTypePriority;
+    private List<String> categoriesList;
+
+    public static final String ICON_STRING = "iconString";
+    private String iconString;
 
     public CustomDataType() { }
 
@@ -226,5 +233,28 @@ public class CustomDataType {
 
     public void setSkipDataTypeTestTemplateMapping(boolean skipDataTypeTestTemplateMapping) {
         this.skipDataTypeTestTemplateMapping = skipDataTypeTestTemplateMapping;
+    }
+    public Severity getDataTypePriority() {
+        return dataTypePriority;
+    }
+
+    public void setDataTypePriority(Severity dataTypePriority) {
+        this.dataTypePriority = dataTypePriority;
+    }
+
+    public List<String> getCategoriesList() {
+        return categoriesList;
+    }
+
+    public void setCategoriesList(List<String> categoriesList) {
+        this.categoriesList = categoriesList;
+    }
+
+    public String getIconString() {
+        return iconString;
+    }
+
+    public void setIconString(String iconString) {
+        this.iconString = iconString;
     }
 }

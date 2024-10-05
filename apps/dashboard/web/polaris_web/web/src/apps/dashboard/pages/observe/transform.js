@@ -351,13 +351,35 @@ const transform = {
         return { sensitiveSampleData: sensitiveSampleData };
     },
 
-    getColor(key){
+    getColor(key, isSensitiveBadge=false){
         switch(key.toUpperCase()){
-            case "HIGH" : return "critical";
-            case "MEDIUM": return "attention";
-            case "LOW": return "info";
+            case "CRITICAL": return "critical-strong-experimental"
+            case "HIGH" : {
+                if(isSensitiveBadge){
+                    return "warning"
+                }
+                return "critical"
+            }
+            case "MEDIUM": return "attention"
+            case "LOW": {
+                if(isSensitiveBadge){
+                    return "success"
+                }
+                return "info"
+            }
             default:
                 return "bg";
+        }
+    },
+
+    getColorForSensitiveData(key){
+        switch(key.toUpperCase()){
+            case "CRITICAL": return "#E45357"
+            case "HIGH" : return "#EF864C"
+            case "MEDIUM": return "#F6C564"
+            case "LOW": return "#6FD1A6"
+            default:
+                return "#6FD1A6";
         }
     },
 

@@ -734,6 +734,13 @@ export default {
             }
         })
     },
+    fetchCountMapOfApis(){
+        return request({
+            url: "/api/fetchCountMapOfApis",
+            method: "post",
+            data: {}
+        })
+    },
     resetDataTypeRetro(name){
         return request({
             url: '/api/resetDataTypeRetro',

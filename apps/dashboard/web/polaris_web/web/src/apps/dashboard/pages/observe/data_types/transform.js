@@ -1,3 +1,4 @@
+import globalFunc from "@/util/func"
 const func = {
     initialObj: {
         id:"",
@@ -8,7 +9,10 @@ const func = {
         sensitiveState: '4',
         operator: "OR",
         dataType: "Custom",
-        redacted: 'false'
+        redacted: 'false',
+        priority: 'CRITICAL',
+        categoriesList: [],
+        iconString: ""
       },
 
     convertToSensitiveData: function(state) {
@@ -52,6 +56,9 @@ const func = {
         initialObj.name = dataObj.name
         initialObj.dataType = type
         initialObj.redacted = dataObj.redacted.toString()
+        initialObj.priority = dataObj?.dataTypePriority || "CRITICAL"
+        initialObj.categoriesList = dataObj?.categoriesList || []
+        initialObj.iconString = dataObj?.iconString || globalFunc.getSensitiveIcons(dataObj.name)
         let state = func.convertDataToState(dataObj.sensitiveAlways, dataObj.sensitivePosition)
         initialObj.sensitiveState = state
         if(type === 'Custom'){
@@ -98,7 +105,10 @@ const func = {
             valueConditionFromUsers: valueArr,
             valueOperator: state.valueConditions.operator,
             redacted: state.redacted,
-            skipDataTypeTestTemplateMapping: state.skipDataTypeTestTemplateMapping
+            skipDataTypeTestTemplateMapping: state.skipDataTypeTestTemplateMapping,
+            iconString: state?.iconString?.displayName,
+            categoriesList: state?.categoriesList,
+            dataTypePriority: state?.priority ? state.priority.toUpperCase() : ""
         }
 
         return finalObj
@@ -110,7 +120,10 @@ const func = {
             name: regexObj.name,
             valueConditions: regexObj.valueConditions,
             active: true,
-            sensitiveState: '2'
+            sensitiveState: '2',
+            priority: regexObj?.dataTypePriority || "",
+            categoriesList: regexObj?.categoriesList || [],
+            iconString: regexObj?.iconString || globalFunc.getSensitiveIcons(regexObj.name)
         }
 
         return obj

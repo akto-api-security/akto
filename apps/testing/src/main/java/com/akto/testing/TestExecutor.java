@@ -602,7 +602,9 @@ public class TestExecutor {
 
                 insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
             }else{
-                logger.info("Test stopped for id: " + testRunId.toString());
+                if(GetRunningTestsStatus.getRunningTests().getCurrentState(testRunId).equals(TestingRun.State.STOPPED)){
+                    logger.info("Test stopped for id: " + testRunId.toString());
+                }
                 return;
             }
         }

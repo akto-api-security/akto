@@ -14,10 +14,14 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.testing.TemplateMapper;
+import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.akto.utils.AktoCustomException;
 import com.akto.utils.RedactSampleData;
+import com.akto.utils.Utils;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -59,6 +63,10 @@ public class CustomDataTypeAction extends UserAction{
     private List<ConditionFromUser> valueConditionFromUsers;
     private boolean redacted;
     private boolean skipDataTypeTestTemplateMapping;
+
+    private String iconString;
+    private List<String> categoriesList;
+    private Severity dataTypePriority;
 
     public static class ConditionFromUser {
         Predicate.Type type;
@@ -199,7 +207,10 @@ public class CustomDataTypeAction extends UserAction{
                     Updates.set(CustomDataType.ACTIVE,active),
                     Updates.set(CustomDataType.REDACTED,customDataType.isRedacted()),
                     Updates.set(CustomDataType.SKIP_DATA_TYPE_TEST_TEMPLATE_MAPPING,skipDataTypeTestTemplateMapping),
-                    Updates.set(CustomDataType.SAMPLE_DATA_FIXED,customDataType.isSampleDataFixed())
+                    Updates.set(CustomDataType.SAMPLE_DATA_FIXED,customDataType.isSampleDataFixed()),
+                    Updates.set(AktoDataType.CATEGORIES_LIST, customDataType.getCategoriesList()),
+                    Updates.set(AktoDataType.DATA_TYPE_PRIORITY, customDataType.getDataTypePriority()),
+                    Updates.set(CustomDataType.ICON_STRING, customDataType.getIconString())
                 ),
                 options
             );
@@ -263,7 +274,8 @@ public class CustomDataTypeAction extends UserAction{
                 Updates.set("sensitivePosition",sensitivePositions),
                 Updates.set("timestamp",Context.now()),
                 Updates.set("redacted",redacted),
-                Updates.set(AktoDataType.SAMPLE_DATA_FIXED, !redacted)
+                Updates.set(AktoDataType.SAMPLE_DATA_FIXED, !redacted),
+                Updates.set(AktoDataType.CATEGORIES_LIST, Utils.getUniqueValuesOfList(categoriesList))
             ),
             options
         );
@@ -831,8 +843,13 @@ public class CustomDataTypeAction extends UserAction{
         }
 
         IgnoreData ignoreData = new IgnoreData();
-        return new CustomDataType(name, sensitiveAlways, sensitivePositions, userId,
+        CustomDataType dataType = new CustomDataType(name, sensitiveAlways, sensitivePositions, userId,
                 true,keyConditions,valueConditions, mainOperator,ignoreData, redacted, !redacted);
+        
+        dataType.setCategoriesList(Utils.getUniqueValuesOfList(categoriesList));
+        dataType.setIconString(iconString);
+        dataType.setDataTypePriority(dataTypePriority);
+        return dataType;
     }
 
     public void setCreateNew(boolean createNew) {
@@ -1029,6 +1046,53 @@ public class CustomDataTypeAction extends UserAction{
         return SUCCESS.toUpperCase();
 
     }
+    
+    BasicDBObject response;
+
+    public String getCountOfApiVsDataType(){
+        this.response = new BasicDBObject();
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
+                                    .append(SingleTypeInfo._URL, "$url")
+                                    .append(SingleTypeInfo._METHOD, "$method");
+        Bson customFilter = Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculator.getDeactivated());
+
+        List<String> sensitiveSubtypes = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+        sensitiveSubtypes.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+        List<String> sensitiveSubtypesInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+
+        sensitiveSubtypes.addAll(sensitiveSubtypesInRequest);
+        List<Bson> pipeline = SingleTypeInfoDao.instance.generateFilterForSubtypes(sensitiveSubtypes, groupedId, false, customFilter);
+
+        try {
+            MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+            Map<String,Integer> countOfApisVsDataType = new HashMap<>();
+            Map<String,Set<Integer>> apiCollectionsMap = new HashMap<>();
+            int count = 0;
+            while (cursor.hasNext()) {
+                count++;
+                BasicDBObject bDbObject = cursor.next();
+                BasicDBObject id = (BasicDBObject) bDbObject.get(Constants.ID);
+                List<String> subTypes = (List<String>) bDbObject.get("subTypes");
+                for(String subType: subTypes){
+                    int initialCount = countOfApisVsDataType.getOrDefault(subType, 0);
+                    Set<Integer> collSet = apiCollectionsMap.getOrDefault(subType, new HashSet<>());
+                    countOfApisVsDataType.put(subType, initialCount + 1);
+                    collSet.add(id.getInt(SingleTypeInfo._API_COLLECTION_ID));
+                    apiCollectionsMap.put(subType, collSet);
+                }
+            }
+            response.put("countMap", countOfApisVsDataType);
+            response.put("totalApisCount", count);
+            response.put("apiCollectionsMap", apiCollectionsMap);
+        } catch (Exception e) {
+            addActionError("Error in fetching subtypes count");
+            return ERROR.toUpperCase();
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
+    
 
     public void setActive(boolean active) {
         this.active = active;
@@ -1073,4 +1137,20 @@ public class CustomDataTypeAction extends UserAction{
     public void setSkipDataTypeTestTemplateMapping(boolean skipDataTypeTestTemplateMapping) {
         this.skipDataTypeTestTemplateMapping = skipDataTypeTestTemplateMapping;
     }
+    public BasicDBObject getResponse() {
+        return response;
+    }
+
+    public void setIconString(String iconString) {
+        this.iconString = iconString;
+    }
+
+    public void setCategoriesList(List<String> categoriesList) {
+        this.categoriesList = categoriesList;
+    }
+
+    public void setDataTypePriority(Severity dataTypePriority) {
+        this.dataTypePriority = dataTypePriority;
+    }
+
 }

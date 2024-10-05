@@ -79,7 +79,7 @@ function GithubServerTable(props) {
   const [sortableColumns, setSortableColumns] = useState([])
   const [activeColumnSort, setActiveColumnSort] = useState({columnIndex: -1, sortDirection: 'descending'})
 
-  let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.value] = 'OR'; return map }, {})
+  let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.filterKey || e.value] = 'OR'; return map }, {})
 
   useEffect(()=> {
     let queryFilters 
@@ -407,6 +407,7 @@ function GithubServerTable(props) {
                 sortColumnIndex={activeColumnSort.columnIndex}
                 sortDirection={activeColumnSort.sortDirection}
                 onSort={handleSort}
+                lastColumnSticky={props?.lastColumnSticky || false}
               >
                 {rowMarkup}
               </IndexTable>

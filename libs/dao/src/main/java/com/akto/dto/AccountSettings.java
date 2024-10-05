@@ -110,7 +110,10 @@ public class AccountSettings {
     private static final List<String> defaultCidrRangesList = Arrays.asList("10.0.0.0/8", "172.16.0.0/12",
             "192.168.0.0/16", "127.0.0.0/8", "169.254.0.0/16", "224.0.0.0/4", "192.0.2.0/24", "198.51.100.0/24",
             "203.0.113.0/24", "255.255.255.255/32", "100.64.0.0/10", "192.88.99.0/24", "240.0.0.0/4");
-    
+
+    public static final String DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES = "timeForScheduledSummaries";
+    private int timeForScheduledSummaries;
+
     public AccountSettings() {
     }
 
@@ -422,5 +425,13 @@ public class AccountSettings {
 
     public void setAllowDeletionOfUrls(boolean allowDeletionOfUrls) {
         this.allowDeletionOfUrls = allowDeletionOfUrls;
+    }
+
+    public int getTimeForScheduledSummaries() {
+        return timeForScheduledSummaries;
+    }
+
+    public void setTimeForScheduledSummaries(int timeForScheduledSummaries) {
+        this.timeForScheduledSummaries = timeForScheduledSummaries;
     }
 }

@@ -91,6 +91,7 @@ import com.akto.util.DbMode;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.UsageUtils;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -327,6 +328,8 @@ public class InitializerListener implements ServletContextListener {
                         try {
                             executePIISourceFetch();
                         } catch (Exception e) {
+                            e.printStackTrace();
+                            loggerMaker.errorAndAddToDb("Error in fetching PII sources: " +  e.getMessage());
                         }
                         /*
                          * This job updates the test templates based on data types.
@@ -542,6 +545,7 @@ public class InitializerListener implements ServletContextListener {
 
     public static void executePIISourceFetch() {
         List<PIISource> piiSources = PIISourceDao.instance.findAll("active", true);
+        Map<String, CustomDataType> customDataTypesMap = new HashMap<>();
         for (PIISource piiSource : piiSources) {
             String id = piiSource.getId();
             Map<String, PIIType> currTypes = piiSource.getMapNameToPIIType();
@@ -558,10 +562,11 @@ public class InitializerListener implements ServletContextListener {
             BasicDBList dataTypes = (BasicDBList) (fileObj.get("types"));
             Bson findQ = Filters.eq("_id", id);
 
-            List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
-            Map<String, CustomDataType> customDataTypesMap = new HashMap<>();
-            for (CustomDataType customDataType : customDataTypes) {
-                customDataTypesMap.put(customDataType.getName(), customDataType);
+            if(customDataTypesMap.isEmpty()){
+                List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
+                for (CustomDataType customDataType : customDataTypes) {
+                    customDataTypesMap.put(customDataType.getName(), customDataType);
+                }
             }
 
             List<Bson> piiUpdates = new ArrayList<>();
@@ -581,9 +586,29 @@ public class InitializerListener implements ServletContextListener {
 
                 if (currTypes.containsKey(piiKey) &&
                         (currTypes.get(piiKey).equals(piiType) &&
-                                dt.getBoolean(PIISource.ACTIVE, true))) {
+                                dt.getBoolean(PIISource.ACTIVE, true))
+                        && existingCDT.getDataTypePriority() != null
+                        && (existingCDT.getCategoriesList() != null && !existingCDT.getCategoriesList().isEmpty())
+                ) {
                     continue;
                 } else {
+                    Severity dtSeverity = null;
+                    List<String> categoriesList = null;
+                    categoriesList = (List<String>) dt.get(AktoDataType.TAGS_LIST);
+                    if(dt.getString(AktoDataType.DATA_TYPE_PRIORITY) != null){
+                        try {
+                            dtSeverity = Severity.valueOf(dt.getString(AktoDataType.DATA_TYPE_PRIORITY));
+                            newCDT.setDataTypePriority(dtSeverity);
+                           
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            loggerMaker.errorAndAddToDb("Invalid severity of dataType " + piiKey);
+                        }
+                        
+                    }
+                    if(categoriesList != null){
+                        newCDT.setCategoriesList(categoriesList);
+                    }
                     if (!dt.getBoolean(PIISource.ACTIVE, true)) {
                         if (currTypes.getOrDefault(piiKey, null) != null || piiSource.getLastSynced() == 0) {
                             piiUpdates.add(Updates.unset(PIISource.MAP_NAME_TO_PII_TYPE + "." + piiKey));
@@ -619,8 +644,9 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static List<Bson> getCustomDataTypeUpdates(CustomDataType existingCDT, CustomDataType newCDT){
-
         List<Bson> ret = new ArrayList<>();
+        Severity oldSeverity = existingCDT.getDataTypePriority();
+        Severity newSeverity = newCDT.getDataTypePriority();
 
         if(!Conditions.areEqual(existingCDT.getKeyConditions(), newCDT.getKeyConditions())){
             ret.add(Updates.set(CustomDataType.KEY_CONDITIONS, newCDT.getKeyConditions()));
@@ -630,6 +656,16 @@ public class InitializerListener implements ServletContextListener {
         }
         if(existingCDT.getOperator()!=newCDT.getOperator()){
             ret.add(Updates.set(CustomDataType.OPERATOR, newCDT.getOperator()));
+        }
+        if(newSeverity != null && (oldSeverity == null || (!oldSeverity.equals(newSeverity)))){
+            ret.add(
+                Updates.set(AktoDataType.DATA_TYPE_PRIORITY, newCDT.getDataTypePriority())
+            );
+        }
+        if((existingCDT.getCategoriesList() == null || existingCDT.getCategoriesList().isEmpty()) && newCDT.getCategoriesList() != null){
+            ret.add(
+                Updates.set(AktoDataType.CATEGORIES_LIST, newCDT.getCategoriesList())
+            );
         }
 
         if (!ret.isEmpty()) {
@@ -1535,18 +1571,21 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void addAktoDataTypes(BackwardCompatibility backwardCompatibility) {
-        if (backwardCompatibility.getAddAktoDataTypes() == 0) {
+        List<AktoDataType> dataTypes = AktoDataTypeDao.instance.findAll(
+            Filters.exists(AktoDataType.DATA_TYPE_PRIORITY,true)
+        );
+        if (backwardCompatibility.getAddAktoDataTypes() == 0 || dataTypes == null || dataTypes.isEmpty()) {
             List<AktoDataType> aktoDataTypes = new ArrayList<>();
             int now = Context.now();
             IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
-            aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("PHONE_NUMBER", true, Collections.emptyList(), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("UUID", false, Collections.emptyList(), now, ignoreData, false, true));
+            aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true, Arrays.asList("AUTHENTICATION","TOKEN"), Severity.HIGH));
+            aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.MEDIUM));
+            aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("FINANCIAL","PII"), Severity.MEDIUM));
+            aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.HIGH ));
+            aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.LOW));
+            aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true, Arrays.asList("DEVICE IDENTIFIER"), Severity.HIGH));
+            aktoDataTypes.add(new AktoDataType("PHONE_NUMBER", true, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("PII"), Severity.MEDIUM));
+            aktoDataTypes.add(new AktoDataType("UUID", false, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("IDENTIFIER"),Severity.MEDIUM));
             AktoDataTypeDao.instance.getMCollection().drop();
             AktoDataTypeDao.instance.insertMany(aktoDataTypes);
 

@@ -2422,6 +2422,26 @@
             </result>
         </action>
 
+        <action name="api/fetchCountMapOfApis" class="com.akto.action.CustomDataTypeAction" method="getCountOfApiVsDataType">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">SENSITIVE_DATA</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/fetchTagConfigs" class="com.akto.action.TagConfigsAction" method="fetchTagConfigs">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2772,6 +2792,25 @@
         </action>
 
         <action name="api/updateGlobalRateLimit" class="com.akto.action.AdminSettingsAction" method="updateGlobalRateLimit">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+         <action name="api/updateIgnoreTimeForSummaries" class="com.akto.action.AdminSettingsAction" method="updateDeltaTimeForIgnoringSummaries">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
