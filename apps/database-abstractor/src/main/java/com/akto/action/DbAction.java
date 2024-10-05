@@ -5,6 +5,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
+import com.akto.data_actor.DbActor;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -18,20 +19,7 @@ import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.AccessMatrixTaskInfo;
-import com.akto.dto.testing.AccessMatrixUrlToRole;
-import com.akto.dto.testing.CollectionWiseTestingEndpoints;
-import com.akto.dto.testing.CustomTestingEndpoints;
-import com.akto.dto.testing.EndpointLogicalGroup;
-import com.akto.dto.testing.TestRoles;
-import com.akto.dto.testing.TestingRun;
-import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.TestingRunResultSummary;
-import com.akto.dto.testing.WorkflowNodeDetails;
-import com.akto.dto.testing.WorkflowTest;
-import com.akto.dto.testing.WorkflowTestResult;
-import com.akto.dto.testing.YamlNodeDetails;
+import com.akto.dto.testing.*;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
@@ -39,6 +27,11 @@ import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_collector.TrafficCollectorMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.notifications.slack.APITestStatusAlert;
+import com.akto.notifications.slack.NewIssuesModel;
+import com.akto.notifications.slack.SlackAlerts;
+import com.akto.notifications.slack.SlackSender;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.utils.CustomAuthUtil;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.RedactAlert;
@@ -65,14 +58,7 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import com.google.gson.Gson;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -2032,7 +2018,7 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String updateIssueCountAndStateInSummary(){
+    public String updateIssueCountAndStateInSummary() {
         try {
             if (summaryId != null) {
                 ObjectId summaryObjectId = new ObjectId(summaryId);
@@ -2044,7 +2030,95 @@ public class DbAction extends ActionSupport {
             loggerMaker.errorAndAddToDb(e, "Error in updateIssueCountAndStateInSummary " + e.toString());
             return Action.ERROR.toUpperCase();
         }
+
+        // send slack alert
+        try {
+            sendSlack(trrs, totalCountIssues, Context.accountId.get());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in sending slack alert for testing" + e);
+        }
+
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public static void sendSlack(TestingRunResultSummary trrs, Map<String, Integer> totalCountIssues, int accountId) {
+        TestingRun testingRun = DbLayer.findTestingRun(trrs.getTestingRunId().toHexString());
+
+        if (!testingRun.getSendSlackAlert()) {
+            loggerMaker.infoAndAddToDb("Not sending slack alert for trrs " + trrs.getId());
+            return;
+        }
+
+        String summaryId = trrs.getHexId();
+
+        int totalApis = trrs.getTotalApis();
+        String testType =  TestingRun.findTestType(testingRun,trrs);
+        int countIssues = totalCountIssues.values().stream().mapToInt(Integer::intValue).sum();
+        long nextTestRun = testingRun.getPeriodInSeconds() == 0 ? 0 : ((long) testingRun.getScheduleTimestamp() + (long) testingRun.getPeriodInSeconds());
+        long scanTimeInSeconds = Math.abs(Context.now() - trrs.getStartTimestamp());
+
+        String collectionName = null;
+        TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
+        if(testingEndpoints != null && testingEndpoints.getType() != null && testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE)) {
+            CollectionWiseTestingEndpoints collectionWiseTestingEndpoints = (CollectionWiseTestingEndpoints) testingEndpoints;
+            int apiCollectionId = collectionWiseTestingEndpoints.getApiCollectionId();
+            ApiCollection apiCollection = DbLayer.fetchApiCollectionMeta(apiCollectionId);
+            collectionName = apiCollection.getName();
+        }
+
+        int newIssues = 0;
+        List<TestingRunIssues> testingRunIssuesList = DbLayer.fetchOpenIssues(summaryId);
+        Map<String, Integer> apisAffectedCount = new HashMap<>();
+        for (TestingRunIssues testingRunIssues: testingRunIssuesList) {
+            String testSubCategory = testingRunIssues.getId().getTestSubCategory();
+            int totalApisAffected = apisAffectedCount.getOrDefault(testSubCategory, 0)+1;
+            apisAffectedCount.put(testSubCategory, totalApisAffected);
+            if(testingRunIssues.getCreationTime() > trrs.getStartTimestamp()) newIssues++;
+        }
+
+        testingRunIssuesList.sort(Comparator.comparing(TestingRunIssues::getSeverity));
+
+        List<NewIssuesModel> newIssuesModelList = new ArrayList<>();
+        for(TestingRunIssues testingRunIssues : testingRunIssuesList) {
+            if(testingRunIssues.getCreationTime() > trrs.getStartTimestamp()) {
+                String testRunResultId;
+                if(newIssuesModelList.size() <= 5) {
+                    Bson filterForRunResult = Filters.and(
+                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunIssues.getLatestTestingRunSummaryId()),
+                            Filters.eq(TestingRunResult.TEST_SUB_TYPE, testingRunIssues.getId().getTestSubCategory()),
+                            Filters.eq(TestingRunResult.API_INFO_KEY, testingRunIssues.getId().getApiInfoKey())
+                    );
+                    TestingRunResult testingRunResult = DbLayer.fetchTestingRunResults(filterForRunResult);
+                    testRunResultId = testingRunResult.getHexId();
+                } else testRunResultId = "";
+
+                String issueCategory = testingRunIssues.getId().getTestSubCategory();
+                newIssuesModelList.add(new NewIssuesModel(
+                        issueCategory,
+                        testRunResultId,
+                        apisAffectedCount.get(issueCategory),
+                        testingRunIssues.getCreationTime()
+                ));
+            }
+        }
+
+        SlackAlerts apiTestStatusAlert = new APITestStatusAlert(
+                testingRun.getName(),
+                totalCountIssues.getOrDefault(GlobalEnums.Severity.HIGH.name(), 0),
+                totalCountIssues.getOrDefault(GlobalEnums.Severity.MEDIUM.name(), 0),
+                totalCountIssues.getOrDefault(GlobalEnums.Severity.LOW.name(), 0),
+                countIssues,
+                newIssues,
+                totalApis,
+                collectionName,
+                scanTimeInSeconds,
+                testType,
+                nextTestRun,
+                newIssuesModelList,
+                testingRun.getHexId(),
+                summaryId
+        );
+        SlackSender.sendAlert(accountId, apiTestStatusAlert);
     }
 
     public List<CustomDataTypeMapper> getCustomDataTypes() {
