@@ -2032,14 +2032,10 @@ public class DbAction extends ActionSupport {
         }
 
         // send slack alert
-        if (testingRun.getSendSlackAlert()) {
-            try {
-                sendSlack(trrs, totalCountIssues, accountId);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "error in sending slack alert for testing" + e);
-            }
-        } else {
-            loggerMaker.infoAndAddToDb("Not sending slack alert because state is " + ( state != null ? state : "null"));
+        try {
+            sendSlack(trrs, totalCountIssues, Context.accountId.get());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in sending slack alert for testing" + e);
         }
 
         return Action.SUCCESS.toUpperCase();
@@ -2047,6 +2043,12 @@ public class DbAction extends ActionSupport {
 
     public static void sendSlack(TestingRunResultSummary trrs, Map<String, Integer> totalCountIssues, int accountId) {
         TestingRun testingRun = DbLayer.findTestingRun(trrs.getTestingRunId().toHexString());
+
+        if (!testingRun.getSendSlackAlert()) {
+            loggerMaker.infoAndAddToDb("Not sending slack alert for trrs " + trrs.getId());
+            return;
+        }
+
         String summaryId = trrs.getHexId();
 
         int totalApis = trrs.getTotalApis();
