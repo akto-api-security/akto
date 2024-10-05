@@ -7,12 +7,14 @@ import java.util.List;
 
 public class TestResult extends GenericTestResult {
 
+    public static final String _MESSAGE = "message";
     private String message;
     public static final String _ERRORS = "errors";
     private List<String> errors;
     public static final String TEST_RESULTS_ERRORS = TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS;
 
     public static final String ERRORS = "errors";
+    public static final String ORIGINAL_MESSAGE = "originalMessage";
     private String originalMessage;
     private double percentageMatch;
     private TestInfo testInfo;

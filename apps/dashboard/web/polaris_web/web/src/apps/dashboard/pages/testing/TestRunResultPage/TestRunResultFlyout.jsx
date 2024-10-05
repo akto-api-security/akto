@@ -5,7 +5,7 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Avatar, Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack } from '@shopify/polaris'
+import { Avatar, Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link } from '@shopify/polaris'
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import GridRows from '../../../components/shared/GridRows'
@@ -159,10 +159,22 @@ function TestRunResultFlyout(props) {
         )
     }
 
+    const dataExpiredComponent = <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
+        <Text>
+            Sample data might not be available for non-vulnerable tests more than 2 months ago.
+            <br/>
+            Please contact <Link url="mailto:support@akto.io">support@akto.io</Link> for more information.
+        </Text>
+    </Box>
+
+    const dataStoreTime = 2 * 30 * 24 * 60 * 60;
+    const dataExpired = func.timeNow() - (selectedTestRunResult?.endTimestamp || func.timeNow()) > dataStoreTime
+
     const ValuesTab = {
         id: 'values',
         content: "Values",
-        component: func.showTestSampleData(selectedTestRunResult) && selectedTestRunResult.testResults &&
+        component: dataExpired ? dataExpiredComponent :
+            (func.showTestSampleData(selectedTestRunResult) && selectedTestRunResult.testResults &&
         <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
             key="Sample values"
             heading={"Attempt"}
@@ -175,7 +187,7 @@ function TestRunResultFlyout(props) {
             vulnerable={selectedTestRunResult?.vulnerable}
             isVulnerable={selectedTestRunResult.vulnerable}
         />
-        </Box> 
+        </Box>)
     }
     const moreInfoComponent = (
         infoStateFlyout.length > 0 ?

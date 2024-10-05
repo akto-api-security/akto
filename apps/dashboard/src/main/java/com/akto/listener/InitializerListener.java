@@ -102,6 +102,7 @@ import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
 import com.akto.utils.jobs.CleanInventory;
+import com.akto.utils.jobs.CleanTestingJob;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
@@ -2130,6 +2131,7 @@ public class InitializerListener implements ServletContextListener {
                      * TODO: Remove this once traffic pipeline is cleaned.
                      */
                     CleanInventory.cleanInventoryJobRunner();
+                    CleanTestingJob.cleanTestingJobRunner();
 
                     MatchingJob.MatchingJobRunner();
 
