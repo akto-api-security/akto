@@ -2032,7 +2032,7 @@ public class DbAction extends ActionSupport {
         }
 
         // send slack alert
-        if (state != null && state.equalsIgnoreCase(TestingRun.State.COMPLETED.name())) {
+        if (testingRun.getSendSlackAlert()) {
             try {
                 sendSlack(trrs, totalCountIssues, accountId);
             } catch (Exception e) {
