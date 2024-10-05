@@ -40,9 +40,12 @@ public class TestingRun {
         ONE_TIME, RECURRING, CI_CD, CONTINUOUS_TESTING
     }
 
+    public static final String SEND_SLACK_ALERT = "sendSlackAlert";
+    private boolean sendSlackAlert = false;
+
     public TestingRun() { }
 
-    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, String triggeredBy) {
+    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, String triggeredBy, boolean sendSlackAlert) {
         this.scheduleTimestamp = scheduleTimestamp;
         this.testRunTime = -1;
         this.maxConcurrentRequests = -1;
@@ -55,8 +58,9 @@ public class TestingRun {
         this.periodInSeconds = periodInSeconds;
         this.name = name;
         this.triggeredBy = triggeredBy;
+        this.sendSlackAlert = sendSlackAlert;
     }
-    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests) {
+    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests, boolean sendSlackAlert) {
         this.scheduleTimestamp = scheduleTimestamp;
         this.testRunTime = testRunTime;
         this.maxConcurrentRequests = maxConcurrentRequests;
@@ -68,6 +72,7 @@ public class TestingRun {
         this.state = state;
         this.periodInSeconds = periodInSeconds;
         this.name = name;
+        this.sendSlackAlert = sendSlackAlert;
     }
 
     public TestingRunConfig getTestingRunConfig() {
@@ -189,6 +194,18 @@ public class TestingRun {
 
     public void setTriggeredBy(String triggeredBy) {
         this.triggeredBy = triggeredBy;
+    }
+
+    public boolean isSendSlackAlert() {
+        return sendSlackAlert;
+    }
+
+    public boolean getSendSlackAlert() {
+        return sendSlackAlert;
+    }
+
+    public void setSendSlackAlert(boolean sendSlackAlert) {
+        this.sendSlackAlert = sendSlackAlert;
     }
 
     @Override
