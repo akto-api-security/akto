@@ -501,7 +501,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return countMap;
     }
 
-    private List<Bson> generateFilterForSubtypes(List<String> sensitiveParameters, BasicDBObject groupedId, Boolean inResponseOnly, Bson customFilter){
+    public List<Bson> generateFilterForSubtypes(List<String> sensitiveParameters, BasicDBObject groupedId, Boolean inResponseOnly, Bson customFilter){
         int codeValue = inResponseOnly ? 0 : -1 ;
         List<Bson> pipeline = new ArrayList<>();
         Bson filterOnResponse = Filters.gte(SingleTypeInfo._RESPONSE_CODE, codeValue);

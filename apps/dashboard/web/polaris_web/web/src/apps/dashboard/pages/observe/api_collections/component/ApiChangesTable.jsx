@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import transform from '../../transform';
 import apiChangesData from '../data/apiChanges';
-import Store from '../../../../store';
 import PersistStore from '../../../../../main/PersistStore';
 import func from '@/util/func';
 import tableFunc from '../../../../components/tables/transform';
@@ -15,7 +14,7 @@ function ApiChangesTable(props) {
   const { handleRowClick, tableLoading, startTimeStamp, endTimeStamp, newEndpoints, parametersCount } = props ;
   const [selectedTab, setSelectedTab] = useState("new_endpoints") ;
   const [selected, setSelected] = useState(0) ;
-  const dataTypeNames = Store(state => state.dataTypeNames);
+  const [dataTypeNames,setDataTypeNames] = useState([])
   const apiCollectionMap = PersistStore(state => state.collectionsMap)
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState([])
@@ -81,6 +80,9 @@ function ApiChangesTable(props) {
       setLoading(true);
         let ret = [];
         let total = 0;
+        await api.fetchDataTypeNames().then((resp) => {
+          setDataTypeNames(resp.allDataTypes)
+        })
         await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimeStamp, endTimeStamp, false, false, queryValue).then((res) => {
             ret = res.endpoints.map((x,index) => transform.prepareEndpointForTable(x,index));
             total = res.total;
