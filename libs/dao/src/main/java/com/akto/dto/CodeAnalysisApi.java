@@ -19,6 +19,15 @@ public class CodeAnalysisApi {
         this.responseBody = responseBody;
     }
 
+    @Override
+    public String toString() {
+        return "CodeAnalysisApi{" +
+                "method='" + method + '\'' +
+                ", endpoint='" + endpoint + '\'' +
+                ", location=" + location +
+                '}';
+    }
+
     public String generateCodeAnalysisApisMapKey() {
         return method + " " + endpoint;
     }
