@@ -122,7 +122,6 @@ public class KafkaUtils {
         } finally {
             this.consumer.close();
         }
-
     }
 
     public void initKafkaProducer() {
@@ -184,6 +183,11 @@ public class KafkaUtils {
             case "bulkWriteTestingRunIssues":
                 dbAction.setWritesForTestingRunIssues(bulkWrites);
                 dbAction.bulkWriteTestingRunIssues();
+                break;
+
+            case "bulkWriteSuspectSampleData":
+                dbAction.setWritesForSuspectSampleData(bulkWrites);
+                dbAction.bulkWriteSuspectSampleData();
                 break;
 
             default:

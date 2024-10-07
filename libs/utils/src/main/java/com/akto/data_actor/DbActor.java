@@ -1,9 +1,12 @@
 package com.akto.data_actor;
 
+import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -14,6 +17,7 @@ import com.akto.dto.testing.AccessMatrixUrlToRole;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
@@ -21,6 +25,7 @@ import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
@@ -407,6 +412,10 @@ public class DbActor extends DataActor {
         return DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues);
     }
 
+    public TestingRunResultSummary updateIssueCountAndStateInSummary(String summaryId, Map<String, Integer> totalCountIssues, String state) {
+        return DbLayer.updateIssueCountAndStateInSummary(summaryId, totalCountIssues, state);
+    }
+
     public List<Integer> fetchDeactivatedCollections() {
         return DbLayer.fetchDeactivatedCollections();
     }
@@ -461,6 +470,10 @@ public class DbActor extends DataActor {
         DbLayer.insertTestingLog(log);
     }
 
+    public void insertProtectionLog(Log log) {
+        DbLayer.insertProtectionLog(log);
+    }
+
     public void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
         DbLayer.bulkWriteDependencyNodes(dependencyNodeList);
     }
@@ -471,6 +484,31 @@ public class DbActor extends DataActor {
 
     public void insertRuntimeMetricsData(BasicDBList metricsData) {
         DbLayer.insertRuntimeMetricsData(metricsData);
+    }
+
+    public void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData) {
+        ArrayList<WriteModel<SuspectSampleData>> writes = new ArrayList<>();
+        for (Object obj: writesForSuspectSampleData) {
+            WriteModel<SuspectSampleData> write = (WriteModel<SuspectSampleData>)obj;
+            writes.add(write);
+        }
+        DbLayer.bulkWriteSuspectSampleData(writes);
+    }
+
+    public List<YamlTemplate> fetchFilterYamlTemplates() {
+        return DbLayer.fetchFilterYamlTemplates();
+    }
+    
+    public List<YamlTemplate> fetchActiveAdvancedFilters(){
+        return DbLayer.fetchActiveFilterTemplates();
+    }
+
+    public Set<MergedUrls> fetchMergedUrls() {
+        return DbLayer.fetchMergedUrls();
+    }
+
+    public List<TestingRunResultSummary> fetchStatusOfTests() {
+        return DbLayer.fetchStatusOfTests();
     }
 
 }

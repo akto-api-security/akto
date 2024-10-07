@@ -12,9 +12,11 @@ import java.util.Set;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
+import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.dependency_analyser.DependencyAnalyserUtils;
 import com.akto.dto.*;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
@@ -24,6 +26,8 @@ import org.bson.types.ObjectId;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
@@ -59,6 +63,7 @@ import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
@@ -379,6 +384,10 @@ public class DbLayer {
         LogsDao.instance.insertOne(log);
     }
 
+    public static void insertProtectionLog(Log log) {
+        ProtectionLogsDao.instance.insertOne(log);
+    }
+
     public static void modifyHybridSaasSetting(boolean isHybridSaas) {
         Integer accountId = Context.accountId.get();
         AccountsDao.instance.updateOne(Filters.eq("_id", accountId), Updates.set(Account.HYBRID_SAAS_ACCOUNT, isHybridSaas));
@@ -638,8 +647,21 @@ public class DbLayer {
                 options);
     }
 
+    public static TestingRunResultSummary updateIssueCountAndStateInSummary(String summaryId, Map<String, Integer> totalCountIssues, String state) {
+        ObjectId summaryObjectId = new ObjectId(summaryId);
+        FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
+        options.returnDocument(ReturnDocument.AFTER);
+        return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                Filters.eq(Constants.ID, summaryObjectId),
+                Updates.combine(
+                        Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+                        Updates.set(TestingRunResultSummary.STATE, state),
+                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)),
+                options);
+    }
+
     public static List<Integer> fetchDeactivatedCollections() {
-        return new ArrayList<>(UsageMetricCalculator.getDeactivatedLatest());
+        return new ArrayList<>(UsageMetricCalculator.getDeactivated());
     }
 
     public static void updateUsage(MetricTypes metricType, int deltaUsage){
@@ -888,5 +910,35 @@ public class DbLayer {
             loggerMaker.infoAndAddToDb("insertRuntimeMetricsData bulk write size " + metricsData.size());
             RuntimeMetricsDao.bulkInsertMetrics(bulkUpdates);
         }
+    }
+
+    public static void bulkWriteSuspectSampleData(List<WriteModel<SuspectSampleData>> writesForSingleTypeInfo) {
+        SuspectSampleDataDao.instance.getMCollection().bulkWrite(writesForSingleTypeInfo);
+    }
+
+    public static List<YamlTemplate> fetchFilterYamlTemplates() {
+        return FilterYamlTemplateDao.instance.findAll(Filters.empty());
+    }
+
+    public static List<YamlTemplate> fetchActiveFilterTemplates(){
+        return AdvancedTrafficFiltersDao.instance.findAll(
+            Filters.ne(YamlTemplate.INACTIVE, false)
+        );
+    }
+
+    public static Set<MergedUrls> fetchMergedUrls() {
+        return MergedUrlsDao.instance.getMergedUrls();
+    }
+
+    public static List<TestingRunResultSummary> fetchStatusOfTests() {
+        int timeFilter = Context.now() - 30 * 60;
+        List<TestingRunResultSummary> currentRunningTests = TestingRunResultSummariesDao.instance.findAll(
+            Filters.gte(TestingRunResultSummary.START_TIMESTAMP, timeFilter),
+            Projections.include("_id", TestingRunResultSummary.STATE, TestingRunResultSummary.TESTING_RUN_ID) 
+        );
+        for (TestingRunResultSummary summary: currentRunningTests) {
+            summary.setTestingRunHexId(summary.getTestingRunId().toHexString());
+        }
+        return currentRunningTests;
     }
 }

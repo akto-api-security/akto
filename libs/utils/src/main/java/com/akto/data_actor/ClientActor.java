@@ -1,6 +1,7 @@
 package com.akto.data_actor;
 
 import com.akto.DaoInit;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.testing.ApiExecutor;
 import com.auth0.jwt.JWT;
@@ -2004,6 +2005,39 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public TestingRunResultSummary updateIssueCountAndStateInSummary(String summaryId, Map<String, Integer> totalCountIssues, String state) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("summaryId", summaryId);
+        obj.put("totalCountIssues", totalCountIssues);
+        obj.put("state", state);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateIssueCountAndStateInSummary", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateIssueCountAndStateInSummary", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject testingRunResultSummary = (BasicDBObject) payloadObj.get("trrs");
+                testingRunResultSummary.remove("id");
+                testingRunResultSummary.remove("testingRunId");
+                TestingRunResultSummary res = objectMapper.readValue(testingRunResultSummary.toJson(), TestingRunResultSummary.class);
+                res.setId(new ObjectId(testingRunResultSummary.getString("hexId")));
+                res.setTestingRunId(new ObjectId(testingRunResultSummary.getString("testingRunHexId")));
+                return res;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateIssueCountAndStateInSummary" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
     public List<TestingRunResult> fetchLatestTestingRunResultBySummaryId(String summaryId, int limit, int skip) {
         Map<String, List<String>> headers = buildHeaders();
         List<TestingRunResult> testingRunResultList = new ArrayList<>();
@@ -2939,6 +2973,28 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void insertProtectionLog(Log log) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertProtectionLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                System.out.println("non 2xx response in insertProtectionLog");
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("error in insertProtectionLog" + e);
+            return;
+        }
+    }
+
     public void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("dependencyNodeList", dependencyNodeList);
@@ -3037,6 +3093,141 @@ public class ClientActor extends DataActor {
         } catch (Exception e) {
             System.out.println("error in insertRuntimeMetricsData" + e);
             return;
+        }
+    }
+
+    public void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData) {
+        bulkWrite(writesForSuspectSampleData, "/bulkWriteSuspectSampleData", "writesForSuspectSampleData");
+    }
+
+    public List<YamlTemplate> fetchFilterYamlTemplates() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<YamlTemplate> templates = new ArrayList<>();
+        BasicDBObject obj = new BasicDBObject();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchFilterYamlTemplates", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchFilterYamlTemplates", LoggerMaker.LogDb.THREAT_DETECTION);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList yamlTemplates = (BasicDBList) payloadObj.get("yamlTemplates");
+                for (Object template: yamlTemplates) {
+                    BasicDBObject obj2 = (BasicDBObject) template;
+                    templates.add(objectMapper.readValue(obj2.toJson(), YamlTemplate.class));
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchFilterYamlTemplates" + e, LoggerMaker.LogDb.THREAT_DETECTION);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchFilterYamlTemplates" + e, LoggerMaker.LogDb.THREAT_DETECTION);
+            return null;
+        }
+        return templates;
+    }
+
+    public List<YamlTemplate> fetchActiveAdvancedFilters(){
+        Map<String, List<String>> headers = buildHeaders();
+
+        List<YamlTemplate> respList = new ArrayList<>();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchActiveAdvancedFilters", "", "POST", "", headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchActiveAdvancedFilters", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList newTemplates = (BasicDBList) payloadObj.get("activeAdvancedFilters");
+                for (Object template: newTemplates) {
+                    BasicDBObject templateObject = (BasicDBObject) template;
+                    YamlTemplate yamlTemplate = objectMapper.readValue(templateObject.toJson(), YamlTemplate.class);
+                    respList.add(yamlTemplate);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchActiveAdvancedFilters" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetching filter yaml templates" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+        return respList;
+    }
+
+    public Set<MergedUrls> fetchMergedUrls() {
+        Map<String, List<String>> headers = buildHeaders();
+
+        List<MergedUrls> respList = new ArrayList<>();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchMergedUrls", "", "POST", "", headers, "");
+
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchMergedUrls", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList newUrls = (BasicDBList) payloadObj.get("mergedUrls");
+                for (Object url: newUrls) {
+                    BasicDBObject urlObj = (BasicDBObject) url;
+                    MergedUrls mergedUrl = objectMapper.readValue(urlObj.toJson(), MergedUrls.class);
+                    respList.add(mergedUrl);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchMergedUrls" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetching merged urls: " + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+
+        return new HashSet<>(respList);
+    }
+
+    public List<TestingRunResultSummary> fetchStatusOfTests() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<TestingRunResultSummary> result = new ArrayList<>();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStatusOfTests", "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb( "non 2xx response in fetchStatusOfTests", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList tests = (BasicDBList) payloadObj.get("currentlyRunningTests");
+                for (Object test: tests) {
+                    BasicDBObject obj = (BasicDBObject) test;
+                    obj.remove("id");
+                    obj.remove("testingRunId");
+                    TestingRunResultSummary res = objectMapper.readValue(obj.toJson(), TestingRunResultSummary.class);
+                    res.setId(new ObjectId(obj.getString("hexId")));
+                    res.setTestingRunId(new ObjectId(obj.getString("testingRunHexId")));
+                    result.add(res);
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchStatusOfTests" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+
+            return result;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchStatusOfTests" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
         }
     }
 

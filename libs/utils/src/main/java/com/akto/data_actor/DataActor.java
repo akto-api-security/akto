@@ -3,6 +3,7 @@ package com.akto.data_actor;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -164,6 +165,8 @@ public abstract class DataActor {
 
     public abstract TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues);
 
+    public abstract TestingRunResultSummary updateIssueCountAndStateInSummary(String summaryId, Map<String, Integer> totalCountIssues, String state);
+
     public abstract List<TestingRunResult> fetchLatestTestingRunResultBySummaryId(String summaryId, int limit, int skip);
 
     public abstract List<TestRoles> fetchTestRoles();
@@ -230,4 +233,15 @@ public abstract class DataActor {
 
     public abstract void insertRuntimeMetricsData(BasicDBList metricsData);
 
+    public abstract void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData);
+
+    public abstract List<YamlTemplate> fetchFilterYamlTemplates();
+
+    public abstract void insertProtectionLog(Log log);
+    
+    public abstract List<YamlTemplate> fetchActiveAdvancedFilters();
+
+    public abstract Set<MergedUrls> fetchMergedUrls();
+
+    public abstract List<TestingRunResultSummary> fetchStatusOfTests();
 }

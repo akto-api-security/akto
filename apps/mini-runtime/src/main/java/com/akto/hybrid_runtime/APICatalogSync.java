@@ -6,9 +6,13 @@ import java.util.regex.Pattern;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.filter.MergedUrlsDao;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dto.*;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.sql.SampleDataAlt;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
@@ -26,6 +30,7 @@ import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
 import com.akto.types.CappedSet;
+import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.RedactSampleData;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -57,6 +62,7 @@ public class APICatalogSync {
     public int lastStiFetchTs = 0;
 
     private DataActor dataActor = DataActorFactory.fetchInstance();
+    public static Set<MergedUrls> mergedUrls;
 
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
@@ -70,6 +76,7 @@ public class APICatalogSync {
         this.delta = new HashMap<>();
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
         this.aktoPolicyNew = new AktoPolicyNew();
+        this.mergedUrls = new HashSet<>();
         if (buildFromDb) {
             buildFromDB(false, fetchAllSTI);
         }
@@ -527,6 +534,7 @@ public class APICatalogSync {
         int start = newUrl.getUrl().startsWith("http") ? 3 : 0;
         for(int i = start; i < tokens.length; i ++) {
             String tempToken = tokens[i];
+            if(DictionaryFilter.isEnglishWord(tempToken)) continue;
 
             if (NumberUtils.isParsable(tempToken)) {
                 newTypes[i] = isNumber(tempToken) ? SuperType.INTEGER : SuperType.FLOAT;
@@ -556,7 +564,21 @@ public class APICatalogSync {
         }
 
         if (allNull) return null;
-        return new URLTemplate(tokens, newTypes, newUrl.getMethod());
+
+        URLTemplate urlTemplate = new URLTemplate(tokens, newTypes, newUrl.getMethod());
+
+        try {
+            for(MergedUrls mergedUrl : mergedUrls) {
+                if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
+                        mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
+                    return null;
+                }
+            }
+        } catch(Exception e) {
+            loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
+        }
+
+        return urlTemplate;
     }
 
 
@@ -578,6 +600,7 @@ public class APICatalogSync {
         for(int i = 0; i < newTokens.length; i ++) {
             String tempToken = newTokens[i];
             String dbToken = dbTokens[i];
+            if (DictionaryFilter.isEnglishWord(tempToken) || DictionaryFilter.isEnglishWord(dbToken)) continue;
 
             int minCount = dbUrl.getUrl().startsWith("http") && newUrl.getUrl().startsWith("http") ? 3 : 0;
             if (tempToken.equalsIgnoreCase(dbToken) || i < minCount) {
@@ -611,7 +634,20 @@ public class APICatalogSync {
         if (allNull) return null;
 
         if (templatizedStrTokens <= 1) {
-            return new URLTemplate(newTokens, newTypes, newUrl.getMethod());
+            URLTemplate urlTemplate = new URLTemplate(newTokens, newTypes, newUrl.getMethod());
+
+            try {
+                for(MergedUrls mergedUrl : mergedUrls) {
+                    if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
+                            mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
+                        return null;
+                    }
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
+            }
+
+            return urlTemplate;
         }
 
         return null;
@@ -1097,6 +1133,9 @@ public class APICatalogSync {
         } catch (Exception e) {
             loggerMaker.infoAndAddToDb("Error while clearing values in db: " + e.getMessage(), LogDb.RUNTIME);
         }
+
+        mergedUrls = dataActor.fetchMergedUrls();
+
         aktoPolicyNew.buildFromDb(fetchAllSTI);
     }
 
@@ -1222,7 +1261,7 @@ public class APICatalogSync {
 
     private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams) {
         Map<Integer, APICatalog> ret = new HashMap<>();
-        
+
         for (SingleTypeInfo param: allParams) {
             try {
                 buildHelper(param, ret);

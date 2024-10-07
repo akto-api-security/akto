@@ -5,6 +5,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
+import com.akto.data_actor.DbActor;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -12,29 +13,25 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.AccessMatrixTaskInfo;
-import com.akto.dto.testing.AccessMatrixUrlToRole;
-import com.akto.dto.testing.CollectionWiseTestingEndpoints;
-import com.akto.dto.testing.CustomTestingEndpoints;
-import com.akto.dto.testing.EndpointLogicalGroup;
-import com.akto.dto.testing.TestRoles;
-import com.akto.dto.testing.TestingRun;
-import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.TestingRunResultSummary;
-import com.akto.dto.testing.WorkflowTest;
-import com.akto.dto.testing.WorkflowTestResult;
+import com.akto.dto.testing.*;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_collector.TrafficCollectorMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.notifications.slack.APITestStatusAlert;
+import com.akto.notifications.slack.NewIssuesModel;
+import com.akto.notifications.slack.SlackAlerts;
+import com.akto.notifications.slack.SlackSender;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.utils.CustomAuthUtil;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.RedactAlert;
@@ -44,11 +41,13 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.testing.TestExecutor;
 import com.akto.trafficFilter.HostFilter;
 import com.akto.trafficFilter.ParamFilter;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -59,14 +58,7 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import com.google.gson.Gson;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -97,6 +89,7 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForTrafficInfo;
     List<BulkUpdates> writesForTrafficMetrics;
     List<BulkUpdates> writesForTestingRunIssues;
+    List<BulkUpdates> writesForSuspectSampleData;
     List<DependencyNode> dependencyNodeList;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
@@ -159,6 +152,10 @@ public class DbAction extends ActionSupport {
     List<ApiInfo.ApiInfoKey> newEps;
     String logicalGroupName;
     BasicDBList issuesIds;
+    List<YamlTemplate> activeAdvancedFilters;
+    Set<MergedUrls> mergedUrls;
+    List<TestingRunResultSummary> currentlyRunningTests;
+    String state;
 
     public BasicDBList getIssuesIds() {
         return issuesIds;
@@ -216,7 +213,7 @@ public class DbAction extends ActionSupport {
     TestRoles testRole;
     List<TestRoles> testRoles;
     Map<ObjectId, TestingRunResultSummary> testingRunResultSummaryMap;
-    TestingRunResult testingRunResult;
+    BasicDBObject testingRunResult;
     Tokens token;
     WorkflowTest workflowTest;
     List<YamlTemplate> yamlTemplates;
@@ -224,7 +221,7 @@ public class DbAction extends ActionSupport {
     int scheduleTs;
 
     private static final Gson gson = new Gson();
-    ObjectMapper objectMapper = new ObjectMapper();
+    ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
     KafkaUtils kafkaUtils = new KafkaUtils();
     String endpointLogicalGroupId;
 
@@ -390,20 +387,28 @@ public class DbAction extends ActionSupport {
             for (BasicDBObject obj: apiInfoList) {
                 ApiInfo apiInfo = objectMapper.readValue(obj.toJson(), ApiInfo.class);
                 ApiInfoKey id = apiInfo.getId();
+                if (UsageMetricCalculator.getDeactivated().contains(id.getApiCollectionId())) {
+                    continue;
+                }
+                if (accountId == 1714700875 && URLMethods.Method.OPTIONS.equals(id.getMethod())) {
+                    continue;
+                }
                 if (accountId == 1721887185 && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)  && !id.getMethod().equals(Method.OPTIONS))  {
                     loggerMaker.infoAndAddToDb("auth types for endpoint from runtime " + id.getUrl() + " " + id.getMethod() + " : " + apiInfo.getAllAuthTypesFound());
                 }
                 apiInfos.add(apiInfo);
             }
-            SingleTypeInfo.fetchCustomAuthTypes(accountId);
-            service.schedule(new Runnable() {
-                public void run() {
-                    Context.accountId.set(accountId);
-                    List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(accountId);
-                    CustomAuthUtil.calcAuth(apiInfos, customAuthTypes, accountId == 1721887185);
-                    DbLayer.bulkWriteApiInfo(apiInfos);
-                }
-            }, 0, TimeUnit.SECONDS);
+            if (apiInfos!=null && !apiInfos.isEmpty()) {
+                SingleTypeInfo.fetchCustomAuthTypes(accountId);
+                service.schedule(new Runnable() {
+                    public void run() {
+                        Context.accountId.set(accountId);
+                        List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(accountId);
+                        CustomAuthUtil.calcAuth(apiInfos, customAuthTypes, accountId == 1721887185);
+                        DbLayer.bulkWriteApiInfo(apiInfos);
+                    }
+                }, 0, TimeUnit.SECONDS);
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in bulkWriteApiInfo " + e.toString());
             if (kafkaUtils.isWriteEnabled()) {
@@ -445,10 +450,16 @@ public class DbAction extends ActionSupport {
                                 if (ignoreHosts.contains(val)) {
                                     ignore = true;
                                 }
+                                if(UsageMetricCalculator.getDeactivated().contains(apiCollectionId)){
+                                    ignore = true;
+                                }
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._URL)){
                                 url = entry.getValue().toString();
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._METHOD)){
                                 method = entry.getValue().toString();
+                                if (accId == 1714700875 && URLMethods.Method.OPTIONS.equals(Method.valueOf(method))) {
+                                    ignore = true;
+                                }
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._PARAM)){
                                 param = entry.getValue().toString();
                             }
@@ -568,7 +579,9 @@ public class DbAction extends ActionSupport {
 
                 loggerMaker.infoAndAddToDb(String.format("Consumer data: %d ignored: %d writes: %d", writesForSti.size(), ignoreCount, writes.size()));
     
-                DbLayer.bulkWriteSingleTypeInfo(writes);
+                if (writes != null && !writes.isEmpty()) {
+                    DbLayer.bulkWriteSingleTypeInfo(writes);
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSti " + e.toString());
                 return Action.ERROR.toUpperCase();
@@ -578,8 +591,8 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteSampleData() {
+        int accId = Context.accountId.get();
         if (kafkaUtils.isWriteEnabled()) {
-            int accId = Context.accountId.get();
             kafkaUtils.insertData(writesForSampleData, "bulkWriteSampleData", accId);
         } else {
             try {
@@ -589,6 +602,10 @@ public class DbAction extends ActionSupport {
                     Map<String, Object> mObj = (Map) bulkUpdate.getFilters().get("_id");
                     String apiCollectionIdStr = mObj.get("apiCollectionId").toString();
                     int apiCollectionId = Integer.valueOf(apiCollectionIdStr);
+
+                    if(UsageMetricCalculator.getDeactivated().contains(apiCollectionId)){
+                        continue;
+                    }
 
                     String bucketEndEpochStr = mObj.get("bucketEndEpoch").toString();
                     int bucketEndEpoch = Integer.valueOf(bucketEndEpochStr);
@@ -601,6 +618,10 @@ public class DbAction extends ActionSupport {
 
                     String url = (String) mObj.get("url");
                     String method = (String) mObj.get("method");
+
+                    if (accId == 1714700875 && URLMethods.Method.OPTIONS.equals(Method.valueOf(method))) {
+                        continue;
+                    }
 
                     Bson filters = Filters.and(Filters.eq("_id.apiCollectionId", apiCollectionId),
                             Filters.eq("_id.bucketEndEpoch", bucketEndEpoch),
@@ -639,7 +660,9 @@ public class DbAction extends ActionSupport {
                             new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
                     );
                 }
-                DbLayer.bulkWriteSampleData(writes);
+                if(writes!=null && !writes.isEmpty()){
+                    DbLayer.bulkWriteSampleData(writes);
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSampleData " + e.toString());
                 e.printStackTrace();
@@ -650,8 +673,8 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteSensitiveSampleData() {
+        int accId = Context.accountId.get();
         if (kafkaUtils.isWriteEnabled()) {
-            int accId = Context.accountId.get();
             kafkaUtils.insertData(writesForSensitiveSampleData, "bulkWriteSensitiveSampleData", accId);
         } else {
             try {
@@ -660,11 +683,16 @@ public class DbAction extends ActionSupport {
                 for (BulkUpdates bulkUpdate: writesForSensitiveSampleData) {
                     Bson filters = Filters.empty();
                     int apiCollectionId = 0;
+                    boolean ignore = false;
                     for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                         if (entry.getKey().equalsIgnoreCase("_id.apiCollectionId") ) {
                             String valStr = entry.getValue().toString();
                             int val = Integer.valueOf(valStr);
                             apiCollectionId = val;
+                            if(UsageMetricCalculator.getDeactivated().contains(apiCollectionId)){
+                                ignore = true;
+                                break;
+                            }
                             filters = Filters.and(filters, Filters.eq(entry.getKey(), val));
                         } else if(entry.getKey().equalsIgnoreCase("_id.responseCode")) {
                             String valStr = entry.getValue().toString();
@@ -672,8 +700,23 @@ public class DbAction extends ActionSupport {
                             filters = Filters.and(filters, Filters.eq(entry.getKey(), val));
                         } else {
                             filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
+                            try {
+                                String key = entry.getKey();
+                                String value = (String) entry.getValue();
+                                if ("_id.method".equals(key) && accId == 1714700875
+                                        && URLMethods.Method.OPTIONS.equals(Method.valueOf(value))) {
+                                    ignore = true;
+                                    break;
+                                }
+                            } catch (Exception e){
+                            }
                         }
                     }
+
+                    if(ignore){
+                        continue;
+                    }
+
                     List<String> updatePayloadList = bulkUpdate.getUpdates();
     
                     boolean isDeleteWrite = false;
@@ -713,7 +756,9 @@ public class DbAction extends ActionSupport {
                         );
                     }
                 }
-                DbLayer.bulkWriteSensitiveSampleData(writes);
+                if(writes!=null && !writes.isEmpty()){
+                    DbLayer.bulkWriteSensitiveSampleData(writes);
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSensitiveSampleData " + e.toString());
                 return Action.ERROR.toUpperCase();
@@ -1514,7 +1559,8 @@ public class DbAction extends ActionSupport {
 
     public String fetchTestingRunResults() {
         try {
-            testingRunResult = DbLayer.fetchTestingRunResults(filterForRunResult);
+            // testingRunResult = DbLayer.fetchTestingRunResults(filterForRunResult);
+            loggerMaker.errorAndAddToDb("API called fetchTestingRunResults");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchTestingRunResults " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -1637,6 +1683,34 @@ public class DbAction extends ActionSupport {
 
     public String insertTestingRunResults() {
         try {
+
+            Map<String, WorkflowNodeDetails> data = new HashMap<>();
+            try {
+                if (this.testingRunResult != null && this.testingRunResult.get("workflowTest") != null) {
+                    Map<String, BasicDBObject> x = (Map) (((Map) this.testingRunResult.get("workflowTest"))
+                            .get("mapNodeIdToWorkflowNodeDetails"));
+                    if (x != null) {
+                        for (String tmp : x.keySet()) {
+                            ((Map) x.get(tmp)).remove("authMechanism");
+                            ((Map) x.get(tmp)).remove("customAuthTypes");
+                            data.put(tmp, objectMapper.convertValue(x.get(tmp), YamlNodeDetails.class));
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails" + e.toString());
+                e.printStackTrace();
+            }
+            TestingRunResult testingRunResult = objectMapper.readValue(this.testingRunResult.toJson(), TestingRunResult.class);
+
+            try {
+                if (!data.isEmpty()) {
+                    testingRunResult.getWorkflowTest().setMapNodeIdToWorkflowNodeDetails(data);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails2" + e.toString());
+                e.printStackTrace();
+            }
 
             if(testingRunResult.getSingleTestResults()!=null){
                 testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getSingleTestResults()));
@@ -1835,6 +1909,17 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String insertProtectionLog() {
+        try {
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            DbLayer.insertProtectionLog(dbLog);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertProtectionLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String bulkWriteDependencyNodes() {
         try {
             loggerMaker.infoAndAddToDb("bulkWriteDependencyNodes called");
@@ -1867,6 +1952,173 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String bulkWriteSuspectSampleData() {
+        if (kafkaUtils.isWriteEnabled()) {
+            int accId = Context.accountId.get();
+            kafkaUtils.insertData(writesForSuspectSampleData, "bulkWriteSuspectSampleData", accId);
+        } else {
+            ArrayList<WriteModel<SuspectSampleData>> writes = new ArrayList<>();
+            for (BulkUpdates update : writesForSuspectSampleData) {
+                List<String> updates = update.getUpdates();
+                try {
+                    SuspectSampleData sd = objectMapper.readValue(
+                            gson.toJson(gson.fromJson(updates.get(0), Map.class).get("val")), SuspectSampleData.class);
+                    writes.add(new InsertOneModel<SuspectSampleData>(sd));
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSuspectSampleData " + e.toString());
+                }
+            }
+            try {
+                DbLayer.bulkWriteSuspectSampleData(writes);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSuspectSampleData " + e.toString());
+            }
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchFilterYamlTemplates() {
+        try {
+            yamlTemplates = DbLayer.fetchFilterYamlTemplates();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchFilterYamlTemplates " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchActiveAdvancedFilters(){
+        try {
+            this.activeAdvancedFilters = DbLayer.fetchActiveFilterTemplates();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchActiveFilterTemplates " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchMergedUrls() {
+        try {
+            this.mergedUrls = DbLayer.fetchMergedUrls();
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchStatusOfTests(){
+        try {
+            this.currentlyRunningTests = DbLayer.fetchStatusOfTests();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchStatusOfTests " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateIssueCountAndStateInSummary() {
+        try {
+            if (summaryId != null) {
+                ObjectId summaryObjectId = new ObjectId(summaryId);
+                totalCountIssues = TestExecutor.calcTotalCountIssues(summaryObjectId);
+            }
+            trrs = DbLayer.updateIssueCountAndStateInSummary(summaryId, totalCountIssues, state);
+            trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateIssueCountAndStateInSummary " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+
+        // send slack alert
+        try {
+            sendSlack(trrs, totalCountIssues, Context.accountId.get());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in sending slack alert for testing" + e);
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public static void sendSlack(TestingRunResultSummary trrs, Map<String, Integer> totalCountIssues, int accountId) {
+        TestingRun testingRun = DbLayer.findTestingRun(trrs.getTestingRunId().toHexString());
+
+        if (!testingRun.getSendSlackAlert()) {
+            loggerMaker.infoAndAddToDb("Not sending slack alert for trrs " + trrs.getId());
+            return;
+        }
+
+        String summaryId = trrs.getHexId();
+
+        int totalApis = trrs.getTotalApis();
+        String testType =  TestingRun.findTestType(testingRun,trrs);
+        int countIssues = totalCountIssues.values().stream().mapToInt(Integer::intValue).sum();
+        long nextTestRun = testingRun.getPeriodInSeconds() == 0 ? 0 : ((long) testingRun.getScheduleTimestamp() + (long) testingRun.getPeriodInSeconds());
+        long scanTimeInSeconds = Math.abs(Context.now() - trrs.getStartTimestamp());
+
+        String collectionName = null;
+        TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
+        if(testingEndpoints != null && testingEndpoints.getType() != null && testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE)) {
+            CollectionWiseTestingEndpoints collectionWiseTestingEndpoints = (CollectionWiseTestingEndpoints) testingEndpoints;
+            int apiCollectionId = collectionWiseTestingEndpoints.getApiCollectionId();
+            ApiCollection apiCollection = DbLayer.fetchApiCollectionMeta(apiCollectionId);
+            collectionName = apiCollection.getName();
+        }
+
+        int newIssues = 0;
+        List<TestingRunIssues> testingRunIssuesList = DbLayer.fetchOpenIssues(summaryId);
+        Map<String, Integer> apisAffectedCount = new HashMap<>();
+        for (TestingRunIssues testingRunIssues: testingRunIssuesList) {
+            String testSubCategory = testingRunIssues.getId().getTestSubCategory();
+            int totalApisAffected = apisAffectedCount.getOrDefault(testSubCategory, 0)+1;
+            apisAffectedCount.put(testSubCategory, totalApisAffected);
+            if(testingRunIssues.getCreationTime() > trrs.getStartTimestamp()) newIssues++;
+        }
+
+        testingRunIssuesList.sort(Comparator.comparing(TestingRunIssues::getSeverity));
+
+        List<NewIssuesModel> newIssuesModelList = new ArrayList<>();
+        for(TestingRunIssues testingRunIssues : testingRunIssuesList) {
+            if(testingRunIssues.getCreationTime() > trrs.getStartTimestamp()) {
+                String testRunResultId;
+                if(newIssuesModelList.size() <= 5) {
+                    Bson filterForRunResult = Filters.and(
+                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunIssues.getLatestTestingRunSummaryId()),
+                            Filters.eq(TestingRunResult.TEST_SUB_TYPE, testingRunIssues.getId().getTestSubCategory()),
+                            Filters.eq(TestingRunResult.API_INFO_KEY, testingRunIssues.getId().getApiInfoKey())
+                    );
+                    TestingRunResult testingRunResult = DbLayer.fetchTestingRunResults(filterForRunResult);
+                    testRunResultId = testingRunResult.getHexId();
+                } else testRunResultId = "";
+
+                String issueCategory = testingRunIssues.getId().getTestSubCategory();
+                newIssuesModelList.add(new NewIssuesModel(
+                        issueCategory,
+                        testRunResultId,
+                        apisAffectedCount.get(issueCategory),
+                        testingRunIssues.getCreationTime()
+                ));
+            }
+        }
+
+        SlackAlerts apiTestStatusAlert = new APITestStatusAlert(
+                testingRun.getName(),
+                totalCountIssues.getOrDefault(GlobalEnums.Severity.HIGH.name(), 0),
+                totalCountIssues.getOrDefault(GlobalEnums.Severity.MEDIUM.name(), 0),
+                totalCountIssues.getOrDefault(GlobalEnums.Severity.LOW.name(), 0),
+                countIssues,
+                newIssues,
+                totalApis,
+                collectionName,
+                scanTimeInSeconds,
+                testType,
+                nextTestRun,
+                newIssuesModelList,
+                testingRun.getHexId(),
+                summaryId
+        );
+        SlackSender.sendAlert(accountId, apiTestStatusAlert);
     }
 
     public List<CustomDataTypeMapper> getCustomDataTypes() {
@@ -2527,7 +2779,7 @@ public class DbAction extends ActionSupport {
         this.totalApiCount = totalApiCount;
     }
 
-    public boolean isHybridTestingEnabled() {
+    public boolean getHybridTestingEnabled() {
         return hybridTestingEnabled;
     }
 
@@ -2647,11 +2899,11 @@ public class DbAction extends ActionSupport {
         this.testingRunResultSummaryMap = testingRunResultSummaryMap;
     }
 
-    public TestingRunResult getTestingRunResult() {
+    public BasicDBObject getTestingRunResult() {
         return testingRunResult;
     }
 
-    public void setTestingRunResult(TestingRunResult testingRunResult) {
+    public void setTestingRunResult(BasicDBObject testingRunResult) {
         this.testingRunResult = testingRunResult;
     }
 
@@ -2758,4 +3010,45 @@ public class DbAction extends ActionSupport {
     public void setTrafficCollectorMetrics(TrafficCollectorMetrics trafficCollectorMetrics) {
         this.trafficCollectorMetrics = trafficCollectorMetrics;
     }
+
+    public List<BulkUpdates> getWritesForSuspectSampleData() {
+        return writesForSuspectSampleData;
+    }
+
+    public void setWritesForSuspectSampleData(List<BulkUpdates> writesForSuspectSampleData) {
+        this.writesForSuspectSampleData = writesForSuspectSampleData;
+    }
+    
+    public List<YamlTemplate> getActiveAdvancedFilters() {
+        return activeAdvancedFilters;
+    }
+
+    public void setActiveAdvancedFilters(List<YamlTemplate> activeAdvancedFilters) {
+        this.activeAdvancedFilters = activeAdvancedFilters;
+    }
+
+    public Set<MergedUrls> getMergedUrls() {
+        return mergedUrls;
+    }
+
+    public void setMergedUrls(Set<MergedUrls> mergedUrls) {
+        this.mergedUrls = mergedUrls;
+    }
+
+    public List<TestingRunResultSummary> getCurrentlyRunningTests() {
+        return currentlyRunningTests;
+    }
+
+    public void setCurrentlyRunningTests(List<TestingRunResultSummary> currentlyRunningTests) {
+        this.currentlyRunningTests = currentlyRunningTests;
+    }
+
+    public String getState() {
+        return state;
+    }
+
+    public void setState(String state) {
+        this.state = state;
+    }
+
 }

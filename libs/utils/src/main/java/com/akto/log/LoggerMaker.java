@@ -89,7 +89,7 @@ public class LoggerMaker  {
     private LogDb db;
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, DB_ABS
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, DB_ABS, THREAT_DETECTION
     }
 
     private static AccountSettings accountSettings = null;
@@ -268,6 +268,9 @@ public class LoggerMaker  {
                     BillingLogsDao.instance.insertOne(log);
                     break;
                 // Add db for db-abs
+                case THREAT_DETECTION:
+                    dataActor.insertProtectionLog(log);
+                    break;
                 default:
                     break;
             }
