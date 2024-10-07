@@ -11,6 +11,7 @@ function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight}
                         <TitleWithInfo
                             tooltipContent={titleToolTip}
                             titleText={title}
+                            textProps={{variant: 'headingMd'}}
                         />
                         <Link url={linkUrl} target="_blank">{linkText}</Link>
                     </HorizontalStack>
