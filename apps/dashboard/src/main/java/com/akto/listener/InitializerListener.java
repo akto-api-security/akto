@@ -2130,7 +2130,7 @@ public class InitializerListener implements ServletContextListener {
                      * TODO: Remove this once traffic pipeline is cleaned.
                      */
                     CleanInventory.cleanInventoryJobRunner();
-                    CleanTestingJob.cleanTestingJobRunner();
+                    // CleanTestingJob.cleanTestingJobRunner();
 
                     MatchingJob.MatchingJobRunner();
 
