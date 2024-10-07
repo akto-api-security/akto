@@ -6,11 +6,12 @@ import values from "@/util/values";
 import {produce} from "immer"
 import api from "../api"
 import func from "@/util/func"
-import { useNavigate, useParams } from "react-router-dom"
+import { useParams, useSearchParams } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore"
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter"
 import GetPrettifyEndpoint from "../GetPrettifyEndpoint";
 import TooltipText from "../../../components/shared/TooltipText";
+import SaveAsCollectionModal from "../api_collections/api_query_component/SaveAsCollectionModal";
 
 const headings = [
     {
@@ -21,9 +22,9 @@ const headings = [
         filterKey: 'endpoint'
     },
     {
-        title: 'Key & Value',
+        title: 'Key',
         value: 'keyValueComp',
-        text: 'Key & Value',
+        text: 'Key',
         textValue: 'keyValue',
         filterKey: 'keyValue'
     },
@@ -99,15 +100,6 @@ let filters = [
   }
 ]
 
-const appliedFilters = [
-    {
-        key: 'isRequest',
-        label: 'In response',
-        value: [false],
-        onRemove: () => {}
-    }
-]
-
 const resourceName = {
     singular: 'endpoint with sensitive data',
     plural: 'endpoints with sensitive data',
@@ -116,7 +108,7 @@ const resourceName = {
 const convertDataIntoTableFormat = (endpoint, apiCollectionMap) => {
     let temp = {}
     const key = func.findLastParamField(endpoint.param)
-    const value = endpoint?.values?.elements?.length > 0 ? endpoint.values.elements[0] : ""
+    // const value = endpoint?.values?.elements?.length > 0 ? endpoint.values.elements[0] : ""
     const id = endpoint.method + " " + endpoint.url
     temp['id'] = id
     temp['endpoint'] = id;
@@ -129,20 +121,20 @@ const convertDataIntoTableFormat = (endpoint, apiCollectionMap) => {
     temp['location'] = (endpoint.isHeader ? "Header" : (endpoint.isUrlParam ? "URL param" : "Payload"))
     temp['isHeader'] = endpoint.isHeader
     temp["paramLocation"] = endpoint.responseCode < 0 ? "Request" : "Response"
-    temp['keyValue'] = key + ": " + value
-    temp['endpointComp'] = <GetPrettifyEndpoint key={id} method={endpoint.method} url={endpoint.url} />
+    temp['keyValue'] = key
+    temp['endpointComp'] = <GetPrettifyEndpoint key={id} maxWidth="300px" method={endpoint.method} url={endpoint.url} />
     temp["call"] = endpoint.responseCode < 0 ? "Request" : "Response"
     temp['keyValueComp'] = (
         <Badge key={id} status="critical" size="slim">
             <Box maxWidth="270px">
                 <HorizontalStack gap={"1"} wrap={false}>
-                    <Box as="span" maxWidth="100px">
+                    <Box as="span" maxWidth="180px">
                         <TooltipText tooltip={key} text={key} />
                     </Box>
-                    :
+                    {/* :
                     <Box maxWidth="150px">
                         <TooltipText tooltip={value} text={value}/>
-                    </Box>
+                    </Box> */}
                 </HorizontalStack>
             </Box>
         </Badge>
@@ -156,6 +148,69 @@ function SensitiveDataExposure() {
     const params = useParams()
     const subType = params.subType;
     const apiCollectionMap = PersistStore(state => state.collectionsMap)
+    const [modal, setModal] = useState(false)
+
+    const [searchParams] = useSearchParams();
+    const filterParams = searchParams.get('filters')
+    let initialValForResponseFilter = false
+    if(filterParams && filterParams !== undefined &&filterParams.split('isRequest').length > 1){
+        let isRequestVal =  filterParams.split("isRequest__")[1].split('&')[0]
+        if(isRequestVal.length > 0){
+            initialValForResponseFilter = (isRequestVal === 'true' || isRequestVal.includes('true'))
+        }
+    }
+
+    const appliedFilters = [
+        {
+            key: 'isRequest',
+            label: 'In response',
+            value: [initialValForResponseFilter],
+            onRemove: () => {}
+        }
+    ]
+
+    const handleCreateCollection = async(collectionName) => {
+        const filterOperators = {
+            "endpoint": "OR",
+            "keyValue": "OR",
+            "location": "OR",
+            "apiCollectionId": "OR",
+            "timestamp": "OR",
+            "collectionIds": "OR",
+            "subType": "OR"
+        }
+        setLoading(true)
+        const apiInfosSet = new Set()
+        let apisList = []
+        await api.fetchChanges('timestamp', -1, 0, 100000, [], filterOperators, startTimestamp, endTimestamp, true, false).then((res) => {
+            
+            res.endpoints.forEach(x => {
+                let stringId = x.apiCollectionId + "####" + x.method + "###" + x.url
+                if(apiInfosSet.has(stringId)){
+                    return;
+                }
+                let apiInfo = {
+                    apiCollectionId: x.apiCollectionId,
+                    method: x.method,
+                    url: x.url,
+                }
+                apisList.push(apiInfo)
+                apiInfosSet.add(stringId)
+            })
+        })
+
+        api.addApisToCustomCollection(apisList,collectionName).then((resp) => {
+            try {
+                func.setToast(true, false, `Saved ${apiInfosSet.size} urls in group`)
+            } catch (error) {
+                func.setToast(true, true, error)
+            }
+        })
+
+        setLoading(false)
+        setModal(false)
+        
+    }
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
     const getTimeEpoch = (key) => {
@@ -180,10 +235,9 @@ function SensitiveDataExposure() {
     }
 
     filters = func.getCollectionFilters(filters)
-
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
         setLoading(true);
-        let isRequest = filters['isRequest'][0] || false;
+        let isRequest = (filters && filters['isRequest'] !== undefined && filters['isRequest'][0]) || initialValForResponseFilter;
         delete filters['isRequest']
         filters['subType'] = [subType]
         filterOperators['subType']="OR"
@@ -200,12 +254,6 @@ function SensitiveDataExposure() {
         return {value:ret , total:total};
     }
 
-const navigate = useNavigate();
-
-const handleRedirect = () => {
-    navigate("/dashboard/observe/data-types")
-}
-
 const handleReset = async () => {
     await api.resetDataTypeRetro(subType)
     func.setToast(true, false, "Resetting data types")
@@ -215,7 +263,7 @@ const primaryActions = (
     <HorizontalStack gap={"2"}>
         <Button id={"reset-data-type"} onClick={handleReset}>Reset</Button>
         <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
-        <Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>
+        <Button id={"all-data-types"} primary onClick={() => setModal(!modal)}>Create API group</Button>
     </HorizontalStack>
 )
 
@@ -245,6 +293,14 @@ const primaryActions = (
                 condensedHeight={true}
                 pageLimit={20}
                 headings={headings}
+            />,
+            <SaveAsCollectionModal
+                key="modal"
+                active={modal}
+                setActive={setModal}
+                createNewCollection={handleCreateCollection}
+                initialCollectionName={'APIs with ' + subType}
+                loading={loading}
             />
         ]}
         />
