@@ -208,6 +208,7 @@ function SensitiveDataExposure() {
         })
 
         setLoading(false)
+        setModal(false)
         
     }
 
