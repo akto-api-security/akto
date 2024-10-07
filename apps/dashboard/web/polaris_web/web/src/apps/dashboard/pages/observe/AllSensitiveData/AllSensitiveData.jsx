@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Button, Modal, HorizontalStack, IndexFiltersMode, Text, Badge, Thumbnail, HorizontalGrid } from "@shopify/polaris"
+import { Button, Modal, HorizontalStack, IndexFiltersMode, Text, Badge, Thumbnail, HorizontalGrid, Box } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState } from "react"
 import func from "@/util/func"
@@ -101,7 +101,7 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
         id: type.name,
         nameComp: <Text fontWeight="medium">{type.name}</Text>,
         subType: type.name,
-        avatarComp: <Thumbnail source={iconSource} size="extraSmall"/>,
+        avatarComp: <Thumbnail source={iconSource} size="small" />,
         priorityVal: priorityText.length > 1 ? severityOrder[priorityText] : 0,
         priorityText: priorityText,
         priorityComp: priorityText.length > 1 ? <Badge status={transform.getColor(priorityText, true)}>{func.toSentenceCase(priorityText)}</Badge> : "-",
@@ -122,6 +122,7 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
                 maxItems={1}
                 maxWidth={"250px"}
                 status={"new"}
+                itemWidth={"200px"}
             />) 
         : "-" ,
         response: (countMap['RESPONSE'] && countMap['RESPONSE'][type.name]) || 0,
@@ -134,7 +135,7 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
 
 function AllSensitiveData() {
 
-    const [data, setData] = useState({"all":[]})
+    const [data, setData] = useState({"enabled":[]})
     const [mapData, setMapData] = useState({})
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
@@ -337,15 +338,17 @@ function AllSensitiveData() {
                 title={"Top 5 sensitive datatype"}
                 titleToolTip={"Numbers of APIs having the corresponding data type in request or response"}
                 component={
-                    <ChartypeComponent
-                        data={countMap}
-                        isNormal={true} 
-                        boxHeight={'250px'} 
-                        chartOnLeft={true} 
-                        dataTableWidth="250px" 
-                        boxPadding={0}
-                        pieInnerSize="50%"
-                    />
+                    <Box paddingBlockStart={"6"}>
+                        <ChartypeComponent
+                            data={countMap}
+                            isNormal={true} 
+                            boxHeight={'280px'} 
+                            chartOnLeft={true} 
+                            dataTableWidth="270px" 
+                            boxPadding={0}
+                            pieInnerSize="50%"
+                        />
+                    </Box>
                 }
             />
         </HorizontalGrid>
@@ -370,7 +373,7 @@ function AllSensitiveData() {
             mode={IndexFiltersMode.Default}
             headings={headers}
             useNewRow={true}
-            condensedHeight={true}
+            // condensedHeight={true}
             tableTabs={tableTabs}
             onSelect={(val) => setSelected(val)}
             selected={selected}

@@ -265,7 +265,7 @@ function TestRoleSettings() {
     )
 
     const savedParamComponent = (
-        getAuthWithCondList() !== undefined && getAuthWithCondList().length > 0 ?
+        getAuthWithCondList() && getAuthWithCondList() !== undefined && getAuthWithCondList().length > 0 ?
         <LegacyCard title={<Text variant="headingMd">Configured auth details</Text>} key={"savedAuth"}>
             <br/>
             <Divider />

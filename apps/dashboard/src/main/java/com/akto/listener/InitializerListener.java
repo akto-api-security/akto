@@ -562,9 +562,8 @@ public class InitializerListener implements ServletContextListener {
                 CustomDataType newCDT = getCustomDataTypeFromPiiType(piiSource, piiType, false);
 
                 if (currTypes.containsKey(piiKey) &&
-                        (currTypes.get(piiKey).equals(piiType) &&
-                                dt.getBoolean(PIISource.ACTIVE, true))
-                        && existingCDT.getDataTypePriority() != null
+                        (currTypes.get(piiKey).equals(piiType) && dt.getBoolean(PIISource.ACTIVE, true)) &&
+                        (existingCDT != null && existingCDT.getDataTypePriority() != null)
                         && (existingCDT.getCategoriesList() != null && !existingCDT.getCategoriesList().isEmpty())
                 ) {
                     continue;
