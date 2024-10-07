@@ -65,6 +65,12 @@ let headers = [
     sortActive: true
   },
   {
+    text: 'Total Apis',
+    title: 'Total Endpoints',
+    value: 'total_apis',
+    type: CellType.TEXT
+  },
+  {
     title: '',
     type: CellType.ACTION,
   }

@@ -6,7 +6,7 @@ function DropdownSearch(props) {
 
     const id = props.id ? props.id : "dropdown-search"
 
-    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested} = props
+    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal} = props
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
@@ -188,7 +188,7 @@ function DropdownSearch(props) {
     return (
             <Autocomplete
                 {...(allowMultiple ? {allowMultiple:true} : {} )}
-                options={options.slice(0,20)}
+                options={options.slice(0,sliceMaxVal || 20)}
                 selected={selectedOptions}
                 onSelect={updateSelection}
                 emptyState={emptyState}
@@ -199,7 +199,8 @@ function DropdownSearch(props) {
                     content:(<Checkbox label={checkboxLabel} checked={checked} onChange={() => selectAllFunc()}/>),
                     onAction: () => selectAllFunc(),
                 }} : {})}
-            />
+            >
+            </Autocomplete>
     );
 }
 

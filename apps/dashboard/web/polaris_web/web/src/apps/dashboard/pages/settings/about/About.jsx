@@ -93,21 +93,46 @@ function About() {
     }
 
     const timezonesAvailable = [
+        { label: "Baker Island Time (BIT) UTC-12:00", value: "Etc/GMT+12" },
+        { label: "Niue Time (NUT) UTC-11:00", value: "Pacific/Niue" },
+        { label: "Marquesas Islands Time (MART) UTC-09:30", value: "Pacific/Marquesas" },
+        { label: "Hawaii-Aleutian Standard Time (HST) UTC-10:00", value: "Pacific/Honolulu" },
+        { label: "Alaska Standard Time (AKST) UTC-09:00", value: "America/Anchorage" },
         { label: "Pacific Standard Time (PST) UTC-08:00", value: "America/Los_Angeles" },
         { label: "Mountain Standard Time (MST) UTC-07:00", value: "America/Denver" },
         { label: "Central Standard Time (CST) UTC-06:00", value: "America/Chicago" },
         { label: "Eastern Standard Time (EST) UTC-05:00", value: "America/New_York" },
+        { label: "Venezuelan Standard Time (VET) UTC-04:30", value: "America/Caracas" },
         { label: "Atlantic Standard Time (AST) UTC-04:00", value: "America/Halifax" },
+        { label: "Newfoundland Standard Time (NST) UTC-03:30", value: "America/St_Johns" },
+        { label: "Argentina Time (ART) UTC-03:00", value: "America/Argentina/Buenos_Aires" },
+        { label: "South Georgia Time (GST) UTC-02:00", value: "Etc/GMT+2" },
+        { label: "Cape Verde Time (CVT) UTC-01:00", value: "Atlantic/Cape_Verde" },
         { label: "Greenwich Mean Time (GMT) UTC+00:00", value: "Etc/GMT" },
         { label: "Central European Time (CET) UTC+01:00", value: "Europe/Berlin" },
         { label: "Eastern European Time (EET) UTC+02:00", value: "Europe/Kiev" },
         { label: "Moscow Standard Time (MSK) UTC+03:00", value: "Europe/Moscow" },
-        { label: "India Standard Time (IST) UTC+05:30", value: "Asia/Kolkata" },
+        { label: "Iran Standard Time (IRST) UTC+03:30", value: "Asia/Tehran" },
+        { label: "Gulf Standard Time (GST) UTC+04:00", value: "Asia/Dubai" },
+        { label: "Afghanistan Time (AFT) UTC+04:30", value: "Asia/Kabul" },
+        { label: "Pakistan Standard Time (PKT) UTC+05:00", value: "Asia/Karachi" },
+        { label: "Indian Standard Time (IST) UTC+05:30", value: "Asia/Kolkata" },
+        { label: "Nepal Time (NPT) UTC+05:45", value: "Asia/Kathmandu" },
+        { label: "Bangladesh Standard Time (BST) UTC+06:00", value: "Asia/Dhaka" },
+        { label: "Cocos Islands Time (CCT) UTC+06:30", value: "Indian/Cocos" },
+        { label: "Indochina Time (ICT) UTC+07:00", value: "Asia/Bangkok" },
         { label: "China Standard Time (CST) UTC+08:00", value: "Asia/Shanghai" },
+        { label: "Australian Western Standard Time (AWST) UTC+08:00", value: "Australia/Perth" },
+        { label: "Australian Central Standard Time (ACST) UTC+09:30", value: "Australia/Darwin" },
         { label: "Japan Standard Time (JST) UTC+09:00", value: "Asia/Tokyo" },
         { label: "Australian Eastern Standard Time (AEST) UTC+10:00", value: "Australia/Sydney" },
+        { label: "Lord Howe Standard Time (LHST) UTC+10:30", value: "Australia/Lord_Howe" },
+        { label: "Solomon Islands Time (SBT) UTC+11:00", value: "Pacific/Guadalcanal" },
+        { label: "Norfolk Island Time (NFT) UTC+11:30", value: "Pacific/Norfolk" },
+        { label: "Fiji Time (FJT) UTC+12:00", value: "Pacific/Fiji" },
         { label: "New Zealand Standard Time (NZST) UTC+12:00", value: "Pacific/Auckland" }
-      ];
+    ];
+    
 
     const infoComponent = (
         <VerticalStack gap={4}>
@@ -129,6 +154,7 @@ function About() {
                     optionsList={timezonesAvailable}
                     setSelected={(val) => {handleSaveSettings("timezone", val); setCurrentTimeZone(val)}}
                     value={currentTimeZone}
+                    sliceMaxVal={40}
                 />
             </HorizontalGrid>
             {objArr.map((item)=>(
