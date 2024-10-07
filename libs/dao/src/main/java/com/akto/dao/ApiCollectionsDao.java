@@ -3,6 +3,8 @@ package com.akto.dao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.CodeAnalysisCollection;
+import com.akto.dto.testing.CollectionWiseTestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
@@ -168,6 +170,22 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
                 e.printStackTrace();
             }
         }
+
+        Map<String, Integer> codeAnalysisUrlsCountMap = CodeAnalysisApiInfoDao.instance.getUrlsCount();
+        if (codeAnalysisUrlsCountMap.isEmpty()) return countMap;
+
+        Map<String, Integer> idToCollectionNameMap = CodeAnalysisCollectionDao.instance.findIdToCollectionNameMap();
+        for (String codeAnalysisId: codeAnalysisUrlsCountMap.keySet()) {
+            int count = codeAnalysisUrlsCountMap.getOrDefault(codeAnalysisId, 0);
+            Integer apiCollectionId = idToCollectionNameMap.get(codeAnalysisId);
+            if (apiCollectionId == null) continue;
+
+            int currentCount = countMap.getOrDefault(apiCollectionId, 0);
+            currentCount += count;
+
+            countMap.put(apiCollectionId, currentCount);
+        }
+
 
         return countMap;
     }

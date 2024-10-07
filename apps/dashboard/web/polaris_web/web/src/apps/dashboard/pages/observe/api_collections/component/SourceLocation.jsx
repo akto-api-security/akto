@@ -1,5 +1,6 @@
 import { Box, Text, Tooltip, Link } from '@shopify/polaris'
 import React from 'react'
+import TooltipText from '../../../../components/shared/TooltipText'
 
 function SourceLocation(props) {
     const { location } = props
@@ -24,7 +25,7 @@ function SourceLocation(props) {
                     {location.fileLink === "" ?
                         <Text variant="bodyMd" fontWeight="medium">{filePathText}</Text> :
                         <Link onClick={(e) => e.stopPropagation()} url={location.fileLink} monochrome target="_blank">
-                            <Text variant="bodyMd" fontWeight="medium" breakWord>{filePathText}</Text> 
+                            <TooltipText tooltip={filePathText} text={filePathText}/>
                         </Link> 
                     }
                 </Tooltip>
