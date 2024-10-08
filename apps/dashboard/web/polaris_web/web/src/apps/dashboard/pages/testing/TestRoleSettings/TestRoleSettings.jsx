@@ -145,7 +145,7 @@ function TestRoleSettings() {
             } else {
                 api.updateTestRoles(roleName, andConditions, orConditions).then((res) => {
                     setChange(false);
-                    navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions }, authWithCondList: authWithCondLists},
+                    navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions }, authWithCondList: authWithCondLists || getAuthWithCondList()},
                         replace:true })
                 }).catch((err) => {
                     func.setToast(true, true, "Unable to update test role")
@@ -314,7 +314,7 @@ function TestRoleSettings() {
             const automationType = "HardCoded";
             const authParamData = [{key: hardCodeAuthInfo.authHeaderKey, value: hardCodeAuthInfo.authHeaderValue, where: "HEADER"}]
             if(editableDoc > -1){
-                resp = await api.updateAuthInRole(initialItems.name, editableDoc, authParamData, automationType)
+                resp = await api.updateAuthInRole(initialItems.name, apiCond, editableDoc, authParamData, automationType)
             }else{
                 resp = await api.addAuthToRole(initialItems.name, apiCond, authParamData, automationType, null)
             }

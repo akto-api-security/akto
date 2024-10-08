@@ -247,11 +247,11 @@ export default {
             data: {roleName, index}
         })
     },
-    updateAuthInRole(roleName, index, authParamData, authAutomationType) {
+    updateAuthInRole(roleName, apiCond ,index, authParamData, authAutomationType) {
         return request({
             url: '/api/updateAuthInRole',
             method: 'post',
-            data: {roleName, index, authParamData, authAutomationType}
+            data: {roleName, apiCond, index, authParamData, authAutomationType}
         })
     },
     deleteTestRuns(testRunIds){
