@@ -88,7 +88,13 @@ function Billing() {
             <Text variant="headingMd">Switch plan</Text>
         </Box>
     )
-
+    function redirectToPricingFormEnterprise() {
+        window.open("https://www.akto.io/pricing-sales", "_blank");
+    }
+    
+    function redirectToPricingForm() {
+        window.open("https://www.akto.io/pricing-free-trial", "_blank");
+    }
     const planInfo = (
             <Box>
                   <Paywall
@@ -102,11 +108,26 @@ function Billing() {
                         switch (intentionType) {
 
                             case SubscribeIntentionType.REQUEST_CUSTOM_PLAN_ACCESS:
-                              window.location.href = "https://calendly.com/ankita-akto/akto-demo?month=2023-11"
+                              redirectToPricingFormEnterprise()
                               break;
                             case SubscribeIntentionType.CHANGE_UNIT_QUANTITY:
                             case SubscribeIntentionType.UPGRADE_PLAN:
                             case SubscribeIntentionType.DOWNGRADE_PLAN:
+                            
+                                if (customer.subscriptions.length != 1) {
+                                    redirectToPricingForm()
+                                    break;
+                                }
+                                if (!customer.subscriptions[0].plan) {
+                                    redirectToPricingForm()
+                                    break;
+                                }
+                                if (customer.subscriptions[0].plan.id === "plan-akto-saas-free")
+                                {
+                                    redirectToPricingForm()
+                                    break;
+                                }
+                            
                                 const checkoutResult = await billingApi.provisionSubscription({
                                   billingPeriod: selectedBillingPeriod,
                                   customerId: customer.id,
