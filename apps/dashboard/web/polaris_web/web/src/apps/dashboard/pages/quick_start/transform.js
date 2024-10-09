@@ -17,7 +17,7 @@ const mirroringObj = {
     icon: '/public/aws.svg',
     label: "AWS Mirroring",
     text: "You can deploy Akto in AWS and collect traffic through traffic mirroring.",
-    docsUrl: 'https://docs.akto.io/traffic-connections/amazon-aws',
+    docsUrl: 'https://docs.akto.io/traffic-connector/mirroring/amazon-aws',
     key: "AWS",
     component: <AwsSource />
 }
@@ -26,7 +26,7 @@ const apigeeObj = {
     icon: '/public/apigee.svg',
     label: "Apigee",
     text: "Apigee setup is recommended if you are using Google's Apigee API Management platform to design, secure, and scale your APIs.",
-    docsUrl: 'https://docs.akto.io/traffic-connections',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     key: "Apigee",
     component: <AddOnComponenet/>
 }
@@ -35,7 +35,7 @@ const githubObj = {
     icon: '/public/github.svg',
     label: "GitHub",
     text: "We recommend setting up GitHub if you want to connect and retrieve APIs directly from your source code hosted on GitHub.",
-    docsUrl: 'https://docs.akto.io/traffic-connections',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     key: "GitHub",
     component: <GithubSource/>
 }
@@ -44,7 +44,7 @@ const gitlabObj = {
     icon: '/public/gitlab.svg',
     label: "GitLab",
     text: "We recommend setting up GitLab if you want to connect and retrieve APIs directly from your source code hosted on GitLab.",
-    docsUrl: 'https://docs.akto.io/traffic-connections',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     key: "GitLab",
     component: <AddOnComponenet/>
 }
@@ -53,7 +53,7 @@ const bitbucketObj = {
     icon: '/public/bitbucket.svg',
     label: "Bitbucket",
     text: "We recommend setting up Bitbucket if you want to connect and retrieve APIs directly from your source code hosted on Bitbucket.",
-    docsUrl: 'https://docs.akto.io/traffic-connections',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     key: "Bitbucket",
     component: <BitBucketSource/>
 }
@@ -62,7 +62,7 @@ const azureObj = {
     icon: '/public/azure.svg',
     label: "Azure API Gateway",
     text: "Azure API Gateway setup is recommended if you are using Azure's API Management service to manage, secure, and analyze your APIs.",
-    docsUrl: 'https://docs.akto.io/traffic-connections',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     key: "Azure",
     component: <AddOnComponenet/>
 }
@@ -71,7 +71,7 @@ const cloudflareObj = {
     icon: '/public/cloudflare.svg',
     label: "Cloudflare",
     text: "You should use Cloudflare as a traffic connector if you are leveraging Cloudflare's CDN and security features to manage and optimize your API traffic.",
-    docsUrl: 'https://docs.akto.io/traffic-connections',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     key: "Cloudflare",
     component: <AddOnComponenet/>
 }
@@ -80,7 +80,7 @@ const f5Obj = {
     icon: '/public/f5.svg',
     label: "F5",
     text: "F5 setup is recommended if you are using F5's BIG-IP as an API gateway or load balancer to manage and control your API traffic.",
-    docsUrl: 'https://docs.akto.io/traffic-connections',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     key: "F5",
     component: <AddOnComponenet/>
 }
@@ -89,7 +89,7 @@ const goObj = {
     icon: '/public/go.svg',
     label: "Go",
     text: "Use where Go-based services are deployed.",
-    docsUrl: 'https://docs.akto.io/traffic-connections',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     key: "Go",
     component: <AddOnComponenet/>
 }
@@ -98,7 +98,7 @@ const haproxyObj = {
     icon: '/public/haproxy.svg',
     label: "HA Proxy",
     text: "HA Proxy should be used as a traffic connector if you are leveraging HA Proxy for load balancing, high availability, and proxying HTTP and TCP-based applications.",
-    docsUrl: 'https://docs.akto.io/traffic-connections',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     key: "HAproxy",
     component: <AddOnComponenet/>
 }
@@ -107,7 +107,7 @@ const javaObj = {
     icon: '/public/java.svg',
     label: "Java",
     text: "You can use Akto's Java agent to capture API traffic directly from your Java applications.",
-    docsUrl: 'https://docs.akto.io/traffic-connections',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     key: "Java",
     component: <AddOnComponenet/>
 }
@@ -116,7 +116,7 @@ const kongmeshObj = {
     icon: '/public/kongmesh.svg',
     label: "Kong Mesh",
     text: "Use this set-up if you are utilizing Kong's service mesh capabilities to manage and secure your microservices and APIs.",
-    docsUrl: 'https://docs.akto.io/traffic-connections',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     key: "Kong Mesh",
     component: <AddOnComponenet/>
 }
@@ -125,7 +125,7 @@ const layer7Obj = {
     icon: '/public/layer7.svg',
     label: "Layer 7",
     text: "Layer7 is recommended if you are using CA Technologies' Layer7 API Management for securing and managing your APIs.",
-    docsUrl: 'https://docs.akto.io/traffic-connections',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     key: "Layer 7",
     component: <AddOnComponenet/>
 }
@@ -134,7 +134,7 @@ const nodejsObj = {
     icon: '/public/nodejs.svg',
     label: "NodeJS",
     text: "This setup is ideal for environments where NodeJS-based services are deployed, ensuring seamless integration and real-time traffic monitoring.",
-    docsUrl: 'https://docs.akto.io/traffic-connections',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     key: "NodeJS",
     component: <AddOnComponenet/>
 }
@@ -143,7 +143,7 @@ const openshiftObj = {
     icon: '/public/openshift.svg',
     label: "OpenShift",
     text: "OpenShift should be used as a traffic connector if you are deploying and managing containerized applications using OpenShift.",
-    docsUrl: 'https://docs.akto.io/traffic-connections',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     key: "OpenShift",
     component: <AddOnComponenet/>
 }
@@ -152,7 +152,7 @@ const threescaleObj = {
     icon: '/public/threescale.svg',
     label: "3Scale",
     text: "This setup is recommended if your APIs are managed by 3scale.",
-    docsUrl: 'https://docs.akto.io/traffic-connections',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     key: "3Scale",
     component: <AddOnComponenet/>
 }
@@ -161,7 +161,7 @@ const beanStalkObj = {
     icon: '/public/beanstalk.svg',
     label: "AWS Beanstalk",
     text: "You can deploy Akto in AWS and collect traffic through mirroring on your AWS Beanstalk setup.",
-    docsUrl: 'https://docs.akto.io/traffic-connections/aws-beanstalk',
+    docsUrl: 'https://docs.akto.io/traffic-connector/aws-services/aws-beanstalk',
     component: <AddOnComponenet/>,
     key: "Bean Stalk",
 }
@@ -170,8 +170,8 @@ const eksObj = {
     icon: '/public/eks.svg',
     label: 'AWS EKS',
     text: "You can deploy Akto in AWS and collect traffic through a daemonset on your AWS EKS configuration.",
-    docsUrl: 'https://docs.akto.io/traffic-connections/aws-eks',
-    component: <Kubernetes docsUrl= 'https://docs.akto.io/traffic-connections/aws-eks' bannerTitle="Setup using AWS EKS"/>,
+    docsUrl: 'https://docs.akto.io/traffic-connector/aws-services/aws-eks',
+    component: <Kubernetes docsUrl= 'https://docs.akto.io/traffic-connector/aws-services/aws-eks' bannerTitle="Setup using AWS EKS"/>,
     key: "EKS"
 }
 
@@ -179,16 +179,15 @@ const fargateObj = {
     icon: '/public/fargate.svg',
     label: 'AWS Fargate',
     text: "AWS Fargate allows you to use Amazon ECS to run containers without having to manage servers or clusters of Amazon EC2 instances.", 
-    docsUrl: 'https://docs.akto.io/traffic-connections/aws-fargate',
-    component: <FargateSource docsUrl='https://docs.akto.io/traffic-connections/aws-fargate' bannerTitle="Setup using Fargate" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/aws-fargate#add-akto-traffic-collector-container"/>,
+    docsUrl: 'https://docs.akto.io/traffic-connector/aws-services/aws-fargate',
+    component: <FargateSource docsUrl='https://docs.akto.io/traffic-connector/aws-services/aws-fargate' bannerTitle="Setup using Fargate" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/aws-fargate#add-akto-traffic-collector-container"/>,
     key: "FARGATE"
 }
-
 const burpObj = {
     icon: '/public/burp.svg',
     label: "Burp Suite",
     text: "You can deploy Akto on your machine and download Akto's Burp extension to collect API traffic.",   
-    docsUrl: 'https://docs.akto.io/traffic-connections/burp-suite',
+    docsUrl: 'https://docs.akto.io/traffic-connector/manual/burp-suite',
     key: "BURP",
     component : <BurpSource/>
 }
@@ -197,8 +196,8 @@ const dockerObj = {
     icon: '/public/docker.svg',
     label: "Docker",
     text: "This setup is recommended only if other setups for AWS or GCP don't work.",
-    docsUrl: 'https://docs.akto.io/traffic-connections/docker',
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/docker" bannerTitle="Setup using Docker"innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/docker#adding-akto-docker-service"/>,
+    docsUrl: 'https://docs.akto.io/traffic-connector/virtual-machines/docker',
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/virtual-machines/docker" bannerTitle="Setup using Docker"innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/docker#adding-akto-docker-service"/>,
     key: "DOCKER"
 }
 
@@ -206,18 +205,18 @@ const envoyObj = {
     icon: '/public/envoy.svg',
     label: 'Envoy',
     text: 'Akto-Envoy setup is recommended if your APIs are routed by Envoy.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/envoy',
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/envoy',
     key: "ENVOY",
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/envoy" bannerTitle="Setup using Envoy" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/envoy#adding-akto-traffic-collector"/>,
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/api-gateways/envoy" bannerTitle="Setup using Envoy" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/envoy#adding-akto-traffic-collector"/>,
 }
 
 const gcpObj = {
     icon: '/public/gcp.svg',
     label: 'GCP Mirroring',
     text: 'This setup only takes ten minutes. Once you connect GCP, Akto will process GCP traffic to create an API Inventory in real time.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/google-cloud-gcp',
+    docsUrl: 'https://docs.akto.io/traffic-connector/mirroring/google-cloud-gcp',
     key: "GCP",
-    component: <BannerComponent title="Setup using GCP Mirroring" docsUrl="https://docs.akto.io/traffic-connections/google-cloud-gcp"
+    component: <BannerComponent title="Setup using GCP Mirroring" docsUrl="https://docs.akto.io/traffic-connector/mirroring/google-cloud-gcp"
                     content="Use Google packet mirroring to send duplicate stream of traffic to Akto. No performance impact, only mirrored traffic is used to analyze APIs." />
 }
 
@@ -225,9 +224,9 @@ const harFileUploadObj = {
     icon: '/public/HAR.svg',
     label: 'Har File Upload',
     text: "For a very quick view of your inventory, you can upload a HAR file that contains traffic to Akto.",
-    docsUrl: 'https://docs.akto.io/traffic-connections/har-file-upload',
+    docsUrl: 'https://docs.akto.io/traffic-connector/manual/har-file-upload',
     key: "HAR",
-    component: <BannerComponent title="Upload .har file" docsUrl="https://docs.akto.io/traffic-connections/har-file-upload"
+    component: <BannerComponent title="Upload .har file" docsUrl="https://docs.akto.io/traffic-connector/manual/har-file-upload"
                     content=" You can use this method if you quickly want to try out Akto. Akto can process HAR (Http ARchive) files and populate inventory from it." />
 }
 
@@ -235,7 +234,7 @@ const kongObj = {
     icon: '/public/kong.svg',
     label: 'Kong',
     text: 'Kong Gateway is an open source API gateway, built for multi-cloud and hybrid, and optimized for microservices and distributed architectures.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/kong',
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/kong',
     key: "KONG",
     component: <AddOnComponenet/>
 }
@@ -244,25 +243,25 @@ const kubernetesObj = {
     icon: '/public/kubernetes.svg',
     label: 'Kubernetes Daemonset',
     text: 'You can deploy Akto in Kubernetes and collect traffic through a daemonset on your Kubernetes configuration.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/kubernetes',
+    docsUrl: 'https://docs.akto.io/traffic-connector/kubernetes/kubernetes',
     key: "KUBERNETES",
-    component: <Kubernetes docsUrl="https://docs.akto.io/traffic-connections/kubernetes" bannerTitle="Setup using Kubernetes Daemonset"/>
+    component: <Kubernetes docsUrl="https://docs.akto.io/traffic-connector/kubernetes/kubernetes" bannerTitle="Setup using Kubernetes Daemonset"/>
 }
 
 const nginxObj = {
     icon: '/public/Nginx.svg',
     label: 'NGINX',
     text: 'This setup is recommended if your APIs are routed by NGINX.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/nginx',
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/nginx',
     key: "NGINX",
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/nginx" bannerTitle="Setup using NGINX" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/nginx#add-nginx-module"/>
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/api-gateways/nginx" bannerTitle="Setup using NGINX" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/nginx#add-nginx-module"/>
 }
 
 const postmanObj = {
     icon: '/public/postman.svg',
     label: 'Postman',
     text: 'This setup is recommended if you have updated API collections maintained in Postman.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/postman',
+    docsUrl: 'https://docs.akto.io/traffic-connector/manual/postman',
     component: <PostmanSource/>,
     key: "POSTMAN"
 }
@@ -271,7 +270,7 @@ const openApiObj = {
     icon: '/public/openApi.svg',
     label: 'OpenAPI',
     text: 'Upload Open API/Swagger specification file to Akto to create an API inventory.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/openapi',
+    docsUrl: 'https://docs.akto.io/traffic-connector/manual/openapi',
     component: <OpenApiSource/>,
     key: "OPENAPI"
 }
@@ -280,16 +279,16 @@ const tcpObj = {
     icon: '/public/TCP.svg',
     label: 'TCP Agent',
     text: ' This setup is recommended only if other setups for AWS or GCP do not work.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/tcp-agent',
+    docsUrl: 'https://docs.akto.io/traffic-connector/virtual-machines/tcp-agent',
     key: "NGINX",
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/tcp-agent" bannerTitle="Setup using TCP Agent" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/tcp-agent#adding-akto-traffic-collector-container" />
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/virtual-machines/tcp-agent" bannerTitle="Setup using TCP Agent" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/tcp-agent#adding-akto-traffic-collector-container" />
 }
 
 const hybridSaasObj = {
     icon: '/public/aws.svg',
     label: "Hybrid Saas",
     text: "You can just deploy our agent in your cloud and send the data to Akto's Saas Setup",
-    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/hybrid-saas',
+    docsUrl: 'https://docs.akto.io/getting-started/traffic-processor/hybrid-saas',
     key: "Hybrid Saas",
     component : <HybridSaasSource/>
 }
@@ -309,34 +308,34 @@ const ebpfObj = {
     label: 'eBPF',
     badge: "Recommended",
     text: 'Akto-eBPF setup is recommended for mTLS systems when TLS termination happens at a proxy.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf',
+    docsUrl: 'https://docs.akto.io/traffic-connector/ebpf/ebpf',
     key: "EBPF",
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf" bannerTitle="Setup using eBPF" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf#adding-akto-traffic-collector"/>,
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/ebpf/ebpf" bannerTitle="Setup using eBPF" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf#adding-akto-traffic-collector"/>,
 }
 
 const ebpfMTLSObj = {
     icon: '/public/ebpf.svg',
     label: 'eBPF on mTLS',
     text: 'Akto-eBPF-mTLS setup is recommended for mTLS systems where TLS termination occurs at the application.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf-mtls',
+    docsUrl: 'https://docs.akto.io/traffic-connector/ebpf/ebpf-mtls',
     key: "EBPF_MTLS",
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf-mtls" bannerTitle="Setup using eBPF mTLS" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf-mtls#adding-akto-traffic-collector"/>,
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/ebpf/ebpf-mtls" bannerTitle="Setup using eBPF mTLS" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf-mtls#adding-akto-traffic-collector"/>,
 }
 
 const istioObj = {
     icon: '/public/istio.svg',
     label: 'Istio',
     text: 'Akto-Istio setup is recommended if your APIs are routed by Istio.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/envoy-1',
+    docsUrl: 'https://docs.akto.io/getting-started/traffic-processor',
     key: "ISTIO",
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/envoy-1" bannerTitle="Setup using Istio" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/envoy-1#adding-akto-traffic-collector"/>,
+    component: <FargateSource docsUrl="https://docs.akto.io/getting-started/traffic-processor" bannerTitle="Setup using Istio" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/envoy-1#adding-akto-traffic-collector"/>,
 }
 
 const pythonObj = {
     icon: '/public/python.svg',
     label: 'Python',
     text: 'Use where Python-based services are deployed.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/',
+    docsUrl: 'https://docs.akto.io/traffic-connector/',
     component: <AddOnComponenet/>,
     key: "Python"
 }
@@ -345,7 +344,7 @@ const awsApiGatewayObj = {
     icon: '/public/aws_api_gateway.svg',
     label: "AWS API Gateway",
     text: "Akto-AWS-API-Gateway setup is recommended if you are using AWS API Gateway.",
-    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/aws-api-gateway',
+    docsUrl: 'https://docs.akto.io/traffic-connector/aws-services/aws-api-gateway',
     component: <AddOnComponenet/>,
     key: "AWS_API_GATEWAY",
 }
