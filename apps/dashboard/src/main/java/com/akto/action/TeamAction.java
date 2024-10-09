@@ -8,6 +8,8 @@ import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Pair;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -19,13 +21,17 @@ import com.opensymphony.xwork2.Action;
 import org.bson.conversions.Bson;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class TeamAction extends UserAction {
 
     int id;
     BasicDBList users;
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TeamAction.class, LogDb.DASHBOARD);
 
     public String fetchTeamData() {
         int accountId = Context.accountId.get();
@@ -45,11 +51,20 @@ public class TeamAction extends UserAction {
         }
 
         users = UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get());
+        Set<String> userSet = new HashSet<>();
         for(Object obj: users) {
             BasicDBObject userObj = (BasicDBObject) obj;
             RBAC rbac = userToRBAC.get(userObj.getInt("id"));
             String status = rbac == null ? Role.MEMBER.getName() : rbac.getRole().getName();
             userObj.append("role", status);
+            try {
+                String login = userObj.getString(User.LOGIN);
+                if (login != null) {
+                    userSet.add(login);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in fetchTeamData " + e.getMessage());
+            }
         }
 
         List<PendingInviteCode> pendingInviteCodes = PendingInviteCodesDao.instance.findAll(Filters.or(
@@ -68,7 +83,11 @@ public class TeamAction extends UserAction {
             } else {
                 roleText += "for " + inviteeRole.name();
             }
-            if (pendingInviteCode.getAccountId() == accountId) {
+            /*
+             * Do not send invitation code, if already a member.
+             */
+            if (pendingInviteCode.getAccountId() == accountId &&
+                    !userSet.contains(pendingInviteCode.getInviteeEmailId())) {
                 users.add(
                         new BasicDBObject("id", pendingInviteCode.getIssuer())
                                 .append("login", pendingInviteCode.getInviteeEmailId())
