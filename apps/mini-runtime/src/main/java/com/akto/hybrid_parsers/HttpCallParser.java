@@ -120,10 +120,16 @@ public class HttpCallParser {
         return vxlanId;
     }
 
+    public int createCollectionSimpleForVpc(int vxlanId, String vpcId) {
+        dataActor.createCollectionSimpleForVpc(vxlanId, vpcId);
+        return vxlanId;
+    }
+
 
     public int createCollectionBasedOnHostName(int id, String host)  throws Exception {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
+        String vpcId = System.getenv("VPC_ID");
         // 3 cases
         // 1. If 2 threads are trying to insert same host simultaneously then both will succeed with upsert true
         // 2. If we are trying to insert different host but same id (hashCode collision) then it will fail,
@@ -132,7 +138,7 @@ public class HttpCallParser {
         for (int i=0;i < 100; i++) {
             id += i;
             try {
-                dataActor.createCollectionForHost(host, id);
+                dataActor.createCollectionForHostAndVpc(host, id, vpcId);
                 flag = true;
                 break;
             } catch (Exception e) {

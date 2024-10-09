@@ -244,4 +244,8 @@ public abstract class DataActor {
     public abstract Set<MergedUrls> fetchMergedUrls();
 
     public abstract List<TestingRunResultSummary> fetchStatusOfTests();
+    public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId);
+
+    public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId);
+
 }
