@@ -13,6 +13,7 @@ import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
+import com.akto.testing.TemplateMapper;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
@@ -61,6 +62,7 @@ public class CustomDataTypeAction extends UserAction{
     private String valueOperator;
     private List<ConditionFromUser> valueConditionFromUsers;
     private boolean redacted;
+    private boolean skipDataTypeTestTemplateMapping;
 
     private String iconString;
     private List<String> categoriesList;
@@ -204,6 +206,7 @@ public class CustomDataTypeAction extends UserAction{
                     Updates.set(CustomDataType.TIMESTAMP,Context.now()),
                     Updates.set(CustomDataType.ACTIVE,active),
                     Updates.set(CustomDataType.REDACTED,customDataType.isRedacted()),
+                    Updates.set(CustomDataType.SKIP_DATA_TYPE_TEST_TEMPLATE_MAPPING,skipDataTypeTestTemplateMapping),
                     Updates.set(CustomDataType.SAMPLE_DATA_FIXED,customDataType.isSampleDataFixed()),
                     Updates.set(AktoDataType.CATEGORIES_LIST, customDataType.getCategoriesList()),
                     Updates.set(AktoDataType.DATA_TYPE_PRIORITY, customDataType.getDataTypePriority()),
@@ -226,6 +229,17 @@ public class CustomDataTypeAction extends UserAction{
                 Context.accountId.set(accountId);
                 loggerMaker.infoAndAddToDb("Triggered a job to fix existing custom data types", LogDb.DASHBOARD);
                 handleDataTypeRedaction();
+            });
+        }
+
+        if (!customDataType.isSkipDataTypeTestTemplateMapping()) {
+            int accountId = Context.accountId.get();
+            service.submit(() -> {
+                Context.accountId.set(accountId);
+                loggerMaker.infoAndAddToDb("Triggered a job to update test template based on akto data type " + name,
+                        LogDb.DASHBOARD);
+                TemplateMapper templateMapper = new TemplateMapper();
+                templateMapper.createTestTemplateForCustomDataType(customDataType);
             });
         }
 
@@ -280,6 +294,14 @@ public class CustomDataTypeAction extends UserAction{
                 handleDataTypeRedaction();
             });
         }
+
+        int accountId = Context.accountId.get();
+        service.submit(() ->{
+            Context.accountId.set(accountId);
+            loggerMaker.infoAndAddToDb("Triggered a job to update test template based on akto data type " + name, LogDb.DASHBOARD);
+            TemplateMapper templateMapper = new TemplateMapper();
+            templateMapper.createTestTemplateForAktoDataType(aktoDataType);
+        });
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -1108,6 +1130,13 @@ public class CustomDataTypeAction extends UserAction{
         this.redacted = redacted;
     }
 
+    public boolean isSkipDataTypeTestTemplateMapping() {
+        return skipDataTypeTestTemplateMapping;
+    }
+
+    public void setSkipDataTypeTestTemplateMapping(boolean skipDataTypeTestTemplateMapping) {
+        this.skipDataTypeTestTemplateMapping = skipDataTypeTestTemplateMapping;
+    }
     public BasicDBObject getResponse() {
         return response;
     }

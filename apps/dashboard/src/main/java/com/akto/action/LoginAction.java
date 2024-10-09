@@ -10,8 +10,9 @@ import com.akto.dto.Config;
 import com.akto.dto.SignupInfo;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
-import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.Token;
 import com.akto.utils.JWT;
 import com.mongodb.BasicDBObject;
@@ -190,6 +191,22 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                                 Updates.set(User.LAST_LOGIN_TS, Context.now())
                         )
                 );
+                /*
+                 * Creating datatype to template on user login.
+                 * TODO: Remove this job once templates for majority users are created.
+                 */
+                service.submit(() -> {
+                    try {
+                        for (String accountIdStr : user.getAccounts().keySet()) {
+                            int accountId = Integer.parseInt(accountIdStr);
+                            Context.accountId.set(accountId);
+                            SingleTypeInfo.fetchCustomDataTypes(accountId);
+                            logger.info("updating data type test templates for account " + accountId);
+                            InitializerListener.executeDataTypeToTemplate();
+                        }
+                    } catch (Exception e) {
+                    }
+                });
             }
             service.submit(() ->{
                 triggerVulnColUpdation(user);

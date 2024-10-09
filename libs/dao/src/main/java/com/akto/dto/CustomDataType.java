@@ -37,6 +37,8 @@ public class CustomDataType {
     private boolean sampleDataFixed;
     public static final String SAMPLE_DATA_FIXED = "sampleDataFixed";
 
+    public static final String SKIP_DATA_TYPE_TEST_TEMPLATE_MAPPING = "skipDataTypeTestTemplateMapping";
+    private boolean skipDataTypeTestTemplateMapping;
     private Severity dataTypePriority;
     private List<String> categoriesList;
 
@@ -100,7 +102,6 @@ public class CustomDataType {
                     return false;
             }
         }
-
     }
         
     public ObjectId getId() {
@@ -226,6 +227,13 @@ public class CustomDataType {
         this.sampleDataFixed = sampleDataFixed;
     }
 
+    public boolean isSkipDataTypeTestTemplateMapping() {
+        return skipDataTypeTestTemplateMapping;
+    }
+
+    public void setSkipDataTypeTestTemplateMapping(boolean skipDataTypeTestTemplateMapping) {
+        this.skipDataTypeTestTemplateMapping = skipDataTypeTestTemplateMapping;
+    }
     public Severity getDataTypePriority() {
         return dataTypePriority;
     }

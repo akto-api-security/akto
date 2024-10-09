@@ -74,8 +74,8 @@ import com.akto.stigg.StiggReporterClient;
 import com.akto.task.Cluster;
 import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
-import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
+import com.akto.testing.TemplateMapper;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
@@ -141,6 +141,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -331,10 +332,32 @@ public class InitializerListener implements ServletContextListener {
                             e.printStackTrace();
                             loggerMaker.errorAndAddToDb("Error in fetching PII sources: " +  e.getMessage());
                         }
+                        /*
+                         * This job updates the test templates based on data types.
+                         * Since this may cause a significant load on db on first release,
+                         * commenting this.
+                         * TODO: uncomment this later.
+                         */
+                        // try {
+                        //     executeDataTypeToTemplate();
+                        // } catch (Exception e) {
+                        //     loggerMaker.errorAndAddToDb(e, "Error in executeDataTypeToTemplate " + e.toString());
+                        // }
                     }
                 }, "pii-scheduler");
             }
         }, 0, 4, TimeUnit.HOURS);
+    }
+
+    public static void executeDataTypeToTemplate() {
+        TemplateMapper mapper = new TemplateMapper();
+        int accountId = Context.accountId.get();
+        for (Entry<String, CustomDataType> dataType : SingleTypeInfo.getCustomDataTypeMap(accountId).entrySet()) {
+            mapper.createTestTemplateForCustomDataType(dataType.getValue());
+        }
+        for (Entry<String, AktoDataType> dataType : SingleTypeInfo.getAktoDataTypeMap(accountId).entrySet()) {
+            mapper.createTestTemplateForAktoDataType(dataType.getValue());
+        }
     }
 
     static TestCategory findTestCategory(String path, Map<String, TestCategory> shortNameToTestCategory) {
@@ -2785,8 +2808,6 @@ public class InitializerListener implements ServletContextListener {
         return url != null ? url : "https://stairway.akto.io/deployment/status";
     }
 
-    public final static String _AKTO = "AKTO";
-
     public void setUpTestEditorTemplatesScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -2798,7 +2819,7 @@ public class InitializerListener implements ServletContextListener {
                 AccountTask.instance.executeTask((account) -> {
                     try {
                         loggerMaker.infoAndAddToDb("Updating Test Editor Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
-                        processTemplateFilesZip(testingTemplates, _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                        processTemplateFilesZip(testingTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                     } catch (Exception e) {
                         cacheLoggerMaker.errorAndAddToDb(e,
                                 String.format("Error while updating Test Editor Files %s", e.toString()),
@@ -2892,7 +2913,7 @@ public class InitializerListener implements ServletContextListener {
                             } catch (Exception e) {
                             }
 
-                            if (_AKTO.equals(author)) {
+                            if (Constants._AKTO.equals(author)) {
                                 YamlTemplateDao.instance.updateOne(
                                         Filters.eq(Constants.ID, id),
                                         Updates.combine(updates));
@@ -2907,7 +2928,7 @@ public class InitializerListener implements ServletContextListener {
                                 try {
                                     YamlTemplateDao.instance.getMCollection().findOneAndUpdate(
                                         Filters.and(Filters.eq(Constants.ID, id),
-                                                Filters.ne(YamlTemplate.AUTHOR, _AKTO)),
+                                                Filters.ne(YamlTemplate.AUTHOR, Constants._AKTO)),
                                         Updates.combine(updates),
                                         new FindOneAndUpdateOptions().upsert(true));
                                 } catch (Exception e){

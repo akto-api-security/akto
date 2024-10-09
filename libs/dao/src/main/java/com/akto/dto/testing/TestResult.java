@@ -24,8 +24,16 @@ public class TestResult extends GenericTestResult {
 
     private boolean requiresConfig;
 
+    /*
+     * This field is being used as severity.
+     * Thus keeping this in sync with "enum severity".
+     */
     public enum Confidence {
-        HIGH, MEDIUM, LOW
+        CRITICAL,
+        HIGH,
+        MEDIUM,
+        LOW,
+        INFO
     }
 
     public enum TestError {
@@ -103,6 +111,15 @@ public class TestResult extends GenericTestResult {
     }
 
     public String getOriginalMessage() {
+        /*
+         Not storing original messages for passive tests,
+         as original and attempt are same for passive tests.
+
+         For any other test, there will always be original message.
+         */
+        if(originalMessage == null || originalMessage.isEmpty()){
+            return message;
+        }
         return originalMessage;
     }
 

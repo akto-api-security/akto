@@ -311,6 +311,15 @@ prettifyEpoch(epoch) {
   },
 
   getRunResultSeverity(runResult, subCategoryMap) {
+    try {
+      if (runResult?.testResults?.[0]?.confidence._name) {
+        return runResult?.testResults?.[0]?.confidence._name
+      } else if (runResult?.testResults?.[0]?.confidence) {
+        return runResult?.testResults?.[0]?.confidence
+      }
+    } catch(e){
+    }
+
     let testSubType = subCategoryMap[runResult.testSubType]
     if (!testSubType) {
       return "HIGH"

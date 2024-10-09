@@ -137,6 +137,21 @@ public class Executor {
             return yamlTestResult;
         }
 
+        if (executionType.equals("passive")) {
+            ExecutionResult attempt = new ExecutionResult(true, "", rawApi.getRequest(), rawApi.getResponse());
+            TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+            if (res != null) {
+                /*
+                 * Since the original message and test message are same, saving only one.
+                 * Being set as message in the getter later.
+                 */
+                res.setOriginalMessage("");
+                result.add(res);
+            }
+            yamlTestResult = new YamlTestResult(result, workflowTest);
+            return yamlTestResult;
+        }
+
         List<RawApi> testRawApis = new ArrayList<>();
         testRawApis.add(sampleRawApi.copy());
         ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes);

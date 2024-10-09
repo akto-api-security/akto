@@ -774,7 +774,7 @@ getPrettifiedTestRunResults(testRunResults){
   const errorsObject = TestingStore.getState().errorsObject
   let testRunResultsObj = {}
   testRunResults.forEach((test)=>{
-    let key = test.name + ': ' + test.vulnerable
+    let key = test.name + ': ' + test.vulnerable + ": " + test.severity
     let error_message = ""
     if(test?.errorsList.length > 0){
       const errorType = this.getTestErrorType(test.errorsList[0])
