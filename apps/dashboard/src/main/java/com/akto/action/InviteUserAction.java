@@ -12,6 +12,7 @@ import com.akto.notifications.email.SendgridEmail;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.sendgrid.helpers.mail.Mail;
 
@@ -92,7 +93,7 @@ public class InviteUserAction extends UserAction{
 
         User admin = UsersDao.instance.getFirstUser(Context.accountId.get());
         if (admin == null) {
-            loggerMaker.infoAndAddToDb("admin is null");
+            loggerMaker.infoAndAddToDb("admin not found for organization");
             return ERROR.toUpperCase();
         }
 
@@ -134,8 +135,21 @@ public class InviteUserAction extends UserAction{
 
         try {
             Jws<Claims> jws = JWT.parseJwt(inviteCode,"");
-            PendingInviteCodesDao.instance.insertOne(
-                    new PendingInviteCode(inviteCode, user_id, inviteeEmail,jws.getBody().getExpiration().getTime(),Context.accountId.get(), this.inviteeRole)
+            /*
+             * There should only be one invite code per user per account.
+             * So if we update with upsert:true per account-inviteeEmail
+             */
+            PendingInviteCodesDao.instance.updateOne(
+                    Filters.and(
+                        Filters.eq(PendingInviteCode.ACCOUNT_ID, Context.accountId.get()),
+                        Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, inviteeEmail)
+                    ),
+                    Updates.combine(
+                        Updates.set(PendingInviteCode.INVITEE_ROLE, this.inviteeRole),
+                        Updates.set(PendingInviteCode.INVITE_CODE, inviteCode),
+                        Updates.set(PendingInviteCode._EXPIRY, jws.getBody().getExpiration().getTime()),
+                        Updates.set(PendingInviteCode._ISSUER, user_id)
+                    )
             );
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             e.printStackTrace();
