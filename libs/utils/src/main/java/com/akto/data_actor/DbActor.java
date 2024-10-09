@@ -493,4 +493,12 @@ public class DbActor extends DataActor {
         return DbLayer.fetchMergedUrls();
     }
 
+    public void createCollectionSimpleForVpc(int vxlanId, String vpcId) {
+        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId);
+    }
+
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId) {
+        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId);
+    }
+
 }

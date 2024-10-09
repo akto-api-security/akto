@@ -216,6 +216,7 @@ public class DbAction extends ActionSupport {
     ObjectMapper objectMapper = new ObjectMapper();
     KafkaUtils kafkaUtils = new KafkaUtils();
     String endpointLogicalGroupId;
+    String vpcId;
 
     String metricType;
 
@@ -1676,6 +1677,26 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String createCollectionSimpleForVpc() {
+        try {
+            System.out.println("called1 vpcId" + vpcId);
+            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String createCollectionForHostAndVpc() {
+        try {
+            System.out.println("called2 vpcId" + vpcId);
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -2576,6 +2597,14 @@ public class DbAction extends ActionSupport {
 
     public void setState(String state) {
         this.state = state;
+    }
+
+    public String getVpcId() {
+        return vpcId;
+    }
+
+    public void setVpcId(String vpcId) {
+        this.vpcId = vpcId;
     }
 
 }
