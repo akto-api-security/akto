@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dto.*;
 import com.akto.util.Pair;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import com.akto.DaoInit;
