@@ -1,124 +1,98 @@
-import { Avatar, Box, Button, Card, HorizontalStack, Scrollable, Text, VerticalStack } from '@shopify/polaris'
+import { Avatar, Box, Button, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
-import { useNavigate } from "react-router-dom"
-import func from '../../../../../util/func'
-import './ActivityTracker.css';
-import PersistStore from '../../../../main/PersistStore';
+import './ActivityTracker.css'
 
-function ActivityTracker({latestActivity, onLoadMore, showLoadMore, collections }) {
+function ActivityTracker({ issueDetails }) {
+  const formatDate = (epochTime) => {
+      const date = new Date(epochTime * 1000)
+      const formattedDate = date.toLocaleDateString('en-US', { 
+          year: 'numeric', month: 'short', day: 'numeric' 
+      })
+      const formattedTime = date.toLocaleTimeString('en-US', { 
+          hour: 'numeric', minute: '2-digit', hour12: true 
+      })
+      return [formattedDate, formattedTime]
+  }
 
-    const navigate = useNavigate()
-    const filtersMap = PersistStore(state => state.filtersMap)
-    const setFiltersMap = PersistStore(state => state.setFiltersMap)
+  const generateActivityEvents = (issue) => {
+      const activityEvents = []
 
-      function extractCollectionName(description) {
-        const parts = description.split(' ');
-        const nameIndex = parts.indexOf('named');
-        if (nameIndex !== -1 && nameIndex < parts.length - 1) {
-          return parts[nameIndex + 1];
-        } else {
-          return null;
-        }
+      const createdEvent = {
+          description: 'Found the issue',
+          timestamp: issue.creationTime,
+      }
+      activityEvents.push(createdEvent)
+
+      if (issue.testRunIssueStatus === 'IGNORED') {
+          const ignoredEvent = {
+              description: <Text>Issue marked as <b>IGNORED</b> - {issue.ignoreReason || 'No reason provided'}</Text>,
+              timestamp: issue.lastUpdated,
+          }
+          activityEvents.push(ignoredEvent)
       }
 
-      function getKeyByValue(obj, value) {
-        return Object.keys(obj).find(key => obj[key] === value);
+      if (issue.testRunIssueStatus === 'FIXED') {
+          const fixedEvent = {
+              description: <Text>Issue marked as <b>FIXED</b></Text>,
+              timestamp: issue.lastUpdated,
+          }
+          activityEvents.push(fixedEvent)
       }
 
+      return activityEvents
+  }
 
-      function handleActivityType(activityType, activityDescription, timestamp) {
-        if (activityType === "Collection created") {
-          // Perform operations for "created" type
-          const collectionName = extractCollectionName(activityDescription)
+  // Group events by date
+  const groupEventsByDate = (events) => {
+      return events.reduce((groupedEvents, event) => {
+          const eventDate = formatDate(event.timestamp)[0]
+          if (!groupedEvents[eventDate]) {
+              groupedEvents[eventDate] = []
+          }
+          groupedEvents[eventDate].push(event)
+          return groupedEvents
+      }, {})
+  }
 
-          const collectionKey = getKeyByValue(collections, collectionName)
+  const latestActivity = generateActivityEvents(issueDetails).reverse()
+  const groupedActivity = groupEventsByDate(latestActivity)
 
-          navigate(`/dashboard/observe/inventory/${collectionKey}`);
-       
-        } else if (activityType === "Endpoints detected") {
-        
-
-          navigate(`/dashboard/observe/changes`,{ state:{tab:0, timestamp: timestamp}});
-
-  
-        }
-        else if(activityType === "Parameters detected" ){
-
-            navigate(`/dashboard/observe/changes`,{state:{tab:1, timestamp: timestamp}});
-
-
-        }
-        else if(activityType === "High Vulnerability detected"){
-          
-        let updatedFiltersMap = { ...filtersMap }; 
-
-            const filterKey = '/dashboard/issues'
-
-            const filterArray = [{
-              key: "severity",
-              label: "High",
-              value: ["HIGH"],
-            },
-            {
-              key: "startTimestamp",
-              label: "Custom",
-              value: [timestamp-10000],
-            }]
-
-            updatedFiltersMap[filterKey] = {filters: filterArray, sort : []};
-
-
-        setFiltersMap(updatedFiltersMap)
-          navigate('/dashboard/issues')
-
-
-        }
-      }
-      
-
-    return (
-        <Card>
-            <VerticalStack gap={5}>
-                <Text variant="bodyLg" fontWeight="semibold">Latest activity</Text>
-                <Scrollable style={{maxHeight: '400px' }}  shadow> 
-                    <VerticalStack gap={3}>
-                        <HorizontalStack gap={3}>
-                            <VerticalStack>
-                            {latestActivity.map((c,index)=>{
-                                return (
-
-                                    <div style={{display: 'flex', gap: '12px'}} key={index}>
-                                   
-                                        <Box>
-                                            
-                                            <Avatar shape="round" size="extraSmall" source="/public/steps_icon.svg"/>
-                                            {index < (latestActivity.length - 1) ? <div style={{background: '#e6e6ff', width: '2px', margin: 'auto', height: '36px'}} /> : null}
-                                        </Box>
-
-                                        <Box>
-                                        <Button  textAlign="start"  plain monochrome removeUnderline onClick={() => handleActivityType(c.type, c.description, c.timestamp)}>
-                                        <Text variant="bodySm" color="subdued">{`${func.prettifyEpoch(c.timestamp)}`}</Text>
-                                        <div className="customButton" > 
-                                            <Text variant="bodyMd" color="semibold" >{c.description}</Text>
-                                        </div>      
-                                         
-
-                                        </Button>
-
-                                            
-                                           
-                                        </Box>                             
-                                    </div>
-                                )
-                            })}
-                            </VerticalStack>
-                        </HorizontalStack>
-                    </VerticalStack>
-                </Scrollable>
-                {showLoadMore() ? <Button plain removeUnderline onClick={onLoadMore}>Load more</Button> : null}
-            </VerticalStack>
-        </Card>
-    )
+  return (
+      <Box padding={5}>
+          <VerticalStack>
+              {Object.keys(groupedActivity).map((date, dateIndex) => (
+                  <Box key={dateIndex}>
+                      <HorizontalStack gap={5}>
+                        <div style={{ background: '#C9CCCF', width: '2px', marginLeft: '12px', height: '44px' }} />
+                        <Text variant="bodySm" color="subdued" style={{ marginBottom: '10px' }}>
+                            {date}
+                        </Text>
+                      </HorizontalStack>
+                      {groupedActivity[date].map((event, eventIndex) => (
+                          <HorizontalStack key={eventIndex} align='space-between'>
+                              <div style={{ display: 'flex', gap: '12px' }}>
+                                  <Box>
+                                      <div className='issues-event-item-gap'><Avatar shape="round" size="extraSmall" source="/public/issues-event-icon.svg" /></div>
+                                      {eventIndex < (groupedActivity[date].length - 1) ? (
+                                          <div style={{ background: '#C9CCCF', width: '2px', margin: 'auto', height: '12px' }} />
+                                      ) : null}
+                                  </Box>
+                                  <Box>
+                                    <div className='issues-event-item-gap'><Text variant="bodyMd">{event.description}</Text></div>
+                                  </Box>
+                              </div>
+                              <div className='issues-event-item-gap'>
+                                <Text id="event-time-text" variant="bodySm" color="subdued">
+                                    {formatDate(event.timestamp)[1]}
+                                </Text>
+                              </div>
+                          </HorizontalStack>
+                      ))}
+                  </Box>
+              ))}
+          </VerticalStack>
+      </Box>
+  )
 }
-                          
-export default ActivityTracker
+
+export default ActivityTracker;
