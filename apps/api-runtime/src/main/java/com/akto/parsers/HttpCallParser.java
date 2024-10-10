@@ -627,6 +627,13 @@ public class HttpCallParser {
         boolean ret = false;
         Set<String> urlSet= new HashSet<>();
         for (HttpResponseParams responseParams: responses) {
+
+            String debugHost = Utils.printDebugLog(responseParams);
+            if (debugHost != null) {
+                HttpRequestParams requestParams = responseParams.getRequestParams();
+                loggerMaker.infoAndAddToDb("Found host: " + debugHost + " in HttpCallParser.java for url: " + requestParams.getMethod() + " " + requestParams.getURL());
+            }
+
             if (responseParams.getSource() == HttpResponseParams.Source.HAR || responseParams.getSource() == HttpResponseParams.Source.PCAP) {
                 ret = true;
             }

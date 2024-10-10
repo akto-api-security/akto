@@ -228,6 +228,11 @@ public class Main {
                         }
 
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
+                        String debugHost = Utils.printDebugLog(httpResponseParams);
+                        if (debugHost != null) {
+                            HttpRequestParams requestParams = httpResponseParams.getRequestParams();
+                            loggerMaker.infoAndAddToDb("Found host: " + debugHost + " in Main.java for url: " + requestParams.getMethod() + " " + requestParams.getURL());
+                        }
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e, LogDb.RUNTIME);
                         continue;

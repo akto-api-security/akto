@@ -1,10 +1,6 @@
 package com.akto.runtime.utils;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.math.NumberUtils;
@@ -97,6 +93,30 @@ public class Utils {
     }
 
     private static int GRPC_DEBUG_COUNTER = 50;
+
+    private static final Set<String> DEBUG_HOSTS_SET = initializeDebugHostsSet();
+
+    private static Set<String> initializeDebugHostsSet() {
+        String debugHosts = System.getenv("DEBUG_HOSTS");
+        if (debugHosts == null || debugHosts.isEmpty()) {
+            return new HashSet<>();
+        }
+        return new HashSet<>(Arrays.asList(debugHosts.split(",")));
+    }
+
+    public static String printDebugLog(HttpResponseParams httpResponseParams) {
+        if (DEBUG_HOSTS_SET.isEmpty()) return null;
+        Map<String, List<String>> headers = httpResponseParams.getRequestParams().getHeaders();
+        List<String> hosts = headers.get("host");
+        if (hosts == null || hosts.isEmpty()) return null;
+        String host = hosts.get(0);
+
+        return printDebugLog(host) ? host : null;
+    }
+
+    public static boolean printDebugLog(String host) {
+        return DEBUG_HOSTS_SET.contains(host);
+    }
 
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
 

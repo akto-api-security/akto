@@ -20,6 +20,7 @@ import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
 import com.akto.hybrid_runtime.URLAggregator;
 import com.akto.runtime.RuntimeUtil;
+import com.akto.runtime.utils.Utils;
 import com.akto.util.JSONUtils;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
@@ -546,6 +547,12 @@ public class HttpCallParser {
         boolean ret = false;
         Set<String> urlSet= new HashSet<>();
         for (HttpResponseParams responseParams: responses) {
+            String debugHost = Utils.printDebugLog(responseParams);
+            if (debugHost != null) {
+                HttpRequestParams requestParams = responseParams.getRequestParams();
+                loggerMaker.infoAndAddToDb("Found host: " + debugHost + " in HttpCallParser.java for url: " + requestParams.getMethod() + " " + requestParams.getURL());
+            }
+
             if (responseParams.getSource() == HttpResponseParams.Source.HAR || responseParams.getSource() == HttpResponseParams.Source.PCAP) {
                 ret = true;
             }
