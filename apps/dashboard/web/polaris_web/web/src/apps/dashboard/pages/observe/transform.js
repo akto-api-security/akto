@@ -351,6 +351,19 @@ const transform = {
         return { sensitiveSampleData: sensitiveSampleData };
     },
 
+    getSeverityColor(severity) {
+        switch(severity.toUpperCase()) {
+            case "CRITICAL":
+                return "#E45357"
+            case "HIGH":
+                return "#EF864C"
+            case "MEDIUM":
+                return "#F6C564"
+            default:
+                return "#333"
+        }
+    },
+
     getColor(key, isSensitiveBadge=false){
         switch(key.toUpperCase()){
             case "CRITICAL": return "critical-strong-experimental"

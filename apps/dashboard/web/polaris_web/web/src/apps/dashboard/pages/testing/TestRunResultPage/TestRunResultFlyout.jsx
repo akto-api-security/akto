@@ -5,13 +5,15 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Avatar, Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link } from '@shopify/polaris'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link } from '@shopify/polaris'
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import GridRows from '../../../components/shared/GridRows'
 import { useNavigate } from 'react-router-dom'
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
 import "./style.css"
+import ActivityTracker from '../../dashboard/components/ActivityTracker'
+import observeFunc from "../../observe/transform.js"
 
 function TestRunResultFlyout(props) {
 
@@ -101,7 +103,7 @@ function TestRunResultFlyout(props) {
         return(
             issueDetails?.id &&
         <Popover
-            activator={<Button disclosure plain onClick={() => setPopoverActive(!popoverActive)}>Actions</Button>}
+            activator={<Button disclosure onClick={() => setPopoverActive(!popoverActive)}>Triage</Button>}
             active={popoverActive}
             onClose={() => setPopoverActive(false)}
             autofocusTarget="first-node"
@@ -111,18 +113,6 @@ function TestRunResultFlyout(props) {
             <Popover.Pane fixed>
                 <Popover.Section>
                     <VerticalStack gap={"4"}>
-                        <Text variant="headingSm">Create</Text>
-                        <Button plain monochrome removeUnderline onClick={()=>{createJiraTicket(issueDetails); setPopoverActive(false)}} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>
-                            <HorizontalStack gap={"2"}>
-                                <Avatar shape="square" size="extraSmall" source="/public/logo_jira.svg"/>
-                                <Text>Jira Ticket</Text>
-                            </HorizontalStack>
-                        </Button>
-                    </VerticalStack>
-                </Popover.Section>
-                <Popover.Section>
-                    <VerticalStack gap={"4"}>
-                        <Text variant="headingSm">Ignore</Text>
                         {issuesActions.map((issue, index) => {
                             return(
                                 <div style={{cursor: 'pointer'}} onClick={() => {issue.onAction(); setPopoverActive(false)}} key={index}>
@@ -145,7 +135,7 @@ function TestRunResultFlyout(props) {
                             <Button removeUnderline plain monochrome onClick={() => openTest()}>
                                 <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
                             </Button>
-                            {severity.length > 0 ? <Box><Badge size="small" status={func.getTestResultStatus(severity)}>{severity}</Badge></Box> : null}
+                            {severity.length > 0 ? <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box> : null}
                         </div>
                     </Box>
                     <HorizontalStack gap={"2"}>
@@ -154,7 +144,10 @@ function TestRunResultFlyout(props) {
                         <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
                     </HorizontalStack>
                 </VerticalStack>
-                <ActionsComp />
+                <HorizontalStack gap={2} wrap={false}>
+                    <ActionsComp />
+                    {isIssuePage && <Button fullWidth id={"create-jira-ticket-button"} primary secondaryActions onClick={()=>{createJiraTicket(issueDetails); setPopoverActive(false)}} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button>}
+                </HorizontalStack>
             </div>
         )
     }
@@ -263,6 +256,12 @@ function TestRunResultFlyout(props) {
         component: issueDetails.id && overviewComp
     }
 
+    const timelineTab = isIssuePage && {
+        id: "timeline",
+        content: "Timeline",
+        component: <ActivityTracker issueDetails={issueDetails} />
+    }
+
     const errorTab = {
         id: "error",
         content: "Attempt",
@@ -288,7 +287,7 @@ function TestRunResultFlyout(props) {
     const tabsComponent = (
         <LayoutWithTabs
             key="tab-comp"
-            tabs={issueDetails?.id ? [overviewTab,ValuesTab]: [attemptTab]}
+            tabs={issueDetails?.id ? [overviewTab,timelineTab,ValuesTab]: [attemptTab]}
             currTab = {() => {}}
         />
     )
