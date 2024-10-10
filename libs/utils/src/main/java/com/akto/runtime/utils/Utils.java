@@ -107,6 +107,9 @@ public class Utils {
 
     public static String printDebugHostLog(HttpResponseParams httpResponseParams) {
         if (DEBUG_HOSTS_SET.isEmpty()) return null;
+        if (httpResponseParams == null || httpResponseParams.requestParams == null || httpResponseParams.requestParams.getHeaders() == null) {
+            return null;
+        }
         Map<String, List<String>> headers = httpResponseParams.getRequestParams().getHeaders();
         List<String> hosts = headers.get("host");
         if (hosts == null || hosts.isEmpty()) return null;

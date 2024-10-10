@@ -40,7 +40,7 @@ public class Main {
     public static final String VPC_CIDR = "vpc_cidr";
     public static final String ACCOUNT_ID = "account_id";
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.RUNTIME);
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
@@ -235,7 +235,7 @@ public class Main {
                         }
 
                         if (Utils.printDebugUrlLog(requestParams.getURL())) {
-                            loggerMaker.infoAndAddToDb("Found debug url in Main.java: " + requestParams.getURL());
+                            loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
                         }
 
                     } catch (Exception e) {
