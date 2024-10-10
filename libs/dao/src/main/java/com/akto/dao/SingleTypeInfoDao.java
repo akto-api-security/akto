@@ -445,38 +445,6 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return instance.getMCollection().estimatedDocumentCount();
     }
 
-    public Map<String,Map<String, Integer>> buildSubTypeCountMap(int startTimestamp, int endTimestamp) {
-
-        ArrayList<Bson> filterList = new ArrayList<>();
-        filterList.add(Filters.gt("timestamp", startTimestamp));
-        filterList.add(Filters.lt("timestamp", endTimestamp));
-
-        List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
-        sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-        Bson sensitveSubTypeFilterRequest = Filters.in("subType",sensitiveInRequest);
-        List<Bson> requestFilterList = new ArrayList<>();
-        requestFilterList.add(sensitveSubTypeFilterRequest);
-        requestFilterList.addAll(filterList);
-        requestFilterList.add(Filters.eq("responseCode", -1));
-
-        List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
-        sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-        Bson sensitveSubTypeFilterResponse = Filters.in("subType",sensitiveInResponse);
-        List<Bson> responseFilterList = new ArrayList<>();
-        responseFilterList.add(sensitveSubTypeFilterResponse);
-        responseFilterList.addAll(filterList);
-        responseFilterList.add(Filters.gt("responseCode", -1));
-
-        Map<String, Integer> requestResult = execute(requestFilterList);
-        Map<String, Integer> responseResult = execute(responseFilterList);
-
-        Map<String, Map<String, Integer>> resultMap = new HashMap<>();
-        resultMap.put("REQUEST", requestResult);
-        resultMap.put("RESPONSE", responseResult);
-        
-        return resultMap;
-    }
-
     public Map<String, Integer> execute(List<Bson> filterList) {
         Map<String, Integer> countMap = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
@@ -506,7 +474,27 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         List<Bson> pipeline = new ArrayList<>();
         Bson filterOnResponse = Filters.gte(SingleTypeInfo._RESPONSE_CODE, codeValue);
         Bson sensitiveSubTypeFilter = Filters.and(Filters.in(SingleTypeInfo.SUB_TYPE,sensitiveParameters), filterOnResponse, customFilter);
-        pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
+
+        List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+        sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+        Bson sensitveSubTypeFilterRequest = Filters.in("subType",sensitiveInRequest);
+        List<Bson> requestFilterList = new ArrayList<>();
+        requestFilterList.add(sensitveSubTypeFilterRequest);
+        requestFilterList.add(customFilter);
+        requestFilterList.add(Filters.eq("responseCode", -1));
+
+        List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+        sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+        Bson sensitveSubTypeFilterResponse = Filters.in("subType",sensitiveInResponse);
+        List<Bson> responseFilterList = new ArrayList<>();
+        responseFilterList.add(sensitveSubTypeFilterResponse);
+        responseFilterList.add(customFilter);
+        responseFilterList.add(Filters.gt("responseCode", -1));
+
+        pipeline.add(Aggregates.match(Filters.or(
+            Filters.and(responseFilterList),
+            Filters.and(requestFilterList)
+        )));
         pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("subTypes", "$subType")));
         return pipeline;
     }
