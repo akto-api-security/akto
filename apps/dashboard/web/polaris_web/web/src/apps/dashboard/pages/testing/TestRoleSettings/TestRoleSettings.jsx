@@ -22,7 +22,7 @@ const selectOptions = [
         value: 'CONTAINS'
     },
     {
-        label: 'belongs to',
+        label: 'in',
         value: 'BELONGS_TO',
         operators: [
             {
@@ -40,6 +40,17 @@ const selectOptions = [
             value: 'AND',
         }],
         type: "MAP"
+    },
+    {
+        label: 'belongs to',
+        value: 'IN_COLLECTION',
+        operators: [
+            {
+                label: 'OR',
+                value: 'OR',
+            }
+        ],
+        type: "COLLECTIONS_MAP"
     }
 ]
 

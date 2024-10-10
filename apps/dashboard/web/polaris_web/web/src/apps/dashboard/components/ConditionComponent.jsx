@@ -1,4 +1,4 @@
-import { ButtonGroup, HorizontalStack, TextField } from '@shopify/polaris'
+import { HorizontalGrid, TextField } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import Dropdown from './layouts/Dropdown';
 import DropdownSearch from './shared/DropdownSearch';
@@ -102,10 +102,9 @@ function ConditionComponent(props) {
         </div>
     )
 
-    const collectionComponent = (field) => {
+    const collectionComponent = (field, showOnlyCollections = false) => {
         return (
-            <div style={{display:"flex", gap:"4px"}}>
-                <div style={{flexGrow:"1"}}>
+            <HorizontalGrid gap={"1"} columns={showOnlyCollections ? "1" : "2"}>
                 <DropdownSearch
                     id={`${id}-api-collection-${index}`}
                     placeholder="Select API collection"
@@ -114,9 +113,7 @@ function ConditionComponent(props) {
                     preSelected={[Number(getCollectionId(field))]}
                     value={mapCollectionIdToName[getCollectionId(field)]}
                 />
-                </div>
-                <div style={{flexGrow:"1"}}>
-                <DropdownSearch
+                {!showOnlyCollections &&<DropdownSearch
                     id={`${id}-api-endpoint-${index}`}
                     disabled={apiEndpoints?.endpoints == undefined || apiEndpoints.endpoints.length === 0}
                     placeholder="Select API endpoint"
@@ -128,9 +125,8 @@ function ConditionComponent(props) {
                     itemName={"endpoint"}
                     value={getEndpointCount(field)}
                     allowMultiple
-                />
-                </div>
-            </div>
+                />}
+            </HorizontalGrid>
         )
     }
 
@@ -139,6 +135,7 @@ function ConditionComponent(props) {
 
         switch (type) {
             case "MAP": return collectionComponent(condition);
+            case "COLLECTIONS_MAP": return collectionComponent(condition, true);
             case "NUMBER": return <TextField id={`${id}-param-text-${index}`} disabled/>;
             default:
                 return <TextField

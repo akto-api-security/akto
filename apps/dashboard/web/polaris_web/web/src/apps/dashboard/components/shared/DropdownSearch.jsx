@@ -1,4 +1,4 @@
-import { Autocomplete, Avatar, Checkbox, Icon, TextContainer } from '@shopify/polaris';
+import { Autocomplete, Avatar, HorizontalStack, Icon, Link, TextContainer } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import React, { useState, useCallback, useEffect } from 'react';
 import func from "@/util/func";
@@ -196,7 +196,7 @@ function DropdownSearch(props) {
                 textField={textField}
                 preferredPosition='below'
                 {...(showSelectAll ? {actionBefore:{
-                    content:(<Checkbox label={checkboxLabel} checked={checked} onChange={() => selectAllFunc()}/>),
+                    content: (<HorizontalStack align="end"><Link>{checkboxLabel}</Link></HorizontalStack>),
                     onAction: () => selectAllFunc(),
                 }} : {})}
             >

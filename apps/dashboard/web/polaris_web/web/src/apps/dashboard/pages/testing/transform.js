@@ -549,6 +549,7 @@ const transform = {
               filteredCondition['predicates'].push({ type: element.type, value: apiKeyInfoList })
             }
           }
+        }else if(element.type === 'IN_COLLECTION'){
         }
       }
     });
