@@ -69,6 +69,24 @@ public class GetRunningTestsStatus {
         return currentRunningTestsMap;
     }
 
+    public boolean isTestRunning(ObjectId runId, boolean isSummary){
+        // handles cases for CICD as it has summary state as scheduled
+        boolean ans = isTestRunning(runId);
+        if(!ans){
+            /*
+                Here we check from scheduled state because the getCurrentState map is updated every minute, 
+                thus the value in the map might be old, but in reality it is running.
+                Therefore checking for "RUNNING" using "SCHEDULED"
+            */
+            if(getCurrentState(runId) != null && getCurrentState(runId).equals(TestingRun.State.SCHEDULED)){
+                return true;
+            }else{
+                return false;
+            }
+        }
+        return ans;
+    }
+
     public boolean isTestRunning(ObjectId runId){
         if(currentRunningTestsMap == null || !currentRunningTestsMap.containsKey(runId) || currentRunningTestsMap.get(runId).equals(TestingRun.State.RUNNING)){
             return true;
