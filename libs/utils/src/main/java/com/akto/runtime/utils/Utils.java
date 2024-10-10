@@ -95,6 +95,7 @@ public class Utils {
     private static int GRPC_DEBUG_COUNTER = 50;
 
     private static final Set<String> DEBUG_HOSTS_SET = initializeDebugHostsSet();
+    private static final Set<String> DEBUG_URLS_SET = initializeDebugUrlsSet();
 
     private static Set<String> initializeDebugHostsSet() {
         String debugHosts = System.getenv("DEBUG_HOSTS");
@@ -104,19 +105,29 @@ public class Utils {
         return new HashSet<>(Arrays.asList(debugHosts.split(",")));
     }
 
-    public static String printDebugLog(HttpResponseParams httpResponseParams) {
+    public static String printDebugHostLog(HttpResponseParams httpResponseParams) {
         if (DEBUG_HOSTS_SET.isEmpty()) return null;
         Map<String, List<String>> headers = httpResponseParams.getRequestParams().getHeaders();
         List<String> hosts = headers.get("host");
         if (hosts == null || hosts.isEmpty()) return null;
         String host = hosts.get(0);
 
-        return printDebugLog(host) ? host : null;
+        return DEBUG_HOSTS_SET.contains(host) ? host : null;
     }
 
-    public static boolean printDebugLog(String host) {
-        return DEBUG_HOSTS_SET.contains(host);
+    private static Set<String> initializeDebugUrlsSet() {
+        String debugUrls = System.getenv("DEBUG_URLS");
+        if (debugUrls == null || debugUrls.isEmpty()) {
+            return new HashSet<>();
+        }
+        return new HashSet<>(Arrays.asList(debugUrls.split(",")));
     }
+
+    public static boolean printDebugUrlLog(String url) {
+        if (DEBUG_URLS_SET.isEmpty()) return false;
+        return DEBUG_HOSTS_SET.contains(url);
+    }
+
 
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
 

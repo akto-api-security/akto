@@ -29,7 +29,6 @@ import com.mongodb.client.model.Updates;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -228,11 +227,17 @@ public class Main {
                         }
 
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
-                        String debugHost = Utils.printDebugLog(httpResponseParams);
+                        HttpRequestParams requestParams = httpResponseParams.getRequestParams();
+
+                        String debugHost = Utils.printDebugHostLog(httpResponseParams);
                         if (debugHost != null) {
-                            HttpRequestParams requestParams = httpResponseParams.getRequestParams();
-                            loggerMaker.infoAndAddToDb("Found host: " + debugHost + " in Main.java for url: " + requestParams.getMethod() + " " + requestParams.getURL());
+                            loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
                         }
+
+                        if (Utils.printDebugUrlLog(requestParams.getURL())) {
+                            loggerMaker.infoAndAddToDb("Found debug url in Main.java: " + requestParams.getURL());
+                        }
+
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e, LogDb.RUNTIME);
                         continue;

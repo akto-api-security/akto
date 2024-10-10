@@ -1,7 +1,5 @@
 package com.akto.hybrid_parsers;
 
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.hybrid_dependency.DependencyAnalyser;
@@ -30,7 +28,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import okhttp3.*;
 import org.apache.commons.lang3.math.NumberUtils;
-import org.bson.conversions.Bson;
 import com.alibaba.fastjson2.*;
 
 import java.io.IOException;
@@ -547,7 +544,7 @@ public class HttpCallParser {
         boolean ret = false;
         Set<String> urlSet= new HashSet<>();
         for (HttpResponseParams responseParams: responses) {
-            String debugHost = Utils.printDebugLog(responseParams);
+            String debugHost = Utils.printDebugHostLog(responseParams);
             if (debugHost != null) {
                 HttpRequestParams requestParams = responseParams.getRequestParams();
                 loggerMaker.infoAndAddToDb("Found host: " + debugHost + " in HttpCallParser.java for url: " + requestParams.getMethod() + " " + requestParams.getURL());

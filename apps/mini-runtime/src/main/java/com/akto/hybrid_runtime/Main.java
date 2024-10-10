@@ -4,10 +4,8 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-import com.akto.DaoInit;
 import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
@@ -21,17 +19,13 @@ import com.akto.runtime.utils.Utils;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
-import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.util.DashboardMode;
 import com.akto.util.filter.DictionaryFilter;
 import com.google.gson.Gson;
-import com.mongodb.ConnectionString;
-import com.mongodb.client.model.Filters;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -234,11 +228,17 @@ public class Main {
                         }
 
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
-                        String debugHost = Utils.printDebugLog(httpResponseParams);
+                        HttpRequestParams requestParams = httpResponseParams.getRequestParams();
+
+                        String debugHost = Utils.printDebugHostLog(httpResponseParams);
                         if (debugHost != null) {
-                            HttpRequestParams requestParams = httpResponseParams.getRequestParams();
-                            loggerMaker.infoAndAddToDb("Found host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
+                            loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
                         }
+
+                        if (Utils.printDebugUrlLog(requestParams.getURL())) {
+                            loggerMaker.infoAndAddToDb("Found debug url in Main.java: " + requestParams.getURL());
+                        }
+
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e, LogDb.RUNTIME);
                         continue;
