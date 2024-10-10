@@ -274,7 +274,7 @@ public class TestExecutor {
         FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
         options.returnDocument(ReturnDocument.AFTER);
 
-        State updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
+        State updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
 
         TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(Constants.ID, summaryId),
@@ -550,7 +550,7 @@ public class TestExecutor {
 
         int countSuccessfulTests = 0;
         for (String testSubCategory: testSubCategories) {
-            if(GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId)){
+            if(GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId, true)){
                 if (Context.now() - startTime > timeToKill) {
                     loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
                     return;
@@ -602,7 +602,7 @@ public class TestExecutor {
 
                 insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
             }else{
-                if(GetRunningTestsStatus.getRunningTests().getCurrentState(testRunId).equals(TestingRun.State.STOPPED)){
+                if(GetRunningTestsStatus.getRunningTests().getCurrentState(testRunId) != null && GetRunningTestsStatus.getRunningTests().getCurrentState(testRunId).equals(TestingRun.State.STOPPED)){
                     logger.info("Test stopped for id: " + testRunId.toString());
                 }
                 return;
