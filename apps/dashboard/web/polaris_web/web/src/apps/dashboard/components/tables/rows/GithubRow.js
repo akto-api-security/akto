@@ -192,9 +192,9 @@ function GithubRow(props) {
     }
 
     function CollapsibleCell(treeView, value) {
-        let iconSource = treeView ? ChevronRightMinor : ChevronDownMinor
+        let iconSource = ChevronRightMinor
         if(collapsibleActive === data?.name){
-            iconSource = treeView ? ChevronDownMinor : ChevronUpMinor
+            iconSource = ChevronDownMinor
         }
         return (
             <IndexTable.Cell key={"collapsible"}>

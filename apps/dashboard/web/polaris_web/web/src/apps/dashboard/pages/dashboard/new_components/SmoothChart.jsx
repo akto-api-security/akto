@@ -29,10 +29,8 @@ function SmoothAreaChart({tickPositions}) {
                 },
                 align: 'right'
             },
-            tickPositions: tickPositions,
             gridLineWidth: 0,
             opposite: true,
-            max: Math.max(...tickPositions),
             endOnTick: false,
             visible: false
         },

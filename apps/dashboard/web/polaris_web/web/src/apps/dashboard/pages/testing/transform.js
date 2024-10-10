@@ -23,6 +23,10 @@ import LocalStore from "../../../main/LocalStorageStore";
 
 let headers = [
     {
+      title: '',
+      type: CellType.COLLAPSIBLE
+    },
+    {
       value: "nameComp",
       title: 'Issue name',
       tooltipContent: 'Name of the test as in our test editor'
@@ -53,10 +57,6 @@ let headers = [
       title: 'Scanned',
       sortActive: true
     },
-    {
-      title: '',
-      type: CellType.COLLAPSIBLE
-    }
 ]
 
 const MAX_SEVERITY_THRESHOLD = 100000;
@@ -896,7 +896,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
   const rowItems = [
     {
       title: 'Severity',
-      value: <Text fontWeight="semibold" color={observeFunc.getColor(severity)}>{severity}</Text>,
+      value: <Text fontWeight="semibold"><span style={{color: observeFunc.getSeverityColor(severity)}}>{severity}</span></Text>,
       tooltipContent: "Severity of the test run result"
     },
     {

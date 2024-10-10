@@ -1,13 +1,12 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubServerTable from "../../../components/tables/GithubServerTable"
-import { useState } from "react";
+import { useReducer, useState } from "react";
 import api from "../api"
 import Store from "../../../store";
-import transform from "../transform";
 import func from "@/util/func";
-import { ClockMinor,DynamicSourceMinor,LinkMinor, MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
+import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { Button } from "@shopify/polaris";
+import { Button, HorizontalStack, IndexFiltersMode } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -16,70 +15,25 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import { useSearchParams } from "react-router-dom";
 import TestRunResultPage from "../../testing/TestRunResultPage/TestRunResultPage";
 import LocalStore from "../../../../main/LocalStorageStore";
-
-const headers = [
-    {
-        text:"Issue",
-        value:"categoryName",
-        itemOrder:1
-    },
-    
-    {
-        text: "Collection",
-        value: "collection",
-        itemOrder: 3,
-        icon: DynamicSourceMinor,
-    },
-    {
-        text: "API Collection ID",
-        value: "apiCollectionId",
-    },
-    {
-        text: "Discovered",
-        value: "detected_timestamp",
-        itemOrder: 3,
-        icon: ClockMinor,
-    },
-    {
-        text: "Timestamp",
-        value: "timestamp",
-        sortActive: true
-    },
-    {
-        text: "Endpoint",
-        value: "url",
-        itemOrder: 3,
-        icon: LinkMinor,
-    },
-    {
-        text:"Severity",
-        value:"severity",
-        itemOrder:2
-    },
-    {
-        text:"Status",
-        value:"issueStatus"
-    },
-    {
-        text:"Ignore reason",
-        value:"ignoreReason",
-        itemCell:2
-    },
-    {
-        value: 'collectionIds'
-    },
-    {
-        text:"unread",
-        value:"unread",
-        itemOrder:2
-    },
-]
+import { CellType } from "../../../components/tables/rows/GithubRow.js";
+import DateRangeFilter from "../../../components/layouts/DateRangeFilter.jsx";
+import { produce } from "immer";
+import "./style.css"
+import CriticalIssuesDetailGraph from "./CriticalIssuesDetailGraph.jsx";
+import transform from "../transform.js";
+import SummaryInfo from "./SummaryInfo.jsx";
+import useTable from "../../../components/tables/TableContext.js";
+import values from "@/util/values";
+import SpinnerCentered from "../../../components/progress/SpinnerCentered.jsx";
+import TableStore from "../../../components/tables/TableStore.js";
 
 const sortOptions = [
-    { label: 'Discovered time', value: 'timestamp asc', directionLabel: 'Newest', sortKey: 'timestamp', columnIndex: 5 },
-    { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp', columnIndex: 5 },
-    { label: 'Issue', value: 'categoryName asc', directionLabel: 'A-Z', sortKey: 'categoryName', columnIndex: 1 },
-    { label: 'Issue', value: 'categoryName desc', directionLabel: 'Z-A', sortKey: 'categoryName', columnIndex: 1 },
+    { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
+    { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest', sortKey: 'severity', columnIndex: 2 },
+    { label: 'Number of endpoints', value: 'numberOfEndpoints asc', directionLabel: 'More', sortKey: 'numberOfEndpoints', columnIndex: 5 },
+    { label: 'Number of endpoints', value: 'numberOfEndpoints desc', directionLabel: 'Less', sortKey: 'numberOfEndpoints', columnIndex: 5 },
+    { label: 'Discovered time', value: 'creationTime asc', directionLabel: 'Newest', sortKey: 'creationTime', columnIndex: 6 },
+    { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 6 },
 ];
 
 let filtersOptions = [
@@ -106,41 +60,10 @@ let filtersOptions = [
         choices:[]
     },
     {
-        key:"issueStatus",
-        label:"Status",
-        title:"Status",
-        singleSelect:true,
-        choices:[
-            { label:"Open", value:"OPEN" },
-            { label:"Fixed", value:"FIXED" },
-            { label:"Ignored", value:"IGNORED" },
-        ]
-    },
-    {
-        key:"startTimestamp",
-        label: "Time",
-        title:"Time",
-        singleSelect:true,
-        choices:[
-            { label:"Last 1 day", value:func.timeNow() - 24 * 60 * 60 },
-            { label:"Last week", value:func.timeNow() - 7 * 24 * 60 * 60 },
-            { label:"Last month", value:func.timeNow() + 60 - 30 * 24 * 60 * 60 },
-        ]
-    },
-    {
         key: 'collectionIds',
         label: 'API groups',
         title: 'API groups',
         choices: [],
-    }
-]
-
-let appliedFilters = [
-    {
-        key: 'issueStatus',
-        label: 'Open',
-        value: ['OPEN'],
-        onRemove: () => {}
     }
 ]
 
@@ -149,21 +72,70 @@ const resourceName = {
     plural: 'issues',
 };
 
-async function getNextUrl(issueId){
-    const res = await api.fetchTestingRunResult(JSON.parse(issueId))
-    return "/dashboard/issues?result="+res.testingRunResult.hexId;
-}
+function IssuesPage() {
+    const [headers, setHeaders] = useState([
+        {
+          title: '',
+          type: CellType.COLLAPSIBLE
+        },
+        {
+            title: "Severity",
+            text: "Severity",
+            value: "severity",
+            sortActive: true
+        },
+        {
+            title: "Issue name",
+            text: "Issue name",
+            value: "issueName",
+        },
+        {
+            title: "Category",
+            text: "Category",
+            value: "category"
+        },
+        {
+            title: "Number of endpoints",
+            text: "Number of endpoints",
+            value: "numberOfEndpoints",
+            sortActive: true
+        },
+        {
+            title: "Discovered",
+            text: "Discovered",
+            value: "creationTime",
+            sortActive: true
+        },
+        {
+            value: 'collectionIds'
+        },
+        {
+            title: "Domains",
+            text: "Domains",
+            value: "domains"
+        }
+    ])
 
-function IssuesPage(){
-
-    const [loading, setLoading] = useState(true);
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
-    const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
-    const [issueStatus, setIssueStatus] = useState([]);
     const [issuesFilters, setIssuesFilters] = useState({})
     const [key, setKey] = useState(false);
     const apiCollectionMap = PersistStore(state => state.collectionsMap);
     const [showEmptyScreen, setShowEmptyScreen] = useState(true)
+    const [selectedTab, setSelectedTab] = useState("open")
+    const [loading, setLoading] = useState(true)
+    const [selected, setSelected] = useState(0)
+    const [tableLoading, setTableLoading] = useState(false)
+    const [issuesDataCount, setIssuesDataCount] = useState([])
+    
+    const initialVal = (location.state) ?  { alias: "recencyPeriod", title : (new Date((location.state.timestamp - 5* 60 )*1000)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' }).replace(/,/g, '') ,  period : {since: new Date((location.state.timestamp - 5* 60 )*1000), until: new Date((location.state.timestamp + 5* 60 )*1000)} } : values.ranges[3]
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal)
+
+    const getTimeEpoch = (key) => {
+        return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
+    }
+
+    const startTimestamp = getTimeEpoch("since")
+    const endTimestamp = getTimeEpoch("until")
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -174,26 +146,72 @@ function IssuesPage(){
         })
     }
 
+    const handleSelectedTab = (selectedIndex) => {
+        setTableLoading(true)
+        setSelected(selectedIndex)
+        setTimeout(()=> {
+            setTableLoading(false)
+        }, 200)
+    }
+
+    const definedTableTabs = ["Open", "Fixed", "Ignored"]
+
+    const { tabsInfo, selectItems } = useTable()
+    const tableCountObj = func.getTabsCount(definedTableTabs, {}, issuesDataCount)
+    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
+
+    useEffect(() => {
+        const statusHeader = {
+            title: "Status",
+            text: "Status",
+            value: "issueStatus"
+        }
+    
+        if (selectedTab.toUpperCase() === 'OPEN') {
+            if (!headers.some(header => header.value === "issueStatus")) {
+                setHeaders(prevHeaders => {
+                    const newHeaders = [...prevHeaders]
+                    newHeaders.splice(6, 0, statusHeader)
+                    return newHeaders
+                })
+            }
+        } else {
+            setHeaders(prevHeaders => prevHeaders.filter(header => header.value !== "issueStatus"))
+        }
+    }, [selectedTab])
+
     const [searchParams, setSearchParams] = useSearchParams();
   const resultId = searchParams.get("result")
 
     filtersOptions = func.getCollectionFilters(filtersOptions)
 
+    const resetResourcesSelected = () => {
+        TableStore.getState().setSelectedItems([])
+        selectItems([])
+    }
+
     let promotedBulkActions = (selectedResources) => {
-        selectedResources = selectedResources.map((item) => JSON.parse(item));
-        
+        let items
+        if(selectedResources.length > 0 && typeof selectedResources[0][0] === 'string') {
+            const flatSelectedResources = selectedResources.flat()
+            items = flatSelectedResources.map((item) => JSON.parse(item))
+        } else {
+            items = selectedResources.map((item) => JSON.parse(item))
+        }
         
         function ignoreAction(ignoreReason){
-            api.bulkUpdateIssueStatus(selectedResources, "IGNORED", ignoreReason ).then((res) => {
-                setToast(true, false, `Issue${selectedResources.length==1 ? "" : "s"} ignored`)
+            api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason ).then((res) => {
+                setToast(true, false, `Issue${items.length==1 ? "" : "s"} ignored`)
                 setKey(!key);
+                resetResourcesSelected()
             })
         }
         
         function reopenAction(){
-            api.bulkUpdateIssueStatus(selectedResources, "OPEN", "" ).then((res) => {
-                setToast(true, false, `Issue${selectedResources.length==1 ? "" : "s"} re-opened`)
+            api.bulkUpdateIssueStatus(items, "OPEN", "" ).then((res) => {
+                setToast(true, false, `Issue${items.length==1 ? "" : "s"} re-opened`)
                 setKey(!key);
+                resetResourcesSelected()
             })
         }
         
@@ -216,16 +234,14 @@ function IssuesPage(){
         }]
         
         let ret = [];
-        let status = issueStatus[0];
+        let status = selectedTab.toUpperCase()
         
         switch (status) {
             case "OPEN": ret = [].concat(issues); break;
-            case "IGNORED": if (selectedResources.length == 1) {
+            case "IGNORED": if (items.length == 1) {
                 ret = [].concat(issues);
             }
                 ret = ret.concat(reopen);
-                appliedFilters[0].label = "Ignored"
-                appliedFilters[0].value = ["IGNORED"]
                 break;
             case "FIXED":
         }
@@ -263,42 +279,6 @@ function IssuesPage(){
           }          
     }
 
-    async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
-        setLoading(true);
-        const res = await api.fetchIssues(skip, 1, null, null, null, null, 0)
-        if(res.totalIssuesCount === 0){
-            setShowEmptyScreen(true)
-            return {value:{} , total:0};
-        }
-        let total =0;
-        let ret = []
-        let filterCollectionsId = filters.apiCollectionId.concat(filters.collectionIds);
-        let filterSeverity = filters.severity
-        let filterSubCategory = []
-        filters?.issueCategory?.forEach((issue) => {
-            filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
-        })
-        let filterStatus = filters.issueStatus
-        setIssueStatus(filterStatus);
-        let startTimestamp = filters?.startTimestamp?.[0] || 0;
-        let obj = {
-            'filterStatus': filterStatus,
-            'filterCollectionsId': filterCollectionsId,
-            'filterSeverity': filterSeverity,
-            filterSubCategory: filterSubCategory,
-            startEpoch: startTimestamp
-        }
-        setIssuesFilters(obj)
-        await api.fetchIssues(skip, limit,filterStatus,filterCollectionsId,filterSeverity,filterSubCategory,startTimestamp).then((res) => {
-            total = res.totalIssuesCount;
-            ret = transform.prepareIssues(res, subCategoryMap, subCategoryFromSourceConfigMap, apiCollectionMap);
-            setLoading(false);
-        })
-        ret = func.sortFunc(ret, sortKey, sortOrder)
-        
-        return {value:ret , total:total};
-    }
-
     const openVulnerabilityReport = () => {
         let summaryId = btoa(JSON.stringify(issuesFilters))
         window.open('/dashboard/issues/summary/' + summaryId, '_blank');
@@ -325,18 +305,144 @@ function IssuesPage(){
   useEffect(() => {
     if (subCategoryMap && Object.keys(subCategoryMap).length > 0 && apiCollectionMap && Object.keys(apiCollectionMap).length > 0) {
         setShowEmptyScreen(false)
+        setLoading(false)
     }
   }, [subCategoryMap, apiCollectionMap])
+
+  setTimeout(() => {
+    setLoading(false)
+  }, 10000);
+
+    const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
+        setTableLoading(true)
+        
+        let filterStatus = [selectedTab.toUpperCase()]
+        let filterSeverity = filters.severity
+        const apiCollectionId = filters.apiCollectionId || []
+        let filterCollectionsId = apiCollectionId.concat(filters.collectionIds)
+        let filterSubCategory = []
+        filters?.issueCategory?.forEach((issue) => {
+            filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
+        })
+
+        let obj = {
+            'filterStatus': filterStatus,
+            'filterCollectionsId': filterCollectionsId,
+            'filterSeverity': filterSeverity,
+            filterSubCategory: filterSubCategory,
+            startEpoch: startTimestamp
+        }
+        setIssuesFilters(obj)
+
+        let ret = []
+        let total = 0
+
+        let issueItem = []
+
+        await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp).then((issuesDataRes) => {
+            const uniqueIssuesMap = new Map()
+            issuesDataRes.issues.forEach(item => {
+                const key = `${item.id.testSubCategory}|${item.severity}|${item.unread.toString()}`
+                if (!uniqueIssuesMap.has(key)) {
+                    uniqueIssuesMap.set(key, {
+                        id: item.id,
+                        severity: transform.mapSeverity(item.severity),
+                        severityType: item.severity,
+                        issueName: item.id.testSubCategory,
+                        category: item.id.testSubCategory,
+                        numberOfEndpoints: 1,
+                        creationTime: item.creationTime,
+                        issueStatus: item.unread.toString(),
+                        testRunName: "Test Run",
+                        domains: [transform.extractDomain(item.id.apiInfoKey.url)],
+                        urls: [{
+                            method: item.id.apiInfoKey.method,
+                            url: item.id.apiInfoKey.url,
+                            id: JSON.stringify(item.id),
+                        }],
+                        urlsKey: ['']
+                    })
+                } else {
+                    const existingIssue = uniqueIssuesMap.get(key)
+                    if (!existingIssue.domains.includes(transform.extractDomain(item.id.apiInfoKey.url))) {
+                        existingIssue.domains.push(transform.extractDomain(item.id.apiInfoKey.url))
+                    }
+                    existingIssue.urls.push({
+                        method: item.id.apiInfoKey.method,
+                        url: item.id.apiInfoKey.url,
+                        id: JSON.stringify(item.id),
+                    })
+                    existingIssue.numberOfEndpoints += 1
+                }
+            })
+            issueItem = Array.from(uniqueIssuesMap.values())
+
+            total = selectedTab.toUpperCase() === 'OPEN' ? issuesDataRes.openIssuesCount : selectedTab.toUpperCase() === 'FIXED' ? issuesDataRes.fixedIssuesCount : issuesDataRes.ignoredIssuesCount
+            setIssuesDataCount([issuesDataRes.openIssuesCount, issuesDataRes.fixedIssuesCount, issuesDataRes.ignoredIssuesCount])
+        })
+
+        const sortedIssueItem = transform.sortIssues(issueItem, sortKey, sortOrder)
+
+        const issueTableData = await transform.convertToIssueTableData(sortedIssueItem, subCategoryMap)
+        ret.push(...issueTableData)
+        setTableLoading(false)
+        setLoading(false)
+
+        return {value: ret, total: total}
+    }
+
+    const components = (
+        <>
+            <SummaryInfo
+                startTimestamp={startTimestamp}
+                endTimestamp={endTimestamp}
+            />
+
+            <CriticalIssuesDetailGraph />
+
+            <GithubServerTable
+                key={key}
+                pageLimit={50}
+                fetchData={fetchTableData}
+                sortOptions={sortOptions}
+                resourceName={resourceName}
+                filters={filtersOptions}
+                disambiguateLabel={disambiguateLabel}
+                headers={headers}
+                getStatus={() => { return "warning" }}
+                selected={selected}
+                onRowClick={() => {}}
+                onSelect={handleSelectedTab}
+                getFilteredItems={()=>{}}
+                mode={IndexFiltersMode.Default}
+                headings={headers}
+                useNewRow={true}
+                condensedHeight={true}
+                tableTabs={tableTabs}
+                selectable={true}
+                promotedBulkActions={promotedBulkActions}
+                loading={loading || tableLoading}
+                startTimestamp={startTimestamp}
+                endTimestamp={endTimestamp}
+                hideQueryField={true}
+                isMultipleItemsSelected={true}
+            />
+        </>
+    )
     
     return (
         <>
         <PageWithMultipleCards
-            title={<TitleWithInfo
-                    titleText={"Issues"}
-                    tooltipContent={"Issues are created when a test from test library has passed validation and thus a potential vulnerability is found."}
-                />}
+            title={
+                <HorizontalStack gap={4}>
+                    <TitleWithInfo
+                        titleText={"Issues"}
+                        tooltipContent={"Issues are created when a test from test library has passed validation and thus a potential vulnerability is found."}
+                    />
+                </HorizontalStack>
+            }
             isFirstPage={true}
-            components = {[
+            components = {loading ? [<SpinnerCentered />] : [
                 showEmptyScreen ? 
                 <EmptyScreensLayout key={"emptyScreen"}
                     iconSrc={"/public/alert_hexagon.svg"}
@@ -351,25 +457,14 @@ function IssuesPage(){
                 />
 
             
-            : <GithubServerTable
-                    key={key}
-                    headers={headers}
-                    resourceName={resourceName} 
-                    appliedFilters={appliedFilters}
-                    sortOptions={sortOptions}
-                    disambiguateLabel={disambiguateLabel}
-                    selectable = {true}
-                    loading={loading}
-                    fetchData={fetchData}
-                    filters={filtersOptions}
-                    promotedBulkActions={promotedBulkActions}
-                    hideQueryField={true}
-                    getNextUrl={getNextUrl}
-                    getStatus={func.getTestResultStatus}
-                    filterStateUrl={"/dashboard/issues"}
-                />
+            : components
             ]}
-            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export vulnerability report</Button>}
+            primaryAction={
+                <HorizontalStack gap={2}>
+                    <DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />
+                    <Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export results</Button>
+                </HorizontalStack>
+            }
         />
             {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
         </>
