@@ -25,6 +25,7 @@ import org.apache.struts2.ServletActionContext;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class RoleAccessInterceptor extends AbstractInterceptor {
@@ -136,9 +137,10 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                     String actionDescription = this.actionDescription == null ? "Error: Description not available" : this.actionDescription;
                     String userEmail = user.getLogin();
                     String userAgent = request.getHeader("User-Agent") == null ? "Unknown User-Agent" : request.getHeader("User-Agent");
-                    String userIpAddress = AuditLogsUtil.getClientIpAddress(request);
+                    List<String> userProxyIpAddresses = AuditLogsUtil.getClientIpAddresses(request);
+                    String userIpAddress = userProxyIpAddresses.get(0);
 
-                    ApiAuditLogs apiAuditLogs = new ApiAuditLogs(timestamp, apiEndpoint, actionDescription, userEmail, userAgent, userIpAddress);
+                    ApiAuditLogs apiAuditLogs = new ApiAuditLogs(timestamp, apiEndpoint, actionDescription, userEmail, userAgent, userIpAddress, userProxyIpAddresses);
                     ApiAuditLogsDao.instance.insertOne(apiAuditLogs);
                 }
             } catch(Exception e) {

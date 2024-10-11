@@ -1,35 +1,41 @@
 package com.akto.audit_logs_util;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 public class AuditLogsUtil {
-    public static String getClientIpAddress(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
+    public static List<String> getClientIpAddresses(HttpServletRequest request) {
+        List<String> headers = Arrays.asList(
+                "X-Forwarded-For",
+                "X-Real-IP",
+                "Proxy-Client-IP",
+                "WL-Proxy-Client-IP",
+                "HTTP_CLIENT_IP",
+                "HTTP_X_FORWARDED_FOR"
+        );
 
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("X-Real-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("WL-Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("HTTP_CLIENT_IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("HTTP_X_FORWARDED_FOR");
-        }
+        List<String> ipAddresses = new ArrayList<>();
 
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-
-        if ("[0:0:0:0:0:0:0:1]".equals(ip) || "[::1]".equals(ip)) {
-            ip = "127.0.0.1";
+        for (String header : headers) {
+            String ips = request.getHeader(header);
+            if (ips != null && !ips.isEmpty() && !"unknown".equalsIgnoreCase(ips)) {
+                for (String ip : ips.split(",")) {
+                    ipAddresses.add(ip.trim());
+                }
+                break;
+            }
         }
 
-        return (ip == null || ip.isEmpty()) ? "unknown" : ip;
+        if (ipAddresses.isEmpty()) {
+            String remoteIp = request.getRemoteAddr();
+            if (remoteIp != null && !remoteIp.isEmpty()) {
+                ipAddresses.add(remoteIp);
+            }
+        }
+
+        return ipAddresses.isEmpty() ? Collections.singletonList("unknown") : ipAddresses;
     }
 }

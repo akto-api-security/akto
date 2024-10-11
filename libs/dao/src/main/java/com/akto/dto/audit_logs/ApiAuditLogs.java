@@ -1,5 +1,7 @@
 package com.akto.dto.audit_logs;
 
+import java.util.List;
+
 public class ApiAuditLogs {
 
     public static final String TIMESTAMP = "timestamp";
@@ -20,15 +22,19 @@ public class ApiAuditLogs {
     public static final String USER_IP_ADDRESS = "userIpAddress";
     private String userIpAddress;
 
+    public static final String USER_PROXY_IP_ADDRESSES = "userProxyIpAddresses";
+    private List<String> userProxyIpAddresses;
+
     public ApiAuditLogs() {}
 
-    public ApiAuditLogs(long timestamp, String apiEndpoint, String actionDescription, String userEmail, String userAgent, String userIpAddress) {
+    public ApiAuditLogs(long timestamp, String apiEndpoint, String actionDescription, String userEmail, String userAgent, String userIpAddress, List<String> userProxyIpAddresses) {
         this.timestamp = timestamp;
         this.apiEndpoint = apiEndpoint;
         this.actionDescription = actionDescription;
         this.userEmail = userEmail;
         this.userAgent = userAgent;
         this.userIpAddress = userIpAddress;
+        this.userProxyIpAddresses = userProxyIpAddresses;
     }
 
     public long getTimestamp() {
@@ -77,5 +83,13 @@ public class ApiAuditLogs {
 
     public void setUserIpAddress(String userIpAddress) {
         this.userIpAddress = userIpAddress;
+    }
+
+    public List<String> getUserProxyIpAddresses() {
+        return userProxyIpAddresses;
+    }
+
+    public void setUserProxyIpAddresses(List<String> userProxyIpAddresses) {
+        this.userProxyIpAddresses = userProxyIpAddresses;
     }
 }
