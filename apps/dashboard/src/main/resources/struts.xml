@@ -7017,7 +7017,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">LOGS</param>
+                <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
 
@@ -7025,12 +7025,13 @@
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
-                <param name="root">apiAuditLogs, totalAuditLogs</param>
             </result>
             <result name="SUCCESS" type="json"/>
 
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 

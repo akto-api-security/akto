@@ -91,10 +91,11 @@ const AuditLogs = () => {
             })
         
             setAuditLogsData(apiAuditLogsArr)
+        }).finally(() => {
+            setLoading(false)
+            setTableLoading(false)
         })
 
-        setLoading(false)
-        setTableLoading(false)
     }
 
     useEffect(() => {
@@ -105,6 +106,7 @@ const AuditLogs = () => {
         setLoading(true)
         if(auditLogsData == null || auditLogsData.length === 0) {
             func.setToast(true, true, "Can not export empty CSV")
+            setLoading(false)
             return
         }
         const csvHeaders = Object.keys(auditLogsData[0]).join(',') + '\n'
@@ -155,7 +157,7 @@ const AuditLogs = () => {
                 />
             }
             primaryAction={<Button loading={loading} primary onClick={exportAuditLogsCSV}>Export as CSV</Button>}
-            secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+            secondaryActions={<DateRangeFilter disabled={window.USER_ROLE !== "ADMIN"} initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
             isFirstPage={true}
             components={[auditLogsTable]}
         />
