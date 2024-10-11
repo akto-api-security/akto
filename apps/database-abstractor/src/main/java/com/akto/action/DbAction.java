@@ -390,7 +390,7 @@ public class DbAction extends ActionSupport {
                 if (UsageMetricCalculator.getDeactivated().contains(id.getApiCollectionId())) {
                     continue;
                 }
-                if (URLMethods.Method.OPTIONS.equals(id.getMethod())) {
+                if (URLMethods.Method.OPTIONS.equals(id.getMethod()) || URLMethods.Method.OTHER.equals(id.getMethod())) {
                     continue;
                 }
                 if (accountId == 1721887185 && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)  && !id.getMethod().equals(Method.OPTIONS))  {
@@ -457,7 +457,7 @@ public class DbAction extends ActionSupport {
                                 url = entry.getValue().toString();
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._METHOD)){
                                 method = entry.getValue().toString();
-                                if ("OPTIONS".equals(method)) {
+                                if ("OPTIONS".equals(method) || "CONNECT".equals(method)) {
                                     ignore = true;
                                 }
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._PARAM)){
@@ -619,7 +619,7 @@ public class DbAction extends ActionSupport {
                     String url = (String) mObj.get("url");
                     String method = (String) mObj.get("method");
 
-                    if ("OPTIONS".equals(method)) {
+                    if ("OPTIONS".equals(method) || "CONNECT".equals(method)) {
                         continue;
                     }
 
@@ -704,7 +704,7 @@ public class DbAction extends ActionSupport {
                                 String key = entry.getKey();
                                 String value = (String) entry.getValue();
                                 if ("_id.method".equals(key)
-                                        && ("OPTIONS".equals(value))) {
+                                        && ("OPTIONS".equals(value) || "CONNECT".equals(value))) {
                                     ignore = true;
                                     break;
                                 }
