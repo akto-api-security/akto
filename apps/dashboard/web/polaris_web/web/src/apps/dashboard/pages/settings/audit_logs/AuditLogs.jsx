@@ -1,4 +1,4 @@
-import { Button, IndexFiltersMode, Text } from '@shopify/polaris'
+import { Box, Button, IndexFiltersMode, Text } from '@shopify/polaris'
 import React, { useEffect, useReducer, useState } from 'react'
 import settingRequests from '../api'
 import func from '@/util/func'
@@ -80,12 +80,13 @@ const AuditLogs = () => {
         setTableLoading(true)
         await settingRequests.fetchApiAuditLogsFromDb(0, -1, 1, startTimestamp, endTimestamp).then((resp) => {
             const apiAuditLogsArr = resp?.apiAuditLogs.map((item) => {
-                const { timestamp, userAgent } = item
+                const { actionDescription, timestamp, userAgent } = item
                 return {
                     ...item,
+                    actionDescription: <Box width='200px'><Text breakWord>{actionDescription}</Text></Box>,
                     timestamp: func.prettifyEpoch(timestamp),
                     rawTimestamp: timestamp,
-                    userAgent: <Text breakWord>{userAgent}</Text>,
+                    userAgent: <Box width='250px'><Text breakWord>{userAgent}</Text></Box>,
                     rawUserAgent: userAgent
                 }
             })
