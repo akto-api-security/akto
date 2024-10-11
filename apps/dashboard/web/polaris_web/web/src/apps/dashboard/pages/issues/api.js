@@ -34,7 +34,7 @@ export default {
         return request({
             url: 'api/findTotalIssuesByDay',
             method: 'post',
-            data: {startTimeStamp, endTimeStamp}
+            data: {startEpoch: startTimeStamp, endTimeStamp}
         })
     },
     fetchTestCoverageData (startTimeStamp, endTimeStamp) {
