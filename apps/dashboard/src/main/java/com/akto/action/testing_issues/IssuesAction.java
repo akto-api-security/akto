@@ -11,7 +11,6 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.HistoricalData;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
@@ -25,6 +24,7 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.GroupByTimeRange;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 
 import static com.akto.util.Constants.ID;
+import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
 
 public class IssuesAction extends UserAction {
 
@@ -61,7 +62,7 @@ public class IssuesAction extends UserAction {
     private List<Severity> filterSeverity;
     private List<String> filterSubCategory;
     private List<TestingRunIssues> similarlyAffectedIssues;
-    long startTimeStamp;
+    private int startEpoch;
     long endTimeStamp;
     private Bson createFilters (boolean useFilterStatus) {
         Bson filters = Filters.empty();
@@ -78,8 +79,8 @@ public class IssuesAction extends UserAction {
             filters = Filters.and(filters, Filters.in(ID + "."
                     + TestingIssuesId.TEST_SUB_CATEGORY, filterSubCategory));
         }
-        if (startTimeStamp != 0 && endTimeStamp != 0) {
-            filters = Filters.and(filters, Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp));
+        if (startEpoch != 0 && endTimeStamp != 0) {
+            filters = Filters.and(filters, Filters.gte(TestingRunIssues.CREATION_TIME, startEpoch));
             filters = Filters.and(filters, Filters.lt(TestingRunIssues.CREATION_TIME, endTimeStamp));
         }
 
@@ -168,79 +169,44 @@ public class IssuesAction extends UserAction {
     List<Integer> openIssuesCountDayWise;
     List<Integer> criticalIssuesCountDayWise;
     public String findTotalIssuesByDay() {
-        long daysBetween = (endTimeStamp - startTimeStamp) / (24 * 3600);
+        long daysBetween = (endTimeStamp - startEpoch) / ONE_DAY_TIMESTAMP;
         List<Bson> pipeline = new ArrayList<>();
 
-        Bson totalIssuesMatchStage = Aggregates.match(Filters.and(
-                Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
+        Bson filters = Filters.and(
+                Filters.gte(TestingRunIssues.CREATION_TIME, startEpoch),
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
-        ));
+        );
+
+        Bson totalIssuesMatchStage = Aggregates.match(filters);
         Bson openIssuesMatchStage = Aggregates.match(Filters.and(
-                Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
-                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
+                filters,
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name())
         ));
         Bson criticalIssuesMatchStage = Aggregates.match(Filters.and(
-                Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
-                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
+                filters,
                 Filters.in(TestingRunIssues.KEY_SEVERITY, Severity.CRITICAL.name(), Severity.HIGH.name())
         ));
 
         pipeline.add(totalIssuesMatchStage);
         totalIssuesCountDayWise = new ArrayList<>();
-        fetchIssuesData(daysBetween, pipeline, totalIssuesCountDayWise);
+        filterIssuesDataByTimeRange(daysBetween, pipeline, totalIssuesCountDayWise);
         pipeline.clear();
 
         pipeline.add(openIssuesMatchStage);
         openIssuesCountDayWise = new ArrayList<>();
-        fetchIssuesData(daysBetween, pipeline, openIssuesCountDayWise);
+        filterIssuesDataByTimeRange(daysBetween, pipeline, openIssuesCountDayWise);
         pipeline.clear();
 
         pipeline.add(criticalIssuesMatchStage);
         criticalIssuesCountDayWise = new ArrayList<>();
-        fetchIssuesData(daysBetween, pipeline, criticalIssuesCountDayWise);
+        filterIssuesDataByTimeRange(daysBetween, pipeline, criticalIssuesCountDayWise);
         pipeline.clear();
 
         return SUCCESS.toUpperCase();
     }
 
-    private void fetchIssuesData(long daysBetween, List<Bson> pipeline, List<Integer> issuesList) {
-        issuesList.clear();
-        if (daysBetween <= 30) {
-            Bson addFieldsStage = Aggregates.addFields(
-                    new Field<>("day", new BasicDBObject("$dateToString",
-                            new BasicDBObject("format", "%Y-%m-%d")
-                                    .append("date", new BasicDBObject("$toDate",
-                                            new BasicDBObject("$multiply", Arrays.asList("$creationTime", 1000))))
-                    ))
-            );
-            Bson groupStage = Aggregates.group("$day", Accumulators.sum("totalIssues", 1));
-            Bson sortStage = Aggregates.sort(new BasicDBObject("_id", 1));
-            pipeline.add(addFieldsStage);
-            pipeline.add(groupStage);
-            pipeline.add(sortStage);
-        } else if (daysBetween <= 210) {
-            Bson addFieldsStage = Aggregates.addFields(
-                    new Field<>("week", new BasicDBObject("$week", new BasicDBObject("$toDate",
-                            new BasicDBObject("$multiply", Arrays.asList("$creationTime", 1000))))
-                    ));
-            Bson groupStage = Aggregates.group("$week", Accumulators.sum("totalIssues", 1));
-            Bson sortStage = Aggregates.sort(new BasicDBObject("_id", 1));
-            pipeline.add(addFieldsStage);
-            pipeline.add(groupStage);
-            pipeline.add(sortStage);
-        } else {
-            Bson addFieldsStage = Aggregates.addFields(
-                    new Field<>("month", new BasicDBObject("$month", new BasicDBObject("$toDate",
-                            new BasicDBObject("$multiply", Arrays.asList("$creationTime", 1000))))
-                    ));
-            Bson groupStage = Aggregates.group("$month", Accumulators.sum("totalIssues", 1));
-            Bson sortStage = Aggregates.sort(new BasicDBObject("_id", 1));
-            pipeline.add(addFieldsStage);
-            pipeline.add(groupStage);
-            pipeline.add(sortStage);
-        }
-
+    private void filterIssuesDataByTimeRange(long daysBetween, List<Bson> pipeline, List<Integer> issuesList) {
+        GroupByTimeRange.groupByAllRange(daysBetween, pipeline, TestingRunIssues.CREATION_TIME, "totalIssues");
         MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while (cursor.hasNext()) {
             BasicDBObject document = cursor.next();
@@ -252,12 +218,12 @@ public class IssuesAction extends UserAction {
 
     List<HistoricalData> historicalData;
     public String fetchTestCoverageData() {
-        long daysBetween = (endTimeStamp - startTimeStamp) / (24 * 3600);
+        long daysBetween = (endTimeStamp - startEpoch) / ONE_DAY_TIMESTAMP;
 
         List<Bson> pipeline = new ArrayList<>();
 
         Bson filter = Filters.and(
-                Filters.gte("time", startTimeStamp),
+                Filters.gte("time", startEpoch),
                 Filters.lte("time", endTimeStamp)
         );
         pipeline.add(Aggregates.match(filter));
@@ -684,8 +650,8 @@ public class IssuesAction extends UserAction {
         this.mode = mode;
     }
 
-    public void setStartTimeStamp(long startTimeStamp) {
-        this.startTimeStamp = startTimeStamp;
+    public void setStartEpoch(int startEpoch) {
+        this.startEpoch = startEpoch;
     }
 
     public void setEndTimeStamp(long endTimeStamp) {

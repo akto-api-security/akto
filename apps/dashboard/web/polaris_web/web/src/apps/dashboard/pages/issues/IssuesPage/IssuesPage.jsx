@@ -6,7 +6,7 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { Button, HorizontalStack, IndexFiltersMode } from "@shopify/polaris";
+import { Button, HorizontalGrid, HorizontalStack, IndexFiltersMode } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -19,21 +19,23 @@ import { CellType } from "../../../components/tables/rows/GithubRow.js";
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter.jsx";
 import { produce } from "immer";
 import "./style.css"
-import CriticalIssuesDetailGraph from "./CriticalIssuesDetailGraph.jsx";
 import transform from "../transform.js";
 import SummaryInfo from "./SummaryInfo.jsx";
 import useTable from "../../../components/tables/TableContext.js";
 import values from "@/util/values";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered.jsx";
 import TableStore from "../../../components/tables/TableStore.js";
+import observeFunc from "../../../pages/observe/transform.js"
+import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
+import CriticalUnsecuredAPIsOverTimeGraph from "./CriticalUnsecuredAPIsOverTimeGraph.jsx";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
     { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest', sortKey: 'severity', columnIndex: 2 },
     { label: 'Number of endpoints', value: 'numberOfEndpoints asc', directionLabel: 'More', sortKey: 'numberOfEndpoints', columnIndex: 5 },
     { label: 'Number of endpoints', value: 'numberOfEndpoints desc', directionLabel: 'Less', sortKey: 'numberOfEndpoints', columnIndex: 5 },
-    { label: 'Discovered time', value: 'creationTime asc', directionLabel: 'Newest', sortKey: 'creationTime', columnIndex: 6 },
-    { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 6 },
+    { label: 'Discovered time', value: 'creationTime asc', directionLabel: 'Newest', sortKey: 'creationTime', columnIndex: 7 },
+    { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 7 },
 ];
 
 let filtersOptions = [
@@ -101,6 +103,11 @@ function IssuesPage() {
             sortActive: true
         },
         {
+            title: "Domains",
+            text: "Domains",
+            value: "domains"
+        },
+        {
             title: "Discovered",
             text: "Discovered",
             value: "creationTime",
@@ -109,11 +116,6 @@ function IssuesPage() {
         {
             value: 'collectionIds'
         },
-        {
-            title: "Domains",
-            text: "Domains",
-            value: "domains"
-        }
     ])
 
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
@@ -126,9 +128,8 @@ function IssuesPage() {
     const [selected, setSelected] = useState(0)
     const [tableLoading, setTableLoading] = useState(false)
     const [issuesDataCount, setIssuesDataCount] = useState([])
-    
-    const initialVal = (location.state) ?  { alias: "recencyPeriod", title : (new Date((location.state.timestamp - 5* 60 )*1000)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' }).replace(/,/g, '') ,  period : {since: new Date((location.state.timestamp - 5* 60 )*1000), until: new Date((location.state.timestamp + 5* 60 )*1000)} } : values.ranges[3]
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal)
+
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
     const getTimeEpoch = (key) => {
         return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
@@ -160,6 +161,12 @@ function IssuesPage() {
     const tableCountObj = func.getTabsCount(definedTableTabs, {}, issuesDataCount)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
+    const resetResourcesSelected = () => {
+        TableStore.getState().setSelectedItems([])
+        selectItems([])
+        setKey(!key)
+    }
+    
     useEffect(() => {
         const statusHeader = {
             title: "Status",
@@ -170,8 +177,7 @@ function IssuesPage() {
         if (selectedTab.toUpperCase() === 'OPEN') {
             if (!headers.some(header => header.value === "issueStatus")) {
                 setHeaders(prevHeaders => {
-                    const newHeaders = [...prevHeaders]
-                    newHeaders.splice(6, 0, statusHeader)
+                    const newHeaders = [...prevHeaders, statusHeader]
                     return newHeaders
                 })
             }
@@ -180,15 +186,18 @@ function IssuesPage() {
         }
     }, [selectedTab])
 
+    useEffect(() => {
+        setKey(!key)
+    }, [startTimestamp, endTimestamp])
+
+    useEffect(() => {
+        resetResourcesSelected()
+    }, [selectedTab])
+
     const [searchParams, setSearchParams] = useSearchParams();
   const resultId = searchParams.get("result")
 
     filtersOptions = func.getCollectionFilters(filtersOptions)
-
-    const resetResourcesSelected = () => {
-        TableStore.getState().setSelectedItems([])
-        selectItems([])
-    }
 
     let promotedBulkActions = (selectedResources) => {
         let items
@@ -202,7 +211,6 @@ function IssuesPage() {
         function ignoreAction(ignoreReason){
             api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason ).then((res) => {
                 setToast(true, false, `Issue${items.length==1 ? "" : "s"} ignored`)
-                setKey(!key);
                 resetResourcesSelected()
             })
         }
@@ -210,7 +218,6 @@ function IssuesPage() {
         function reopenAction(){
             api.bulkUpdateIssueStatus(items, "OPEN", "" ).then((res) => {
                 setToast(true, false, `Issue${items.length==1 ? "" : "s"} re-opened`)
-                setKey(!key);
                 resetResourcesSelected()
             })
         }
@@ -309,13 +316,9 @@ function IssuesPage() {
     }
   }, [subCategoryMap, apiCollectionMap])
 
-  setTimeout(() => {
-    setLoading(false)
-  }, 10000);
 
     const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
         setTableLoading(true)
-        
         let filterStatus = [selectedTab.toUpperCase()]
         let filterSeverity = filters.severity
         const apiCollectionId = filters.apiCollectionId || []
@@ -342,35 +345,35 @@ function IssuesPage() {
         await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp).then((issuesDataRes) => {
             const uniqueIssuesMap = new Map()
             issuesDataRes.issues.forEach(item => {
-                const key = `${item.id.testSubCategory}|${item.severity}|${item.unread.toString()}`
+                const key = `${item?.id?.testSubCategory}|${item?.severity}|${item?.unread.toString()}`
                 if (!uniqueIssuesMap.has(key)) {
                     uniqueIssuesMap.set(key, {
-                        id: item.id,
-                        severity: transform.mapSeverity(item.severity),
-                        severityType: item.severity,
-                        issueName: item.id.testSubCategory,
-                        category: item.id.testSubCategory,
+                        id: item?.id,
+                        severity: func.toSentenceCase(item?.severity),
+                        severityType: item?.severity,
+                        issueName: item?.id?.testSubCategory,
+                        category: item?.id?.testSubCategory,
                         numberOfEndpoints: 1,
-                        creationTime: item.creationTime,
-                        issueStatus: item.unread.toString(),
+                        creationTime: item?.creationTime,
+                        issueStatus: item?.unread.toString(),
                         testRunName: "Test Run",
-                        domains: [transform.extractDomain(item.id.apiInfoKey.url)],
+                        domains: [observeFunc.getHostName(item?.id?.apiInfoKey?.url)],
                         urls: [{
-                            method: item.id.apiInfoKey.method,
-                            url: item.id.apiInfoKey.url,
-                            id: JSON.stringify(item.id),
+                            method: item?.id?.apiInfoKey?.method,
+                            url: item?.id?.apiInfoKey?.url,
+                            id: JSON.stringify(item?.id),
                         }],
                         urlsKey: ['']
                     })
                 } else {
                     const existingIssue = uniqueIssuesMap.get(key)
-                    if (!existingIssue.domains.includes(transform.extractDomain(item.id.apiInfoKey.url))) {
-                        existingIssue.domains.push(transform.extractDomain(item.id.apiInfoKey.url))
+                    if (!existingIssue.domains.includes(observeFunc.getHostName(item?.id?.apiInfoKey?.url))) {
+                        existingIssue.domains.push(observeFunc.getHostName(item?.id?.apiInfoKey?.url))
                     }
                     existingIssue.urls.push({
-                        method: item.id.apiInfoKey.method,
-                        url: item.id.apiInfoKey.url,
-                        id: JSON.stringify(item.id),
+                        method: item?.id?.apiInfoKey?.method,
+                        url: item?.id?.apiInfoKey?.url,
+                        id: JSON.stringify(item?.id),
                     })
                     existingIssue.numberOfEndpoints += 1
                 }
@@ -379,6 +382,10 @@ function IssuesPage() {
 
             total = selectedTab.toUpperCase() === 'OPEN' ? issuesDataRes.openIssuesCount : selectedTab.toUpperCase() === 'FIXED' ? issuesDataRes.fixedIssuesCount : issuesDataRes.ignoredIssuesCount
             setIssuesDataCount([issuesDataRes.openIssuesCount, issuesDataRes.fixedIssuesCount, issuesDataRes.ignoredIssuesCount])
+        }).catch((e) => {
+            func.setToast(true, true, e.message)
+            setTableLoading(false)
+            setLoading(false)
         })
 
         const sortedIssueItem = transform.sortIssues(issueItem, sortKey, sortOrder)
@@ -394,11 +401,15 @@ function IssuesPage() {
     const components = (
         <>
             <SummaryInfo
+                key={"issues-summary-graph-details"}
                 startTimestamp={startTimestamp}
                 endTimestamp={endTimestamp}
             />
 
-            <CriticalIssuesDetailGraph />
+            <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
+                <CriticalUnsecuredAPIsOverTimeGraph />
+                <CriticalFindingsGraph />
+            </HorizontalGrid>
 
             <GithubServerTable
                 key={key}
@@ -422,8 +433,6 @@ function IssuesPage() {
                 selectable={true}
                 promotedBulkActions={promotedBulkActions}
                 loading={loading || tableLoading}
-                startTimestamp={startTimestamp}
-                endTimestamp={endTimestamp}
                 hideQueryField={true}
                 isMultipleItemsSelected={true}
             />
@@ -459,12 +468,8 @@ function IssuesPage() {
             
             : components
             ]}
-            primaryAction={
-                <HorizontalStack gap={2}>
-                    <DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />
-                    <Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export results</Button>
-                </HorizontalStack>
-            }
+            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export results</Button>}
+            secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
         />
             {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
         </>

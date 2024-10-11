@@ -134,7 +134,7 @@ function GithubServerTable(props) {
     handleSelectedTab(props?.selected)
     setActiveColumnSort(tableFunc.getColumnSort(sortSelected, props?.sortOptions))
     fetchData(queryValue);
-  }, [sortSelected, appliedFilters, page, pageFiltersMap, props?.startTimestamp, props?.endTimestamp])
+  }, [sortSelected, appliedFilters, page, pageFiltersMap])
 
   useEffect(()=> {
     setSortableColumns(tableFunc.getSortableChoices(props?.headers))

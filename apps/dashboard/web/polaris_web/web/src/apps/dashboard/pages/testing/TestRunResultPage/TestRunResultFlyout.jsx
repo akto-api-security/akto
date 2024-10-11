@@ -146,7 +146,7 @@ function TestRunResultFlyout(props) {
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
                     <ActionsComp />
-                    {isIssuePage && <Button fullWidth id={"create-jira-ticket-button"} primary secondaryActions onClick={()=>{createJiraTicket(issueDetails); setPopoverActive(false)}} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button>}
+                    {selectedTestRunResult && selectedTestRunResult.vulnerable && <Button fullWidth id={"create-jira-ticket-button"} primary secondaryActions onClick={()=>{createJiraTicket(issueDetails); setPopoverActive(false)}} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button>}
                 </HorizontalStack>
             </div>
         )
@@ -256,10 +256,39 @@ function TestRunResultFlyout(props) {
         component: issueDetails.id && overviewComp
     }
 
-    const timelineTab = isIssuePage && {
+    const generateActivityEvents = (issue) => {
+        const activityEvents = []
+
+        const createdEvent = {
+            description: 'Found the issue',
+            timestamp: issue.creationTime,
+        }
+        activityEvents.push(createdEvent)
+
+        if (issue.testRunIssueStatus === 'IGNORED') {
+            const ignoredEvent = {
+                description: <Text>Issue marked as <b>IGNORED</b> - {issue.ignoreReason || 'No reason provided'}</Text>,
+                timestamp: issue.lastUpdated,
+            }
+            activityEvents.push(ignoredEvent)
+        }
+
+        if (issue.testRunIssueStatus === 'FIXED') {
+            const fixedEvent = {
+                description: <Text>Issue marked as <b>FIXED</b></Text>,
+                timestamp: issue.lastUpdated,
+            }
+            activityEvents.push(fixedEvent)
+        }
+
+        return activityEvents
+    }
+    const latestActivity = generateActivityEvents(issueDetails).reverse()
+
+    const timelineTab = (selectedTestRunResult && selectedTestRunResult.vulnerable) && {
         id: "timeline",
         content: "Timeline",
-        component: <ActivityTracker issueDetails={issueDetails} />
+        component: <ActivityTracker latestActivity={latestActivity} />
     }
 
     const errorTab = {

@@ -896,7 +896,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
   const rowItems = [
     {
       title: 'Severity',
-      value: <Text fontWeight="semibold"><span style={{color: observeFunc.getSeverityColor(severity)}}>{severity}</span></Text>,
+      value: <Text fontWeight="semibold"><span style={{color: observeFunc.getColor(severity)}}>{severity}</span></Text>,
       tooltipContent: "Severity of the test run result"
     },
     {

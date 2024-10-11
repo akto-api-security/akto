@@ -88,41 +88,6 @@ const transform = {
         )
         
         return processedData
-    },
-
-    mapSeverity: (severity) => {
-        switch (severity) {
-            case 'CRITICAL':
-                return 'High'
-            case 'HIGH':
-                return 'High'
-            case 'MEDIUM':
-                return 'Medium'
-            default:
-                return 'Low'
-        }
-    },
-    
-    getIssueStatus: (type) => {
-        switch (type.toUpperCase()) {
-            case "OPEN":
-                return "Open"
-            case "FIXED":
-                return "Fixed"
-            case "IGNORED":
-                return "Ignored"
-            default:
-                return type;
-        }
-    },
-    
-    extractDomain: (url) => {
-        try {
-            const parsedUrl = new URL(url)
-            return parsedUrl.hostname
-        } catch (error) {
-            return url
-        }
     }
 }
 
