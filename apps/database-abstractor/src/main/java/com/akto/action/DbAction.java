@@ -390,7 +390,7 @@ public class DbAction extends ActionSupport {
                 if (UsageMetricCalculator.getDeactivated().contains(id.getApiCollectionId())) {
                     continue;
                 }
-                if (accountId == 1714700875 && URLMethods.Method.OPTIONS.equals(id.getMethod())) {
+                if (URLMethods.Method.OPTIONS.equals(id.getMethod())) {
                     continue;
                 }
                 if (accountId == 1721887185 && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)  && !id.getMethod().equals(Method.OPTIONS))  {
@@ -457,7 +457,7 @@ public class DbAction extends ActionSupport {
                                 url = entry.getValue().toString();
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._METHOD)){
                                 method = entry.getValue().toString();
-                                if (accId == 1714700875 && URLMethods.Method.OPTIONS.equals(Method.valueOf(method))) {
+                                if (URLMethods.Method.OPTIONS.equals(Method.valueOf(method))) {
                                     ignore = true;
                                 }
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._PARAM)){
@@ -619,7 +619,7 @@ public class DbAction extends ActionSupport {
                     String url = (String) mObj.get("url");
                     String method = (String) mObj.get("method");
 
-                    if (accId == 1714700875 && URLMethods.Method.OPTIONS.equals(Method.valueOf(method))) {
+                    if (URLMethods.Method.OPTIONS.equals(Method.valueOf(method))) {
                         continue;
                     }
 
@@ -703,7 +703,7 @@ public class DbAction extends ActionSupport {
                             try {
                                 String key = entry.getKey();
                                 String value = (String) entry.getValue();
-                                if ("_id.method".equals(key) && accId == 1714700875
+                                if ("_id.method".equals(key)
                                         && URLMethods.Method.OPTIONS.equals(Method.valueOf(value))) {
                                     ignore = true;
                                     break;
