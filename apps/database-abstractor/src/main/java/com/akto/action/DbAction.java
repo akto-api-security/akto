@@ -457,7 +457,7 @@ public class DbAction extends ActionSupport {
                                 url = entry.getValue().toString();
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._METHOD)){
                                 method = entry.getValue().toString();
-                                if (URLMethods.Method.OPTIONS.equals(Method.valueOf(method))) {
+                                if ("OPTIONS".equals(method)) {
                                     ignore = true;
                                 }
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._PARAM)){
@@ -619,7 +619,7 @@ public class DbAction extends ActionSupport {
                     String url = (String) mObj.get("url");
                     String method = (String) mObj.get("method");
 
-                    if (URLMethods.Method.OPTIONS.equals(Method.valueOf(method))) {
+                    if ("OPTIONS".equals(method)) {
                         continue;
                     }
 
@@ -704,7 +704,7 @@ public class DbAction extends ActionSupport {
                                 String key = entry.getKey();
                                 String value = (String) entry.getValue();
                                 if ("_id.method".equals(key)
-                                        && URLMethods.Method.OPTIONS.equals(Method.valueOf(value))) {
+                                        && ("OPTIONS".equals(value))) {
                                     ignore = true;
                                     break;
                                 }
