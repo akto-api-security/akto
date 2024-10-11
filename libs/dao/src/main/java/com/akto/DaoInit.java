@@ -1,6 +1,7 @@
 package com.akto;
 
 import com.akto.dao.*;
+import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.testing.TestRolesDao;
@@ -402,6 +403,7 @@ public class DaoInit {
         RBACDao.instance.createIndicesIfAbsent();
         TrafficAlertsDao.instance.createIndicesIfAbsent();
         RuntimeMetricsDao.instance.createIndicesIfAbsent();
+        ApiAuditLogsDao.instance.createIndicesIfAbsent();
     }
 
 }
