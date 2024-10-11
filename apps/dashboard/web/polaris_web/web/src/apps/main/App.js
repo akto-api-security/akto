@@ -77,6 +77,7 @@ import SignUpWithSSO from "../signup/components/SignUpWithSSO";
 
 import TeamsWebhooks from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhooks";
 import TeamsWebhook from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhook";
+import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -317,6 +318,10 @@ const router = createBrowserRouter([
           {
             path: "self-hosted",
             element: <SelfHosted/>
+          },
+          {
+            path: 'audit-logs',
+            element: <AuditLogs/>
           }
         ]
       },
