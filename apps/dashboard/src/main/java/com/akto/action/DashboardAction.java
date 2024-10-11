@@ -90,15 +90,8 @@ public class DashboardAction extends UserAction {
             Filters.and(
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
                 Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
-                Filters.or(
-                    Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.OPEN),
-                    Filters.and(
-                        Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.FIXED),
-                        Filters.lte(TestingRunIssues.LAST_UPDATED, endTimeStamp)
-                    )
-                )
-            )       
-        );
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.OPEN))       
+            );
 
         // issues that have been created till start timestamp
         oldOpenCount = TestingRunIssuesDao.instance.count(

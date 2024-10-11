@@ -136,7 +136,7 @@ function TestRunResultFlyout(props) {
         </Popover>
     )}
     function TitleComponent() {
-        const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? selectedTestRunResult.severity[0] : ""
+        const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : ""
         return(
             <div style={{display: 'flex', justifyContent: "space-between", gap:"24px", padding: "16px", paddingTop: '0px'}}>
                 <VerticalStack gap={"2"}>
