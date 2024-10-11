@@ -1,6 +1,10 @@
 package com.akto.action;
 
+import com.akto.dao.RBACDao;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
+import com.akto.dao.context.Context;
+import com.akto.dto.RBAC;
+import com.akto.dto.User;
 import com.akto.dto.audit_logs.ApiAuditLogs;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -18,6 +22,15 @@ public class ApiAuditLogsAction extends UserAction {
     private List<ApiAuditLogs> apiAuditLogs;
     private long totalAuditLogs;
     public String fetchApiAuditLogsFromDb() {
+        User user = getSUser();
+        if(user == null) return ERROR.toUpperCase();
+
+        RBAC.Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
+        if(currentRoleForUser == null || !currentRoleForUser.equals(RBAC.Role.ADMIN)) {
+            addActionError("You do not have access to the audit logs.");
+            return ERROR.toUpperCase();
+        }
+
         Bson filters = Filters.and(
                 Filters.gte(ApiAuditLogs.TIMESTAMP, startTimestamp),
                 Filters.lt(ApiAuditLogs.TIMESTAMP, endTimestamp)
