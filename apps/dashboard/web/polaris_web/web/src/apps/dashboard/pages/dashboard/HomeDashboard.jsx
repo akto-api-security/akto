@@ -577,7 +577,7 @@ function HomeDashboard() {
             />
         }
         title="Critical Unsecured APIs Over Time"
-        titleToolTip="Chart showing the number of critical unsecured APIs detected each month over the past year. Helps track security trends over time."
+        titleToolTip="Chart showing the number of APIs detected(risk score >= 4) each month over the past year. Helps track security trends over time."
         linkText="Fix critical issues"
         linkUrl="/dashboard/issues"
     /> : <EmptyCard title="Critical Unsecured APIs Over Time" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Unsecured APIs found</Text>: runTestEmptyCardComponent} />
@@ -607,11 +607,11 @@ function HomeDashboard() {
                     exportingDisabled={true}
                 />
             }
-            title="Critical Findings"
+            title="Vulnerabilities findings"
             titleToolTip="Overview of the most critical security issues detected, including the number of issues and APIs affected for each type of vulnerability."
             linkText="Fix critical issues"
             linkUrl="/dashboard/issues"
-        /> : <EmptyCard title="Critical Findings" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Critical findings found</Text>: runTestEmptyCardComponent} />
+        /> : <EmptyCard title="Vulnerabilities findings" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Vulnerabilities found</Text>: runTestEmptyCardComponent} />
 
     const apisByRiskscoreComponent = <InfoCard
         component={

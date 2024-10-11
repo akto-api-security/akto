@@ -94,6 +94,10 @@ const learnMoreObject = {
             {
                 content:"How to delete an API Collection",
                 value:"https://docs.akto.io/api-inventory/how-to/delete-an-api-collection"
+            },
+            {
+                content: 'What is risk score',
+                value: 'https://docs.akto.io/api-discovery/concepts/risk-score'
             }
         ],
         videoLink: [
@@ -130,6 +134,9 @@ const learnMoreObject = {
             {
                 content:"How to create Swagger File using Akto",
                 value:"https://docs.akto.io/api-inventory/how-to/create-swagger-file-using-akto"
+            }, {
+                content: 'What is risk score',
+                value: 'https://docs.akto.io/api-discovery/concepts/risk-score'
             }
         ],
         videoLink: [
