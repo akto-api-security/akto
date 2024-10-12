@@ -4,7 +4,7 @@ import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
-import {useLocation, useParams } from "react-router-dom"
+import {useLocation, useNavigate, useParams } from "react-router-dom"
 import { saveAs } from 'file-saver'
 
 import "./api_inventory.css"
@@ -148,6 +148,7 @@ function ApiEndpoints(props) {
     const params = useParams()
     const location = useLocation()
     const apiCollectionId = params.apiCollectionId
+    const navigate = useNavigate()
 
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
@@ -186,11 +187,8 @@ function ApiEndpoints(props) {
     const selectedMethod = queryParams.get('selected_method')
 
     // the values used here are defined at the server.
-    const definedTableTabs = apiCollectionId == 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId == 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow'] )
+    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow'] )
 
-    const isApiGroup = allCollections.filter(x => {
-        return x.id == apiCollectionId && x.type == "API_GROUP"
-    }).length > 0
 
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
@@ -633,6 +631,9 @@ function ApiEndpoints(props) {
         const activePrompts = dashboardFunc.getPrompts(requestObj)
         setPrompts(activePrompts)
     }
+    const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
+    const isApiGroup = collectionsObj?.type === 'API_GROUP'
+
     const secondaryActionsComponent = (
         <HorizontalStack gap="2">
 
@@ -654,17 +655,13 @@ function ApiEndpoints(props) {
                                 <Text fontWeight="regular" variant="bodyMd">Refresh</Text>
                             </div>
                             {
-                                allCollections.filter(x => {
-                                    return x.id == apiCollectionId && x.type == "API_GROUP"
-                                }).length > 0 ?
+                                isApiGroup ?
                                     <div onClick={computeApiGroup} style={{ cursor: 'pointer' }}>
                                         <Text fontWeight="regular" variant="bodyMd">Re-compute api group</Text>
                                     </div> :
                                     null
                             }
-                            { allCollections.filter(x => {
-                                    return x.id == apiCollectionId && x.type == "API_GROUP"
-                                }).length == 0 ?
+                            { !isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) ?
                                 <UploadFile
                                 fileFormat=".har"
                                 fileChanged={file => handleFileChange(file)}
@@ -715,6 +712,8 @@ function ApiEndpoints(props) {
                 </Popover.Pane>
             </Popover>
 
+            {isApiGroup &&collectionsObj?.automated !== true ? <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> : null}
+
             {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null}
                     
             <RunTest
@@ -754,10 +753,6 @@ function ApiEndpoints(props) {
     }
 
     const promotedBulkActions = (selectedResources) => {
-
-        let isApiGroup = allCollections.filter(x => {
-            return x.id == apiCollectionId && x.type == "API_GROUP"
-        }).length > 0
 
         let ret = [
             {

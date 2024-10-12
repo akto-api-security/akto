@@ -634,6 +634,15 @@ export default {
             }
         })
     },
+    async updateCustomCollection(apiCollectionId, conditions) {
+        return await request({
+            url: '/api/updateCustomCollection',
+            method: 'post',
+            data: {
+                apiCollectionId, conditions
+            }
+        })
+    },
     async getEndpointsListFromConditions(conditions) {
         return await request({
             url: '/api/getEndpointsListFromConditions',
