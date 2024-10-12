@@ -209,7 +209,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -228,7 +228,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -246,7 +246,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -264,7 +264,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -340,7 +340,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_ACTIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -484,7 +484,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -563,7 +563,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -642,7 +642,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -663,7 +663,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1411,7 +1411,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -2037,7 +2037,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2056,7 +2056,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2621,7 +2621,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -3517,7 +3517,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">LOGS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3537,7 +3537,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">LOGS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3577,7 +3577,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ISSUES</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4082,7 +4082,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4103,7 +4103,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4601,7 +4601,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4675,7 +4675,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4769,7 +4769,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4813,7 +4813,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4834,7 +4834,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4855,7 +4855,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4897,7 +4897,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_CONFIG</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4940,7 +4940,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5188,7 +5188,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">METRICS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5231,7 +5231,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">METRICS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5312,7 +5312,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5370,7 +5370,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5815,7 +5815,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6086,7 +6086,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">BILLING</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6130,7 +6130,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">BILLING</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6520,7 +6520,7 @@
 
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_ACTIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6912,7 +6912,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -7019,6 +7019,9 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">API_AUDIT_LOGS</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">

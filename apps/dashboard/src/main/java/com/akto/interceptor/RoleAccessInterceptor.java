@@ -18,6 +18,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
 import com.mongodb.client.model.Filters;
+import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionInvocation;
 import com.opensymphony.xwork2.ActionSupport;
 import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
@@ -79,6 +80,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
     @Override
     public String intercept(ActionInvocation invocation) throws Exception {
+        ApiAuditLogs apiAuditLogs = null;
         try {
             HttpServletRequest request = ServletActionContext.getRequest();
 
@@ -140,8 +142,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                     List<String> userProxyIpAddresses = AuditLogsUtil.getClientIpAddresses(request);
                     String userIpAddress = userProxyIpAddresses.get(0);
 
-                    ApiAuditLogs apiAuditLogs = new ApiAuditLogs(timestamp, apiEndpoint, actionDescription, userEmail, userAgent, userIpAddress, userProxyIpAddresses);
-                    ApiAuditLogsDao.instance.insertOne(apiAuditLogs);
+                    apiAuditLogs = new ApiAuditLogs(timestamp, apiEndpoint, actionDescription, userEmail, userAgent, userIpAddress, userProxyIpAddresses);
                 }
             } catch(Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while inserting api audit logs: " + e.getMessage(), LogDb.DASHBOARD);
@@ -153,6 +154,12 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             loggerMaker.errorAndAddToDb(e, error, LoggerMaker.LogDb.DASHBOARD);
         }
 
-        return invocation.invoke();
+        String result = invocation.invoke();
+
+        if (apiAuditLogs != null && result.equalsIgnoreCase(Action.SUCCESS.toUpperCase())) {
+            ApiAuditLogsDao.instance.insertOne(apiAuditLogs);
+        }
+
+        return result;
     }
 }
