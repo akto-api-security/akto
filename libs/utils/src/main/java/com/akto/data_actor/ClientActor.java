@@ -1097,6 +1097,44 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("colId", colId);
+        obj.put("host", host);
+        obj.put("vpcId", vpcId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForHostAndVpc", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in createCollectionForHostAndVpc", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in createCollectionForHostAndVpc" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+    public void createCollectionSimpleForVpc(int vxlanId, String vpcId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("vxlanId", vxlanId);
+        obj.put("vpcId", vpcId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionSimpleForVpc", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in createCollectionSimpleForVpc", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in createCollectionSimpleForVpc" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
+
     public void insertRuntimeLog(Log log) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();

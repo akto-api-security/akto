@@ -224,6 +224,7 @@ public class DbAction extends ActionSupport {
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
     KafkaUtils kafkaUtils = new KafkaUtils();
     String endpointLogicalGroupId;
+    String vpcId;
 
     String metricType;
 
@@ -2121,6 +2122,26 @@ public class DbAction extends ActionSupport {
         SlackSender.sendAlert(accountId, apiTestStatusAlert);
     }
 
+    public String createCollectionSimpleForVpc() {
+        try {
+            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in createCollectionSimpleForVpc " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String createCollectionForHostAndVpc() {
+        try {
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in createCollectionForHostAndVpc " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -3049,6 +3070,14 @@ public class DbAction extends ActionSupport {
 
     public void setState(String state) {
         this.state = state;
+    }
+
+    public String getVpcId() {
+        return vpcId;
+    }
+
+    public void setVpcId(String vpcId) {
+        this.vpcId = vpcId;
     }
 
 }
