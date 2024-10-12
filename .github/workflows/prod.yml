@@ -60,7 +60,7 @@ jobs:
           REGISTRY_ALIAS: p7q3h0z2
           IMAGE_TAG: kafkalatest
           IMAGE_TAG2: latest
-          IMAGE_TAG3: 1.42.0_local
+          IMAGE_TAG3: 1.42.1_local
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
