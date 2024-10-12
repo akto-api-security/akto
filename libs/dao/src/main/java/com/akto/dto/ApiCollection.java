@@ -78,7 +78,7 @@ public class ApiCollection {
     Type type;
     public static final String _TYPE = "type";
     
-    ENV_TYPE userSetEnvType;
+    String userSetEnvType;
 
 	public static final String USER_ENV_TYPE = "userSetEnvType";
 
@@ -141,19 +141,19 @@ public class ApiCollection {
         this.urls = urls;
     }
 
-    public ENV_TYPE getEnvType(){
+    public String getEnvType(){
         if(this.type != null && this.type == Type.API_GROUP) return null;
         
         if(this.userSetEnvType == null){
             if (this.hostName != null) {
                 for (String keyword : ENV_KEYWORDS_WITH_DOT) {
                     if (this.hostName.contains("." + keyword)) {
-                        return ENV_TYPE.STAGING;
+                        return "STAGING";
                     }
                 }
                 for (String keyword : ENV_KEYWORDS_WITHOUT_DOT) {
                     if (this.hostName.contains(keyword)) {
-                        return ENV_TYPE.STAGING;
+                        return "STAGING";
                     }
                 }
             }
@@ -299,11 +299,11 @@ public class ApiCollection {
         this.sampleCollectionsDropped = sampleCollectionsDropped;
     }
 
-    public ENV_TYPE getUserSetEnvType() {
+    public String getUserSetEnvType() {
 		return userSetEnvType;
 	}
 
-	public void setUserSetEnvType(ENV_TYPE userSetEnvType) {
+	public void setUserSetEnvType(String userSetEnvType) {
 		this.userSetEnvType = userSetEnvType;
 	}
 
