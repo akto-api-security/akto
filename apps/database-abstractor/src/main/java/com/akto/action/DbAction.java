@@ -2126,6 +2126,7 @@ public class DbAction extends ActionSupport {
         try {
             DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId);
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in createCollectionSimpleForVpc " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -2135,6 +2136,7 @@ public class DbAction extends ActionSupport {
         try {
             DbLayer.createCollectionForHostAndVpc(host, colId, vpcId);
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in createCollectionForHostAndVpc " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();

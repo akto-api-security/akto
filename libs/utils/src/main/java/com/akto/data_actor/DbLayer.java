@@ -352,7 +352,7 @@ public class DbLayer {
                 Updates.combine(
                         Updates.set(ApiCollection.VXLAN_ID, vxlanId),
                         Updates.setOnInsert("startTs", Context.now()),
-                        Updates.set("urls", new HashSet<>())
+                        Updates.setOnInsert("urls", new HashSet<>())
                 ),
                 updateOptions
         );
