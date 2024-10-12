@@ -7,7 +7,7 @@ import testingApi from "../../testing/api.js"
 import testingFunc from "../../testing/transform.js"
 import func from "@/util/func";
 
-const CriticalFindingsGraph = () => {
+const CriticalFindingsGraph = ({ linkText, linkUrl }) => {
     const [criticalFindingsData, setCriticalFindingsData] = useState([])
     const [showTestingComponents, setShowTestingComponents] = useState(false)
 
@@ -73,11 +73,11 @@ const CriticalFindingsGraph = () => {
                 exportingDisabled={true}
             />
         }
-        title="Critical Findings"
+        title="Vulnerabilities findings"
         titleToolTip="Overview of the most critical security issues detected, including the number of issues and APIs affected for each type of vulnerability."
-        linkText=""
-        linkUrl=""
-    /> : <EmptyCard title="Critical Findings" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Critical findings found</Text>: runTestEmptyCardComponent} />
+        linkText={linkText}
+        linkUrl={linkUrl}
+    /> : <EmptyCard title="Vulnerabilities findings" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Vulnerabilities found</Text>: runTestEmptyCardComponent} />
 
     return (
         {...criticalFindings}

@@ -502,9 +502,9 @@ function HomeDashboard() {
         linkUrl="/dashboard/issues"
     /> : <EmptyCard title="Vulnerable APIs by Severity" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No vulnerable APIs found</Text>: runTestEmptyCardComponent}/>
 
-    const criticalUnsecuredAPIsOverTime = <CriticalUnsecuredAPIsOverTimeGraph />
+    const criticalUnsecuredAPIsOverTime = <CriticalUnsecuredAPIsOverTimeGraph linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
 
-    const criticalFindings = <CriticalFindingsGraph />
+    const criticalFindings = <CriticalFindingsGraph linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
 
     const apisByRiskscoreComponent = <InfoCard
         component={

@@ -407,8 +407,8 @@ function IssuesPage() {
             />
 
             <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
-                <CriticalUnsecuredAPIsOverTimeGraph />
-                <CriticalFindingsGraph />
+                <CriticalUnsecuredAPIsOverTimeGraph linkText={""} linkUrl={""} />
+                <CriticalFindingsGraph linkText={""} linkUrl={""} />
             </HorizontalGrid>
 
             <GithubServerTable

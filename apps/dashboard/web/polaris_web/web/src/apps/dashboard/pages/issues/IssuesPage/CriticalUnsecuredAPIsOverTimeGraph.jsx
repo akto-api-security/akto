@@ -5,7 +5,7 @@ import { Link, Text } from '@shopify/polaris'
 import InfoCard from '../../dashboard/new_components/InfoCard'
 import dashboardApi from "../../dashboard/api.js"
 
-const CriticalUnsecuredAPIsOverTimeGraph = () => {
+const CriticalUnsecuredAPIsOverTimeGraph = ({ linkText, linkUrl }) => {
     const [unsecuredAPIs, setUnsecuredAPIs] = useState([])
     const [showTestingComponents, setShowTestingComponents] = useState(false)
 
@@ -62,9 +62,9 @@ const CriticalUnsecuredAPIsOverTimeGraph = () => {
             />
         }
         title="Critical Unsecured APIs Over Time"
-        titleToolTip="Chart showing the number of critical unsecured APIs detected each month over the past year. Helps track security trends over time."
-        linkText=""
-        linkUrl=""
+        titleToolTip="Chart showing the number of APIs detected(risk score >= 4) each month over the past year. Helps track security trends over time."
+        linkText={linkText}
+        linkUrl={linkUrl}
     /> : <EmptyCard title="Critical Unsecured APIs Over Time" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Unsecured APIs found</Text>: runTestEmptyCardComponent} />
 
     return (
