@@ -15,7 +15,6 @@ import PersistStore from "../../../../main/PersistStore";
 import collectionsApi from "./api"
 
 function APIQuery() {
-    const emptyCondition = { data: {}, operator: "AND", type: "CUSTOM" };
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => conditionsReducer(draft, action)), []);
     const [endpointListFromConditions, setEndpointListFromConditions] = useState({})
     const [sensitiveParams, setSensitiveParams] = useState({})
@@ -28,6 +27,12 @@ function APIQuery() {
 
     const [searchParams, setSearchParams] = useSearchParams();
     const collectionId = (searchParams && searchParams.get("collectionId") !== null) ? searchParams.get("collectionId") : -1
+
+    const getEmptyCondition = (type) => {
+        return { data: {}, operator: "AND", type: type };
+    }
+
+    const emptyCondition = getEmptyCondition('CUSTOM')
 
     function conditionsReducer(draft, action) {
         switch (action.type) {
@@ -52,9 +57,10 @@ function APIQuery() {
     const getApiCollection = () => {
         collectionsApi.getCollection(collectionId).then((res) => {
             (res[0].conditions || []).forEach((x, index) => {
+                const tempEmptyCondition = getEmptyCondition(x.type)
+                dispatchConditions({ type: "add", obj: tempEmptyCondition })
+                dispatchConditions({ type: "updateKey", index: index, key: "operator", obj: x.operator })
                 if(x.type === 'CUSTOM'){
-                    dispatchConditions({ type: "add", obj: emptyCondition })
-                    dispatchConditions({ type: "updateKey", index: index, key: "operator", obj: x.operator })
                     let data = {
                         [x.apisList[0]['apiCollectionId']]: x.apisList.map((obj) => {
                             let temp = obj 
@@ -67,12 +73,7 @@ function APIQuery() {
                     let temp = JSON.parse(JSON.stringify(x))
                     delete temp['type']
                     delete temp['operator']
-                    const finalObj = {
-                        data: temp,
-                        type: x.type,
-                        operator: x.operator
-                    }
-                    dispatchConditions({index: index, type: "add", obj: finalObj, key: "data"})
+                    dispatchConditions({index: index, type: "overwrite", obj: temp, key: "data"})
                 }
                 
             })
