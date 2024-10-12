@@ -194,7 +194,7 @@ public class ApiCollectionsAction extends UserAction {
                 String userEnvType = collection.getString(ApiCollection.USER_ENV_TYPE);
                 if(userEnvType != null && userEnvType.length() > 0){
                     ApiCollection.ENV_TYPE envEnum = ApiCollection.ENV_TYPE.valueOf(userEnvType);
-                    apiCollection.setUserSetEnvType(envEnum);
+                    apiCollection.setUserSetEnvType(userEnvType);
                 }
                 this.apiCollections.add(apiCollection);
             } catch (Exception e) {
