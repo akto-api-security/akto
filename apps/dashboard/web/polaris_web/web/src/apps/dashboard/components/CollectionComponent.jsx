@@ -24,8 +24,10 @@ function CollectionComponent(props) {
 
     const { condition, index, dispatch, operatorComponent } = props
     const [apiEndpoints, setApiEndpoints] = useState({})
-    const [regexText, setRegexText] = useState('')
-    const [hostRegexText, setHostRegexText] = useState('')
+    const initialRegexText = (condition && condition?.type === 'REGEX') ? (condition?.data?.regex || '') : ''
+    const initialHostRegexText = (condition && condition?.type === 'HOST_REGEX') ? (condition?.data?.host_regex || '') : ''
+    const [regexText, setRegexText] = useState(initialRegexText)
+    const [hostRegexText, setHostRegexText] = useState(initialHostRegexText)
 
     useEffect(() => {
         fetchApiEndpoints(condition.data)
