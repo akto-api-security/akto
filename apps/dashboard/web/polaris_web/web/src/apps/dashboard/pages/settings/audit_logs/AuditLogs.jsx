@@ -19,20 +19,20 @@ const headers = [
         showFilter: true
     },
     {
-        title: "API endpoint",
-        text: "API endpoint",
+        title: "Operation",
+        text: "Operation",
         value: "apiEndpoint",
         filterKey: "apiEndpoint",
         showFilter: true
     },
     {
-        title: "Action description",
-        text: "Action description",
+        title: "Operation description",
+        text: "Operation description",
         value: "actionDescription"
     },
     {
-        title: "Timestamp",
-        text: "Timestamp",
+        title: "Time",
+        text: "Time",
         value: "timestamp",
         sortActive: true,
     },
@@ -80,13 +80,14 @@ const AuditLogs = () => {
         setTableLoading(true)
         await settingRequests.fetchApiAuditLogsFromDb(0, -1, 1, startTimestamp, endTimestamp).then((resp) => {
             const apiAuditLogsArr = resp?.apiAuditLogs.map((item) => {
-                const { actionDescription, timestamp, userAgent } = item
+                const { apiEndpoint, actionDescription, timestamp, userAgent } = item
                 return {
                     ...item,
-                    actionDescription: <Box width='200px'><Text breakWord>{actionDescription}</Text></Box>,
+                    apiEndpoint: func.formatEndpoint(apiEndpoint),
+                    actionDescription: <Box width='250px'><p style={{whiteSpace: 'pre-wrap'}}>{actionDescription}</p></Box>,
                     timestamp: func.prettifyEpoch(timestamp),
                     rawTimestamp: timestamp,
-                    userAgent: <Box width='250px'><Text breakWord>{userAgent}</Text></Box>,
+                    userAgent: <Box width='fit-content'><p style={{whiteSpace: 'pre-wrap'}}>{userAgent}</p></Box>,
                     rawUserAgent: userAgent
                 }
             })
@@ -157,7 +158,7 @@ const AuditLogs = () => {
                     titleText={"Audit logs"} 
                 />
             }
-            primaryAction={<Button loading={loading} primary onClick={exportAuditLogsCSV}>Export as CSV</Button>}
+            primaryAction={<Button disabled={window.USER_ROLE !== "ADMIN"} loading={loading} primary onClick={exportAuditLogsCSV}>Export as CSV</Button>}
             secondaryActions={<DateRangeFilter disabled={window.USER_ROLE !== "ADMIN"} initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
             isFirstPage={true}
             components={[auditLogsTable]}
