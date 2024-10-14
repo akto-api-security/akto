@@ -30,6 +30,14 @@ public class CustomWebhook {
     private List<String> newSensitiveEndpointCollections;
     public static final String SELECTED_WEBHOOK_OPTIONS = "selectedWebhookOptions";
     private List<WebhookOptions> selectedWebhookOptions;
+    public static final String SEND_INSTANTLY = "sendInstantly";
+    private boolean sendInstantly;
+
+    private WebhookType webhookType;
+
+    public enum WebhookType {
+        DEFAULT, MICROSOFT_TEAMS
+    }
 
     public enum ActiveStatus{
         ACTIVE,INACTIVE;
@@ -216,5 +224,20 @@ public class CustomWebhook {
     public void setBatchSize(int batchSize) {
         this.batchSize = batchSize;
     }
+
+    public WebhookType getWebhookType() {
+        return webhookType;
+    }
+
+    public void setWebhookType(WebhookType webhookType) {
+        this.webhookType = webhookType;
+    }
     
+    public boolean getSendInstantly() {
+        return sendInstantly;
+    }
+
+    public void setSendInstantly(boolean sendInstantly) {
+        this.sendInstantly = sendInstantly;
+    }
 }
