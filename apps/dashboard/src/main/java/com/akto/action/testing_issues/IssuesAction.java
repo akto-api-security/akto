@@ -36,6 +36,7 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -489,6 +490,18 @@ public class IssuesAction extends UserAction {
         TestingRunIssuesDao.instance.updateMany(Filters.in(ID, issueIdArray), update);
         return SUCCESS.toUpperCase();
     }
+
+    String latestTestingRunSummaryId;
+    String issueStatusQuery;
+    public String fetchIssuesBySummaryId() {
+        Bson filters = Filters.and(
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
+                Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId))
+        );
+        issues = TestingRunIssuesDao.instance.findAll(filters);
+        return SUCCESS.toUpperCase();
+    }
+
     public List<TestingRunIssues> getIssues() {
         return issues;
     }
@@ -698,5 +711,13 @@ public class IssuesAction extends UserAction {
 
     public void setSortOrder(int sortOrder) {
         this.sortOrder = sortOrder;
+    }
+
+    public void setLatestTestingRunSummaryId(String latestTestingRunSummaryId) {
+        this.latestTestingRunSummaryId = latestTestingRunSummaryId;
+    }
+
+    public void setIssueStatusQuery(String issueStatusQuery) {
+        this.issueStatusQuery = issueStatusQuery;
     }
 }
