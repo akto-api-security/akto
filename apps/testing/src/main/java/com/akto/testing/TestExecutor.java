@@ -550,7 +550,9 @@ public class TestExecutor {
 
         int countSuccessfulTests = 0;
         for (String testSubCategory: testSubCategories) {
+            loggerMaker.infoAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(testRunResultSummaryId) );
             if(GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId, true)){
+                loggerMaker.infoAndAddToDb("Entered tests for api.");
                 if (Context.now() - startTime > timeToKill) {
                     loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
                     return;
@@ -559,7 +561,10 @@ public class TestExecutor {
 
                 TestConfig testConfig = testConfigMap.get(testSubCategory);
                 
-                if (testConfig == null) continue;
+                if (testConfig == null) {
+                    loggerMaker.infoAndAddToDb("Found testing config null.");
+                    continue;
+                }
                 TestingRunResult testingRunResult = null;
                 if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
                     continue;
