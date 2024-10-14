@@ -107,14 +107,14 @@ let filters = [
 
 function SingleTestRunPage() {
 
-  const [testRunResults, setTestRunResults] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [] })
-  const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [] })
+  const [testRunResults, setTestRunResults] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [], ignored_issues: [] })
+  const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [], ignored_issues: [] })
   const [ selectedTestRun, setSelectedTestRun ] = useState({});
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const subCategoryMap = LocalStore(state => state.subCategoryMap);
   const params= useParams()
   const [loading, setLoading] = useState(false);
-  const [tempLoading , setTempLoading] = useState({vulnerable: false, no_vulnerability_found: false, skipped: false, running: false,need_configurations:false})
+  const [tempLoading , setTempLoading] = useState({vulnerable: false, no_vulnerability_found: false, skipped: false, running: false,need_configurations:false,ignored_issues:false})
   const [selectedTab, setSelectedTab] = useState("vulnerable")
   const [selected, setSelected] = useState(0)
   const [workflowTest, setWorkflowTest ] = useState(false);
@@ -176,14 +176,42 @@ function SingleTestRunPage() {
       prev.no_vulnerability_found = true;
       prev.skipped = true;
       prev.need_configurations = true
+      prev.ignored_issues = true
       return {...prev};
     });
     let testRunResults = [];
+    let vulnerableTestingRunResults = [];
     await api.fetchTestingRunResults(summaryHexId, "VULNERABLE").then(({ testingRunResults }) => {
+      vulnerableTestingRunResults = testingRunResults
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
     })
-    fillTempData(testRunResults, 'vulnerable')
-    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'vulnerable')
+
+    let ignoredTestRunResults = []
+    await api.fetchIssuesBySummaryId(summaryHexId, "IGNORED").then((issues) => {
+      const ignoredTestingResults = vulnerableTestingRunResults.filter(result => {
+        return issues.some(issue =>
+            issue.id.apiInfoKey.apiCollectionId === result.apiInfoKey.apiCollectionId &&
+            issue.id.apiInfoKey.method === result.apiInfoKey.method &&
+            issue.id.apiInfoKey.url === result.apiInfoKey.url &&
+            issue.id.testSubCategory === result.testSubType
+        )
+      })
+    
+      ignoredTestRunResults = transform.prepareTestRunResults(hexId, ignoredTestingResults, subCategoryMap, subCategoryFromSourceConfigMap)
+    })
+
+    const updatedTestRunResults = testRunResults.filter(result => {
+      return !ignoredTestRunResults.some(ignoredResult => {
+        return JSON.stringify(result) === JSON.stringify(ignoredResult)
+      })
+    })    
+
+    fillTempData(updatedTestRunResults, 'vulnerable')
+    fillData(transform.getPrettifiedTestRunResults(updatedTestRunResults), 'vulnerable')
+
+    fillTempData(ignoredTestRunResults, 'ignored_issues')
+    fillData(transform.getPrettifiedTestRunResults(ignoredTestRunResults), 'ignored_issues')
+
 
     await api.fetchTestingRunResults(summaryHexId, "SKIPPED_EXEC_API_REQUEST_FAILED").then(({ testingRunResults, errorEnums }) => {
       testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
@@ -364,7 +392,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
     </div> : null
   )
 
-  const definedTableTabs = ['Vulnerable', 'Need configurations','Skipped', 'No vulnerability found','Domain unreachable']
+  const definedTableTabs = ['Vulnerable', 'Need configurations','Skipped', 'No vulnerability found','Domain unreachable','Ignored Issues']
 
   const { tabsInfo } = useTable()
   const tableCountObj = func.getTabsCount(definedTableTabs, testRunResults)
@@ -495,7 +523,7 @@ const runningTestsComp = useMemo(() => (
     )
   }
 
-  const allResultsLength = testRunResults.skipped.length + testRunResults.need_configurations.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length + progress
+  const allResultsLength = testRunResults.skipped.length + testRunResults.need_configurations.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length + testRunResults.ignored_issues.length + progress
   const useComponents = (!workflowTest && allResultsLength === 0 && (selectedTestRun.run_type && selectedTestRun.run_type ==='One-time')) ? [<EmptyData key="empty"/>] : components
   const headingComp = (
     <Box paddingBlockStart={1}>
