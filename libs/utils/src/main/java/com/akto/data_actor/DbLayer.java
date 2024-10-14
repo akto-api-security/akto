@@ -347,7 +347,23 @@ public class DbLayer {
                 Updates.combine(
                         Updates.set(ApiCollection.VXLAN_ID, vxlanId),
                         Updates.setOnInsert("startTs", Context.now()),
-                        Updates.setOnInsert("urls", new HashSet<>())
+                        Updates.set("urls", new HashSet<>())
+                ),
+                updateOptions
+        );
+    }
+
+    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId) {
+        UpdateOptions updateOptions = new UpdateOptions();
+        updateOptions.upsert(true);
+
+        ApiCollectionsDao.instance.getMCollection().updateOne(
+                Filters.eq("_id", vxlanId),
+                Updates.combine(
+                        Updates.set(ApiCollection.VXLAN_ID, vxlanId),
+                        Updates.setOnInsert("startTs", Context.now()),
+                        Updates.setOnInsert("urls", new HashSet<>()),
+                        Updates.set("userSetEnvType", vpcId)
                 ),
                 updateOptions
         );
@@ -362,6 +378,21 @@ public class DbLayer {
             Updates.setOnInsert("_id", id),
             Updates.setOnInsert("startTs", Context.now()),
             Updates.setOnInsert("urls", new HashSet<>())
+        );
+
+        ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
+    }
+
+    public static void createCollectionForHostAndVpc(String host, int id, String vpcId) {
+
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+        updateOptions.upsert(true);
+
+        Bson updates = Updates.combine(
+            Updates.setOnInsert("_id", id),
+            Updates.setOnInsert("startTs", Context.now()),
+            Updates.setOnInsert("urls", new HashSet<>()),
+            Updates.set("userSetEnvType", vpcId)
         );
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
