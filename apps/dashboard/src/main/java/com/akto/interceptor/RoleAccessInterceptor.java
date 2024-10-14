@@ -123,7 +123,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             ReadWriteAccess accessGiven = userRoleRecord.getReadWriteAccessForFeature(featureType);
             boolean hasRequiredAccess = false;
 
-            if(this.accessType.equalsIgnoreCase(ReadWriteAccess.READ.toString()) || this.accessType.equalsIgnoreCase(accessGiven.toString())){
+            if(this.accessType.equalsIgnoreCase(ReadWriteAccess.READ.toString()) || (accessGiven != null && this.accessType.equalsIgnoreCase(accessGiven.toString()))){
                 hasRequiredAccess = true;
             }
             
@@ -133,7 +133,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             }
 
             try {
-                if (this.accessType.equalsIgnoreCase(ReadWriteAccess.READ_WRITE.toString())) {
+                if (accessGiven != null && this.accessType.equalsIgnoreCase(ReadWriteAccess.READ_WRITE.toString())) {
                     long timestamp = Context.now();
                     String apiEndpoint = invocation.getProxy().getActionName();
                     String actionDescription = this.actionDescription == null ? "Error: Description not available" : this.actionDescription;
