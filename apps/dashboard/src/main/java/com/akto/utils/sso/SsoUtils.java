@@ -10,7 +10,9 @@ import javax.servlet.http.HttpServletRequest;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.ConfigsDao;
-import com.akto.utils.AzureLogin;
+import com.akto.dto.Config;
+import com.akto.dto.Config.ConfigType;
+import com.akto.util.Constants;
 import com.akto.utils.CustomHttpsWrapper;
 import com.mongodb.client.model.Filters;
 
@@ -30,7 +32,7 @@ public class SsoUtils {
 
     public static HttpServletRequest getWrappedRequest(HttpServletRequest servletRequest){
         String requestUri = servletRequest.getRequestURL().toString();
-        String savedRequestUri = AzureLogin.getInstance().getAzureConfig().getAcsUrl();
+        String savedRequestUri =CustomSamlSettings.getInstance(ConfigType.AZURE).getSamlConfig().getAcsUrl();
 
         if(requestUri.equals(savedRequestUri)){
             return servletRequest;
@@ -43,5 +45,11 @@ public class SsoUtils {
         }else{
             return servletRequest;
         }
+    }
+
+    public static SAMLConfig findSAMLConfig(ConfigType configType){
+        String configString = configType.name() + "-" + Config.CONFIG_SALT;
+        SAMLConfig config = (SAMLConfig) ConfigsDao.instance.findOne(Constants.ID, configString);
+        return config;
     }
 }

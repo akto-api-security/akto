@@ -3,6 +3,7 @@ package com.akto.action;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.*;
+import com.akto.dto.Config.ConfigType;
 import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
 import com.akto.mixpanel.AktoMixpanel;
@@ -13,14 +14,12 @@ import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
-import com.akto.utils.AzureLogin;
 import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
 import com.akto.utils.OktaLogin;
+import com.akto.utils.sso.CustomSamlSettings;
 import com.akto.utils.sso.SsoUtils;
 import com.akto.util.DashboardMode;
-import com.akto.utils.GithubLogin;
-import com.akto.utils.JWT;
 import com.akto.utils.billing.OrganizationUtils;
 import com.auth0.Tokens;
 import com.auth0.jwk.Jwk;
@@ -554,16 +553,16 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     }
 
     public String sendRequestToAzure () throws IOException{
-        if(AzureLogin.getInstance() == null){
+        if(CustomSamlSettings.getInstance(ConfigType.AZURE) == null){
             return ERROR.toUpperCase();
         }
-        Saml2Settings settings = AzureLogin.getSamlSettings();
+        Saml2Settings settings = CustomSamlSettings.getSamlSettings(ConfigType.AZURE);
         if(settings == null){
             return ERROR.toUpperCase();
         }
         try {
             Auth auth = new Auth(settings, servletRequest, servletResponse);
-            auth.login( AzureLogin.getInstance().getAzureConfig().getApplicationIdentifier() + "/dashboard/onboarding");
+            auth.login(CustomSamlSettings.getInstance(ConfigType.AZURE).getSamlConfig().getApplicationIdentifier() + "/dashboard/onboarding");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while getting response of azure sso \n" + e.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
@@ -575,10 +574,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     public String registerViaAzure() throws Exception{
         if (!DashboardMode.isOnPremDeployment()) return Action.ERROR.toUpperCase();
-        if(AzureLogin.getInstance() == null){
+        if(CustomSamlSettings.getInstance(ConfigType.AZURE) == null){
             return ERROR.toUpperCase();
         }
-        Saml2Settings settings = AzureLogin.getSamlSettings();
+        Saml2Settings settings = CustomSamlSettings.getSamlSettings(ConfigType.AZURE);
         if(settings == null){
             return ERROR.toUpperCase();
         }
