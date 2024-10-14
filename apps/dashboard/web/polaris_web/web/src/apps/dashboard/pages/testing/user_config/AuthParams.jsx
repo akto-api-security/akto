@@ -5,7 +5,7 @@ import Dropdown from "../../../components/layouts/Dropdown";
 import Store from "../../../store";
 
 
-function AuthParams({ authParams, setAuthParams }) {
+function AuthParams({ authParams, setAuthParams, hideTitle }) {
 
     const setToastConfig = Store(state => state.setToastConfig)
 
@@ -49,7 +49,7 @@ function AuthParams({ authParams, setAuthParams }) {
     }
 
     return (
-        <LegacyCard title="Extract">
+        <LegacyCard title={hideTitle ? '' : "Extract"}>
             <br />
             <Divider />
             <LegacyCard.Section>

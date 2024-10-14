@@ -58,7 +58,7 @@ function TestRoleSettings() {
     const [roleName, setRoleName] = useState(systemRole || "");
     const [change, setChange] = useState(false);
     const [currentInfo, setCurrentInfo] = useState({steps: [], authParams: {}});
-    const [hardCodeAuthInfo, setHardCodeAuthInfo] = useState({authHeaderKey: '',authHeaderValue: ''})
+    const [hardCodeAuthInfo, setHardCodeAuthInfo] = useState({authParams:[]})
     const [showAuthComponent, setShowAuthComponent] = useState(false)
     const [showAuthDeleteModal, setShowAuthDeleteModal] = useState(false)
     const [deletedIndex, setDeletedIndex] = useState(-1);
@@ -169,11 +169,12 @@ function TestRoleSettings() {
         }
     }
 
+
+
     const setHardCodedInfo = (obj) => {
         setHardCodeAuthInfo(prev => ({
             ...prev,
-            authHeaderKey: obj.authHeaderKey,
-            authHeaderValue: obj.authHeaderValue,
+            authParams: obj.authParams
         }))
     }
 
@@ -290,7 +291,6 @@ function TestRoleSettings() {
             steps: obj.steps,
             authParams: obj.authParams
         }))
-    
     }
 
     const addAuthButton = (
@@ -304,7 +304,7 @@ function TestRoleSettings() {
         setCurrentInfo({})
         setHeaderKey('')
         setHeaderValue('')
-        setHardCodeAuthInfo({})
+        setHardCodeAuthInfo({authParams:[]})
     }
 
     const handleSaveAuthMechanism = async() => {
@@ -312,7 +312,7 @@ function TestRoleSettings() {
         let resp = {}
         if(hardcodedOpen){
             const automationType = "HardCoded";
-            const authParamData = [{key: hardCodeAuthInfo.authHeaderKey, value: hardCodeAuthInfo.authHeaderValue, where: "HEADER"}]
+            const authParamData = hardCodeAuthInfo.authParams
             if(editableDoc > -1){
                 resp = await api.updateAuthInRole(initialItems.name, apiCond, editableDoc, authParamData, automationType)
             }else{
