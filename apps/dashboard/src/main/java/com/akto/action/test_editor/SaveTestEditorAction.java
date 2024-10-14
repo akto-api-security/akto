@@ -47,6 +47,7 @@ import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -289,7 +290,9 @@ public class SaveTestEditorAction extends UserAction {
         }
 
         try {
-            GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity());
+            if (!TestConfig.DYNAMIC_SEVERITY.equals(testConfig.getInfo().getSeverity())) {
+                GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity());
+            }
         } catch (Exception e) {
             addActionError("invalid severity, please choose from " + Arrays.toString(GlobalEnums.Severity.values()));
             return ERROR.toUpperCase();
@@ -344,7 +347,8 @@ public class SaveTestEditorAction extends UserAction {
         testingRunResult.setId(new ObjectId());
         if (testingRunResult.isVulnerable()) {
             TestingIssuesId issuesId = new TestingIssuesId(infoKey, GlobalEnums.TestErrorSource.TEST_EDITOR, testConfig.getId(), null);
-            testingRunIssues = new TestingRunIssues(issuesId, GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity()), GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(),null, null, Context.now());
+            Severity severity = TestExecutor.getSeverityFromTestingRunResult(testingRunResult);
+            testingRunIssues = new TestingRunIssues(issuesId, severity, GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(),null, null, Context.now());
         }
         BasicDBObject infoObj = IssuesAction.createSubcategoriesInfoObj(testConfig);
         subCategoryMap = new HashMap<>();

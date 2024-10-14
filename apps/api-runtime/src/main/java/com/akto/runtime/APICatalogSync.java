@@ -4,12 +4,20 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
-import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.*;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.dependency_flow.DependencyFlow;
+import com.akto.dto.filter.MergedUrls;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
+import com.akto.dto.*;
+import com.akto.dto.billing.SyncLimit;
+import com.akto.dto.dependency_flow.DependencyFlow;
+import com.akto.dto.monitoring.FilterConfig;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -21,6 +29,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.filter.DictionaryFilter;
 import com.akto.runtime.merge.MergeOnHostOnly;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.task.Cluster;
@@ -35,12 +44,10 @@ import com.google.api.client.util.Charsets;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.UpdateResult;
 import org.apache.commons.lang3.math.NumberUtils;
-import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
 import org.bson.types.ObjectId;
@@ -48,10 +55,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-import java.util.*;
 import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 
@@ -71,6 +75,10 @@ public class APICatalogSync {
     public static boolean mergeAsyncOutside = true;
     public BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
 
+    public static Set<MergedUrls> mergedUrls;
+
+    public Map<String, FilterConfig> advancedFilterMap =  new HashMap<>();
+
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
     }
@@ -83,6 +91,7 @@ public class APICatalogSync {
         this.delta = new HashMap<>();
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
         this.aktoPolicyNew = new AktoPolicyNew();
+        mergedUrls = new HashSet<>();
         if (buildFromDb) {
             buildFromDB(false, fetchAllSTI);
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
@@ -717,6 +726,7 @@ public class APICatalogSync {
         int start = newUrl.getUrl().startsWith("http") ? 3 : 0;
         for(int i = start; i < tokens.length; i ++) {
             String tempToken = tokens[i];
+            if(DictionaryFilter.isEnglishWord(tempToken)) continue;
 
             if (NumberUtils.isParsable(tempToken)) {
                 newTypes[i] = isNumber(tempToken) ? SuperType.INTEGER : SuperType.FLOAT;
@@ -746,7 +756,21 @@ public class APICatalogSync {
         }
 
         if (allNull) return null;
-        return new URLTemplate(tokens, newTypes, newUrl.getMethod());
+
+        URLTemplate urlTemplate = new URLTemplate(tokens, newTypes, newUrl.getMethod());
+
+        try {
+            for(MergedUrls mergedUrl : mergedUrls) {
+                if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
+                   mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
+                    return null;
+                }
+            }
+        } catch(Exception e) {
+            loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
+        }
+
+        return urlTemplate;
     }
 
 
@@ -768,6 +792,7 @@ public class APICatalogSync {
         for(int i = 0; i < newTokens.length; i ++) {
             String tempToken = newTokens[i];
             String dbToken = dbTokens[i];
+            if (DictionaryFilter.isEnglishWord(tempToken) || DictionaryFilter.isEnglishWord(dbToken)) continue;
 
             int minCount = dbUrl.getUrl().startsWith("http") && newUrl.getUrl().startsWith("http") ? 3 : 0;
             if (tempToken.equalsIgnoreCase(dbToken) || i < minCount) {
@@ -801,7 +826,20 @@ public class APICatalogSync {
         if (allNull) return null;
 
         if (templatizedStrTokens <= 1) {
-            return new URLTemplate(newTokens, newTypes, newUrl.getMethod());
+            URLTemplate urlTemplate = new URLTemplate(newTokens, newTypes, newUrl.getMethod());
+
+            try {
+                for(MergedUrls mergedUrl : mergedUrls) {
+                    if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
+                            mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
+                        return null;
+                    }
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
+            }
+
+            return urlTemplate;
         }
 
         return null;
@@ -1539,7 +1577,8 @@ public class APICatalogSync {
             this.delta = new HashMap<>();
         }
 
-
+        List<YamlTemplate> advancedFilterTemplates = AdvancedTrafficFiltersDao.instance.findAll(Filters.ne(YamlTemplate.INACTIVE, true));
+        advancedFilterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, advancedFilterTemplates, true);
         try {
             // fetchAllSTI check added to make sure only runs in dashboard
             if (!fetchAllSTI) {
@@ -1553,6 +1592,8 @@ public class APICatalogSync {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while filling urls in apiCollection: " + e.getMessage(), LogDb.RUNTIME);
         }
+
+        mergedUrls = MergedUrlsDao.instance.getMergedUrls();
 
         loggerMaker.infoAndAddToDb("Building from db completed", LogDb.RUNTIME);
         aktoPolicyNew.buildFromDb(fetchAllSTI);

@@ -1,5 +1,8 @@
 package com.akto.util;
 
+import com.akto.dao.context.Context;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.types.CappedSet;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.akto.util.grpc.ProtoBufUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,6 +24,36 @@ public class HttpRequestResponseUtils {
 
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     public static final String GRPC_CONTENT_TYPE = "application/grpc";
+
+    public static List<SingleTypeInfo> generateSTIsFromPayload(int apiCollectionId, String url, String method,String body, int responseCode) {
+        int now = Context.now();
+        List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
+        Map<String, Set<Object>> respFlattened = extractValuesFromPayload(body);
+        for (String param: respFlattened.keySet()) {
+            // values is basically the type
+            Set<Object> values = respFlattened.get(param);
+            if (values == null || values.isEmpty()) continue;
+
+            ArrayList<Object> valuesList = new ArrayList<>(values);
+            String val = valuesList.get(0) == null ? null : valuesList.get(0).toString();
+            SingleTypeInfo.SubType subType = findSubType(val);
+            SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(url, method,responseCode, false, param, subType, apiCollectionId, false);
+            SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0, now, 0, new CappedSet<>(), SingleTypeInfo.Domain.ANY, Long.MAX_VALUE, Long.MIN_VALUE);
+            singleTypeInfos.add(singleTypeInfo);
+        }
+
+        return singleTypeInfos;
+    }
+
+    public static SingleTypeInfo.SubType findSubType(String val) {
+        if (val == null) return SingleTypeInfo.GENERIC;
+        if (val.equalsIgnoreCase("short") || val.equalsIgnoreCase("int")) return  SingleTypeInfo.INTEGER_32;
+        if (val.equalsIgnoreCase("long")) return  SingleTypeInfo.INTEGER_64;
+        if (val.equalsIgnoreCase("float") || val.equalsIgnoreCase("double")) return  SingleTypeInfo.FLOAT;
+        if (val.equalsIgnoreCase("boolean")) return  SingleTypeInfo.TRUE;
+
+        return SingleTypeInfo.GENERIC;
+    }
 
     public static Map<String, Set<Object>> extractValuesFromPayload(String body) {
         if (body == null) return new HashMap<>();
@@ -143,15 +176,21 @@ public class HttpRequestResponseUtils {
         return formUrlEncoded.toString();
     }
     public static String encode(String s) throws UnsupportedEncodingException {
-        return URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8.name())
-                .replaceAll("\\+", "%20")
-                .replaceAll("\\%21", "!")
-                .replaceAll("\\%27", "'")
-                .replaceAll("\\%28", "(")
-                .replaceAll("\\%29", ")")
-                .replaceAll("\\%7E", "~")
-                .replaceAll("\\%5B", "[")
-                .replaceAll("\\%5D", "]");
+
+        /*
+         * No need to reverse the encoding for application/x-www-form-urlencoded  
+         * Ref: https://www.w3.org/TR/html401/interact/forms.html#h-17.13.4.1
+         */
+
+        return URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8.name());
+                // .replaceAll("\\+", "%20")
+                // .replaceAll("\\%21", "!")
+                // .replaceAll("\\%27", "'")
+                // .replaceAll("\\%28", "(")
+                // .replaceAll("\\%29", ")")
+                // .replaceAll("\\%7E", "~")
+                // .replaceAll("\\%5B", "[")
+                // .replaceAll("\\%5D", "]");
     }
 
 }

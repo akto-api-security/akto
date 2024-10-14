@@ -5,6 +5,7 @@ const initialState = {
     subCategoryMap: {},
     categoryMap: {},
     sendEventOnLogin: false,
+    defaultIgnoreSummaryTime: 2 * 60 * 60
 };
 
 let localStore = (set) => ({
@@ -12,6 +13,7 @@ let localStore = (set) => ({
     setSubCategoryMap: (subCategoryMap) => set({ subCategoryMap }),
     setCategoryMap: (categoryMap) => set({ categoryMap }),
     setSendEventOnLogin: (sendEventOnLogin) => set({ sendEventOnLogin }),
+    setDefaultIgnoreSummaryTime: (val) => set({val}),
     resetStore: () => set(initialState), // Reset function
 })
 

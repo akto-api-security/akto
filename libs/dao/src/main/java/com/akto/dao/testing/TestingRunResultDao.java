@@ -4,10 +4,16 @@ import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.TestResult.Confidence;
+import com.akto.dto.type.URLMethods;
 import com.akto.util.Constants;
 import com.akto.util.DbMode;
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -62,24 +68,69 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
                         TestingRunResult.CONFIDENCE_PERCENTAGE,
                         TestingRunResult.START_TIMESTAMP,
                         TestingRunResult.END_TIMESTAMP,
-                        TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID
-                ),
-                Projections.computed(TestingRunResult.ERRORS_LIST,Projections.computed("$arrayElemAt", Arrays.asList("$testResults.errors", 0)))
+                        TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
+                        TestingRunResult.TEST_RESULTS + "." + GenericTestResult._CONFIDENCE,
+                        TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS
+                )
             );
 
         return fetchLatestTestingRunResult(filters, limit, 0, projections);
     }
 
     public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit, int skip, Bson projections) {
-        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find(filters)
-                .projection(projections)
-                .sort(Sorts.descending("_id"))
-                .skip(skip)
-                .limit(limit)
-                .cursor();
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(filters));
+        pipeline.add(Aggregates.project(projections));
+        pipeline.add(Aggregates.sort(Sorts.descending(Constants.ID)));
+        pipeline.add(Aggregates.skip(skip));
+        pipeline.add(Aggregates.limit(limit));
+        MongoCursor<BasicDBObject> cursor = instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor();
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         while (cursor.hasNext()) {
-            TestingRunResult testingRunResult = cursor.next();
+            TestingRunResult testingRunResult = new TestingRunResult();
+            BasicDBObject doc = cursor.next();
+            testingRunResult.setId(new ObjectId(doc.getString(Constants.ID)));
+            testingRunResult.setTestRunId(new ObjectId(doc.getString(TestingRunResult.TEST_RUN_ID)));
+            BasicDBObject apiInfoKeyObj = (BasicDBObject) doc.get(TestingRunResult.API_INFO_KEY);
+            ApiInfoKey apiInfoKey = new ApiInfoKey(apiInfoKeyObj.getInt(ApiInfoKey.API_COLLECTION_ID),
+                    apiInfoKeyObj.getString(ApiInfoKey.URL),
+                    URLMethods.Method.valueOf(apiInfoKeyObj.getString(ApiInfoKey.METHOD)));
+            testingRunResult.setApiInfoKey(apiInfoKey);
+            testingRunResult.setTestSuperType(doc.getString(TestingRunResult.TEST_SUPER_TYPE));
+            testingRunResult.setTestSubType(doc.getString(TestingRunResult.TEST_SUB_TYPE));
+            testingRunResult.setVulnerable(doc.getBoolean(TestingRunResult.VULNERABLE));
+            testingRunResult.setConfidencePercentage(doc.getInt(TestingRunResult.CONFIDENCE_PERCENTAGE));
+            testingRunResult.setStartTimestamp(doc.getInt(TestingRunResult.START_TIMESTAMP));
+            testingRunResult.setEndTimestamp(doc.getInt(TestingRunResult.END_TIMESTAMP));
+            testingRunResult.setTestRunResultSummaryId(
+                    new ObjectId(doc.getString(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID)));        
+
+            BasicDBList testResultsList = (BasicDBList)doc.get(TestingRunResult.TEST_RESULTS);
+
+            List<String> errors = new ArrayList<>();
+            List<GenericTestResult> testResults = new ArrayList<>();
+            if (testResultsList != null && !testResultsList.isEmpty()) {
+                BasicDBObject genericTestResult = (BasicDBObject)testResultsList.get(0);
+                String confidence = "";
+                if (genericTestResult.get(GenericTestResult._CONFIDENCE)!=null) {
+                    TestResult testResult = new TestResult();
+                    confidence = genericTestResult.getString(GenericTestResult._CONFIDENCE);
+                    try {
+                        testResult.setConfidence(Confidence.valueOf(confidence));
+                        testResults.add(testResult);
+                    } catch(Exception e){
+                    }
+                }
+                if (genericTestResult.get(TestResult._ERRORS)!=null) {
+                    try {
+                        errors = (List)genericTestResult.get(TestResult._ERRORS);
+                    } catch(Exception e){
+                    }
+                }
+            }
+            testingRunResult.setErrorsList(errors);
+            testingRunResult.setTestResults(testResults);
             testingRunResult.setHexId(testingRunResult.getId().toHexString());
             testingRunResults.add(testingRunResult);
         }

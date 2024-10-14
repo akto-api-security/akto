@@ -1,5 +1,6 @@
 package com.akto.data_actor;
 
+import com.akto.dto.filter.MergedUrls;
 import com.akto.testing.ApiExecutor;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
@@ -1207,6 +1208,32 @@ public class ClientActor extends DataActor {
 
     }
 
+    public void updateRepoLastRun( CodeAnalysisRepo codeAnalysisRepo) {
+        Map<String, List<String>> headers = buildHeaders();
+
+        Map<String, Object> m = new HashMap<>();
+        m.put("projectName", codeAnalysisRepo.getProjectName());
+        m.put("repoName", codeAnalysisRepo.getRepoName());
+        m.put("codeAnalysisRepo",codeAnalysisRepo);
+
+        String json = gson.toJson(m);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateRepoLastRun", "", "POST", json , headers, "");
+
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+
+
+    }
+
     public List<CodeAnalysisRepo> findReposToRun()  {
         List<CodeAnalysisRepo> codeAnalysisRepos = new ArrayList<>();
 
@@ -1280,5 +1307,39 @@ public class ClientActor extends DataActor {
             return null;
         }
         return templates;
+    }
+
+    public Set<MergedUrls> fetchMergedUrls() {
+        Map<String, List<String>> headers = buildHeaders();
+
+        List<MergedUrls> respList = new ArrayList<>();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchMergedUrls", "", "POST", "", headers, "");
+
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchMergedUrls", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList newUrls = (BasicDBList) payloadObj.get("mergedUrls");
+                for (Object url: newUrls) {
+                    BasicDBObject urlObj = (BasicDBObject) url;
+                    MergedUrls mergedUrl = objectMapper.readValue(urlObj.toJson(), MergedUrls.class);
+                    respList.add(mergedUrl);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchMergedUrls" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetching merged urls: " + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+
+        return new HashSet<>(respList);
     }
 }

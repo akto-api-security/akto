@@ -1,7 +1,7 @@
 import { Navigation } from "@shopify/polaris"
 import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor} from "@shopify/polaris-icons"
 import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor, ChatMajor} from "@shopify/polaris-icons"
-import { VariantMajor, VocabularyMajor } from "@shopify/polaris-icons"
+import { VariantMajor, VocabularyMajor, AdjustMinor } from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
 import func from "@/util/func"
 
@@ -89,6 +89,12 @@ const SettingsLeftNav = () => {
                         selected: page === "default-payloads",
                         onClick: () => navigate("/dashboard/settings/default-payloads")
                     },
+                    {
+                        label: 'Advanced traffic filters',
+                        icon: AdjustMinor,
+                        selected: page === "advanced-filters",
+                        onClick: () => navigate("/dashboard/settings/advanced-filters")
+                    }, 
                     {
                         label: 'Tags',
                         icon: CollectionsFilledMajor,

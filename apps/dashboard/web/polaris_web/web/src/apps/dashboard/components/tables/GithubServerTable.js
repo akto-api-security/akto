@@ -79,7 +79,7 @@ function GithubServerTable(props) {
   const [sortableColumns, setSortableColumns] = useState([])
   const [activeColumnSort, setActiveColumnSort] = useState({columnIndex: -1, sortDirection: 'descending'})
 
-  let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.value] = 'OR'; return map }, {})
+  let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.filterKey || e.value] = 'OR'; return map }, {})
 
   useEffect(()=> {
     let queryFilters 
@@ -262,12 +262,12 @@ function GithubServerTable(props) {
   
 
   const {selectedResources, allResourcesSelected, handleSelectionChange } =
-    useIndexResourceState(fullDataIds, {
+    useIndexResourceState(fullDataIds!== undefined ? fullDataIds : data , {
       resourceIDResolver,
     });
 
   const customSelectionChange = (selectionType,toggleType, selection) => {
-    if(props?.treeView){
+    if(props?.treeView || props?.isMultipleItemsSelected === true){
       let tempItems = selection;
         if(typeof selectItems !== 'object'){
           tempItems = [selection]
@@ -349,6 +349,9 @@ function GithubServerTable(props) {
   let tableHeightClass = props.increasedHeight ? "control-row" : (props.condensedHeight ? "condensed-row" : '') 
   let tableClass = props.useNewRow ? "new-table" : (props.selectable ? "removeHeaderColor" : "hideTableHead")
   const bulkActionResources = selectedItems.length > 0 ? selectedItems : selectedResources
+  if (typeof props.setSelectedResourcesForPrimaryAction === 'function') {
+    props.setSelectedResourcesForPrimaryAction(bulkActionResources)
+  }
   return (
     <div className={tableClass} style={{display: "flex", flexDirection: "column", gap: "20px"}}>
       <LegacyCard>
@@ -404,6 +407,7 @@ function GithubServerTable(props) {
                 sortColumnIndex={activeColumnSort.columnIndex}
                 sortDirection={activeColumnSort.sortDirection}
                 onSort={handleSort}
+                lastColumnSticky={props?.lastColumnSticky || false}
               >
                 {rowMarkup}
               </IndexTable>
@@ -432,17 +436,16 @@ function GithubServerTable(props) {
         }
 
       </LegacyCard>
-      <HorizontalStack gap="1" align="center">
+      {(props?.showFooter !== false) && <HorizontalStack gap="1" align="center">
         <Text>Stuck? feel free to</Text>
         <Link onClick={() => {
           window?.Intercom("show")
         }}>Contact us</Link>
         <Text>or</Text>
         <Link url="https://akto.io/api-security-demo" target="_blank">Book a call</Link>
-      </HorizontalStack>
+      </HorizontalStack>}
     </div>
   );
-
 }
 
 export default GithubServerTable

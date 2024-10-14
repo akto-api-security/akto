@@ -4,7 +4,7 @@ import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
-import {useLocation, useParams } from "react-router-dom"
+import {useLocation, useNavigate, useParams } from "react-router-dom"
 import { saveAs } from 'file-saver'
 
 import "./api_inventory.css"
@@ -124,6 +124,13 @@ headers.push({
     showFilter: true,
 })
 
+headers.push({
+    text: 'Response codes',
+    value: 'responseCodes',
+    filterKey: 'responseCodes',
+    showFilter: true,
+})
+
 
 const sortOptions = [
     { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore', columnIndex: 2},
@@ -141,6 +148,7 @@ function ApiEndpoints(props) {
     const params = useParams()
     const location = useLocation()
     const apiCollectionId = params.apiCollectionId
+    const navigate = useNavigate()
 
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
@@ -158,6 +166,7 @@ function ApiEndpoints(props) {
     const [endpointData, setEndpointData] = useState({"all":[]})
     const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
+    const [selectedResourcesForPrimaryAction, setSelectedResourcesForPrimaryAction] = useState([])
     const [loading, setLoading] = useState(true)
     const [apiDetail, setApiDetail] = useState({})
     const [exportOpen, setExportOpen] = useState(false)
@@ -178,11 +187,8 @@ function ApiEndpoints(props) {
     const selectedMethod = queryParams.get('selected_method')
 
     // the values used here are defined at the server.
-    const definedTableTabs = apiCollectionId == 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId == 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow'] )
+    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow'] )
 
-    const isApiGroup = allCollections.filter(x => {
-        return x.id == apiCollectionId && x.type == "API_GROUP"
-    }).length > 0
 
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
@@ -306,16 +312,22 @@ function ApiEndpoints(props) {
             })
 
             shadowApis = Object.entries(shadowApis).map(([ codeAnalysisApiKey, codeAnalysisApi ]) => {
-                const { method, endpoint, location } = codeAnalysisApi
+                const {id, lastSeenTs, discoveredTs, location,  } = codeAnalysisApi
+                const { method, endpoint} = id
 
                 return {
                     id: codeAnalysisApiKey,
                     endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={false} />,
                     method: method,
                     endpoint: endpoint,
+                    apiCollectionId: apiCollectionId,
                     codeAnalysisEndpoint: true,
                     sourceLocation: location.filePath, 
                     sourceLocationComp: <SourceLocation location={location} />,
+                    parameterisedEndpoint: method + " " + endpoint,
+                    apiCollectionName: collectionsMap[apiCollectionId],
+                    last_seen: func.prettifyEpoch(lastSeenTs),
+                    added: func.prettifyEpoch(discoveredTs)
                 }
             })
         }
@@ -379,9 +391,6 @@ function ApiEndpoints(props) {
     }
 
     function handleRowClick(data) {
-        // Don't show api details for Code analysis endpoints
-        if (data.codeAnalysisEndpoint) 
-            return
         
         let tmp = { ...data, endpointComp: "", sensitiveTagsComp: "" }
         
@@ -399,7 +408,7 @@ function ApiEndpoints(props) {
         })
     }
 
-
+    
 
     function handleRefresh() {
         fetchData()
@@ -429,6 +438,25 @@ function ApiEndpoints(props) {
         })
     }
 
+    function deleteApisAction() {
+        setShowDeleteApiModal(false)
+        var apiObjects = apis.map((x) => {
+            let tmp = x.split("###");
+            return {
+                method: tmp[0],
+                url: tmp[1],
+                apiCollectionId: parseInt(tmp[2])
+            }
+        }) 
+    
+    
+        api.deleteApis(apiObjects).then(resp => {
+            func.setToast(true, false, "APIs deleted successfully. Refresh to see the changes.")
+        }).catch (err => {
+            func.setToast(true, true, "There was some error deleting the APIs. Please contact support@akto.io for assistance")
+        })
+    }
+
     async function exportOpenApi() {
         let lastFetchedUrl = null;
         let lastFetchedMethod = null;
@@ -447,6 +475,38 @@ function ApiEndpoints(props) {
             if (!lastFetchedUrl || !lastFetchedMethod) break;
         }
         func.setToast(true, false, <div data-testid="openapi_spec_download_message">OpenAPI spec downloaded successfully</div>)
+    }
+
+    async function exportOpenApiForSelectedApi() {
+        const apiInfoKeyList = selectedResourcesForPrimaryAction.map(str => {
+            const parts = str.split('###')
+
+            const method = parts[0]
+            const url = parts[1]
+            const apiCollectionId = parseInt(parts[2], 10)
+
+            return {
+                apiCollectionId: apiCollectionId,
+                method: method,
+                url: url
+            }
+        })
+        let result = await api.downloadOpenApiFileForSelectedApis(apiInfoKeyList, apiCollectionId)
+        let openApiString = result["openAPIString"]
+        let blob = new Blob([openApiString], {
+            type: "application/json",
+        });
+        const fileName = "open_api_" + collectionsMap[apiCollectionId] + ".json";
+        saveAs(blob, fileName);
+
+        func.setToast(true, false, <div data-testid="openapi_spec_download_message">OpenAPI spec downloaded successfully</div>)
+    }
+
+    function deleteApis(selectedResources){
+
+            setActionOperation(Operation.REMOVE)
+            setApis(selectedResources)
+            setShowDeleteApiModal(true);
     }
 
     function exportCsv(selectedResources = []) {
@@ -470,7 +530,27 @@ function ApiEndpoints(props) {
     }
 
     async function exportPostman() {
-        const result = await api.exportToPostman(apiCollectionId)
+        let result;
+        if(selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) {
+            const apiInfoKeyList = selectedResourcesForPrimaryAction.map(str => {
+                const parts = str.split('###')
+
+                const method = parts[0]
+                const url = parts[1]
+                const apiCollectionId = parseInt(parts[2], 10)
+
+                return {
+                    apiCollectionId: apiCollectionId,
+                    method: method,
+                    url: url
+                }
+            })
+
+            result = await api.exportToPostmanForSelectedApis(apiInfoKeyList, apiCollectionId)
+        } else {
+            result = await api.exportToPostman(apiCollectionId)
+        }
+
         if (result)
         func.setToast(true, false, "We have initiated export to Postman, checkout API section on your Postman app in sometime.")
     }
@@ -551,6 +631,9 @@ function ApiEndpoints(props) {
         const activePrompts = dashboardFunc.getPrompts(requestObj)
         setPrompts(activePrompts)
     }
+    const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
+    const isApiGroup = collectionsObj?.type === 'API_GROUP'
+
     const secondaryActionsComponent = (
         <HorizontalStack gap="2">
 
@@ -572,17 +655,13 @@ function ApiEndpoints(props) {
                                 <Text fontWeight="regular" variant="bodyMd">Refresh</Text>
                             </div>
                             {
-                                allCollections.filter(x => {
-                                    return x.id == apiCollectionId && x.type == "API_GROUP"
-                                }).length > 0 ?
+                                isApiGroup ?
                                     <div onClick={computeApiGroup} style={{ cursor: 'pointer' }}>
                                         <Text fontWeight="regular" variant="bodyMd">Re-compute api group</Text>
                                     </div> :
                                     null
                             }
-                            { allCollections.filter(x => {
-                                    return x.id == apiCollectionId && x.type == "API_GROUP"
-                                }).length == 0 ?
+                            { !isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) ?
                                 <UploadFile
                                 fileFormat=".har"
                                 fileChanged={file => handleFileChange(file)}
@@ -597,7 +676,7 @@ function ApiEndpoints(props) {
                         <VerticalStack gap={2}>
                             <Text>Export as</Text>
                                 <VerticalStack gap={1}>
-                                <div data-testid="openapi_spec_option" onClick={exportOpenApi} style={{cursor: 'pointer'}}>
+                                <div data-testid="openapi_spec_option" onClick={(selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi : exportOpenApi} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">OpenAPI spec</Text>
                                 </div>
                                 <div data-testid="postman_option" onClick={exportPostman} style={{cursor: 'pointer'}}>
@@ -633,6 +712,8 @@ function ApiEndpoints(props) {
                 </Popover.Pane>
             </Popover>
 
+            {isApiGroup &&collectionsObj?.automated !== true ? <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> : null}
+
             {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null}
                     
             <RunTest
@@ -642,6 +723,7 @@ function ApiEndpoints(props) {
                 runTestFromOutside={runTests}
                 closeRunTest={() => setRunTests(false)}
                 disabled={showEmptyScreen}
+                selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
             />
         </HorizontalStack>
     )
@@ -653,7 +735,8 @@ function ApiEndpoints(props) {
             setTableLoading(false)
         },200)
     }
-
+    
+    const [showDeleteApiModal, setShowDeleteApiModal] = useState(false)
     const [showApiGroupModal, setShowApiGroupModal] = useState(false)
     const [apis, setApis] = useState([])
     const [actionOperation, setActionOperation] = useState(Operation.ADD)
@@ -670,10 +753,6 @@ function ApiEndpoints(props) {
     }
 
     const promotedBulkActions = (selectedResources) => {
-
-        let isApiGroup = allCollections.filter(x => {
-            return x.id == apiCollectionId && x.type == "API_GROUP"
-        }).length > 0
 
         let ret = [
             {
@@ -694,6 +773,14 @@ function ApiEndpoints(props) {
                 onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
             })
         }
+
+        if (window.USER_NAME && window.USER_NAME.endsWith("@akto.io")) {
+            ret.push({
+                content: 'Delete APIs',
+                onAction: () => deleteApis(selectedResources)
+            })
+        }
+
         return ret;
     }
 
@@ -706,10 +793,27 @@ function ApiEndpoints(props) {
                 content: 'Enable',
                 onAction: redactCollection
             }}
-            key="redact-modal"
+            key="redact-modal-1"
         >
             <Modal.Section>
                 <Text>When enabled, existing sample payload values for this collection will be deleted, and data in all the future payloads for this collection will be redacted. Please note that your API Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.</Text>
+            </Modal.Section>
+        </Modal>
+    )
+
+    let deleteApiModal = (
+        <Modal
+            open={showDeleteApiModal}
+            onClose={() => setShowApiGroupModal(false)}
+            title="Confirm"
+            primaryAction={{
+                content: 'Yes',
+                onAction: deleteApisAction
+            }}
+            key="redact-modal-1"
+        >
+            <Modal.Section>
+                <Text>Are you sure you want to delete {(apis || []).length} API(s)?</Text>
             </Modal.Section>
         </Modal>
     )
@@ -746,6 +850,7 @@ function ApiEndpoints(props) {
         selectable={true}
         promotedBulkActions={promotedBulkActions}
         loading={tableLoading || loading}
+        setSelectedResourcesForPrimaryAction={setSelectedResourcesForPrimaryAction}
     />,
     <ApiDetails
         key="api-details"
@@ -753,7 +858,6 @@ function ApiEndpoints(props) {
         setShowDetails={setShowDetails}
         apiDetail={apiDetail}
         headers={transform.getDetailsHeaders()}
-        getStatus={() => { return "warning" }}
         isGptActive={isGptActive}
     />,
     ]
@@ -786,15 +890,6 @@ function ApiEndpoints(props) {
                           </Modal.Section>
                       </Modal>
                   </div>,
-                  <ApiDetails
-                      key="details"
-                      showDetails={showDetails && apiDetail && Object.keys(apiDetail).length > 0}
-                      setShowDetails={setShowDetails}
-                      apiDetail={apiDetail}
-                      headers={transform.getDetailsHeaders()}
-                      getStatus={() => { return "warning" }}
-                      isGptActive={isGptActive}
-                  />,
                   <ApiGroupModal
                       key="api-group-modal"
                       showApiGroupModal={showApiGroupModal}
@@ -804,7 +899,8 @@ function ApiEndpoints(props) {
                       currentApiGroupName={pageTitle}
                       fetchData={fetchData}
                   />,
-                  modal
+                  modal,
+                  deleteApiModal
             ]
         )
       ]

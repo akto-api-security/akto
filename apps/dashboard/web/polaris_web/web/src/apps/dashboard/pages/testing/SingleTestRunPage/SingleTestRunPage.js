@@ -133,6 +133,7 @@ function SingleTestRunPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const resultId = searchParams.get("result")
   const collectionsMap = PersistStore(state => state.collectionsMap)
+  // const { currentTestsObj } = usePolling()
 
   function fillData(data, key){
     setTestRunResults((prev) => {
@@ -217,14 +218,27 @@ function SingleTestRunPage() {
   async function fetchData(setData) {
     let localSelectedTestRun = {}
     await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest, testingRunType }) => {
-      if(testingRun==undefined){
+      if(testingRun===undefined){
         return {};
       }
 
-      if(testingRun.testIdConfig == 1){
+      if(testingRun.testIdConfig === 1){
         setWorkflowTest(workflowTest);
       }
       let cicd = testingRunType === "CI_CD";
+      const timeNow = func.timeNow()
+      const defaultIgnoreTime = LocalStore.getState().defaultIgnoreSummaryTime
+      testingRunResultSummaries.sort((a,b) => {
+        const isAWithinTimeAndRunning = (timeNow - defaultIgnoreTime <= a.startTimestamp) && a.state === 'RUNNING';
+        const isBWithinTimeAndRunning = (timeNow - defaultIgnoreTime <= b.startTimestamp) && b.state === 'RUNNING';
+
+        if (isAWithinTimeAndRunning && isBWithinTimeAndRunning) {
+            return b.startTimestamp - a.startTimestamp;
+        }
+        if (isAWithinTimeAndRunning) return -1;
+        if (isBWithinTimeAndRunning) return 1;
+        return b.startTimestamp - a.startTimestamp;
+      })
       localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0], cicd, false);
 
       if(setData){
@@ -248,8 +262,6 @@ function SingleTestRunPage() {
     }
     loadData();
   }, [subCategoryMap])
-
-  // console.log("rest in peace")
 
   useEffect(() => {
     if (resultId === null || resultId.length === 0) {
@@ -307,7 +319,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
       case "FAIL":
         return "Test execution has failed during run";
       default:
-        return "";
+        return "No summary for test exists";
     }
   }
 
@@ -433,7 +445,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
 
   const progress = useMemo(() => {
     return currentTestObj.testsInitiated === 0 ? 0 : Math.floor((currentTestObj.testsInsertedInDb * 100) / currentTestObj.testsInitiated);
-}, [currentTestObj]);
+}, [currentTestObj.testingRunId]);
 
 const runningTestsComp = useMemo(() => (
     currentTestObj.testingRunId !== -1 ? (
@@ -484,7 +496,7 @@ const runningTestsComp = useMemo(() => (
   }
 
   const allResultsLength = testRunResults.skipped.length + testRunResults.need_configurations.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length + progress
-  const useComponents = (!workflowTest && allResultsLength === 0 && (selectedTestRun.run_type && selectedTestRun.run_type!=='One-time')) ? [<EmptyData key="empty"/>] : components
+  const useComponents = (!workflowTest && allResultsLength === 0 && (selectedTestRun.run_type && selectedTestRun.run_type ==='One-time')) ? [<EmptyData key="empty"/>] : components
   const headingComp = (
     <Box paddingBlockStart={1}>
       <VerticalStack gap="2">

@@ -18,6 +18,7 @@ function prepareTableData (data, handleBadgeClick) {
     data.forEach((element,index) => {
         let paramText = element.param.replaceAll("#", ".").replaceAll(".$", "")
         let isSensitive = func.isSubTypeSensitive(element)
+        let nonSensitiveDataType = element?.nonSensitiveDataType
         let comp = [(<HorizontalStack gap={"2"} key={index}>
             <Text fontWeight="regular" variant="bodyMd">
                 {paramText}
@@ -28,7 +29,13 @@ function prepareTableData (data, handleBadgeClick) {
                         <Badge status="warning">
                             {element.subType.name}
                         </Badge>
-                    </Button> : null
+                    </Button> : (nonSensitiveDataType ?
+                        <Button plain monochrome onClick={() => { handleBadgeClick(element.subType.name, "") }}>
+                            <Badge status="info">
+                                {element.subType.name}
+                            </Badge>
+                        </Button> : null)
+
             }
             </HorizontalStack>), <Text variant="bodySm" fontWeight="regular" color="subdued">{func.prepareValuesTooltip(element)}</Text>
         ]

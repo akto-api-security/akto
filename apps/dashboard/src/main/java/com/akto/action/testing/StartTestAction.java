@@ -70,7 +70,7 @@ public class StartTestAction extends UserAction {
     private Map<ObjectId, TestingRunResultSummary> latestTestingRunResultSummaries;
     private Map<String, String> sampleDataVsCurlMap;
     private String overriddenTestAppUrl;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class, LogDb.DASHBOARD);
     private TestingRunType testingRunType;
     private String searchString;
     private boolean continuousTesting;
@@ -105,6 +105,7 @@ public class StartTestAction extends UserAction {
     }
 
     private CallSource source;
+    private boolean sendSlackAlert = false;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
@@ -158,7 +159,7 @@ public class StartTestAction extends UserAction {
 
         return new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
-                this.maxConcurrentRequests);
+                this.maxConcurrentRequests, this.sendSlackAlert);
     }
 
     private List<String> selectedTests;
@@ -206,12 +207,13 @@ public class StartTestAction extends UserAction {
             }
             this.testIdConfig = 0;
         } else {
-            TestingRunDao.instance.updateOne(
+            if(this.metadata == null || this.metadata.isEmpty()){
+                TestingRunDao.instance.updateOne(
                     Filters.eq(Constants.ID, localTestingRun.getId()),
                     Updates.combine(
                             Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
                             Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)));
-
+            }
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
                 int id = UUID.randomUUID().hashCode() & 0xfffffff ;
                 TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
@@ -517,6 +519,8 @@ public class StartTestAction extends UserAction {
             addActionError("Invalid test summary id");
             return ERROR.toUpperCase();
         }
+        if (testingRunResultSummaryHexId != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
+        if (queryMode != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
         List<Bson> testingRunResultFilters = new ArrayList<>();
 
         testingRunResultFilters.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
@@ -568,8 +572,12 @@ public class StartTestAction extends UserAction {
             this.errorEnums.put(TestError.NO_API_REQUEST, TestError.NO_API_REQUEST.getMessage());
         }
 
-        this.testingRunResults = TestingRunResultDao.instance
-                .fetchLatestTestingRunResult(Filters.and(testingRunResultFilters));
+        try {
+            this.testingRunResults = TestingRunResultDao.instance
+                    .fetchLatestTestingRunResult(Filters.and(testingRunResultFilters));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResult: " + e);
+        }
 
         return SUCCESS.toUpperCase();
     }
@@ -1249,4 +1257,7 @@ public class StartTestAction extends UserAction {
         this.continuousTesting = continuousTesting;
     }
 
+    public void setSendSlackAlert(boolean sendSlackAlert) {
+        this.sendSlackAlert = sendSlackAlert;
+    }
 }

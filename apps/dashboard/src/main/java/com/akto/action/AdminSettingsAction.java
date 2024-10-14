@@ -8,9 +8,11 @@ import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.runtime.Main;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
+import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.utils.libs.utils.src.main.java.com.akto.runtime.policies.ApiAccessTypePolicyUtil;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
@@ -23,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -44,10 +47,18 @@ public class AdminSettingsAction extends UserAction {
     private static final String CIDR_REGEX = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/(3[0-2]|[12]?[0-9])$";
     private static final Pattern CIDR_PATTERN = Pattern.compile(CIDR_REGEX);
 
+    Account currentAccount;
+
     @Override
     public String execute() throws Exception {
         accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         organization = OrganizationsDao.instance.findOne(Filters.empty());
+        if(Context.accountId.get() != null && Context.accountId.get() != 0){
+            currentAccount = AccountsDao.instance.findOne(
+                Filters.eq(Constants.ID, Context.accountId.get()),
+                Projections.include("name", "timezone")
+            );
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -349,6 +360,99 @@ public class AdminSettingsAction extends UserAction {
         
     }
 
+    private boolean updateFiltersFlag;
+    private String permissionValue;
+
+    Map<String,Boolean> advancedFilterPermission;
+
+    
+
+    public String getAdvancedFilterFlagsForAccount(){
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        advancedFilterPermission = new HashMap<>();
+        advancedFilterPermission.put(AccountSettings.ALLOW_FILTER_LOGS, accountSettings.getAllowFilterLogs());
+        advancedFilterPermission.put(AccountSettings.ALLOW_DELETION_OF_REDUNDANT_URLS, accountSettings.getAllowDeletionOfUrls());
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String updatePermissionsForAdvancedFilters(){
+        if(this.permissionValue.equals(AccountSettings.ALLOW_DELETION_OF_REDUNDANT_URLS) || this.permissionValue.equals(AccountSettings.ALLOW_FILTER_LOGS)){
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(this.permissionValue, this.updateFiltersFlag)
+            );
+            return SUCCESS.toUpperCase();
+        }else{
+            addActionError("invalid permission");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String accountPermission;
+    public String modifiedValueForAccount;
+
+    public String modifyAccountSettings () {
+        if(accountPermission.equals("name") || accountPermission.equals("timezone")){
+            if(Context.accountId.get() != null && Context.accountId.get() != 0){
+                AccountsDao.instance.updateOne(
+                    Filters.eq(Constants.ID, Context.accountId.get()),
+                    Updates.set(accountPermission, modifiedValueForAccount)
+                );
+                if(accountPermission.equals("name")){
+                    UsersDao.instance.updateManyNoUpsert(
+                        Filters.exists(User.ACCOUNTS + "." + Context.accountId.get()),
+                        Updates.set(User.ACCOUNTS + "." + Context.accountId.get() + ".name", modifiedValueForAccount)
+                    );
+                }
+                return SUCCESS.toUpperCase();
+            }else{
+                addActionError("Account id cannot be null");
+                return ERROR.toUpperCase();
+            }
+        }else{
+            addActionError("Permission not modifiable");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    private int deltaTimeForScheduledSummaries;
+
+    public String updateDeltaTimeForIgnoringSummaries () {
+        if(this.deltaTimeForScheduledSummaries < 1200){
+            addActionError("Value cannot be less than 20 minutes");
+            return ERROR.toUpperCase();
+        }
+        if(this.deltaTimeForScheduledSummaries > 14400){
+            addActionError("Value cannot be greater than 4 hours");
+            return ERROR.toUpperCase();
+        }
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES, this.deltaTimeForScheduledSummaries));
+        return SUCCESS.toUpperCase();
+    }
+
+    public void setAccountPermission(String accountPermission) {
+        this.accountPermission = accountPermission;
+    }
+
+    public void setModifiedValueForAccount(String modifiedValueForAccount) {
+        this.modifiedValueForAccount = modifiedValueForAccount;
+    }
+
+    public void setUpdateFiltersFlag(boolean updateFiltersFlag) {
+        this.updateFiltersFlag = updateFiltersFlag;
+    }
+
+    public void setPermissionValue(String permissionValue) {
+        this.permissionValue = permissionValue;
+    }
+
+    public Map<String, Boolean> getAdvancedFilterPermission() {
+        return advancedFilterPermission;
+    }
+
     public AccountSettings getAccountSettings() {
         return this.accountSettings;
     }
@@ -441,4 +545,16 @@ public class AdminSettingsAction extends UserAction {
     public void setAllowRedundantEndpointsList(List<String> allowRedundantEndpointsList) {
         this.allowRedundantEndpointsList = allowRedundantEndpointsList;
     }   
+
+    public Account getCurrentAccount() {
+        return currentAccount;
+    }
+
+    public void setCurrentAccount(Account currentAccount) {
+        this.currentAccount = currentAccount;
+    }
+
+    public void setDeltaTimeForScheduledSummaries(int deltaTimeForScheduledSummaries) {
+        this.deltaTimeForScheduledSummaries = deltaTimeForScheduledSummaries;
+    }
 }

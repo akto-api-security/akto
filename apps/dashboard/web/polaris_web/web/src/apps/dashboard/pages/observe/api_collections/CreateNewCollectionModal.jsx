@@ -2,7 +2,7 @@ import { Text, Modal, TextField, VerticalStack, HorizontalStack, Button, Card } 
 import api from "../api"
 import func from "@/util/func"
 import CollectionComponent from "../../../components/CollectionComponent";
-import React, { useState, useReducer, useCallback } from 'react'
+import React, { useState, useReducer, useCallback, useMemo } from 'react'
 import { produce } from "immer"
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
 
@@ -12,6 +12,10 @@ function CreateNewCollectionModal(props) {
 
     const [newCollectionName, setNewCollectionName] = useState('');
     const [showApiSelector, setShowApiSelector] = useState(false);
+
+    const isCreateButtonDisabled = useMemo(() => {
+        return newCollectionName.trim().length === 0;
+    }, [newCollectionName]);
 
     function prepareData(){
         let dt = []
@@ -110,6 +114,7 @@ function CreateNewCollectionModal(props) {
             id: "create-new-collection",
             content: 'Create',
             onAction: createNewCollection,
+            disabled: isCreateButtonDisabled
         }}
         secondaryActions={showApiSelector ? [{
             id: "verify-new-collection",
@@ -130,7 +135,6 @@ function CreateNewCollectionModal(props) {
                         <Text>{newCollectionName.length}/24</Text>
                     )}
                     autoFocus
-                    {...newCollectionName.length === 0 ? {error: "Collection name cannot be empty"} : {}}
                 />
                 <span>
                     <Button plain onClick={() => setShowApiSelector(!showApiSelector)}>

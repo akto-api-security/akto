@@ -11,6 +11,7 @@ import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 
 public class MultiExecTestResult extends GenericTestResult {
 
+    public static final String NODE_RESULT_MAP = "nodeResultMap";
     Map<String, NodeResult> nodeResultMap;
     private List<String> executionOrder;
 

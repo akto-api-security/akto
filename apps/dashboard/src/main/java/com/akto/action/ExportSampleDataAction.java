@@ -65,7 +65,7 @@ public class ExportSampleDataAction extends UserAction {
             if (samples.size() < 1) continue;
 
             String msg = samples.get(0);
-            Map<String, String> burpRequestFromSampleData = generateBurpRequestFromSampleData(msg);
+            Map<String, String> burpRequestFromSampleData = generateBurpRequestFromSampleData(msg, false);
             // use url from the sample data instead of relying on the id
             // this is to handle parameterised URLs
             String url = burpRequestFromSampleData.get("url");
@@ -95,13 +95,13 @@ public class ExportSampleDataAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        Map<String, String> result = generateBurpRequestFromSampleData(sampleData);
+        Map<String, String> result = generateBurpRequestFromSampleData(sampleData, true);
         burpRequest = result.get("request_path");
         return SUCCESS.toUpperCase();
     }
 
 
-    private Map<String, String> generateBurpRequestFromSampleData(String sampleData) {
+    private Map<String, String> generateBurpRequestFromSampleData(String sampleData, boolean shouldDeleteContentLengthHeader) {
         OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
         try {
             originalHttpRequest.buildFromSampleMessage(sampleData);
@@ -130,6 +130,10 @@ public class ExportSampleDataAction extends UserAction {
                 } catch (URISyntaxException e) {
                 }
             }
+        }
+
+        if(shouldDeleteContentLengthHeader){
+            originalHttpRequest.getHeaders().remove("content-length");
         }
 
         StringBuilder builderWithUrl = buildRequest(originalHttpRequest, url);
@@ -245,6 +249,7 @@ public class ExportSampleDataAction extends UserAction {
 
         Map<String, List<String>> headers = httpRequestParams.getHeaders();
         List<String> values = headers.get("x-forwarded-proto");
+        headers.remove("content-length");
         String protocol = values != null && values.size() != 0 ? values.get(0) : "https";
         // Method
         builder.append("-X ").append(httpRequestParams.getMethod()).append(" \\\n  ");
@@ -283,7 +288,8 @@ public class ExportSampleDataAction extends UserAction {
             boolean squareBracesCond = payload.startsWith("[") && payload.endsWith("]");
             if (curlyBracesCond || squareBracesCond) {
                 if (!Objects.equals(httpRequestParams.getMethod(), "GET")) {
-                    builder.append("-d '").append(payload).append("' \\\n  ");
+                    String escapedPayload = payload.replace("'", "'\\''");
+                    builder.append("-d '").append(escapedPayload).append("' \\\n  ");
                 } else {
                     JsonParser jp = factory.createParser(payload);
                     JsonNode node = mapper.readTree(jp);

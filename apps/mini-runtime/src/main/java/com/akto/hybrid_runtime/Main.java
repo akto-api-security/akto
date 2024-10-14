@@ -23,6 +23,7 @@ import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.util.DashboardMode;
+import com.akto.util.filter.DictionaryFilter;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -151,6 +152,7 @@ public class Main {
         if (topicName == null) topicName = "akto.api.logs";
 
         //DaoInit.init(new ConnectionString(mongoURI));
+        DictionaryFilter.readDictionaryBinary();
 
         loggerMaker.infoAndAddToDb("Runtime starting at " + Context.now() + "....", LogDb.RUNTIME);
 

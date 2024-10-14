@@ -248,6 +248,14 @@ public class ApiExecutor {
         return replaceHostFromConfig(url, testingRunConfig);
     }
 
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean useTestingRunConfig) throws Exception {
+        if(useTestingRunConfig) {
+            return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
+        }
+
+        return sendRequest(request, followRedirects, null, debug, testLogs, skipSSRFCheck);
+    }
+
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
 
@@ -451,6 +459,11 @@ public class ApiExecutor {
             if (payload == null) payload = "{}";
             payload = payload.trim();
             if (!payload.startsWith("[") && !payload.startsWith("{")) payload = "{}";
+        } else if (contentType.contains(HttpRequestResponseUtils.FORM_URL_ENCODED_CONTENT_TYPE)) {
+            if(payload.startsWith("{")) {
+                payload = HttpRequestResponseUtils.jsonToFormUrlEncoded(payload);
+                body = RequestBody.create(payload, MediaType.parse(contentType));
+            }
         } else if (contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
             try {
                 loggerMaker.infoAndAddToDb("encoding to grpc payload:" + payload, LogDb.TESTING);

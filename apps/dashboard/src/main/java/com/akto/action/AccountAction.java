@@ -12,6 +12,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.Main;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
+import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.utils.TestTemplateUtils;
 import com.akto.utils.billing.OrganizationUtils;
@@ -313,9 +314,14 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
                     BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
                 }
                 InitializerListener.setBackwardCompatibilities(backwardCompatibility);
+                loggerMaker.infoAndAddToDb("start create indices", LogDb.DASHBOARD);
                 DaoInit.createIndices();
+
+                loggerMaker.infoAndAddToDb("start run time filters", LogDb.DASHBOARD);
                 Main.insertRuntimeFilters();
+
                 RuntimeListener.initialiseDemoCollections();
+                loggerMaker.infoAndAddToDb("created juiceshop", LogDb.DASHBOARD);
                 service.submit(() ->{
                     Context.accountId.set(newAccountId);
                     loggerMaker.infoAndAddToDb("updating vulnerable api's collection for new account " + newAccountId, LogDb.DASHBOARD);
@@ -337,7 +343,7 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
                         return;
                     }
                     loggerMaker.infoAndAddToDb(String.format("Updating akto test templates for new account: %d", newAccountId), LogDb.DASHBOARD);
-                    InitializerListener.processTemplateFilesZip(testingTemplates, InitializerListener._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                    InitializerListener.processTemplateFilesZip(testingTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,String.format("Error while adding test editor templates for new account %d, Error: %s", newAccountId, e.getMessage()), LogDb.DASHBOARD);
                 }

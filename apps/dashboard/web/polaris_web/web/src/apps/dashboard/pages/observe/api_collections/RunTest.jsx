@@ -9,7 +9,7 @@ import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction }) {
 
     const initialState = {
         categories: [],
@@ -29,6 +29,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         authMechanismPresent: false,
         testRoleLabel: "No test role selected",
         testRoleId: "",
+        sendSlackAlert: false
     }
 
     const navigate = useNavigate()
@@ -59,6 +60,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const initialArr = ['akto','custom']
 
     const [optionsSelected, setOptionsSelected] = useState(initialArr)
+    const [slackIntegrated, setSlackIntegrated] = useState(false)
 
     function nameSuffixes(tests) {
         return Object.entries(tests)
@@ -82,6 +84,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     async function fetchData() {
         setLoading(true)
+
+        observeApi.fetchSlackWebhooks().then((resp) => {
+            const apiTokenList = resp.apiTokenList
+            setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
+        })
 
         const allSubCategoriesResponse = await testingApi.fetchAllSubCategories(true, "runTests")
         const testRolesResponse = await testingApi.fetchTestRoles()
@@ -381,7 +388,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting } = testRun
+        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert } = testRun
         const collectionId = parseInt(apiCollectionId)
 
         const tests = testRun.tests
@@ -393,16 +400,33 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             })
         })
 
-        const apiInfoKeyList = endpoints.map(endpoint => ({
-            apiCollectionId: endpoint.apiCollectionId,
-            method: endpoint.method,
-            url: endpoint.endpoint
-        }))
-
-        if (filtered) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting)
+        let apiInfoKeyList;
+        if(!selectedResourcesForPrimaryAction || selectedResourcesForPrimaryAction.length === 0) {
+            apiInfoKeyList = endpoints.map(endpoint => ({
+                apiCollectionId: endpoint.apiCollectionId,
+                method: endpoint.method,
+                url: endpoint.endpoint
+            }))
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting)
+            apiInfoKeyList = selectedResourcesForPrimaryAction.map(str => {
+                const parts = str.split('###')
+                
+                const method = parts[0]
+                const url = parts[1]
+                const apiCollectionId = parseInt(parts[2], 10)
+
+                return {
+                  apiCollectionId: apiCollectionId,
+                  method: method,
+                  url: url
+                }
+            })
+        }
+
+        if (filtered || selectedResourcesForPrimaryAction.length > 0) {
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert)
+        } else {
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert)
         }
 
         setActive(false)
@@ -452,6 +476,17 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const handleInputValue = (val) => {
         setSearchValue(val);
+    }
+
+    function generateLabelForSlackIntegration() {
+        return <HorizontalStack gap={1}>
+            <Link url='/dashboard/settings/integrations/slack' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
+                Enable
+            </Link>
+            <Text>
+                Slack integration to send alerts post completion
+            </Text>
+        </HorizontalStack>
     }
 
     return (
@@ -682,19 +717,30 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             </HorizontalGrid>
 
                             <Checkbox
-                                label="Use different target for testing"
-                                checked={testRun.hasOverriddenTestAppUrl}
-                                onChange={() => setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl }))}
+                                label={slackIntegrated ? "Send slack alert post test completion" : generateLabelForSlackIntegration()}
+                                checked={testRun.sendSlackAlert}
+                                onChange={() => setTestRun(prev => ({ ...prev, sendSlackAlert: !prev.sendSlackAlert}))}
+                                disabled={!slackIntegrated}
                             />
-                            {testRun.hasOverriddenTestAppUrl &&
-                                <div style={{ width: '400px'}}> 
-                                    <TextField
-                                        placeholder="Override test app host"
-                                        value={testRun.overriddenTestAppUrl}
-                                        onChange={(overriddenTestAppUrl) => setTestRun(prev => ({ ...prev, overriddenTestAppUrl: overriddenTestAppUrl }))}
-                                    />
-                                </div>
-                            }
+
+                            <HorizontalGrid columns={2}>
+                                <Checkbox
+                                    label="Use different target for testing"
+                                    checked={testRun.hasOverriddenTestAppUrl}
+                                    onChange={() => setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl }))}
+                                />
+                                {testRun.hasOverriddenTestAppUrl &&
+                                    <div style={{ width: '400px'}}> 
+                                        <TextField
+                                            placeholder="Override test app host"
+                                            value={testRun.overriddenTestAppUrl}
+                                            onChange={(overriddenTestAppUrl) => setTestRun(prev => ({ ...prev, overriddenTestAppUrl: overriddenTestAppUrl }))}
+                                        />
+                                    </div>
+                                }
+                            </HorizontalGrid>
+
+
                         </VerticalStack>
 
                     </Modal.Section>

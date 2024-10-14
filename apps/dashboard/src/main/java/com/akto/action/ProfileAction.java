@@ -29,6 +29,7 @@ import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 
 import io.micrometer.core.instrument.util.StringUtils;
@@ -93,7 +94,7 @@ public class ProfileAction extends UserAction {
         }
 
         BasicDBList listDashboards = new BasicDBList();
-
+        Account currAccount = AccountsDao.instance.findOne(Filters.eq(Constants.ID, sessionAccId),Projections.include("name", "timezone"));
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         boolean showOnboarding = accountSettings == null ? true : accountSettings.isShowOnboarding();
@@ -110,6 +111,13 @@ public class ProfileAction extends UserAction {
 
         EmailAccountName emailAccountName = new EmailAccountName(username); // username is the email id of the current user
         String accountName = emailAccountName.getAccountName();
+        if(currAccount != null && !currAccount.getName().isEmpty() && !currAccount.getName().equals("My account")){
+            accountName = currAccount.getName();
+        }
+        String timeZone = "US/Pacific";
+        if(currAccount != null && !currAccount.getTimezone().isEmpty()){
+            timeZone = currAccount.getTimezone();
+        }
         String dashboardVersion = accountSettings.getDashboardVersion();
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
@@ -124,8 +132,23 @@ public class ProfileAction extends UserAction {
         } catch (Exception e) {
         }
 
+        Organization organization = OrganizationsDao.instance.findOne(
+                Filters.in(Organization.ACCOUNTS, sessionAccId)
+        );
+
+        String userActualName = "";
+        if(userFromDB.getNameLastUpdate() > 0) {
+            userActualName = userFromDB.getName();
+        }
+
+        String orgName = "";
+        if(organization != null && organization.getNameLastUpdate() > 0) {
+            orgName = organization.getName();
+        }
+
         userDetails.append("accounts", accounts)
                 .append("username",username)
+                .append("userFullName", userActualName)
                 .append("avatar", "dummy")
                 .append("activeAccount", sessionAccId)
                 .append("dashboardMode", DashboardMode.getDashboardMode())
@@ -135,7 +158,9 @@ public class ProfileAction extends UserAction {
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name())
                 .append("jiraIntegrated", jiraIntegrated)
-                .append("userRole", userRole.toString().toUpperCase());
+                .append("userRole", userRole.toString().toUpperCase())
+                .append("currentTimeZone", timeZone)
+                .append("organizationName", orgName);
 
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));
@@ -143,9 +168,6 @@ public class ProfileAction extends UserAction {
 
         // only external API calls have non-null "utility"
         if (DashboardMode.isMetered() &&  utility == null) {
-            Organization organization = OrganizationsDao.instance.findOne(
-                    Filters.in(Organization.ACCOUNTS, sessionAccId)
-            );
             if(organization == null){
                 loggerMaker.infoAndAddToDb("Org not found for user: " + username + " acc: " + sessionAccId + ", creating it now!", LoggerMaker.LogDb.DASHBOARD);
                 InitializerListener.createOrg(sessionAccId);
@@ -178,7 +200,6 @@ public class ProfileAction extends UserAction {
             }
 
             userDetails.append("organizationId", organizationId);
-            userDetails.append("organizationName", organization.getName());
             userDetails.append("stiggIsOverage", isOverage);
             BasicDBObject stiggFeatureWiseAllowed = new BasicDBObject();
             for (String key : featureWiseAllowed.keySet()) {

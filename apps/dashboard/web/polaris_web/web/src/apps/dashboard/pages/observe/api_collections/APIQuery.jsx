@@ -1,18 +1,20 @@
 import CollectionComponent from "../../../components/CollectionComponent"
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
-import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon, Modal, TextField } from "@shopify/polaris";
+import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
-import React, { useState, useReducer, useCallback, useMemo } from 'react'
+import React, { useState, useReducer, useCallback, useMemo, useEffect } from 'react'
 import { produce } from "immer"
 import ApiEndpoints from "./ApiEndpoints";
 import api from "../api"
 import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
 import func from "@/util/func";
 import SaveAsCollectionModal from "./api_query_component/SaveAsCollectionModal";
+import { useSearchParams } from "react-router-dom";
+import PersistStore from "../../../../main/PersistStore";
+import collectionsApi from "./api"
 
 function APIQuery() {
-    const emptyCondition = { data: {}, operator: "AND", type: "CUSTOM" };
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => conditionsReducer(draft, action)), []);
     const [endpointListFromConditions, setEndpointListFromConditions] = useState({})
     const [sensitiveParams, setSensitiveParams] = useState({})
@@ -20,12 +22,17 @@ function APIQuery() {
     const handleToggle = useCallback(() => setOpen((open) => !open), []);
     const [apiCount, setApiCount] = useState(0)
     const [active, setActive] = useState(false);
-    const [newCollectionName, setNewCollectionName] = useState('');
+    const collectionsMap = PersistStore.getState().collectionsMap
+    const [isUpdate, setIsUpdate] = useState(false)
 
-    const handleNewCollectionNameChange =
-        useCallback(
-            (newValue) => setNewCollectionName(newValue),
-            []);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const collectionId = (searchParams && searchParams.get("collectionId") !== null) ? searchParams.get("collectionId") : -1
+
+    const getEmptyCondition = (type) => {
+        return { data: {}, operator: "AND", type: type };
+    }
+
+    const emptyCondition = getEmptyCondition('CUSTOM')
 
     function conditionsReducer(draft, action) {
         switch (action.type) {
@@ -46,6 +53,47 @@ function APIQuery() {
     const openModal = useCallback(() => {
         setActive(true);
     }, []);
+
+    const getApiCollection = () => {
+        collectionsApi.getCollection(collectionId).then((res) => {
+            (res[0].conditions || []).forEach((x, index) => {
+                const tempEmptyCondition = getEmptyCondition(x.type)
+                dispatchConditions({ type: "add", obj: tempEmptyCondition })
+                dispatchConditions({ type: "updateKey", index: index, key: "operator", obj: x.operator })
+                if(x.type === 'CUSTOM'){
+                    let data = {
+                        [x.apisList[0]['apiCollectionId']]: x.apisList.map((obj) => {
+                            let temp = obj 
+                            delete temp['apiCollectionId']
+                            return temp
+                        })
+                    }
+                    dispatchConditions({ obj: data ,key: "data", type: "overwrite", index: index })
+                }else{
+                    let temp = JSON.parse(JSON.stringify(x))
+                    delete temp['type']
+                    delete temp['operator']
+                    dispatchConditions({index: index, type: "overwrite", obj: temp, key: "data"})
+                }
+                
+            })
+        })
+    }
+
+    useEffect(() => {
+        if(collectionId.length > 0 && collectionsMap && Object.keys(collectionsMap).length > 0) {
+            if(collectionsMap.hasOwnProperty(collectionId)){
+                setIsUpdate(true)
+                getApiCollection();
+                exploreEndpoints() ;
+            }else{
+                func.setToast(true, true, "No such collection exists")
+                const newSearchParams = new URLSearchParams(searchParams);
+                newSearchParams.delete('collectionId');
+                setSearchParams(newSearchParams);
+            }
+        }
+    },[collectionId])
 
     const prepareData = useCallback(() => {
         let dt = [];
@@ -107,6 +155,7 @@ function APIQuery() {
         }
     }, [prepareData]);
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const modalComponent =
         <SaveAsCollectionModal
             key="save-as-collection-modal"
@@ -115,6 +164,7 @@ function APIQuery() {
             setActive={setActive}
         ></SaveAsCollectionModal>
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const collapsibleComponent =
         <VerticalStack gap={"0"} key="conditions-filters">
             <Box background={"bg-subdued"} width="100%" padding={"2"} onClick={handleToggle} key="collapsible-component-header">
@@ -185,6 +235,23 @@ function APIQuery() {
         />
     ], [modalComponent, collapsibleComponent, endpointListFromConditions, sensitiveParams]);
 
+    const handleClick = () => {
+        if(isUpdate){
+            let dt = prepareData()
+            api.updateCustomCollection(collectionId, dt).then((res) => {
+                try {
+                    func.setToast(true, false, "Conditions updated successfully")
+                } catch (error) {
+                    func.setToast(true,true, "Error in updating conditions")
+                }
+            })
+        }else{
+            openModal()
+        }
+    }
+
+    const primaryActionLabel = isUpdate ? 'Update conditions' : 'Save as Collection'
+
     return (
         <PageWithMultipleCards
             title={
@@ -193,7 +260,7 @@ function APIQuery() {
                     titleText={"Explore Mode"}
                 />
             }
-            primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={openModal}>Save as collection</Button>}
+            primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={handleClick}>{primaryActionLabel}</Button>}
             components={components}
             backUrl="/dashboard/observe/inventory"
         />

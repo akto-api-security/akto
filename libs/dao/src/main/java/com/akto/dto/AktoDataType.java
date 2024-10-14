@@ -3,6 +3,7 @@ package com.akto.dto;
 import java.util.List;
 
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.enums.GlobalEnums.Severity;
 
 public class AktoDataType {
     private String name;
@@ -16,6 +17,13 @@ public class AktoDataType {
     public static final String SAMPLE_DATA_FIXED = "sampleDataFixed";
     private boolean sampleDataFixed;
 
+    public static final String CATEGORIES_LIST = "categoriesList";
+    public static final String TAGS_LIST = "tagsLists";
+    private List<String> categoriesList;
+
+    public static final String DATA_TYPE_PRIORITY = "dataTypePriority";
+    private Severity dataTypePriority;
+
     public AktoDataType() {
     }
     public AktoDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition,int timestamp, IgnoreData ignoreData, boolean redacted, boolean sampleDataFixed) {
@@ -26,6 +34,18 @@ public class AktoDataType {
         this.redacted = redacted;
         this.sampleDataFixed = sampleDataFixed;
     }
+
+    public AktoDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition,int timestamp, IgnoreData ignoreData, boolean redacted, boolean sampleDataFixed, List<String> categoriesList, Severity severity) {
+        this.name = name;
+        this.sensitiveAlways = sensitiveAlways;
+        this.sensitivePosition = sensitivePosition;
+        this.ignoreData = ignoreData;
+        this.redacted = redacted;
+        this.sampleDataFixed = sampleDataFixed;
+        this.categoriesList = categoriesList;
+        this.dataTypePriority = severity;
+    }
+
     public String getName() {
         return name;
     }
@@ -73,5 +93,19 @@ public class AktoDataType {
 
     public void setSampleDataFixed(boolean sampleDataFixed) {
         this.sampleDataFixed = sampleDataFixed;
+    }
+
+    public Severity getDataTypePriority() {
+        return dataTypePriority;
+    }
+    public void setDataTypePriority(Severity dataTypePriority) {
+        this.dataTypePriority = dataTypePriority;
+    }
+
+    public List<String> getCategoriesList() {
+        return categoriesList;
+    }
+    public void setCategoriesList(List<String> categoriesList) {
+        this.categoriesList = categoriesList;
     }
 }

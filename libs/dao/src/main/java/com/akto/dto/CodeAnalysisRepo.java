@@ -15,6 +15,13 @@ public class CodeAnalysisRepo {
     private int scheduleTime;
     public static final String SCHEDULE_TIME = "scheduleTime";
 
+    public enum SourceCodeType {
+        BITBUCKET, GITHUB
+    }
+
+    private SourceCodeType sourceCodeType;
+    public static final String SOURCE_CODE_TYPE = "sourceCodeType";
+
     @BsonIgnore
     private String hexId;
 
@@ -77,4 +84,20 @@ public class CodeAnalysisRepo {
     public void setHexId(String hexId) {
         this.hexId = hexId;
     }
+    public SourceCodeType getSourceCodeType() {
+        if (sourceCodeType == null) {
+            return SourceCodeType.BITBUCKET;
+        }
+        return sourceCodeType;
+    }
+
+    public void setSourceCodeType(SourceCodeType sourceCodeType) {
+        this.sourceCodeType = sourceCodeType;
+    }
+
+    @Override
+    public String toString() {
+        return "Project: " + this.projectName + " Repository:" + this.getRepoName();
+    }
+
 }

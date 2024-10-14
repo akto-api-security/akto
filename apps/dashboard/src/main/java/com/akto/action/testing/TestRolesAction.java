@@ -77,7 +77,7 @@ public class TestRolesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public void addAuthMechanism(TestRoles role){
+    private AuthWithCond makeAuthWithConditionFromParamData(TestRoles role){
         if (authParamData != null) {            
             List<AuthParam> authParams = new ArrayList<>();
 
@@ -93,7 +93,18 @@ public class TestRolesAction extends UserAction {
 
             AuthMechanism authM = new AuthMechanism(authParams, this.reqData, authAutomationType, null);
             AuthWithCond authWithCond = new AuthWithCond(authM, apiCond, recordedLoginFlowInput);
-            TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.push(TestRoles.AUTH_WITH_COND_LIST, authWithCond));
+            return authWithCond;
+        }else{
+            return null;
+        }
+    }
+
+    public void addAuthMechanism(TestRoles role){
+        if (authParamData != null) {            
+            AuthWithCond authWithCond = makeAuthWithConditionFromParamData(role);
+            if(authWithCond != null){
+                TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.push(TestRoles.AUTH_WITH_COND_LIST, authWithCond));
+            }
         }
     }
 
@@ -227,6 +238,20 @@ public class TestRolesAction extends UserAction {
         Bson removeNull = Updates.pull(TestRoles.AUTH_WITH_COND_LIST, null);
         TestRolesDao.instance.updateOne(roleFilter, removeFromArr);
         TestRolesDao.instance.updateOne(roleFilter, removeNull);
+        this.selectedRole = getRole();
+        return SUCCESS.toUpperCase();
+    }
+
+    public String updateAuthInRole(){
+        TestRoles role = getRole();
+        if (role == null) {
+            return ERROR.toUpperCase();
+        }
+        Bson roleFilter = Filters.eq(TestRoles.NAME, roleName);
+        AuthWithCond authWithCond = makeAuthWithConditionFromParamData(role);
+        TestRolesDao.instance.updateOne(roleFilter,
+            Updates.set(TestRoles.AUTH_WITH_COND_LIST+"."+index, authWithCond)
+        );
         this.selectedRole = getRole();
         return SUCCESS.toUpperCase();
     }

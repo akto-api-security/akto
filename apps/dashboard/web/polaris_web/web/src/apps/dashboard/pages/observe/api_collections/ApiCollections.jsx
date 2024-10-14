@@ -175,12 +175,12 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         return{
             ...c,
             displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
-            testedEndpoints: coverageMap[c.id] ? coverageMap[c.id] : 0,
+            testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] ? coverageMap[c.id] : 0),
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
             severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
-            detectedTimestamp : trafficInfoMap[c.id] || 0,
-            riskScore: riskScoreMap[c.id] ? riskScoreMap[c.id] : 0,
+            detectedTimestamp: c.urlsCount === 0 ? 0 : (trafficInfoMap[c.id] || 0),
+            riskScore: c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] ? riskScoreMap[c.id] : 0),
             discovered: func.prettifyEpoch(c.startTs || 0),
         }
     })
@@ -192,11 +192,11 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 function ApiCollections() {
 
     const navigate = useNavigate();
-    const [data, setData] = useState({'groups':[]})
+    const [data, setData] = useState({'hostname':[]})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
-    const [selectedTab, setSelectedTab] = useState("groups")
-    const [selected, setSelected] = useState(2)
+    const [selectedTab, setSelectedTab] = useState("hostname")
+    const [selected, setSelected] = useState(1)
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
@@ -208,7 +208,7 @@ function ApiCollections() {
 
     // const dummyData = dummyJson;
 
-    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom']
+    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated']
 
     const { tabsInfo, selectItems } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, data)
@@ -269,10 +269,16 @@ function ApiCollections() {
         dataObj = convertToNewData(tmp, {}, {}, {}, {}, {}, true);
         let res = {}
         res.all = dataObj.prettify
-        res.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
-        res.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
-        res.custom = res.all.filter(x => !res.hostname.includes(x) && !res.groups.includes(x));
+        res.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined && !c.deactivated)
+        res.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated)
+        res.custom = res.all.filter(x => !res.hostname.includes(x) && !x.deactivated && !res.groups.includes(x));
         setData(res);
+        if (res.hostname.length === 0) {
+            setTimeout(() => {
+                setSelectedTab("custom");
+                setSelected(3);
+            },[100])
+        }
 
         let envTypeObj = {}
         tmp.forEach((c) => {
@@ -289,6 +295,7 @@ function ApiCollections() {
         let apiPromises = [
             api.getCoverageInfoForCollections(),
             api.getLastTrafficSeen(),
+            collectionApi.fetchCountForHostnameDeactivatedCollections()
         ];
         if(shouldCallHeavyApis){
             apiPromises = [
@@ -301,30 +308,31 @@ function ApiCollections() {
         let coverageInfo = results[0].status === 'fulfilled' ? results[0].value : {};
         // let coverageInfo = dummyData.coverageMap
         let trafficInfo = results[1].status === 'fulfilled' ? results[1].value : {};
+        let deactivatedCountInfo = results[2].status === 'fulfilled' ? results[2].value : {};
 
         let riskScoreObj = lastFetchedResp
         let sensitiveInfo = lastFetchedSensitiveResp
         let severityObj = lastFetchedSeverityResp
 
         if(shouldCallHeavyApis){
-            if(results[2]?.status === "fulfilled"){
-                const res = results[2].value
+            if(results[3]?.status === "fulfilled"){
+                const res = results[3].value
                 riskScoreObj = {
                     criticalUrls: res.criticalEndpointsCount,
                     riskScoreMap: res.riskScoreOfCollectionsMap
                 } 
             }
 
-            if(results[3]?.status === "fulfilled"){
-                const res = results[3].value
+            if(results[4]?.status === "fulfilled"){
+                const res = results[4].value
                 sensitiveInfo ={ 
                     sensitiveUrls: res.sensitiveUrlsInResponse,
                     sensitiveInfoMap: res.sensitiveSubtypesInCollection
                 }
             }
 
-            if(results[4]?.status === "fulfilled"){
-                const res = results[4].value
+            if(results[5]?.status === "fulfilled"){
+                const res = results[5].value
                 severityObj = res
             }
 
@@ -341,22 +349,31 @@ function ApiCollections() {
 
         dataObj = convertToNewData(tmp, sensitiveInfo.sensitiveInfoMap, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap, false);
         setNormalData(dataObj.normal)
+
+        // Separate active and deactivated collections
+        const deactivatedCollections = dataObj.prettify.filter(c => c.deactivated).map((c)=>{
+            if(deactivatedCountInfo.hasOwnProperty(c.id)){
+                c.urlsCount = deactivatedCountInfo[c.id]
+            }
+            return c
+        });
+        
+        // Calculate summary data only for active collections
         const summary = transform.getSummaryData(dataObj.normal)
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
         summary.totalSensitiveEndpoints = sensitiveInfo.sensitiveUrls
         setSummaryData(summary)
 
-        
         setCollectionsMap(func.mapCollectionIdToName(tmp))
         const allHostNameMap = func.mapCollectionIdToHostName(tmp)
         setHostNameMap(allHostNameMap)
-        
+
         tmp = {}
         tmp.all = dataObj.prettify
-        tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
-        tmp.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP")
-        tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !tmp.groups.includes(x));
-
+        tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined && !c.deactivated)
+        tmp.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated)
+        tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
+        tmp.deactivated = deactivatedCollections
         setData(tmp);
     }
 

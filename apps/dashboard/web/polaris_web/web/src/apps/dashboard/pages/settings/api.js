@@ -145,21 +145,21 @@ const settingRequests = {
         })
     },
 
-    addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections) {
+    addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize) {
         return request({
             url: '/api/addCustomWebhook',
             method: 'post',
             data: {
-                webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections
+                webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize
             }
         })
     },
-    updateCustomWebhook(id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections) {
+    updateCustomWebhook(id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize) {
         return request({
             url: '/api/updateCustomWebhook',
             method: 'post',
             data: {
-                id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections
+                id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize
             }
         })
     },
@@ -438,6 +438,15 @@ const settingRequests = {
                 userRole
             }
         });
+    },
+    updateAccountSettings(accountPermission,modifiedValueForAccount){
+        return request({
+            url: '/api/modifyAccountSettings',
+            method: "post",
+            data: {
+                accountPermission, modifiedValueForAccount
+            }
+        })
     }
 }
 

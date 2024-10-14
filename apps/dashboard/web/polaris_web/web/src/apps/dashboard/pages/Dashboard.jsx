@@ -13,6 +13,7 @@ import ConfirmationModal from "../components/shared/ConfirmationModal";
 import AlertsBanner from "./AlertsBanner";
 import dashboardFunc from "./transform";
 import homeRequests from "./home/api";
+import WelcomeBackDetailsModal from "../components/WelcomeBackDetailsModal";
 
 function Dashboard() {
 
@@ -164,10 +165,13 @@ function Dashboard() {
 
     },[])
 
+    // const shouldShowWelcomeBackModal = !func.checkLocal() && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
+
     return (
         <div className="dashboard">
         <Frame>
             <Outlet />
+            {/* {shouldShowWelcomeBackModal && <WelcomeBackDetailsModal isAdmin={window.USER_ROLE === 'ADMIN'} />} */}
             {toastMarkup}
             {ConfirmationModalMarkup}
             {displayItems.length > 0 ? <div className="alerts-banner">
@@ -185,7 +189,7 @@ function Dashboard() {
                         })}
                     </VerticalStack>
             </div> : null}
-            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings")) ?<div className="call-banner">
+            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner">
                 <Banner hideIcon={true}> 
                     <Text variant="headingMd">Need a 1:1 experience?</Text>
                     <Button plain monochrome onClick={() => {

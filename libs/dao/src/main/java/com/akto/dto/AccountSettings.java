@@ -101,6 +101,19 @@ public class AccountSettings {
     public static final String ALLOW_SENDING_EVENTS_TO_INTERCOM = "allowSendingEventsToIntercom";
     private boolean allowSendingEventsToIntercom;
 
+    public static final String ALLOW_FILTER_LOGS = "allowFilterLogs";
+    private boolean allowFilterLogs;
+
+    public static final String ALLOW_DELETION_OF_REDUNDANT_URLS = "allowDeletionOfUrls";
+    private boolean allowDeletionOfUrls;
+
+    private static final List<String> defaultCidrRangesList = Arrays.asList("10.0.0.0/8", "172.16.0.0/12",
+            "192.168.0.0/16", "127.0.0.0/8", "169.254.0.0/16", "224.0.0.0/4", "192.0.2.0/24", "198.51.100.0/24",
+            "203.0.113.0/24", "255.255.255.255/32", "100.64.0.0/10", "192.88.99.0/24", "240.0.0.0/4");
+
+    public static final String DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES = "timeForScheduledSummaries";
+    private int timeForScheduledSummaries;
+
     public AccountSettings() {
     }
 
@@ -177,6 +190,9 @@ public class AccountSettings {
     }
 
     public List<String> getPrivateCidrList() {
+        if(this.privateCidrList == null || this.privateCidrList.isEmpty()){
+            return defaultCidrRangesList;
+        }
         return privateCidrList;
     }
 
@@ -371,12 +387,12 @@ public class AccountSettings {
     public List<String> getAllowRedundantEndpointsList() {
         if(this.allowRedundantEndpointsList == null) {
             List<String> ignoreUrlTypesList = Arrays.asList(
-                "htm","html", "css", "js",   // Web formats
+                "htm","html", "css", "js", "js.map",   // Web formats
                 "jpg", "jpeg", "png", "gif", "svg", "webp",  // Image formats
                 "mp4", "webm", "ogg", "ogv", "avi", "mov",  // Video formats
                 "mp3", "wav", "oga",  // Audio formats
                 "woff", "woff2", "ttf", "otf", // Font formats
-                "pptx", "json" // file formats
+                "pptx", "json", "ico" // file formats
             );
             return ignoreUrlTypesList;
         }
@@ -393,5 +409,29 @@ public class AccountSettings {
 
     public void setAllowSendingEventsToIntercom(boolean allowSendingEventsToIntercom) {
         this.allowSendingEventsToIntercom = allowSendingEventsToIntercom;
+    }
+
+    public boolean getAllowFilterLogs() {
+        return allowFilterLogs;
+    }
+
+    public void setAllowFilterLogs(boolean allowFilterLogs) {
+        this.allowFilterLogs = allowFilterLogs;
+    }
+
+    public boolean getAllowDeletionOfUrls() {
+        return allowDeletionOfUrls;
+    }
+
+    public void setAllowDeletionOfUrls(boolean allowDeletionOfUrls) {
+        this.allowDeletionOfUrls = allowDeletionOfUrls;
+    }
+
+    public int getTimeForScheduledSummaries() {
+        return timeForScheduledSummaries;
+    }
+
+    public void setTimeForScheduledSummaries(int timeForScheduledSummaries) {
+        this.timeForScheduledSummaries = timeForScheduledSummaries;
     }
 }

@@ -4,7 +4,7 @@ import PersistStore from "../../../main/PersistStore";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
 import CopyEndpoint from "./api_collections/component/CopyEndpoint"
-import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor } from "@shopify/polaris-icons"
+import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor, ArrowUpMinor, ArrowDownMinor } from "@shopify/polaris-icons"
 import api from "./api";
 import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
 
@@ -112,6 +112,11 @@ const apiDetailsHeaders = [
         value: "parameterisedEndpoint",
         itemOrder: 1,
         component: (data) => CopyEndpoint(data)
+    },
+    {
+        text: 'Non-Sensitive Params',
+        value: 'nonSensitiveTags',
+        itemOrder: 4,
     }
 ]
 
@@ -346,13 +351,35 @@ const transform = {
         return { sensitiveSampleData: sensitiveSampleData };
     },
 
-    getColor(key){
+    getColor(key, isSensitiveBadge=false){
         switch(key.toUpperCase()){
-            case "HIGH" : return "critical";
-            case "MEDIUM": return "attention";
-            case "LOW": return "info";
+            case "CRITICAL": return "critical-strong-experimental"
+            case "HIGH" : {
+                if(isSensitiveBadge){
+                    return "warning"
+                }
+                return "critical"
+            }
+            case "MEDIUM": return "attention"
+            case "LOW": {
+                if(isSensitiveBadge){
+                    return "success"
+                }
+                return "info"
+            }
             default:
                 return "bg";
+        }
+    },
+
+    getColorForSensitiveData(key){
+        switch(key.toUpperCase()){
+            case "CRITICAL": return "#E45357"
+            case "HIGH" : return "#EF864C"
+            case "MEDIUM": return "#F6C564"
+            case "LOW": return "#6FD1A6"
+            default:
+                return "#6FD1A6";
         }
     },
 
@@ -457,7 +484,9 @@ const transform = {
             if (c.hasOwnProperty('type') && c.type === 'API_GROUP') {
                 return
             }
-
+            if (c.deactivated) {
+                return
+            }
             totalUrl += c.urlsCount ;
             totalTested += c.testedEndpoints;
         })
@@ -609,6 +638,44 @@ const transform = {
             sensitiveSubTypes: this.prettifySubtypes(c?.sensitiveInRespTypes || []),
             lastTraffic: func.prettifyEpoch(c.detectedTimestamp),
             discovered: func.prettifyEpoch(c.startTs),
+        }
+    },
+    generateByLineComponent: (val, time) => {
+        if (!val || isNaN(val)) return null
+        if (val === 0 ) {
+            return <Text>No change in {time}</Text>
+        }
+        const source = val > 0 ? ArrowUpMinor : ArrowDownMinor
+        return (
+            <HorizontalStack gap={1}>
+                <Box>
+                    <Icon source={source} color='subdued' />
+                </Box>
+                <Text color='subdued' fontWeight='medium'>{Math.abs(val)}</Text>
+                <Text color='subdued' fontWeight='semibold'>{time}</Text>
+            </HorizontalStack>
+        )
+    },
+    getCumulativeData: (data) => {
+        let cumulative = []
+        data.reduce((acc, val, i) => cumulative[i] = acc + val, 0)
+        return cumulative
+    },
+    setIssuesState: (data, setState, setDelta, useCumulative) => {
+        if(useCumulative) {
+            data = transform.getCumulativeData(data)
+        }
+
+        if (data == null || data.length === 0) {
+            setState([0, 0])
+            setDelta(0)
+        } else if (data.length === 1) {
+            setState([0, data[0]])
+            setDelta(data[0])
+        } else {
+            setState(data)
+            
+            setDelta(data[data.length-1] - data[0])
         }
     }
 }

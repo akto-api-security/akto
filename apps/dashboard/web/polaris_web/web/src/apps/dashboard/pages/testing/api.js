@@ -247,6 +247,13 @@ export default {
             data: {roleName, index}
         })
     },
+    updateAuthInRole(roleName, apiCond ,index, authParamData, authAutomationType) {
+        return request({
+            url: '/api/updateAuthInRole',
+            method: 'post',
+            data: {roleName, apiCond, index, authParamData, authAutomationType}
+        })
+    },
     deleteTestRuns(testRunIds){
         return request({
             url: '/api/deleteTestRuns',
@@ -425,6 +432,13 @@ export default {
             url: '/api/updateScript',
             method: 'post',
             data: {testScript:{id, javascript}}
+        })
+    },
+    updateDeltaTimeForSummaries(deltaTimeForScheduledSummaries){
+        return request({
+            url: '/api/updateIgnoreTimeForSummaries',
+            method: 'post',
+            data: {deltaTimeForScheduledSummaries}
         })
     }
 }

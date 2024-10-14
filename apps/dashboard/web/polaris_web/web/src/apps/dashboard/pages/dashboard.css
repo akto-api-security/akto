@@ -1,6 +1,36 @@
 .dashboard {
     overflow-x: hidden;
 }
+.custom-color .Polaris-Text--success {
+    color: rgb(0, 127, 95) !important;
+}
+
+.custom-badge-color .Polaris-Badge--statusCritical {
+    background-color: #E45357;
+    color: white;
+}
+
+.custom-badge-color .Polaris-Badge--statusAttention{
+    background-color: #EF864C;
+    color: white;
+}
+
+.custom-badge-color .Polaris-Badge--statusWarning{
+    background-color: #F6C564;
+}
+
+.custom-badge-color .Polaris-Badge--statusInfo {
+    background-color: #F5D8A1;
+}
+
+.custom-badge-color .Polaris-Badge--statusNew {
+    background-color: #A4E8F2;
+}
+
+.custom-badge-color .Polaris-Badge--statusSuccess {
+    background-color: #6FD1A6;
+    color: white;
+}
 
 .aktoButton {
     z-index: 518;
@@ -157,4 +187,13 @@
 
 .form-class .Polaris-Label{
     color: #202223 !important;
+}
+
+.welcome-back-modal-title {
+    width: 95%;
+    position: absolute;
+    z-index: 2;
+    background: white;
+    margin-top: -20px;
+    padding-block: 10px;
 }

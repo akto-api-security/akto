@@ -24,6 +24,7 @@ import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
@@ -40,6 +41,7 @@ import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.*;
@@ -70,6 +72,14 @@ public class Main {
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
 
+    private static Map<String, Integer> emptyCountIssuesMap = new HashMap<>();
+
+    static {
+        emptyCountIssuesMap.put(Severity.HIGH.toString(), 0);
+        emptyCountIssuesMap.put(Severity.MEDIUM.toString(), 0);
+        emptyCountIssuesMap.put(Severity.LOW.toString(), 0);
+    }
+
     private static TestingRunResultSummary createTRRSummaryIfAbsent(TestingRun testingRun, int start){
         ObjectId testingRunId = new ObjectId(testingRun.getHexId());
 
@@ -80,7 +90,9 @@ public class Main {
                 ),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
-                        Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start)
+                        Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start),
+                        Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, 0),
+                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, emptyCountIssuesMap)
                 ),
                 new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER)
         );
@@ -117,9 +129,11 @@ public class Main {
         return ret;
     }
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
+    private static final int DEFAULT_DELTA_IGNORE_TIME = 2*60*60;
 
-    private static TestingRun findPendingTestingRun() {
-        int delta = Context.now() - 20*60;
+    private static TestingRun findPendingTestingRun(int userDeltaTime) {
+        int deltaPeriod = userDeltaTime == 0 ? DEFAULT_DELTA_IGNORE_TIME : userDeltaTime;
+        int delta = Context.now() - deltaPeriod;
 
         Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
                 Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
@@ -139,11 +153,12 @@ public class Main {
                 Filters.or(filter1,filter2), update);
     }
 
-    private static TestingRunResultSummary findPendingTestingRunResultSummary() {
+    private static TestingRunResultSummary findPendingTestingRunResultSummary(int userDeltaTime) {
 
         // if you change this delta, update this delta in method getCurrentRunningTestsSummaries
         int now = Context.now();
-        int delta = now - 20*60;
+        int deltaPeriod = userDeltaTime == 0 ? DEFAULT_DELTA_IGNORE_TIME : userDeltaTime;
+        int delta = now - deltaPeriod;
 
         Bson filter1 = Filters.and(
             Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
@@ -240,17 +255,20 @@ public class Main {
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
 
+        SingleTypeInfo.init();
         while (true) {
             AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
                 int accountId = account.getId();
-
+                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                    Filters.eq(Constants.ID, accountId), Projections.include(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES)
+                );
                 int start = Context.now();
-                TestingRunResultSummary trrs = findPendingTestingRunResultSummary();
+                TestingRunResultSummary trrs = findPendingTestingRunResultSummary(accountSettings.getTimeForScheduledSummaries());
                 boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
                 TestingRun testingRun;
                 ObjectId summaryId = null;
                 if (trrs == null) {
-                    testingRun = findPendingTestingRun();
+                    testingRun = findPendingTestingRun(accountSettings.getTimeForScheduledSummaries());
                 } else {
                     summaryId = trrs.getId();
                     loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);
@@ -371,6 +389,8 @@ public class Main {
                                 trrs.setId(new ObjectId());
                                 trrs.setStartTimestamp(start);
                                 trrs.setState(State.RUNNING);
+                                trrs.setTestResultsCount(0);
+                                trrs.setCountIssues(emptyCountIssuesMap);
                                 TestingRunResultSummariesDao.instance.insertOne(trrs);
                                 summaryId = trrs.getId();
                             } else {
@@ -635,7 +655,9 @@ public class Main {
                 testingRun.getHexId(),
                 summaryId.toHexString()
         );
-        SlackSender.sendAlert(accountId, apiTestStatusAlert);
+        if (testingRun.getSendSlackAlert()) {
+            SlackSender.sendAlert(accountId, apiTestStatusAlert);
+        }
 
         AktoMixpanel aktoMixpanel = new AktoMixpanel();
         aktoMixpanel.sendEvent(distinct_id, "Test executed", props);

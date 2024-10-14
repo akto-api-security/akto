@@ -139,6 +139,13 @@ const methodObj = [{
     sortActive: true
 }]
 
+const responseCodesArr =[{
+    text: 'Response codes',
+    value: 'responseCodes',
+    filterKey: 'responseCodes',
+    showFilter: true,
+}]
+
 const endpointSortOptions = [
     { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Recent first', sortKey: 'lastSeenTs', columnIndex: 8 },
     { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest first', sortKey: 'lastSeenTs', columnIndex: 8 },
@@ -209,7 +216,7 @@ const apiChangesData = {
         }else{
             const obj = {
                 headings: endpointHeadings,
-                headers: endpointHeadings,
+                headers: [...endpointHeadings, ...responseCodesArr],
                 resourceName: endpointResourceName,
                 sortOptions: endpointSortOptions,
             }

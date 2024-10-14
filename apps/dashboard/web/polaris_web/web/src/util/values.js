@@ -68,7 +68,17 @@ const ranges = [
             ),
             until: todayDayEnd,
         }
+    },
+    {
+        title: 'All time',
+        alias: "allTime",
+        period:{
+            since: new Date(0),
+            until: todayDayEnd,
+        }
     }
 ];
 
-export default { today, yesterday, ranges, yesterdayDayEnd, todayDayEnd };
+const skipList = ["GENERIC", "TRUE", "FALSE","INTEGER_32", "INTEGER_64", "NULL", "OTHER", "DICT", "FLOAT"]
+
+export default { today, yesterday, ranges, yesterdayDayEnd, todayDayEnd , skipList};

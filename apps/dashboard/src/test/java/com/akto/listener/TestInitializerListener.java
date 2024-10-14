@@ -15,7 +15,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.URLMethods;
 import com.akto.types.CappedSet;
-
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;
@@ -120,7 +120,7 @@ public class TestInitializerListener extends MongoBasedTest {
         GithubSync githubSync = new GithubSync();
         byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
 
-        InitializerListener.processTemplateFilesZip(repoZip, InitializerListener._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+        InitializerListener.processTemplateFilesZip(repoZip, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
 
         count = YamlTemplateDao.instance.getMCollection().estimatedDocumentCount();
         assertTrue(count > 0);

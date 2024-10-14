@@ -23,7 +23,7 @@ function LearnPopoverComponent({learnMoreObj}) {
         <Popover
             active={popoverActive}
             activator={(
-                <Button onClick={() => setPopoverActive(true)} disclosure>
+                <Button onClick={() => setPopoverActive(!popoverActive)} disclosure>
                     Learn
                 </Button>
             )}

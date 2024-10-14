@@ -6,6 +6,7 @@ import com.akto.action.ApiCollectionsAction;
 import com.akto.action.CustomDataTypeAction;
 import com.akto.action.EventMetricsAction;
 import com.akto.action.observe.InventoryAction;
+import com.akto.action.settings.AdvancedTrafficFiltersAction;
 import com.akto.action.testing.StartTestAction;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
@@ -16,6 +17,7 @@ import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dao.notifications.EventsMetricsDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.pii.PIISourceDao;
+import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.*;
@@ -54,9 +56,11 @@ import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.upload.FileUpload;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
@@ -70,10 +74,12 @@ import com.akto.stigg.StiggReporterClient;
 import com.akto.task.Cluster;
 import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
-import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.testing.HostDNSLookup;
+import com.akto.testing.TemplateMapper;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
+import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.jobs.JobUtils;
 import com.akto.utils.jobs.MatchingJob;
 import com.akto.util.AccountTask;
@@ -85,6 +91,7 @@ import com.akto.util.DbMode;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.UsageUtils;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -95,6 +102,7 @@ import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
 import com.akto.utils.jobs.CleanInventory;
+import com.akto.utils.jobs.CleanTestingJob;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
@@ -133,6 +141,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -147,6 +156,8 @@ import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 import static com.akto.task.Cluster.callDibs;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
 import static com.mongodb.client.model.Filters.eq;
+import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
+import static com.akto.utils.Utils.deleteApis;
 
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
@@ -204,10 +215,22 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         try {
+                            Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivatedLatest();
+
+                            List<String> deactivatedHosts = new ArrayList<>();
+                            if (deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
+                                List<ApiCollection> metaForIds = ApiCollectionsDao.instance.getMetaForIds(new ArrayList<>(deactivatedCollections));
+                                for (ApiCollection apiCollection: metaForIds) {
+                                    String host = apiCollection.getHostName();
+                                    if (host != null) deactivatedHosts.add(host);
+                                }
+                            }
+
+
                             // look back period 6 days
                             loggerMaker.infoAndAddToDb("starting traffic alert scheduler", LoggerMaker.LogDb.DASHBOARD);
                             TrafficUpdates trafficUpdates = new TrafficUpdates(60*60*24*6);
-                            trafficUpdates.populate();
+                            trafficUpdates.populate(deactivatedHosts);
 
                             List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
                             if (listWebhooks == null || listWebhooks.isEmpty()) {
@@ -227,7 +250,7 @@ public class InitializerListener implements ServletContextListener {
                             loggerMaker.infoAndAddToDb("threshold seconds: " + thresholdSeconds, LoggerMaker.LogDb.DASHBOARD);
 
                             if (thresholdSeconds > 0) {
-                                trafficUpdates.sendAlerts(webhook.getWebhook(),webhook.getDashboardUrl()+"/dashboard/settings#Metrics", thresholdSeconds);
+                                trafficUpdates.sendAlerts(webhook.getWebhook(),webhook.getDashboardUrl()+"/dashboard/settings#Metrics", thresholdSeconds, deactivatedHosts);
                             }
                         } catch (Exception e) {
                             loggerMaker.errorAndAddToDb(e,"Error while running traffic alerts: " + e.getMessage(), LogDb.DASHBOARD);
@@ -306,11 +329,35 @@ public class InitializerListener implements ServletContextListener {
                         try {
                             executePIISourceFetch();
                         } catch (Exception e) {
+                            e.printStackTrace();
+                            loggerMaker.errorAndAddToDb("Error in fetching PII sources: " +  e.getMessage());
                         }
+                        /*
+                         * This job updates the test templates based on data types.
+                         * Since this may cause a significant load on db on first release,
+                         * commenting this.
+                         * TODO: uncomment this later.
+                         */
+                        // try {
+                        //     executeDataTypeToTemplate();
+                        // } catch (Exception e) {
+                        //     loggerMaker.errorAndAddToDb(e, "Error in executeDataTypeToTemplate " + e.toString());
+                        // }
                     }
                 }, "pii-scheduler");
             }
         }, 0, 4, TimeUnit.HOURS);
+    }
+
+    public static void executeDataTypeToTemplate() {
+        TemplateMapper mapper = new TemplateMapper();
+        int accountId = Context.accountId.get();
+        for (Entry<String, CustomDataType> dataType : SingleTypeInfo.getCustomDataTypeMap(accountId).entrySet()) {
+            mapper.createTestTemplateForCustomDataType(dataType.getValue());
+        }
+        for (Entry<String, AktoDataType> dataType : SingleTypeInfo.getAktoDataTypeMap(accountId).entrySet()) {
+            mapper.createTestTemplateForAktoDataType(dataType.getValue());
+        }
     }
 
     static TestCategory findTestCategory(String path, Map<String, TestCategory> shortNameToTestCategory) {
@@ -499,6 +546,7 @@ public class InitializerListener implements ServletContextListener {
 
     public static void executePIISourceFetch() {
         List<PIISource> piiSources = PIISourceDao.instance.findAll("active", true);
+        Map<String, CustomDataType> customDataTypesMap = new HashMap<>();
         for (PIISource piiSource : piiSources) {
             String id = piiSource.getId();
             Map<String, PIIType> currTypes = piiSource.getMapNameToPIIType();
@@ -515,10 +563,11 @@ public class InitializerListener implements ServletContextListener {
             BasicDBList dataTypes = (BasicDBList) (fileObj.get("types"));
             Bson findQ = Filters.eq("_id", id);
 
-            List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
-            Map<String, CustomDataType> customDataTypesMap = new HashMap<>();
-            for (CustomDataType customDataType : customDataTypes) {
-                customDataTypesMap.put(customDataType.getName(), customDataType);
+            if(customDataTypesMap.isEmpty()){
+                List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
+                for (CustomDataType customDataType : customDataTypes) {
+                    customDataTypesMap.put(customDataType.getName(), customDataType);
+                }
             }
 
             List<Bson> piiUpdates = new ArrayList<>();
@@ -537,10 +586,29 @@ public class InitializerListener implements ServletContextListener {
                 CustomDataType newCDT = getCustomDataTypeFromPiiType(piiSource, piiType, false);
 
                 if (currTypes.containsKey(piiKey) &&
-                        (currTypes.get(piiKey).equals(piiType) &&
-                                dt.getBoolean(PIISource.ACTIVE, true))) {
+                        (currTypes.get(piiKey).equals(piiType) && dt.getBoolean(PIISource.ACTIVE, true)) &&
+                        (existingCDT != null && existingCDT.getDataTypePriority() != null)
+                        && (existingCDT.getCategoriesList() != null && !existingCDT.getCategoriesList().isEmpty())
+                ) {
                     continue;
                 } else {
+                    Severity dtSeverity = null;
+                    List<String> categoriesList = null;
+                    categoriesList = (List<String>) dt.get(AktoDataType.TAGS_LIST);
+                    if(dt.getString(AktoDataType.DATA_TYPE_PRIORITY) != null){
+                        try {
+                            dtSeverity = Severity.valueOf(dt.getString(AktoDataType.DATA_TYPE_PRIORITY));
+                            newCDT.setDataTypePriority(dtSeverity);
+                           
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            loggerMaker.errorAndAddToDb("Invalid severity of dataType " + piiKey);
+                        }
+                        
+                    }
+                    if(categoriesList != null){
+                        newCDT.setCategoriesList(categoriesList);
+                    }
                     if (!dt.getBoolean(PIISource.ACTIVE, true)) {
                         if (currTypes.getOrDefault(piiKey, null) != null || piiSource.getLastSynced() == 0) {
                             piiUpdates.add(Updates.unset(PIISource.MAP_NAME_TO_PII_TYPE + "." + piiKey));
@@ -576,8 +644,9 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static List<Bson> getCustomDataTypeUpdates(CustomDataType existingCDT, CustomDataType newCDT){
-
         List<Bson> ret = new ArrayList<>();
+        Severity oldSeverity = existingCDT.getDataTypePriority();
+        Severity newSeverity = newCDT.getDataTypePriority();
 
         if(!Conditions.areEqual(existingCDT.getKeyConditions(), newCDT.getKeyConditions())){
             ret.add(Updates.set(CustomDataType.KEY_CONDITIONS, newCDT.getKeyConditions()));
@@ -587,6 +656,16 @@ public class InitializerListener implements ServletContextListener {
         }
         if(existingCDT.getOperator()!=newCDT.getOperator()){
             ret.add(Updates.set(CustomDataType.OPERATOR, newCDT.getOperator()));
+        }
+        if(newSeverity != null && (oldSeverity == null || (!oldSeverity.equals(newSeverity)))){
+            ret.add(
+                Updates.set(AktoDataType.DATA_TYPE_PRIORITY, newCDT.getDataTypePriority())
+            );
+        }
+        if((existingCDT.getCategoriesList() == null || existingCDT.getCategoriesList().isEmpty()) && newCDT.getCategoriesList() != null){
+            ret.add(
+                Updates.set(AktoDataType.CATEGORIES_LIST, newCDT.getCategoriesList())
+            );
         }
 
         if (!ret.isEmpty()) {
@@ -618,6 +697,49 @@ public class InitializerListener implements ServletContextListener {
         );
 
         return ret;
+    }
+    private void cleanInventoryJobRunner() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account account) {
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        boolean detectRedundantUrls = accountSettings.getAllowFilterLogs();
+                        String shouldFilterApisFromYaml = System.getenv("DETECT_REDUNDANT_APIS_RETRO");
+                        String shouldFilterOptionsAndHTMLApis = System.getenv("DETECT_OPTION_APIS_RETRO");
+
+                        String shouldDelete = System.getenv("DELETE_REDUNDANT_APIS");
+                        boolean shouldDeleteApis = accountSettings.getAllowDeletionOfUrls() || (shouldDelete != null && shouldDelete.equalsIgnoreCase("true"));
+
+                        if(!detectRedundantUrls && shouldFilterApisFromYaml == null && shouldFilterOptionsAndHTMLApis == null){
+                            return;
+                        }
+                        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(),
+                                Projections.include(Constants.ID, ApiCollection.NAME, ApiCollection.HOST_NAME));
+
+                        String filePath = "./samples_"+account.getId()+".txt";
+
+                        if((detectRedundantUrls || shouldFilterApisFromYaml != null && shouldFilterApisFromYaml.equalsIgnoreCase("true"))){
+                            List<YamlTemplate> yamlTemplates = AdvancedTrafficFiltersDao.instance.findAll(
+                                Filters.ne(YamlTemplate.INACTIVE, true)
+                            );
+                            List<String> redundantUrlList = accountSettings.getAllowRedundantEndpointsList();
+                            try {
+                                CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections , yamlTemplates, redundantUrlList,filePath, shouldDeleteApis, false);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+
+                        if(shouldFilterOptionsAndHTMLApis != null && shouldFilterOptionsAndHTMLApis.equalsIgnoreCase("true")){
+                            CleanInventory.removeUnnecessaryEndpoints(apiCollections, shouldDeleteApis);
+                        }
+                    }
+                }, "clean-inventory-job");
+            }
+        }, 0, 2 , TimeUnit.HOURS);
     }
 
     private void setUpDefaultPayloadRemover() {
@@ -696,34 +818,7 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 5, TimeUnit.MINUTES);
     }
 
-    private <T> void deleteApisPerDao(List<Key> toBeDeleted, AccountsContextDao<T> dao, String prefix) {
-        if (toBeDeleted == null || toBeDeleted.isEmpty()) return;
-        List<WriteModel<T>> stiList = new ArrayList<>();
-
-        for(Key key: toBeDeleted) {
-            stiList.add(new DeleteManyModel<>(Filters.and(
-                    Filters.eq(prefix + "apiCollectionId", key.getApiCollectionId()),
-                    Filters.eq(prefix + "method", key.getMethod()),
-                    Filters.eq(prefix + "url", key.getUrl())
-            )));
-        }
-
-        dao.bulkWrite(stiList, new BulkWriteOptions().ordered(false));
-    }
-
-    private void deleteApis(List<Key> toBeDeleted) {
-
-        String id = "_id.";
-
-        deleteApisPerDao(toBeDeleted, SingleTypeInfoDao.instance, "");
-        deleteApisPerDao(toBeDeleted, ApiInfoDao.instance, id);
-        deleteApisPerDao(toBeDeleted, SampleDataDao.instance, id);
-        deleteApisPerDao(toBeDeleted, TrafficInfoDao.instance, id);
-        deleteApisPerDao(toBeDeleted, SensitiveSampleDataDao.instance, id);
-        deleteApisPerDao(toBeDeleted, SensitiveParamInfoDao.instance, "");
-        deleteApisPerDao(toBeDeleted, FilterSampleDataDao.instance, id);
-
-    }
+    
 
     private void setUpDailyScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -812,26 +907,88 @@ public class InitializerListener implements ServletContextListener {
         }
 
         ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp(), webhook.getNewEndpointCollections(), webhook.getNewSensitiveEndpointCollections(), true);
-        if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
-            return;
+
+        boolean sendApiThreats = false;
+        List<SuspectSampleData> suspectSampleData = new ArrayList<>();
+        for (WebhookOptions option : webhook.getSelectedWebhookOptions()) {
+            if (WebhookOptions.API_THREAT_PAYLOADS.equals(option)) {
+                // Fetch one record to see if data exists
+                suspectSampleData = SuspectSampleDataDao.instance.findAll(
+                        Filters.and(
+                                Filters.gte(SuspectSampleData._DISCOVERED, webhook.getLastSentTimestamp()),
+                                Filters.lt(SuspectSampleData._DISCOVERED, now)),
+                        0, 1, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID),
+                        Projections.exclude(SuspectSampleData._SAMPLE));
+                if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
+                    sendApiThreats = true;
+                }
+                break;
+            }
         }
 
-        List<String> errors = new ArrayList<>();
+        if ((ci == null ||
+                (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() +
+                        ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0)
+                && (suspectSampleData == null || suspectSampleData.isEmpty())) {
+            return;
+        }
 
         Map<String, Object> valueMap = new HashMap<>();
 
         createBodyForWebhook(webhook);
 
-        valueMap.put("AKTO.changes_info.newSensitiveEndpoints", ci.newSensitiveParamsObject);
-        valueMap.put("AKTO.changes_info.newSensitiveEndpointsCount", ci.newSensitiveParams.size());
+        if (ci != null) {
+            valueMap.put("AKTO.changes_info.newSensitiveEndpoints", ci.newSensitiveParamsObject);
+            valueMap.put("AKTO.changes_info.newSensitiveEndpointsCount", ci.newSensitiveParams.size());
+            
+            valueMap.put("AKTO.changes_info.newEndpoints", ci.newEndpointsLast7DaysObject);
+            valueMap.put("AKTO.changes_info.newEndpointsCount", ci.newEndpointsLast7Days.size());
+            
+            valueMap.put("AKTO.changes_info.newSensitiveParametersCount", ci.recentSentiiveParams);
+            valueMap.put("AKTO.changes_info.newParametersCount", ci.newParamsInExistingEndpoints);
+        }
 
-        valueMap.put("AKTO.changes_info.newEndpoints", ci.newEndpointsLast7DaysObject);
-        valueMap.put("AKTO.changes_info.newEndpointsCount", ci.newEndpointsLast7Days.size());
+        if(sendApiThreats){
 
-        valueMap.put("AKTO.changes_info.newSensitiveParametersCount", ci.recentSentiiveParams);
-        valueMap.put("AKTO.changes_info.newParametersCount", ci.newParamsInExistingEndpoints);
+            final int DATA_LIMIT = webhook.getBatchSize() > 0 ? webhook.getBatchSize() : 50;
+            int skip = 0;
+            final int lastSentTimestamp = webhook.getLastSentTimestamp();
 
-        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+            do {
+                try {
+                    suspectSampleData = SuspectSampleDataDao.instance.findAll(
+                            Filters.and(
+                                    Filters.gte(SuspectSampleData._DISCOVERED, lastSentTimestamp),
+                                    Filters.lt(SuspectSampleData._DISCOVERED, now)),
+                            skip, DATA_LIMIT, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID));
+
+                    if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
+                        valueMap.put("AKTO.changes_info.apiThreatPayloads", suspectSampleData);
+                        actuallySendWebhook(webhook, valueMap, now);
+                    }
+                    skip += DATA_LIMIT;
+                    valueMap.clear();
+
+                    if ((suspectSampleData != null && suspectSampleData.size() < DATA_LIMIT) ||
+                    // In case of a dry run / run once, we only want to send data once.
+                            webhook.getFrequencyInSeconds() == 0) {
+                        break;
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error in sending webhook API data " + e.getMessage(),
+                            LogDb.DASHBOARD);
+                }
+
+            } while(suspectSampleData != null && !suspectSampleData.isEmpty());
+
+        } else {
+            actuallySendWebhook(webhook, valueMap, now);
+        }
+
+    }
+
+    private static void actuallySendWebhook(CustomWebhook webhook, Map<String, Object> valueMap, int now){
+        List<String> errors = new ArrayList<>();
         String payload = null;
 
         try {
@@ -856,7 +1013,7 @@ public class InitializerListener implements ServletContextListener {
 
         String message = null;
         try {
-            message = RedactSampleData.convertOriginalReqRespToString(request, response);
+            message = convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
             errors.add("Failed converting sample data");
         }
@@ -1144,6 +1301,7 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    
     public static void dropAuthMechanismData(BackwardCompatibility authMechanismData) {
         if (authMechanismData.getAuthMechanismData() == 0) {
             AuthMechanismsDao.instance.getMCollection().drop();
@@ -1413,18 +1571,21 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void addAktoDataTypes(BackwardCompatibility backwardCompatibility) {
-        if (backwardCompatibility.getAddAktoDataTypes() == 0) {
+        List<AktoDataType> dataTypes = AktoDataTypeDao.instance.findAll(
+            Filters.exists(AktoDataType.DATA_TYPE_PRIORITY,true)
+        );
+        if (backwardCompatibility.getAddAktoDataTypes() == 0 || dataTypes == null || dataTypes.isEmpty()) {
             List<AktoDataType> aktoDataTypes = new ArrayList<>();
             int now = Context.now();
             IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
-            aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("PHONE_NUMBER", true, Collections.emptyList(), now, ignoreData, false, true));
-            aktoDataTypes.add(new AktoDataType("UUID", false, Collections.emptyList(), now, ignoreData, false, true));
+            aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true, Arrays.asList("AUTHENTICATION","TOKEN"), Severity.HIGH));
+            aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.MEDIUM));
+            aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("FINANCIAL","PII"), Severity.MEDIUM));
+            aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.HIGH ));
+            aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.LOW));
+            aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true, Arrays.asList("DEVICE IDENTIFIER"), Severity.HIGH));
+            aktoDataTypes.add(new AktoDataType("PHONE_NUMBER", true, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("PII"), Severity.MEDIUM));
+            aktoDataTypes.add(new AktoDataType("UUID", false, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("IDENTIFIER"),Severity.MEDIUM));
             AktoDataTypeDao.instance.getMCollection().drop();
             AktoDataTypeDao.instance.insertMany(aktoDataTypes);
 
@@ -1892,6 +2053,7 @@ public class InitializerListener implements ServletContextListener {
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         setSubdomain();
+        DictionaryFilter.readDictionaryBinary();
 
         String https = System.getenv("AKTO_HTTPS_FLAG");
         if (Objects.equals(https, "true")) {
@@ -1931,6 +2093,11 @@ public class InitializerListener implements ServletContextListener {
                     }
                 } while (!connectedToMongo);
 
+                if (DashboardMode.isOnPremDeployment()) {
+                    Context.accountId.set(1_000_000);
+                    loggerMaker.infoAndAddToDb("Dashboard started at " + Context.now());
+                }
+
                 setDashboardMode();
                 updateGlobalAktoVersion();
 
@@ -1958,6 +2125,7 @@ public class InitializerListener implements ServletContextListener {
                     }, "context-initializer-secondary");
 
                     crons.trafficAlertsScheduler();
+                    crons.insertHistoricalData();
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
                         setupUsageSyncScheduler();
@@ -1968,6 +2136,7 @@ public class InitializerListener implements ServletContextListener {
                     // setUpAktoMixpanelEndpointsScheduler();
                     setUpDailyScheduler();
                     setUpWebhookScheduler();
+                    cleanInventoryJobRunner();
                     setUpDefaultPayloadRemover();
                     setUpTestEditorTemplatesScheduler();
                     setUpDependencyFlowScheduler();
@@ -1984,6 +2153,7 @@ public class InitializerListener implements ServletContextListener {
                      * TODO: Remove this once traffic pipeline is cleaned.
                      */
                     CleanInventory.cleanInventoryJobRunner();
+                    // CleanTestingJob.cleanTestingJobRunner();
 
                     MatchingJob.MatchingJobRunner();
 
@@ -2301,6 +2471,128 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void backFillDiscovered() {
+
+        long count = ApiInfoDao.instance.count(Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false));
+        if (count == 0) {
+            loggerMaker.infoAndAddToDb("No need to backFillDiscovered");
+            return;
+        }
+
+        loggerMaker.infoAndAddToDb("Running back fill discovered");
+
+        List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
+        ObjectId id = null;
+        Bson sort = Sorts.ascending("_id");
+        do {
+            Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
+            Bson idFilter = id == null ? Filters.empty() : Filters.gt("_id", id);
+            singleTypeInfos = SingleTypeInfoDao.instance.findAll(idFilter, 0, 100_000, sort, Projections.include(SingleTypeInfo._TIMESTAMP, SingleTypeInfo._URL, SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._METHOD));
+            for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+                id = singleTypeInfo.getId();
+                ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(singleTypeInfo.getApiCollectionId(), singleTypeInfo.getUrl(), Method.fromString(singleTypeInfo.getMethod()));
+                ApiInfo apiInfo = apiInfoMap.getOrDefault(apiInfoKey, new ApiInfo(apiInfoKey));
+                if (apiInfo.getDiscoveredTimestamp() == 0 || apiInfo.getDiscoveredTimestamp() > singleTypeInfo.getTimestamp()) {
+                    apiInfo.setDiscoveredTimestamp(singleTypeInfo.getTimestamp());
+                }
+                apiInfoMap.put(apiInfoKey, apiInfo);
+            }
+
+            List<WriteModel<ApiInfo>> updates = new ArrayList<>();
+            for (ApiInfo apiInfo: apiInfoMap.values()) {
+                updates.add(
+                        new UpdateOneModel<>(
+                                Filters.and(
+                                    ApiInfoDao.getFilter(apiInfo.getId()),
+                                    Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false)
+                                ),
+                                Updates.set(ApiInfo.DISCOVERED_TIMESTAMP, apiInfo.getDiscoveredTimestamp()),
+                                new UpdateOptions().upsert(false)
+                        )
+                );
+
+                updates.add(
+                        new UpdateOneModel<>(
+                                Filters.and(
+                                    ApiInfoDao.getFilter(apiInfo.getId()),
+                                    Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, true)
+                                ),
+                                Updates.min(ApiInfo.DISCOVERED_TIMESTAMP, apiInfo.getDiscoveredTimestamp()),
+                                new UpdateOptions().upsert(false)
+                        )
+                );
+            }
+            if (!updates.isEmpty()) ApiInfoDao.instance.getMCollection().bulkWrite(updates);
+
+        } while (!singleTypeInfos.isEmpty());
+
+        loggerMaker.infoAndAddToDb("Finished running back fill discovered");
+    }
+
+    private static void backFillStatusCodeType() {
+        long count = ApiInfoDao.instance.count(Filters.exists(ApiInfo.API_TYPE, false));
+        if (count == 0) {
+            loggerMaker.infoAndAddToDb("No need to run backFillStatusCodeType");
+            return;
+        }
+
+        loggerMaker.infoAndAddToDb("Running backFillStatusCodeType");
+
+        List<SampleData> sampleDataList = new ArrayList<>();
+        Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");
+        int skip = 0;
+        do {
+            sampleDataList = SampleDataDao.instance.findAll(Filters.empty(), skip, 100, sort);
+            skip += sampleDataList.size();
+            List<ApiInfo> apiInfoList = new ArrayList<>();
+            for (SampleData sampleData: sampleDataList) {
+                Key id = sampleData.getId();
+                List<String> samples = sampleData.getSamples();
+                if (samples == null || samples.isEmpty()) continue;
+                ApiInfo apiInfo = new ApiInfo(new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()));
+                apiInfo.setResponseCodes(new ArrayList<>());
+                for (String sample: samples) {
+                    try {
+                        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+
+                        int statusCode = httpResponseParams.getStatusCode();
+                        if (!apiInfo.getResponseCodes().contains(statusCode)) {
+                            apiInfo.getResponseCodes().add(statusCode);
+                        }
+
+                        ApiInfo.ApiType apiType = ApiInfo.findApiTypeFromResponseParams(httpResponseParams);
+                        apiInfo.setApiType(apiType);
+                    } catch (Exception e) {
+                        continue;
+                    }
+                }
+                apiInfoList.add(apiInfo);
+            }
+
+            List<WriteModel<ApiInfo>> updates = new ArrayList<>();
+            for (ApiInfo apiInfo: apiInfoList) {
+                List<Bson> subUpdates = new ArrayList<>();
+
+                // response codes
+                subUpdates.add(Updates.addEachToSet(ApiInfo.RESPONSE_CODES, apiInfo.getResponseCodes()));
+
+                // api type
+                subUpdates.add(Updates.set(ApiInfo.API_TYPE, apiInfo.getApiType()));
+                updates.add(
+                        new UpdateOneModel<>(
+                                ApiInfoDao.getFilter(apiInfo.getId()),
+                                Updates.combine(subUpdates),
+                                new UpdateOptions().upsert(false)
+                        )
+                );
+            }
+            if (!updates.isEmpty()) ApiInfoDao.instance.getMCollection().bulkWrite(updates);
+
+        } while (!sampleDataList.isEmpty());
+
+        loggerMaker.infoAndAddToDb("Finished running backFillStatusCodeType");
+    }
+
     private static void dropLastCronRunInfoField(BackwardCompatibility backwardCompatibility){
         if(backwardCompatibility.getDeleteLastCronRunInfo() == 0){
             AccountSettingsDao.instance.updateOne(Filters.empty(), Updates.unset(AccountSettings.LAST_UPDATED_CRON_INFO));
@@ -2337,6 +2629,25 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void addDefaultAdvancedFilters(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getAddDefaultFilters() == 0){
+            String contentAllow = "id: DEFAULT_ALLOW_FILTER\nfilter:\n    url:\n        regex: '.*'";
+            String contentBlock = "id: DEFAULT_BLOCK_FILTER\nfilter:\n    response_code:\n        gte: 400";
+
+            AdvancedTrafficFiltersAction action = new AdvancedTrafficFiltersAction();
+            action.setYamlContent(contentAllow);
+            action.saveYamlTemplateForTrafficFilters();
+
+            action.setYamlContent(contentBlock);
+            action.saveYamlTemplateForTrafficFilters();
+
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.ADD_DEFAULT_FILTERS, Context.now())
+            );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
@@ -2365,6 +2676,7 @@ public class InitializerListener implements ServletContextListener {
         disableAwsSecretPiiType(backwardCompatibility);
         makeFirstUserAdmin(backwardCompatibility);
         dropSpecialCharacterApiCollections(backwardCompatibility);
+        addDefaultAdvancedFilters(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {
@@ -2408,6 +2720,9 @@ public class InitializerListener implements ServletContextListener {
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
+
+            backFillDiscovered();
+            backFillStatusCodeType();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,"error while setting up dashboard: " + e.toString(), LogDb.DASHBOARD);
         }
@@ -2493,8 +2808,6 @@ public class InitializerListener implements ServletContextListener {
         return url != null ? url : "https://stairway.akto.io/deployment/status";
     }
 
-    public final static String _AKTO = "AKTO";
-
     public void setUpTestEditorTemplatesScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -2506,7 +2819,7 @@ public class InitializerListener implements ServletContextListener {
                 AccountTask.instance.executeTask((account) -> {
                     try {
                         loggerMaker.infoAndAddToDb("Updating Test Editor Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
-                        processTemplateFilesZip(testingTemplates, _AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                        processTemplateFilesZip(testingTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                     } catch (Exception e) {
                         cacheLoggerMaker.errorAndAddToDb(e,
                                 String.format("Error while updating Test Editor Files %s", e.toString()),
@@ -2600,7 +2913,7 @@ public class InitializerListener implements ServletContextListener {
                             } catch (Exception e) {
                             }
 
-                            if (_AKTO.equals(author)) {
+                            if (Constants._AKTO.equals(author)) {
                                 YamlTemplateDao.instance.updateOne(
                                         Filters.eq(Constants.ID, id),
                                         Updates.combine(updates));
@@ -2615,7 +2928,7 @@ public class InitializerListener implements ServletContextListener {
                                 try {
                                     YamlTemplateDao.instance.getMCollection().findOneAndUpdate(
                                         Filters.and(Filters.eq(Constants.ID, id),
-                                                Filters.ne(YamlTemplate.AUTHOR, _AKTO)),
+                                                Filters.ne(YamlTemplate.AUTHOR, Constants._AKTO)),
                                         Updates.combine(updates),
                                         new FindOneAndUpdateOptions().upsert(true));
                                 } catch (Exception e){
