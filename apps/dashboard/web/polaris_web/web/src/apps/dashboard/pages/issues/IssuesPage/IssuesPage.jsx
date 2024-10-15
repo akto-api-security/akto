@@ -359,7 +359,7 @@ function IssuesPage() {
                         creationTime: item?.creationTime,
                         issueStatus: item?.unread.toString(),
                         testRunName: "Test Run",
-                        domains: [(hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : observeFunc.getHostName(item?.id?.apiInfoKey?.url))],
+                        domains: [(hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])],
                         urls: [{
                             method: item?.id?.apiInfoKey?.method,
                             url: item?.id?.apiInfoKey?.url,
@@ -369,7 +369,7 @@ function IssuesPage() {
                     })
                 } else {
                     const existingIssue = uniqueIssuesMap.get(key)
-                    const domain = (hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : observeFunc.getHostName(item?.id?.apiInfoKey?.url))
+                    const domain = (hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])
                     if (!existingIssue.domains.includes(domain)) {
                         existingIssue.domains.push(domain)
                     }
