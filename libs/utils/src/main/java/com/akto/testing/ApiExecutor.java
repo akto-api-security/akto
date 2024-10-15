@@ -241,6 +241,10 @@ public class ApiExecutor {
         if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog"))) {
             loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
         }
+
+        if (url.contains("login_submit")) {
+            loggerMaker.infoAndAddToDb("Request Payload " + request.getBody(), LogDb.TESTING);
+        }
         request.setUrl(url);
 
         Request.Builder builder = new Request.Builder();
@@ -290,6 +294,9 @@ public class ApiExecutor {
         }
         //loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
 
+        if (url.contains("login_submit")) {
+            loggerMaker.infoAndAddToDb("Response Payload " + response.getBody(), LogDb.TESTING);
+        }
         return response;
     }
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
