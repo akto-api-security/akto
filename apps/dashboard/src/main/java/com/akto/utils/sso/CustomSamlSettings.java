@@ -17,6 +17,13 @@ public class CustomSamlSettings {
 
     private CustomSamlSettings() {}
 
+    public static CustomSamlSettings getInstance(ConfigType configType, int accountId) {
+        CustomSamlSettings instance = instances.get(configType);
+        SAMLConfig samlConfig = SsoUtils.findSAMLConfig(configType);
+        instance.samlConfig = samlConfig;
+        return instance;
+    }
+
     public static CustomSamlSettings getInstance(ConfigType configType) {
         CustomSamlSettings instance = instances.get(configType);
         boolean shouldProbeAgain = true;
@@ -41,14 +48,7 @@ public class CustomSamlSettings {
         return samlConfig;
     }
 
-    public static Saml2Settings getSamlSettings(ConfigType configType) {
-        CustomSamlSettings CustomSamlSettingsInstance = CustomSamlSettings.getInstance(configType);
-        if (CustomSamlSettingsInstance == null || CustomSamlSettingsInstance.getSamlConfig() == null) {
-            return null;
-        }
-
-        SAMLConfig samlConfig = CustomSamlSettingsInstance.getSamlConfig();
-
+    private static Saml2Settings buildSamlSettingsMap (SAMLConfig samlConfig){
         Map<String, Object> samlData = new HashMap<>();
         samlData.put("onelogin.saml2.sp.entityid", samlConfig.getApplicationIdentifier());
         samlData.put("onelogin.saml2.idp.single_sign_on_service.url", samlConfig.getLoginUrl());
@@ -59,6 +59,27 @@ public class CustomSamlSettings {
         SettingsBuilder builder = new SettingsBuilder();
         Saml2Settings settings = builder.fromValues(samlData).build();
         return settings;
+    }
+
+    public static Saml2Settings getSamlSettings(ConfigType configType) {
+        CustomSamlSettings CustomSamlSettingsInstance = CustomSamlSettings.getInstance(configType);
+        if (CustomSamlSettingsInstance == null || CustomSamlSettingsInstance.getSamlConfig() == null) {
+            return null;
+        }
+
+        SAMLConfig samlConfig = CustomSamlSettingsInstance.getSamlConfig();
+
+        
+        return buildSamlSettingsMap(samlConfig);
+    }
+
+    public static Saml2Settings getSamlSettings(ConfigType configType, int accountId){
+        CustomSamlSettings CustomSamlSettingsInstance = CustomSamlSettings.getInstance(configType, accountId);
+        if (CustomSamlSettingsInstance == null || CustomSamlSettingsInstance.getSamlConfig() == null) {
+            return null;
+        }
+        SAMLConfig samlConfig = CustomSamlSettingsInstance.getSamlConfig();
+        return buildSamlSettingsMap(samlConfig);
     }
 }
 

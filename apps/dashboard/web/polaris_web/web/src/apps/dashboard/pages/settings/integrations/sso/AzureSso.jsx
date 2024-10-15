@@ -79,6 +79,7 @@ function AzureSso() {
     
     return (
         <CustomSamlSso
+            ssoType={"AZURE"}
             entityTitle="Microsoft Entra Identifier"
             entityId={azureIdentity}
             loginURL={loginUrl}

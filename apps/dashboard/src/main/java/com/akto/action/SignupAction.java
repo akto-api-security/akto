@@ -552,24 +552,41 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return SUCCESS.toUpperCase();
     }
 
-    public String sendRequestToAzure () throws IOException{
-        if(CustomSamlSettings.getInstance(ConfigType.AZURE) == null){
+    private int accountId;
+
+    private String samlUtilMethodForAuth(ConfigType configType) throws IOException{
+        if(CustomSamlSettings.getInstance(ConfigType.valueOf(configType.name())) == null){
             return ERROR.toUpperCase();
         }
-        Saml2Settings settings = CustomSamlSettings.getSamlSettings(ConfigType.AZURE);
+        Saml2Settings settings = null;
+        if(this.accountId == 0){
+            settings = CustomSamlSettings.getSamlSettings(ConfigType.valueOf(configType.name()));
+        }else{
+            settings = CustomSamlSettings.getSamlSettings(ConfigType.valueOf(configType.name()),accountId);
+        }
         if(settings == null){
             return ERROR.toUpperCase();
         }
         try {
             Auth auth = new Auth(settings, servletRequest, servletResponse);
-            auth.login(CustomSamlSettings.getInstance(ConfigType.AZURE).getSamlConfig().getApplicationIdentifier() + "/dashboard/onboarding");
+            if(this.accountId == 0){
+                auth.login(CustomSamlSettings.getInstance(ConfigType.valueOf(configType.name())).getSamlConfig().getApplicationIdentifier() + "/dashboard/onboarding");
+            }else{
+                auth.login(CustomSamlSettings.getInstance(ConfigType.valueOf(configType.name()), accountId).getSamlConfig().getApplicationIdentifier() + "/dashboard/onboarding");
+            }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while getting response of azure sso \n" + e.getMessage(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("Error while getting response of " + configType.name() +  " sso \n" + e.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
         }
-
-        
         return SUCCESS.toUpperCase();
+    }
+
+    public String sendRequestToGoogleWorkspace() throws IOException{
+        return samlUtilMethodForAuth(ConfigType.GOOGLE_SAML);
+    }
+
+    public String sendRequestToAzure () throws IOException{
+        return samlUtilMethodForAuth(ConfigType.AZURE);
     }
 
     public String registerViaAzure() throws Exception{
@@ -584,7 +601,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
         Auth auth;
         try {
-            HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest);
+            HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest,ConfigType.AZURE, 0);
             auth = new Auth(settings, wrappedRequest, servletResponse);
             auth.processResponse();
             if (!auth.isAuthenticated()) {
@@ -597,6 +614,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             List<String> errors = auth.getErrors();
             if (!errors.isEmpty()) {
                 loggerMaker.errorAndAddToDb("Error in authenticating azure user \n" + auth.getLastErrorReason(), LogDb.DASHBOARD);
+                servletResponse.sendRedirect("/login");
                 return ERROR.toUpperCase();
             } else {
                 Map<String, List<String>> attributes = auth.getAttributes();
@@ -608,7 +626,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 username = nameId;
             }
             shouldLogin = "true";
-            SignupInfo.AzureSignupInfo signUpInfo = new SignupInfo.AzureSignupInfo(username, useremail);
+            SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, useremail, Config.ConfigType.AZURE);
             createUserAndRedirect(useremail, username, signUpInfo, 1000000, Config.ConfigType.AZURE.toString());
         } catch (Exception e1) {
             loggerMaker.errorAndAddToDb("Error while signing in via azure sso \n" + e1.getMessage(), LogDb.DASHBOARD);
@@ -617,6 +635,59 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
         return SUCCESS.toUpperCase();
     }
+
+    public String registerViaGoogleSamlSso() throws IOException{
+        if(CustomSamlSettings.getInstance(ConfigType.GOOGLE_SAML) == null){
+            return ERROR.toUpperCase();
+        }
+        Saml2Settings settings = CustomSamlSettings.getSamlSettings(ConfigType.GOOGLE_SAML, this.accountId);
+        if(settings == null){
+            return ERROR.toUpperCase();
+        }
+
+        Auth auth;
+        try {
+            HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest, ConfigType.GOOGLE_SAML, this.accountId);
+            auth = new Auth(settings, wrappedRequest, servletResponse);
+            auth.processResponse();
+            if (!auth.isAuthenticated()) {
+                loggerMaker.errorAndAddToDb("Error reason: " + auth.getLastErrorReason(), LogDb.DASHBOARD);
+                servletResponse.sendRedirect("/login");
+                return ERROR.toUpperCase();
+            }
+            String userEmail = null;
+            String username = null;
+            List<String> errors = auth.getErrors();
+            if (!errors.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Error in authenticating user from google sso \n" + auth.getLastErrorReason(), LogDb.DASHBOARD);
+                return ERROR.toUpperCase();
+            }
+            Map<String, List<String>> attributes = auth.getAttributes();
+            String nameId = "";
+            if (!attributes.isEmpty()) {
+                List<String> emails = attributes.get("email");
+                if(!emails.isEmpty()){
+                    nameId = emails.get(0);
+                }else{
+                    nameId = auth.getNameId();
+                }
+            }else{
+                nameId = auth.getNameId();
+            }
+            userEmail = nameId;
+            username = nameId;
+            
+            shouldLogin = "true";
+            SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, userEmail, Config.ConfigType.GOOGLE_SAML);
+            createUserAndRedirect(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString());
+        } catch (Exception e1) {
+            loggerMaker.errorAndAddToDb("Error while signing in via google workspace sso \n" + e1.getMessage(), LogDb.DASHBOARD);
+            servletResponse.sendRedirect("/login");
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
     public static final String MINIMUM_PASSWORD_ERROR = "Minimum of 8 characters required";
     public static final String MAXIMUM_PASSWORD_ERROR = "Maximum of 40 characters allowed";
     public static final String INVALID_CHAR = "Invalid character";
@@ -844,5 +915,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     public void setInvitationCode(String invitationCode) {
         this.invitationCode = invitationCode;
+    }
+
+    public void setAccountId(int accountId) {
+        this.accountId = accountId;
     }
 }

@@ -77,6 +77,7 @@ function GoogleSamlSso() {
     
     return (
         <CustomSamlSso
+            ssoType={"Google Workspace"}
             entityTitle="Google identity information"
             entityId={ssoIdentity}
             loginURL={loginUrl}

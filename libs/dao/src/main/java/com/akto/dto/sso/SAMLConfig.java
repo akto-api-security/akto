@@ -11,9 +11,9 @@ public class SAMLConfig extends Config  {
 
     public SAMLConfig(){}
     
-    public SAMLConfig(ConfigType configType) {
+    public SAMLConfig(ConfigType configType, int accountId) {
         this.setConfigType(configType);
-        String CONFIG_ID = configType.name() + CONFIG_SALT;
+        String CONFIG_ID = String.valueOf(accountId);
         this.setId(CONFIG_ID);
     }
 

@@ -9,7 +9,7 @@ import func from "@/util/func"
 import Details from '../components/Details';
 import { CancelMajor } from "@shopify/polaris-icons"
 
-function CustomSamlSso({entityTitle, entityId, loginURL,pageTitle, signinUrl, integrationSteps, cardContent, handleSubmitOutSide, handleDeleteOutside, samlUrlDocs, loading, showCustomInputs, certificateName}) {
+function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signinUrl, integrationSteps, cardContent, handleSubmitOutSide, handleDeleteOutside, samlUrlDocs, loading, showCustomInputs, certificateName}) {
     const [componentType, setComponentType] = useState(0) ;
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [files, setFiles] = useState(null)
@@ -110,7 +110,7 @@ function CustomSamlSso({entityTitle, entityId, loginURL,pageTitle, signinUrl, in
     return (
         <>
             <IntegrationsLayout title={pageTitle} cardContent={cardContent} component={azureSSOComponent} docsUrl={"https://docs.akto.io/sso/" + samlUrlDocs} />
-            <DeleteModal setShowDeleteModal={setShowDeleteModal} showDeleteModal={showDeleteModal} SsoType={"Azure"} onAction={handleDelete} />
+            <DeleteModal setShowDeleteModal={setShowDeleteModal} showDeleteModal={showDeleteModal} SsoType={ssoType} onAction={handleDelete} />
         </>
     )
 }

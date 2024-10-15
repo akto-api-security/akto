@@ -5,7 +5,7 @@ import com.opensymphony.xwork2.Action;
 import java.util.ArrayList;
 
 import com.akto.action.UserAction;
-import com.akto.dao.ConfigsDao;
+import com.akto.dao.SSOConfigsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
@@ -29,7 +29,7 @@ public class AzureSsoAction extends UserAction{
     private ConfigType configType;
 
     private SAMLConfig getConfig(ConfigType configType){
-        SAMLConfig config = new SAMLConfig(configType);
+        SAMLConfig config = new SAMLConfig(configType,Context.accountId.get());
         config.setX509Certificate(x509Certificate);
         config.setEntityId(ssoEntityId);
         config.setAcsUrl(acsUrl);
@@ -39,18 +39,19 @@ public class AzureSsoAction extends UserAction{
     }
 
     public String addSamlSsoInfo(){
-        if (SsoUtils.isAnySsoActive()) {
+        if (SsoUtils.isAnySsoActive(Context.accountId.get())) {
             addActionError("A SSO Integration already exists.");
             return ERROR.toUpperCase();
         }
         SAMLConfig samlConfig = getConfig(this.configType);       
-        ConfigsDao.instance.insertOne(samlConfig);
+        SSOConfigsDao.instance.insertOne(samlConfig);
 
         return Action.SUCCESS.toUpperCase();
     }
 
     private void deleteSAMLSettings(ConfigType configType){
-        DeleteResult result = ConfigsDao.instance.deleteAll(Filters.eq(Constants.ID, this.configType.name() + Config.CONFIG_SALT));
+        int accountId = Context.accountId.get();
+        DeleteResult result = SSOConfigsDao.instance.deleteAll(Filters.eq(Constants.ID, String.valueOf(accountId)));
 
         if (result.getDeletedCount() > 0) {
             for (Object obj : UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get())) {
@@ -68,9 +69,14 @@ public class AzureSsoAction extends UserAction{
 
     @Override
     public String execute() throws Exception {
-
-        SAMLConfig samlConfig = (SAMLConfig) ConfigsDao.instance.findOne(Constants.ID, this.configType.name() + Config.CONFIG_SALT);
-        if (SsoUtils.isAnySsoActive() && samlConfig == null) {
+        String idString = String.valueOf(Context.accountId.get());
+        SAMLConfig samlConfig = (SAMLConfig) SSOConfigsDao.instance.findOne(
+            Filters.and(
+                Filters.eq(Constants.ID, idString),
+                Filters.eq("configType", configType.name())
+            )
+        );
+        if (SsoUtils.isAnySsoActive(Context.accountId.get()) && samlConfig == null) {
             addActionError("A different SSO Integration already exists.");
             return ERROR.toUpperCase();
         }
