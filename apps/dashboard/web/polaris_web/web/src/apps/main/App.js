@@ -73,6 +73,7 @@ import { PollingProvider } from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
 import GoogleSamlSso from "../dashboard/pages/settings/integrations/sso/GoogleSamlSso";
+import SignUpWithSSO from "../signup/components/SignUpWithSSO";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -345,6 +346,10 @@ const router = createBrowserRouter([
   {
     path: "/business-email",
     element: <PageBusinessEmail />
+  },
+  {
+    path: "/sign-in-with-sso",
+    element: <SignUpWithSSO />
   },
   // catches all undefined paths and redirects to homepage.
   {

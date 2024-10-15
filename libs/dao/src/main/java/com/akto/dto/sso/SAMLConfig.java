@@ -8,6 +8,7 @@ public class SAMLConfig extends Config  {
     private String x509Certificate;
     private String acsUrl;
     private String entityId;
+    private String organizationKey;
 
     public SAMLConfig(){}
     
@@ -55,6 +56,14 @@ public class SAMLConfig extends Config  {
 
     public void setEntityId(String entityId) {
         this.entityId = entityId;
+    }
+
+    public String getOrganizationKey() {
+        return organizationKey;
+    }
+
+    public void setOrganizationKey(String organizationKey) {
+        this.organizationKey = organizationKey;
     }
 
 }

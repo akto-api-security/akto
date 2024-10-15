@@ -64,6 +64,9 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
         if(CustomSamlSettings.getSamlSettings(ConfigType.AZURE) != null){
             servletRequest.setAttribute("azureRequestUrl", new String(Base64.getEncoder().encode((CustomSamlSettings.getInstance(ConfigType.AZURE).getSamlConfig().getApplicationIdentifier() + "/signup-azure-request").getBytes())));
         }
+        if(CustomSamlSettings.getSamlSettings(ConfigType.GOOGLE_SAML) != null){
+            servletRequest.setAttribute("googleSsoUrl", new String(Base64.getEncoder().encode((CustomSamlSettings.getInstance(ConfigType.GOOGLE_SAML).getSamlConfig().getLoginUrl().getBytes()))));
+        }
         if (InitializerListener.aktoVersion != null && InitializerListener.aktoVersion.contains("akto-release-version")) {
             servletRequest.setAttribute("AktoVersionGlobal", "");
         } else {

@@ -553,6 +553,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     }
 
     private int accountId;
+    private String userEmail;
 
     private String samlUtilMethodForAuth(ConfigType configType) throws IOException{
         if(CustomSamlSettings.getInstance(ConfigType.valueOf(configType.name())) == null){
@@ -919,5 +920,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     public void setAccountId(int accountId) {
         this.accountId = accountId;
+    }
+
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
     }
 }

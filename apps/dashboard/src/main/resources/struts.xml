@@ -412,7 +412,7 @@
             </result>
         </action>
 
-        <action name="trigger-google-sso" class="com.akto.action.SignupAction" method="sendRequestToGoogleWorkspace">
+        <action name="w" class="com.akto.action.SignupAction" method="sendRequestToGoogleWorkspace">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"   type="json"/>
