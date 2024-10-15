@@ -65,6 +65,9 @@ const func = {
 
   timeDifference(startTimestamp, endTimestamp) {
     const diffMs = endTimestamp - startTimestamp;
+    if(startTimestamp === 0) {
+      return 'in total'
+    }
 
     // Convert seconds to days
     const days = diffMs / (60 * 60 * 24);

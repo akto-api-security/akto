@@ -45,10 +45,13 @@ const CriticalFindingsGraph = ({ linkText, linkUrl }) => {
             <BarGraph
                 data={criticalFindingsData}
                 areaFillHex="true"
+                height={"320px"}
                 defaultChartOptions={defaultChartOptions}
+                barGap={12}
+                showGridLines={true}
                 showYAxis={true}
                 yAxisTitle="Number of Issues"
-                showGridLines={true}
+                barWidth={30}
             />
         }
         title="Vulnerabilities findings"

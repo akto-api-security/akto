@@ -73,7 +73,7 @@ const ranges = [
         title: 'All time',
         alias: "allTime",
         period:{
-            since: window.ACTIVE_ACCOUNT ? new Date(window.ACTIVE_ACCOUNT * 1000) : new Date(0),
+            since: new Date(0),
             until: todayDayEnd,
         }
     }
