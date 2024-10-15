@@ -138,6 +138,8 @@ function IssuesPage() {
     const startTimestamp = getTimeEpoch("since")
     const endTimestamp = getTimeEpoch("until")
 
+    const hostNameMap = PersistStore.getState().hostNameMap
+
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
         setToastConfig({
@@ -357,7 +359,7 @@ function IssuesPage() {
                         creationTime: item?.creationTime,
                         issueStatus: item?.unread.toString(),
                         testRunName: "Test Run",
-                        domains: [observeFunc.getHostName(item?.id?.apiInfoKey?.url)],
+                        domains: [(hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])],
                         urls: [{
                             method: item?.id?.apiInfoKey?.method,
                             url: item?.id?.apiInfoKey?.url,
@@ -367,8 +369,9 @@ function IssuesPage() {
                     })
                 } else {
                     const existingIssue = uniqueIssuesMap.get(key)
-                    if (!existingIssue.domains.includes(observeFunc.getHostName(item?.id?.apiInfoKey?.url))) {
-                        existingIssue.domains.push(observeFunc.getHostName(item?.id?.apiInfoKey?.url))
+                    const domain = (hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])
+                    if (!existingIssue.domains.includes(domain)) {
+                        existingIssue.domains.push(domain)
                     }
                     existingIssue.urls.push({
                         method: item?.id?.apiInfoKey?.method,
