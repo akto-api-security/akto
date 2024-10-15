@@ -2222,20 +2222,22 @@ public class ClientActor extends DataActor {
             }
         }
         Document defaultAuthMechanism = (Document) testRole.get("defaultAuthMechanism");
-        defaultAuthMechanism.put("_t", "com.akto.dto.testing.HardcodedAuthParam");
-        String type = defaultAuthMechanism.getString("type");
-        List<Document> defaultAuthParams = (List<Document>) defaultAuthMechanism.get("authParams");
-        for (Document defaultAuthParam: defaultAuthParams) {
-            switch (type) {
-                case "HardCoded":
-                case "HARDCODED":
-                    defaultAuthParam.put("_t", "com.akto.dto.testing.HardcodedAuthParam");
-                    break;
-                case "LOGIN_REQUEST":
-                    defaultAuthParam.put("_t", "com.akto.dto.testing.LoginRequestAuthParam");
-                    break;
-                default:
-                    break;
+        if (defaultAuthMechanism != null) {
+            defaultAuthMechanism.put("_t", "com.akto.dto.testing.HardcodedAuthParam");
+            String type = defaultAuthMechanism.getString("type");
+            List<Document> defaultAuthParams = (List<Document>) defaultAuthMechanism.get("authParams");
+            for (Document defaultAuthParam: defaultAuthParams) {
+                switch (type) {
+                    case "HardCoded":
+                    case "HARDCODED":
+                        defaultAuthParam.put("_t", "com.akto.dto.testing.HardcodedAuthParam");
+                        break;
+                    case "LOGIN_REQUEST":
+                        defaultAuthParam.put("_t", "com.akto.dto.testing.LoginRequestAuthParam");
+                        break;
+                    default:
+                        break;
+                }
             }
         }
         testRole.put("endpointLogicalGroupId", new ObjectId(testRole.getString("endpointLogicalGroupIdHexId")));
