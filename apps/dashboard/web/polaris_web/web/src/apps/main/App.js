@@ -54,7 +54,7 @@ import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
 import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
-import AzureSso from "../dashboard/pages/settings/integrations/AzureSso";
+import AzureSso from "../dashboard/pages/settings/integrations/sso/AzureSso";
 
 import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
 import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
@@ -72,6 +72,7 @@ import ThreatDetectionPage from "../dashboard/pages/threat_detection/ThreatDetec
 import { PollingProvider } from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
+import GoogleSamlSso from "../dashboard/pages/settings/integrations/sso/GoogleSamlSso";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -235,6 +236,10 @@ const router = createBrowserRouter([
           {
             path: "integrations/azure_sso",
             element: <AzureSso />
+          },
+          {
+            path: "integrations/google_workspace_sso",
+            element: <GoogleSamlSso />
           },
           {
             path: "integrations/github_app",

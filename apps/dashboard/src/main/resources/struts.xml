@@ -570,7 +570,7 @@
             </result>
         </action>
 
-        <action name="api/addAzureSso" class="com.akto.action.user.AzureSsoAction" method="addAzureSsoInfo">
+        <action name="api/addSAMLSso" class="com.akto.action.user.AzureSsoAction" method="addSamlSsoInfo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
@@ -599,7 +599,7 @@
             </result>
         </action>
 
-        <action name="api/deleteAzureSso" class="com.akto.action.user.AzureSsoAction" method="deleteAzureSso">
+        <action name="api/deleteSamlSso" class="com.akto.action.user.AzureSsoAction" method="deleteSamlSso">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
@@ -628,7 +628,7 @@
             </result>
         </action>
 
-         <action name="api/fetchAzureSso" class="com.akto.action.user.AzureSsoAction">
+         <action name="api/fetchSAMLSso" class="com.akto.action.user.AzureSsoAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">

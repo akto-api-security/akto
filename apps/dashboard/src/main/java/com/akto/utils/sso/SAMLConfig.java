@@ -5,15 +5,19 @@ import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 import com.akto.dto.Config;
     
 @BsonDiscriminator
-
-public abstract class SAMLConfig extends Config  {
+public class SAMLConfig extends Config  {
 
     private String applicationIdentifier;
     private String loginUrl;
     private String x509Certificate;
     private String acsUrl;
     private String entityId;
-    public SAMLConfig() {
+
+
+    public SAMLConfig(ConfigType configType) {
+        this.setConfigType(configType);
+        String CONFIG_ID = configType.name() + CONFIG_SALT;
+        this.setId(CONFIG_ID);
     }
 
     public String getApplicationIdentifier() {
