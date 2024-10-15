@@ -1,6 +1,7 @@
 {
     "types": [
-        {"name": "IMAGE", "regexPattern" : "([^\\s]+(\\.(?i)(jpe?g|png|svg))$)", "sensitive":false, "onKey": false, "active" : false},
-        {"name": "DATA FILE", "regexPattern" : "([^\\s]+(\\.(?i)(pdf|js|css|woff|txt))$)", "sensitive":false, "onKey": false, "active" : false}
+        {"name": "IMAGE", "regexPattern" : "([^\\s]+(\\.(?i)(jpe?g|png|svg))$)", "sensitive":false, "onKey": false, "active" : false, "tagsLists": ["PII"], "dataTypePriority": "MEDIUM"},
+        {"name": "DATA FILE", "regexPattern" : "([^\\s]+(\\.(?i)(pdf|js|css|woff|txt))$)", "sensitive":false, "onKey": false, "active" : false, "tagsLists": ["RESOURCE"], "dataTypePriority": "MEDIUM"}
     ]
 }
+ 

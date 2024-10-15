@@ -6,12 +6,17 @@ public class PendingInviteCode {
 
     private ObjectId id;
     private String inviteCode;
-    public static final String INVITE_CODE = "inviteCode";
+    public static final String INVITE_CODE = "inviteCode";    
     private int issuer;
+    public static final String _ISSUER = "issuer";
     private String inviteeEmailId;
+    public static final String INVITEE_EMAIL_ID = "inviteeEmailId";
     private long expiry;
+    public static final String _EXPIRY = "expiry";
     private int accountId;
+    public static final String ACCOUNT_ID = "accountId";
     private RBAC.Role inviteeRole;
+    public static final String INVITEE_ROLE = "inviteeRole";
 
     public PendingInviteCode() {
     }

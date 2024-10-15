@@ -58,7 +58,7 @@ function TestRoleSettings() {
     const [roleName, setRoleName] = useState(systemRole || "");
     const [change, setChange] = useState(false);
     const [currentInfo, setCurrentInfo] = useState({steps: [], authParams: {}});
-    const [hardCodeAuthInfo, setHardCodeAuthInfo] = useState({authHeaderKey: '',authHeaderValue: ''})
+    const [hardCodeAuthInfo, setHardCodeAuthInfo] = useState({authParams:[]})
     const [showAuthComponent, setShowAuthComponent] = useState(false)
     const [showAuthDeleteModal, setShowAuthDeleteModal] = useState(false)
     const [deletedIndex, setDeletedIndex] = useState(-1);
@@ -130,11 +130,8 @@ function TestRoleSettings() {
     const saveAction = async (updatedAuth=false, authWithCondLists = null) => {
         let andConditions = transform.filterContainsConditions(conditions, 'AND')
         let orConditions = transform.filterContainsConditions(conditions, 'OR')
-        if (!(andConditions || orConditions) || roleName.length == 0) {
-            navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions }, authWithCondList: authWithCondLists},
-                replace:true })
+        if (!(andConditions || orConditions) || roleName.length === 0) {
             func.setToast(true, true, "Please select valid values for a test role")
-            
         } else {
             if (isNew) {
                 api.addTestRoles(roleName, andConditions, orConditions).then((res) => {
@@ -148,7 +145,7 @@ function TestRoleSettings() {
             } else {
                 api.updateTestRoles(roleName, andConditions, orConditions).then((res) => {
                     setChange(false);
-                    navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions }, authWithCondList: authWithCondLists},
+                    navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions }, authWithCondList: authWithCondLists || getAuthWithCondList()},
                         replace:true })
                 }).catch((err) => {
                     func.setToast(true, true, "Unable to update test role")
@@ -172,11 +169,12 @@ function TestRoleSettings() {
         }
     }
 
+
+
     const setHardCodedInfo = (obj) => {
         setHardCodeAuthInfo(prev => ({
             ...prev,
-            authHeaderKey: obj.authHeaderKey,
-            authHeaderValue: obj.authHeaderValue,
+            authParams: obj.authParams
         }))
     }
 
@@ -265,7 +263,7 @@ function TestRoleSettings() {
     )
 
     const savedParamComponent = (
-        getAuthWithCondList() !== undefined && getAuthWithCondList().length > 0 ?
+        getAuthWithCondList() && getAuthWithCondList() !== undefined && getAuthWithCondList().length > 0 ?
         <LegacyCard title={<Text variant="headingMd">Configured auth details</Text>} key={"savedAuth"}>
             <br/>
             <Divider />
@@ -293,7 +291,6 @@ function TestRoleSettings() {
             steps: obj.steps,
             authParams: obj.authParams
         }))
-    
     }
 
     const addAuthButton = (
@@ -307,7 +304,7 @@ function TestRoleSettings() {
         setCurrentInfo({})
         setHeaderKey('')
         setHeaderValue('')
-        setHardCodeAuthInfo({})
+        setHardCodeAuthInfo({authParams:[]})
     }
 
     const handleSaveAuthMechanism = async() => {
@@ -315,9 +312,9 @@ function TestRoleSettings() {
         let resp = {}
         if(hardcodedOpen){
             const automationType = "HardCoded";
-            const authParamData = [{key: hardCodeAuthInfo.authHeaderKey, value: hardCodeAuthInfo.authHeaderValue, where: "HEADER"}]
+            const authParamData = hardCodeAuthInfo.authParams
             if(editableDoc > -1){
-                resp = await api.updateAuthInRole(initialItems.name, editableDoc, authParamData, automationType)
+                resp = await api.updateAuthInRole(initialItems.name, apiCond, editableDoc, authParamData, automationType)
             }else{
                 resp = await api.addAuthToRole(initialItems.name, apiCond, authParamData, automationType, null)
             }

@@ -714,13 +714,45 @@ public class InventoryAction extends UserAction {
     }
 
     public String fetchSubTypeCountMap() {
-        Map<String,Map<String, Integer>> subTypeCountMap = SingleTypeInfoDao.instance.buildSubTypeCountMap(startTimestamp, endTimestamp);
+        Map<String,Map<String, Integer>> subTypeCountMap = buildSubTypeCountMap(startTimestamp, endTimestamp);
         response = new BasicDBObject();
         response.put("subTypeCountMap", subTypeCountMap);
 
         return Action.SUCCESS.toUpperCase();
     }
 
+    public Map<String,Map<String, Integer>> buildSubTypeCountMap(int startTimestamp, int endTimestamp) {
+
+        ArrayList<Bson> filterList = new ArrayList<>();
+        filterList.add(Filters.gt("timestamp", startTimestamp));
+        filterList.add(Filters.lt("timestamp", endTimestamp));
+        filterList.add(Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculator.getDeactivated()));
+
+        List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+        sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+        Bson sensitveSubTypeFilterRequest = Filters.in("subType",sensitiveInRequest);
+        List<Bson> requestFilterList = new ArrayList<>();
+        requestFilterList.add(sensitveSubTypeFilterRequest);
+        requestFilterList.addAll(filterList);
+        requestFilterList.add(Filters.eq("responseCode", -1));
+
+        List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+        sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+        Bson sensitveSubTypeFilterResponse = Filters.in("subType",sensitiveInResponse);
+        List<Bson> responseFilterList = new ArrayList<>();
+        responseFilterList.add(sensitveSubTypeFilterResponse);
+        responseFilterList.addAll(filterList);
+        responseFilterList.add(Filters.gt("responseCode", -1));
+
+        Map<String, Integer> requestResult = SingleTypeInfoDao.instance.execute(requestFilterList);
+        Map<String, Integer> responseResult = SingleTypeInfoDao.instance.execute(responseFilterList);
+
+        Map<String, Map<String, Integer>> resultMap = new HashMap<>();
+        resultMap.put("REQUEST", requestResult);
+        resultMap.put("RESPONSE", responseResult);
+        
+        return resultMap;
+    }
 
     public String deMergeApi() {
         if (this.url == null || this.url.length() == 0) {

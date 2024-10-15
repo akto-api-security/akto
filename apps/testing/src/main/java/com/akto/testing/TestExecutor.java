@@ -34,6 +34,7 @@ import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.testing_utils.TestingUtils;
@@ -273,7 +274,7 @@ public class TestExecutor {
         FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
         options.returnDocument(ReturnDocument.AFTER);
 
-        State updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
+        State updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
 
         TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(Constants.ID, summaryId),
@@ -549,7 +550,9 @@ public class TestExecutor {
 
         int countSuccessfulTests = 0;
         for (String testSubCategory: testSubCategories) {
-            if(GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId)){
+            loggerMaker.infoAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(testRunResultSummaryId) );
+            if(GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId, true)){
+                loggerMaker.infoAndAddToDb("Entered tests for api.");
                 if (Context.now() - startTime > timeToKill) {
                     loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
                     return;
@@ -558,7 +561,10 @@ public class TestExecutor {
 
                 TestConfig testConfig = testConfigMap.get(testSubCategory);
                 
-                if (testConfig == null) continue;
+                if (testConfig == null) {
+                    loggerMaker.infoAndAddToDb("Found testing config null.");
+                    continue;
+                }
                 TestingRunResult testingRunResult = null;
                 if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
                     continue;
@@ -601,7 +607,9 @@ public class TestExecutor {
 
                 insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
             }else{
-                logger.info("Test stopped for id: " + testRunId.toString());
+                if(GetRunningTestsStatus.getRunningTests().getCurrentState(testRunId) != null && GetRunningTestsStatus.getRunningTests().getCurrentState(testRunId).equals(TestingRun.State.STOPPED)){
+                    logger.info("Test stopped for id: " + testRunId.toString());
+                }
                 return;
             }
         }
@@ -711,6 +719,11 @@ public class TestExecutor {
             } catch (Exception e){
                 testResult.setConfidence(Confidence.HIGH);
             }
+            // dynamic severity for tests
+            Confidence overConfidence = getConfidenceForTests(testConfig, yamlTestTemplate);
+            if (overConfidence != null) {
+                testResult.setConfidence(overConfidence);
+            }
         }
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
@@ -722,6 +735,31 @@ public class TestExecutor {
                 vulnerable,singleTypeInfos,confidencePercentage,startTime,
                 endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs
         );
+    }
+
+    public Confidence getConfidenceForTests(TestConfig testConfig, YamlTestTemplate template) {
+        Confidence someConfidence = null;
+        if (testConfig.getDynamicSeverityList() != null) {
+            for (SeverityParserResult temp : testConfig.getDynamicSeverityList()) {
+                if (temp.getCheck() != null) {
+                    FilterNode filterNode = temp.getCheck().getNode();
+                    template.setFilterNode(filterNode);
+                    ValidationResult res = template.filter();
+                    if (res.getIsValid()) {
+                        try {
+                            return Confidence.valueOf(temp.getSeverity());
+                        } catch (Exception e) {
+                        }
+                    }
+                } else {
+                    /*
+                     * Default value has no check condition.
+                     */
+                    someConfidence = Confidence.valueOf(temp.getSeverity());
+                }
+            }
+        }
+        return someConfidence;
     }
 
     public boolean filterGraphQlPayload(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) throws Exception {

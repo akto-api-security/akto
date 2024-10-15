@@ -611,4 +611,14 @@ public class Utils {
 
     }
 
+    public static List<String> getUniqueValuesOfList(List<String> input){
+        if(input == null || input.isEmpty()){
+            return new ArrayList<>();
+        }
+        Set<String> copySet = new HashSet<>(input);
+        input = new ArrayList<>();
+        input.addAll(copySet);
+        return input;
+    }
+
 }

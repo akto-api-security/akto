@@ -30,29 +30,37 @@ function LoginForm({ step, setSteps }) {
     async function handleLoginFlowTest() {
         setTestDisable(true)
         func.setToast(true,  false,  "Running login flow")
-        const response = await api.triggerSingleStep('LOGIN_REQUEST', step.id, [{ ...step }])
-        if (response) {
-            func.setToast(true,  false,  <div data-testid="login_flow_ran_message">Login flow ran successfully!</div>)
-            const testResponse = JSON.parse(response.responses[0])
+        try {
+            const response = await api.triggerSingleStep('LOGIN_REQUEST', step.id, [{ ...step }])
+            if (response) {
+                func.setToast(true,  false,  <div data-testid="login_flow_ran_message">Login flow ran successfully!</div>)
+                const testResponse = JSON.parse(response.responses[0])
 
-            let responseBody
-            try {
-                responseBody = func.formatJsonForEditor(testResponse.body)
-            } catch {
-                responseBody = testResponse.body
-            }
-
-            setSteps(prev => prev.map((s) => s.id === step.id ? {
-                ...s,
-                testResponse: {
-                    headers: { message: func.formatJsonForEditor(testResponse.headers) },
-                    body: {  message: responseBody }
+                let responseBody
+                try {
+                    responseBody = func.formatJsonForEditor(testResponse.body)
+                } catch {
+                    responseBody = testResponse.body
                 }
+
+                setSteps(prev => prev.map((s) => s.id === step.id ? {
+                    ...s,
+                    testResponse: {
+                        headers: { message: func.formatJsonForEditor(testResponse.headers) },
+                        body: {  message: responseBody }
+                    }
+                }
+                : s))
+                setSelectedApiResponseTab(0)
             }
-            : s))
-            setSelectedApiResponseTab(0)
+            
+        } 
+        catch (Exception ) {
+            
         }
+
         setTestDisable(false);
+
     }   
 
     return (

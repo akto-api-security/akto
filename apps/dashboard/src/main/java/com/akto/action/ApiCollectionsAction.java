@@ -40,6 +40,7 @@ import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import com.mongodb.client.model.Sorts;
@@ -170,7 +171,7 @@ public class ApiCollectionsAction extends UserAction {
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.project(Projections.fields(
             Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE, ApiCollection._DEACTIVATED,ApiCollection.START_TS)
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED)
         )));
         MongoCursor<BasicDBObject> cursor = ApiCollectionsDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
         while(cursor.hasNext()){
@@ -183,6 +184,7 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setHostName(collection.getString(ApiCollection.HOST_NAME));
                 apiCollection.setDeactivated(collection.getBoolean(ApiCollection._DEACTIVATED));
                 apiCollection.setStartTs(collection.getInt(ApiCollection.START_TS));
+                apiCollection.setAutomated(collection.getBoolean(ApiCollection.AUTOMATED));
                 
                 String type = collection.getString(ApiCollection._TYPE);
                 if(type != null && type.length() > 0){
@@ -191,8 +193,7 @@ public class ApiCollectionsAction extends UserAction {
                 }
                 String userEnvType = collection.getString(ApiCollection.USER_ENV_TYPE);
                 if(userEnvType != null && userEnvType.length() > 0){
-                    ApiCollection.ENV_TYPE envEnum = ApiCollection.ENV_TYPE.valueOf(userEnvType);
-                    apiCollection.setUserSetEnvType(envEnum);
+                    apiCollection.setUserSetEnvType(userEnvType);
                 }
                 this.apiCollections.add(apiCollection);
             } catch (Exception e) {
@@ -436,6 +437,19 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
 
+        return SUCCESS.toUpperCase();
+    }
+
+    public String updateCustomCollection(){
+        Bson filter = Filters.eq(Constants.ID, this.apiCollectionId);
+        ApiCollection collection = ApiCollectionsDao.instance.findOne(filter);
+        if(collection == null){
+            addActionError("No collection with id exists.");
+            return ERROR.toUpperCase();
+        }
+        List<TestingEndpoints> conditions = generateConditions(this.conditions);
+        ApiCollectionsDao.instance.updateOneNoUpsert(filter, Updates.set(ApiCollection.CONDITIONS_STRING, conditions));
+        ApiCollectionUsers.computeCollectionsForCollectionId(conditions, collection.getId());
         return SUCCESS.toUpperCase();
     }
 

@@ -105,6 +105,7 @@ public class StartTestAction extends UserAction {
     }
 
     private CallSource source;
+    private boolean sendSlackAlert = false;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
@@ -158,7 +159,7 @@ public class StartTestAction extends UserAction {
 
         return new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
-                this.maxConcurrentRequests);
+                this.maxConcurrentRequests, this.sendSlackAlert);
     }
 
     private List<String> selectedTests;
@@ -206,12 +207,13 @@ public class StartTestAction extends UserAction {
             }
             this.testIdConfig = 0;
         } else {
-            TestingRunDao.instance.updateOne(
+            if(this.metadata == null || this.metadata.isEmpty()){
+                TestingRunDao.instance.updateOne(
                     Filters.eq(Constants.ID, localTestingRun.getId()),
                     Updates.combine(
                             Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
                             Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)));
-
+            }
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
                 int id = UUID.randomUUID().hashCode() & 0xfffffff ;
                 TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
@@ -1255,4 +1257,7 @@ public class StartTestAction extends UserAction {
         this.continuousTesting = continuousTesting;
     }
 
+    public void setSendSlackAlert(boolean sendSlackAlert) {
+        this.sendSlackAlert = sendSlackAlert;
+    }
 }

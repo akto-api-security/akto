@@ -3,8 +3,9 @@ import React, { useState } from 'react'
 
 
 function SaveAsCollectionModal(props) {
-    const [newCollectionName, setNewCollectionName] = useState('');
-    const {createNewCollection, active, setActive} = props
+    
+    const {createNewCollection, active, setActive, initialCollectionName, loading} = props
+    const [newCollectionName, setNewCollectionName] = useState(initialCollectionName || '');
     return (
         <Modal
             large
@@ -16,6 +17,7 @@ function SaveAsCollectionModal(props) {
                 id: "create-new-collection",
                 content: 'Create',
                 onAction: () => createNewCollection(newCollectionName),
+                loading: loading || false
             }}
         >
             <Modal.Section>

@@ -1,11 +1,11 @@
 import request from "../../../../util/request"
 
 export default {
-    fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, startEpoch) {
+    fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp) {
         return request({
             url: 'api/fetchAllIssues',
             method: 'post',
-            data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, startEpoch}
+            data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp}
         })
     },
     fetchVulnerableTestingRunResultsFromIssues(filters, skip) {
@@ -28,6 +28,20 @@ export default {
             url: 'api/fetchTestingRunResult',
             method: 'post',
             data: {issueId}
+        })
+    },
+    findTotalIssuesByDay (startTimeStamp, endTimeStamp) {
+        return request({
+            url: 'api/findTotalIssuesByDay',
+            method: 'post',
+            data: {startEpoch: startTimeStamp, endTimeStamp}
+        })
+    },
+    fetchTestCoverageData (startTimeStamp, endTimeStamp) {
+        return request({
+            url: 'api/fetchTestCoverageData',
+            method: 'post',
+            data: {startTimeStamp, endTimeStamp}
         })
     },
 }

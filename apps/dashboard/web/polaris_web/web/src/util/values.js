@@ -68,6 +68,14 @@ const ranges = [
             ),
             until: todayDayEnd,
         }
+    },
+    {
+        title: 'All time',
+        alias: "allTime",
+        period:{
+            since: new Date(0),
+            until: todayDayEnd,
+        }
     }
 ];
 
