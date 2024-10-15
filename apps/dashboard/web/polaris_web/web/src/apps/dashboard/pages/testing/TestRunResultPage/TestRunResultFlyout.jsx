@@ -166,7 +166,9 @@ function TestRunResultFlyout(props) {
     const ValuesTab = {
         id: 'values',
         content: "Values",
-        component: dataExpired ? dataExpiredComponent :
+        component: (dataExpired && !selectedTestRunResult?.vulnerable && 
+            !(selectedTestRunResult?.testResults?.[0]?.originalMessage || selectedTestRunResult?.testResults?.[0]?.message) )
+            ? dataExpiredComponent :
             (func.showTestSampleData(selectedTestRunResult) && selectedTestRunResult.testResults &&
         <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
             key="Sample values"
