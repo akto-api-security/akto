@@ -1,6 +1,7 @@
 package com.akto.test_editor.execution;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -31,6 +32,7 @@ import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
+import com.akto.util.Pair;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -451,6 +453,8 @@ public class Executor {
         return removed;
     }
 
+    private static ConcurrentHashMap<String, Pair<AuthMechanism, Integer>> mapTestRoleIdToAuthMechanism = new ConcurrentHashMap<>();
+
     private ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
         Map<String, List<String>> rawHeaders = rawApi.fetchReqHeaders();
         for(AuthWithCond authWithCond: testRole.getAuthWithCondList()) {
@@ -497,11 +501,18 @@ public class Executor {
                 } else {
                     if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
                         try {
-                            LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null);
-                            if (!loginFlowResponse.getSuccess())
-                                throw new Exception(loginFlowResponse.getError());
-    
-                            authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
+
+                            Pair<AuthMechanism, Integer> pair = mapTestRoleIdToAuthMechanism.get(testRole.getName());
+                            if (pair != null && pair.getSecond() >= (Context.now() - 15 * 60)) {
+                                authMechanismForRole = pair.getFirst();
+                            } else {
+                                LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null);
+                                if (!loginFlowResponse.getSuccess())
+                                    throw new Exception(loginFlowResponse.getError());
+        
+                                authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
+                                mapTestRoleIdToAuthMechanism.put(testRole.getName(), new Pair<>(authMechanismForRole, Context.now()));
+                            }
                         } catch (Exception e) {
                             return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: " + e.getMessage());
                         }
