@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import StepsComponent from '../components/StepsComponent';
 import { Button, Form, FormLayout, HorizontalStack, LegacyCard, Tag, Text, TextField, VerticalStack } from '@shopify/polaris';
 import FileUpload from '../../../../components/shared/FileUpload';
@@ -9,11 +9,12 @@ import func from "@/util/func"
 import Details from '../components/Details';
 import { CancelMajor } from "@shopify/polaris-icons"
 
-function CustomSamlSso({entityTitle, entityId, loginURL,pageTitle, signinUrl, integrationSteps, cardContent, handleSubmitOutSide, handleDeleteOutside, samlUrlDocs, loading, showSSOUrl, certificateName}) {
+function CustomSamlSso({entityTitle, entityId, loginURL,pageTitle, signinUrl, integrationSteps, cardContent, handleSubmitOutSide, handleDeleteOutside, samlUrlDocs, loading, showCustomInputs, certificateName}) {
     const [componentType, setComponentType] = useState(0) ;
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [files, setFiles] = useState(null)
     const [ssoUrl, setSSOUrl] = useState('')
+    const [identifier, setIdentifier] = useState('')
 
     const stepsComponent = (
         <StepsComponent integrationSteps={integrationSteps} onClickFunc={() => setComponentType(1)} buttonActive={true}/>
@@ -28,21 +29,34 @@ function CustomSamlSso({entityTitle, entityId, loginURL,pageTitle, signinUrl, in
     }
 
     const handleSubmit = () => {
-        handleSubmitOutSide(files, ssoUrl)
+        handleSubmitOutSide(files, ssoUrl, identifier)
         setComponentType(2)
     }
+
+    useEffect(() => {
+        if((loginURL !== null || entityId !== null) && (loginURL?.length > 0 || entityId?.length > 0)){
+            setComponentType(2)
+        }
+    },[loginURL,entityId])
 
     const formComponent = (
         <LegacyCard.Section>
             <Form onSubmit={handleSubmit}>
                 <FormLayout>
                     <VerticalStack gap={"4"}>
-                        {showSSOUrl ? 
-                            <TextField label={<Text fontWeight="medium" variant="bodySm">Enter sso url</Text>} 
-                                placeholder='Enter your SSO url'
-                                onChange={setSSOUrl}
-                                value={ssoUrl}
-                            /> : null
+                        {showCustomInputs ? 
+                            <VerticalStack gap={"3"}>
+                                <TextField label={<Text fontWeight="medium" variant="bodySm">Enter sso url</Text>} 
+                                    placeholder='Enter your SSO url'
+                                    onChange={setSSOUrl}
+                                    value={ssoUrl}
+                                />
+                                <TextField label={<Text fontWeight="medium" variant="bodySm">Enter Entity Id</Text>} 
+                                    placeholder='Enter your Entity Id'
+                                    onChange={setIdentifier}
+                                    value={identifier}
+                                />
+                            </VerticalStack> : null
                         }
                         <HorizontalStack gap="3">
                             {files ? 
@@ -73,11 +87,11 @@ function CustomSamlSso({entityTitle, entityId, loginURL,pageTitle, signinUrl, in
 
     const listValues = [
         {
-            title: 'Login Url',
+            title: 'SSO url by IdP',
             value: loginURL,
         },
         {
-            title: 'Sign on Url',
+            title: 'Assertion consumer URL',
             value: signinUrl,
         },
         {

@@ -1,10 +1,6 @@
-package com.akto.utils.sso;
-
-import org.bson.codecs.pojo.annotations.BsonDiscriminator;
-
+package com.akto.dto.sso;
 import com.akto.dto.Config;
-    
-@BsonDiscriminator
+
 public class SAMLConfig extends Config  {
 
     private String applicationIdentifier;
@@ -13,7 +9,8 @@ public class SAMLConfig extends Config  {
     private String acsUrl;
     private String entityId;
 
-
+    public SAMLConfig(){}
+    
     public SAMLConfig(ConfigType configType) {
         this.setConfigType(configType);
         String CONFIG_ID = configType.name() + CONFIG_SALT;

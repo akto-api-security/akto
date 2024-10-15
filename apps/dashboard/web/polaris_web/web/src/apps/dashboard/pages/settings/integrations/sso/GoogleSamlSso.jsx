@@ -14,7 +14,7 @@ function GoogleSamlSso() {
     const [loading, setLoading] = useState(false)
 
     const [loginUrl, setLoginUrl] = useState('')
-    const [appIdentity, setAppIdentity] = useState('')
+    const [ssoIdentity, setSsoIdentity] = useState('')
 
     const cardContent = "Enable Login via Google Workspace on your Akto dashboard";
 
@@ -48,9 +48,9 @@ function GoogleSamlSso() {
         }
     ]
     
-    const handleSubmit = async(files, ssoUrl) => {
+    const handleSubmit = async(files, ssoUrl, identifier) => {
         setLoading(true)
-        await settingRequests.addAzureSso(ssoUrl ,files.content, entityId, entityId, AcsUrl, "GOOGLE_SAML");
+        await settingRequests.addAzureSso(ssoUrl ,files.content, identifier, entityId, AcsUrl, "GOOGLE_SAML");
         fetchData();
     }
 
@@ -59,7 +59,7 @@ function GoogleSamlSso() {
             setLoading(true)
             await settingRequests.fetchAzureSso("GOOGLE_SAML").then((resp)=> {
                 setLoginUrl(resp.loginUrl)
-                setAppIdentity(resp.ssoEntityId)
+                setSsoIdentity(resp.ssoEntityId)
             })
             setLoading(false)
         } catch (error) {
@@ -78,7 +78,7 @@ function GoogleSamlSso() {
     return (
         <CustomSamlSso
             entityTitle="Google identity information"
-            entityId={appIdentity}
+            entityId={ssoIdentity}
             loginURL={loginUrl}
             integrationSteps={integrationSteps}
             cardContent={cardContent}
@@ -87,8 +87,9 @@ function GoogleSamlSso() {
             samlUrlDocs={''}
             pageTitle={"Google Workspace SSO SAML"}
             loading={loading}
-            showSSOUrl={true}
+            showCustomInputs={true}
             certificateName={"X509 certificate"}
+            signinUrl={AcsUrl}
         />
     )
 }

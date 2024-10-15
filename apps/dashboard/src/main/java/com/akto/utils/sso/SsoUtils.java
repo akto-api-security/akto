@@ -12,6 +12,7 @@ import org.bson.conversions.Bson;
 import com.akto.dao.ConfigsDao;
 import com.akto.dto.Config;
 import com.akto.dto.Config.ConfigType;
+import com.akto.dto.sso.SAMLConfig;
 import com.akto.util.Constants;
 import com.akto.utils.CustomHttpsWrapper;
 import com.mongodb.client.model.Filters;

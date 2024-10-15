@@ -5,6 +5,7 @@ import java.util.Map;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.Config.ConfigType;
+import com.akto.dto.sso.SAMLConfig;
 import com.onelogin.saml2.settings.Saml2Settings;
 import com.onelogin.saml2.settings.SettingsBuilder;
 
