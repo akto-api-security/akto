@@ -149,7 +149,7 @@ public class LoggerMaker  {
 
     public void errorAndAddToDb(String err, LogDb db) {
         try {
-            basicError(err, db);
+            err = basicError(err, db);
 
             if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
                 sendToSlack(err);
