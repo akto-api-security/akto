@@ -12,10 +12,14 @@ const CriticalFindingsGraph = ({ linkText, linkUrl }) => {
     const [showTestingComponents, setShowTestingComponents] = useState(false)
 
     function convertSubCategoryInfo(tempSubCategoryMap) {
-        const entries = Object.values(tempSubCategoryMap);
+        const entries = Object.keys(tempSubCategoryMap).map((x) => {
+            let tempObj = tempSubCategoryMap[x];
+            tempObj.key = x
+            return tempObj
+        })
         entries.sort((a, b) => b.text - a.text);
         const topEntries = entries.slice(0, 5);
-        const data = topEntries.map(entry => {return {text: entry.filterKey, value: entry.text, color: entry.color}});
+        const data = topEntries.map(entry => {return {text: entry.key, value: entry.text, color: entry.color}});
         setCriticalFindingsData(data)
     }
 

@@ -29,7 +29,6 @@ import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
 function HomeDashboard() {
 
     const [loading, setLoading] = useState(true);
-    const [skip, setSkip] = useState(0)
     const [showBannerComponent, setShowBannerComponent] = useState(false)
     const [testSummaryInfo, setTestSummaryInfo] = useState([])
 
@@ -52,6 +51,7 @@ function HomeDashboard() {
     const initialStartTimestamp = func.timeNow() - 60 * 60 * 24
     const initialEndTimestamp = func.timeNow()
     const [showTestingComponents, setShowTestingComponents] = useState(false)
+    const [customRiskScoreAvg, setCustomRiskScoreAvg] = useState(0)
 
     const tempVal = { alias: "custom", title: "Custom", period: { since: new Date(initialStartTimestamp * 1000), until: new Date(initialEndTimestamp * 1000) } }
 
@@ -332,6 +332,21 @@ function HomeDashboard() {
     function buildSetRiskScoreData(apiStats) {
         const totalApisCount = apiStats.totalAPIs
 
+        let tempScore = 0, tempTotal = 0
+        Object.keys(apiStats.riskScoreMap).forEach((x) => {
+            if(x > 1){
+                const apisVal = apiStats.riskScoreMap[x]
+                tempScore += (x * apisVal)
+                tempTotal += apisVal
+            }
+        })
+        if(tempScore > 0 && tempTotal > 0){
+            let val = (tempScore * 1.0)/tempTotal
+            if(val >= 2){
+                setCustomRiskScoreAvg(val)
+            }
+        }
+
         const sumOfRiskScores = Object.values(apiStats.riskScoreMap).reduce((acc, value) => acc + value, 0);
 
         // Calculate the additional APIs that should be added to risk score "0"
@@ -395,15 +410,17 @@ function HomeDashboard() {
             variant: 'heading2xl',
             color: 'critical',
             byLineComponent: observeFunc.generateByLineComponent((totalIssuesCount - oldIssueCount), func.timeDifference(startTimestamp, endTimestamp)),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldIssueCount, totalIssuesCount]} />)
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldIssueCount, totalIssuesCount]} />),
         },
         {
             title: 'API Risk Score',
-            data: apiRiskScore,
+            data: customRiskScoreAvg !== 0 ? customRiskScoreAvg  : apiRiskScore,
             variant: 'heading2xl',
-            color: apiRiskScore > 2.5 ? 'critical' : 'warning',
+            color: (customRiskScoreAvg > 2.5 || apiRiskScore > 2.5) ? 'critical' : 'warning',
             byLineComponent: observeFunc.generateByLineComponent((apiRiskScore - oldRiskScore).toFixed(2), func.timeDifference(startTimestamp, endTimestamp)),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldRiskScore, apiRiskScore]} />)
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldRiskScore, apiRiskScore]} />),
+            tooltipContent: 'This represents a cumulative risk score for the whole dashboard',
+            docsUrl: 'https://docs.akto.io/api-discovery/concepts/risk-score'
         },
         {
             title: 'Test Coverage',
