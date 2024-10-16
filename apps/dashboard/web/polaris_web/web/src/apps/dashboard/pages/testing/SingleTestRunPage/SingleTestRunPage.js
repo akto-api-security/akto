@@ -364,7 +364,9 @@ const promotedBulkActions = (selectedDataHexIds) => {
     </div> : null
   )
 
-  const definedTableTabs = ['Vulnerable', 'Need configurations','Skipped', 'No vulnerability found','Domain unreachable']
+  const definedTableTabs = window?.USER_NAME && window?.USER_NAME.includes("akto") ?
+    ['Vulnerable', 'Need configurations', 'Skipped', 'No vulnerability found', 'Domain unreachable'] :
+    ['Vulnerable', 'Need configurations', 'No vulnerability found', 'Domain unreachable']
 
   const { tabsInfo } = useTable()
   const tableCountObj = func.getTabsCount(definedTableTabs, testRunResults)
