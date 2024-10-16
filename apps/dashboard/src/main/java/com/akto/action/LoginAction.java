@@ -13,6 +13,9 @@ import com.akto.dto.User;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
+import com.akto.notifications.email.SendgridEmail;
+import com.akto.password_reset.PasswordResetUtils;
+import com.akto.util.DashboardMode;
 import com.akto.utils.Token;
 import com.akto.utils.JWT;
 import com.mongodb.BasicDBObject;
@@ -20,9 +23,11 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
+import com.sendgrid.helpers.mail.Mail;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
+import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -218,6 +223,125 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
         return Action.ERROR.toUpperCase();
 
+    }
+
+    String forgotPasswordEmail;
+    String websiteHostName;
+    public String sendPasswordResetLink() {
+//        if(!DashboardMode.isOnPremDeployment()) {
+//            return Action.ERROR.toUpperCase();
+//        }
+
+        if(forgotPasswordEmail == null || forgotPasswordEmail.trim().isEmpty()) {
+            return Action.ERROR.toUpperCase();
+        }
+
+        if(websiteHostName == null || websiteHostName.trim().isEmpty()) {
+            return Action.ERROR.toUpperCase();
+        }
+
+        setForgotPasswordEmail(forgotPasswordEmail.trim());
+
+        Bson filters = Filters.eq(User.LOGIN, forgotPasswordEmail);
+        User user = UsersDao.instance.findOne(filters);
+
+        if(user == null) {
+            logger.info("user not found while sending password reset link");
+            return Action.SUCCESS.toUpperCase();
+        }
+
+        int lastPasswordReset = user.getLastPasswordReset();
+        if(Context.now() - lastPasswordReset < 1800) {
+            return Action.ERROR.toUpperCase();
+        }
+
+        String resetUrl = PasswordResetUtils.insertPasswordResetToken(forgotPasswordEmail, websiteHostName);
+
+        if(resetUrl == null || resetUrl.trim().isEmpty()) {
+            logger.error("Error while generating password reset link");
+            return Action.ERROR.toUpperCase();
+        }
+
+        Mail mail = SendgridEmail.getInstance().buildPasswordResetEmail(forgotPasswordEmail, resetUrl);
+
+        try {
+            SendgridEmail.getInstance().send(mail);
+        } catch (IOException e) {
+            logger.error("Error while sending password reset email: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    String resetPasswordToken;
+    String newPassword;
+    public String resetPassword() {
+//        if(!DashboardMode.isOnPremDeployment()) {
+//            return Action.ERROR.toUpperCase();
+//        }
+
+        if(resetPasswordToken == null || resetPasswordToken.trim().isEmpty()) {
+            return Action.ERROR.toUpperCase();
+        }
+
+        if(newPassword == null || newPassword.trim().isEmpty()) {
+            return Action.ERROR.toUpperCase();
+        }
+
+        if(SignupAction.validatePassword(newPassword) != null) {
+            return Action.ERROR.toUpperCase();
+        }
+
+        User user = UsersDao.instance.findOne(
+                Filters.eq(User.PASSWORD_RESET_TOKEN, resetPasswordToken)
+        );
+
+        if(user == null) {
+            return Action.ERROR.toUpperCase();
+        }
+
+        int getLastPasswordResetToken = user.getLastPasswordResetToken();
+        if(Context.now() - getLastPasswordResetToken > 1800) {
+            return Action.SUCCESS.toUpperCase();
+        }
+
+
+        String salt = "39yu";
+        String passHash = Integer.toString((salt + newPassword).hashCode());
+        Map<String, SignupInfo> signupInfoMap = new HashMap<>();
+        SignupInfo.PasswordHashInfo signupInfo = new SignupInfo.PasswordHashInfo(passHash, salt);
+        signupInfoMap.put(signupInfo.getKey(), signupInfo);
+        UsersDao.instance.updateOne(
+                Filters.and(
+                        Filters.eq(User.PASSWORD_RESET_TOKEN, resetPasswordToken)
+                ),
+                Updates.combine(
+                        Updates.set(User.SIGNUP_INFO_MAP, signupInfoMap),
+                        Updates.set(User.LAST_PASSWORD_RESET, Context.now()),
+                        Updates.set(User.PASSWORD_RESET_TOKEN, ""),
+                        Updates.set(User.LAST_PASSWORD_RESET, Context.now()),
+                        Updates.set(User.REFRESH_TOKEN, new ArrayList<String>())
+                )
+        );
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public void setForgotPasswordEmail(String forgotPasswordEmail) {
+        this.forgotPasswordEmail = forgotPasswordEmail;
+    }
+
+    public void setWebsiteHostName(String websiteHostName) {
+        this.websiteHostName = websiteHostName;
+    }
+
+    public void setResetPasswordToken(String resetPasswordToken) {
+        this.resetPasswordToken = resetPasswordToken;
+    }
+
+    public void setNewPassword(String newPassword) {
+        this.newPassword = newPassword;
     }
 
     private String username;
