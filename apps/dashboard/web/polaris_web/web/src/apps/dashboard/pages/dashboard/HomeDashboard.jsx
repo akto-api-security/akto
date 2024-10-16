@@ -414,7 +414,7 @@ function HomeDashboard() {
         },
         {
             title: 'API Risk Score',
-            data: customRiskScoreAvg !== 0 ? customRiskScoreAvg  : apiRiskScore,
+            data: customRiskScoreAvg !== 0 ? parseFloat(customRiskScoreAvg.toFixed(2))  : apiRiskScore,
             variant: 'heading2xl',
             color: (customRiskScoreAvg > 2.5 || apiRiskScore > 2.5) ? 'critical' : 'warning',
             byLineComponent: observeFunc.generateByLineComponent((apiRiskScore - oldRiskScore).toFixed(2), func.timeDifference(startTimestamp, endTimestamp)),
