@@ -19,7 +19,10 @@ const SummaryInfo = ({ startTimestamp, endTimestamp }) => {
         const issuesGraphDataRes = await api.findTotalIssuesByDay(startTimestamp, endTimestamp)
         const testCoverageDataRes = await api.fetchTestCoverageData(startTimestamp, endTimestamp)
         
-        const testCoverageData = testCoverageDataRes.historicalData.map(item => Math.round(100 * item.apisTested / item.totalApis))
+        const testCoverageData = testCoverageDataRes.historicalData.map(item => {
+            const totalCoverageVal = (((100 * item.apisTested) / item.totalApis).toFixed(2))
+            return parseFloat(totalCoverageVal)
+        })
         
         const {
             totalIssuesCountDayWise,
