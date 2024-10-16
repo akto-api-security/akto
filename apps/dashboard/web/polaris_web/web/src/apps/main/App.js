@@ -73,6 +73,9 @@ import { PollingProvider } from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
 
+import TeamsWebhooks from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhooks";
+import TeamsWebhook from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhook";
+
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
 const router = createBrowserRouter([
@@ -256,6 +259,19 @@ const router = createBrowserRouter([
             path: "integrations/webhooks/create_custom_webhook",
             element: <Webhook />,
           },
+          {
+            path: "integrations/teamsWebhooks",
+            element: <TeamsWebhooks />,
+          },
+          {
+            path: "integrations/teamsWebhooks/:webhookId",
+            element: <TeamsWebhook />,
+          },
+          {
+            path: "integrations/teamsWebhooks/create_custom_webhook",
+            element: <TeamsWebhook />,
+          },
+
           {
             path: "logs",
             element: <HealthLogs />,

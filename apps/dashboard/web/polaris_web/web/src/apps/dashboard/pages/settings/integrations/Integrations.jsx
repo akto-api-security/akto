@@ -54,6 +54,11 @@ function Integrations() {
         name:'Webhooks',
         source: '/public/webhooks_logo.svg'
     }
+    let teamsWebhooksObj={
+      id: 'teamsWebhooks',
+      name:'Microsoft Teams Webhooks',
+      source: '/public/ms_teams.svg'
+  }
     let githubSsoObj={
       id: 'github_sso',
       name:'Github SSO',
@@ -83,11 +88,10 @@ function Integrations() {
 
     let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, githubAppObj]
 
-    let allItems = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj, jiraObj]
+    let allItems = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj,teamsWebhooksObj, jiraObj]
     if (window.DASHBOARD_MODE === "ON_PREM") {
         allItems = [...allItems, ...ssoItems]
     }
-    let currObjs = allItems
     const [currItems , setCurrentItems] = useState(getTabItems('all'))
     const tabs = [
         {
@@ -133,7 +137,7 @@ function Integrations() {
     const reportingItems = [githubAppObj];
     const aiItems = [aktoGptObj];
     const ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj];
-    const alertsItems = [slackObj, webhooksObj];
+    const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj];
     switch (tabId) {
       case 'traffic':
