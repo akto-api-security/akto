@@ -24,6 +24,7 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.GroupByTimeRange;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -172,7 +173,10 @@ public class IssuesAction extends UserAction {
         long daysBetween = (endTimeStamp - startEpoch) / ONE_DAY_TIMESTAMP;
         List<Bson> pipeline = new ArrayList<>();
 
+        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated("_id.apiInfoKey.apiCollectionId");
+
         Bson filters = Filters.and(
+                notIncludedCollections,
                 Filters.gte(TestingRunIssues.CREATION_TIME, startEpoch),
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
         );
@@ -222,7 +226,9 @@ public class IssuesAction extends UserAction {
 
         List<Bson> pipeline = new ArrayList<>();
 
+        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated("apiCollectionId");
         Bson filter = Filters.and(
+                notIncludedCollections,
                 Filters.gte("time", startEpoch),
                 Filters.lte("time", endTimeStamp)
         );
