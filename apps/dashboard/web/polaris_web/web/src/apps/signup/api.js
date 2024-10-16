@@ -62,5 +62,25 @@ export default {
                 email, password, invitationCode
             }
         })
+    },
+    sendPasswordResetLink: function(email, websiteHostName) {
+        return request({
+            url: 'auth/sendPasswordResetLink',
+            method: 'post',
+            data: {
+                forgotPasswordEmail: email,
+                websiteHostName
+            }
+        })
+    },
+    resetPassword: function(token, newPassword) {
+        return request({
+            url: 'auth/resetPassword',
+            method: 'post',
+            data: {
+                resetPasswordToken: token,
+                newPassword
+            }
+        })
     }
 }
