@@ -120,6 +120,187 @@ function SignUp() {
   const activeObject = loginActive ? loginObject : signupObject
   const navigate = useNavigate()
 
+  const [isForgotPasswordActive, setIsForgotPasswordActive] = useState(false)
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("")
+
+  useEffect(() => {
+    if(validateEmail(email)) {
+      setForgotPasswordEmail(email)
+    } else {
+      setForgotPasswordEmail("")
+    }
+  }, [email])
+
+  const websiteHostName = window.location.origin
+
+  const validateEmail = (email) => {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailPattern.test(email)
+  }
+
+  const handleForgotPassword = async () => {
+    if(!validateEmail(forgotPasswordEmail)) {
+      func.setToast(true, true, "Please enter a valid email!")
+      return
+    }
+
+    await api.sendPasswordResetLink(forgotPasswordEmail, websiteHostName).finally(() => {
+      func.setToast(true, false, "Reset password link has been sent!")
+      setIsForgotPasswordActive(false)
+      setForgotPasswordEmail("")
+    })
+  }
+
+  function validatePassword(password, confirmPassword) {
+    if (password.length < 8) {
+        func.setToast(true, true, "Minimum of 8 characters required")
+        return false
+    }
+
+    if (password.length >= 40) {
+        func.setToast(true, true, "Maximum of 40 characters allowed")
+        return false
+    }
+
+    if (password !== confirmPassword) {
+        func.setToast(true, true, "Passwords do not match")
+        return false
+    }
+
+    let numbersFlag = false
+    let lettersFlag = false
+
+    const allowedSpecialChars = new Set([
+        "+", "@", "*", "#", "$", "%", "&", "/", "(", ")", "=", "?", "^", "!",
+        "[", "]", "{", "}", "-", "_", ":", ";", ">", "<", "|", ",", "."
+    ])
+
+    for (let i = 0; i < password.length; i++) {
+        const ch = password.charAt(i)
+        const upperCaseCh = ch.toUpperCase()
+
+        if (ch >= '0' && ch <= '9') {
+            numbersFlag = true
+        } else if (upperCaseCh >= 'A' && upperCaseCh <= 'Z') {
+            lettersFlag = true
+        } else if (!allowedSpecialChars.has(ch)) {
+            func.setToast(true, true,  "Invalid character")
+            return false
+        }
+    }
+
+    if (!numbersFlag || !lettersFlag) {
+        func.setToast(true, true, "Must contain letters and numbers")
+        return false
+    }
+
+    return true
+  }
+
+  const forgotPasswordComp = (
+    <Modal
+      small
+      activator={
+        <div style={{textAlign: 'end'}}>
+          <Button plain onClick={() => setIsForgotPasswordActive(true)}>Forgot Password?</Button>
+        </div>
+      }
+      open={isForgotPasswordActive}
+      onClose={() => setIsForgotPasswordActive(false)}
+      title="Forgot Password"
+      primaryAction={{
+          content: 'Send',
+          onAction: handleForgotPassword,
+      }}
+      secondaryActions={[
+          {
+              content: 'Cancel',
+              onAction: () => setIsForgotPasswordActive(false),
+          },
+      ]}
+
+    >
+      <Modal.Section>
+          <TextField
+              label="Email"
+              value={forgotPasswordEmail}
+              placeholder="name@workemail.com"
+              onChange={(email) => setForgotPasswordEmail(email)}
+              autoComplete="off"
+          />
+          <Text variant="bodyMd" color="subdued">We'll use this email to send a password reset link.</Text>
+      </Modal.Section>
+    </Modal>
+  )
+
+  const [passwordResetToken, setPasswordResetToken] = useState("")
+  const [passwordResetActive, setPasswordResetActive] = useState(false)
+  const [newPassword, setNewPassword] = useState("")
+  const [newConfirmPassword, setNewConfirmPassword] = useState("")
+
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search)
+    const tokenFromUrl = queryParams.get('token')
+    setPasswordResetToken(tokenFromUrl)
+    setPasswordResetActive(tokenFromUrl && tokenFromUrl.length > 0)
+  }, [])
+
+  const handleResetPassword = async () => {
+    if(!passwordResetToken || passwordResetToken.length === 0) return
+    if(!validatePassword(newPassword, newConfirmPassword)) return
+
+    await api.resetPassword(passwordResetToken, newPassword).then(() => {
+      func.setToast(true, false, "Password changed successfully!")
+    }).catch((error) => {
+      func.setToast(true, true, "Password reset link is expired or invalid.")
+    }).finally(() => {
+      setPasswordResetActive(false)
+      const urlWithoutToken = window.location.pathname
+      window.history.replaceState({}, document.title, urlWithoutToken)
+    })
+  }
+
+  const resetPasswordComp = (
+    <Modal
+      small
+      open={passwordResetActive}
+      onClose={() => setPasswordResetActive(false)}
+      title="Reset Password"
+      primaryAction={{
+          content: 'Save',
+          onAction: handleResetPassword,
+      }}
+      secondaryActions={[
+          {
+              content: 'Cancel',
+              onAction: () => setPasswordResetActive(false),
+          },
+      ]}
+
+    >
+      <Modal.Section>
+          <PasswordTextField
+              label="Password"
+              field={newPassword}
+              setField={(val) => setNewPassword(val)}
+              monospaced={true}
+              onFunc={true}
+          />
+          <PasswordTextField
+              label="Confirm Password"
+              field={newConfirmPassword}
+              setField={(val) => setNewConfirmPassword(val)}
+              monospaced={true}
+              onFunc={true}
+          />
+      </Modal.Section>
+    </Modal>
+  )
+
+  // TODO("change localhosts to localhost")
+  const notOnPremHostnames = ["app.akto.io", "localhosts", "127.0.0.1", "[::1]"]
+  const isOnPrem = websiteHostName && !notOnPremHostnames.includes(window.location.hostname)
+
   const signupEmailCard = (
     <VerticalStack gap={4}>
       <Form onSubmit={loginFunc}>
@@ -129,6 +310,7 @@ function SignUp() {
           </div>
           <div className='form-class'>
             <PasswordTextField setField={(val) => setPassword(val)} onFunc={true} field={password} label="Password" monospaced={true}/>
+            {loginActive && isOnPrem && forgotPasswordComp}
           </div>
           <Button fullWidth primary onClick={loginFunc} size="large" loading={loading}><div data-testid="signin_signup_button">{activeObject.buttonText}</div></Button>
         </VerticalStack>
@@ -150,7 +332,7 @@ function SignUp() {
       </VerticalStack>
     </VerticalStack>
   )
-  
+
   return (
    <SignUpPageLayout
     customComponent={customComponent}
