@@ -11,6 +11,7 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.HistoricalData;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
@@ -173,7 +174,7 @@ public class IssuesAction extends UserAction {
         long daysBetween = (endTimeStamp - startEpoch) / ONE_DAY_TIMESTAMP;
         List<Bson> pipeline = new ArrayList<>();
 
-        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated("_id.apiInfoKey.apiCollectionId");
+        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated("_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID);
 
         Bson filters = Filters.and(
                 notIncludedCollections,
@@ -226,7 +227,7 @@ public class IssuesAction extends UserAction {
 
         List<Bson> pipeline = new ArrayList<>();
 
-        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated("apiCollectionId");
+        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated(HistoricalData.API_COLLECTION_ID);
         Bson filter = Filters.and(
                 notIncludedCollections,
                 Filters.gte("time", startEpoch),
