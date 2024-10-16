@@ -239,6 +239,27 @@ public class TemplateMapper {
             return true;
         }
 
+        /*
+         * If sensitive only in request , mark as inactive,
+         * since only sensitive in response is in scope for vulnerability.
+         */
+        if (!isSensitiveAlways) {
+            List<SingleTypeInfo.Position> temp = new ArrayList<>();
+            for (SingleTypeInfo.Position position : sensitivePositions) {
+                /*
+                 * For checking sensitive data vulnerabilities,
+                 * only response is in scope.
+                 */
+                if (SingleTypeInfo.Position.REQUEST_HEADER.equals(position) ||
+                        SingleTypeInfo.Position.REQUEST_PAYLOAD.equals(position)) {
+                            temp.add(position);
+                }
+            }
+            if(temp.size() == sensitivePositions.size()){
+                return true;
+            }
+        }
+
         return defaultInactivity;
     }
 
@@ -246,13 +267,19 @@ public class TemplateMapper {
             List<SingleTypeInfo.Position> sensitivePositions) {
         Set<SingleTypeInfo.Position> positions = new HashSet<>();
         if (isSensitiveAlways) {
-            positions.add(SingleTypeInfo.Position.REQUEST_HEADER);
-            positions.add(SingleTypeInfo.Position.REQUEST_PAYLOAD);
             positions.add(SingleTypeInfo.Position.RESPONSE_HEADER);
             positions.add(SingleTypeInfo.Position.RESPONSE_PAYLOAD);
         }
         if (sensitivePositions != null && !sensitivePositions.isEmpty()) {
             for (SingleTypeInfo.Position position : sensitivePositions) {
+                /*
+                 * For checking sensitive data vulnerabilities,
+                 * only response is in scope.
+                 */
+                if (SingleTypeInfo.Position.REQUEST_HEADER.equals(position) ||
+                        SingleTypeInfo.Position.REQUEST_PAYLOAD.equals(position)) {
+                    continue;
+                }
                 positions.add(position);
             }
         }
@@ -262,8 +289,6 @@ public class TemplateMapper {
              * Then create a test with all positions but mark as inactive.
              */
             positions = new HashSet<>();
-            positions.add(SingleTypeInfo.Position.REQUEST_HEADER); 
-            positions.add(SingleTypeInfo.Position.REQUEST_PAYLOAD);
             positions.add(SingleTypeInfo.Position.RESPONSE_HEADER);
             positions.add(SingleTypeInfo.Position.RESPONSE_PAYLOAD);
         }
