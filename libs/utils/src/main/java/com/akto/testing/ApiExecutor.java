@@ -366,9 +366,9 @@ public class ApiExecutor {
 
     private static void calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest, boolean executeScript) {
         if (!executeScript) {
-            loggerMaker.infoAndAddToDb("invalid context for hash calculation, returning");
             return;
         }
+        loggerMaker.infoAndAddToDb("Starting calculateHashAndAddAuth");
         int accountId = Context.accountId.get();
         try {
             String script;

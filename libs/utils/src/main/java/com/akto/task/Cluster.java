@@ -24,6 +24,7 @@ public class Cluster {
     public static final String TOKEN_GENERATOR_CRON = "token-generator-cron";
     public static final String AUTOMATED_API_GROUPS_CRON = "automated-api-groups-cron";
     public static final String DEPENDENCY_FLOW_CRON= "dependency-flow-cron";
+    public static final String DELETE_TESTING_RUN_RESULTS = "delete-testing-run-results";
 
     public static final String winnerId = UUID.randomUUID().toString();
 

@@ -10,7 +10,6 @@ import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
 
-import com.mongodb.BasicDBObject;
 import org.bson.Document;
 import com.mongodb.client.result.UpdateResult;
 
@@ -32,6 +31,8 @@ public abstract class MCollection<T> {
     public static final String ID = "_id";
     public static final String NAME = "name";
     public static final String ROOT_ELEMENT = "$$ROOT";
+    public static final String _COUNT = "count";
+    public static final String _SIZE = "size";
     abstract public String getDBName();
     abstract public String getCollName();
     abstract public Class<T> getClassT();
@@ -367,5 +368,14 @@ public abstract class MCollection<T> {
         logger.info("Trimmed : " + deleteResult.getDeletedCount());
     }
 
+    public Document getCollectionStats(){
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        return mongoDatabase.runCommand(new Document("collStats",getCollName()));
+    }
+
+    public Document compactCollection() {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        return mongoDatabase.runCommand(new Document("compact", getCollName()));
+    }
 
 }
