@@ -468,9 +468,9 @@ public class Main {
                     try {
                         /*
                          * Since this is a heavy job,
-                         * running it for only one account at a time.
+                         * running it for only one account on one instance at a time.
                          */
-                        boolean dibs = Cluster.callDibs(Cluster.DELETE_TESTING_RUN_RESULTS, 4 * 60 * 60, 60);
+                        boolean dibs = Cluster.callDibs(Cluster.DELETE_TESTING_RUN_RESULTS, 60 * 60, 60);
                         if (!dibs) {
                             return;
                         }
