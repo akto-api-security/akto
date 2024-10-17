@@ -1902,6 +1902,13 @@ public class DbAction extends ActionSupport {
     public String insertTestingLog() {
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+
+            // Skip writing cyborg call logs.
+            if (dbLog.getLog().contains("ApiExecutor") &&
+                    dbLog.getLog().contains("cyborg")) {
+                return Action.SUCCESS.toUpperCase();
+            }
+
             DbLayer.insertTestingLog(dbLog);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertTestingLog " + e.toString());
