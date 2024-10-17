@@ -77,6 +77,12 @@ function APIQuery() {
                     let temp = JSON.parse(JSON.stringify(x))
                     delete temp['type']
                     delete temp['operator']
+                    if(x?.actualType !== undefined && x?.actualType === 'HOST_REGEX'){
+                        temp['host_regex'] = temp.regex
+                        delete temp['regex']
+                    }
+                    delete temp['actualType']
+                    
                     dispatchConditions({index: index, type: "overwrite", obj: temp, key: "data"})
                 }
                 
