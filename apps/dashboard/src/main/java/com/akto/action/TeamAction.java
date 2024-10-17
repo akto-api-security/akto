@@ -229,16 +229,16 @@ public class TeamAction extends UserAction {
             addActionError("User not found.");
             return Action.ERROR.toUpperCase();
         }
-        int lastPasswordResetToken = forgotPasswordUser.getLastPasswordResetToken();
 
-        if(Context.now() - lastPasswordResetToken < 1800) {
-            addActionError("Please wait 30 minutes for another password reset link.");
+        int lastPasswordReset = user.getLastPasswordReset();
+        if(Context.now() - lastPasswordReset < 1800) {
+            addActionError("Please wait 30 minutes for another password reset.");
             return Action.ERROR.toUpperCase();
         }
 
         passwordResetToken = PasswordResetUtils.insertPasswordResetToken(userEmail, websiteHostName);
 
-        if(passwordResetToken == null) {
+        if(passwordResetToken == null || passwordResetToken.isEmpty()) {
             return Action.ERROR.toUpperCase();
         }
 

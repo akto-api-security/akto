@@ -8,9 +8,6 @@ import InviteUserModal from "./InviteUserModal";
 const Users = () => {
     const username = window.USER_NAME
     const userRole = window.USER_ROLE
-    const websiteHostName = window.location.origin
-
-    const ref = useRef(null)
 
     const [inviteUser, setInviteUser] = useState({
         isActive: false,
@@ -25,6 +22,36 @@ const Users = () => {
     const rbacAccess = func.checkForRbacFeature();
 
     const [roleSelectionPopup, setRoleSelectionPopup] = useState({})
+
+    const [passwordResetLogin, setPasswordResetLogin] = useState("")
+    const [confirmPasswordResetActive, setConfirmPasswordResetActive] = useState(false)
+    const [passwordResetLinkActive, setPasswordResetLinkActive] = useState(false)
+    const [passwordResetLink, setPasswordResetLink] = useState("")
+
+    const websiteHostName = window.location.origin
+
+    const ref = useRef(null)
+
+    const resetPassword = async () => {
+        await settingRequests.resetUserPassword(passwordResetLogin, websiteHostName).then((resetPasswordLink) => {
+            setPasswordResetLinkActive(true)
+            setPasswordResetLink(resetPasswordLink)
+        }).catch((error) => {
+            const errorMessage = error?.response?.data?.actionErrors[0]
+            func.setToast(true, true, errorMessage)
+            closePasswordResetToggle()
+        })
+    }
+
+    const closePasswordResetToggle = () => {
+        setPasswordResetLinkActive(false)
+        setConfirmPasswordResetActive(false)
+        setPasswordResetLink("")
+    }
+
+    const handleCopyPasswordResetLink = () => {
+        func.copyToClipboard(passwordResetLink, ref, "Password reset link copied to clipboard")
+    }
 
     let paidFeatureRoleOptions =  rbacAccess ? [
         {
@@ -96,7 +123,8 @@ const Users = () => {
         }
 
         if(newRole === 'RESET_PASSWORD') {
-            await resetPassword(login)
+            setConfirmPasswordResetActive(true)
+            setPasswordResetLogin(login)
             toggleRoleSelectionPopup(id)
             return
         }
@@ -164,28 +192,6 @@ const Users = () => {
     const updateUserRole = async (login,roleVal) => {
         await settingRequests.makeAdmin(login, roleVal)
         func.setToast(true, false, "Role updated for " + login + " successfully")
-    }
-
-
-    const [passwordResetLinkActive, setPasswordResetLinkActive] = useState(false)
-    const [passwordResetLink, setPasswordResetLink] = useState("")
-    const resetPassword = async (login) => {
-        await settingRequests.resetUserPassword(login, websiteHostName).then((resetPasswordLink) => {
-            setPasswordResetLinkActive(true)
-            setPasswordResetLink(resetPasswordLink)
-        }).catch((error) => {
-            const errorMessage = error?.response?.data?.actionErrors[0]
-            func.setToast(true, true, errorMessage)
-        })
-    }
-
-    const closePasswordResetToggle = () => {
-        setPasswordResetLinkActive(false)
-        setPasswordResetLink("")
-    }
-
-    const handleCopyPasswordResetLink = () => {
-        func.copyToClipboard(passwordResetLink, ref, "Password reset link copied to clipboard")
     }
 
     return (
@@ -282,6 +288,27 @@ const Users = () => {
                     roleHierarchy={roleHierarchy}
                     rolesOptions={rolesOptions}
                 />
+                <Modal
+                    small
+                    open={confirmPasswordResetActive}
+                    onClose={() => setConfirmPasswordResetActive(false)}
+                    title="Password Reset"
+                    primaryAction={{
+                        content: 'Generate',
+                        onAction: resetPassword,
+                    }}
+                    secondaryActions={[
+                        {
+                        content: 'Cancel',
+                        onAction: () => setConfirmPasswordResetActive(false),
+                        },
+                    ]}
+                >
+                    <Modal.Section>
+                        <Text>Are you sure you want to generate a link to reset the password for <b>{passwordResetLogin}</b>?</Text>
+                    </Modal.Section>
+                </Modal>
+
                 <Modal
                     small
                     open={passwordResetLinkActive}
