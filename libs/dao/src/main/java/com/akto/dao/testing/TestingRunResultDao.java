@@ -28,6 +28,10 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     public static final TestingRunResultDao instance = new TestingRunResultDao();
     public static final int maxDocuments = 5_000_000;
     public static final long sizeInBytes = 50_000_000_000L;
+
+    public static final int CLEAN_THRESHOLD = 90;
+    public static final int DESIRED_THRESHOLD = 50;
+
     public static final String ERRORS_KEY = TestingRunResult.TEST_RESULTS+".0."+TestResult.ERRORS+".0";
 
     @Override

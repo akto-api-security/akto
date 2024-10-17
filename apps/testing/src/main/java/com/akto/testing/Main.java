@@ -40,11 +40,15 @@ import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
+import com.akto.util.Util;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.DeleteResult;
+
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
@@ -58,12 +62,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public class Main {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.TESTING);
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    public static final ScheduledExecutorService deleteScheduler = Executors.newScheduledThreadPool(1);
+    public static boolean testRunResultDeleteJobUnderProgress = false;
 
     public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
 
@@ -418,7 +424,7 @@ public class Main {
                     RequiredConfigs.initiate();
                     testExecutor.init(testingRun, summaryId, syncLimit);
                     raiseMixpanelEvent(summaryId, testingRun, accountId);
-                } catch (Exception e) {
+            } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error in init " + e);
                 }
                 Bson completedUpdate = Updates.combine(
@@ -453,6 +459,34 @@ public class Main {
 
                 loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds for account: " + accountId, LogDb.TESTING);
 
+                /*
+                 * In case the testing run results start overflowing
+                 * due to being a capped collection,
+                 * we will start deleting non-vulnerable results,
+                 * since we cap on size as well as number of documents.
+                 */
+                deleteScheduler.execute(() -> {
+                    Context.accountId.set(accountId);
+                    try {
+                        /*
+                         * Since this is a heavy job,
+                         * running it for only one account at a time.
+                         */
+                        if (testRunResultDeleteJobUnderProgress) {
+                            return;
+                        }
+                        testRunResultDeleteJobUnderProgress = true;
+                        deleteNonVulnerableResults();
+
+                        // TODO: fix clean testing job (CleanTestingJob) for more scale and add here.
+
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error in deleting testing run results");
+                    } finally {
+                        testRunResultDeleteJobUnderProgress = false;
+                    }
+                });
+                
                 Organization organization = OrganizationsDao.instance.findOne(
                         Filters.in(Organization.ACCOUNTS, Context.accountId.get()));
 
@@ -662,4 +696,95 @@ public class Main {
         AktoMixpanel aktoMixpanel = new AktoMixpanel();
         aktoMixpanel.sendEvent(distinct_id, "Test executed", props);
     }
+
+    private static void deleteNonVulnerableResults() {
+        Document stats = TestingRunResultDao.instance.getCollectionStats();
+        long count = Util.getLongValue(stats.get(MCollection._COUNT));
+        long size = Util.getLongValue(stats.get(MCollection._SIZE));
+
+        if ((size >= (TestingRunResultDao.CLEAN_THRESHOLD * TestingRunResultDao.sizeInBytes)/100) ||
+                (count >= (TestingRunResultDao.CLEAN_THRESHOLD * TestingRunResultDao.maxDocuments)/100)) {
+
+            /*
+             * We delete non-vulnerable results,
+             * per summary, starting from the oldest one.
+             */
+            loggerMaker.infoAndAddToDb(String.format(
+                    "deleteNonVulnerableResults Starting deleting non-vulnerable TestingRunResults, current stats: size: %s count: %s",
+                    size, count));
+            deleteNonVulnerableResultsUtil();
+            loggerMaker.infoAndAddToDb(
+                    "deleteNonVulnerableResults Completed deleting non-vulnerable TestingRunResults");
+        }
+    }
+
+    private static void deleteNonVulnerableResultsUtil() {
+
+        final int LIMIT = 1000;
+        final int BATCH_LIMIT = 5;
+        int skip = 0;
+
+        do {
+
+            // oldest first.
+            List<TestingRunResultSummary> summaries = TestingRunResultSummariesDao.instance.findAll(
+                    Filters.empty(), skip, LIMIT, Sorts.ascending(TestingRunResultSummary.END_TIMESTAMP),
+                    Projections.exclude(TestingRunResultSummary.METADATA_STRING));
+
+            if (summaries == null || summaries.isEmpty()) {
+                break;
+            }
+
+            loggerMaker.infoAndAddToDb(String.format(
+                    "deleteNonVulnerableResultsUtil Fetched %s summaries for deleting TestingRunResults",
+                    summaries.size()));
+            List<ObjectId> ids = new ArrayList<>();
+
+            for (TestingRunResultSummary summary : summaries) {
+                ids.add(summary.getId());
+                if (ids.size() >= BATCH_LIMIT) {
+                    if (actuallyDeleteTestingRunResults(ids)) {
+                        break;
+                    }
+                    ids = new ArrayList<>();
+                }
+            }
+
+            if (ids.size() > 0) {
+                if (actuallyDeleteTestingRunResults(ids)) {
+                    break;
+                }
+            }
+            skip += LIMIT;
+        } while (true);
+
+        loggerMaker.infoAndAddToDb("deleteNonVulnerableResultsUtil Running compact to reclaim space");
+        Document compactResult = TestingRunResultDao.instance.compactCollection();
+        loggerMaker.infoAndAddToDb(String.format("deleteNonVulnerableResultsUtil compact result: %s", compactResult.toString()));
+    }
+
+    private static boolean actuallyDeleteTestingRunResults(List<ObjectId> ids) {
+
+        if (ids == null || ids.isEmpty()) {
+            return false;
+        }
+
+        DeleteResult res = TestingRunResultDao.instance.deleteAll(
+                Filters.and(
+                        Filters.in(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, ids),
+                        Filters.eq(TestingRunResult.VULNERABLE, false)));
+        Document stats = TestingRunResultDao.instance.getCollectionStats();
+        long count = Util.getLongValue(stats.get(MCollection._COUNT));
+        long size = Util.getLongValue(stats.get(MCollection._SIZE));
+
+        loggerMaker.infoAndAddToDb(String.format(
+                "actuallyDeleteTestingRunResults Deleted %s TestingRunResults, stats: size: %s count: %s",
+                res.getDeletedCount(), size, count));
+        if ((size <= (TestingRunResultDao.DESIRED_THRESHOLD * TestingRunResultDao.sizeInBytes)/100) ||
+                (count <= (TestingRunResultDao.DESIRED_THRESHOLD * TestingRunResultDao.maxDocuments)/100)) {
+            return true;
+        }
+        return false;
+    }
+
 }
