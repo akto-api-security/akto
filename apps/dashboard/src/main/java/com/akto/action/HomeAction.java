@@ -2,10 +2,8 @@ package com.akto.action;
 
 import com.akto.dao.UsersDao;
 import com.akto.dto.User;
-import com.akto.dto.Config.ConfigType;
 import com.akto.listener.InitializerListener;
 import com.akto.utils.*;
-import com.akto.utils.sso.CustomSamlSettings;
 import com.akto.util.DashboardMode;
 import com.auth0.AuthorizeUrl;
 import com.auth0.SessionUtils;
@@ -60,12 +58,6 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
         }
         if(OktaLogin.getAuthorisationUrl() != null){
             servletRequest.setAttribute("oktaAuthUrl", new String(Base64.getEncoder().encode(OktaLogin.getAuthorisationUrl().getBytes())));
-        }
-        if(CustomSamlSettings.getSamlSettings(ConfigType.AZURE) != null){
-            servletRequest.setAttribute("azureRequestUrl", new String(Base64.getEncoder().encode((CustomSamlSettings.getInstance(ConfigType.AZURE).getSamlConfig().getApplicationIdentifier() + "/signup-azure-request").getBytes())));
-        }
-        if(CustomSamlSettings.getSamlSettings(ConfigType.GOOGLE_SAML) != null){
-            servletRequest.setAttribute("googleSsoUrl", new String(Base64.getEncoder().encode((CustomSamlSettings.getInstance(ConfigType.GOOGLE_SAML).getSamlConfig().getLoginUrl().getBytes()))));
         }
         if (InitializerListener.aktoVersion != null && InitializerListener.aktoVersion.contains("akto-release-version")) {
             servletRequest.setAttribute("AktoVersionGlobal", "");

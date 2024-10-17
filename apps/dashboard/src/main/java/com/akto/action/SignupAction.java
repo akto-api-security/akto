@@ -40,7 +40,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.onelogin.saml2.Auth;
 import com.onelogin.saml2.settings.Saml2Settings;
-import com.onelogin.saml2.settings.SettingsBuilder;
 import com.opensymphony.xwork2.Action;
 import com.slack.api.Slack;
 import com.slack.api.methods.SlackApiException;
@@ -557,15 +556,17 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     private String userEmail;
 
     private String samlUtilMethodForAuth(ConfigType configType) throws IOException{
-
-        if(this.userEmail == null || this.userEmail.trim().isEmpty()){
+        String queryString = servletRequest.getQueryString();
+        if(queryString == null || queryString.isEmpty() || queryString.split("email=").length < 2){
             code = "Error, user email cannot be empty";
+            servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
-
-        int tempAccountId = SSOConfigsDao.instance.getSSOConfigId(this.userEmail);
+        setUserEmail(queryString.split("email=")[1]);
+        int tempAccountId = SSOConfigsDao.instance.getSSOConfigId(userEmail);
         if(tempAccountId == -1){
             code = "Error, cannot login via SSO, redirecting to login";
+            servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
         setAccountId(tempAccountId);
@@ -578,10 +579,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             return ERROR.toUpperCase();
         }
         try {
-            if(configType.equals(ConfigType.GOOGLE_SAML)){
-                SAMLConfig config = CustomSamlSettings.getInstance(configType).getSamlConfig();
-                servletResponse.sendRedirect(config.getLoginUrl());
-            }
             Auth auth = new Auth(settings, servletRequest, servletResponse);
             String relayState = String.valueOf(tempAccountId);
             auth.login(relayState);
@@ -650,12 +647,18 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public String registerViaGoogleSamlSso() throws IOException{
         Auth auth;
         try {
+            String tempAccountId = servletRequest.getParameter("RelayState");
+            if(tempAccountId == null || tempAccountId.isEmpty()){
+                loggerMaker.errorAndAddToDb("Account id not found");
+                servletResponse.sendRedirect("/login");
+                return ERROR.toUpperCase();
+            }
+            setAccountId(Integer.parseInt(tempAccountId));
             Saml2Settings settings = CustomSamlSettings.getSamlSettings(ConfigType.GOOGLE_SAML, this.accountId);
             HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest, ConfigType.GOOGLE_SAML, this.accountId);
             auth = new Auth(settings, wrappedRequest, servletResponse);
             auth.processResponse();
             if (!auth.isAuthenticated()) {
-                loggerMaker.errorAndAddToDb("Error reason: " + auth.getLastErrorReason(), LogDb.DASHBOARD);
                 servletResponse.sendRedirect("/login");
                 return ERROR.toUpperCase();
             }

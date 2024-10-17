@@ -2,24 +2,13 @@
 import React, { useState } from 'react'
 import SignUpPageLayout from './SignUpPageLayout';
 import { Button, Form, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris';
-import api from '../api';
-import func from "@/util/func"
 
 function SignUpWithSSO() {
 
     const [email, setEmail] = useState('')
 
-    const handleSubmit = async() => {
-        await api.triggerGoogleSSO(email).then((res) => {
-            if(res !== null && res !== undefined && res.length > 0){
-                if(res.toLowerCase().includes("error")) func.setToast(true, true, res)
-                if(res.toLowerCase().includes("redirecting")){
-                    setTimeout(() => {
-                        window.location.href = "/login"
-                    }, 2000);   
-                }
-            }
-        })
+    const handleSubmit = () => {
+        window.location.href = "/trigger-google-sso?email=" + email
     }
 
     const customComponent = (

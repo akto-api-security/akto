@@ -53,9 +53,9 @@ export const PollingProvider = ({ children }) => {
             intervalAlertRef.current = id2
         };
         if (window.location.pathname.startsWith('/dashboard')) {
-            // fetchTestingStatus();
+            fetchTestingStatus();
             if (window.USER_NAME.length > 0 && window.USER_NAME.includes('akto.io')) {
-                // fetchAlerts();
+                fetchAlerts();
             }
         }
         return () => {

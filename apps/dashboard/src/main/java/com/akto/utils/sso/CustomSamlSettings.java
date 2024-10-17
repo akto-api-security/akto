@@ -18,7 +18,7 @@ public class CustomSamlSettings {
     private CustomSamlSettings() {}
 
     public static CustomSamlSettings getInstance(ConfigType configType, int accountId) {
-        CustomSamlSettings instance = instances.get(configType);
+        CustomSamlSettings instance = instances.getOrDefault(configType, new CustomSamlSettings());
         SAMLConfig samlConfig = SsoUtils.findSAMLConfig(configType, accountId);
         instance.samlConfig = samlConfig;
         return instance;
