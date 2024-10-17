@@ -11,13 +11,11 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
-import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingEndpoints.Operator;
 import com.akto.dto.testing.TestingRun.State;
@@ -36,6 +34,7 @@ import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.rules.RequiredConfigs;
+import com.akto.task.Cluster;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -69,7 +68,6 @@ public class Main {
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     public static final ScheduledExecutorService deleteScheduler = Executors.newScheduledThreadPool(1);
-    public static boolean testRunResultDeleteJobUnderProgress = false;
 
     public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
 
@@ -472,18 +470,18 @@ public class Main {
                          * Since this is a heavy job,
                          * running it for only one account at a time.
                          */
-                        if (testRunResultDeleteJobUnderProgress) {
+                        boolean dibs = Cluster.callDibs(Cluster.DELETE_TESTING_RUN_RESULTS, 4 * 60 * 60, 60);
+                        if (!dibs) {
                             return;
                         }
-                        testRunResultDeleteJobUnderProgress = true;
+                        loggerMaker.infoAndAddToDb(
+                                String.format("%s dibs acquired, starting", Cluster.DELETE_TESTING_RUN_RESULTS));
                         deleteNonVulnerableResults();
 
                         // TODO: fix clean testing job (CleanTestingJob) for more scale and add here.
 
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error in deleting testing run results");
-                    } finally {
-                        testRunResultDeleteJobUnderProgress = false;
                     }
                 });
                 
@@ -701,6 +699,8 @@ public class Main {
         Document stats = TestingRunResultDao.instance.getCollectionStats();
         long count = Util.getLongValue(stats.get(MCollection._COUNT));
         long size = Util.getLongValue(stats.get(MCollection._SIZE));
+
+        // Deleting only in case of capped collection limits about to breach
 
         if ((size >= (TestingRunResultDao.CLEAN_THRESHOLD * TestingRunResultDao.sizeInBytes)/100) ||
                 (count >= (TestingRunResultDao.CLEAN_THRESHOLD * TestingRunResultDao.maxDocuments)/100)) {
