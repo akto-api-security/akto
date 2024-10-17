@@ -228,9 +228,9 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     String forgotPasswordEmail;
     String websiteHostName;
     public String sendPasswordResetLink() {
-//        if(!DashboardMode.isOnPremDeployment()) {
-//            return Action.ERROR.toUpperCase();
-//        }
+        if(!DashboardMode.isOnPremDeployment()) {
+            return Action.ERROR.toUpperCase();
+        }
 
         if(forgotPasswordEmail == null || forgotPasswordEmail.trim().isEmpty()) {
             return Action.ERROR.toUpperCase();
@@ -277,9 +277,9 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     String resetPasswordToken;
     String newPassword;
     public String resetPassword() {
-//        if(!DashboardMode.isOnPremDeployment()) {
-//            return Action.ERROR.toUpperCase();
-//        }
+        if(!DashboardMode.isOnPremDeployment()) {
+            return Action.ERROR.toUpperCase();
+        }
 
         if(resetPasswordToken == null || resetPasswordToken.trim().isEmpty()) {
             return Action.ERROR.toUpperCase();
@@ -303,7 +303,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
         int getLastPasswordResetToken = user.getLastPasswordResetToken();
         if(Context.now() - getLastPasswordResetToken > 1800) {
-            return Action.SUCCESS.toUpperCase();
+            return Action.ERROR.toUpperCase();
         }
 
 
@@ -318,7 +318,6 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                 ),
                 Updates.combine(
                         Updates.set(User.SIGNUP_INFO_MAP, signupInfoMap),
-                        Updates.set(User.LAST_PASSWORD_RESET, Context.now()),
                         Updates.set(User.PASSWORD_RESET_TOKEN, ""),
                         Updates.set(User.LAST_PASSWORD_RESET, Context.now()),
                         Updates.set(User.REFRESH_TOKEN, new ArrayList<String>())
