@@ -94,6 +94,7 @@
         <url-pattern>/auth/login</url-pattern>
         <url-pattern>/api/inviteUsers</url-pattern>
         <url-pattern>/tools/*</url-pattern>
+        <url-pattern>/trigger-google-sso</url-pattern>
     </filter-mapping>
 
     <filter>

@@ -23,13 +23,13 @@ public abstract class Config {
         this.id = id;
     }
 
-    String id;
+    public String id;
 
     public enum ConfigType {
         SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML;
     }
 
-    ConfigType configType;
+    public ConfigType configType;
 
     @BsonDiscriminator
     public static class SlackConfig extends Config {
@@ -595,5 +595,4 @@ public abstract class Config {
             this.publicKey = publicKey;
         }
     }
-
 }

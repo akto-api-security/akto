@@ -19,7 +19,7 @@ public class CustomSamlSettings {
 
     public static CustomSamlSettings getInstance(ConfigType configType, int accountId) {
         CustomSamlSettings instance = instances.get(configType);
-        SAMLConfig samlConfig = SsoUtils.findSAMLConfig(configType);
+        SAMLConfig samlConfig = SsoUtils.findSAMLConfig(configType, accountId);
         instance.samlConfig = samlConfig;
         return instance;
     }

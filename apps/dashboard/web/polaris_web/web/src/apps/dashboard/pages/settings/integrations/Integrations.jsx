@@ -148,7 +148,7 @@ function Integrations() {
       case 'ai':
         return aiItems;
       case 'sso':
-        if (func.checkLocal()) {
+        if (!func.checkLocal()) {
           return emptyItem;
         }
         return ssoItems;

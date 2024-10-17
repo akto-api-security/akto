@@ -5,6 +5,7 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.*;
 import com.akto.dto.Config.ConfigType;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.sso.SAMLConfig;
 import com.akto.listener.InitializerListener;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.log.LoggerMaker;
@@ -556,28 +557,37 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     private String userEmail;
 
     private String samlUtilMethodForAuth(ConfigType configType) throws IOException{
-        if(CustomSamlSettings.getInstance(ConfigType.valueOf(configType.name())) == null){
+
+        if(this.userEmail == null || this.userEmail.trim().isEmpty()){
+            code = "Error, user email cannot be empty";
             return ERROR.toUpperCase();
         }
-        Saml2Settings settings = null;
-        if(this.accountId == 0){
-            settings = CustomSamlSettings.getSamlSettings(ConfigType.valueOf(configType.name()));
-        }else{
-            settings = CustomSamlSettings.getSamlSettings(ConfigType.valueOf(configType.name()),accountId);
+
+        int tempAccountId = SSOConfigsDao.instance.getSSOConfigId(this.userEmail);
+        if(tempAccountId == -1){
+            code = "Error, cannot login via SSO, redirecting to login";
+            return ERROR.toUpperCase();
         }
+        setAccountId(tempAccountId);
+
+        Saml2Settings settings = null;
+        settings = CustomSamlSettings.getSamlSettings(ConfigType.valueOf(configType.name()),accountId);
+
         if(settings == null){
+            code= "Error, cannot find sso for this organization, redirecting to login";
             return ERROR.toUpperCase();
         }
         try {
-            Auth auth = new Auth(settings, servletRequest, servletResponse);
-            if(this.accountId == 0){
-                auth.login(CustomSamlSettings.getInstance(ConfigType.valueOf(configType.name())).getSamlConfig().getApplicationIdentifier() + "/dashboard/onboarding");
-            }else{
-                auth.login(CustomSamlSettings.getInstance(ConfigType.valueOf(configType.name()), accountId).getSamlConfig().getApplicationIdentifier() + "/dashboard/onboarding");
+            if(configType.equals(ConfigType.GOOGLE_SAML)){
+                SAMLConfig config = CustomSamlSettings.getInstance(configType).getSamlConfig();
+                servletResponse.sendRedirect(config.getLoginUrl());
             }
+            Auth auth = new Auth(settings, servletRequest, servletResponse);
+            String relayState = String.valueOf(tempAccountId);
+            auth.login(relayState);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while getting response of " + configType.name() +  " sso \n" + e.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
+            return ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();
     }
@@ -638,16 +648,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     }
 
     public String registerViaGoogleSamlSso() throws IOException{
-        if(CustomSamlSettings.getInstance(ConfigType.GOOGLE_SAML) == null){
-            return ERROR.toUpperCase();
-        }
-        Saml2Settings settings = CustomSamlSettings.getSamlSettings(ConfigType.GOOGLE_SAML, this.accountId);
-        if(settings == null){
-            return ERROR.toUpperCase();
-        }
-
         Auth auth;
         try {
+            Saml2Settings settings = CustomSamlSettings.getSamlSettings(ConfigType.GOOGLE_SAML, this.accountId);
             HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest, ConfigType.GOOGLE_SAML, this.accountId);
             auth = new Auth(settings, wrappedRequest, servletResponse);
             auth.processResponse();

@@ -8,7 +8,6 @@ import com.akto.action.UserAction;
 import com.akto.dao.SSOConfigsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.Config;
 import com.akto.dto.User;
 import com.akto.dto.Config.ConfigType;
 import com.akto.dto.sso.SAMLConfig;
@@ -28,22 +27,26 @@ public class AzureSsoAction extends UserAction{
     private String applicationIdentifier;
     private ConfigType configType;
 
-    private SAMLConfig getConfig(ConfigType configType){
+    private SAMLConfig getConfig(ConfigType configType, String domain){
         SAMLConfig config = new SAMLConfig(configType,Context.accountId.get());
         config.setX509Certificate(x509Certificate);
         config.setEntityId(ssoEntityId);
         config.setAcsUrl(acsUrl);
         config.setLoginUrl(loginUrl);
         config.setApplicationIdentifier(applicationIdentifier);
+        config.setOrganizationDomain(domain);
         return config;
     }
 
     public String addSamlSsoInfo(){
+        String userLogin = getSUser().getLogin();
+        String domain = userLogin.split("@")[1];
         if (SsoUtils.isAnySsoActive(Context.accountId.get())) {
             addActionError("A SSO Integration already exists.");
             return ERROR.toUpperCase();
         }
-        SAMLConfig samlConfig = getConfig(this.configType);       
+        
+        SAMLConfig samlConfig = getConfig(this.configType, domain);       
         SSOConfigsDao.instance.insertOne(samlConfig);
 
         return Action.SUCCESS.toUpperCase();
