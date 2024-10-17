@@ -10,6 +10,7 @@ import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.password_reset.PasswordResetUtils;
 import com.akto.util.Pair;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -202,6 +203,42 @@ public class TeamAction extends UserAction {
         }
     }
 
+    String userEmail;
+    String websiteHostName;
+    String passwordResetToken;
+    public String resetUserPassword() {
+        if(userEmail == null || userEmail.isEmpty()) {
+            addActionError("Email cannot be null or empty");
+            return Action.ERROR.toUpperCase();
+        }
+
+        User user = getSUser();
+        if(user == null) {
+            addActionError("User cannot be null or empty");
+            return Action.ERROR.toUpperCase();
+        }
+
+        User forgotPasswordUser = UsersDao.instance.findOne(Filters.eq(User.LOGIN, userEmail));
+        if(forgotPasswordUser == null) {
+            addActionError("User not found.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        int lastPasswordReset = user.getLastPasswordReset();
+        if(Context.now() - lastPasswordReset < 1800) {
+            addActionError("Please wait 30 minutes for another password reset.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        passwordResetToken = PasswordResetUtils.insertPasswordResetToken(userEmail, websiteHostName);
+
+        if(passwordResetToken == null || passwordResetToken.isEmpty()) {
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public int getId() {
         return id;
     }
@@ -234,4 +271,15 @@ public class TeamAction extends UserAction {
         return userRoleHierarchy;
     }
 
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
+    }
+
+    public void setWebsiteHostName(String websiteHostName) {
+        this.websiteHostName = websiteHostName;
+    }
+
+    public String getPasswordResetToken() {
+        return passwordResetToken;
+    }
 }

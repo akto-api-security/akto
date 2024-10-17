@@ -1,6 +1,6 @@
-import { ActionList, Avatar, Banner, Box, Button, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text } from "@shopify/polaris"
-import { DeleteMajor, TickMinor } from "@shopify/polaris-icons"
-import { useEffect, useState } from "react";
+import { ActionList, Avatar, Banner, Box, Button, Icon, LegacyCard, Link, Modal, Page, Popover, ResourceItem, ResourceList, Text, TextField } from "@shopify/polaris"
+import { DeleteMajor, TickMinor, PasskeyMajor } from "@shopify/polaris-icons"
+import { useEffect, useRef, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
@@ -22,6 +22,36 @@ const Users = () => {
     const rbacAccess = func.checkForRbacFeature();
 
     const [roleSelectionPopup, setRoleSelectionPopup] = useState({})
+
+    const [passwordResetLogin, setPasswordResetLogin] = useState("")
+    const [confirmPasswordResetActive, setConfirmPasswordResetActive] = useState(false)
+    const [passwordResetLinkActive, setPasswordResetLinkActive] = useState(false)
+    const [passwordResetLink, setPasswordResetLink] = useState("")
+
+    const websiteHostName = window.location.origin
+
+    const ref = useRef(null)
+
+    const resetPassword = async () => {
+        await settingRequests.resetUserPassword(passwordResetLogin, websiteHostName).then((resetPasswordLink) => {
+            setPasswordResetLinkActive(true)
+            setPasswordResetLink(resetPasswordLink)
+        }).catch((error) => {
+            const errorMessage = error?.response?.data?.actionErrors[0]
+            func.setToast(true, true, errorMessage)
+            closePasswordResetToggle()
+        })
+    }
+
+    const closePasswordResetToggle = () => {
+        setPasswordResetLinkActive(false)
+        setConfirmPasswordResetActive(false)
+        setPasswordResetLink("")
+    }
+
+    const handleCopyPasswordResetLink = () => {
+        func.copyToClipboard(passwordResetLink, ref, "Password reset link copied to clipboard")
+    }
 
     let paidFeatureRoleOptions =  rbacAccess ? [
         {
@@ -47,12 +77,20 @@ const Users = () => {
             }, ...paidFeatureRoleOptions]
         },
         {
-            items: [{
-                destructive: true,
-                content: 'Remove',
-                role: 'REMOVE',
-                icon: DeleteMajor
-            }]
+            items: [
+                {
+                    destructive: false,
+                    content: 'Reset Password',
+                    role: 'RESET_PASSWORD',
+                    icon: PasskeyMajor
+                },
+                {
+                    destructive: true,
+                    content: 'Remove',
+                    role: 'REMOVE',
+                    icon: DeleteMajor
+                }
+            ]
         }
     ]
 
@@ -63,6 +101,7 @@ const Users = () => {
         }
         if(window.USER_ROLE === 'ADMIN'){
             roleHierarchyResp.push('REMOVE')
+            roleHierarchyResp.push('RESET_PASSWORD')
         }
         setRoleHierarchy(roleHierarchyResp)
         
@@ -78,6 +117,13 @@ const Users = () => {
             await handleRemoveUser(login)
             toggleRoleSelectionPopup(id)
             setUsers(users.filter(user => user.login !== login))
+            return
+        }
+
+        if(newRole === 'RESET_PASSWORD') {
+            setConfirmPasswordResetActive(true)
+            setPasswordResetLogin(login)
+            toggleRoleSelectionPopup(id)
             return
         }
 
@@ -101,7 +147,7 @@ const Users = () => {
             ...section,
             items: section.items.filter((c) => roleHierarchy.includes(c.role)).map(item => ({
                 ...item,
-                prefix: item.role === "REMOVE"?  <Box><Icon source={DeleteMajor}/></Box> : item.role === currentRole ? <Box><Icon source={TickMinor}/></Box> : <div style={{padding: "10px"}}/>
+                prefix: item.role === "REMOVE"?  <Box><Icon source={DeleteMajor}/></Box> : item.role === "RESET_PASSWORD" ? <Box><Icon source={PasskeyMajor}/></Box> : item.role === currentRole ? <Box><Icon source={TickMinor}/></Box> : <div style={{padding: "10px"}}/>
             }))
         }));
         return tempArr
@@ -240,6 +286,52 @@ const Users = () => {
                     roleHierarchy={roleHierarchy}
                     rolesOptions={rolesOptions}
                 />
+                <Modal
+                    small
+                    open={confirmPasswordResetActive}
+                    onClose={() => setConfirmPasswordResetActive(false)}
+                    title="Password Reset"
+                    primaryAction={{
+                        content: 'Generate',
+                        onAction: resetPassword,
+                    }}
+                    secondaryActions={[
+                        {
+                        content: 'Cancel',
+                        onAction: () => setConfirmPasswordResetActive(false),
+                        },
+                    ]}
+                >
+                    <Modal.Section>
+                        <Text>Are you sure you want to generate a link to reset the password for <b>{passwordResetLogin}</b>?</Text>
+                    </Modal.Section>
+                </Modal>
+
+                <Modal
+                    small
+                    open={passwordResetLinkActive}
+                    onClose={closePasswordResetToggle}
+                    title="Password Reset"
+                    primaryAction={{
+                        content: 'Copy link',
+                        onAction: handleCopyPasswordResetLink,
+                    }}
+                    secondaryActions={[
+                        {
+                        content: 'Cancel',
+                        onAction: closePasswordResetToggle,
+                        },
+                    ]}
+                >
+                    <Modal.Section>
+                        <TextField
+                            label="Password reset link"
+                            disabled={true}
+                            value={passwordResetLink}
+                        />
+                        <div ref={ref} />
+                    </Modal.Section>
+                </Modal>
             </div>
 
         </Page>

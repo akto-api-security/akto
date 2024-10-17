@@ -1,4 +1,4 @@
-import { Avatar, Box, Button, Form, Frame, HorizontalStack, Page, Text, TextField, Toast, VerticalStack } from '@shopify/polaris'
+import { Avatar, Box, Button, Form, Frame, HorizontalStack, Modal, Page, Text, TextField, Toast, VerticalStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import SSOTextfield from './SSOTextfield'
 import PasswordTextField from '../../dashboard/components/layouts/PasswordTextField'
@@ -19,6 +19,13 @@ function SignUp() {
   const [password, setPassword] = useState("")
   const [loginActive, setLoginActive] = useState(location.pathname.includes("login"))
   const [loading, setLoading] = useState(false)
+
+  const [isForgotPasswordActive, setIsForgotPasswordActive] = useState(false)
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("")
+  const [passwordResetToken, setPasswordResetToken] = useState("")
+  const [passwordResetActive, setPasswordResetActive] = useState(false)
+  const [newPassword, setNewPassword] = useState("")
+  const [newConfirmPassword, setNewConfirmPassword] = useState("")
 
   const oktaUrl = window.OKTA_AUTH_URL
   const azureUrl = window.AZURE_REQUEST_URL
@@ -67,6 +74,21 @@ function SignUp() {
       navigate('/dashboard/observe/inventory');
     }
   }, [])
+
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search)
+    const tokenFromUrl = queryParams.get('token')
+    setPasswordResetToken(tokenFromUrl)
+    setPasswordResetActive(tokenFromUrl && tokenFromUrl.length > 0)
+  }, [])
+
+  useEffect(() => {
+    if(func.validateEmail(email)) {
+      setForgotPasswordEmail(email)
+    } else {
+      setForgotPasswordEmail("")
+    }
+  }, [email])
 
   const ssoCard = (
     ssoList.length === 0 ? null :
@@ -130,6 +152,126 @@ function SignUp() {
 
   const activeObject = loginActive ? loginObject : signupObject
   const navigate = useNavigate()
+  
+  const websiteHostName = window.location.origin
+
+  const handleForgotPassword = async () => {
+    if(!func.validateEmail(forgotPasswordEmail)) {
+      func.setToast(true, true, "Please enter a valid email!")
+      return
+    }
+    
+    await api.sendPasswordResetLink(forgotPasswordEmail, websiteHostName).then((resp) => {
+      func.setToast(true, false, "Reset password link has been sent!")
+    }).catch((error) => {
+      if(error?.response?.status === 429) {
+        func.setToast(true, error, "Too many requests. Please try again later.")
+      } else {
+        const errorMessage = error?.response?.data || "Reset password link has been sent!"
+        const errorStatus = error?.response?.data !== undefined && error?.response?.data.length > 0
+        func.setToast(true, errorStatus, errorMessage)
+      }
+    }).finally(() => {
+      setIsForgotPasswordActive(false)
+      setForgotPasswordEmail("")
+    })
+  }
+
+  const forgotPasswordComp = (
+    <Modal
+      small
+      activator={
+        <div style={{textAlign: 'end'}}>
+          <Button plain onClick={() => setIsForgotPasswordActive(true)}>Forgot Password?</Button>
+        </div>
+      }
+      open={isForgotPasswordActive}
+      onClose={() => setIsForgotPasswordActive(false)}
+      title="Forgot Password"
+      primaryAction={{
+          content: 'Send',
+          onAction: handleForgotPassword,
+      }}
+      secondaryActions={[
+          {
+              content: 'Cancel',
+              onAction: () => setIsForgotPasswordActive(false),
+          },
+      ]}
+      
+    >
+      <Modal.Section>
+          <TextField
+              label="Email"
+              value={forgotPasswordEmail}
+              placeholder="name@workemail.com"
+              onChange={(email) => setForgotPasswordEmail(email)}
+              autoComplete="off"
+          />
+          <Text variant="bodyMd" color="subdued">We'll use this email to send a password reset link.</Text>
+      </Modal.Section>
+    </Modal>
+  )
+
+  const handleResetPassword = async () => {
+    if(!passwordResetToken || passwordResetToken.length === 0) return
+    if(!func.validatePassword(newPassword, newConfirmPassword)) return
+
+    await api.resetPassword(passwordResetToken, newPassword).then(() => {
+      func.setToast(true, false, "Password changed successfully!")
+    }).catch((error) => {
+      if(error?.response?.status === 429) {
+        func.setToast(true, error, "Too many requests. Please try again later.")
+      } else {
+        const errorMessage = error?.response?.data || "Password reset link is expired or invalid."
+        func.setToast(true, true, errorMessage)
+      }
+    }).finally(() => {
+      setPasswordResetActive(false)
+      const urlWithoutToken = window.location.pathname
+      window.history.replaceState({}, document.title, urlWithoutToken)
+    })
+  }
+
+  const resetPasswordComp = (
+    <Modal
+      small
+      open={passwordResetActive}
+      onClose={() => setPasswordResetActive(false)}
+      title="Reset Password"
+      primaryAction={{
+          content: 'Save',
+          onAction: handleResetPassword,
+      }}
+      secondaryActions={[
+          {
+              content: 'Cancel',
+              onAction: () => setPasswordResetActive(false),
+          },
+      ]}
+      
+    >
+      <Modal.Section>
+          <PasswordTextField
+              label="Password"
+              field={newPassword}
+              setField={(val) => setNewPassword(val)}
+              monospaced={true}
+              onFunc={true} 
+          />
+          <PasswordTextField
+              label="Confirm Password"
+              field={newConfirmPassword}
+              setField={(val) => setNewConfirmPassword(val)}
+              monospaced={true}
+              onFunc={true} 
+          />
+      </Modal.Section>
+    </Modal>
+  )
+
+  const notOnPremHostnames = ["app.akto.io", "localhost", "127.0.0.1", "[::1]"]
+  const isOnPrem = websiteHostName && !notOnPremHostnames.includes(window.location.hostname)
 
   const signupEmailCard = (
     <VerticalStack gap={4}>
@@ -140,6 +282,7 @@ function SignUp() {
           </div>
           <div className='form-class'>
             <PasswordTextField setField={(val) => setPassword(val)} onFunc={true} field={password} label="Password" monospaced={true}/>
+            {loginActive && isOnPrem && forgotPasswordComp}
           </div>
           <Button fullWidth primary onClick={loginFunc} size="large" loading={loading}><div data-testid="signin_signup_button">{activeObject.buttonText}</div></Button>
         </VerticalStack>
@@ -185,6 +328,7 @@ function SignUp() {
                       <VerticalStack gap={5}>
                         {ssoCard}
                         {signupEmailCard}
+                        {loginActive && isOnPrem && resetPasswordComp}
                       </VerticalStack>
                     </VerticalStack>
 
