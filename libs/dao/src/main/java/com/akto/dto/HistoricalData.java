@@ -6,6 +6,7 @@ import org.bson.types.ObjectId;
 public class HistoricalData {
 
     private ObjectId id;
+    public static final String API_COLLECTION_ID = "apiCollectionId";
     private int apiCollectionId;
     private int totalApis;
     private float riskScore;
