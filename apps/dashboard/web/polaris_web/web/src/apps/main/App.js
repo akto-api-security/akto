@@ -72,6 +72,7 @@ import ThreatDetectionPage from "../dashboard/pages/threat_detection/ThreatDetec
 import { PollingProvider } from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
+import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
 
 import TeamsWebhooks from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhooks";
 import TeamsWebhook from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhook";
@@ -311,6 +312,10 @@ const router = createBrowserRouter([
           {
             path: "self-hosted",
             element: <SelfHosted/>
+          },
+          {
+            path: 'audit-logs',
+            element: <AuditLogs/>
           }
         ]
       },

@@ -1,5 +1,5 @@
 import { Navigation } from "@shopify/polaris"
-import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor} from "@shopify/polaris-icons"
+import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ComposeMajor} from "@shopify/polaris-icons"
 import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor, ChatMajor} from "@shopify/polaris-icons"
 import { VariantMajor, VocabularyMajor, AdjustMinor } from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
@@ -29,6 +29,12 @@ const SettingsLeftNav = () => {
         icon: PlanMajor,
         selected: page === "self-hosted",
         onClick: () => navigate("/dashboard/settings/self-hosted")
+    }] : []
+    const auditLogsArr = ((window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM') && window.USER_ROLE === 'ADMIN') ? [{
+        label: 'Audit logs',
+        icon: ComposeMajor,
+        selected: page === 'audit-logs',
+        onClick: () => navigate("/dashboard/settings/audit-logs")
     }] : []
 
     const billingArr = window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM' ? [{
@@ -109,6 +115,7 @@ const SettingsLeftNav = () => {
                     },
                     ...billingArr,
                     ...selfHostedArr,
+                    ...auditLogsArr,
                     {
                         label: 'Help & Support',
                         icon: ChatMajor,

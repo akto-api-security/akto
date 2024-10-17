@@ -447,6 +447,13 @@ const settingRequests = {
                 accountPermission, modifiedValueForAccount
             }
         })
+    },
+    fetchApiAuditLogsFromDb(skip, limit, sortOrder, startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/fetchApiAuditLogsFromDb',
+            method: 'post',
+            data: {skip, limit, sortOrder, startTimestamp, endTimestamp}
+        })
     }
 }
 
