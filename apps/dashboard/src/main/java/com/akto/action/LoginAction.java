@@ -225,18 +225,23 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
     }
 
+    String code;
+
     String forgotPasswordEmail;
     String websiteHostName;
     public String sendPasswordResetLink() {
         if(!DashboardMode.isOnPremDeployment()) {
+            code = "This feature is not in your plan.";
             return Action.ERROR.toUpperCase();
         }
 
         if(forgotPasswordEmail == null || forgotPasswordEmail.trim().isEmpty()) {
+            code = "Email cannot be empty.";
             return Action.ERROR.toUpperCase();
         }
 
         if(websiteHostName == null || websiteHostName.trim().isEmpty()) {
+            code = "Something went wrong. Please try again later";
             return Action.ERROR.toUpperCase();
         }
 
@@ -252,6 +257,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
         int lastPasswordReset = user.getLastPasswordReset();
         if(Context.now() - lastPasswordReset < 1800) {
+            code = "You need to wait 30 minutes before generating another password reset link.";
             return Action.ERROR.toUpperCase();
         }
 
@@ -259,6 +265,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
         if(resetUrl == null || resetUrl.trim().isEmpty()) {
             logger.error("Error while generating password reset link");
+            code = "Something went wrong. Please try again later";
             return Action.ERROR.toUpperCase();
         }
 
@@ -268,6 +275,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             SendgridEmail.getInstance().send(mail);
         } catch (IOException e) {
             logger.error("Error while sending password reset email: " + e.getMessage());
+            code = "Error while sending email.";
             return Action.ERROR.toUpperCase();
         }
 
@@ -278,18 +286,23 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     String newPassword;
     public String resetPassword() {
         if(!DashboardMode.isOnPremDeployment()) {
+            code = "This feature is not in your plan.";
             return Action.ERROR.toUpperCase();
         }
 
         if(resetPasswordToken == null || resetPasswordToken.trim().isEmpty()) {
+            code = "Token is expired or invalid.";
             return Action.ERROR.toUpperCase();
         }
 
         if(newPassword == null || newPassword.trim().isEmpty()) {
+            code = "Password cannot be empty.";
             return Action.ERROR.toUpperCase();
         }
 
-        if(SignupAction.validatePassword(newPassword) != null) {
+        String validatePasswordStatus = SignupAction.validatePassword(newPassword);
+        if(validatePasswordStatus != null) {
+            code = validatePasswordStatus;
             return Action.ERROR.toUpperCase();
         }
 
@@ -298,11 +311,13 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         );
 
         if(user == null) {
+            code = "Token is expired or invalid.";
             return Action.ERROR.toUpperCase();
         }
 
         int getLastPasswordResetToken = user.getLastPasswordResetToken();
         if(Context.now() - getLastPasswordResetToken > 1800) {
+            code = "Token is expired or invalid.";
             return Action.ERROR.toUpperCase();
         }
 
@@ -352,6 +367,10 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     }
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public String getCode() {
+        return code;
     }
 
     protected HttpServletResponse servletResponse;

@@ -156,7 +156,9 @@ function SignUp() {
       if(error?.response?.status === 429) {
         func.setToast(true, error, "Too many requests. Please try again later.")
       } else {
-        func.setToast(true, false, "Reset password link has been sent!")
+        const errorMessage = error?.response?.data || "Reset password link has been sent!"
+        const errorStatus = error?.response?.data !== undefined && error?.response?.data.length > 0
+        func.setToast(true, errorStatus, errorMessage)
       }
     }).finally(() => {
       setIsForgotPasswordActive(false)
@@ -210,7 +212,8 @@ function SignUp() {
       if(error?.response?.status === 429) {
         func.setToast(true, error, "Too many requests. Please try again later.")
       } else {
-        func.setToast(true, true, "Password reset link is expired or invalid.")
+        const errorMessage = error?.response?.data || "Password reset link is expired or invalid."
+        func.setToast(true, true, errorMessage)
       }
     }).finally(() => {
       setPasswordResetActive(false)
@@ -256,8 +259,7 @@ function SignUp() {
     </Modal>
   )
 
-  // TODO("change localhosts to localhost")
-  const notOnPremHostnames = ["app.akto.io", "localhosts", "127.0.0.1", "[::1]"]
+  const notOnPremHostnames = ["app.akto.io", "localhost", "127.0.0.1", "[::1]"]
   const isOnPrem = websiteHostName && !notOnPremHostnames.includes(window.location.hostname)
 
   const signupEmailCard = (
