@@ -218,12 +218,6 @@ public class TeamAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
-        if(currentRoleForUser == null || !currentRoleForUser.getName().equals(Role.ADMIN.getName())) {
-            addActionError("You don't have access to reset password for this user.");
-            return Action.ERROR.toUpperCase();
-        }
-
         User forgotPasswordUser = UsersDao.instance.findOne(Filters.eq(User.LOGIN, userEmail));
         if(forgotPasswordUser == null) {
             addActionError("User not found.");
