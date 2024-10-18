@@ -59,8 +59,8 @@ const transform = {
                     severity: <div className={`badge-wrapper-${issue.severityType}`}>
                                 <Badge size="small" key={idx}>{issue.severity}</Badge>
                             </div>,
-                    issueName: subCategoryMap[issue.issueName].testName,
-                    category: subCategoryMap[issue.issueName].superCategory.shortName,
+                    issueName: subCategoryMap[issue.issueName]?.testName,
+                    category: subCategoryMap[issue.issueName]?.superCategory?.shortName,
                     numberOfEndpoints: issue.numberOfEndpoints,
                     creationTime: func.prettifyEpoch(issue.creationTime),
                     issueStatus: (
