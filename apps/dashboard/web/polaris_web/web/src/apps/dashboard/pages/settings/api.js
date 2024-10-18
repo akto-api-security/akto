@@ -447,6 +447,13 @@ const settingRequests = {
                 accountPermission, modifiedValueForAccount
             }
         })
+    },
+    resetUserPassword(userEmail) {
+        return request({
+            url: '/api/resetUserPassword',
+            method: 'post',
+            data: {userEmail}
+        })
     }
 }
 
