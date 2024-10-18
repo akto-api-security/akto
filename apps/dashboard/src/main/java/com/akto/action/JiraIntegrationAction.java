@@ -2,11 +2,14 @@ package com.akto.action;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
@@ -40,7 +43,6 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import okhttp3.ResponseBody;
 
 public class JiraIntegrationAction extends UserAction {
 
@@ -63,6 +65,8 @@ public class JiraIntegrationAction extends UserAction {
     private String origReq;
     private String testReq;
     private String issueId;
+
+    private Map<String,List<BasicDBObject>> projectAndIssueMap;
 
     private final String META_ENDPOINT = "/rest/api/3/issue/createmeta";
     private final String CREATE_ISSUE_ENDPOINT = "/rest/api/3/issue";
@@ -92,9 +96,11 @@ public class JiraIntegrationAction extends UserAction {
                 responsePayload = response.body().string();
                 loggerMaker.errorAndAddToDb("error while testing jira integration, received null response", LoggerMaker.LogDb.DASHBOARD);
                 if (responsePayload == null) {
+                    addActionError("Error while testing jira integration, received null response");
                     return Action.ERROR.toUpperCase();
                 }
             } catch (Exception e) {
+                addActionError("Error while testing jira integration, error making call\"");
                 loggerMaker.errorAndAddToDb("error while testing jira integration, error making call" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
                 return Action.ERROR.toUpperCase();
             } finally {
@@ -103,41 +109,33 @@ public class JiraIntegrationAction extends UserAction {
                 }
             }
             BasicDBObject payloadObj;
+            setProjId(projId.trim());
+            Set<String> inputProjectIds = new HashSet(Arrays.asList(this.projId.split(",")));
+            this.projectAndIssueMap = new HashMap<>();
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
                 BasicDBList projects = (BasicDBList) payloadObj.get("projects");
                 for (Object projObj: projects) {
                     BasicDBObject obj = (BasicDBObject) projObj;
                     String key = obj.getString("key");
-                    loggerMaker.infoAndAddToDb("evaluating issuetype for project key " + key + " ,actualProjId " + projId, LoggerMaker.LogDb.DASHBOARD);
-                    if (issueType!=null) {
-                        break;
-                    }
-
-                    if (!key.equalsIgnoreCase(projId)) {
+                    if (!inputProjectIds.contains(key)) {
                         continue;
                     }
                     loggerMaker.infoAndAddToDb("evaluating issuetype for project key " + key + ", project json obj " + obj, LoggerMaker.LogDb.DASHBOARD);
                     BasicDBList issueTypes = (BasicDBList) obj.get("issuetypes");
-                    issueType = determineIssueType(issueTypes, "TASK");
-                    loggerMaker.infoAndAddToDb("evaluated issue type for TASK type " + issueType, LoggerMaker.LogDb.DASHBOARD);
-                    if (issueType == null) {
-                        issueType = determineIssueType(issueTypes, "BUG");
-                        loggerMaker.infoAndAddToDb("evaluated issue type for BUG type " + issueType, LoggerMaker.LogDb.DASHBOARD);
-                    }
-                    if (issueType == null) {
-                        issueType = determineIssueType(issueTypes, "");
-                        loggerMaker.infoAndAddToDb("evaluated issue type for ANY type " + issueType, LoggerMaker.LogDb.DASHBOARD);
-                    }
+                    List<BasicDBObject> issueIdPairs = getIssueTypesWithIds(issueTypes);
+                    this.projectAndIssueMap.put(key, issueIdPairs);
                 }
-                if (issueType == null) {
-                    loggerMaker.errorAndAddToDb("error while testing jira integration, unable to resolve issue type id", LoggerMaker.LogDb.DASHBOARD);
+                if (this.projectAndIssueMap.isEmpty()) {
+                    addActionError("Error while testing jira integration, unable to resolve issue type id");
+                    loggerMaker.errorAndAddToDb("Error while testing jira integration, unable to resolve issue type id", LoggerMaker.LogDb.DASHBOARD);
                     return Action.ERROR.toUpperCase();
                 }
             } catch(Exception e) {
                 return Action.ERROR.toUpperCase();
             }
         } catch (Exception e) {
+            addActionError("Error while testing jira integration");
             loggerMaker.errorAndAddToDb("error while testing jira integration, " + e, LoggerMaker.LogDb.DASHBOARD);
             return Action.ERROR.toUpperCase();
         }
@@ -145,18 +143,19 @@ public class JiraIntegrationAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String determineIssueType(BasicDBList issueTypes, String jiraIssueType) {
+    private List<BasicDBObject> getIssueTypesWithIds(BasicDBList issueTypes) {
 
-        String issueType = null;
+        List<BasicDBObject> idPairs = new ArrayList<>();
         for (Object issueObj: issueTypes) {
             BasicDBObject obj2 = (BasicDBObject) issueObj;
             String issueName = obj2.getString("name");
-            if (!jiraIssueType.equals("") && !issueName.equalsIgnoreCase(jiraIssueType)) {
-                continue;
-            }
-            issueType = obj2.getString("id");
+            String issueId = obj2.getString("id");
+            BasicDBObject finalObj = new BasicDBObject();
+            finalObj.put("issueId", issueId);
+            finalObj.put("issueType", issueName);
+            idPairs.add(finalObj);
         }
-        return issueType;
+        return idPairs;
     }
 
     public String addIntegration() {
@@ -173,7 +172,8 @@ public class JiraIntegrationAction extends UserAction {
                         Updates.set("apiToken", apiToken),
                         Updates.set("issueType", issueType),
                         Updates.setOnInsert("createdTs", Context.now()),
-                        Updates.set("updatedTs", Context.now())
+                        Updates.set("updatedTs", Context.now()),
+                        Updates.set("projectIdsMap", projectAndIssueMap)
                 ),
                 updateOptions
         );
@@ -510,5 +510,12 @@ public class JiraIntegrationAction extends UserAction {
         this.jiraTicketKey = jiraTicketKey;
     }
 
+    public Map<String, List<BasicDBObject>> getProjectAndIssueMap() {
+        return projectAndIssueMap;
+    }
+
+    public void setProjectAndIssueMap(Map<String, List<BasicDBObject>> projectAndIssueMap) {
+        this.projectAndIssueMap = projectAndIssueMap;
+    }
     
 }

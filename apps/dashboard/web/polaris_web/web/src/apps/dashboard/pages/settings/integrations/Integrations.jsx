@@ -166,7 +166,7 @@ function Integrations() {
         return automationItems;
       default:
         let allItems = [...trafficItems, ...aiItems]
-        if (!func.checkLocal()){
+        if (func.checkLocal()){
           allItems = [...allItems, ...alertsItems, ...automationItems]
         }
         if(func.checkOnPrem()){
