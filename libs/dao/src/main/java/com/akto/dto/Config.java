@@ -1,11 +1,16 @@
 package com.akto.dto;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 @BsonDiscriminator
 public abstract class Config {
 
     public static final String CONFIG_SALT = "-ankush";
+    private static final Set<ConfigType> ssoConfigTypes = new HashSet(Arrays.asList( ConfigType.OKTA, ConfigType.AZURE, ConfigType.GOOGLE_SAML));
 
     public ConfigType getConfigType() {
         return configType;
@@ -594,5 +599,12 @@ public abstract class Config {
         public void setPublicKey(String publicKey) {
             this.publicKey = publicKey;
         }
+    }
+
+    public static boolean isConfigSSOType(ConfigType configType){
+        if(configType == null){
+            return false;
+        }
+        return ssoConfigTypes.contains(configType);
     }
 }

@@ -1,14 +1,13 @@
 package com.akto.dao;
 
-import com.akto.dto.Config;
 import com.akto.dto.sso.SAMLConfig;
+import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
-public class SSOConfigsDao extends CommonContextDao<Config> {
+public class SSOConfigsDao extends CommonContextDao<SAMLConfig> {
 
     public static final SSOConfigsDao instance = new SSOConfigsDao();
-
     public int getSSOConfigId(String userEmail){
         if (userEmail.trim().isEmpty()) {
             return -1;
@@ -19,10 +18,8 @@ public class SSOConfigsDao extends CommonContextDao<Config> {
         }
 
         String domain = companyKeyArr[1];
-        SAMLConfig config = (SAMLConfig) SSOConfigsDao.instance.findOne(
-            Filters.eq(SAMLConfig.ORGANIZATION_DOMAIN, domain), Projections.exclude(
-                SAMLConfig.CERTIFICATE, SAMLConfig.LOGIN_URL, SAMLConfig.IDENTIFIER
-            )
+        SAMLConfig config = SSOConfigsDao.instance.findOne(
+            Filters.eq(SAMLConfig.ORGANIZATION_DOMAIN, domain), Projections.include(Constants.ID)
         );
         if(config == null){
             return -1;
@@ -37,7 +34,7 @@ public class SSOConfigsDao extends CommonContextDao<Config> {
     }
 
     @Override
-    public Class<Config> getClassT() {
-        return Config.class;
+    public Class<SAMLConfig> getClassT() {
+        return SAMLConfig.class;
     }
 }

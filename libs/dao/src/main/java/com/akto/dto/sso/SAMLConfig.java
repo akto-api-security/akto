@@ -1,6 +1,9 @@
 package com.akto.dto.sso;
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+
 import com.akto.dto.Config;
 
+@BsonDiscriminator
 public class SAMLConfig extends Config  {
 
     public static final String IDENTIFIER = "applicationIdentifier";

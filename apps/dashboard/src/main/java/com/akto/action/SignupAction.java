@@ -794,6 +794,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 }
             }
 
+            boolean isSSOLogin = Config.isConfigSSOType(signupInfo.getConfigType());
+
             if (user == null) {
 
                 if (accountId == 0) {
@@ -819,17 +821,16 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 user = UsersDao.instance.insertSignUp(userEmail, username, signupInfo, accountId);
                 loggerMaker.infoAndAddToDb("new user: " + user.getId());
 
-            } else if (StringUtils.isEmpty(code)) {
+            } else if (StringUtils.isEmpty(code) && !isSSOLogin) {
                 if (accountId == 0) {
                     throw new IllegalStateException("The account doesn't exist.");
                 }
             } else {
-
-                // insert rbac entry here
-                RBACDao.instance.insertOne(
-                    new RBAC(user.getId(), invitedRole, accountId)
-                );
-
+                if(!isSSOLogin){
+                    RBACDao.instance.insertOne(
+                        new RBAC(user.getId(), invitedRole, accountId)
+                    );
+                }
                 LoginAction.loginUser(user, servletResponse, true, servletRequest);
                 servletResponse.sendRedirect("/dashboard/observe/inventory");
                 return;
