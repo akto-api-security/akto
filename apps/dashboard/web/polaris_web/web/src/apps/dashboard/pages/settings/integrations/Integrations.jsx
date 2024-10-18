@@ -54,6 +54,11 @@ function Integrations() {
         name:'Webhooks',
         source: '/public/webhooks_logo.svg'
     }
+    let teamsWebhooksObj={
+      id: 'teamsWebhooks',
+      name:'Microsoft Teams Webhooks',
+      source: '/public/ms_teams.svg'
+  }
     let githubSsoObj={
       id: 'github_sso',
       name:'Github SSO',
@@ -135,7 +140,7 @@ function Integrations() {
     const trafficItems = [burpSuiteObj, postmanObj];
     const reportingItems = [githubAppObj];
     const aiItems = [aktoGptObj];
-    const alertsItems = [slackObj, webhooksObj];
+    const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj];
     switch (tabId) {
       case 'traffic':

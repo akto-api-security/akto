@@ -65,6 +65,9 @@ const func = {
 
   timeDifference(startTimestamp, endTimestamp) {
     const diffMs = endTimestamp - startTimestamp;
+    if(startTimestamp === 0) {
+      return 'in total'
+    }
 
     // Convert seconds to days
     const days = diffMs / (60 * 60 * 24);
@@ -74,12 +77,18 @@ const func = {
     } else if (days < 7) {
         const dayCount = Math.ceil(days);
         return `in ${dayCount} day${dayCount === 1 ? '' : 's'}`;
-    } else if (days < 30) {
+    } else if (days <= 29) {
         const weekCount = Math.ceil(days / 7);
         return `in ${weekCount} week${weekCount === 1 ? '' : 's'}`;
     } else {
-        const monthCount = Math.ceil(days / 30);
-        return `in ${monthCount} month${monthCount === 1 ? '' : 's'}`;
+        const monthCount = Math.ceil(days / 31);
+        const years = Math.floor(monthCount / 12);
+
+        if (years > 0) {
+            return `in ${years} year${years === 1 ? '' : 's'}`;
+        } else {
+            return `in ${monthCount} month${monthCount === 1 ? '' : 's'}`;
+        }
     }
   },
 

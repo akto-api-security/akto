@@ -1,5 +1,6 @@
 import { Box, Card, HorizontalGrid, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
+import TitleWithInfo from '../../../components/shared/TitleWithInfo'
 
 function SummaryCard({ summaryItems }) {
     return (
@@ -10,9 +11,15 @@ function SummaryCard({ summaryItems }) {
                         <Box borderInlineEndWidth={index < (summaryItems.length - 1) ? "1" : ""} key={index} borderColor="transparent">
                             <HorizontalStack>
                                 <VerticalStack gap="4">
-                                    <Text variant="headingMd">
-                                        {item.title}
-                                    </Text>
+                                    <TitleWithInfo
+                                        titleComp={
+                                        <Text variant="headingMd">
+                                            {item.title}
+                                        </Text>
+                                        }
+                                        docsUrl={item?.docsUrl}
+                                        tooltipContent={item?.tooltipContent}
+                                    />
                                     <HorizontalGrid gap={1} columns={2}>
                                         <VerticalStack gap={4}>
                                             {item?.isComp ? item.data : 

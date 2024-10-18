@@ -485,7 +485,11 @@ function ApiCollections() {
             content: toggleTypeContent
         }
 
-        return [...actions, toggleEnvType];
+        const bulkActionsOptions = [...actions];
+        if(selectedTab !== 'groups') {
+            bulkActionsOptions.push(toggleEnvType)
+        }
+        return bulkActionsOptions
     }
     const updateData = (dataMap) => {
         let copyObj = data;

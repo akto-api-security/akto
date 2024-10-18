@@ -267,7 +267,7 @@ function GithubServerTable(props) {
     });
 
   const customSelectionChange = (selectionType,toggleType, selection) => {
-    if(props?.treeView){
+    if(props?.treeView || props?.isMultipleItemsSelected === true){
       let tempItems = selection;
         if(typeof selectItems !== 'object'){
           tempItems = [selection]
