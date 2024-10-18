@@ -228,16 +228,25 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     String code;
 
     String forgotPasswordEmail;
-    String websiteHostName;
     public String sendPasswordResetLink() {
         if(!DashboardMode.isOnPremDeployment()) {
-            code = "This feature is not in your plan.";
+            code = "This feature is not available in your dashboard mode.";
             return Action.ERROR.toUpperCase();
         }
 
         if(forgotPasswordEmail == null || forgotPasswordEmail.trim().isEmpty()) {
             code = "Email cannot be empty.";
             return Action.ERROR.toUpperCase();
+        }
+
+        String scheme = servletRequest.getScheme();
+        String serverName = servletRequest.getServerName();
+        int serverPort = servletRequest.getServerPort();
+        String websiteHostName;
+        if (serverPort == 80 || serverPort == 443) {
+            websiteHostName = scheme + "://" + serverName;
+        } else {
+            websiteHostName = scheme + "://" + serverName + ":" + serverPort;
         }
 
         if(websiteHostName == null || websiteHostName.trim().isEmpty()) {
@@ -255,9 +264,8 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             return Action.SUCCESS.toUpperCase();
         }
 
-        int lastPasswordReset = user.getLastPasswordReset();
-        if(Context.now() - lastPasswordReset < 1800) {
-            code = "You need to wait 30 minutes before generating another password reset link.";
+        int lastPasswordResetToken = user.getLastPasswordResetToken();
+        if(Context.now() - lastPasswordResetToken < 1800) {
             return Action.ERROR.toUpperCase();
         }
 
@@ -286,7 +294,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     String newPassword;
     public String resetPassword() {
         if(!DashboardMode.isOnPremDeployment()) {
-            code = "This feature is not in your plan.";
+            code = "This feature is not available in your dashboard mode.";
             return Action.ERROR.toUpperCase();
         }
 
@@ -344,10 +352,6 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
     public void setForgotPasswordEmail(String forgotPasswordEmail) {
         this.forgotPasswordEmail = forgotPasswordEmail;
-    }
-
-    public void setWebsiteHostName(String websiteHostName) {
-        this.websiteHostName = websiteHostName;
     }
 
     public void setResetPasswordToken(String resetPasswordToken) {

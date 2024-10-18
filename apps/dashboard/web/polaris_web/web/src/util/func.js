@@ -1703,10 +1703,6 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
 
     return true
-  },
-  validateEmail(email) {
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailPattern.test(email)
   }
 }
 

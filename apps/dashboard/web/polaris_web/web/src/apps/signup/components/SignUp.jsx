@@ -20,12 +20,20 @@ function SignUp() {
   const [loginActive, setLoginActive] = useState(location.pathname.includes("login"))
   const [loading, setLoading] = useState(false)
 
-  const [isForgotPasswordActive, setIsForgotPasswordActive] = useState(false)
-  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("")
-  const [passwordResetToken, setPasswordResetToken] = useState("")
-  const [passwordResetActive, setPasswordResetActive] = useState(false)
-  const [newPassword, setNewPassword] = useState("")
-  const [newConfirmPassword, setNewConfirmPassword] = useState("")
+  const [forgotPasswordState, setForgotPasswordState] = useState({
+    isForgotPasswordActive: false,
+    passwordResetToken: "",
+    passwordResetActive: false,
+    newPassword: "",
+    newConfirmPassword: ""
+  })
+
+  const setForgotPasswordStateHelper = (field, value) => {
+    setForgotPasswordState(prevState => ({
+      ...prevState,
+      [field]: value
+    }))
+  }
 
   const oktaUrl = window.OKTA_AUTH_URL
   const githubId = window.GITHUB_CLIENT_ID
@@ -67,17 +75,9 @@ function SignUp() {
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search)
     const tokenFromUrl = queryParams.get('token')
-    setPasswordResetToken(tokenFromUrl)
-    setPasswordResetActive(tokenFromUrl && tokenFromUrl.length > 0)
+    setForgotPasswordStateHelper("passwordResetToken", tokenFromUrl)
+    setForgotPasswordStateHelper("passwordResetActive", tokenFromUrl && tokenFromUrl.length > 0)
   }, [])
-
-  useEffect(() => {
-    if(func.validateEmail(email)) {
-      setForgotPasswordEmail(email)
-    } else {
-      setForgotPasswordEmail("")
-    }
-  }, [email])
 
   const ssoCard = (
     ssoList.length === 0 ? null :
@@ -145,24 +145,15 @@ function SignUp() {
   const websiteHostName = window.location.origin
 
   const handleForgotPassword = async () => {
-    if(!func.validateEmail(forgotPasswordEmail)) {
-      func.setToast(true, true, "Please enter a valid email!")
-      return
-    }
-
-    await api.sendPasswordResetLink(forgotPasswordEmail, websiteHostName).then((resp) => {
+    await api.sendPasswordResetLink(email).then((resp) => {
       func.setToast(true, false, "Reset password link has been sent!")
     }).catch((error) => {
-      if(error?.response?.status === 429) {
-        func.setToast(true, error, "Too many requests. Please try again later.")
-      } else {
-        const errorMessage = error?.response?.data || "Reset password link has been sent!"
-        const errorStatus = error?.response?.data !== undefined && error?.response?.data.length > 0
-        func.setToast(true, errorStatus, errorMessage)
-      }
+      const errorMessage = error?.response?.data || "Reset password link has been sent!"
+      const errorStatus = error?.response?.data !== undefined && error?.response?.data.length > 0
+      func.setToast(true, errorStatus, errorMessage)
     }).finally(() => {
-      setIsForgotPasswordActive(false)
-      setForgotPasswordEmail("")
+      setForgotPasswordStateHelper("isForgotPasswordActive", false)
+      setEmail("")
     })
   }
 
@@ -171,11 +162,11 @@ function SignUp() {
       small
       activator={
         <div style={{textAlign: 'end'}}>
-          <Button plain onClick={() => setIsForgotPasswordActive(true)}>Forgot Password?</Button>
+          <Button plain onClick={() => setForgotPasswordStateHelper("isForgotPasswordActive", true)}>Forgot Password?</Button>
         </div>
       }
-      open={isForgotPasswordActive}
-      onClose={() => setIsForgotPasswordActive(false)}
+      open={forgotPasswordState.isForgotPasswordActive}
+      onClose={() => setForgotPasswordStateHelper("isForgotPasswordActive", false)}
       title="Forgot Password"
       primaryAction={{
           content: 'Send',
@@ -184,7 +175,7 @@ function SignUp() {
       secondaryActions={[
           {
               content: 'Cancel',
-              onAction: () => setIsForgotPasswordActive(false),
+              onAction: () => setForgotPasswordStateHelper("isForgotPasswordActive", false),
           },
       ]}
 
@@ -192,9 +183,10 @@ function SignUp() {
       <Modal.Section>
           <TextField
               label="Email"
-              value={forgotPasswordEmail}
+              value={email}
+              inputMode='email'
               placeholder="name@workemail.com"
-              onChange={(email) => setForgotPasswordEmail(email)}
+              onChange={(email) => setEmail(email)}
               autoComplete="off"
           />
           <Text variant="bodyMd" color="subdued">We'll use this email to send a password reset link.</Text>
@@ -203,20 +195,16 @@ function SignUp() {
   )
 
   const handleResetPassword = async () => {
-    if(!passwordResetToken || passwordResetToken.length === 0) return
-    if(!func.validatePassword(newPassword, newConfirmPassword)) return
+    if(!forgotPasswordState.passwordResetToken || forgotPasswordState.passwordResetToken.length === 0) return
+    if(!func.validatePassword(forgotPasswordState.newPassword, forgotPasswordState.newConfirmPassword)) return
 
-    await api.resetPassword(passwordResetToken, newPassword).then(() => {
+    await api.resetPassword(forgotPasswordState.passwordResetToken, forgotPasswordState.newPassword).then(() => {
       func.setToast(true, false, "Password changed successfully!")
     }).catch((error) => {
-      if(error?.response?.status === 429) {
-        func.setToast(true, error, "Too many requests. Please try again later.")
-      } else {
-        const errorMessage = error?.response?.data || "Password reset link is expired or invalid."
-        func.setToast(true, true, errorMessage)
-      }
+      const errorMessage = error?.response?.data || "Password reset link is expired or invalid."
+      func.setToast(true, true, errorMessage)
     }).finally(() => {
-      setPasswordResetActive(false)
+      setForgotPasswordStateHelper("passwordResetActive", false)
       const urlWithoutToken = window.location.pathname
       window.history.replaceState({}, document.title, urlWithoutToken)
     })
@@ -225,8 +213,8 @@ function SignUp() {
   const resetPasswordComp = (
     <Modal
       small
-      open={passwordResetActive}
-      onClose={() => setPasswordResetActive(false)}
+      open={forgotPasswordState.passwordResetActive}
+      onClose={() => setForgotPasswordStateHelper("passwordResetActive", false)}
       title="Reset Password"
       primaryAction={{
           content: 'Save',
@@ -235,7 +223,7 @@ function SignUp() {
       secondaryActions={[
           {
               content: 'Cancel',
-              onAction: () => setPasswordResetActive(false),
+              onAction: () => setForgotPasswordStateHelper("passwordResetActive", false),
           },
       ]}
 
@@ -243,15 +231,15 @@ function SignUp() {
       <Modal.Section>
           <PasswordTextField
               label="Password"
-              field={newPassword}
-              setField={(val) => setNewPassword(val)}
+              field={forgotPasswordState.newPassword}
+              setField={(val) => setForgotPasswordStateHelper("newPassword", val)}
               monospaced={true}
               onFunc={true}
           />
           <PasswordTextField
               label="Confirm Password"
-              field={newConfirmPassword}
-              setField={(val) => setNewConfirmPassword(val)}
+              field={forgotPasswordState.newConfirmPassword}
+              setField={(val) => setForgotPasswordStateHelper("newConfirmPassword", val)}
               monospaced={true}
               onFunc={true}
           />
@@ -267,7 +255,7 @@ function SignUp() {
       <Form onSubmit={loginFunc}>
         <VerticalStack gap={4}>
           <div className='form-class'>
-            <TextField onChange={setEmail} value={email} label="Email" placeholder="name@workemail.com" monospaced={true}/>
+            <TextField onChange={setEmail} inputMode='email' value={email} label="Email" placeholder="name@workemail.com" monospaced={true}/>
           </div>
           <div className='form-class'>
             <PasswordTextField setField={(val) => setPassword(val)} onFunc={true} field={password} label="Password" monospaced={true}/>
