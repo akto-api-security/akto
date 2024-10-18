@@ -19,15 +19,19 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
 import com.opensymphony.xwork2.Action;
 
+import org.apache.struts2.interceptor.ServletRequestAware;
+import org.apache.struts2.interceptor.ServletResponseAware;
 import org.bson.conversions.Bson;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class TeamAction extends UserAction {
+public class TeamAction extends UserAction implements ServletResponseAware, ServletRequestAware {
 
     int id;
     BasicDBList users;
@@ -204,7 +208,6 @@ public class TeamAction extends UserAction {
     }
 
     String userEmail;
-    String websiteHostName;
     String passwordResetToken;
     public String resetUserPassword() {
         if(userEmail == null || userEmail.isEmpty()) {
@@ -224,10 +227,22 @@ public class TeamAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        int lastPasswordReset = user.getLastPasswordReset();
-        if(Context.now() - lastPasswordReset < 1800) {
-            addActionError("Please wait 30 minutes for another password reset.");
+        int lastPasswordResetToken = forgotPasswordUser.getLastPasswordResetToken();
+        int timeElapsed = Context.now() - lastPasswordResetToken;
+        if(timeElapsed < 1800) {
+            int remainingTime = (1800 - timeElapsed) / 60;
+            addActionError("Please wait " + remainingTime + " minute" + (remainingTime > 1 ? "s" : "") + " for another password reset.");
             return Action.ERROR.toUpperCase();
+        }
+
+        String scheme = servletRequest.getScheme();
+        String serverName = servletRequest.getServerName();
+        int serverPort = servletRequest.getServerPort();
+        String websiteHostName;
+        if (serverPort == 80 || serverPort == 443) {
+            websiteHostName = scheme + "://" + serverName;
+        } else {
+            websiteHostName = scheme + "://" + serverName + ":" + serverPort;
         }
 
         passwordResetToken = PasswordResetUtils.insertPasswordResetToken(userEmail, websiteHostName);
@@ -275,11 +290,19 @@ public class TeamAction extends UserAction {
         this.userEmail = userEmail;
     }
 
-    public void setWebsiteHostName(String websiteHostName) {
-        this.websiteHostName = websiteHostName;
-    }
-
     public String getPasswordResetToken() {
         return passwordResetToken;
+    }
+
+    protected HttpServletResponse servletResponse;
+    @Override
+    public void setServletResponse(HttpServletResponse httpServletResponse) {
+        this.servletResponse= httpServletResponse;
+    }
+
+    protected HttpServletRequest servletRequest;
+    @Override
+    public void setServletRequest(HttpServletRequest httpServletRequest) {
+        this.servletRequest = httpServletRequest;
     }
 }

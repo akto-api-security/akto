@@ -448,11 +448,11 @@ const settingRequests = {
             }
         })
     },
-    resetUserPassword(userEmail, websiteHostName) {
+    resetUserPassword(userEmail) {
         return request({
             url: '/api/resetUserPassword',
             method: 'post',
-            data: {userEmail, websiteHostName}
+            data: {userEmail}
         })
     }
 }

@@ -63,13 +63,12 @@ export default {
             }
         })
     },
-    sendPasswordResetLink: function(email, websiteHostName) {
+    sendPasswordResetLink: function(email) {
         return request({
             url: 'auth/sendPasswordResetLink',
             method: 'post',
             data: {
-                forgotPasswordEmail: email,
-                websiteHostName
+                forgotPasswordEmail: email
             }
         })
     },
