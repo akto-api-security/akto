@@ -38,6 +38,7 @@ import com.akto.task.Cluster;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.util.DbMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.Util;
 import com.akto.util.enums.GlobalEnums;
@@ -466,18 +467,7 @@ public class Main {
                 deleteScheduler.execute(() -> {
                     Context.accountId.set(accountId);
                     try {
-                        /*
-                         * Since this is a heavy job,
-                         * running it for only one account on one instance at a time.
-                         */
-                        boolean dibs = Cluster.callDibs(Cluster.DELETE_TESTING_RUN_RESULTS, 60 * 60, 60);
-                        if (!dibs) {
-                            return;
-                        }
-                        loggerMaker.infoAndAddToDb(
-                                String.format("%s dibs acquired, starting", Cluster.DELETE_TESTING_RUN_RESULTS));
                         deleteNonVulnerableResults();
-
                         // TODO: fix clean testing job (CleanTestingJob) for more scale and add here.
 
                     } catch (Exception e) {
@@ -696,26 +686,54 @@ public class Main {
     }
 
     private static void deleteNonVulnerableResults() {
-        Document stats = TestingRunResultDao.instance.getCollectionStats();
-        long count = Util.getLongValue(stats.get(MCollection._COUNT));
-        long size = Util.getLongValue(stats.get(MCollection._SIZE));
+        if (shouldDeleteNonVulnerableResults()) {
+            /*
+             * Since this is a heavy job,
+             * running it for only one account on one instance at a time.
+             */
+            boolean dibs = Cluster.callDibs(Cluster.DELETE_TESTING_RUN_RESULTS, 60 * 60, 60);
+            if (!dibs) {
+                return;
+            }
+            loggerMaker.infoAndAddToDb(
+                    String.format("%s dibs acquired, starting", Cluster.DELETE_TESTING_RUN_RESULTS));
+
+            deleteNonVulnerableResultsUtil();
+            loggerMaker.infoAndAddToDb(
+                    "deleteNonVulnerableResults Completed deleting non-vulnerable TestingRunResults");
+        }
+    }
+
+    private static boolean shouldDeleteNonVulnerableResults() {
+        long count = -1;
+        long size = -1;
+
+        if (DbMode.allowCappedCollections()) {
+            Document stats = TestingRunResultDao.instance.getCollectionStats();
+            count = Util.getLongValue(stats.get(MCollection._COUNT));
+            size = Util.getLongValue(stats.get(MCollection._SIZE));
+        } else {
+            /*
+             * db.runCommand not supported for DBs excluding mongoDB
+             */
+            count = TestingRunResultDao.instance.getMCollection().estimatedDocumentCount();
+        }
+
+        loggerMaker.infoAndAddToDb(String.format(
+                "shouldDeleteNonVulnerableResults non-vulnerable TestingRunResults, current stats: size: %s count: %s",
+                size, count));
 
         // Deleting only in case of capped collection limits about to breach
-
-        if ((size >= (TestingRunResultDao.CLEAN_THRESHOLD * TestingRunResultDao.sizeInBytes)/100) ||
-                (count >= (TestingRunResultDao.CLEAN_THRESHOLD * TestingRunResultDao.maxDocuments)/100)) {
+        if ((size >= (TestingRunResultDao.CLEAN_THRESHOLD * TestingRunResultDao.sizeInBytes) / 100) ||
+                (count >= (TestingRunResultDao.CLEAN_THRESHOLD * TestingRunResultDao.maxDocuments) / 100)) {
 
             /*
              * We delete non-vulnerable results,
              * per summary, starting from the oldest one.
              */
-            loggerMaker.infoAndAddToDb(String.format(
-                    "deleteNonVulnerableResults Starting deleting non-vulnerable TestingRunResults, current stats: size: %s count: %s",
-                    size, count));
-            deleteNonVulnerableResultsUtil();
-            loggerMaker.infoAndAddToDb(
-                    "deleteNonVulnerableResults Completed deleting non-vulnerable TestingRunResults");
+            return true;
         }
+        return false;
     }
 
     private static void deleteNonVulnerableResultsUtil() {
@@ -740,27 +758,42 @@ public class Main {
                     summaries.size()));
             List<ObjectId> ids = new ArrayList<>();
 
+            boolean done = false;
             for (TestingRunResultSummary summary : summaries) {
                 ids.add(summary.getId());
                 if (ids.size() >= BATCH_LIMIT) {
                     if (actuallyDeleteTestingRunResults(ids)) {
+                        done = true;
                         break;
                     }
                     ids = new ArrayList<>();
                 }
             }
 
-            if (ids.size() > 0) {
+            if (!done && ids.size() > 0) {
                 if (actuallyDeleteTestingRunResults(ids)) {
                     break;
                 }
             }
+
             skip += LIMIT;
         } while (true);
 
+        runCompactIfPossible();
+    }
+
+    private static void runCompactIfPossible() {
+        if (!DbMode.allowCappedCollections()) {
+            /*
+             * db.runCommand not supported for DBs excluding mongoDB
+             */
+            return;
+        }
+
         loggerMaker.infoAndAddToDb("deleteNonVulnerableResultsUtil Running compact to reclaim space");
         Document compactResult = TestingRunResultDao.instance.compactCollection();
-        loggerMaker.infoAndAddToDb(String.format("deleteNonVulnerableResultsUtil compact result: %s", compactResult.toString()));
+        loggerMaker.infoAndAddToDb(
+                String.format("deleteNonVulnerableResultsUtil compact result: %s", compactResult.toString()));
     }
 
     private static boolean actuallyDeleteTestingRunResults(List<ObjectId> ids) {
@@ -773,15 +806,40 @@ public class Main {
                 Filters.and(
                         Filters.in(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, ids),
                         Filters.eq(TestingRunResult.VULNERABLE, false)));
-        Document stats = TestingRunResultDao.instance.getCollectionStats();
-        long count = Util.getLongValue(stats.get(MCollection._COUNT));
-        long size = Util.getLongValue(stats.get(MCollection._SIZE));
 
         loggerMaker.infoAndAddToDb(String.format(
-                "actuallyDeleteTestingRunResults Deleted %s TestingRunResults, stats: size: %s count: %s",
-                res.getDeletedCount(), size, count));
-        if ((size <= (TestingRunResultDao.DESIRED_THRESHOLD * TestingRunResultDao.sizeInBytes)/100) ||
-                (count <= (TestingRunResultDao.DESIRED_THRESHOLD * TestingRunResultDao.maxDocuments)/100)) {
+                "actuallyDeleteTestingRunResults Deleted %s TestingRunResults",
+                res.getDeletedCount()));
+        if (deletePurposeSuccessful()) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean deletePurposeSuccessful() {
+        long count = -1;
+        long size = -1;
+
+        if (DbMode.allowCappedCollections()) {
+            Document stats = TestingRunResultDao.instance.getCollectionStats();
+            count = Util.getLongValue(stats.get(MCollection._COUNT));
+            size = Util.getLongValue(stats.get(MCollection._SIZE));
+        } else {
+            /*
+             * db.runCommand not supported for DBs excluding mongoDB
+             */
+            count = TestingRunResultDao.instance.getMCollection().estimatedDocumentCount();
+        }
+
+        loggerMaker.infoAndAddToDb(String.format(
+                "actuallyDeleteTestingRunResults stats: size: %s count: %s",
+                size, count));
+
+        if ((size != -1 &&
+                (size <= (TestingRunResultDao.DESIRED_THRESHOLD * TestingRunResultDao.sizeInBytes) / 100)) ||
+                (count != -1 &&
+                        (count <= (TestingRunResultDao.DESIRED_THRESHOLD * TestingRunResultDao.maxDocuments) / 100))) {
+
             return true;
         }
         return false;
