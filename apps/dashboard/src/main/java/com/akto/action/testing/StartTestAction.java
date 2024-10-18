@@ -593,14 +593,25 @@ public class StartTestAction extends UserAction {
             ));
 
             List<ApiInfo.ApiInfoKey> ignoredIssuesApiInfokey = new ArrayList<>();
+            List<String> ignoredIssuesSubCategory = new ArrayList<>();
             for(TestingRunIssues testingRunIssues: allIgnoredTestingRunIssues) {
+                ignoredIssuesSubCategory.add(testingRunIssues.getId().getTestSubCategory());
                 ignoredIssuesApiInfokey.add(testingRunIssues.getId().getApiInfoKey());
             }
 
             Bson filters = Filters.and(
                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
                     Filters.eq(TestingRunResult.VULNERABLE, true),
-                    Filters.nin(TestingRunResult.API_INFO_KEY, ignoredIssuesApiInfokey)
+                    Filters.or(
+                            Filters.and(
+                                    Filters.nin(TestingRunResult.API_INFO_KEY, ignoredIssuesApiInfokey),  // Exclude if apiInfoKey is in the ignored list
+                                    Filters.nin(TestingRunResult.TEST_SUB_TYPE, ignoredIssuesSubCategory) // Exclude if testSubType is in the ignored list
+                            ),
+                            Filters.and(
+                                    Filters.in(TestingRunResult.API_INFO_KEY, ignoredIssuesApiInfokey),  // Include if apiInfoKey is in ignored list
+                                    Filters.nin(TestingRunResult.TEST_SUB_TYPE, ignoredIssuesSubCategory) // But testSubType must NOT be in the ignored list
+                            )
+                    )
             );
 
             List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);

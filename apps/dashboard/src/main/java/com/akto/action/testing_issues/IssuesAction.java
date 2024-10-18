@@ -493,7 +493,7 @@ public class IssuesAction extends UserAction {
 
     String latestTestingRunSummaryId;
     String issueStatusQuery;
-    public String fetchIssuesBySummaryId() {
+    public String fetchIssuesByStatusAndSummaryId() {
         Bson filters = Filters.and(
                 Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
                 Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId))
