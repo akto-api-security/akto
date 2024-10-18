@@ -173,7 +173,7 @@ const Users = () => {
             
             <Banner>
                 <Text variant="headingMd">Role permissions</Text>
-                <Text variant="bodyMd">Each role have different permissions. <Link url="https://docs.akto.io/" target="_blank">Learn more</Link></Text>
+                <Text variant="bodyMd">Each role has different permissions. <Link url="https://docs.akto.io/" target="_blank">Learn more</Link></Text>
             </Banner>
 
             <div style={{ paddingTop: "20px" }}>

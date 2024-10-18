@@ -12,12 +12,13 @@ const SettingsLeftNav = () => {
     const path = location.pathname
     const page = path.substring(path.lastIndexOf('/') + 1)
 
-    const logsArr = window.IS_SAAS === 'true' ? [] : [{
-        label: 'Logs',
-        icon: ListFilledMajor,
-        selected: page === "logs",
-        onClick: () => navigate("/dashboard/settings/logs")
-    }]
+    const logsArr = window?.IS_SAAS !== 'true' ||
+        (window?.USER_NAME && window?.USER_NAME.includes("akto")) ? [{
+            label: 'Logs',
+            icon: ListFilledMajor,
+            selected: page === "logs",
+            onClick: () => navigate("/dashboard/settings/logs")
+        }] : []
     const metricsArr = window.IS_SAAS === 'true' ? [] : [{
         label: 'Metrics',
         icon: ReportFilledMinor,
