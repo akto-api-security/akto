@@ -22,6 +22,8 @@ export default function LeftNav(){
   const handleSelect = (selectedId) => {
     setLeftNavSelected(selectedId);
   };
+
+    const settingsRedirectPath = window.USER_ROLE === 'GUEST' ? "/dashboard/settings/about" : "/dashboard/settings/users"
   
     const navigationMarkup = (
       <div className={active}>
@@ -174,7 +176,7 @@ export default function LeftNav(){
                   label:<Text variant="bodyMd" fontWeight="medium">Settings</Text>,
                   icon: SettingsFilledMinor,
                   onClick: ()=>{
-                    navigate("/dashboard/settings/users")
+                    navigate(settingsRedirectPath)
                     setActive("normal")
                   },
                   selected: currPathString === 'settings',

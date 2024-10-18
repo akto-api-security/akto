@@ -12,6 +12,12 @@ const SettingsLeftNav = () => {
     const path = location.pathname
     const page = path.substring(path.lastIndexOf('/') + 1)
 
+    const usersArr = window.USER_ROLE !== 'GUEST' ? [{
+        label: 'Users',
+        icon: IdentityCardFilledMajor,
+        selected: page === "users",
+        onClick: () => navigate("/dashboard/settings/users")
+    }] : []
     const logsArr = window?.IS_SAAS !== 'true' ||
         (window?.USER_NAME && window?.USER_NAME.includes("akto")) ? [{
             label: 'Logs',
@@ -56,12 +62,7 @@ const SettingsLeftNav = () => {
                         selected: page === "about",
                         onClick: () => navigate("/dashboard/settings/about")
                     },
-                    {
-                        label: 'Users',
-                        icon: IdentityCardFilledMajor,
-                        selected: page === "users",
-                        onClick: () => navigate("/dashboard/settings/users")
-                    },
+                    ...usersArr,
                     // {
                     //     label: 'Alerts',
                     //     icon: DiamondAlertMinor,
