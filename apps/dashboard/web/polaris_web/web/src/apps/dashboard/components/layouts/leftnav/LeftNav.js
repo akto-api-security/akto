@@ -174,7 +174,7 @@ export default function LeftNav(){
                   label:<Text variant="bodyMd" fontWeight="medium">Settings</Text>,
                   icon: SettingsFilledMinor,
                   onClick: ()=>{
-                    navigate("/dashboard/settings/users")
+                    navigate("/dashboard/settings/about")
                     setActive("normal")
                   },
                   selected: currPathString === 'settings',
