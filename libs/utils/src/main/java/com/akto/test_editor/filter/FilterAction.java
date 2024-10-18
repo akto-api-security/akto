@@ -7,15 +7,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
 
-import org.bson.conversions.Bson;
-
-import com.akto.dao.ApiInfoDao;
-import com.akto.dao.SampleDataDao;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.BodyOperator;
 import com.akto.dao.test_editor.TestEditorEnums.CollectionOperands;
@@ -39,8 +35,6 @@ import com.akto.test_editor.filter.data_operands_impl.*;
 import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
-
 import static com.akto.runtime.utils.Utils.parseCookie;
 import static com.akto.dto.RawApi.convertHeaders;
 import static com.akto.runtime.RuntimeUtil.createUrlTemplate;
@@ -68,6 +62,7 @@ public final class FilterAction {
         put("ssrf_url_hit", new SsrfUrlHitFilter());
         put("belongs_to_collections", new ApiCollectionFilter());
     }};
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     public FilterAction() { }
 
@@ -284,6 +279,7 @@ public final class FilterAction {
 
     public DataOperandsFilterResponse applyFilterOnPayload(FilterActionRequest filterActionRequest, String payload) {
 
+        String origPayload = payload;
         BasicDBObject payloadObj = new BasicDBObject();
         try {
             payload = Utils.jsonifyIfArray(payload);
@@ -334,16 +330,16 @@ public final class FilterAction {
             // }
             return new DataOperandsFilterResponse(filterResp, matchingValueKeySet, null, null);
         } else if (filterActionRequest.getConcernedSubProperty() == null) {
-            Object val = payload;
+            Object val = origPayload;
 
             if (filterActionRequest.getBodyOperand() != null && filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.LENGTH.toString())) {
-                val = payload.trim().length() - 2; // todo:
+                val = origPayload.trim().length() - 2; // todo:
             } else if (filterActionRequest.getBodyOperand() != null && filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.PERCENTAGE_MATCH.toString())) {
                 RawApi sampleRawApi = filterActionRequest.getRawApi();
                 if (sampleRawApi == null) {
                     return new DataOperandsFilterResponse(false, null, null, null);
                 }
-                double percentageMatch = compareWithOriginalResponse(payload, sampleRawApi.getResponse().getBody(), new HashMap<>());
+                double percentageMatch = compareWithOriginalResponse(origPayload, sampleRawApi.getResponse().getBody(), new HashMap<>());
                 val = (int) percentageMatch;
             } else if (filterActionRequest.getBodyOperand() != null && filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.PERCENTAGE_MATCH_SCHEMA.toString())) {
                 RawApi sampleRawApi = filterActionRequest.getRawApi();
@@ -1117,13 +1113,7 @@ public final class FilterAction {
         }
         String param = querySet.get(0).toString().trim();
 
-        Bson filter = Filters.and(
-            Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
-            Filters.regex("param", param),
-            Filters.eq("isHeader", false)
-        );
-
-        List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filter, 0, 500, null);
+        List<SingleTypeInfo> singleTypeInfos = dataActor.findStiByParam(apiInfoKey.getApiCollectionId(), param);
 
         if (singleTypeInfos.isEmpty()) {
             return new DataOperandsFilterResponse(false, null, null, null);
@@ -1165,12 +1155,7 @@ public final class FilterAction {
         List<Boolean> querySet = (List) filterActionRequest.getQuerySet();
         Boolean shouldBePresent = (Boolean) querySet.get(0);
 
-        Bson filters = Filters.and(
-            Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
-            Filters.regex("url", filterActionRequest.getTestRunRawApi().getRequest().getUrl()),
-            Filters.eq("method", apiInfoKey.getMethod())
-        );
-        SingleTypeInfo singleTypeInfo = SingleTypeInfoDao.instance.findOne(filters);
+        SingleTypeInfo singleTypeInfo = dataActor.findSti(apiInfoKey.getApiCollectionId(), filterActionRequest.getTestRunRawApi().getRequest().getUrl(), apiInfoKey.getMethod());
         boolean res = false;
         if (shouldBePresent) {
             res = singleTypeInfo != null;
@@ -1183,11 +1168,10 @@ public final class FilterAction {
     private DataOperandsFilterResponse evaluateRolesAccessContext(FilterActionRequest filterActionRequest, boolean include) {
 
         ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
-        Bson filterQ = Filters.eq("_id", apiInfoKey);
         List<String> querySet = (List) filterActionRequest.getQuerySet();
         String roleName = querySet.get(0);
 
-        AccessMatrixUrlToRole accessMatrixUrlToRole = AccessMatrixUrlToRolesDao.instance.findOne(filterQ);
+        AccessMatrixUrlToRole accessMatrixUrlToRole = dataActor.fetchAccessMatrixUrlToRole(apiInfoKey);
 
         List<String> rolesThatHaveAccessToApi = new ArrayList<>();
         if (accessMatrixUrlToRole != null) {
@@ -1204,7 +1188,7 @@ public final class FilterAction {
     private DataOperandsFilterResponse applyFilterOnAccessType(FilterActionRequest filterActionRequest){
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
         ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
-        ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(apiInfoKey));
+        ApiInfo apiInfo = dataActor.fetchApiInfo(apiInfoKey);
         Set<ApiAccessType> apiAccessTypes = apiInfo.getApiAccessTypes();
         boolean res = false;
         if(apiInfo != null && !querySet.isEmpty() && apiAccessTypes.size() > 0){
@@ -1253,12 +1237,7 @@ public final class FilterAction {
                         continue;
                     }
                     if (singleTypeInfo.getValues() == null || singleTypeInfo.getValues().getElements().size() == 0) {
-                        Bson filterQSampleData = Filters.and(
-                            Filters.eq("_id.apiCollectionId", apiInfoKey.getApiCollectionId()),
-                            Filters.eq("_id.method", apiInfoKey.getMethod()),
-                            Filters.eq("_id.url", apiInfoKey.getUrl())
-                        );
-                        SampleData sd = SampleDataDao.instance.findOne(filterQSampleData);
+                        SampleData sd = dataActor.fetchSampleDataById(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod());
                         if (sd.getSamples() == null) {
                             continue;
                         }
@@ -1307,12 +1286,7 @@ public final class FilterAction {
             }
 
             if (singleTypeInfo.getValues() == null || singleTypeInfo.getValues().getElements().size() == 0) {
-                Bson filterQSampleData = Filters.and(
-                    Filters.eq("_id.apiCollectionId", apiInfoKey.getApiCollectionId()),
-                    Filters.eq("_id.method", apiInfoKey.getMethod()),
-                    Filters.eq("_id.url", apiInfoKey.getUrl())
-                );
-                SampleData sd = SampleDataDao.instance.findOne(filterQSampleData);
+                SampleData sd = dataActor.fetchSampleDataById(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod());
                 if (sd.getSamples() == null) {
                     continue;
                 }
@@ -1431,35 +1405,8 @@ public final class FilterAction {
     }
 
     public static SingleTypeInfo querySti(String param, boolean isUrlParam, ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader, int responseCode) {
-
-        Bson urlParamFilters;
-        if (!isUrlParam) {
-            urlParamFilters = Filters.or(
-                Filters.and(
-                    Filters.exists("isUrlParam"),
-                    Filters.eq("isUrlParam", isUrlParam)
-                ),
-                Filters.exists("isUrlParam", false)
-            );
-
-        } else {
-            urlParamFilters = Filters.eq("isUrlParam", isUrlParam);
-        }
-
-        Bson filter = Filters.and(
-            Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
-            Filters.eq("url", apiInfoKey.url),
-            Filters.eq("method", apiInfoKey.method.name()),
-            Filters.eq("responseCode", responseCode),
-            Filters.eq("isHeader", isHeader),
-            Filters.regex("param", param),
-            urlParamFilters
-        );
-        
-        SingleTypeInfo singleTypeInfo = SingleTypeInfoDao.instance.findOne(filter);
-
+        SingleTypeInfo singleTypeInfo = dataActor.findStiWithUrlParamFilters(apiInfoKey.getApiCollectionId(), apiInfoKey.url, apiInfoKey.method.name(), responseCode, isHeader, param, isUrlParam);
         if (singleTypeInfo == null) return null;
-
         return singleTypeInfo;
     }
 

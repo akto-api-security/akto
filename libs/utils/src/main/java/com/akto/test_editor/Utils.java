@@ -1,6 +1,5 @@
 package com.akto.test_editor;
 
-import java.util.*;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -17,7 +16,6 @@ import java.util.regex.Pattern;
 
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
-import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.ApiInfo;
@@ -903,7 +901,7 @@ public class Utils {
                 return Operations.replaceBody(rawApi, newPayload);
             case "add_header":
                 if (value.equals("${akto_header}")) {
-                    BasicDBObject tokenResponse = OrganizationsDao.getBillingTokenForAuth();
+                    BasicDBObject tokenResponse = OrgUtils.getBillingTokenForAuth();
                     if(tokenResponse.getString("token") != null){
                         value = tokenResponse.getString("token");
                     }else{
@@ -956,6 +954,5 @@ public class Utils {
         }
             
     }
-
 
 }

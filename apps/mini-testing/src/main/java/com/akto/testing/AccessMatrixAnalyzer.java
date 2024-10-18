@@ -40,6 +40,7 @@ public class AccessMatrixAnalyzer {
             int lastBatchSize = 0;
             int skip = 0;
             do {
+                // Fix
                 List<BasicDBObject> apiBatch =
                         ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), skip, LIMIT, DELTA_PERIOD_VALUE);
                 skip += LIMIT;
@@ -79,9 +80,8 @@ public class AccessMatrixAnalyzer {
             CustomTestingEndpoints tempTestingEndpoints = new CustomTestingEndpoints(endpoints);        
 
             List<ApiInfo.ApiInfoKey> apiInfoKeyList = tempTestingEndpoints.returnApis();
-            if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
+            if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) continue;
             loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
-
 
             Set<Integer> apiCollectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
             sampleMessageStore.fetchSampleMessages(apiCollectionIds);
