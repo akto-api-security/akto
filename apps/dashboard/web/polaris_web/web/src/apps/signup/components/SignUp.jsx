@@ -1,4 +1,4 @@
-import { Avatar, Box, Button, Form, Frame, HorizontalStack, Page, Text, TextField, Toast, VerticalStack } from '@shopify/polaris'
+import { Button, Form,  HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import SSOTextfield from './SSOTextfield'
 import PasswordTextField from '../../dashboard/components/layouts/PasswordTextField'
@@ -6,9 +6,9 @@ import { useLocation, useNavigate } from "react-router-dom"
 import api from '../api'
 import func from '@/util/func'
 import "../styles.css"
-import Store from '../../dashboard/store'
 import PersistStore from '../../main/PersistStore'
 import { usePolling } from '../../main/PollingProvider'
+import SignUpPageLayout from './SignUpPageLayout'
 
 function SignUp() {
 
@@ -151,59 +151,20 @@ function SignUp() {
     </VerticalStack>
   )
 
-  const toastConfig = Store(state => state.toastConfig)
-  const setToastConfig = Store(state => state.setToastConfig)
-
-  const disableToast = () => {
-    setToastConfig({
-      isActive: false,
-      isError: false,
-      message: ""
-    })
-  }
-
-  const toastMarkup = toastConfig.isActive ? (
-    <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableToast} duration={2000} />
-  ) : null;
+  const customComponent = (
+    <VerticalStack gap={8}>
+      <Text alignment="center" variant="heading2xl">{activeObject.headingText}</Text>
+      <VerticalStack gap={5}>
+        {ssoCard}
+        {signupEmailCard}
+      </VerticalStack>
+    </VerticalStack>
+  )
   
   return (
-    <div className='login-page'>
-      <Frame >
-        <Page fullWidth >
-          <Box padding="10" paddingBlockStart={"24"}>
-            <div style={{display: "flex", justifyContent: 'space-between', flexDirection: "column"}}>
-              <HorizontalStack align="center">
-                <Box width='400px'>
-                  <VerticalStack gap={8}>
-                    <HorizontalStack align='center'>
-                      <div className="akto-logo">
-                        <Avatar source="/public/akto_name_with_logo.svg" shape="round" size="2xl-experimental" />
-                      </div>
-                    </HorizontalStack>
-                    <VerticalStack gap={8}>
-                      <Text alignment="center" variant="heading2xl">{activeObject.headingText}</Text>
-                      <VerticalStack gap={5}>
-                        {ssoCard}
-                        {signupEmailCard}
-                      </VerticalStack>
-                    </VerticalStack>
-
-                  </VerticalStack>
-                  <div style={{bottom: "40px", position: "absolute", width: '400px'}}>
-                    <HorizontalStack gap={3} align="center">
-                      <Button plain onClick={() => window.open("https://www.akto.io/terms-and-policies","_blank")}>Terms of use</Button>
-                      <div style={{width: '1px', height: '24px', background: "#E1E3E5"}} />
-                      <Button plain onClick={() => window.open("https://www.akto.io/terms/privacy","_blank")}>Privacy policy</Button>
-                    </HorizontalStack>
-                  </div>
-                </Box>
-              </HorizontalStack>
-            </div>
-          </Box>
-        </Page>
-        {toastMarkup}
-      </Frame>
-    </div>
+   <SignUpPageLayout
+    customComponent={customComponent}
+    />
   )
 }
 

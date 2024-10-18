@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import com.akto.dto.Config.ConfigType;
 import com.mongodb.BasicDBObject;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
@@ -468,17 +469,17 @@ public abstract class SignupInfo {
         }
     }
 
-    public static class AzureSignupInfo extends SignupInfo {
+    public static class SamlSsoSignupInfo extends SignupInfo {
         private String username;
         private String email;
 
-        public AzureSignupInfo (){}
+        public SamlSsoSignupInfo (){}
 
-        public AzureSignupInfo (String username, String email) {
+        public SamlSsoSignupInfo (String username, String email, ConfigType configType) {
             this.username = username ;
             this.email = email;
-            this.configType = Config.ConfigType.AZURE;
-            this.key = this.configType.name();
+            this.configType = configType;
+            this.key = configType.name();
         }
 
         public String getEmail() {

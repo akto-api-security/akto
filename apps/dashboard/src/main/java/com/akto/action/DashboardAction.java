@@ -305,6 +305,8 @@ public class DashboardAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private String userEmail;
+
     public Map<Integer, Integer> getRiskScoreCountMap() {
         return riskScoreCountMap;
     }
@@ -403,5 +405,9 @@ public class DashboardAction extends UserAction {
 
     public void setOrganization(String organization) {
         this.organization = organization;
+    }
+
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
     }
 }

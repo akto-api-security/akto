@@ -59,9 +59,6 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
         if(OktaLogin.getAuthorisationUrl() != null){
             servletRequest.setAttribute("oktaAuthUrl", new String(Base64.getEncoder().encode(OktaLogin.getAuthorisationUrl().getBytes())));
         }
-        if(AzureLogin.getSamlSettings() != null){
-            servletRequest.setAttribute("azureRequestUrl", new String(Base64.getEncoder().encode((AzureLogin.getInstance().getAzureConfig().getApplicationIdentifier() + "/signup-azure-request").getBytes())));
-        }
         if (InitializerListener.aktoVersion != null && InitializerListener.aktoVersion.contains("akto-release-version")) {
             servletRequest.setAttribute("AktoVersionGlobal", "");
         } else {

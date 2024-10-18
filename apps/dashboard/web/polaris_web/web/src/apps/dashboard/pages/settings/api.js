@@ -277,27 +277,27 @@ const settingRequests = {
         })
     },
 
-    fetchAzureSso() {
+    fetchAzureSso(configType) {
         return request({
-            url: '/api/fetchAzureSso',
+            url: '/api/fetchSAMLSso',
             method: 'post',
-            data: {}
+            data: {configType}
         })
     },
 
-    addAzureSso(loginUrl, x509Certificate, azureEntityId, applicationIdentifier, acsUrl) {
+    addAzureSso(loginUrl, x509Certificate, ssoEntityId, applicationIdentifier, acsUrl, configType) {
         return request({
-            url: '/api/addAzureSso',
+            url: '/api/addSAMLSso',
             method: 'post',
-            data: {loginUrl, x509Certificate, azureEntityId, applicationIdentifier, acsUrl}
+            data: {loginUrl, x509Certificate, ssoEntityId, applicationIdentifier, acsUrl, configType}
         })
     },
 
-    deleteAzureSso() {
+    deleteAzureSso(configType) {
         return request({
-            url: '/api/deleteAzureSso',
+            url: '/api/deleteSamlSso',
             method: 'post',
-            data: {}
+            data: {configType}
         })
     },
 

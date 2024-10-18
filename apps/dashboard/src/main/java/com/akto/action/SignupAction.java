@@ -3,7 +3,9 @@ package com.akto.action;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.*;
+import com.akto.dto.Config.ConfigType;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.sso.SAMLConfig;
 import com.akto.listener.InitializerListener;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.log.LoggerMaker;
@@ -13,14 +15,12 @@ import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
-import com.akto.utils.AzureLogin;
 import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
 import com.akto.utils.OktaLogin;
+import com.akto.utils.sso.CustomSamlSettings;
 import com.akto.utils.sso.SsoUtils;
 import com.akto.util.DashboardMode;
-import com.akto.utils.GithubLogin;
-import com.akto.utils.JWT;
 import com.akto.utils.billing.OrganizationUtils;
 import com.auth0.Tokens;
 import com.auth0.jwk.Jwk;
@@ -40,7 +40,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.onelogin.saml2.Auth;
 import com.onelogin.saml2.settings.Saml2Settings;
-import com.onelogin.saml2.settings.SettingsBuilder;
 import com.opensymphony.xwork2.Action;
 import com.slack.api.Slack;
 import com.slack.api.methods.SlackApiException;
@@ -553,39 +552,64 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return SUCCESS.toUpperCase();
     }
 
-    public String sendRequestToAzure () throws IOException{
-        if(AzureLogin.getInstance() == null){
+    private int accountId;
+    private String userEmail;
+
+    private String samlUtilMethodForAuth(ConfigType configType) throws IOException{
+        String queryString = servletRequest.getQueryString();
+        if(queryString == null || queryString.isEmpty() || queryString.split("email=").length < 2){
+            code = "Error, user email cannot be empty";
+            servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
-        Saml2Settings settings = AzureLogin.getSamlSettings();
+        setUserEmail(queryString.split("email=")[1]);
+        int tempAccountId = SSOConfigsDao.instance.getSSOConfigId(userEmail);
+        if(tempAccountId == -1){
+            code = "Error, cannot login via SSO, redirecting to login";
+            servletResponse.sendRedirect("/login");
+            return ERROR.toUpperCase();
+        }
+        setAccountId(tempAccountId);
+
+        Saml2Settings settings = null;
+        settings = CustomSamlSettings.getSamlSettings(ConfigType.valueOf(configType.name()),accountId);
+
         if(settings == null){
+            code= "Error, cannot find sso for this organization, redirecting to login";
             return ERROR.toUpperCase();
         }
         try {
             Auth auth = new Auth(settings, servletRequest, servletResponse);
-            auth.login( AzureLogin.getInstance().getAzureConfig().getApplicationIdentifier() + "/dashboard/onboarding");
+            String relayState = String.valueOf(tempAccountId);
+            auth.login(relayState);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while getting response of azure sso \n" + e.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
+            return ERROR.toUpperCase();
         }
-
-        
         return SUCCESS.toUpperCase();
+    }
+
+    public String sendRequestToGoogleWorkspace() throws IOException{
+        return samlUtilMethodForAuth(ConfigType.GOOGLE_SAML);
+    }
+
+    public String sendRequestToAzure () throws IOException{
+        return samlUtilMethodForAuth(ConfigType.AZURE);
     }
 
     public String registerViaAzure() throws Exception{
         if (!DashboardMode.isOnPremDeployment()) return Action.ERROR.toUpperCase();
-        if(AzureLogin.getInstance() == null){
+        if(CustomSamlSettings.getInstance(ConfigType.AZURE) == null){
             return ERROR.toUpperCase();
         }
-        Saml2Settings settings = AzureLogin.getSamlSettings();
+        Saml2Settings settings = CustomSamlSettings.getSamlSettings(ConfigType.AZURE);
         if(settings == null){
             return ERROR.toUpperCase();
         }
 
         Auth auth;
         try {
-            HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest);
+            HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest,ConfigType.AZURE, 0);
             auth = new Auth(settings, wrappedRequest, servletResponse);
             auth.processResponse();
             if (!auth.isAuthenticated()) {
@@ -598,6 +622,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             List<String> errors = auth.getErrors();
             if (!errors.isEmpty()) {
                 loggerMaker.errorAndAddToDb("Error in authenticating azure user \n" + auth.getLastErrorReason(), LogDb.DASHBOARD);
+                servletResponse.sendRedirect("/login");
                 return ERROR.toUpperCase();
             } else {
                 Map<String, List<String>> attributes = auth.getAttributes();
@@ -609,7 +634,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 username = nameId;
             }
             shouldLogin = "true";
-            SignupInfo.AzureSignupInfo signUpInfo = new SignupInfo.AzureSignupInfo(username, useremail);
+            SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, useremail, Config.ConfigType.AZURE);
             createUserAndRedirect(useremail, username, signUpInfo, 1000000, Config.ConfigType.AZURE.toString());
         } catch (Exception e1) {
             loggerMaker.errorAndAddToDb("Error while signing in via azure sso \n" + e1.getMessage(), LogDb.DASHBOARD);
@@ -618,6 +643,58 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
         return SUCCESS.toUpperCase();
     }
+
+    public String registerViaGoogleSamlSso() throws IOException{
+        Auth auth;
+        try {
+            String tempAccountId = servletRequest.getParameter("RelayState");
+            if(tempAccountId == null || tempAccountId.isEmpty()){
+                loggerMaker.errorAndAddToDb("Account id not found");
+                servletResponse.sendRedirect("/login");
+                return ERROR.toUpperCase();
+            }
+            setAccountId(Integer.parseInt(tempAccountId));
+            Saml2Settings settings = CustomSamlSettings.getSamlSettings(ConfigType.GOOGLE_SAML, this.accountId);
+            HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest, ConfigType.GOOGLE_SAML, this.accountId);
+            auth = new Auth(settings, wrappedRequest, servletResponse);
+            auth.processResponse();
+            if (!auth.isAuthenticated()) {
+                servletResponse.sendRedirect("/login");
+                return ERROR.toUpperCase();
+            }
+            String userEmail = null;
+            String username = null;
+            List<String> errors = auth.getErrors();
+            if (!errors.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Error in authenticating user from google sso \n" + auth.getLastErrorReason(), LogDb.DASHBOARD);
+                return ERROR.toUpperCase();
+            }
+            Map<String, List<String>> attributes = auth.getAttributes();
+            String nameId = "";
+            if (!attributes.isEmpty()) {
+                List<String> emails = attributes.get("email");
+                if(!emails.isEmpty()){
+                    nameId = emails.get(0);
+                }else{
+                    nameId = auth.getNameId();
+                }
+            }else{
+                nameId = auth.getNameId();
+            }
+            userEmail = nameId;
+            username = nameId;
+            
+            shouldLogin = "true";
+            SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, userEmail, Config.ConfigType.GOOGLE_SAML);
+            createUserAndRedirect(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString());
+        } catch (Exception e1) {
+            loggerMaker.errorAndAddToDb("Error while signing in via google workspace sso \n" + e1.getMessage(), LogDb.DASHBOARD);
+            servletResponse.sendRedirect("/login");
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
     public static final String MINIMUM_PASSWORD_ERROR = "Minimum of 8 characters required";
     public static final String MAXIMUM_PASSWORD_ERROR = "Maximum of 40 characters allowed";
     public static final String INVALID_CHAR = "Invalid character";
@@ -717,6 +794,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 }
             }
 
+            boolean isSSOLogin = Config.isConfigSSOType(signupInfo.getConfigType());
+
             if (user == null) {
 
                 if (accountId == 0) {
@@ -742,17 +821,16 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 user = UsersDao.instance.insertSignUp(userEmail, username, signupInfo, accountId);
                 loggerMaker.infoAndAddToDb("new user: " + user.getId());
 
-            } else if (StringUtils.isEmpty(code)) {
+            } else if (StringUtils.isEmpty(code) && !isSSOLogin) {
                 if (accountId == 0) {
                     throw new IllegalStateException("The account doesn't exist.");
                 }
             } else {
-
-                // insert rbac entry here
-                RBACDao.instance.insertOne(
-                    new RBAC(user.getId(), invitedRole, accountId)
-                );
-
+                if(!isSSOLogin){
+                    RBACDao.instance.insertOne(
+                        new RBAC(user.getId(), invitedRole, accountId)
+                    );
+                }
                 LoginAction.loginUser(user, servletResponse, true, servletRequest);
                 servletResponse.sendRedirect("/dashboard/observe/inventory");
                 return;
@@ -845,5 +923,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     public void setInvitationCode(String invitationCode) {
         this.invitationCode = invitationCode;
+    }
+
+    public void setAccountId(int accountId) {
+        this.accountId = accountId;
+    }
+
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
     }
 }

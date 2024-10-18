@@ -1,11 +1,16 @@
 package com.akto.dto;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 @BsonDiscriminator
 public abstract class Config {
 
     public static final String CONFIG_SALT = "-ankush";
+    private static final Set<ConfigType> ssoConfigTypes = new HashSet(Arrays.asList( ConfigType.OKTA, ConfigType.AZURE, ConfigType.GOOGLE_SAML));
 
     public ConfigType getConfigType() {
         return configType;
@@ -23,13 +28,13 @@ public abstract class Config {
         this.id = id;
     }
 
-    String id;
+    public String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML;
     }
 
-    ConfigType configType;
+    public ConfigType configType;
 
     @BsonDiscriminator
     public static class SlackConfig extends Config {
@@ -490,63 +495,6 @@ public abstract class Config {
             this.activeAccountsLabel = activeAccountsLabel;
         }
     }
-
-    @BsonDiscriminator
-    public static class AzureConfig extends Config{
-        
-        private String x509Certificate ;
-        private String azureEntityId ;
-        private String loginUrl ;
-        private String acsUrl ;
-        private String applicationIdentifier;
-
-        public static final String CONFIG_ID = ConfigType.AZURE.name() + CONFIG_SALT;
-
-        public AzureConfig() {
-            this.configType = ConfigType.AZURE;
-            this.id = CONFIG_ID;
-        }
-
-        public String getX509Certificate() {
-            return x509Certificate;
-        }
-
-        public void setX509Certificate(String x509Certificate) {
-            this.x509Certificate = x509Certificate;
-        }
-
-        public String getAzureEntityId() {
-            return azureEntityId;
-        }
-
-        public void setAzureEntityId(String azureEntityId) {
-            this.azureEntityId = azureEntityId;
-        }
-
-        public String getLoginUrl() {
-            return loginUrl;
-        }
-
-        public void setLoginUrl(String loginUrl) {
-            this.loginUrl = loginUrl;
-        }
-
-        public String getAcsUrl() {
-            return acsUrl;
-        }
-
-        public void setAcsUrl(String acsUrl) {
-            this.acsUrl = acsUrl;
-        }
-
-        public String getApplicationIdentifier() {
-            return applicationIdentifier;
-        }
-
-        public void setApplicationIdentifier(String applicationIdentifier) {
-            this.applicationIdentifier = applicationIdentifier;
-        }
-    }
     @BsonDiscriminator
     public static class MixpanelConfig extends Config {
         private String projectToken;
@@ -653,4 +601,10 @@ public abstract class Config {
         }
     }
 
+    public static boolean isConfigSSOType(ConfigType configType){
+        if(configType == null){
+            return false;
+        }
+        return ssoConfigTypes.contains(configType);
+    }
 }
