@@ -6983,7 +6983,7 @@
             </result>
         </action>
 
-        <action name="api/fetchIssuesBySummaryId" class="com.akto.action.testing_issues.IssuesAction" method="fetchIssuesBySummaryId">
+        <action name="api/fetchIssuesByStatusAndSummaryId" class="com.akto.action.testing_issues.IssuesAction" method="fetchIssuesByStatusAndSummaryId">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
