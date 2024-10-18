@@ -27,6 +27,7 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
@@ -586,9 +587,33 @@ public class StartTestAction extends UserAction {
         ObjectId testingRunResultSummaryId;
         try {
             testingRunResultSummaryId = new ObjectId(testingRunResultSummaryHexId);
+            List<TestingRunIssues> allIgnoredTestingRunIssues = TestingRunIssuesDao.instance.findAll(Filters.and(
+                    Filters.eq(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId),
+                    Filters.ne(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN.name())
+            ));
+
+            List<ApiInfo.ApiInfoKey> ignoredIssuesApiInfokey = new ArrayList<>();
+            List<String> ignoredIssuesSubCategory = new ArrayList<>();
+            for(TestingRunIssues testingRunIssues: allIgnoredTestingRunIssues) {
+                ignoredIssuesSubCategory.add(testingRunIssues.getId().getTestSubCategory());
+                ignoredIssuesApiInfokey.add(testingRunIssues.getId().getApiInfoKey());
+            }
+
             Bson filters = Filters.and(
                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
-                    Filters.eq(TestingRunResult.VULNERABLE, true));
+                    Filters.eq(TestingRunResult.VULNERABLE, true),
+                    Filters.or(
+                            Filters.and(
+                                    Filters.nin(TestingRunResult.API_INFO_KEY, ignoredIssuesApiInfokey),  // Exclude if apiInfoKey is in the ignored list
+                                    Filters.nin(TestingRunResult.TEST_SUB_TYPE, ignoredIssuesSubCategory) // Exclude if testSubType is in the ignored list
+                            ),
+                            Filters.and(
+                                    Filters.in(TestingRunResult.API_INFO_KEY, ignoredIssuesApiInfokey),  // Include if apiInfoKey is in ignored list
+                                    Filters.nin(TestingRunResult.TEST_SUB_TYPE, ignoredIssuesSubCategory) // But testSubType must NOT be in the ignored list
+                            )
+                    )
+            );
+
             List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
             Map<String, String> sampleDataVsCurlMap = new HashMap<>();
             for (TestingRunResult runResult: testingRunResultList) {

@@ -440,5 +440,12 @@ export default {
             method: 'post',
             data: {deltaTimeForScheduledSummaries}
         })
+    },
+    fetchIssuesByStatusAndSummaryId(latestTestingRunSummaryId, issueStatusQuery) {
+        return request({
+            url: '/api/fetchIssuesByStatusAndSummaryId',
+            method: 'post',
+            data: { latestTestingRunSummaryId, issueStatusQuery }
+        })
     }
 }

@@ -44,7 +44,7 @@ function ActivityTracker({ latestActivity }) {
                                     <Box>
                                         <div style={{marginBlock: '5px'}}><Avatar shape="round" size="extraSmall" source="/public/issues-event-icon.svg" /></div>
                                         {eventIndex < (groupedActivity[date].length - 1) ? (
-                                            <Box borderColor='border-info-subdued' borderInlineEndWidth='2' width='0' paddingInlineStart={3} minHeight='12px' />
+                                            <Box borderColor='border-subdued' borderInlineEndWidth='2' width='0' paddingInlineStart={3} minHeight='12px' />
                                         ) : null}
                                     </Box>
                                     <Box>
