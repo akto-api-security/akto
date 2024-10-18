@@ -1,20 +1,17 @@
 package com.akto.test_editor.filter.data_operands_impl;
 
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ApiInfoDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
-import com.mongodb.client.model.Filters;
-import org.bson.conversions.Bson;
-
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public class ApiCollectionFilter extends DataOperandsImpl {
+
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     @Override
     public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
@@ -30,8 +27,7 @@ public class ApiCollectionFilter extends DataOperandsImpl {
             return result;
         }
 
-        Bson fQuery = Filters.in(ApiCollection.NAME, querySet);
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(fQuery);
+        List<ApiCollection> apiCollections = dataActor.findApiCollections(querySet);
         List<Integer> apiCollectionIds = new ArrayList<>();
         for(ApiCollection apiCollection: apiCollections) {
             apiCollectionIds.add(apiCollection.getId());
@@ -47,14 +43,7 @@ public class ApiCollectionFilter extends DataOperandsImpl {
             // eat it
         }
 
-        Bson urlInCollectionQuery = Filters.and(
-            Filters.in(ApiInfo.COLLECTION_IDS, apiCollectionIds),
-            Filters.in(ApiInfo.ID_URL, urls)
-        );
-
-
-        result = ApiInfoDao.instance.findOne(urlInCollectionQuery) != null;
-
+        result = dataActor.apiInfoExists(apiCollectionIds, urls);
         return result;
     }
 }
