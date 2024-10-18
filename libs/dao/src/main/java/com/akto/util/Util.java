@@ -32,4 +32,16 @@ public class Util {
         return System.getenv(var);
     }
 
+    public static long getLongValue(Object obj) {
+        long ret = 0;
+        if (obj instanceof Integer) {
+            ret = (int) obj;
+        } else if (obj instanceof Long) {
+            ret = (long) obj;
+        } else {
+            throw new IllegalArgumentException("Unsupported type for count");
+        }
+        return ret;
+    }
+
 }
