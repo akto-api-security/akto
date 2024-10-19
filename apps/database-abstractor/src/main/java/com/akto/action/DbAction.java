@@ -967,6 +967,11 @@ public class DbAction extends ActionSupport {
                              * cause the info. from mini-testing always contains HIGH.
                              * To be fixed in mini-testing.
                              */
+                            /*
+                             * Severity from info. fixed,
+                             * so taking for dynamic_severity,
+                             * since rest would be same and for old deployments.
+                             */
                             String testSubCategory = idd.getTestSubCategory();
                             YamlTemplate template = YamlTemplateDao.instance
                                     .findOne(Filters.eq(Constants.ID, testSubCategory));
@@ -974,7 +979,7 @@ public class DbAction extends ActionSupport {
 
                             if (template != null) {
                                 String severity = template.getInfo().getSeverity();
-                                if (severity != null) {
+                                if (severity != null && !"dynamic_severity".equals(severity)) {
                                     dVal = severity;
                                 }
                             }
