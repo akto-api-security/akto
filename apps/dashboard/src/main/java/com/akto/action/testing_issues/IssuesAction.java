@@ -492,10 +492,10 @@ public class IssuesAction extends UserAction {
     }
 
     String latestTestingRunSummaryId;
-    String issueStatusQuery;
+    List<String> issueStatusQuery;
     public String fetchIssuesByStatusAndSummaryId() {
         Bson filters = Filters.and(
-                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
                 Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId))
         );
         issues = TestingRunIssuesDao.instance.findAll(filters);
@@ -717,7 +717,7 @@ public class IssuesAction extends UserAction {
         this.latestTestingRunSummaryId = latestTestingRunSummaryId;
     }
 
-    public void setIssueStatusQuery(String issueStatusQuery) {
+    public void setIssueStatusQuery(List<String> issueStatusQuery) {
         this.issueStatusQuery = issueStatusQuery;
     }
 }

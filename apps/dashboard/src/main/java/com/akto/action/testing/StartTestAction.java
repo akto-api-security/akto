@@ -583,15 +583,10 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    List<TestingRunIssues> allIgnoredTestingRunIssues;
     public String fetchVulnerableTestRunResults() {
         ObjectId testingRunResultSummaryId;
         try {
             testingRunResultSummaryId = new ObjectId(testingRunResultSummaryHexId);
-            allIgnoredTestingRunIssues = TestingRunIssuesDao.instance.findAll(Filters.and(
-                    Filters.eq(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId),
-                    Filters.ne(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN.name())
-            ));
 
             Bson filters = Filters.and(
                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
@@ -1268,9 +1263,5 @@ public class StartTestAction extends UserAction {
 
     public void setSendSlackAlert(boolean sendSlackAlert) {
         this.sendSlackAlert = sendSlackAlert;
-    }
-
-    public List<TestingRunIssues> getAllIgnoredTestingRunIssues() {
-        return allIgnoredTestingRunIssues;
     }
 }

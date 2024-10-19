@@ -187,7 +187,7 @@ function SingleTestRunPage() {
     })
 
     let ignoredTestRunResults = []
-    await api.fetchIssuesByStatusAndSummaryId(summaryHexId, "IGNORED").then((issues) => {
+    await api.fetchIssuesByStatusAndSummaryId(summaryHexId, ["IGNORED", "FIXED"]).then((issues) => {
       const ignoredTestingResults = vulnerableTestingRunResults.filter(result => {
         return issues.some(issue =>
             issue.id.apiInfoKey.apiCollectionId === result.apiInfoKey.apiCollectionId &&
