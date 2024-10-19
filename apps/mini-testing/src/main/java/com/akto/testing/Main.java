@@ -114,6 +114,8 @@ public class Main {
         }
     }
 
+    private static boolean matrixAnalyzerRunning = false;
+
     public static void main(String[] args) throws InterruptedException {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
@@ -132,17 +134,21 @@ public class Main {
 
         schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                if (matrixAnalyzerRunning) {
+                    return;
+                }
                 Context.accountId.set(accountSettings.getId());
                 AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
                 try {
+                    matrixAnalyzerRunning = true;
                     matrixAnalyzer.run();
                 } catch (Exception e) {
                     loggerMaker.infoAndAddToDb("could not run matrixAnalyzer: " + e.getMessage(), LogDb.TESTING);
+                } finally {
+                    matrixAnalyzerRunning = false;
                 }
             }
         }, 0, 1, TimeUnit.MINUTES);
-
-
 
         loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
