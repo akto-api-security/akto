@@ -3289,7 +3289,7 @@ public class ClientActor extends DataActor {
             BasicDBObject payloadObj;
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
-                return (List<BasicDBObject>) payloadObj.get("endpoints");
+                return (List<BasicDBObject>) payloadObj.get("apiInfoList");
             } catch(Exception e) {
                 return null;
             }
@@ -3399,12 +3399,12 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public Node fetchDependencyFlowNodesByApiInfoKey(int apiCollectionId, String url, String method) {
+    public Node fetchDependencyFlowNodesByApiInfoKey(int apiCollectionId, String urlVar, String method) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("apiCollectionId", apiCollectionId);
-        obj.put("url", url);
-        obj.put("method", method);
+        obj.put("url", urlVar);
+        obj.put("methodVal", method);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDependencyFlowNodesByApiInfoKey", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
@@ -3465,12 +3465,12 @@ public class ClientActor extends DataActor {
         obj.put("skip", skip);
         List<Node> nodeList = new ArrayList<>();
 
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/apiInfoExists", "", "POST", obj.toString(), headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchNodesForCollectionIds", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in apiInfoExists", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchNodesForCollectionIds", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
             BasicDBObject payloadObj;
@@ -3485,7 +3485,7 @@ public class ClientActor extends DataActor {
                 return nodeList;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in apiInfoExists" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in fetchNodesForCollectionIds" + e, LoggerMaker.LogDb.RUNTIME);
         }
         return nodeList;
     }

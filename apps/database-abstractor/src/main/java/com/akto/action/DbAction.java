@@ -5,7 +5,6 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
-import com.akto.data_actor.DbActor;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -13,6 +12,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
+import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
@@ -248,6 +248,18 @@ public class DbAction extends ActionSupport {
 
     DataControlSettings dataControlSettings;
     BasicDBList metricsData;
+
+    int deltaPeriodValue;
+    String uuid;
+    int currTime;
+    OtpTestData otpTestData;
+    RecordedLoginFlowInput recordedLoginFlowInput;
+    LoginFlowStepsData loginFlowStepsData;
+    int userId;
+    Map<String, Object> valuesMap;
+    Node node;
+    List<Node> nodes;
+    boolean removeZeroLevel;
 
     public String fetchDataControlSettings() {
         try {
@@ -2149,6 +2161,86 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchEndpointsInCollectionUsingHost() {
+        try {
+            apiInfoList = DbLayer.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip, deltaPeriodValue);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchEndpointsInCollectionUsingHost " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchOtpTestData() {
+        try {
+            otpTestData = DbLayer.fetchOtpTestData(uuid, currTime);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchOtpTestData " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchRecordedLoginFlowInput() {
+        try {
+            recordedLoginFlowInput = DbLayer.fetchRecordedLoginFlowInput();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchRecordedLoginFlowInput " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchLoginFlowStepsData() {
+        try {
+            loginFlowStepsData = DbLayer.fetchLoginFlowStepsData(userId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchLoginFlowStepsData " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateLoginFlowStepsData() {
+        try {
+            DbLayer.updateLoginFlowStepsData(userId, valuesMap);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateLoginFlowStepsData " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchDependencyFlowNodesByApiInfoKey() {
+        try {
+            node = DbLayer.fetchDependencyFlowNodesByApiInfoKey(apiCollectionId, url, methodVal);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchDependencyFlowNodesByApiInfoKey " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchSampleDataForEndpoints() {
+        try {
+            sampleDatas = DbLayer.fetchSampleDataForEndpoints(endpoints);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchSampleDataForEndpoints " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchNodesForCollectionIds() {
+        try {
+            nodes = DbLayer.fetchNodesForCollectionIds(apiCollectionIds,removeZeroLevel, skip);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchNodesForCollectionIds " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -3085,6 +3177,95 @@ public class DbAction extends ActionSupport {
 
     public void setVpcId(String vpcId) {
         this.vpcId = vpcId;
+    }
+
+
+    public int getDeltaPeriodValue() {
+        return deltaPeriodValue;
+    }
+
+    public void setDeltaPeriodValue(int deltaPeriodValue) {
+        this.deltaPeriodValue = deltaPeriodValue;
+    }
+
+    public String getUuid() {
+        return uuid;
+    }
+
+    public void setUuid(String uuid) {
+        this.uuid = uuid;
+    }
+
+    public int getCurrTime() {
+        return currTime;
+    }
+
+    public void setCurrTime(int currTime) {
+        this.currTime = currTime;
+    }
+
+    public OtpTestData getOtpTestData() {
+        return otpTestData;
+    }
+
+    public void setOtpTestData(OtpTestData otpTestData) {
+        this.otpTestData = otpTestData;
+    }
+
+    public RecordedLoginFlowInput getRecordedLoginFlowInput() {
+        return recordedLoginFlowInput;
+    }
+
+    public void setRecordedLoginFlowInput(RecordedLoginFlowInput recordedLoginFlowInput) {
+        this.recordedLoginFlowInput = recordedLoginFlowInput;
+    }
+
+    public LoginFlowStepsData getLoginFlowStepsData() {
+        return loginFlowStepsData;
+    }
+
+    public void setLoginFlowStepsData(LoginFlowStepsData loginFlowStepsData) {
+        this.loginFlowStepsData = loginFlowStepsData;
+    }
+
+    public int getUserId() {
+        return userId;
+    }
+
+    public void setUserId(int userId) {
+        this.userId = userId;
+    }
+
+    public Map<String, Object> getValuesMap() {
+        return valuesMap;
+    }
+
+    public void setValuesMap(Map<String, Object> valuesMap) {
+        this.valuesMap = valuesMap;
+    }
+
+    public Node getNode() {
+        return node;
+    }
+
+    public void setNode(Node node) {
+        this.node = node;
+    }
+
+    public List<Node> getNodes() {
+        return nodes;
+    }
+
+    public void setNodes(List<Node> nodes) {
+        this.nodes = nodes;
+    }
+
+    public boolean getRemoveZeroLevel() {
+        return removeZeroLevel;
+    }
+
+    public void setRemoveZeroLevel(boolean removeZeroLevel) {
+        this.removeZeroLevel = removeZeroLevel;
     }
 
 }
