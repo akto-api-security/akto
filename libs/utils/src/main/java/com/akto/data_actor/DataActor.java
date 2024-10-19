@@ -3,6 +3,7 @@ package com.akto.data_actor;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
+import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
@@ -12,6 +13,8 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
 import com.akto.dto.testing.EndpointLogicalGroup;
+import com.akto.dto.testing.LoginFlowStepsData;
+import com.akto.dto.testing.OtpTestData;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunConfig;
@@ -24,6 +27,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.usage.MetricTypes;
+import com.mongodb.BasicDBObject;
 
 import java.util.List;
 import java.util.Map;
@@ -238,5 +242,21 @@ public abstract class DataActor {
     public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId);
 
     public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId);
+
+    public abstract List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue);
+
+    public abstract OtpTestData fetchOtpTestData(String uuid, int curTime);
+
+    public abstract RecordedLoginFlowInput fetchRecordedLoginFlowInput();
+
+    public abstract LoginFlowStepsData fetchLoginFlowStepsData(int userId);
+
+    public abstract void updateLoginFlowStepsData(int userId, Map<String, Object> valuesMap);
+
+    public abstract Node fetchDependencyFlowNodesByApiInfoKey(int apiCollectionId, String url, String method);
+
+    public abstract List<SampleData> fetchSampleDataForEndpoints(List<ApiInfo.ApiInfoKey> endpoints);
+
+    public abstract List<Node> fetchNodesForCollectionIds(List<Integer> apiCollectionsIds, boolean removeZeroLevel, int skip);
 
 }
