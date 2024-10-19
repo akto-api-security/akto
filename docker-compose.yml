@@ -11,14 +11,14 @@ services:
     ports:
       - "27017:27017"
 
-  # akto-api-security-dashboard:
-  #   image: coastaldemigod/dashboard
-  #   env_file: ./docker.env
-  #   restart: always
-  #   ports: 
-  #     - "8080:8080"
-  #   depends_on:
-  #     - mongo
+  akto-api-security-dashboard:
+    image: aktosecurity/akto-api-security-dashboard
+    env_file: ./docker.env
+    restart: always
+    ports: 
+      - "8080:8080"
+    depends_on:
+      - mongo
     
   # akto-api-security-testing:
   #   image: aktosecurity/akto-api-testing:local

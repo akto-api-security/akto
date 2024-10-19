@@ -129,7 +129,7 @@ public class Executor {
             if (executionType.equals("graph")) {
                 List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
                 apiInfoKeys.add(apiInfoKey);
-                //memory = new Memory(apiInfoKeys, new HashMap<>());
+                memory = new Memory(apiInfoKeys, new HashMap<>());
             }
             workflowTest = buildWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
             result.add(triggerMultiExecution(workflowTest, reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory));

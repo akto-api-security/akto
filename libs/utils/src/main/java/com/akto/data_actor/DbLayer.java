@@ -932,7 +932,7 @@ public class DbLayer {
         return MergedUrlsDao.instance.getMergedUrls();
     }
 
-    private static final int ENDPOINT_LIMIT = 50;
+    public static final int ENDPOINT_LIMIT = 50;
 
     public static List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
@@ -1003,7 +1003,7 @@ public class DbLayer {
         return SampleDataDao.instance.findAll(Filters.or(filters));
     }
 
-    final static int NODE_LIMIT = 100;
+    public final static int NODE_LIMIT = 100;
 
     public static List<Node> fetchNodesForCollectionIds(List<Integer> apiCollectionsIds, boolean removeZeroLevel, int skip) {
         return DependencyFlowNodesDao.instance.findNodesForCollectionIds(apiCollectionsIds, removeZeroLevel, skip,

@@ -48,6 +48,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.*;
+import com.akto.testing.workflow_node_executor.Utils;
 
 public class TestExecutor {
 
@@ -130,8 +131,16 @@ public class TestExecutor {
         AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
 
         List<YamlTemplate> yamlTemplates = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            yamlTemplates.addAll(dataActor.fetchYamlTemplates(false, i*50));
+        final int TEST_LIMIT = 50;
+        for (int i = 0; i < 100; i++) {
+            List<YamlTemplate> temp = dataActor.fetchYamlTemplates(false, i * TEST_LIMIT);
+            if (temp == null || temp.isEmpty()) {
+                break;
+            }
+            yamlTemplates.addAll(temp);
+            if (temp.size() < TEST_LIMIT) {
+                break;
+            }
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates);
@@ -358,7 +367,7 @@ public class TestExecutor {
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         LoginFlowResponse loginFlowResp;
-        loginFlowResp =  com.akto.testing.workflow_node_executor.Utils.runLoginFlow(workflowObj, authMechanism, loginFlowParams);
+        loginFlowResp =  Utils.runLoginFlow(workflowObj, authMechanism, loginFlowParams);
         return loginFlowResp;
     }
 

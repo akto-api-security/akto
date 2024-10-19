@@ -66,7 +66,13 @@ public class AccessMatrixTaskInfo {
     }
 
     public String getHexId() {
-        return this.id.toHexString();
+        if (this.hexId != null) {
+            return this.hexId;
+        }
+        if (this.id != null) {
+            return this.id.toHexString();
+        }
+        return null;
     }
 
     public String getEndpointLogicalGroupName() {

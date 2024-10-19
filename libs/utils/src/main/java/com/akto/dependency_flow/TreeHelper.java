@@ -1,14 +1,18 @@
-package com.akto.dto.dependency_flow;
+package com.akto.dependency_flow;
 
-import com.akto.dao.DependencyFlowNodesDao;
-import com.mongodb.client.model.Filters;
-
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.dependency_flow.Connection;
+import com.akto.dto.dependency_flow.Edge;
+import com.akto.dto.dependency_flow.Node;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 public class TreeHelper {
+
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
     public Map<Integer, Node> result = new HashMap<>();
     public int nodeCount = 0;
     private final int MAX_NODE_COUNT = 10;
@@ -26,13 +30,7 @@ public class TreeHelper {
         nodeCount += 1;
         if (nodeCount > MAX_NODE_COUNT) return;
 
-        Node node = DependencyFlowNodesDao.instance.findOne(
-                Filters.and(
-                        Filters.eq("apiCollectionId", apiCollectionId),
-                        Filters.eq("url", url),
-                        Filters.eq("method", method)
-                )
-        );
+        Node node = dataActor.fetchDependencyFlowNodesByApiInfoKey(Integer.parseInt(apiCollectionId), url, method);
 
         if (node == null) return;
 
