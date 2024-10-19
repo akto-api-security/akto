@@ -13,21 +13,20 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
-import org.bson.conversions.Bson;
 
 import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.JiraIntegration;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
-import com.akto.dto.test_run_findings.TestingIssuesId;
-import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.jira_integration.JiraIntegration;
+import com.akto.dto.jira_integration.JiraMetaData;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.Constants;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -52,15 +51,9 @@ public class JiraIntegrationAction extends UserAction {
     private String apiToken;
     private String issueType;
     private JiraIntegration jiraIntegration;
-    
-    private String issueTitle;
-    private String hostStr;
-    private String endPointStr;
-    private String issueUrl;
-    private String issueDescription;
-    private String jiraTicketUrl;
+    private JiraMetaData jiraMetaData;
+
     private String jiraTicketKey;
-    private TestingIssuesId testingIssueId;
 
     private String origReq;
     private String testReq;
@@ -195,25 +188,17 @@ public class JiraIntegrationAction extends UserAction {
         BasicDBObject fields = new BasicDBObject();
 
         // issue title
-        fields.put("summary", "Akto Report - " + issueTitle);
+        fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle());
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-        Bson filters = Filters.and(
-            Filters.eq("_id.apiInfoKey.apiCollectionId", testingIssueId.getApiInfoKey().getApiCollectionId()),
-            Filters.eq("_id.apiInfoKey.method", testingIssueId.getApiInfoKey().getMethod()),
-            Filters.eq("_id.apiInfoKey.url", testingIssueId.getApiInfoKey().getUrl()),
-            Filters.eq("_id" + "." + TestingIssuesId.TEST_SUB_CATEGORY, testingIssueId.getTestSubCategory()),
-            Filters.in("_id" + "." + TestingIssuesId.TEST_CATEGORY_FROM_SOURCE_CONFIG, testingIssueId.getTestCategoryFromSourceConfig())
-        );
-        TestingRunIssues testingRunIssues = TestingRunIssuesDao.instance.findOne(filters);
 
         // issue type (TASK)
-        BasicDBObject issueType = new BasicDBObject();
-        issueType.put("id", jiraIntegration.getIssueType());
-        fields.put("issuetype", issueType);
+        BasicDBObject issueTypeObj = new BasicDBObject();
+        issueTypeObj.put("id", this.issueType);
+        fields.put("issuetype", issueTypeObj);
 
         // project id
         BasicDBObject project = new BasicDBObject();
-        project.put("key", jiraIntegration.getProjId());
+        project.put("key", this.projId);
         fields.put("project", project);
 
         // issue description
@@ -221,10 +206,10 @@ public class JiraIntegrationAction extends UserAction {
         description.put("type", "doc");
         description.put("version", 1);
         BasicDBList contentList = new BasicDBList();
-        contentList.add(buildContentDetails(hostStr, null));
-        contentList.add(buildContentDetails(endPointStr, null));
-        contentList.add(buildContentDetails("Issue link - Akto dashboard", issueUrl));
-        contentList.add(buildContentDetails(issueDescription, null));
+        contentList.add(buildContentDetails(jiraMetaData.getHostStr(), null));
+        contentList.add(buildContentDetails(jiraMetaData.getEndPointStr(), null));
+        contentList.add(buildContentDetails("Issue link - Akto dashboard", jiraMetaData.getIssueUrl()));
+        contentList.add(buildContentDetails(jiraMetaData.getIssueDescription(), null));
         description.put("content", contentList);
 
         fields.put("description", description);
@@ -234,6 +219,7 @@ public class JiraIntegrationAction extends UserAction {
         String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT;
         String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
 
+        String jiraTicketUrl = "";
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
@@ -263,8 +249,8 @@ public class JiraIntegrationAction extends UserAction {
             BasicDBObject payloadObj;
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
-                jiraTicketKey = payloadObj.getString("key");
-                jiraTicketUrl = jiraIntegration.getBaseUrl() + "/browse/" + jiraTicketKey;
+                this.jiraTicketKey = payloadObj.getString("key");
+                jiraTicketUrl = jiraIntegration.getBaseUrl() + "/browse/" + this.jiraTicketKey;
             } catch(Exception e) {
                 loggerMaker.errorAndAddToDb(e, "error making jira issue url " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
                 return Action.ERROR.toUpperCase();
@@ -276,14 +262,15 @@ public class JiraIntegrationAction extends UserAction {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(false);
 
-        TestingRunIssuesDao.instance.getMCollection().updateOne(
-                filters,
+        if(jiraTicketUrl.length() > 0){
+            TestingRunIssuesDao.instance.getMCollection().updateOne(
+                Filters.eq(Constants.ID, jiraMetaData.getTestingIssueId()),
                 Updates.combine(
                         Updates.set("jiraIssueUrl", jiraTicketUrl)
                 ),
                 updateOptions
-        );
-
+            );
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -293,7 +280,6 @@ public class JiraIntegrationAction extends UserAction {
 
         try {
             jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-            // issueId = "KAN-34";
             String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT + "/" + issueId + ATTACH_FILE_ENDPOINT;
             String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
 
@@ -422,62 +408,6 @@ public class JiraIntegrationAction extends UserAction {
         this.jiraIntegration = jiraIntegration;
     }
 
-    public String getIssueTitle() {
-        return issueTitle;
-    }
-
-    public void setIssueTitle(String issueTitle) {
-        this.issueTitle = issueTitle;
-    }
-
-    public String getHostStr() {
-        return hostStr;
-    }
-
-    public void setHostStr(String hostStr) {
-        this.hostStr = hostStr;
-    }
-
-    public String getEndPointStr() {
-        return endPointStr;
-    }
-
-    public void setEndPointStr(String endPointStr) {
-        this.endPointStr = endPointStr;
-    }
-
-    public String getIssueUrl() {
-        return issueUrl;
-    }
-
-    public void setIssueUrl(String issueUrl) {
-        this.issueUrl = issueUrl;
-    }
-
-    public String getIssueDescription() {
-        return issueDescription;
-    }
-
-    public void setIssueDescription(String issueDescription) {
-        this.issueDescription = issueDescription;
-    }
-
-    public String getJiraTicketUrl() {
-        return jiraTicketUrl;
-    }
-
-    public void setJiraTicketUrl(String jiraTicketUrl) {
-        this.jiraTicketUrl = jiraTicketUrl;
-    }
-
-    public TestingIssuesId getTestingIssueId() {
-        return testingIssueId;
-    }
-
-    public void setTestingIssueId(TestingIssuesId testingIssueId) {
-        this.testingIssueId = testingIssueId;
-    }
-
     public String getOrigReq() {
         return origReq;
     }
@@ -502,20 +432,28 @@ public class JiraIntegrationAction extends UserAction {
         this.issueId = issueId;
     }
 
-    public String getJiraTicketKey() {
-        return jiraTicketKey;
-    }
-
-    public void setJiraTicketKey(String jiraTicketKey) {
-        this.jiraTicketKey = jiraTicketKey;
-    }
-
     public Map<String, List<BasicDBObject>> getProjectAndIssueMap() {
         return projectAndIssueMap;
     }
 
     public void setProjectAndIssueMap(Map<String, List<BasicDBObject>> projectAndIssueMap) {
         this.projectAndIssueMap = projectAndIssueMap;
+    }
+
+    public JiraMetaData getJiraMetaData() {
+        return jiraMetaData;
+    }
+
+    public void setJiraMetaData(JiraMetaData jiraMetaData) {
+        this.jiraMetaData = jiraMetaData;
+    }
+
+    public String getJiraTicketKey() {
+        return jiraTicketKey;
+    }
+
+    public void setJiraTicketKey(String jiraTicketKey) {
+        this.jiraTicketKey = jiraTicketKey;
     }
     
 }

@@ -1,4 +1,4 @@
-package com.akto.dto;
+package com.akto.dto.jira_integration;
 
 import java.util.List;
 import java.util.Map;
