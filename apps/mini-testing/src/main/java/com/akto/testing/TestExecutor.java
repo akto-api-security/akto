@@ -559,6 +559,9 @@ public class TestExecutor {
             TestingIssuesHandler handler = new TestingIssuesHandler();
             boolean triggeredByTestEditor = false;
             try{
+                List<GenericTestResult> list = new ArrayList<>();
+                list.add(testRes);
+                trr.setTestResults(list);
                 handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb(e, "Unable to create issues", LogDb.TESTING);
@@ -740,6 +743,11 @@ public class TestExecutor {
             } catch (Exception e){
                 testResult.setConfidence(Confidence.HIGH);
             }
+            // dynamic severity for tests
+            Confidence overConfidence = getConfidenceForTests(testConfig, yamlTestTemplate);
+            if (overConfidence != null) {
+                testResult.setConfidence(overConfidence);
+            }
         }
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
@@ -751,6 +759,31 @@ public class TestExecutor {
                 vulnerable,singleTypeInfos,confidencePercentage,startTime,
                 endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs
         );
+    }
+
+    public Confidence getConfidenceForTests(TestConfig testConfig, YamlTestTemplate template) {
+        Confidence someConfidence = null;
+        if (testConfig.getDynamicSeverityList() != null) {
+            for (SeverityParserResult temp : testConfig.getDynamicSeverityList()) {
+                if (temp.getCheck() != null) {
+                    FilterNode filterNode = temp.getCheck().getNode();
+                    template.setFilterNode(filterNode);
+                    boolean res = template.filter();
+                    if (res) {
+                        try {
+                            return Confidence.valueOf(temp.getSeverity());
+                        } catch (Exception e) {
+                        }
+                    }
+                } else {
+                    /*
+                     * Default value has no check condition.
+                     */
+                    someConfidence = Confidence.valueOf(temp.getSeverity());
+                }
+            }
+        }
+        return someConfidence;
     }
 
     public boolean filterGraphQlPayload(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) throws Exception {

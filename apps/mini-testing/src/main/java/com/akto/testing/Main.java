@@ -6,7 +6,6 @@ import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
-import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -16,6 +15,7 @@ import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -28,7 +28,6 @@ import com.akto.notifications.slack.SlackSender;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.enums.GlobalEnums;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -116,6 +115,19 @@ public class Main {
 
     private static boolean matrixAnalyzerRunning = false;
 
+    public static void singleTypeInfoInit(int accountId) {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
+                loggerMaker.infoAndAddToDb("customDataType size: " + customDataTypes.size());
+                List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
+                List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
+                SingleTypeInfo.fetchCustomDataTypes(accountId, customDataTypes, aktoDataTypes);
+                SingleTypeInfo.fetchCustomAuthTypes(accountId, customAuthTypes);
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
+
     public static void main(String[] args) throws InterruptedException {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
@@ -156,11 +168,13 @@ public class Main {
         
         Map<Integer, Integer> logSentMap = new HashMap<>();
 
-        Context.accountId.set(accountSettings.getId());
+        int accountId = accountSettings.getId();
+        Context.accountId.set(accountId);
         GetRunningTestsStatus.getRunningTests().getStatusOfRunningTests();
 
+        singleTypeInfoInit(accountId);
+
         while (true) {
-            int accountId = accountSettings.getId();
             int start = Context.now();
             long startDetailed = System.currentTimeMillis();
             int delta = start - 20*60;
