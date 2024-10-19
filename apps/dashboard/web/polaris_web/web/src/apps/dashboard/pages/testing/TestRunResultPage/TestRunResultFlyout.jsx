@@ -79,9 +79,14 @@ function TestRunResultFlyout(props) {
     const handleJiraClick = async() => {
         if(!modalActive){
             const jirIntegration = await settingFunctions.fetchJiraIntegration()
-            setJiraProjectMap(jirIntegration.projectIdsMap)
-            if(Object.keys(jirIntegration.projectIdsMap).length > 0){
-                setProjId(Object.keys(jirIntegration.projectIdsMap)[0])
+            if(jirIntegration.projectIdsMap !== null && Object.keys(jirIntegration.projectIdsMap).length > 0){
+                setJiraProjectMap(jirIntegration.projectIdsMap)
+                if(Object.keys(jirIntegration.projectIdsMap).length > 0){
+                    setProjId(Object.keys(jirIntegration.projectIdsMap)[0])
+                }
+            }else{
+                setProjId(jirIntegration.projId)
+                setIssueType(jirIntegration.issueType)
             }
         }
         setModalActive(!modalActive)
@@ -131,7 +136,7 @@ function TestRunResultFlyout(props) {
                 return jiraTemp[0].issueType
             }
         }
-        return ""
+        return issueType
         
     }
     
@@ -208,7 +213,7 @@ function TestRunResultFlyout(props) {
                                     />
 
                                     <DropdownSearch
-                                        disabled={projId.length === 0}
+                                        disabled={Object.keys(jiraProjectMaps).length === 0 || projId.length === 0}
                                         placeholder="Select JIRA issue type"
                                         optionsList={jiraProjectMaps[projId] && jiraProjectMaps[projId].length > 0 ? jiraProjectMaps[projId].map((x) => {return{label: x.issueType, value: x.issueId}}) : []}
                                         setSelected={setIssueType}
