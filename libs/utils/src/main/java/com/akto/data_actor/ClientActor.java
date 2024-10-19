@@ -26,6 +26,7 @@ import com.akto.dto.data_types.NotBelongsToPredicate;
 import com.akto.dto.data_types.Predicate;
 import com.akto.dto.data_types.RegexPredicate;
 import com.akto.dto.data_types.StartsWithPredicate;
+import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
@@ -36,6 +37,8 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
 import com.akto.dto.testing.EndpointLogicalGroup;
+import com.akto.dto.testing.LoginFlowStepsData;
+import com.akto.dto.testing.OtpTestData;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunConfig;
@@ -3199,4 +3202,224 @@ public class ClientActor extends DataActor {
             return null;
         }
     }
+
+    public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiCollectionId", apiCollectionId);
+        obj.put("skip", skip);
+        obj.put("deltaPeriodValue", deltaPeriodValue);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchEndpointsInCollectionUsingHost", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchEndpointsInCollectionUsingHost", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                return (List<BasicDBObject>) payloadObj.get("endpoints");
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchEndpointsInCollectionUsingHost" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    public OtpTestData fetchOtpTestData(String uuid, int curTime) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("uuid", uuid);
+        obj.put("curTime", curTime);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchOtpTestData", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchOtpTestData", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject otpTestDataObj = (BasicDBObject) payloadObj.get("otpTestData");
+                OtpTestData otpTestData = objectMapper.readValue(otpTestDataObj.toJson(), OtpTestData.class);
+                return otpTestData;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchOtpTestData" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    public RecordedLoginFlowInput fetchRecordedLoginFlowInput() {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchRecordedLoginFlowInput", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchRecordedLoginFlowInput", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject recordedLoginFlowInputObj = (BasicDBObject) payloadObj.get("recordedLoginFlowInput");
+                RecordedLoginFlowInput recordedLoginFlowInput = objectMapper.readValue(recordedLoginFlowInputObj.toJson(), RecordedLoginFlowInput.class);
+                return recordedLoginFlowInput;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchRecordedLoginFlowInput" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    public LoginFlowStepsData fetchLoginFlowStepsData(int userId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("userId", userId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchLoginFlowStepsData", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchLoginFlowStepsData", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject loginFlowStepsDataObj = (BasicDBObject) payloadObj.get("loginFlowStepsData");
+                LoginFlowStepsData loginFlowStepsData = objectMapper.readValue(loginFlowStepsDataObj.toJson(), LoginFlowStepsData.class);
+                return loginFlowStepsData;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchLoginFlowStepsData" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    public void updateLoginFlowStepsData(int userId, Map<String, Object> valuesMap) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("userId", userId);
+        obj.put("valuesMap", valuesMap);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateLoginFlowStepsData", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateLoginFlowStepsData", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateLoginFlowStepsData" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
+
+    public Node fetchDependencyFlowNodesByApiInfoKey(int apiCollectionId, String url, String method) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiCollectionId", apiCollectionId);
+        obj.put("url", url);
+        obj.put("method", method);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDependencyFlowNodesByApiInfoKey", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchDependencyFlowNodesByApiInfoKey", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject data = (BasicDBObject) payloadObj.get("node");
+                return objectMapper.readValue(data.toJson(), Node.class);
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchDependencyFlowNodesByApiInfoKey" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    public List<SampleData> fetchSampleDataForEndpoints(List<ApiInfo.ApiInfoKey> endpoints) {
+        Map<String, List<String>> headers = buildHeaders();
+        List<SampleData> sampleDataList = new ArrayList<>();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("endpoints", endpoints);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchSampleDataForEndpoints", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchSampleDataForEndpoints", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList sampleDatas = (BasicDBList) payloadObj.get("sampleDatas");
+                for (Object sampleData: sampleDatas) {
+                    BasicDBObject obj2 = (BasicDBObject) sampleData;
+                    sampleDataList.add(objectMapper.readValue(obj2.toJson(), SampleData.class));
+                }
+            } catch(Exception e) {
+                return sampleDataList;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchSampleDataForEndpoints" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return sampleDataList;
+    }
+
+    public List<Node> fetchNodesForCollectionIds(List<Integer> apiCollectionsIds, boolean removeZeroLevel, int skip) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiCollectionIds", apiCollectionsIds);
+        obj.put("removeZeroLevel", removeZeroLevel);
+        obj.put("skip", skip);
+        List<Node> nodeList = new ArrayList<>();
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/apiInfoExists", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in apiInfoExists", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList datas = (BasicDBList) payloadObj.get("nodes");
+                for (Object data: datas) {
+                    BasicDBObject obj2 = (BasicDBObject) data;
+                    nodeList.add(objectMapper.readValue(obj2.toJson(), Node.class));
+                }
+            } catch(Exception e) {
+                return nodeList;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in apiInfoExists" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return nodeList;
+    }
+
+
 }
