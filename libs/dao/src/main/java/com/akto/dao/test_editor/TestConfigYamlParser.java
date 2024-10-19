@@ -1,9 +1,9 @@
 package com.akto.dao.test_editor;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import com.akto.dao.test_editor.auth.Parser;
 import com.akto.dao.test_editor.filter.ConfigParser;
 import com.akto.dao.test_editor.info.InfoParser;
@@ -12,6 +12,7 @@ import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ExecutorConfigParserResult;
 import com.akto.dto.test_editor.Info;
+import com.akto.dto.test_editor.SeverityParserResult;
 import com.akto.dto.test_editor.Strategy;
 import com.akto.dto.test_editor.TestConfig;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -107,16 +108,35 @@ public class TestConfigYamlParser {
             new TestConfig(id, info, auth, filters, wordListMap, executeOperations, null, null);
         }
 
-        Object strategyObject = config.get("strategy");
-        if (strategyObject == null) {
-            return new TestConfig(id, info, auth, filters, wordListMap, executeOperations, validations, null);
+        List<Object> apiSeverityTemp = new ArrayList<>();
+        List<SeverityParserResult> dynamicSeverityList = new ArrayList<>();
+        try {
+            if (config.containsKey(TestConfig.DYNAMIC_SEVERITY)) {
+                apiSeverityTemp = (List) config.get(TestConfig.DYNAMIC_SEVERITY);
+            }
+            for (Object temp : apiSeverityTemp) {
+                Map<String, Object> keys = (Map) temp;
+                Object filter = keys.get(SeverityParserResult._CHECK);
+                ConfigParserResult parsedFilter = null;
+                if (filter != null) {
+                    parsedFilter = configParser.parse(filter);
+                }
+                String str = (String)keys.get(SeverityParserResult._RETURN);
+                SeverityParserResult spr = new SeverityParserResult(parsedFilter, str);
+                dynamicSeverityList.add(spr);
+            }
+        } catch (Exception e) {
         }
 
-        StrategyParser strategyParser = new StrategyParser();
-
-        Strategy strategy = strategyParser.parse(strategyObject);
+        Object strategyObject = config.get("strategy");
+        Strategy strategy = null;
+        if (strategyObject != null) {
+            StrategyParser strategyParser = new StrategyParser();   
+            strategy = strategyParser.parse(strategyObject);
+        }
 
         testConfig = new TestConfig(id, info, auth, filters, wordListMap, executeOperations, validations, strategy);
+        testConfig.setDynamicSeverityList(dynamicSeverityList);
         return testConfig;
     }
 
