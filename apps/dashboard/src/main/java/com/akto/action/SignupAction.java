@@ -555,7 +555,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     private int accountId;
     private String userEmail;
 
-    private String samlUtilMethodForAuth(ConfigType configType) throws IOException{
+    public String sendRequestToSamlIdP() throws IOException{
         String queryString = servletRequest.getQueryString();
         if(queryString == null || queryString.isEmpty() || queryString.split("email=").length < 2){
             code = "Error, user email cannot be empty";
@@ -563,16 +563,17 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             return ERROR.toUpperCase();
         }
         setUserEmail(queryString.split("email=")[1]);
-        int tempAccountId = SSOConfigsDao.instance.getSSOConfigId(userEmail);
-        if(tempAccountId == -1){
+        SAMLConfig samlConfig = SSOConfigsDao.instance.getSSOConfig(userEmail);
+        if(samlConfig == null){
             code = "Error, cannot login via SSO, redirecting to login";
             servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
+        int tempAccountId = Integer.parseInt(samlConfig.getId());
         setAccountId(tempAccountId);
 
         Saml2Settings settings = null;
-        settings = CustomSamlSettings.getSamlSettings(ConfigType.valueOf(configType.name()),accountId);
+        settings = CustomSamlSettings.getSamlSettings(samlConfig);
 
         if(settings == null){
             code= "Error, cannot find sso for this organization, redirecting to login";
@@ -589,27 +590,18 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return SUCCESS.toUpperCase();
     }
 
-    public String sendRequestToGoogleWorkspace() throws IOException{
-        return samlUtilMethodForAuth(ConfigType.GOOGLE_SAML);
-    }
-
-    public String sendRequestToAzure () throws IOException{
-        return samlUtilMethodForAuth(ConfigType.AZURE);
-    }
-
     public String registerViaAzure() throws Exception{
-        if (!DashboardMode.isOnPremDeployment()) return Action.ERROR.toUpperCase();
-        if(CustomSamlSettings.getInstance(ConfigType.AZURE) == null){
-            return ERROR.toUpperCase();
-        }
-        Saml2Settings settings = CustomSamlSettings.getSamlSettings(ConfigType.AZURE);
-        if(settings == null){
-            return ERROR.toUpperCase();
-        }
-
         Auth auth;
         try {
-            HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest,ConfigType.AZURE, 0);
+            String tempAccountId = servletRequest.getParameter("RelayState");
+            if(tempAccountId == null || tempAccountId.isEmpty()){
+                loggerMaker.errorAndAddToDb("Account id not found");
+                servletResponse.sendRedirect("/login");
+                return ERROR.toUpperCase();
+            }
+            setAccountId(Integer.parseInt(tempAccountId));
+            Saml2Settings settings = CustomSamlSettings.getSamlSettings(ConfigType.AZURE, this.accountId);
+            HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest,ConfigType.AZURE, this.accountId);
             auth = new Auth(settings, wrappedRequest, servletResponse);
             auth.processResponse();
             if (!auth.isAuthenticated()) {
@@ -635,7 +627,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
             shouldLogin = "true";
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, useremail, Config.ConfigType.AZURE);
-            createUserAndRedirect(useremail, username, signUpInfo, 1000000, Config.ConfigType.AZURE.toString());
+            createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString());
         } catch (Exception e1) {
             loggerMaker.errorAndAddToDb("Error while signing in via azure sso \n" + e1.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");

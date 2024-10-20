@@ -31,6 +31,8 @@ import com.akto.dto.*;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
+import com.akto.dto.Config.AzureConfig;
+import com.akto.dto.Config.ConfigType;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.User.AktoUIMode;
 import com.akto.dto.data_types.Conditions;
@@ -49,6 +51,7 @@ import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.settings.DefaultPayload;
+import com.akto.dto.sso.SAMLConfig;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.*;
@@ -2805,6 +2808,44 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void moveAzureSamlConfig(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getMoveAzureSamlToNormalSaml() == 0){
+
+            if(DashboardMode.isOnPremDeployment()){
+                Bson filterQ = Filters.eq(Constants.ID, AzureConfig.CONFIG_ID);
+                Config.AzureConfig azureConfig = (AzureConfig) ConfigsDao.instance.findOne(filterQ);
+                if(azureConfig != null){
+                    String adminEmail = "";
+                    Organization org = OrganizationsDao.instance.findOne(Filters.empty());
+                    if(org == null){
+                        RBAC rbac = RBACDao.instance.findOne(Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN.name()));
+                        User adminUser = UsersDao.instance.findOne(Filters.eq("login", rbac.getUserId()));
+                        adminEmail = adminUser.getLogin();
+                    }else{
+                        adminEmail = org.getAdminEmail();
+                    }
+                    
+                    String domain = "";
+                    if(!adminEmail.isEmpty()){
+                        domain = OrganizationUtils.determineEmailDomain(adminEmail);
+                    }
+
+                    SAMLConfig samlConfig = SAMLConfig.convertAzureConfigToSAMLConfig(azureConfig);
+                    ConfigsDao.instance.deleteAll(filterQ);
+                    samlConfig.setId("1000000");
+                    samlConfig.setOrganizationDomain(domain);
+                    SSOConfigsDao.instance.insertOne(samlConfig);
+                    
+                }
+            }
+            
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.MOVE_AZURE_SAML, Context.now())
+            );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
@@ -2834,6 +2875,7 @@ public class InitializerListener implements ServletContextListener {
         makeFirstUserAdmin(backwardCompatibility);
         dropSpecialCharacterApiCollections(backwardCompatibility);
         addDefaultAdvancedFilters(backwardCompatibility);
+        moveAzureSamlConfig(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {

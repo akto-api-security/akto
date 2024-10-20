@@ -394,15 +394,6 @@
             </result>
         </action>
 
-        <action name="signup-azure-request" class="com.akto.action.SignupAction" method="sendRequestToAzure">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"   type="json"/>
-            <result name="ERROR" type="json">
-                <param name="root">code</param>
-            </result>
-        </action>
-
         <action name="signup-azure-saml" class="com.akto.action.SignupAction" method="registerViaAzure">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -412,7 +403,7 @@
             </result>
         </action>
 
-        <action name="trigger-google-sso" class="com.akto.action.SignupAction" method="sendRequestToGoogleWorkspace">
+        <action name="trigger-saml-sso" class="com.akto.action.SignupAction" method="sendRequestToSamlIdP">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"   type="json"/>

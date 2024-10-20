@@ -61,15 +61,7 @@ public class CustomSamlSettings {
         return settings;
     }
 
-    public static Saml2Settings getSamlSettings(ConfigType configType) {
-        CustomSamlSettings CustomSamlSettingsInstance = CustomSamlSettings.getInstance(configType);
-        if (CustomSamlSettingsInstance == null || CustomSamlSettingsInstance.getSamlConfig() == null) {
-            return null;
-        }
-
-        SAMLConfig samlConfig = CustomSamlSettingsInstance.getSamlConfig();
-
-        
+    public static Saml2Settings getSamlSettings(SAMLConfig samlConfig) {
         return buildSamlSettingsMap(samlConfig);
     }
 

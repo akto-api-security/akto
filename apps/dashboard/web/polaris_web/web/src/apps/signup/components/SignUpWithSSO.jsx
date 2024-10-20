@@ -8,7 +8,7 @@ function SignUpWithSSO() {
     const [email, setEmail] = useState('')
 
     const handleSubmit = () => {
-        window.location.href = "/trigger-google-sso?email=" + email
+        window.location.href = "/trigger-saml-sso?email=" + email
     }
 
     const customComponent = (

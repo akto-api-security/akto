@@ -32,6 +32,17 @@ public class SAMLConfig extends Config  {
         this.setId(CONFIG_ID);
     }
 
+    public static SAMLConfig convertAzureConfigToSAMLConfig(Config.AzureConfig azureConfig) {
+        SAMLConfig samlConfig = new SAMLConfig();
+        samlConfig.setApplicationIdentifier(azureConfig.getApplicationIdentifier());
+        samlConfig.setX509Certificate(azureConfig.getX509Certificate());
+        samlConfig.setLoginUrl(azureConfig.getLoginUrl());
+        samlConfig.setAcsUrl(azureConfig.getAcsUrl());
+        samlConfig.setEntityId(azureConfig.getAzureEntityId()); 
+        samlConfig.setConfigType(ConfigType.AZURE);
+        return samlConfig;
+    }
+
     public String getApplicationIdentifier() {
         return applicationIdentifier;
     }
