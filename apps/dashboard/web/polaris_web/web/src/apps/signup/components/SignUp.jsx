@@ -21,7 +21,6 @@ function SignUp() {
   const [loading, setLoading] = useState(false)
 
   const oktaUrl = window.OKTA_AUTH_URL
-  const azureUrl = window.AZURE_REQUEST_URL
   const githubId = window.GITHUB_CLIENT_ID
   const githubUrl = window.GITHUB_URL ? window.GITHUB_URL : "https://github.com"
   const resetAll = PersistStore(state => state.resetAll)
@@ -31,12 +30,6 @@ function SignUp() {
     logo: '/public/github_icon.svg',
     text: 'Continue with Github SSO',
     onClickFunc: () => { window.location.href = (githubUrl + "/login/oauth/authorize?client_id=" + githubId); }
-  }
-
-  const azureAuthObj = {
-    logo: '/public/azure_logo.svg',
-    text: 'Continue with Azure SSO',
-    onClickFunc: () => { window.location.href = azureUrl }
   }
 
   const oktaAuthObj = {
@@ -57,10 +50,6 @@ function SignUp() {
       copySsoList.push(oktaAuthObj)
     }
 
-    if (azureUrl !== undefined && azureUrl > 0) {
-      copySsoList.push(azureAuthObj)
-    }
-
     setSsoList(copySsoList)
 
     if (window.IS_SAAS && window.IS_SAAS === "true") {
@@ -75,7 +64,7 @@ function SignUp() {
           ssoList.map((sso, index) => {
             return (
               <VerticalStack gap={5} key={index}>
-                <SSOTextfield onClickFunc={sso.onClickFunc} logo={sso.logo} text={sso.text} />
+                <SSOTextfield onClickFunc={sso.onClickFunc} logos={[sso.logo]} text={sso.text} />
                 <HorizontalStack gap={3}>
                   <div style={{ flexGrow: 1, borderBottom: '1px solid #c9cccf' }}></div>
                   <Text variant="bodySm" color="subdued">or</Text>
@@ -156,6 +145,7 @@ function SignUp() {
       <Text alignment="center" variant="heading2xl">{activeObject.headingText}</Text>
       <VerticalStack gap={5}>
         {ssoCard}
+        <SSOTextfield onClickFunc={() => window.location.href="/sign-in-with-sso"} logos={['/public/azure_logo.svg', '/public/gcp.svg']} text={"Sign in with SSO"} />
         {signupEmailCard}
       </VerticalStack>
     </VerticalStack>
