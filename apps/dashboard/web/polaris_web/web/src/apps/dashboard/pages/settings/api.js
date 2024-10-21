@@ -448,6 +448,15 @@ const settingRequests = {
             }
         })
     },
+    updateApisCaseInsensitive(toggleCaseSensitiveApis){
+        return request({
+            url: '/api/toggleCaseSensitiveApis',
+            method: "post",
+            data: {
+                toggleCaseSensitiveApis
+            }
+        })
+    },
     fetchApiAuditLogsFromDb(skip, limit, sortOrder, startTimestamp, endTimestamp) {
         return request({
             url: '/api/fetchApiAuditLogsFromDb',
