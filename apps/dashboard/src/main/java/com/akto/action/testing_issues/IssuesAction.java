@@ -11,6 +11,7 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.HistoricalData;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
@@ -24,6 +25,7 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.GroupByTimeRange;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -34,6 +36,7 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -172,7 +175,10 @@ public class IssuesAction extends UserAction {
         long daysBetween = (endTimeStamp - startEpoch) / ONE_DAY_TIMESTAMP;
         List<Bson> pipeline = new ArrayList<>();
 
+        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated("_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID);
+
         Bson filters = Filters.and(
+                notIncludedCollections,
                 Filters.gte(TestingRunIssues.CREATION_TIME, startEpoch),
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
         );
@@ -222,7 +228,9 @@ public class IssuesAction extends UserAction {
 
         List<Bson> pipeline = new ArrayList<>();
 
+        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated(HistoricalData.API_COLLECTION_ID);
         Bson filter = Filters.and(
+                notIncludedCollections,
                 Filters.gte("time", startEpoch),
                 Filters.lte("time", endTimeStamp)
         );
@@ -482,6 +490,18 @@ public class IssuesAction extends UserAction {
         TestingRunIssuesDao.instance.updateMany(Filters.in(ID, issueIdArray), update);
         return SUCCESS.toUpperCase();
     }
+
+    String latestTestingRunSummaryId;
+    List<String> issueStatusQuery;
+    public String fetchIssuesByStatusAndSummaryId() {
+        Bson filters = Filters.and(
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
+                Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId))
+        );
+        issues = TestingRunIssuesDao.instance.findAll(filters);
+        return SUCCESS.toUpperCase();
+    }
+
     public List<TestingRunIssues> getIssues() {
         return issues;
     }
@@ -691,5 +711,13 @@ public class IssuesAction extends UserAction {
 
     public void setSortOrder(int sortOrder) {
         this.sortOrder = sortOrder;
+    }
+
+    public void setLatestTestingRunSummaryId(String latestTestingRunSummaryId) {
+        this.latestTestingRunSummaryId = latestTestingRunSummaryId;
+    }
+
+    public void setIssueStatusQuery(List<String> issueStatusQuery) {
+        this.issueStatusQuery = issueStatusQuery;
     }
 }

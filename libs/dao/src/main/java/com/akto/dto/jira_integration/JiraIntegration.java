@@ -1,4 +1,9 @@
-package com.akto.dto;
+package com.akto.dto.jira_integration;
+
+import java.util.List;
+import java.util.Map;
+
+import com.mongodb.BasicDBObject;
 
 public class JiraIntegration {
     
@@ -9,6 +14,7 @@ public class JiraIntegration {
     private String issueType;
     private int createdTs; 
     private int updatedTs;
+    private Map<String,List<BasicDBObject>> projectIdsMap;
 
     public String getBaseUrl() {
         return baseUrl;
@@ -64,6 +70,14 @@ public class JiraIntegration {
 
     public void setUpdatedTs(int updatedTs) {
         this.updatedTs = updatedTs;
+    }
+
+    public Map<String, List<BasicDBObject>> getProjectIdsMap() {
+        return projectIdsMap;
+    }
+
+    public void setProjectIdsMap(Map<String, List<BasicDBObject>> projectIdsMap) {
+        this.projectIdsMap = projectIdsMap;
     }
 
 }

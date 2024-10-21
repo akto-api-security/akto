@@ -253,11 +253,11 @@ const settingRequests = {
         })
     },
 
-    addJiraIntegration(userEmail, apiToken, baseUrl, projId, issueType) {
+    addJiraIntegration(userEmail, apiToken, baseUrl, projId, projectAndIssueMap) {
         return request({
             url: '/api/addIntegration',
             method: 'post',
-            data: {userEmail, apiToken, baseUrl, projId, issueType}
+            data: {userEmail, apiToken, baseUrl, projId, projectAndIssueMap}
         })
     },
 

@@ -56,7 +56,11 @@ public abstract class SecurityTestTemplate {
 
     private YamlTestResult getResultWithError(List<String> errorMessages, boolean requiresConfig){
         List<GenericTestResult> testResults = new ArrayList<>();
-        TestResult testResult = new TestResult(null, rawApi.getOriginalMessage(), errorMessages, 0, false, TestResult.Confidence.HIGH, null);
+        /*
+         * Only skipped tests calling this function, 
+         * thus no need to store original message here.
+         */
+        TestResult testResult = new TestResult(null, null, errorMessages, 0, false, TestResult.Confidence.HIGH, null);
         testResult.setRequiresConfig(requiresConfig);
         testResults.add(testResult);
         return new YamlTestResult(testResults, null);

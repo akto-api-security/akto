@@ -81,6 +81,19 @@ function GithubServerTable(props) {
 
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.filterKey || e.value] = 'OR'; return map }, {})
 
+  useEffect(() => {
+    const handleEsc = (event) => {
+      if (event.key === "Escape") {
+        setMode(IndexFiltersMode.Default)
+      }
+    }
+
+    window.addEventListener("keydown", handleEsc)
+    return () => {
+      window.removeEventListener("keydown", handleEsc)
+    }
+  }, [])
+
   useEffect(()=> {
     let queryFilters 
     if (performance.getEntriesByType('navigation')[0].type === 'reload') {
