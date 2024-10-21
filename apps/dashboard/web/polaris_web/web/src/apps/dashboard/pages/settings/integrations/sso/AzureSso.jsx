@@ -83,7 +83,7 @@ function AzureSso() {
             entityTitle="Microsoft Entra Identifier"
             entityId={azureIdentity}
             loginURL={loginUrl}
-            signinUrl={signonUrl}
+            signinUrl={AcsUrl}
             integrationSteps={integrationSteps}
             cardContent={cardContent}
             handleSubmitOutSide={handleSubmit}

@@ -627,7 +627,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
             shouldLogin = "true";
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, useremail, Config.ConfigType.AZURE);
-            createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString());
+            createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), RBAC.Role.MEMBER);
         } catch (Exception e1) {
             loggerMaker.errorAndAddToDb("Error while signing in via azure sso \n" + e1.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
@@ -678,7 +678,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             
             shouldLogin = "true";
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, userEmail, Config.ConfigType.GOOGLE_SAML);
-            createUserAndRedirect(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString());
+            createUserAndRedirect(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString(), RBAC.Role.MEMBER);
         } catch (Exception e1) {
             loggerMaker.errorAndAddToDb("Error while signing in via google workspace sso \n" + e1.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
