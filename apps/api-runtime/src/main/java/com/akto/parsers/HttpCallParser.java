@@ -61,7 +61,6 @@ public class HttpCallParser {
     private int last_synced;
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class, LogDb.RUNTIME);
     public APICatalogSync apiCatalogSync;
-    public DependencyAnalyser dependencyAnalyser;
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
     private Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap = new HashMap<>();
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
@@ -96,7 +95,6 @@ public class HttpCallParser {
         this.sync_threshold_time = sync_threshold_time;
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
-        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
     }
 
     public HttpCallParser(int sync_threshold_count, int sync_threshold_time) {
@@ -255,16 +253,6 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-        if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
-            for (HttpResponseParams responseParam: filteredResponseParams) {
-                try{
-                    dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
-                } catch (Exception e){
-                    loggerMaker.errorAndAddToDb(e, "error in analyzing dependency: " + e);
-                }
-            }
-        }
-
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
@@ -274,10 +262,6 @@ public class HttpCallParser {
 
             numberOfSyncs++;
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
-            if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
-                dependencyAnalyser.dbState = apiCatalogSync.dbState;
-                dependencyAnalyser.syncWithDb();
-            }
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
