@@ -1647,6 +1647,17 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     if(iconsUsedMap[iconString] !== undefined){
       return iconsUsedMap[iconString]
     } return null
+  },
+  formatEndpoint(endpoint) {
+    const trimmedEndpoint = endpoint.replace(/^api\//, '')
+    const spacedEndpoint = trimmedEndpoint.replace(/([a-z])([A-Z])/g, '$1 $2')
+    const finalEndpoint = spacedEndpoint.replace(/[_-]/g, ' ')
+    const capitalizedEndpoint = finalEndpoint
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ')
+
+    return capitalizedEndpoint
   }
 }
 

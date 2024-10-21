@@ -94,6 +94,9 @@ public class BackwardCompatibility {
     public static final String ADD_DEFAULT_FILTERS = "addDefaultFilters";
     private int addDefaultFilters;
 
+    public static final String MOVE_AZURE_SAML = "moveAzureSamlToNormalSaml";
+    private int moveAzureSamlToNormalSaml;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -103,7 +106,7 @@ public class BackwardCompatibility {
                                  int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
                                  int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
-                                 int addDefaultFilters) {
+                                 int addDefaultFilters, int moveAzureSamlToNormalSaml) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -133,6 +136,7 @@ public class BackwardCompatibility {
         this.addAdminRoleIfAbsent = addAdminRoleIfAbsent;
         this.dropSpecialCharacterApiCollections = dropSpecialCharacterApiCollections;
         this.fixApiAccessType = fixApiAccessType;
+        this.moveAzureSamlToNormalSaml = moveAzureSamlToNormalSaml;
     }
 
     public BackwardCompatibility() {
@@ -400,5 +404,13 @@ public class BackwardCompatibility {
 
     public void setAddDefaultFilters(int addDefaultFilters) {
         this.addDefaultFilters = addDefaultFilters;
+    }
+
+    public int getMoveAzureSamlToNormalSaml() {
+        return moveAzureSamlToNormalSaml;
+    }
+
+    public void setMoveAzureSamlToNormalSaml(int moveAzureSamlToNormalSaml) {
+        this.moveAzureSamlToNormalSaml = moveAzureSamlToNormalSaml;
     }
 }
