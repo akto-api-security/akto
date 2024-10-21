@@ -144,7 +144,7 @@ const AuditLogs = () => {
             useNewRow={true}
             condensedHeight={true}
             disambiguateLabel={disambiguateLabel}
-            mode={IndexFiltersMode.Default}
+            mode={IndexFiltersMode.Filtering}
             onRowClick={(data) => {}}
             showFooter={false}
             loading={tableLoading}
