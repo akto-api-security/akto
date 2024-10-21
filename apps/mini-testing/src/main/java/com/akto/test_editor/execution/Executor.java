@@ -121,6 +121,7 @@ public class Executor {
                 loggerMaker.infoAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
             }
         }
+        origRawApi = sampleRawApi.copy();
 
         boolean requestSent = false;
 
