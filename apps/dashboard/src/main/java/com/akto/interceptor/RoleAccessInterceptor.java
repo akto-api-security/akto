@@ -16,6 +16,7 @@ import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 import com.akto.filter.UserDetailsFilter;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.policies.UserAgentTypePolicy;
 import com.akto.util.DashboardMode;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
@@ -123,7 +124,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             ReadWriteAccess accessGiven = userRoleRecord.getReadWriteAccessForFeature(featureType);
             boolean hasRequiredAccess = false;
 
-            if(this.accessType.equalsIgnoreCase(ReadWriteAccess.READ.toString()) || (accessGiven != null && this.accessType.equalsIgnoreCase(accessGiven.toString()))){
+            if(this.accessType.equalsIgnoreCase(ReadWriteAccess.READ.toString()) || this.accessType.equalsIgnoreCase(accessGiven.toString())){
                 hasRequiredAccess = true;
             }
             if(featureLabel.equals(Feature.ADMIN_ACTIONS.name())){
@@ -136,13 +137,13 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             }
 
             try {
-                if (accessGiven != null && this.accessType.equalsIgnoreCase(ReadWriteAccess.READ_WRITE.toString())) {
+                if (this.accessType.equalsIgnoreCase(ReadWriteAccess.READ_WRITE.toString())) {
                     long timestamp = Context.now();
                     String apiEndpoint = invocation.getProxy().getActionName();
                     String actionDescription = this.actionDescription == null ? "Error: Description not available" : this.actionDescription;
                     String userEmail = user.getLogin();
                     String userAgent = request.getHeader("User-Agent") == null ? "Unknown User-Agent" : request.getHeader("User-Agent");
-                    AuditLogsUtil.ClientType userAgentType = AuditLogsUtil.findUserAgentType(userAgent);
+                    UserAgentTypePolicy.ClientType userAgentType = UserAgentTypePolicy.findUserAgentType(userAgent);
                     List<String> userProxyIpAddresses = AuditLogsUtil.getClientIpAddresses(request);
                     String userIpAddress = userProxyIpAddresses.get(0);
 

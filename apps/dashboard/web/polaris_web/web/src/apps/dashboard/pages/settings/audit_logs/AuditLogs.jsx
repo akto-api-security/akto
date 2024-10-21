@@ -1,4 +1,4 @@
-import { Box, Button, IndexFiltersMode, Text } from '@shopify/polaris'
+import { Badge, Button, IndexFiltersMode, Text } from '@shopify/polaris'
 import React, { useEffect, useReducer, useState } from 'react'
 import settingRequests from '../api'
 import func from '@/util/func'
@@ -87,7 +87,7 @@ const AuditLogs = () => {
                     actionDescription: <Text>{actionDescription}</Text>,
                     timestamp: func.prettifyEpoch(timestamp),
                     rawTimestamp: timestamp,
-                    userAgent: <Text>{userAgent}</Text>,
+                    userAgent: <Badge>{func.toSentenceCase(userAgent)}</Badge>,
                     rawUserAgent: userAgent
                 }
             })
@@ -158,8 +158,8 @@ const AuditLogs = () => {
                     titleText={"Audit logs"} 
                 />
             }
-            primaryAction={<Button disabled={window.USER_ROLE !== "ADMIN"} loading={loading} primary onClick={exportAuditLogsCSV}>Export as CSV</Button>}
-            secondaryActions={<DateRangeFilter disabled={window.USER_ROLE !== "ADMIN"} initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+            primaryAction={<Button loading={loading} primary onClick={exportAuditLogsCSV}>Export as CSV</Button>}
+            secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
             isFirstPage={true}
             components={[auditLogsTable]}
         />

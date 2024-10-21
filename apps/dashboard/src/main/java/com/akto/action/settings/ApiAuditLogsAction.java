@@ -1,5 +1,6 @@
-package com.akto.action;
+package com.akto.action.settings;
 
+import com.akto.action.UserAction;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dto.User;
 import com.akto.dto.audit_logs.ApiAuditLogs;

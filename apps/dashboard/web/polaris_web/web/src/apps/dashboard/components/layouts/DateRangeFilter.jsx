@@ -25,7 +25,6 @@ function DateRangeFilter(props){
         fullHeight
         activator={
           <Button
-            disabled={props?.disabled}
             icon={CalendarMinor}
             onClick={() => setPopoverActive(!popoverActive)}
           >

@@ -7169,7 +7169,7 @@
             </result>
         </action>
 
-        <action name="api/fetchApiAuditLogsFromDb" class="com.akto.action.ApiAuditLogsAction" method="fetchApiAuditLogsFromDb">
+        <action name="api/fetchApiAuditLogsFromDb" class="com.akto.action.settings.ApiAuditLogsAction" method="fetchApiAuditLogsFromDb">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
