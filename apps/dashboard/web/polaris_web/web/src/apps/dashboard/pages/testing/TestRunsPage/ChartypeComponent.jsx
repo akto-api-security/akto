@@ -13,9 +13,11 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
             let comp = [
                 (
                     <Box >
-                        <div style={{display: "flex", gap: "8px", alignItems: "center", maxWidth: '200px'}} key={index}>
+                        <div style={{display: "flex", gap: "8px", alignItems: "center"}} key={index}>
                             <span style={{background: data[key]?.color, borderRadius: "50%", width: "8px", height: "8px"}} />
-                            <TooltipText tooltip={key} text={key}/>
+                            <Box width='200px'>
+                                <Text style={{textWrap: 'wrap'}}>{key}</Text>
+                            </Box>
                         </div>
                     </Box>
                 ),
@@ -47,7 +49,7 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                 <VerticalStack gap="2">
                     <Text fontWeight="semibold" variant="bodySm">{title}</Text>
                     <Scrollable style={{maxHeight: boxHeight}} focusable shadow>
-                        <Box width={dataTableWidth ? dataTableWidth : '260px'}>
+                        <Box>
                             <DataTable headings={[]}
                                 columnContentTypes={[
                                     'text',
