@@ -245,7 +245,11 @@ public class HttpCallParser {
             redundantList = accountSettings.getAllowRedundantEndpointsList();
         }
         Pattern regexPattern = Utils.createRegexPatternFromList(redundantList);
-        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, redundantList, regexPattern, accountSettings.getHandleApisCaseInsensitive());
+        boolean makeApisCaseInsensitive = false;
+        if(accountSettings != null){
+            makeApisCaseInsensitive = accountSettings.getHandleApisCaseInsensitive();
+        }
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, redundantList, regexPattern, makeApisCaseInsensitive);
         
 
         boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
