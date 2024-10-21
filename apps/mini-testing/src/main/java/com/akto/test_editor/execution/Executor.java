@@ -17,10 +17,7 @@ import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.testing.*;
 import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
-import com.akto.utils.RedactSampleData;
 import com.akto.dto.api_workflow.Graph;
-import com.akto.dto.billing.Organization;
-import com.akto.dto.billing.Tokens;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
@@ -28,8 +25,8 @@ import com.akto.dto.type.KeyTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
+import com.akto.test_editor.OrgUtils;
 import com.akto.test_editor.Utils;
-import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -132,12 +129,27 @@ public class Executor {
             if (executionType.equals("graph")) {
                 List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
                 apiInfoKeys.add(apiInfoKey);
-                //memory = new Memory(apiInfoKeys, new HashMap<>());
+                memory = new Memory(apiInfoKeys, new HashMap<>());
             }
             workflowTest = buildWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
             result.add(triggerMultiExecution(workflowTest, reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory));
             yamlTestResult = new YamlTestResult(result, workflowTest);
             
+            return yamlTestResult;
+        }
+
+        if (executionType.equals("passive")) {
+            ExecutionResult attempt = new ExecutionResult(true, "", rawApi.getRequest(), rawApi.getResponse());
+            TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+            if (res != null) {
+                /*
+                 * Since the original message and test message are same, saving only one.
+                 * Being set as message in the getter later.
+                 */
+                res.setOriginalMessage("");
+                result.add(res);
+            }
+            yamlTestResult = new YamlTestResult(result, workflowTest);
             return yamlTestResult;
         }
 
@@ -527,30 +539,6 @@ public class Executor {
         return null;
     }
 
-    private static BasicDBObject getBillingTokenForAuth() {
-        BasicDBObject bDObject;
-        int accountId = Context.accountId.get();
-        Organization organization = dataActor.fetchOrganization(accountId);
-        if (organization == null) {
-            return new BasicDBObject("error", "organization not found");
-        }
-
-        String errMessage = "";
-        Tokens tokens = dataActor.fetchToken(organization.getId(), accountId);
-        if (tokens == null) {
-            errMessage = "error extracting ${akto_header}, token is missing";
-        }
-        if (tokens.isOldToken()) {
-            errMessage = "error extracting ${akto_header}, token is old";
-        }
-        if(errMessage.length() > 0){
-            bDObject = new BasicDBObject("error", errMessage);
-        }else{
-            bDObject = new BasicDBObject("token", tokens.getToken());
-        }
-        return bDObject;
-    }
-
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
         switch (operationType.toLowerCase()) {
             case "send_ssrf_req":
@@ -562,7 +550,7 @@ public class Executor {
                 uuidList.add(generatedUUID);
                 varMap.put("random_uuid", uuidList);
 
-                BasicDBObject response = getBillingTokenForAuth();
+                BasicDBObject response = OrgUtils.getBillingTokenForAuth();
                 if(response.getString("token") != null){
                     String tokenVal = response.getString("token");
                     return Utils.sendRequestToSsrfServer(url + generatedUUID, redirectUrl, tokenVal);
@@ -600,7 +588,7 @@ public class Executor {
                 return Operations.replaceBody(rawApi, newPayload);
             case "add_header":
                 if (value.equals("${akto_header}")) {
-                    BasicDBObject tokenResponse = getBillingTokenForAuth();
+                    BasicDBObject tokenResponse = OrgUtils.getBillingTokenForAuth();
                     if(tokenResponse.getString("token") != null){
                         value = tokenResponse.getString("token");
                     }else{

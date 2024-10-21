@@ -30,6 +30,7 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
+import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -43,6 +44,7 @@ import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
+import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -50,6 +52,8 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
 import com.akto.dto.testing.EndpointLogicalGroup;
+import com.akto.dto.testing.LoginFlowStepsData;
+import com.akto.dto.testing.OtpTestData;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunConfig;
@@ -927,4 +931,84 @@ public class DbLayer {
     public static Set<MergedUrls> fetchMergedUrls() {
         return MergedUrlsDao.instance.getMergedUrls();
     }
+
+    public static final int ENDPOINT_LIMIT = 50;
+
+    public static List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+
+        if(apiCollection == null){
+            return new ArrayList<>();
+        }
+
+        if (apiCollection.getHostName() == null || apiCollection.getHostName().length() == 0 ) {
+            return ApiCollectionsDao.fetchEndpointsInCollection(apiCollectionId, skip, ENDPOINT_LIMIT, deltaPeriodValue);
+        } else {
+            List<SingleTypeInfo> allUrlsInCollection = ApiCollectionsDao.fetchHostSTI(apiCollectionId, skip);
+
+            List<BasicDBObject> endpoints = new ArrayList<>();
+            for(SingleTypeInfo singleTypeInfo: allUrlsInCollection) {
+                BasicDBObject groupId = new BasicDBObject(ApiInfoKey.API_COLLECTION_ID, singleTypeInfo.getApiCollectionId())
+                    .append(ApiInfoKey.URL, singleTypeInfo.getUrl())
+                    .append(ApiInfoKey.METHOD, singleTypeInfo.getMethod());
+                endpoints.add(new BasicDBObject("startTs", singleTypeInfo.getTimestamp()).append(Constants.ID, groupId));
+            }
+
+            return endpoints;
+        }
+    }    
+
+    public static OtpTestData fetchOtpTestData(String uuid, int curTime){
+        Bson filters = Filters.and(
+            Filters.eq("uuid", uuid),
+            Filters.gte("createdAtEpoch", curTime)
+        );
+        return OtpTestDataDao.instance.findOne(filters);
+    }
+
+    public static RecordedLoginFlowInput fetchRecordedLoginFlowInput(){
+        return RecordedLoginInputDao.instance.findOne(new BasicDBObject());
+    }
+
+    public static LoginFlowStepsData fetchLoginFlowStepsData(int userId) {
+        Bson filters = Filters.and(
+                Filters.eq("userId", userId));
+        return LoginFlowStepsDao.instance.findOne(filters);
+    }
+
+    public static void updateLoginFlowStepsData(int userId, Map<String, Object> valuesMap) {
+        Bson filter = Filters.and(
+                Filters.eq("userId", userId));
+        Bson update = Updates.set("valuesMap", valuesMap);
+        LoginFlowStepsDao.instance.updateOne(filter, update);
+    }
+
+    public static Node fetchDependencyFlowNodesByApiInfoKey(int apiCollectionId, String url, String method) {
+        Node node = DependencyFlowNodesDao.instance.findOne(
+                Filters.and(
+                        Filters.eq("apiCollectionId", apiCollectionId + ""),
+                        Filters.eq("url", url),
+                        Filters.eq("method", method)));
+        return node;
+    }
+
+    public static List<SampleData> fetchSampleDataForEndpoints(List<ApiInfo.ApiInfoKey> endpoints) {
+        List<Bson> filters = new ArrayList<>();
+        for (ApiInfo.ApiInfoKey endpoint : endpoints) {
+            filters.add(Filters.and(
+                    Filters.eq("_id.apiCollectionId", endpoint.getApiCollectionId()),
+                    Filters.eq("_id.url", endpoint.getUrl()),
+                    Filters.eq("_id.method", endpoint.getMethod().name())));
+        }
+        return SampleDataDao.instance.findAll(Filters.or(filters));
+    }
+
+    public final static int NODE_LIMIT = 100;
+
+    public static List<Node> fetchNodesForCollectionIds(List<Integer> apiCollectionsIds, boolean removeZeroLevel, int skip) {
+        return DependencyFlowNodesDao.instance.findNodesForCollectionIds(apiCollectionsIds, removeZeroLevel, skip,
+                NODE_LIMIT);
+    }
+
+
 }

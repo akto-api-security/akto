@@ -48,6 +48,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.*;
+import com.akto.testing.workflow_node_executor.Utils;
 
 public class TestExecutor {
 
@@ -130,8 +131,16 @@ public class TestExecutor {
         AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
 
         List<YamlTemplate> yamlTemplates = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            yamlTemplates.addAll(dataActor.fetchYamlTemplates(false, i*50));
+        final int TEST_LIMIT = 50;
+        for (int i = 0; i < 100; i++) {
+            List<YamlTemplate> temp = dataActor.fetchYamlTemplates(false, i * TEST_LIMIT);
+            if (temp == null || temp.isEmpty()) {
+                break;
+            }
+            yamlTemplates.addAll(temp);
+            if (temp.size() < TEST_LIMIT) {
+                break;
+            }
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates);
@@ -358,7 +367,7 @@ public class TestExecutor {
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         LoginFlowResponse loginFlowResp;
-        loginFlowResp =  com.akto.testing.workflow_node_executor.Utils.runLoginFlow(workflowObj, authMechanism, loginFlowParams);
+        loginFlowResp =  Utils.runLoginFlow(workflowObj, authMechanism, loginFlowParams);
         return loginFlowResp;
     }
 
@@ -550,6 +559,9 @@ public class TestExecutor {
             TestingIssuesHandler handler = new TestingIssuesHandler();
             boolean triggeredByTestEditor = false;
             try{
+                List<GenericTestResult> list = new ArrayList<>();
+                list.add(testRes);
+                trr.setTestResults(list);
                 handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb(e, "Unable to create issues", LogDb.TESTING);
@@ -731,6 +743,11 @@ public class TestExecutor {
             } catch (Exception e){
                 testResult.setConfidence(Confidence.HIGH);
             }
+            // dynamic severity for tests
+            Confidence overConfidence = getConfidenceForTests(testConfig, yamlTestTemplate);
+            if (overConfidence != null) {
+                testResult.setConfidence(overConfidence);
+            }
         }
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
@@ -742,6 +759,31 @@ public class TestExecutor {
                 vulnerable,singleTypeInfos,confidencePercentage,startTime,
                 endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs
         );
+    }
+
+    public Confidence getConfidenceForTests(TestConfig testConfig, YamlTestTemplate template) {
+        Confidence someConfidence = null;
+        if (testConfig.getDynamicSeverityList() != null) {
+            for (SeverityParserResult temp : testConfig.getDynamicSeverityList()) {
+                if (temp.getCheck() != null) {
+                    FilterNode filterNode = temp.getCheck().getNode();
+                    template.setFilterNode(filterNode);
+                    boolean res = template.filter();
+                    if (res) {
+                        try {
+                            return Confidence.valueOf(temp.getSeverity());
+                        } catch (Exception e) {
+                        }
+                    }
+                } else {
+                    /*
+                     * Default value has no check condition.
+                     */
+                    someConfidence = Confidence.valueOf(temp.getSeverity());
+                }
+            }
+        }
+        return someConfidence;
     }
 
     public boolean filterGraphQlPayload(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) throws Exception {
