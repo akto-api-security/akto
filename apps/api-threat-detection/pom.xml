@@ -70,6 +70,12 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+          <groupId>io.lettuce</groupId>
+          <artifactId>lettuce-core</artifactId>
+          <version>6.4.0.RELEASE</version>
+        </dependency>
+
     </dependencies>
     <build>
         <plugins>
