@@ -28,7 +28,8 @@ public class ApiAuditLogsDao extends AccountsContextDao<ApiAuditLogs> {
         String[] fieldNames = { ApiAuditLogs.TIMESTAMP };
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        fieldNames = new String[]{ApiAuditLogs.USER_EMAIL, ApiAuditLogs.USER_IP_ADDRESS};
+        fieldNames = new String[]{ApiAuditLogs.USER_EMAIL, ApiAuditLogs.USER_IP_ADDRESS, ApiAuditLogs.TIMESTAMP};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
     }
 
     @Override
