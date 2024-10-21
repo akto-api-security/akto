@@ -14,17 +14,14 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
-import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.*;
 import com.akto.test_editor.execution.Memory;
 import org.apache.commons.lang3.StringUtils;
-import org.bson.conversions.Bson;
 import org.json.JSONObject;
 
-import com.akto.dao.OtpTestDataDao;
-import com.akto.dao.RecordedLoginInputDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.LoginFlowStepsDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.api_workflow.Graph;
@@ -36,12 +33,12 @@ import com.akto.util.JSONUtils;
 import com.akto.util.RecordedLoginFlowUtil;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
 
 public class Utils {
     
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.TESTING);
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
+
     private static final Gson gson = new Gson();
 
     public static WorkflowTestResult.NodeResult processOtpNode(Node node, Map<String, Object> valuesMap) {
@@ -103,11 +100,7 @@ public class Utils {
             }
             String uuid = workflowNodeDetails.getOtpRefUuid();
             int curTime = Context.now() - 5 * 60;
-            Bson filters = Filters.and(
-                Filters.eq("uuid", uuid),
-                Filters.gte("createdAtEpoch", curTime)
-            );
-            otpTestData = OtpTestDataDao.instance.findOne(filters);
+            otpTestData = dataActor.fetchOtpTestData(uuid, curTime);
             if (otpTestData != null) {
                 break;
             }
@@ -136,7 +129,7 @@ public class Utils {
         BasicDBObject data = new BasicDBObject();
         String message;
 
-        RecordedLoginFlowInput recordedLoginFlowInput = RecordedLoginInputDao.instance.findOne(new BasicDBObject());
+        RecordedLoginFlowInput recordedLoginFlowInput = dataActor.fetchRecordedLoginFlowInput();
         
         String token = fetchToken(recordedLoginFlowInput, 5);
 
@@ -292,10 +285,7 @@ public class Utils {
         if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
             return valuesMap;
         }
-        Bson filters = Filters.and(
-            Filters.eq("userId", loginFlowParams.getUserId())
-        );
-        LoginFlowStepsData loginFlowStepData = LoginFlowStepsDao.instance.findOne(filters);
+        LoginFlowStepsData loginFlowStepData = dataActor.fetchLoginFlowStepsData(loginFlowParams.getUserId());
 
         if (loginFlowStepData == null || loginFlowStepData.getValuesMap() == null) {
             return valuesMap;
@@ -316,14 +306,8 @@ public class Utils {
     }
 
     public static Map<String, Object> saveValueMapData(LoginFlowParams loginFlowParams, Map<String, Object> valuesMap) {
-
         Integer userId = loginFlowParams.getUserId();
-
-        Bson filter = Filters.and(
-            Filters.eq("userId", loginFlowParams.getUserId())
-        );
-        Bson update = Updates.set("valuesMap", valuesMap);
-        LoginFlowStepsDao.instance.updateOne(filter, update);
+        dataActor.updateLoginFlowStepsData(userId, valuesMap);
         return valuesMap;
     }
 

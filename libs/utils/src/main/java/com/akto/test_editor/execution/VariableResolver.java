@@ -7,14 +7,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.bson.conversions.Bson;
-
-import com.akto.dao.SampleDataDao;
-import com.akto.dao.SingleTypeInfoDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.HttpRequestParams;
@@ -32,13 +29,12 @@ import com.akto.util.modifier.InvalidSignatureJWTModifier;
 import com.akto.util.modifier.JwtKvModifier;
 import com.akto.util.modifier.NoneAlgoJWTModifier;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
-
 import static com.akto.runtime.parser.SampleParser.parseSampleMessage;
 
 public class VariableResolver {
     
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
+
     public static Object getValue(Map<String, Object> varMap, String key) {
         if (!varMap.containsKey(key)) {
             return null;
@@ -490,28 +486,13 @@ public class VariableResolver {
                 continue;
             }
 
-            Bson filters = Filters.and(
-                Filters.eq("apiCollectionId", infoKey.getApiCollectionId()),
-                Filters.or(
-                    Filters.regex("param", key),
-                    Filters.regex("param", key.toLowerCase())
-                    )
-            );
-
-            List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filters, Projections.include("url", "method"));
-
+            List<SingleTypeInfo> singleTypeInfos = dataActor.fetchMatchParamSti(infoKey.getApiCollectionId(), key);
             for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
                 ApiInfo.ApiInfoKey infKey = new ApiInfo.ApiInfoKey(infoKey.getApiCollectionId(), singleTypeInfo.getUrl(), URLMethods.Method.fromString(singleTypeInfo.getMethod()));
                 if (infKey.equals(infoKey)) {
                     continue;
                 }
-                Bson sdfilters = Filters.and(
-                    Filters.eq("_id.apiCollectionId", infoKey.getApiCollectionId()),
-                    Filters.eq("_id.method", singleTypeInfo.getMethod()),
-                    Filters.in("_id.url", singleTypeInfo.getUrl())
-                );
-
-                SampleData sd = SampleDataDao.instance.findOne(sdfilters);
+                SampleData sd = dataActor.fetchSampleDataByIdMethod(infoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
                 newSampleDataMap.put(infKey, sd.getSamples());
 
             }
@@ -562,29 +543,15 @@ public class VariableResolver {
                 if (mapValue.containsKey("all_apis")) {
                     allApis = Objects.equals(m.get("all_apis"), true);
                 }
-
-                Bson filters = Filters.and(
-                    Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
-                    Filters.or(
-                        Filters.regex("param", key.toString()),
-                        Filters.regex("param", key.toString().toLowerCase())
-                        )
-                );
-
-                List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filters, Projections.include("url", "method"));
+                List<SingleTypeInfo> singleTypeInfos = dataActor.fetchMatchParamSti(apiInfoKey.getApiCollectionId(), key.toString());
 
                 for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
                     ApiInfo.ApiInfoKey infKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), singleTypeInfo.getUrl(), URLMethods.Method.fromString(singleTypeInfo.getMethod()));
                     if (!allApis && !infKey.equals(apiInfoKey)) {
                         continue;
                     }
-                    Bson sdfilters = Filters.and(
-                        Filters.eq("_id.apiCollectionId", apiInfoKey.getApiCollectionId()),
-                        Filters.eq("_id.method", singleTypeInfo.getMethod()),
-                        Filters.in("_id.url", singleTypeInfo.getUrl())
-                    );
 
-                    SampleData sd = SampleDataDao.instance.findOne(sdfilters);
+                    SampleData sd = dataActor.fetchSampleDataByIdMethod(apiInfoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
                     newSampleDataMap.put(infKey, sd.getSamples());
 
                 }

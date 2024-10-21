@@ -31,6 +31,10 @@ public class SampleDataAltDb {
 
     public static void bulkInsert(List<SampleDataAlt> list) throws Exception {
 
+        if (!Main.isPostgresConnected()) {
+            return;
+        }
+
         try (Connection conn = Main.getConnection();
              PreparedStatement stmt = conn.prepareStatement(INSERT_QUERY, Statement.RETURN_GENERATED_KEYS)) {
 
@@ -51,6 +55,10 @@ public class SampleDataAltDb {
     final static String DELETE_QUERY = "DELETE from sampledata02 WHERE timestamp < ? AND id IN (?";
 
     public static<T> T executeQuery(FailableFunction<Connection, PreparedStatement, SQLException> prepareQueryFunc, FailableFunction<ResultSet, T, SQLException> extractResultFunc) {
+
+        if (!Main.isPostgresConnected()) {
+            return null;
+        }
 
         Connection conn = null;
         try {
@@ -79,6 +87,11 @@ public class SampleDataAltDb {
     }
 
     public static int executeUpdateQuery(FailableFunction<Connection, PreparedStatement, SQLException> prepareQueryFunc) {
+
+        if (!Main.isPostgresConnected()) {
+            return 0;
+        }
+
         Connection conn = null;
         try {
             conn = Main.getConnection();
@@ -99,6 +112,11 @@ public class SampleDataAltDb {
     }
 
     public static BasicDBList runCommand(String command) throws Exception {
+
+        if (!Main.isPostgresConnected()) {
+            return new BasicDBListL("Exception in runCommand(" + command + ") Postgres not connected");
+        }
+
         try (Connection conn = Main.getConnection();
              Statement stmt = conn.createStatement()) {
 
@@ -128,6 +146,10 @@ public class SampleDataAltDb {
     }
 
     public static void delete(List<String> uuidList, int timestamp) throws Exception {
+
+        if (!Main.isPostgresConnected()) {
+            return;
+        }
 
         if (uuidList == null || uuidList.isEmpty()) {
             return;

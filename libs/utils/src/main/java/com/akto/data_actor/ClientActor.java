@@ -26,6 +26,7 @@ import com.akto.dto.data_types.NotBelongsToPredicate;
 import com.akto.dto.data_types.Predicate;
 import com.akto.dto.data_types.RegexPredicate;
 import com.akto.dto.data_types.StartsWithPredicate;
+import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
@@ -36,6 +37,8 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
 import com.akto.dto.testing.EndpointLogicalGroup;
+import com.akto.dto.testing.LoginFlowStepsData;
+import com.akto.dto.testing.OtpTestData;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunConfig;
@@ -2519,7 +2522,11 @@ public class ClientActor extends DataActor {
     public AccessMatrixUrlToRole fetchAccessMatrixUrlToRole(ApiInfo.ApiInfoKey apiInfoKey) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
-        obj.put("apiInfoKey", apiInfoKey);
+        BasicDBObject obj2 = new BasicDBObject();
+        obj2.put("apiCollectionId", apiInfoKey.getApiCollectionId());
+        obj2.put("url", apiInfoKey.getUrl());
+        obj2.put("method", apiInfoKey.getMethod().name());
+        obj.put("apiInfoKey", obj2);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAccessMatrixUrlToRole", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -2731,11 +2738,8 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in fetchEndpointLogicalGroup", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
-            BasicDBObject payloadObj;
             try {
-                payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBObject endpointLogicalGroup = (BasicDBObject) payloadObj.get("endpointLogicalGroup");
-                return objectMapper.readValue(endpointLogicalGroup.toJson(), EndpointLogicalGroup.class);
+                return decodeEndpointLogicalGroup(responsePayload);
             } catch(Exception e) {
                 return null;
             }
@@ -2757,108 +2761,8 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in fetchEndpointLogicalGroupById", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
-            BasicDBObject payloadObj;
             try {
-                Document doc = Document.parse(responsePayload);
-                Document endpointLogicalGroup = (Document) doc.get("endpointLogicalGroup");
-                Codec<EndpointLogicalGroup> codec = codecRegistry.get(EndpointLogicalGroup.class);
-                String type = ((Document) endpointLogicalGroup.get("testingEndpoints")).getString("type");
-                switch (type) {
-                    case "CUSTOM":
-                        ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CustomTestingEndpoints");
-                        break;
-                    case "COLLECTION_WISE":
-                        ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CollectionWiseTestingEndpoints");
-                        break;
-                    case "WORKFLOW":
-                        ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");
-                        break;
-                    case "ALL":
-                        ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.AllTestingEndpoints");
-                        break;
-                    case "LOGICAL_GROUP":
-                        ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.LogicalGroupTestingEndpoint");
-                        break;
-                    default:
-                        break;
-                }
-                endpointLogicalGroup.put("id", null);
-                Document cond = (Document) ((Document) endpointLogicalGroup.get("testingEndpoints")).get("orConditions");
-                if (cond != null) {
-                    cond.put("_t", "com.akto.dto.data_types.Conditions");
-                    List<Document> predicateList = (List) cond.get("predicates");
-                    for (Document predicate: predicateList) {
-                        String predType = (String) predicate.get("type");
-                        switch (predType) {
-                            case "REGEX":
-                                predicate.put("_t", "com.akto.dto.data_types.RegexPredicate");
-                                break;
-                            case "STARTS_WITH":
-                                predicate.put("_t", "com.akto.dto.data_types.StartsWithPredicate");
-                                break;
-                            case "ENDS_WITH":
-                                predicate.put("_t", "com.akto.dto.data_types.ENDSWithPredicate");
-                                break;
-                            case "IS_NUMBER":
-                                predicate.put("_t", "com.akto.dto.data_types.IsNumberWithPredicate");
-                                break;
-                            case "EQUALS_TO":
-                                predicate.put("_t", "com.akto.dto.data_types.EqualsToWithPredicate");
-                                break;
-                            case "CONTAINS":
-                                predicate.put("_t", "com.akto.dto.data_types.ContainsPredicate");
-                                break;
-                            case "BELONGS_TO":
-                                predicate.put("_t", "com.akto.dto.data_types.BelongsToPredicate");
-                                break;
-                            case "NOT_BELONGS_TO":
-                                predicate.put("_t", "com.akto.dto.data_types.NotBelongsToPredicate");
-                                break;
-                            default:
-                                break;
-                        }
-                    }
-                }
-
-                cond = (Document) ((Document) endpointLogicalGroup.get("testingEndpoints")).get("andConditions");
-                if (cond != null) {
-                    cond.put("_t", "com.akto.dto.data_types.Conditions");
-                    List<Document> predicateList = (List) cond.get("predicates");
-                    for (Document predicate: predicateList) {
-                        String predType = (String) predicate.get("type");
-                        switch (predType) {
-                            case "REGEX":
-                                predicate.put("_t", "com.akto.dto.data_types.RegexPredicate");
-                                break;
-                            case "STARTS_WITH":
-                                predicate.put("_t", "com.akto.dto.data_types.StartsWithPredicate");
-                                break;
-                            case "ENDS_WITH":
-                                predicate.put("_t", "com.akto.dto.data_types.ENDSWithPredicate");
-                                break;
-                            case "IS_NUMBER":
-                                predicate.put("_t", "com.akto.dto.data_types.IsNumberWithPredicate");
-                                break;
-                            case "EQUALS_TO":
-                                predicate.put("_t", "com.akto.dto.data_types.EqualsToWithPredicate");
-                                break;
-                            case "CONTAINS":
-                                predicate.put("_t", "com.akto.dto.data_types.ContainsPredicate");
-                                break;
-                            case "BELONGS_TO":
-                                predicate.put("_t", "com.akto.dto.data_types.BelongsToPredicate");
-                                break;
-                            case "NOT_BELONGS_TO":
-                                predicate.put("_t", "com.akto.dto.data_types.NotBelongsToPredicate");
-                                break;
-                            default:
-                                break;
-                        }
-                    }
-                }
-
-                EndpointLogicalGroup res = decode(codec, endpointLogicalGroup);
-                return res;
+                return decodeEndpointLogicalGroup(responsePayload);
             } catch(Exception e) {
                 return null;
             }
@@ -2868,10 +2772,117 @@ public class ClientActor extends DataActor {
         }
     }
 
+    private EndpointLogicalGroup decodeEndpointLogicalGroup(String responsePayload){
+        Document doc = Document.parse(responsePayload);
+        Document endpointLogicalGroup = (Document) doc.get("endpointLogicalGroup");
+        Codec<EndpointLogicalGroup> codec = codecRegistry.get(EndpointLogicalGroup.class);
+        String type = ((Document) endpointLogicalGroup.get("testingEndpoints")).getString("type");
+        switch (type) {
+            case "CUSTOM":
+                ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CustomTestingEndpoints");
+                break;
+            case "COLLECTION_WISE":
+                ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CollectionWiseTestingEndpoints");
+                break;
+            case "WORKFLOW":
+                ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");
+                break;
+            case "ALL":
+                ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.AllTestingEndpoints");
+                break;
+            case "LOGICAL_GROUP":
+                ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.LogicalGroupTestingEndpoint");
+                break;
+            default:
+                break;
+        }
+        endpointLogicalGroup.put("id", null);
+        Document cond = (Document) ((Document) endpointLogicalGroup.get("testingEndpoints")).get("orConditions");
+        if (cond != null) {
+            cond.put("_t", "com.akto.dto.data_types.Conditions");
+            List<Document> predicateList = (List) cond.get("predicates");
+            for (Document predicate: predicateList) {
+                String predType = (String) predicate.get("type");
+                switch (predType) {
+                    case "REGEX":
+                        predicate.put("_t", "com.akto.dto.data_types.RegexPredicate");
+                        break;
+                    case "STARTS_WITH":
+                        predicate.put("_t", "com.akto.dto.data_types.StartsWithPredicate");
+                        break;
+                    case "ENDS_WITH":
+                        predicate.put("_t", "com.akto.dto.data_types.ENDSWithPredicate");
+                        break;
+                    case "IS_NUMBER":
+                        predicate.put("_t", "com.akto.dto.data_types.IsNumberWithPredicate");
+                        break;
+                    case "EQUALS_TO":
+                        predicate.put("_t", "com.akto.dto.data_types.EqualsToWithPredicate");
+                        break;
+                    case "CONTAINS":
+                        predicate.put("_t", "com.akto.dto.data_types.ContainsPredicate");
+                        break;
+                    case "BELONGS_TO":
+                        predicate.put("_t", "com.akto.dto.data_types.BelongsToPredicate");
+                        break;
+                    case "NOT_BELONGS_TO":
+                        predicate.put("_t", "com.akto.dto.data_types.NotBelongsToPredicate");
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        cond = (Document) ((Document) endpointLogicalGroup.get("testingEndpoints")).get("andConditions");
+        if (cond != null) {
+            cond.put("_t", "com.akto.dto.data_types.Conditions");
+            List<Document> predicateList = (List) cond.get("predicates");
+            for (Document predicate: predicateList) {
+                String predType = (String) predicate.get("type");
+                switch (predType) {
+                    case "REGEX":
+                        predicate.put("_t", "com.akto.dto.data_types.RegexPredicate");
+                        break;
+                    case "STARTS_WITH":
+                        predicate.put("_t", "com.akto.dto.data_types.StartsWithPredicate");
+                        break;
+                    case "ENDS_WITH":
+                        predicate.put("_t", "com.akto.dto.data_types.ENDSWithPredicate");
+                        break;
+                    case "IS_NUMBER":
+                        predicate.put("_t", "com.akto.dto.data_types.IsNumberWithPredicate");
+                        break;
+                    case "EQUALS_TO":
+                        predicate.put("_t", "com.akto.dto.data_types.EqualsToWithPredicate");
+                        break;
+                    case "CONTAINS":
+                        predicate.put("_t", "com.akto.dto.data_types.ContainsPredicate");
+                        break;
+                    case "BELONGS_TO":
+                        predicate.put("_t", "com.akto.dto.data_types.BelongsToPredicate");
+                        break;
+                    case "NOT_BELONGS_TO":
+                        predicate.put("_t", "com.akto.dto.data_types.NotBelongsToPredicate");
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        EndpointLogicalGroup res = decode(codec, endpointLogicalGroup);
+        return res;
+    }
+
     public void updateAccessMatrixUrlToRoles(ApiInfo.ApiInfoKey apiInfoKey, List<String> ret) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
-        obj.put("apiInfoKey", apiInfoKey);
+        BasicDBObject obj2 = new BasicDBObject();
+        obj2.put("apiCollectionId", apiInfoKey.getApiCollectionId());
+        obj2.put("url", apiInfoKey.getUrl());
+        obj2.put("method", apiInfoKey.getMethod().name());
+        obj.put("apiInfoKey", obj2);
         obj.put("ret", ret);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateAccessMatrixUrlToRoles", "", "POST", obj.toString(), headers, "");
         try {
@@ -3199,4 +3210,230 @@ public class ClientActor extends DataActor {
             return null;
         }
     }
+
+    public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiCollectionId", apiCollectionId);
+        obj.put("skip", skip);
+        obj.put("deltaPeriodValue", deltaPeriodValue);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchEndpointsInCollectionUsingHost", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchEndpointsInCollectionUsingHost", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                return (List<BasicDBObject>) payloadObj.get("apiInfoList");
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchEndpointsInCollectionUsingHost" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    public OtpTestData fetchOtpTestData(String uuid, int curTime) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("uuid", uuid);
+        obj.put("currTime", curTime);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchOtpTestData", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchOtpTestData", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject otpTestDataObj = (BasicDBObject) payloadObj.get("otpTestData");
+                OtpTestData otpTestData = objectMapper.readValue(otpTestDataObj.toJson(), OtpTestData.class);
+                return otpTestData;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchOtpTestData" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    public RecordedLoginFlowInput fetchRecordedLoginFlowInput() {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchRecordedLoginFlowInput", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchRecordedLoginFlowInput", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject recordedLoginFlowInputObj = (BasicDBObject) payloadObj.get("recordedLoginFlowInput");
+                RecordedLoginFlowInput recordedLoginFlowInput = objectMapper.readValue(recordedLoginFlowInputObj.toJson(), RecordedLoginFlowInput.class);
+                return recordedLoginFlowInput;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchRecordedLoginFlowInput" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    public LoginFlowStepsData fetchLoginFlowStepsData(int userId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("userId", userId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchLoginFlowStepsData", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchLoginFlowStepsData", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject loginFlowStepsDataObj = (BasicDBObject) payloadObj.get("loginFlowStepsData");
+                LoginFlowStepsData loginFlowStepsData = objectMapper.readValue(loginFlowStepsDataObj.toJson(), LoginFlowStepsData.class);
+                return loginFlowStepsData;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchLoginFlowStepsData" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    public void updateLoginFlowStepsData(int userId, Map<String, Object> valuesMap) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("userId", userId);
+        obj.put("valuesMap", valuesMap);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateLoginFlowStepsData", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateLoginFlowStepsData", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateLoginFlowStepsData" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
+
+    public Node fetchDependencyFlowNodesByApiInfoKey(int apiCollectionId, String urlVar, String method) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiCollectionId", apiCollectionId);
+        obj.put("url", urlVar);
+        obj.put("methodVal", method);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDependencyFlowNodesByApiInfoKey", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchDependencyFlowNodesByApiInfoKey", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject data = (BasicDBObject) payloadObj.get("node");
+                return objectMapper.readValue(data.toJson(), Node.class);
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchDependencyFlowNodesByApiInfoKey" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    public List<SampleData> fetchSampleDataForEndpoints(List<ApiInfo.ApiInfoKey> endpoints) {
+        Map<String, List<String>> headers = buildHeaders();
+        List<SampleData> sampleDataList = new ArrayList<>();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBList list = new BasicDBList();
+        for (ApiInfoKey apiInfoKey : endpoints) {
+            BasicDBObject obj2 = new BasicDBObject();
+            obj2.put("apiCollectionId", apiInfoKey.getApiCollectionId());
+            obj2.put("url", apiInfoKey.getUrl());
+            obj2.put("method", apiInfoKey.getMethod().name());
+            list.add(obj2);
+        }
+        obj.put("endpoints", list);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchSampleDataForEndpoints", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchSampleDataForEndpoints", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList sampleDatas = (BasicDBList) payloadObj.get("sampleDatas");
+                for (Object sampleData: sampleDatas) {
+                    BasicDBObject obj2 = (BasicDBObject) sampleData;
+                    sampleDataList.add(objectMapper.readValue(obj2.toJson(), SampleData.class));
+                }
+            } catch(Exception e) {
+                return sampleDataList;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchSampleDataForEndpoints" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return sampleDataList;
+    }
+
+    public List<Node> fetchNodesForCollectionIds(List<Integer> apiCollectionsIds, boolean removeZeroLevel, int skip) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiCollectionIds", apiCollectionsIds);
+        obj.put("removeZeroLevel", removeZeroLevel);
+        obj.put("skip", skip);
+        List<Node> nodeList = new ArrayList<>();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchNodesForCollectionIds", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchNodesForCollectionIds", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList datas = (BasicDBList) payloadObj.get("nodes");
+                for (Object data: datas) {
+                    BasicDBObject obj2 = (BasicDBObject) data;
+                    nodeList.add(objectMapper.readValue(obj2.toJson(), Node.class));
+                }
+            } catch(Exception e) {
+                return nodeList;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchNodesForCollectionIds" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return nodeList;
+    }
+
 }
