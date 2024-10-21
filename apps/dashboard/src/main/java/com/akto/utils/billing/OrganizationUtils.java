@@ -235,12 +235,7 @@ public class OrganizationUtils {
         }
 
         String domain = parts[1];
-        String[] domainParts = domain.split("\\.");
-        if (domainParts.length != 2) {
-            return domain;
-        }
-
-        return domainParts[0];
+        return domain;
     }
 
     public static BasicDBList fetchEntitlements(String orgId, String adminEmail) {

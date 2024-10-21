@@ -1,7 +1,9 @@
 package com.akto.util;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class Util {
     
@@ -42,6 +44,23 @@ public class Util {
             throw new IllegalArgumentException("Unsupported type for count");
         }
         return ret;
+    }
+
+    public static String getValueFromQueryString(String queryParamsStr, String key){
+        if(queryParamsStr == null){
+            return  "";
+        }
+        String[] queryParams = queryParamsStr.split("&");
+        Map<String, String> queryMap = new HashMap<>();
+        for (String queryParam : queryParams) {
+            String[] keyVal = queryParam.split("=");
+            if (keyVal.length != 2) {
+                continue;
+            }
+            queryMap.put(keyVal[0], keyVal[1]);
+        }
+
+        return queryMap.getOrDefault(key, "");
     }
 
 }
