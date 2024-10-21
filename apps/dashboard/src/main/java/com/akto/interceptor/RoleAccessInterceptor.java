@@ -142,10 +142,11 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                     String actionDescription = this.actionDescription == null ? "Error: Description not available" : this.actionDescription;
                     String userEmail = user.getLogin();
                     String userAgent = request.getHeader("User-Agent") == null ? "Unknown User-Agent" : request.getHeader("User-Agent");
+                    AuditLogsUtil.ClientType userAgentType = AuditLogsUtil.findUserAgentType(userAgent);
                     List<String> userProxyIpAddresses = AuditLogsUtil.getClientIpAddresses(request);
                     String userIpAddress = userProxyIpAddresses.get(0);
 
-                    apiAuditLogs = new ApiAuditLogs(timestamp, apiEndpoint, actionDescription, userEmail, userAgent, userIpAddress, userProxyIpAddresses);
+                    apiAuditLogs = new ApiAuditLogs(timestamp, apiEndpoint, actionDescription, userEmail, userAgentType.name(), userIpAddress, userProxyIpAddresses);
                 }
             } catch(Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while inserting api audit logs: " + e.getMessage(), LogDb.DASHBOARD);
