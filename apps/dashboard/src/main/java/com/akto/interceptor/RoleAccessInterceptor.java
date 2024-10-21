@@ -126,7 +126,10 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             if(this.accessType.equalsIgnoreCase(ReadWriteAccess.READ.toString()) || (accessGiven != null && this.accessType.equalsIgnoreCase(accessGiven.toString()))){
                 hasRequiredAccess = true;
             }
-            
+            if(featureLabel.equals(Feature.ADMIN_ACTIONS.name())){
+                hasRequiredAccess = userRole.equals(Role.ADMIN.name());
+            }
+
             if(!hasRequiredAccess) {
                 ((ActionSupport) invocation.getAction()).addActionError("The role '" + userRole + "' does not have access.");
                 return FORBIDDEN;

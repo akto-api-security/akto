@@ -129,7 +129,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User created a new account"</param>
+                <param name="actionDescription">User created a new account</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -307,7 +307,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"Removed a user from Akto"</param>
+                <param name="actionDescription">Removed a user from Akto</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -326,7 +326,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User made another user admin in Akto"</param>
+                <param name="actionDescription">User made another user admin in Akto</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -436,7 +436,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted Github SSO settings"</param>
+                <param name="actionDescription">User deleted Github SSO settings</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -466,7 +466,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added Github SSO settings"</param>
+                <param name="actionDescription">User added Github SSO settings</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -517,7 +517,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added Okta SSO settings"</param>
+                <param name="actionDescription">User added Okta SSO settings</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -547,7 +547,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted Okta SSO settings"</param>
+                <param name="actionDescription">User deleted Okta SSO settings</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -598,7 +598,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added Azure SSO settings"</param>
+                <param name="actionDescription">User added Azure SSO settings</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -628,7 +628,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted Azure SSO settings"</param>
+                <param name="actionDescription">User deleted Azure SSO settings</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -697,7 +697,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added Github App Secret Key"</param>
+                <param name="actionDescription">User added Github App Secret Key</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -719,7 +719,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted Github App Secret Key"</param>
+                <param name="actionDescription">User deleted Github App Secret Key</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1065,7 +1065,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ISSUES</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User triaged an API as false positive"</param>
+                <param name="actionDescription">User triaged an API as false positive</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1087,7 +1087,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User invited another user to Akto"</param>
+                <param name="actionDescription">User invited another user to Akto</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1121,7 +1121,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added a sensitive field"</param>
+                <param name="actionDescription">User added a sensitive field</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1144,7 +1144,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User bulk marked sensitive fields"</param>
+                <param name="actionDescription">User bulk marked sensitive fields</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1209,7 +1209,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User analyzed API samples for access matrix"</param>
+                <param name="actionDescription">User analyzed API samples for access matrix</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1252,7 +1252,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated an access matrix task"</param>
+                <param name="actionDescription">User updated an access matrix task</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1274,7 +1274,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User created multiple access matrix tasks"</param>
+                <param name="actionDescription">User created multiple access matrix tasks</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1295,7 +1295,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted an access matrix"</param>
+                <param name="actionDescription">User deleted an access matrix</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1317,7 +1317,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted an access matrix task"</param>
+                <param name="actionDescription">User deleted an access matrix task</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1339,7 +1339,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User generated an OpenAPI file for a collection"</param>
+                <param name="actionDescription">User generated an OpenAPI file for a collection</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1360,7 +1360,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deactivated collections from inventory"</param>
+                <param name="actionDescription">User deactivated collections from inventory</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1385,7 +1385,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User imported an OpenAPI specification"</param>
+                <param name="actionDescription">User imported an OpenAPI specification</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1413,7 +1413,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User activated collections in inventory"</param>
+                <param name="actionDescription">User activated collections in inventory</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1469,7 +1469,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User imported OpenAPI/Swagger file to Akto"</param>
+                <param name="actionDescription">User imported OpenAPI/Swagger file to Akto</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -1696,7 +1696,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added APIs to a custom collection"</param>
+                <param name="actionDescription">User added APIs to a custom collection</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -1718,7 +1718,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted APIs from a custom collection"</param>
+                <param name="actionDescription">User deleted APIs from a custom collection</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -1740,7 +1740,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User removed APIs from a custom collection"</param>
+                <param name="actionDescription">User removed APIs from a custom collection</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -1762,7 +1762,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User computed custom collections"</param>
+                <param name="actionDescription">User computed custom collections</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -1806,7 +1806,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated environment type"</param>
+                <param name="actionDescription">User updated environment type</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -1827,7 +1827,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User redacted a collection"</param>
+                <param name="actionDescription">User redacted a collection</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -1850,7 +1850,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User uploaded a HAR file"</param>
+                <param name="actionDescription">User uploaded a HAR file</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -1880,7 +1880,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User uploaded a TCP file"</param>
+                <param name="actionDescription">User uploaded a TCP file</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -1900,7 +1900,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User created an empty collection"</param>
+                <param name="actionDescription">User created an empty collection</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -1929,7 +1929,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User created a custom collection with API endpoints"</param>
+                <param name="actionDescription">User created a custom collection with API endpoints</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -1951,7 +1951,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated a custom collection"</param>
+                <param name="actionDescription">User updated a custom collection</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2016,7 +2016,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added/updated Postman credentials"</param>
+                <param name="actionDescription">User added/updated Postman credentials</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2036,7 +2036,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User created a Postman API"</param>
+                <param name="actionDescription">User created a Postman API</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2058,7 +2058,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added an API collection via Postman API"</param>
+                <param name="actionDescription">User added an API collection via Postman API</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2153,7 +2153,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User imported Postman data to Akto"</param>
+                <param name="actionDescription">User imported Postman data to Akto</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2181,7 +2181,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added a Slack webhook"</param>
+                <param name="actionDescription">User added a Slack webhook</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2209,7 +2209,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted a Slack webhook"</param>
+                <param name="actionDescription">User deleted a Slack webhook</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2232,7 +2232,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added an API token"</param>
+                <param name="actionDescription">User added an API token</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2257,7 +2257,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted an API token"</param>
+                <param name="actionDescription">User deleted an API token</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2364,7 +2364,7 @@
            <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted an API collection"</param>
+                <param name="actionDescription">User deleted an API collection</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2384,7 +2384,7 @@
            <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted multiple API collections"</param>
+                <param name="actionDescription">User deleted multiple API collections</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2583,7 +2583,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added/updated a sensitive data type"</param>
+                <param name="actionDescription">User added/updated a sensitive data type</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2612,7 +2612,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User reset a sensitive data type"</param>
+                <param name="actionDescription">User reset a sensitive data type</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2633,7 +2633,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added/updated a sensitive data type"</param>
+                <param name="actionDescription">User added/updated a sensitive data type</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2654,7 +2654,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User reset a sensitive data type"</param>
+                <param name="actionDescription">User reset a sensitive data type</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2695,7 +2695,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User reset a sensitive data type"</param>
+                <param name="actionDescription">User reset a sensitive data type</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2716,7 +2716,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the active status of a sensitive data type"</param>
+                <param name="actionDescription">User updated the active status of a sensitive data type</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2775,7 +2775,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">AUTH_TYPE</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added a custom auth type"</param>
+                <param name="actionDescription">User added a custom auth type</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2796,7 +2796,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">AUTH_TYPE</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated a custom auth type"</param>
+                <param name="actionDescription">User updated a custom auth type</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2818,7 +2818,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">AUTH_TYPE</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User resets all custom auth types"</param>
+                <param name="actionDescription">User resets all custom auth types</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2839,7 +2839,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">AUTH_TYPE</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the active status of a custom auth type"</param>
+                <param name="actionDescription">User updated the active status of a custom auth type</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2863,7 +2863,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the sample data redaction status"</param>
+                <param name="actionDescription">User updated the sample data redaction status</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -2888,7 +2888,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the merge async status"</param>
+                <param name="actionDescription">User updated the merge async status</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -2908,7 +2908,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the global rate limit"</param>
+                <param name="actionDescription">User updated the global rate limit</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -2928,7 +2928,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the delta time for ignoring summaries"</param>
+                <param name="actionDescription">User updated the delta time for ignoring summaries</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -2964,7 +2964,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the private CIDR IPs"</param>
+                <param name="actionDescription">User updated the private CIDR IPs</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -2988,7 +2988,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User applied access type to a collection"</param>
+                <param name="actionDescription">User applied access type to a collection</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -3009,7 +3009,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the partner IPs"</param>
+                <param name="actionDescription">User updated the partner IPs</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3033,7 +3033,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TAGS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added/updated a tag config"</param>
+                <param name="actionDescription">User added/updated a tag config</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3055,7 +3055,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TAGS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User reviewed a tag config"</param>
+                <param name="actionDescription">User reviewed a tag config</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3077,7 +3077,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TAGS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the active status of a tag config"</param>
+                <param name="actionDescription">User updated the active status of a tag config</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3099,7 +3099,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User successfully updated Akto via instance refresh"</param>
+                <param name="actionDescription">User successfully updated Akto via instance refresh</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3123,7 +3123,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">START_TEST_RUN</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User started a test run"</param>
+                <param name="actionDescription">User started a test run</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3259,7 +3259,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">START_TEST_RUN</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User toggled a collection for testing"</param>
+                <param name="actionDescription">User toggled a collection for testing</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3281,7 +3281,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added an auth mechanism"</param>
+                <param name="actionDescription">User added an auth mechanism</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3311,7 +3311,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User triggered login steps"</param>
+                <param name="actionDescription">User triggered login steps</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3494,7 +3494,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the setup (Production/Staging/QA/Development) type"</param>
+                <param name="actionDescription">User updated the setup (Production/Staging/QA/Development) type</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3516,7 +3516,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the regex matching in merging status"</param>
+                <param name="actionDescription">User updated the regex matching in merging status</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3538,7 +3538,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the telemetry status"</param>
+                <param name="actionDescription">User updated the telemetry status</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3560,7 +3560,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">DEFAULT_PAYLOADS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the redundant URL settings"</param>
+                <param name="actionDescription">User updated the redundant URL settings</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3736,7 +3736,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User created a test role"</param>
+                <param name="actionDescription">User created a test role</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3758,7 +3758,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted a test role"</param>
+                <param name="actionDescription">User deleted a test role</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3780,7 +3780,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated a test role"</param>
+                <param name="actionDescription">User updated a test role</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3802,7 +3802,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted an auth mechanism from a test role"</param>
+                <param name="actionDescription">User deleted an auth mechanism from a test role</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3824,7 +3824,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated an auth mechanism in a test role"</param>
+                <param name="actionDescription">User updated an auth mechanism in a test role</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3846,7 +3846,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added an auth mechanism to a test role"</param>
+                <param name="actionDescription">User added an auth mechanism to a test role</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3925,7 +3925,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ISSUES</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the status of an issue"</param>
+                <param name="actionDescription">User updated the status of an issue</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3945,7 +3945,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ISSUES</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User bulk updated the status of issues"</param>
+                <param name="actionDescription">User bulk updated the status of issues</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3965,7 +3965,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">START_TEST_RUN</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User created a workflow test"</param>
+                <param name="actionDescription">User created a workflow test</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3986,7 +3986,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">START_TEST_RUN</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User edited a workflow test"</param>
+                <param name="actionDescription">User edited a workflow test</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4007,7 +4007,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_RESULTS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User set the state of a workflow test"</param>
+                <param name="actionDescription">User set the state of a workflow test</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4028,7 +4028,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_RESULTS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User exported a workflow test as a string"</param>
+                <param name="actionDescription">User exported a workflow test as a string</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4049,7 +4049,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_RESULTS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User edited the details of a workflow node"</param>
+                <param name="actionDescription">User edited the details of a workflow node</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4111,7 +4111,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User fetched OTPs"</param>
+                <param name="actionDescription">User fetched OTPs</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4133,7 +4133,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User sent OTPs"</param>
+                <param name="actionDescription">User sent OTPs</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4218,7 +4218,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User imported collection data in Burp"</param>
+                <param name="actionDescription">User imported collection data in Burp</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4243,7 +4243,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added a custom webhook"</param>
+                <param name="actionDescription">User added a custom webhook</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4270,7 +4270,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_RESULTS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted scheduled workflow tests"</param>
+                <param name="actionDescription">User deleted scheduled workflow tests</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4315,7 +4315,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated a custom webhook"</param>
+                <param name="actionDescription">User updated a custom webhook</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4363,7 +4363,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_RESULTS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted test runs"</param>
+                <param name="actionDescription">User deleted test runs</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4385,7 +4385,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_RESULTS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted test runs from summaries"</param>
+                <param name="actionDescription">User deleted test runs from summaries</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4428,7 +4428,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_RESULTS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User downloaded workflow as JSON"</param>
+                <param name="actionDescription">User downloaded workflow as JSON</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4450,7 +4450,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User changed the status of a webhook"</param>
+                <param name="actionDescription">User changed the status of a webhook</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4475,7 +4475,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User ran a webhook once"</param>
+                <param name="actionDescription">User ran a webhook once</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4514,7 +4514,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">START_TEST_RUN</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User stopped all tests"</param>
+                <param name="actionDescription">User stopped all tests</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4536,7 +4536,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">START_TEST_RUN</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User stopped a test"</param>
+                <param name="actionDescription">User stopped a test</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4726,7 +4726,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the load balancer details"</param>
+                <param name="actionDescription">User updated the load balancer details</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4802,7 +4802,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User created a runtime stack"</param>
+                <param name="actionDescription">User created a runtime stack</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4855,7 +4855,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User saved OTP data"</param>
+                <param name="actionDescription">User saved OTP data</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -4900,7 +4900,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User triggered a login step in user config"</param>
+                <param name="actionDescription">User triggered a login step in user config</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5027,7 +5027,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User uploaded a recorded flow in user config"</param>
+                <param name="actionDescription">User uploaded a recorded flow in user config</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5093,7 +5093,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the Akto UI mode"</param>
+                <param name="actionDescription">User updated the Akto UI mode</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5161,7 +5161,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User ran onboarding tests"</param>
+                <param name="actionDescription">User ran onboarding tests</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5205,8 +5205,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_ACTIONS</param>
-                <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User skipped onboarding"</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5230,7 +5229,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ASK_GPT</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User asked a question via AktoGPT"</param>
+                <param name="actionDescription">User asked a question via AktoGPT</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5281,7 +5280,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ASK_GPT</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated AktoGPT config"</param>
+                <param name="actionDescription">User updated AktoGPT config</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5369,7 +5368,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User imported collection data using postman file"</param>
+                <param name="actionDescription">User imported collection data using postman file</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5399,7 +5398,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User imported collection data using postman file"</param>
+                <param name="actionDescription">User imported collection data using postman file</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5458,7 +5457,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted postman import logs"</param>
+                <param name="actionDescription">User deleted postman import logs</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5511,7 +5510,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User closed a loader"</param>
+                <param name="actionDescription">User closed a loader</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5533,7 +5532,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_EDITOR</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User set a test inactive in test editor"</param>
+                <param name="actionDescription">User set a test inactive in test editor</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5555,7 +5554,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">EXTERNAL_TEST_LIBRARY</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added a new test library"</param>
+                <param name="actionDescription">User added a new test library</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5577,7 +5576,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">EXTERNAL_TEST_LIBRARY</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User removed a test library"</param>
+                <param name="actionDescription">User removed a test library</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5599,7 +5598,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">EXTERNAL_TEST_LIBRARY</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User synced a custom test library"</param>
+                <param name="actionDescription">User synced a custom test library</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5644,7 +5643,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_EDITOR</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User saved a Akto test editor file"</param>
+                <param name="actionDescription">User saved a Akto test editor file</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5667,7 +5666,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User toggled debug logs feature in settings"</param>
+                <param name="actionDescription">User toggled debug logs feature in settings</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5689,7 +5688,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added a filter header value map"</param>
+                <param name="actionDescription">User added a filter header value map</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5711,7 +5710,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added an API collection name mapper"</param>
+                <param name="actionDescription">User added an API collection name mapper</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5732,7 +5731,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted an API collection name mapper"</param>
+                <param name="actionDescription">User deleted an API collection name mapper</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5754,7 +5753,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_EDITOR</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User ran a test for a given template in test editor"</param>
+                <param name="actionDescription">User ran a test for a given template in test editor</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5830,7 +5829,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated the traffic alert threshold seconds in settings"</param>
+                <param name="actionDescription">User updated the traffic alert threshold seconds in settings</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5852,7 +5851,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User de-merged an API"</param>
+                <param name="actionDescription">User de-merged an API</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5886,7 +5885,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User tested Jira integration"</param>
+                <param name="actionDescription">User tested Jira integration</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5918,7 +5917,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added a Jira integration"</param>
+                <param name="actionDescription">User added a Jira integration</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5969,7 +5968,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ISSUES</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User created a Jira issue"</param>
+                <param name="actionDescription">User created a Jira issue</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5991,7 +5990,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ISSUES</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User attached a file to a Jira issue"</param>
+                <param name="actionDescription">User attached a file to a Jira issue</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6114,7 +6113,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User marked a connection as skipped"</param>
+                <param name="actionDescription">User marked a connection as skipped</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6134,7 +6133,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated their username and organization name"</param>
+                <param name="actionDescription">User updated their username and organization name</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6154,7 +6153,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">BILLING</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User provisioned a subscription"</param>
+                <param name="actionDescription">User provisioned a subscription</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6178,7 +6177,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">BILLING</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User synced usage data"</param>
+                <param name="actionDescription">User synced usage data</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6202,7 +6201,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">BILLING</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User synced with Akto usage data"</param>
+                <param name="actionDescription">User synced with Akto usage data</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6247,7 +6246,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">BILLING</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User refreshed usage data for an organization"</param>
+                <param name="actionDescription">User refreshed usage data for an organization</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6313,7 +6312,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">DEFAULT_PAYLOADS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User saved a default payload"</param>
+                <param name="actionDescription">User saved a default payload</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6335,7 +6334,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User built a dependency table"</param>
+                <param name="actionDescription">User built a dependency table</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6358,7 +6357,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User invoked a dependency table"</param>
+                <param name="actionDescription">User invoked a dependency table</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6380,7 +6379,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User saved replace details"</param>
+                <param name="actionDescription">User saved replace details</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6402,7 +6401,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User saved global variables"</param>
+                <param name="actionDescription">User saved global variables</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6508,7 +6507,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User synced extracted APIs from source code"</param>
+                <param name="actionDescription">User synced extracted APIs from source code</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6596,7 +6595,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TRAFFIC_FILTERS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User marked an alert as dismissed"</param>
+                <param name="actionDescription">User marked an alert as dismissed</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6642,7 +6641,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated a script"</param>
+                <param name="actionDescription">User updated a script</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">TEST_PRE_SCRIPT</param>
@@ -6691,7 +6690,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added a script"</param>
+                <param name="actionDescription">User added a script</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">TEST_PRE_SCRIPT</param>
@@ -6720,7 +6719,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added a code analysis repo"</param>
+                <param name="actionDescription">User added a code analysis repo</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -6743,7 +6742,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted a code analysis repo"</param>
+                <param name="actionDescription">User deleted a code analysis repo</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -6827,7 +6826,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User saved a filter in YAML template"</param>
+                <param name="actionDescription">User saved a filter in YAML template</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -6903,7 +6902,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User added advanced filters for traffic analysis"</param>
+                <param name="actionDescription">User added advanced filters for traffic analysis</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -6985,7 +6984,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User deleted an advanced filter for traffic analysis"</param>
+                <param name="actionDescription">User deleted an advanced filter for traffic analysis</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -7007,7 +7006,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User changed the state of an advanced filter for traffic analysis"</param>
+                <param name="actionDescription">User changed the state of an advanced filter for traffic analysis</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -7089,7 +7088,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User updated retrospective filter settings"</param>
+                <param name="actionDescription">User updated retrospective filter settings</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -7133,7 +7132,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">"User modified account settings"</param>
+                <param name="actionDescription">User modified account settings</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>

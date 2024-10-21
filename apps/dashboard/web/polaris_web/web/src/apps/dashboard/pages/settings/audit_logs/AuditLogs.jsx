@@ -84,10 +84,10 @@ const AuditLogs = () => {
                 return {
                     ...item,
                     apiEndpoint: func.formatEndpoint(apiEndpoint),
-                    actionDescription: <Box width='250px'><p style={{whiteSpace: 'pre-wrap'}}>{actionDescription}</p></Box>,
+                    actionDescription: <Text>{actionDescription}</Text>,
                     timestamp: func.prettifyEpoch(timestamp),
                     rawTimestamp: timestamp,
-                    userAgent: <Box width='fit-content'><p style={{whiteSpace: 'pre-wrap'}}>{userAgent}</p></Box>,
+                    userAgent: <Text>{userAgent}</Text>,
                     rawUserAgent: userAgent
                 }
             })
