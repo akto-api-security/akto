@@ -41,12 +41,14 @@ function UserConfig() {
             else setHardcodedOpen(false)
         }
 
-        await settingRequests.fetchAdminSettings().then((resp)=> {
-            setInitialLimit(resp.accountSettings.globalRateLimit);
-            const val = resp?.accountSettings?.timeForScheduledSummaries === undefined || resp?.accountSettings?.timeForScheduledSummaries === 0 ? (120*60) : resp?.accountSettings?.timeForScheduledSummaries
-            setInitialDeltaTime(val/60)
-            LocalStore.getState().setDefaultIgnoreSummaryTime(val)
-        })
+        if(window.USER_ROLE === 'ADMIN') {
+            await settingRequests.fetchAdminSettings().then((resp)=> {
+                setInitialLimit(resp.accountSettings.globalRateLimit);
+                const val = resp?.accountSettings?.timeForScheduledSummaries === undefined || resp?.accountSettings?.timeForScheduledSummaries === 0 ? (120*60) : resp?.accountSettings?.timeForScheduledSummaries
+                setInitialDeltaTime(val/60)
+                LocalStore.getState().setDefaultIgnoreSummaryTime(val)
+            })
+        }
 
         await api.fetchScript().then((resp)=> {
             if (resp) { 

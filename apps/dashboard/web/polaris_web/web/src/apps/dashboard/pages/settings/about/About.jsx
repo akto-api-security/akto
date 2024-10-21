@@ -72,7 +72,9 @@ function About() {
     }
 
     useEffect(()=>{
-        fetchDetails()
+        if(window.USER_ROLE === 'ADMIN') {
+            fetchDetails()
+        }
     },[])
 
     function TitleComponent ({title,description}) {
