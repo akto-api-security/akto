@@ -21,6 +21,7 @@ import com.akto.utils.OktaLogin;
 import com.akto.utils.sso.CustomSamlSettings;
 import com.akto.utils.sso.SsoUtils;
 import com.akto.util.DashboardMode;
+import com.akto.util.Util;
 import com.akto.utils.billing.OrganizationUtils;
 import com.auth0.Tokens;
 import com.auth0.jwk.Jwk;
@@ -557,12 +558,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     public String sendRequestToSamlIdP() throws IOException{
         String queryString = servletRequest.getQueryString();
-        if(queryString == null || queryString.isEmpty() || queryString.split("email=").length < 2){
+        String emailId = Util.getValueFromQueryString(queryString, "email");
+        if(emailId.length() == 0){
             code = "Error, user email cannot be empty";
             servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
-        setUserEmail(queryString.split("email=")[1]);
+        setUserEmail(emailId);
         SAMLConfig samlConfig = SSOConfigsDao.instance.getSSOConfig(userEmail);
         if(samlConfig == null){
             code = "Error, cannot login via SSO, redirecting to login";
@@ -596,7 +598,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String tempAccountId = servletRequest.getParameter("RelayState");
             if(tempAccountId == null || tempAccountId.isEmpty()){
                 loggerMaker.errorAndAddToDb("Account id not found");
-                servletResponse.sendRedirect("/login");
                 return ERROR.toUpperCase();
             }
             setAccountId(Integer.parseInt(tempAccountId));
@@ -614,7 +615,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             List<String> errors = auth.getErrors();
             if (!errors.isEmpty()) {
                 loggerMaker.errorAndAddToDb("Error in authenticating azure user \n" + auth.getLastErrorReason(), LogDb.DASHBOARD);
-                servletResponse.sendRedirect("/login");
                 return ERROR.toUpperCase();
             } else {
                 Map<String, List<String>> attributes = auth.getAttributes();
@@ -642,7 +642,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String tempAccountId = servletRequest.getParameter("RelayState");
             if(tempAccountId == null || tempAccountId.isEmpty()){
                 loggerMaker.errorAndAddToDb("Account id not found");
-                servletResponse.sendRedirect("/login");
                 return ERROR.toUpperCase();
             }
             setAccountId(Integer.parseInt(tempAccountId));
@@ -651,7 +650,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             auth = new Auth(settings, wrappedRequest, servletResponse);
             auth.processResponse();
             if (!auth.isAuthenticated()) {
-                servletResponse.sendRedirect("/login");
                 return ERROR.toUpperCase();
             }
             String userEmail = null;

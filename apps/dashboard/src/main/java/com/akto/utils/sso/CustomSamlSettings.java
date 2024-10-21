@@ -3,17 +3,14 @@ package com.akto.utils.sso;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.akto.dao.context.Context;
 import com.akto.dto.Config.ConfigType;
 import com.akto.dto.sso.SAMLConfig;
 import com.onelogin.saml2.settings.Saml2Settings;
 import com.onelogin.saml2.settings.SettingsBuilder;
 
 public class CustomSamlSettings {
-    private static final int PROBE_PERIOD_IN_SECS = 60;
     private static Map<ConfigType, CustomSamlSettings> instances = new HashMap<>();
     private SAMLConfig samlConfig;
-    private int lastProbeTs;
 
     private CustomSamlSettings() {}
 
@@ -21,26 +18,6 @@ public class CustomSamlSettings {
         CustomSamlSettings instance = instances.getOrDefault(configType, new CustomSamlSettings());
         SAMLConfig samlConfig = SsoUtils.findSAMLConfig(configType, accountId);
         instance.samlConfig = samlConfig;
-        return instance;
-    }
-
-    public static CustomSamlSettings getInstance(ConfigType configType) {
-        CustomSamlSettings instance = instances.get(configType);
-        boolean shouldProbeAgain = true;
-        if (instance != null) {
-            shouldProbeAgain = Context.now() - instance.lastProbeTs >= PROBE_PERIOD_IN_SECS;
-        }
-
-        if (shouldProbeAgain) {
-            SAMLConfig samlConfig = SsoUtils.findSAMLConfig(configType);
-            if (instance == null) {
-                instance = new CustomSamlSettings();
-                instances.put(configType, instance);
-            }
-            instance.samlConfig = samlConfig;
-            instance.lastProbeTs = Context.now();
-        }
-
         return instance;
     }
 

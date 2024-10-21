@@ -2831,11 +2831,12 @@ public class InitializerListener implements ServletContextListener {
                     }
 
                     SAMLConfig samlConfig = SAMLConfig.convertAzureConfigToSAMLConfig(azureConfig);
-                    ConfigsDao.instance.deleteAll(filterQ);
                     samlConfig.setId("1000000");
                     samlConfig.setOrganizationDomain(domain);
-                    SSOConfigsDao.instance.insertOne(samlConfig);
-                    
+                    if(SSOConfigsDao.instance.estimatedDocumentCount() == 0){
+                        SSOConfigsDao.instance.insertOne(samlConfig);
+                    }
+                    ConfigsDao.instance.deleteAll(filterQ);
                 }
             }
             

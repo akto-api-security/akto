@@ -11,7 +11,6 @@ import org.bson.conversions.Bson;
 
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.SSOConfigsDao;
-import com.akto.dto.Config;
 import com.akto.dto.Config.ConfigType;
 import com.akto.dto.sso.SAMLConfig;
 import com.akto.util.Constants;
@@ -40,12 +39,7 @@ public class SsoUtils {
 
     public static HttpServletRequest getWrappedRequest(HttpServletRequest servletRequest, ConfigType configType, int accountId){
         String requestUri = servletRequest.getRequestURL().toString();
-        String savedRequestUri = "";
-        if(accountId == 0){
-             savedRequestUri = CustomSamlSettings.getInstance(configType).getSamlConfig().getAcsUrl();
-        }else{
-            savedRequestUri =CustomSamlSettings.getInstance(configType, accountId).getSamlConfig().getAcsUrl();
-        }
+        String savedRequestUri = CustomSamlSettings.getInstance(configType, accountId).getSamlConfig().getAcsUrl();
         
         if(requestUri.equals(savedRequestUri)){
             return servletRequest;
@@ -68,12 +62,6 @@ public class SsoUtils {
                 Filters.eq("configType", configType.name())
             )
         );
-        return config;
-    }
-
-    public static SAMLConfig findSAMLConfig(ConfigType configType){
-        String configString = configType.name() + Config.CONFIG_SALT;
-        SAMLConfig config = (SAMLConfig) ConfigsDao.instance.findOne(Constants.ID, configString);
         return config;
     }
 }
