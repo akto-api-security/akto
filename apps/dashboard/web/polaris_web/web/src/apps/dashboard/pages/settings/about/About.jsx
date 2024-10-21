@@ -39,6 +39,7 @@ function About() {
     const [partnerIpsList, setPartnerIpsList] = useState([])
     const [accountName, setAccountName] = useState('')
     const [currentTimeZone, setCurrentTimeZone] = useState('')
+    const [toggleCaseSensitiveApis, setToggleCaseSensitiveApis] = useState(false)
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
@@ -69,6 +70,7 @@ function About() {
         setPrivateCidrList(resp.privateCidrList || [])
         setPartnerIpsList(resp.partnerIpList || [])
         setSelectedUrlsList(resp.allowRedundantEndpointsList || [])
+        setToggleCaseSensitiveApis(resp.handleApisCaseInsensitive || false)
     }
 
     useEffect(()=>{
@@ -192,6 +194,13 @@ function About() {
         setTrafficThreshold(val) ;
         await settingRequests.updateTrafficAlertThresholdSeconds(val);
     }
+
+    const handleApisCaseInsensitive = async(val) => {
+        setToggleCaseSensitiveApis(val) ;
+        await settingRequests.updateApisCaseInsensitive(val);
+    }
+
+    
     const handleIpsChange = async(ip, isAdded, type) => {
         let ipList = ip.split(",")
         ipList = ipList.map((x) => x.replace(/\s+/g, '') )
@@ -309,19 +318,22 @@ function About() {
     }
 
     const redundantUrlComp = (
-        <Box width='220px'>
-            <DropdownSearch
-                label="Select redundant url types"
-                placeholder="Select url types"
-                optionsList={initialUrlsList.options}
-                setSelected={handleSelectedUrls}
-                preSelected={selectedUrlList}
-                itemName={"url type"}
-                value={`${selectedUrlList.length} url type selected`}
-                allowMultiple
-                isNested={true}
-            />
-        </Box>
+        <VerticalStack gap={"4"}>
+            <Box width='220px'>
+                <DropdownSearch
+                    label="Select redundant url types"
+                    placeholder="Select url types"
+                    optionsList={initialUrlsList.options}
+                    setSelected={handleSelectedUrls}
+                    preSelected={selectedUrlList}
+                    itemName={"url type"}
+                    value={`${selectedUrlList.length} url type selected`}
+                    allowMultiple
+                    isNested={true}
+                />
+            </Box>
+            <ToggleComponent text={"Treat URLs as case insensitive"} onToggle={handleApisCaseInsensitive} initial={toggleCaseSensitiveApis} />
+        </VerticalStack>
     )
     
     const filterHeaderComponent = (

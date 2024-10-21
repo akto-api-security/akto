@@ -70,6 +70,7 @@ public class AdminSettingsAction extends UserAction {
 
 	private Set<String> partnerIpList;
     private List<String> allowRedundantEndpointsList;
+    private boolean handleApisCaseInsensitive;
 
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -433,6 +434,16 @@ public class AdminSettingsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String toggleCaseSensitiveApis() {
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.HANDLE_APIS_CASE_INSENSITIVE, this.handleApisCaseInsensitive),
+                new UpdateOptions().upsert(false)
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
     public void setAccountPermission(String accountPermission) {
         this.accountPermission = accountPermission;
     }
@@ -556,5 +567,9 @@ public class AdminSettingsAction extends UserAction {
 
     public void setDeltaTimeForScheduledSummaries(int deltaTimeForScheduledSummaries) {
         this.deltaTimeForScheduledSummaries = deltaTimeForScheduledSummaries;
+    }
+
+    public void setHandleApisCaseInsensitive(boolean handleApisCaseInsensitive) {
+        this.handleApisCaseInsensitive = handleApisCaseInsensitive;
     }
 }

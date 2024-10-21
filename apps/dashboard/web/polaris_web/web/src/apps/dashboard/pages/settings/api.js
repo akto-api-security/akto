@@ -447,6 +447,15 @@ const settingRequests = {
                 accountPermission, modifiedValueForAccount
             }
         })
+    },
+    updateApisCaseInsensitive(toggleCaseSensitiveApis){
+        return request({
+            url: '/api/toggleCaseSensitiveApis',
+            method: "post",
+            data: {
+                toggleCaseSensitiveApis
+            }
+        })
     }
 }
 
