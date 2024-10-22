@@ -7186,9 +7186,11 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json"/>
-
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
