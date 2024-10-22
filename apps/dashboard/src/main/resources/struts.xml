@@ -2882,7 +2882,7 @@
             </result>
         </action>
 
-        <action name="api/toggleCaseSensitiveApis" class="com.akto.action.AdminSettingsAction" method="toggleCaseSensitiveApis">
+        <action name="api/toggleCaseSensitiveApis" class="com.akto.action.AdminSettingsAction" method="toggleCaseSensitiveURLs">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">

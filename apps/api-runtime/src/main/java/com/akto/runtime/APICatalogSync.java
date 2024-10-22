@@ -348,9 +348,10 @@ public class APICatalogSync {
                 String staticURL = iterator.next();
                 Method staticMethod = Method.fromString(staticURL.split(" ")[0]);
                 String staticEndpoint = staticURL.split(" ")[1];
+                String tempEndpoint = staticEndpoint.toLowerCase();
 
                 if(ignoreCaseInsensitiveApis){
-                    if(!seenStaticUrls.isEmpty() && seenStaticUrls.contains(staticEndpoint.toLowerCase())){
+                    if(!seenStaticUrls.isEmpty() && seenStaticUrls.contains(tempEndpoint)){
                         finalResult.deleteStaticUrls.add(staticURL);
                         iterator.remove();
                         continue;
@@ -369,7 +370,7 @@ public class APICatalogSync {
                     }
                 }
                 if(ignoreCaseInsensitiveApis){
-                    seenStaticUrls.add(staticEndpoint);
+                    seenStaticUrls.add(tempEndpoint);
                 }
             }
 
