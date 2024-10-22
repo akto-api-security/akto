@@ -1,3 +1,27 @@
 .p-class {
     white-space: pre;
 }
+
+#create-jira-ticket-button {
+    text-wrap: nowrap;
+}
+
+.badge-wrapper-CRITICAL .Polaris-Badge {
+    background-color: #E45357 !important;
+    color: white !important;
+}
+
+.badge-wrapper-HIGH .Polaris-Badge {
+    background-color: #EF864C !important;
+    color: white !important;
+}
+
+.badge-wrapper-MEDIUM .Polaris-Badge {
+    background-color: #F6C564 !important;
+    color: white !important;
+}
+
+.badge-wrapper-LOW .Polaris-Badge {
+    background-color: #6FD1A6;
+    color: white !important;
+}

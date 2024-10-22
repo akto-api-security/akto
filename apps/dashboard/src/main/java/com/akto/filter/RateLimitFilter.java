@@ -17,7 +17,7 @@ public class RateLimitFilter implements Filter {
 
     public Bucket resolveBucket(String ip, String path) {
         ConcurrentHashMap<String, RateLimitCache.IpInfo> val ;
-        if (path.equals("/auth/login")) {
+        if (path.equals("/auth/login") || path.equals("/trigger-google-sso")) {
             val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.SIGN_IN);
         } else if (path.startsWith("/tools/")) {
             val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.ANONYMOUS_LOGIN);

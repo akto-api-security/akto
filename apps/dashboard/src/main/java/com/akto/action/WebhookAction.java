@@ -6,6 +6,7 @@ import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
+import com.akto.dto.notifications.CustomWebhook.WebhookType;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
@@ -39,6 +40,8 @@ public class WebhookAction extends UserAction {
     private List<String> newEndpointCollections;
     private List<String> newSensitiveEndpointCollections;
     private int batchSize;
+    private boolean sendInstantly;
+    private String webhookType;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -89,6 +92,13 @@ public class WebhookAction extends UserAction {
             if (batchSize > 0) {
                 customWebhook.setBatchSize(batchSize);
             }
+            WebhookType type = WebhookType.DEFAULT;
+            try {
+                type = WebhookType.valueOf(webhookType);
+            } catch (Exception e) {
+            }
+            customWebhook.setSendInstantly(sendInstantly);
+            customWebhook.setWebhookType(type);
             CustomWebhooksDao.instance.insertOne(customWebhook);
             fetchCustomWebhooks();
         }
@@ -145,7 +155,8 @@ public class WebhookAction extends UserAction {
                 Updates.set("webhookName", webhookName),
                 Updates.set(CustomWebhook.SELECTED_WEBHOOK_OPTIONS, selectedWebhookOptions),
                 Updates.set(CustomWebhook.NEW_ENDPOINT_COLLECTIONS, newEndpointCollections),
-                Updates.set(CustomWebhook.NEW_SENSITIVE_ENDPOINT_COLLECTIONS, newSensitiveEndpointCollections)
+                Updates.set(CustomWebhook.NEW_SENSITIVE_ENDPOINT_COLLECTIONS, newSensitiveEndpointCollections),
+                Updates.set(CustomWebhook.SEND_INSTANTLY, sendInstantly)
             );
 
             if (batchSize > 0) {
@@ -351,5 +362,21 @@ public class WebhookAction extends UserAction {
 
     public void setBatchSize(int batchSize) {
         this.batchSize = batchSize;
+    }
+
+    public String getWebhookType() {
+        return webhookType;
+    }
+
+    public void setWebhookType(String webhookType) {
+        this.webhookType = webhookType;
+    }
+
+    public boolean getSendInstantly() {
+        return sendInstantly;
+    }
+
+    public void setSendInstantly(boolean sendInstantly) {
+        this.sendInstantly = sendInstantly;
     }
 }

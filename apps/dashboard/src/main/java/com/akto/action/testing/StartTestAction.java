@@ -27,6 +27,7 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
@@ -586,9 +587,12 @@ public class StartTestAction extends UserAction {
         ObjectId testingRunResultSummaryId;
         try {
             testingRunResultSummaryId = new ObjectId(testingRunResultSummaryHexId);
+
             Bson filters = Filters.and(
                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
-                    Filters.eq(TestingRunResult.VULNERABLE, true));
+                    Filters.eq(TestingRunResult.VULNERABLE, true)
+            );
+
             List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
             Map<String, String> sampleDataVsCurlMap = new HashMap<>();
             for (TestingRunResult runResult: testingRunResultList) {

@@ -72,6 +72,7 @@
                     window.TIME_ZONE = '${requestScope.currentTimeZone}'
                     window.USER_FULL_NAME = '${requestScope.userFullName}'
                     window.ORGANIZATION_NAME = '${requestScope.organizationName}'
+                    window.GOOGLE_SSO_URL=atob('${requestScope.googleSsoUrl}')
 
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
                     window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');

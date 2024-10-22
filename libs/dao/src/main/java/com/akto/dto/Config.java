@@ -1,11 +1,16 @@
 package com.akto.dto;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 @BsonDiscriminator
 public abstract class Config {
 
     public static final String CONFIG_SALT = "-ankush";
+    private static final Set<ConfigType> ssoConfigTypes = new HashSet(Arrays.asList( ConfigType.OKTA, ConfigType.AZURE, ConfigType.GOOGLE_SAML));
 
     public ConfigType getConfigType() {
         return configType;
@@ -23,13 +28,13 @@ public abstract class Config {
         this.id = id;
     }
 
-    String id;
+    public String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML;
     }
 
-    ConfigType configType;
+    public ConfigType configType;
 
     @BsonDiscriminator
     public static class SlackConfig extends Config {
@@ -490,7 +495,6 @@ public abstract class Config {
             this.activeAccountsLabel = activeAccountsLabel;
         }
     }
-
     @BsonDiscriminator
     public static class AzureConfig extends Config{
         
@@ -547,6 +551,7 @@ public abstract class Config {
             this.applicationIdentifier = applicationIdentifier;
         }
     }
+
     @BsonDiscriminator
     public static class MixpanelConfig extends Config {
         private String projectToken;
@@ -653,4 +658,10 @@ public abstract class Config {
         }
     }
 
+    public static boolean isConfigSSOType(ConfigType configType){
+        if(configType == null){
+            return false;
+        }
+        return ssoConfigTypes.contains(configType);
+    }
 }

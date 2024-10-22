@@ -43,6 +43,7 @@ function GithubSimpleTable(props) {
         showFooter={props?.showFooter}
         setSelectedResourcesForPrimaryAction={props?.setSelectedResourcesForPrimaryAction}
         lastColumnSticky = {props?.lastColumnSticky}
+        isMultipleItemsSelected={props?.isMultipleItemsSelected}
     />
 
 }

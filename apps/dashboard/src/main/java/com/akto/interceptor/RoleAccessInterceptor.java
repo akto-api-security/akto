@@ -1,8 +1,12 @@
 package com.akto.interceptor;
 
+import com.akto.audit_logs_util.AuditLogsUtil;
 import com.akto.dao.RBACDao;
+import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.User;
+import com.akto.dto.audit_logs.ApiAuditLogs;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.RBAC.Role;
@@ -12,13 +16,18 @@ import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 import com.akto.filter.UserDetailsFilter;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.policies.UserAgentTypePolicy;
 import com.akto.util.DashboardMode;
 import com.mongodb.client.model.Filters;
+import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionInvocation;
 import com.opensymphony.xwork2.ActionSupport;
 import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
+import org.apache.struts2.ServletActionContext;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class RoleAccessInterceptor extends AbstractInterceptor {
@@ -27,6 +36,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
     String featureLabel;
     String accessType;
+    String actionDescription;
 
     public void setFeatureLabel(String featureLabel) {
         this.featureLabel = featureLabel;
@@ -34,6 +44,10 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
     public void setAccessType(String accessType) {
         this.accessType = accessType;
+    }
+
+    public void setActionDescription(String actionDescription) {
+        this.actionDescription = actionDescription;
     }
 
     public final static String FORBIDDEN = "FORBIDDEN";
@@ -67,7 +81,9 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
     @Override
     public String intercept(ActionInvocation invocation) throws Exception {
+        ApiAuditLogs apiAuditLogs = null;
         try {
+            HttpServletRequest request = ServletActionContext.getRequest();
 
             if(featureLabel == null) {
                 throw new Exception("Feature list is null or empty");
@@ -111,17 +127,44 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             if(this.accessType.equalsIgnoreCase(ReadWriteAccess.READ.toString()) || this.accessType.equalsIgnoreCase(accessGiven.toString())){
                 hasRequiredAccess = true;
             }
-            
+            if(featureLabel.equals(Feature.ADMIN_ACTIONS.name())){
+                hasRequiredAccess = userRole.equals(Role.ADMIN.name());
+            }
+
             if(!hasRequiredAccess) {
                 ((ActionSupport) invocation.getAction()).addActionError("The role '" + userRole + "' does not have access.");
                 return FORBIDDEN;
             }
+
+            try {
+                if (this.accessType.equalsIgnoreCase(ReadWriteAccess.READ_WRITE.toString())) {
+                    long timestamp = Context.now();
+                    String apiEndpoint = invocation.getProxy().getActionName();
+                    String actionDescription = this.actionDescription == null ? "Error: Description not available" : this.actionDescription;
+                    String userEmail = user.getLogin();
+                    String userAgent = request.getHeader("User-Agent") == null ? "Unknown User-Agent" : request.getHeader("User-Agent");
+                    UserAgentTypePolicy.ClientType userAgentType = UserAgentTypePolicy.findUserAgentType(userAgent);
+                    List<String> userProxyIpAddresses = AuditLogsUtil.getClientIpAddresses(request);
+                    String userIpAddress = userProxyIpAddresses.get(0);
+
+                    apiAuditLogs = new ApiAuditLogs(timestamp, apiEndpoint, actionDescription, userEmail, userAgentType.name(), userIpAddress, userProxyIpAddresses);
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error while inserting api audit logs: " + e.getMessage(), LogDb.DASHBOARD);
+            }
+
         } catch(Exception e) {
             String api = invocation.getProxy().getActionName();
             String error = "Error in RoleInterceptor for api: " + api + " ERROR: " + e.getMessage();
             loggerMaker.errorAndAddToDb(e, error, LoggerMaker.LogDb.DASHBOARD);
         }
 
-        return invocation.invoke();
+        String result = invocation.invoke();
+
+        if (apiAuditLogs != null && result.equalsIgnoreCase(Action.SUCCESS.toUpperCase())) {
+            ApiAuditLogsDao.instance.insertOne(apiAuditLogs);
+        }
+
+        return result;
     }
 }

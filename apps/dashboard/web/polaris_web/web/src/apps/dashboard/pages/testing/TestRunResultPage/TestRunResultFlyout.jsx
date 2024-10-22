@@ -5,13 +5,17 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Avatar, Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link } from '@shopify/polaris'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, Modal } from '@shopify/polaris'
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import GridRows from '../../../components/shared/GridRows'
 import { useNavigate } from 'react-router-dom'
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
 import "./style.css"
+import ActivityTracker from '../../dashboard/components/ActivityTracker'
+import observeFunc from "../../observe/transform.js"
+import settingFunctions from '../../settings/module.js'
+import DropdownSearch from '../../../components/shared/DropdownSearch.jsx'
 
 function TestRunResultFlyout(props) {
 
@@ -20,6 +24,10 @@ function TestRunResultFlyout(props) {
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
     const [popoverActive, setPopoverActive] = useState(false)
+    const [modalActive, setModalActive] = useState(false)
+    const [jiraProjectMaps,setJiraProjectMap] = useState({})
+    const [issueType, setIssueType] = useState('');
+    const [projId, setProjId] = useState('')
     // modify testing run result and headers
     const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
     const fetchApiInfo = useCallback( async(apiInfoKey) => {
@@ -30,7 +38,7 @@ function TestRunResultFlyout(props) {
             })
             let sensitiveParam = ""
             const sensitiveParamsSet = new Set();
-            await api.loadSensitiveParameters(apiInfoKey.apiCollectionId,apiInfoKey.url, apiInfo.method).then((resp) => {
+            await api.loadSensitiveParameters(apiInfoKey.apiCollectionId,apiInfoKey.url, apiInfoKey.method).then((resp) => {
                 resp?.data?.endpoints.forEach((x, index) => {
                     sensitiveParamsSet.add(x.subTypeString.toUpperCase())
                 })
@@ -44,7 +52,7 @@ function TestRunResultFlyout(props) {
                     index++
                 })
             })
-            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam))
+            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED'))
         }
     },[issueDetails])
 
@@ -66,6 +74,31 @@ function TestRunResultFlyout(props) {
         issuesApi.bulkUpdateIssueStatus([issueDetails.id], "OPEN", "" ).then((res) => {
             func.setToast(true, false, "Issue re-opened")
         })
+    }
+
+    const handleJiraClick = async() => {
+        if(!modalActive){
+            const jirIntegration = await settingFunctions.fetchJiraIntegration()
+            if(jirIntegration.projectIdsMap !== null && Object.keys(jirIntegration.projectIdsMap).length > 0){
+                setJiraProjectMap(jirIntegration.projectIdsMap)
+                if(Object.keys(jirIntegration.projectIdsMap).length > 0){
+                    setProjId(Object.keys(jirIntegration.projectIdsMap)[0])
+                }
+            }else{
+                setProjId(jirIntegration.projId)
+                setIssueType(jirIntegration.issueType)
+            }
+        }
+        setModalActive(!modalActive)
+    }
+
+    const handleSaveAction = (id) => {
+        if(projId.length > 0 && issueType.length > 0){
+            createJiraTicket(id, projId, issueType)
+            setModalActive(false)
+        }else{
+            func.setToast(true, true, "Invalid project id or issue type")
+        }
     }
     
     const issues = [{
@@ -95,13 +128,24 @@ function TestRunResultFlyout(props) {
         const navUrl = window.location.origin + "/dashboard/test-editor/" + selectedTestRunResult.testCategoryId
         window.open(navUrl, "_blank")
     }
+
+    const getValueFromIssueType = (projId, issueId) => {
+        if(Object.keys(jiraProjectMaps).length > 0 && projId.length > 0 && issueId.length > 0){
+            const jiraTemp = jiraProjectMaps[projId].filter(x => x.issueId === issueId)
+            if(jiraTemp.length > 0){
+                return jiraTemp[0].issueType
+            }
+        }
+        return issueType
+        
+    }
     
     function ActionsComp (){
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
         return(
             issueDetails?.id &&
         <Popover
-            activator={<Button disclosure plain onClick={() => setPopoverActive(!popoverActive)}>Actions</Button>}
+            activator={<Button disclosure onClick={() => setPopoverActive(!popoverActive)}>Triage</Button>}
             active={popoverActive}
             onClose={() => setPopoverActive(false)}
             autofocusTarget="first-node"
@@ -111,18 +155,6 @@ function TestRunResultFlyout(props) {
             <Popover.Pane fixed>
                 <Popover.Section>
                     <VerticalStack gap={"4"}>
-                        <Text variant="headingSm">Create</Text>
-                        <Button plain monochrome removeUnderline onClick={()=>{createJiraTicket(issueDetails); setPopoverActive(false)}} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>
-                            <HorizontalStack gap={"2"}>
-                                <Avatar shape="square" size="extraSmall" source="/public/logo_jira.svg"/>
-                                <Text>Jira Ticket</Text>
-                            </HorizontalStack>
-                        </Button>
-                    </VerticalStack>
-                </Popover.Section>
-                <Popover.Section>
-                    <VerticalStack gap={"4"}>
-                        <Text variant="headingSm">Ignore</Text>
                         {issuesActions.map((issue, index) => {
                             return(
                                 <div style={{cursor: 'pointer'}} onClick={() => {issue.onAction(); setPopoverActive(false)}} key={index}>
@@ -145,7 +177,7 @@ function TestRunResultFlyout(props) {
                             <Button removeUnderline plain monochrome onClick={() => openTest()}>
                                 <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
                             </Button>
-                            {severity.length > 0 ? <Box><Badge size="small" status={func.getTestResultStatus(severity)}>{severity}</Badge></Box> : null}
+                            {severity.length > 0 ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
                         </div>
                     </Box>
                     <HorizontalStack gap={"2"}>
@@ -154,7 +186,45 @@ function TestRunResultFlyout(props) {
                         <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
                     </HorizontalStack>
                 </VerticalStack>
-                <ActionsComp />
+                <HorizontalStack gap={2} wrap={false}>
+                    <ActionsComp />
+
+                    {selectedTestRunResult && selectedTestRunResult.vulnerable && 
+                        <Modal
+                            activator={<Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button>}
+                            open={modalActive}
+                            onClose={() => setModalActive(false)}
+                            size="small"
+                            title={<Text variant="headingMd">Configure jira ticket details</Text>}
+                            primaryAction={{
+                                content: 'Create ticket',
+                                onAction: () => handleSaveAction(issueDetails.id)
+                            }}
+                        >
+                            <Modal.Section>
+                                <VerticalStack gap={"3"}>
+                                    <DropdownSearch
+                                        disabled={jiraProjectMaps === undefined || Object.keys(jiraProjectMaps).length === 0}
+                                        placeholder="Select JIRA project"
+                                        optionsList={jiraProjectMaps ? Object.keys(jiraProjectMaps).map((x) => {return{label: x, value: x}}): []}
+                                        setSelected={setProjId}
+                                        preSelected={projId}
+                                        value={projId}
+                                    />
+
+                                    <DropdownSearch
+                                        disabled={Object.keys(jiraProjectMaps).length === 0 || projId.length === 0}
+                                        placeholder="Select JIRA issue type"
+                                        optionsList={jiraProjectMaps[projId] && jiraProjectMaps[projId].length > 0 ? jiraProjectMaps[projId].map((x) => {return{label: x.issueType, value: x.issueId}}) : []}
+                                        setSelected={setIssueType}
+                                        preSelected={issueType}
+                                        value={getValueFromIssueType(projId, issueType)}
+                                    />  
+                                </VerticalStack>
+                            </Modal.Section>
+                        </Modal>
+                    }
+                </HorizontalStack>
             </div>
         )
     }
@@ -173,7 +243,9 @@ function TestRunResultFlyout(props) {
     const ValuesTab = {
         id: 'values',
         content: "Values",
-        component: dataExpired ? dataExpiredComponent :
+        component: (dataExpired && !selectedTestRunResult?.vulnerable && 
+            !(selectedTestRunResult?.testResults?.[0]?.originalMessage || selectedTestRunResult?.testResults?.[0]?.message) )
+            ? dataExpiredComponent :
             (func.showTestSampleData(selectedTestRunResult) && selectedTestRunResult.testResults &&
         <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
             key="Sample values"
@@ -263,6 +335,41 @@ function TestRunResultFlyout(props) {
         component: issueDetails.id && overviewComp
     }
 
+    const generateActivityEvents = (issue) => {
+        const activityEvents = []
+
+        const createdEvent = {
+            description: 'Found the issue',
+            timestamp: issue.creationTime,
+        }
+        activityEvents.push(createdEvent)
+
+        if (issue.testRunIssueStatus === 'IGNORED') {
+            const ignoredEvent = {
+                description: <Text>Issue marked as <b>IGNORED</b> - {issue.ignoreReason || 'No reason provided'}</Text>,
+                timestamp: issue.lastUpdated,
+            }
+            activityEvents.push(ignoredEvent)
+        }
+
+        if (issue.testRunIssueStatus === 'FIXED') {
+            const fixedEvent = {
+                description: <Text>Issue marked as <b>FIXED</b></Text>,
+                timestamp: issue.lastUpdated,
+            }
+            activityEvents.push(fixedEvent)
+        }
+
+        return activityEvents
+    }
+    const latestActivity = generateActivityEvents(issueDetails).reverse()
+
+    const timelineTab = (selectedTestRunResult && selectedTestRunResult.vulnerable) && {
+        id: "timeline",
+        content: "Timeline",
+        component: <ActivityTracker latestActivity={latestActivity} />
+    }
+
     const errorTab = {
         id: "error",
         content: "Attempt",
@@ -288,7 +395,7 @@ function TestRunResultFlyout(props) {
     const tabsComponent = (
         <LayoutWithTabs
             key="tab-comp"
-            tabs={issueDetails?.id ? [overviewTab,ValuesTab]: [attemptTab]}
+            tabs={issueDetails?.id ? [overviewTab,timelineTab,ValuesTab]: [attemptTab]}
             currTab = {() => {}}
         />
     )

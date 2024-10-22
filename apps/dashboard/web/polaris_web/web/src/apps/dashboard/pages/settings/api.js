@@ -145,21 +145,21 @@ const settingRequests = {
         })
     },
 
-    addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize) {
+    addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, webhookType, sendInstantly) {
         return request({
             url: '/api/addCustomWebhook',
             method: 'post',
             data: {
-                webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize
+                webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, webhookType, sendInstantly
             }
         })
     },
-    updateCustomWebhook(id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize) {
+    updateCustomWebhook(id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, sendInstantly) {
         return request({
             url: '/api/updateCustomWebhook',
             method: 'post',
             data: {
-                id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize
+                id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, sendInstantly
             }
         })
     },
@@ -253,11 +253,11 @@ const settingRequests = {
         })
     },
 
-    addJiraIntegration(userEmail, apiToken, baseUrl, projId, issueType) {
+    addJiraIntegration(userEmail, apiToken, baseUrl, projId, projectAndIssueMap) {
         return request({
             url: '/api/addIntegration',
             method: 'post',
-            data: {userEmail, apiToken, baseUrl, projId, issueType}
+            data: {userEmail, apiToken, baseUrl, projId, projectAndIssueMap}
         })
     },
 
@@ -277,27 +277,27 @@ const settingRequests = {
         })
     },
 
-    fetchAzureSso() {
+    fetchAzureSso(configType) {
         return request({
-            url: '/api/fetchAzureSso',
+            url: '/api/fetchSAMLSso',
             method: 'post',
-            data: {}
+            data: {configType}
         })
     },
 
-    addAzureSso(loginUrl, x509Certificate, azureEntityId, applicationIdentifier, acsUrl) {
+    addAzureSso(loginUrl, x509Certificate, ssoEntityId, applicationIdentifier, acsUrl, configType) {
         return request({
-            url: '/api/addAzureSso',
+            url: '/api/addSAMLSso',
             method: 'post',
-            data: {loginUrl, x509Certificate, azureEntityId, applicationIdentifier, acsUrl}
+            data: {loginUrl, x509Certificate, ssoEntityId, applicationIdentifier, acsUrl, configType}
         })
     },
 
-    deleteAzureSso() {
+    deleteAzureSso(configType) {
         return request({
-            url: '/api/deleteAzureSso',
+            url: '/api/deleteSamlSso',
             method: 'post',
-            data: {}
+            data: {configType}
         })
     },
 
@@ -446,6 +446,13 @@ const settingRequests = {
             data: {
                 accountPermission, modifiedValueForAccount
             }
+        })
+    },
+    fetchApiAuditLogsFromDb(skip, limit, sortOrder, startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/fetchApiAuditLogsFromDb',
+            method: 'post',
+            data: {skip, limit, sortOrder, startTimestamp, endTimestamp}
         })
     }
 }

@@ -1,6 +1,7 @@
 package com.akto;
 
 import com.akto.dao.*;
+import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.testing.TestRolesDao;
@@ -19,6 +20,7 @@ import com.akto.dto.dependency_flow.*;
 import com.akto.dto.events.EventsExample;
 import com.akto.dto.gpt.AktoGptConfig;
 import com.akto.dto.gpt.AktoGptConfigState;
+import com.akto.dto.jira_integration.JiraIntegration;
 import com.akto.dto.loaders.Loader;
 import com.akto.dto.loaders.NormalLoader;
 import com.akto.dto.loaders.PostmanUploadLoader;
@@ -27,7 +29,6 @@ import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
-import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -40,7 +41,6 @@ import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
-import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic_metrics.TrafficAlerts;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
@@ -294,7 +294,8 @@ public class DaoInit {
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
-                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel, eventsExampleClassModel, RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel).automatic(true).build());
+                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
+                eventsExampleClassModel, RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -402,6 +403,7 @@ public class DaoInit {
         RBACDao.instance.createIndicesIfAbsent();
         TrafficAlertsDao.instance.createIndicesIfAbsent();
         RuntimeMetricsDao.instance.createIndicesIfAbsent();
+        ApiAuditLogsDao.instance.createIndicesIfAbsent();
     }
 
 }
