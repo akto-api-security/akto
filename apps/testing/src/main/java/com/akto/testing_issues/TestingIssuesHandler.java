@@ -127,24 +127,16 @@ public class TestingIssuesHandler {
                 break;
             }
 
-            boolean shouldCountIssue = false;
             Severity severity = TestExecutor.getSeverityFromTestingRunResult(runResult);
+            int count = countIssuesMap.getOrDefault(severity.toString(), 0);
+            countIssuesMap.put(severity.toString(), count + 1);
 
             for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
                 if (testingRunIssues.getId().equals(testingIssuesId)) {
                     doesExists = true;
-                    if(testingRunIssues.getTestRunIssueStatus().equals(TestRunIssueStatus.OPEN)) {
-                        shouldCountIssue = true;
-                    }
                     break;
                 }
             }
-
-            if(shouldCountIssue) {
-                int count = countIssuesMap.getOrDefault(severity.toString(), 0);
-                countIssuesMap.put(severity.toString(), count + 1);
-            }
-
             if (!doesExists) {
                 // name = category
                 String subCategory = runResult.getTestSubType();
