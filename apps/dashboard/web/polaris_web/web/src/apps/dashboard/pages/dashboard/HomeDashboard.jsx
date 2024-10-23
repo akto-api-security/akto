@@ -40,24 +40,18 @@ function HomeDashboard() {
     const [newDomains, setNewDomains] = useState([])
     const [severityMap, setSeverityMap] = useState({})
     const [severityMapEmpty, setSeverityMapEmpty] = useState(true)
-    const [totalIssuesCount, setTotalIssuesCount] = useState(0)
-    const [oldIssueCount, setOldIssueCount] = useState(0)
-    const [totalAPIs, setTotalAPIs] = useState(0)
-    const [oldTotalApis, setOldTotalApis] = useState(0)
     const initialStartTimestamp = func.timeNow() - 60 * 60 * 24
     const initialEndTimestamp = func.timeNow()
     const [showTestingComponents, setShowTestingComponents] = useState(false)
-    const [dayTotalIssues, setDayTotalIssues] = useState([])
-    const [endpointsCountDayWise, setEndpointsCountDayWise] = useState([])
-    const [metrics, setMetrics] = useState({
-        apiRiskScore: 0,
-        testCoverage: 0,
-        oldTestCoverage: 0,
-        oldRiskScore: 0,
-        riskScoreHistoricalData: [0, 0],
-        testCoverageHistoricalData: [0, 0]
-    })
     const [customRiskScoreAvg, setCustomRiskScoreAvg] = useState(0)
+    const [openIssues, setOpenIssues] = useState([])
+    const [openIssuesDelta, setOpenIssuesDelta] = useState(0)
+    const [testCoverage, setTestCoverage] = useState([])
+    const [testCoverageDelta, setTestCoverageDelta] = useState(0)
+    const [riskScore, setRiskScore] = useState([])
+    const [riskScoreDelta, setRiskScoreDelta] = useState(0)
+    const [totalAPIs, setTotalAPIs] = useState([])
+    const [totalAPIsDelta, setTotalAPIsDelta] = useState(0)
 
     const tempVal = { alias: "custom", title: "Custom", period: { since: new Date(initialStartTimestamp * 1000), until: new Date(initialEndTimestamp * 1000) } }
 
@@ -150,7 +144,6 @@ function HomeDashboard() {
 
         setShowBannerComponent(!userEndpoints)
 
-        buildMetrics(apisStatsResp.apiStatsEnd)
         testSummaryData()
         mapAccessTypes(apisStatsResp)
         mapAuthTypes(apisStatsResp)
@@ -171,83 +164,27 @@ function HomeDashboard() {
         fetchData()
     }, [startTimestamp, endTimestamp])
 
-    function buildIssuesSummary(findTotalIssuesResp) {
-        const totalIssuesValues = findTotalIssuesResp.totalIssuesCountDayWise
-
-        if(!totalIssuesValues || totalIssuesValues.length === 0) {
-            setDayTotalIssues([0, 0])
-            setTotalIssuesCount(0)
-            setOldIssueCount(0)
-            return
-        }
-
-        setTotalIssuesCount(totalIssuesValues.reduce((acc, value) => acc + value, 0))
+    function buildIssuesSummary(issuesGraphDataRes) {
+        const openIssuesCountDayWise = issuesGraphDataRes?.totalIssuesCountDayWise
         
-        if (totalIssuesValues.length === 1) {
-            setDayTotalIssues([0, totalIssuesValues.at(0)])
-        } else if(totalIssuesValues.length > 1) {
-            setOldIssueCount(totalIssuesValues.at(0))
-            setDayTotalIssues(totalIssuesValues)
-        }
-        
+        observeFunc.setIssuesState(openIssuesCountDayWise, setOpenIssues, setOpenIssuesDelta, true)
     }
 
     function buildEndpointsCount(fetchEndpointsCountResp) {
         const endpointsCountDayWise = fetchEndpointsCountResp.endpointsCountDayWise
 
-        if(endpointsCountDayWise) {
-            const res = endpointsCountDayWise
-            if(!res || res.length === 0) {
-                setTotalAPIs(0)
-                setOldTotalApis(0)
-                setEndpointsCountDayWise([0, 0])
-                return
-            }
-
-            setTotalAPIs(res.reduce((acc, value) => acc + value, 0))
-            setOldTotalApis(res[0])
-
-            if(res.length === 1) {
-                setEndpointsCountDayWise([0, res[0]])
-                setOldTotalApis(0)
-            } else {
-                setEndpointsCountDayWise(res)
-            }
-        } else {
-            setTotalAPIs(0)
-            setOldTotalApis(0)
-            setEndpointsCountDayWise([0, 0])
-        }
+        observeFunc.setIssuesState(endpointsCountDayWise, setTotalAPIs, setTotalAPIsDelta, true)
     }
 
     function buildHistoricalData(historicalDataResp) {
-        if(!historicalDataResp || historicalDataResp.length === 0) {
-            setMetrics({
-                apiRiskScore: 0,
-                testCoverage: 0,
-                oldTestCoverage: 0,
-                oldRiskScore: 0,
-                riskScoreHistoricalData: [0, 0],
-                testCoverageHistoricalData: [0, 0]
-            });
-            return;
-        }
-    
-        let riskScoreData = historicalDataResp.map(item => item.riskScore)
-        let testCoverageData = historicalDataResp.map(item => (100 * item.apisTested / item.totalApis))
+        const testCoverageRawData = historicalDataResp.map(item => {
+            const totalCoverageVal = (((100 * item.apisTested) / item.totalApis).toFixed(2))
+            return parseFloat(totalCoverageVal)
+        })
+        const riskScoreRawData = historicalDataResp.map(item => item.riskScore)
 
-        riskScoreData = riskScoreData.length === 1 ? [0, riskScoreData[0]] : riskScoreData
-        testCoverageData = testCoverageData.length === 1 ? [0, testCoverageData[0]] : testCoverageData
-    
-        setMetrics(prevMetrics => ({
-            ...prevMetrics,
-            oldRiskScore: riskScoreData.length > 1 ? riskScoreData[0] : 0,
-            oldTestCoverage: testCoverageData.length > 1 ? testCoverageData[0] : 0,
-            apiRiskScore: riskScoreData.length ? parseFloat(riskScoreData[riskScoreData.length - 1].toFixed(2)) : 0,
-            testCoverage: testCoverageData.length ? parseFloat(testCoverageData[testCoverageData.length - 1].toFixed(2)) : 0,
-            riskScoreHistoricalData: riskScoreData.length === 0 ? [0, 0] : riskScoreData,
-            testCoverageHistoricalData: testCoverageData.length === 0 ? [0, 0] : testCoverageData
-        }));
+        observeFunc.setIssuesState(testCoverageRawData, setTestCoverage, setTestCoverageDelta, false)
+        observeFunc.setIssuesState(riskScoreRawData, setRiskScore, setRiskScoreDelta, true)
     }
 
     function generateChangeComponent(val, invertColor) {
@@ -405,51 +342,43 @@ function HomeDashboard() {
 
         setNewDomains(result)
     }
-    const getCumulativeData = (data) => {
-        let cumulative = [];
-        data.reduce((acc, val, i) => cumulative[i] = acc + val, 0);
-        return cumulative;
-    };
 
     const summaryInfo = [
         {
             title: 'Total APIs',
-            data: transform.formatNumberWithCommas(totalAPIs),
+            data: transform.formatNumberWithCommas(totalAPIs[totalAPIs.length-1]),
             variant: 'heading2xl',
-            byLineComponent: observeFunc.generateByLineComponent((totalAPIs - oldTotalApis), func.timeDifference(startTimestamp, endTimestamp)),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={getCumulativeData(endpointsCountDayWise)} />)
+            byLineComponent: observeFunc.generateByLineComponent(totalAPIsDelta, func.timeDifference(startTimestamp, endTimestamp)),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={totalAPIs} />)
         },
         {
             title: 'Issues',
-            data: observeFunc.formatNumberWithCommas(totalIssuesCount),
+            data: observeFunc.formatNumberWithCommas(openIssues[openIssues.length-1]),
             variant: 'heading2xl',
             color: 'critical',
-            byLineComponent: generateByLineComponent((totalIssuesCount - oldIssueCount), func.timeDifference(startTimestamp, endTimestamp)),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={getCumulativeData(dayTotalIssues)} />)
+            byLineComponent: observeFunc.generateByLineComponent(openIssuesDelta, func.timeDifference(startTimestamp, endTimestamp)),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={openIssues} />)
         },
         {
             title: 'API Risk Score',
-            data: customRiskScoreAvg !== 0 ? parseFloat(customRiskScoreAvg.toFixed(2))  : metrics.apiRiskScore,
+            data: customRiskScoreAvg !== 0 ? parseFloat(customRiskScoreAvg.toFixed(2)) : (riskScore[riskScore.length-1] || 0).toFixed(2),
             variant: 'heading2xl',
-            color: (customRiskScoreAvg > 2.5 || metrics.apiRiskScore > 2.5) ? 'critical' : 'warning',
+            color: (customRiskScoreAvg > 2.5 || (riskScore[riskScore.length-1] || 0).toFixed(2) > 2.5) ? 'critical' : 'warning',
             byLineComponent: observeFunc.generateByLineComponent(
-                (metrics.apiRiskScore - metrics.oldRiskScore).toFixed(2),
+                (riskScoreDelta).toFixed(2),
                 func.timeDifference(startTimestamp, endTimestamp)
             ),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={metrics.riskScoreHistoricalData} />),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={riskScore} />),
             tooltipContent: 'This represents a cumulative risk score for the whole dashboard',
             docsUrl: 'https://docs.akto.io/api-discovery/concepts/risk-score'
         },
         {
             title: 'Test Coverage',
-            data: metrics.testCoverage + "%",
+            data: (testCoverage[testCoverage.length-1] || 0).toFixed(2) + "%",
             variant: 'heading2xl',
-            color: metrics.testCoverage > 80 ? 'success' : 'warning',
-            byLineComponent: observeFunc.generateByLineComponent(
-                (metrics.testCoverage - metrics.oldTestCoverage).toFixed(2),
-                func.timeDifference(startTimestamp, endTimestamp)
-            ),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={metrics.testCoverageHistoricalData} />)
+            color: (testCoverage[testCoverage.length-1] || 0) > 80 ? 'success' : 'warning',
+            byLineComponent: observeFunc.generateByLineComponent(testCoverageDelta.toFixed(2), func.timeDifference(startTimestamp, endTimestamp)),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={testCoverage} />)
         }
     ]
 

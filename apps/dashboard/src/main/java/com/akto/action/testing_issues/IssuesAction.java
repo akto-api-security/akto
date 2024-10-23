@@ -222,53 +222,6 @@ public class IssuesAction extends UserAction {
         cursor.close();
     }
 
-    List<HistoricalData> historicalData;
-    public String fetchTestCoverageData() {
-        long daysBetween = (endTimeStamp - startEpoch) / ONE_DAY_TIMESTAMP;
-
-        List<Bson> pipeline = new ArrayList<>();
-
-        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated(HistoricalData.API_COLLECTION_ID);
-        Bson filter = Filters.and(
-                notIncludedCollections,
-                Filters.gte("time", startEpoch),
-                Filters.lte("time", endTimeStamp)
-        );
-        pipeline.add(Aggregates.match(filter));
-
-        historicalData = new ArrayList<>();
-
-        if(daysBetween > 30 && daysBetween <= 210) {
-            addGroupAndProjectStages(pipeline, "week");
-        } else if(daysBetween > 210) {
-            addGroupAndProjectStages(pipeline, "month");
-        }
-
-        MongoCursor<HistoricalData> cursor = HistoricalDataDao.instance.getMCollection().aggregate(pipeline, HistoricalData.class).cursor();
-        while(cursor.hasNext()) {
-            historicalData.add(cursor.next());
-        }
-        cursor.close();
-
-        return SUCCESS.toUpperCase();
-    }
-
-    private void addGroupAndProjectStages(List<Bson> pipeline, String dateUnit) {
-        Bson groupStage = Aggregates.group(
-                new Document(dateUnit, new Document("$" + dateUnit, new Document("$toDate", new Document("$multiply", Arrays.asList("$time", 1000))))),
-                Accumulators.avg("avgTotalApis", "$totalApis"),
-                Accumulators.avg("avgApisTested", "$apisTested")
-        );
-
-        Bson projectStage = Aggregates.project(new Document(dateUnit, "$" + dateUnit)
-                .append("totalApis", new Document("$round", "$avgTotalApis"))
-                .append("apisTested", new Document("$round", "$avgApisTested"))
-        );
-
-        pipeline.add(groupStage);
-        pipeline.add(projectStage);
-    }
-
     public String fetchVulnerableTestingRunResultsFromIssues() {
         Bson filters = createFilters(true);
         try {
@@ -690,9 +643,6 @@ public class IssuesAction extends UserAction {
         return criticalIssuesCountDayWise;
     }
 
-    public List<HistoricalData> getHistoricalData() {
-        return historicalData;
-    }
     public long getOpenIssuesCount() {
         return openIssuesCount;
     }

@@ -37,9 +37,9 @@ export default {
             data: {startEpoch: startTimeStamp, endTimeStamp}
         })
     },
-    fetchTestCoverageData (startTimeStamp, endTimeStamp) {
+    fetchAllHistoricalData (startTimeStamp, endTimeStamp) {
         return request({
-            url: 'api/fetchTestCoverageData',
+            url: 'api/fetchAllHistoricalData',
             method: 'post',
             data: {startTimeStamp, endTimeStamp}
         })
