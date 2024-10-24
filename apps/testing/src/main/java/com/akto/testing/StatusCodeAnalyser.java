@@ -48,7 +48,7 @@ public class StatusCodeAnalyser {
         }
     }
 
-    public static void run(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, TestingRunConfig testingRunConfig) {
+    public static void run(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, TestingRunConfig testingRunConfig, Set<String> hosts) {
         defaultPayloadsMap = new HashMap<>();
         result = new ArrayList<>();
         if (sampleDataMap == null) {
@@ -57,13 +57,13 @@ public class StatusCodeAnalyser {
         }
         loggerMaker.infoAndAddToDb("started calc default payloads", LogDb.TESTING);
 
-        calculateDefaultPayloads(sampleMessageStore, sampleDataMap, testingRunConfig);
+        calculateDefaultPayloads(sampleMessageStore, sampleDataMap, testingRunConfig, hosts);
 
         loggerMaker.infoAndAddToDb("started fill result", LogDb.TESTING);
         fillResult(sampleMessageStore, sampleDataMap, authMechanismStore, testingRunConfig);
     }
 
-    public static void calculateDefaultPayloads(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig) {
+    public static Set<String> findAllHosts(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap){
         Set<String> hosts = new HashSet<>();
         for (ApiInfo.ApiInfoKey apiInfoKey: sampleDataMap.keySet()) {
             String host;
@@ -76,7 +76,10 @@ public class StatusCodeAnalyser {
 
             hosts.add(host);
         }
+        return hosts;
+    }
 
+    public static void calculateDefaultPayloads(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig, Set<String> hosts) {
         for (String host: hosts) {
             loggerMaker.infoAndAddToDb("calc default payload for host: " + host, LogDb.TESTING);
             for (int idx=0; idx<11;idx++) {
@@ -93,11 +96,10 @@ public class StatusCodeAnalyser {
                     String body = response.getBody();
                     fillDefaultPayloadsMap(body);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("", LogDb.TESTING);
+                    loggerMaker.errorAndAddToDb(e, "Error in calculateDefaultPayloads " + e.getMessage(), LogDb.TESTING);
                 }
             }
         }
-
     }
 
     public static void fillDefaultPayloadsMap(String body) {
