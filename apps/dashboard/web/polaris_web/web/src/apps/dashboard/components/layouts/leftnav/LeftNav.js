@@ -103,6 +103,15 @@ export default function LeftNav(){
                 selected: leftNavSelected.includes('_testing'),
                 subNavigationItems:[
                   {
+                    label: 'Active Testing',
+                    onClick: ()=>{
+                      navigate('/dashboard/testing/active-testing')
+                      handleSelect('dashboard_active_testing')
+                      setActive('active')
+                    },
+                    selected: leftNavSelected === 'dashboard_active_testing'
+                  },
+                  {
                     label: 'Results',
                     onClick: ()=>{
                       navigate('/dashboard/testing')
