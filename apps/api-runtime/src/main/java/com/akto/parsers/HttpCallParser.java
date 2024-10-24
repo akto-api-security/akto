@@ -245,18 +245,18 @@ public class HttpCallParser {
             redundantList = accountSettings.getAllowRedundantEndpointsList();
         }
         Pattern regexPattern = Utils.createRegexPatternFromList(redundantList);
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, redundantList, regexPattern);
+        
         boolean makeApisCaseInsensitive = false;
         if(accountSettings != null){
             makeApisCaseInsensitive = accountSettings.getHandleApisCaseInsensitive();
         }
-        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, redundantList, regexPattern, makeApisCaseInsensitive);
-        
 
         boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
 
         for (int apiCollectionId: aggregatorMap.keySet()) {
             URLAggregator aggregator = aggregatorMap.get(apiCollectionId);
-            apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
+            apiCatalogSync.computeDelta(aggregator, false, apiCollectionId, makeApisCaseInsensitive);
         }
 
         if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
@@ -516,7 +516,7 @@ public class HttpCallParser {
         return res;
     }
 
-    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, List<String> redundantUrlsList, Pattern pattern, Boolean shouldMakeUrlCaseInsensitive) {
+    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, List<String> redundantUrlsList, Pattern pattern) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
 
@@ -585,14 +585,6 @@ public class HttpCallParser {
                 continue;
             }else{
                 httpResponseParam = param;
-            }
-
-            // making url case insensitive here
-            if(shouldMakeUrlCaseInsensitive){
-                HttpRequestParams oldHttpRequestParams = httpResponseParam.requestParams;
-                String updatedUrl = oldHttpRequestParams.url.toLowerCase();
-                oldHttpRequestParams.setUrl(updatedUrl);
-                httpResponseParam.setRequestParams(oldHttpRequestParams);
             }
 
             int apiCollectionId = createApiCollectionId(httpResponseParam);

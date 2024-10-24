@@ -198,7 +198,7 @@ public class APICatalogSync {
         return users.size();
     }
 
-    public void computeDelta(URLAggregator origAggregator, boolean triggerTemplateGeneration, int apiCollectionId) {
+    public void computeDelta(URLAggregator origAggregator, boolean triggerTemplateGeneration, int apiCollectionId, boolean makeApisCaseInsensitive) {
         long start = System.currentTimeMillis();
 
         APICatalog deltaCatalog = this.delta.get(apiCollectionId);
@@ -231,7 +231,7 @@ public class APICatalogSync {
         }
 
         start = System.currentTimeMillis();
-        processKnownStaticURLs(aggregator, deltaCatalog, dbCatalog);
+        processKnownStaticURLs(aggregator, deltaCatalog, dbCatalog, makeApisCaseInsensitive);
         logger.info("processKnownStaticURLs: " +  (System.currentTimeMillis() - start));
 
         start = System.currentTimeMillis();
@@ -1106,14 +1106,29 @@ public class APICatalogSync {
         return ret;
     }
 
-    private void processKnownStaticURLs(URLAggregator aggregator, APICatalog deltaCatalog, APICatalog dbCatalog) {
+    private void processKnownStaticURLs(URLAggregator aggregator, APICatalog deltaCatalog, APICatalog dbCatalog, boolean makeApisCaseInsensitive) {
         Iterator<Map.Entry<URLStatic, Set<HttpResponseParams>>> iterator = aggregator.urls.entrySet().iterator();
         List<SingleTypeInfo> deletedInfo = deltaCatalog.getDeletedInfo();
+
+        // handle case insensitive apis here in the same aggregator
+        Set<String> lowerCaseApisSet = new HashSet<>();
+
         try {
             while (iterator.hasNext()) {
                 Map.Entry<URLStatic, Set<HttpResponseParams>> entry = iterator.next();
                 URLStatic url = entry.getKey();
                 Set<HttpResponseParams> responseParamsList = entry.getValue();
+
+                String endpoint = url.getUrl();
+                if(makeApisCaseInsensitive){
+                    URLStatic tempStatic = new URLStatic(endpoint.toLowerCase(), url.getMethod());
+                    boolean containsInDbCatalog = dbCatalog.getStrictURLToMethods().containsKey(tempStatic);
+                    if(lowerCaseApisSet.contains(endpoint.toLowerCase()) || containsInDbCatalog){
+                        iterator.remove();
+                        continue;
+                    }
+                    lowerCaseApisSet.add(endpoint.toLowerCase());
+                }
 
                 RequestTemplate strictMatch = dbCatalog.getStrictURLToMethods().get(url);
                 if (strictMatch != null) {

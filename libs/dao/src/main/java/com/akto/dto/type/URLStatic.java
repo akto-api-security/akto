@@ -48,7 +48,7 @@ public class URLStatic {
 
     @Override
     public int hashCode() {
-        return this.getFullString().hashCode();
+        return (this.url.toLowerCase() + this.method.name()).hashCode();
     }
 
     @Override
