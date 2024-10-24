@@ -346,14 +346,14 @@ function HomeDashboard() {
     const summaryInfo = [
         {
             title: 'Total APIs',
-            data: transform.formatNumberWithCommas(totalAPIs[totalAPIs.length-1]),
+            data: transform.formatNumberWithCommas((totalAPIs[totalAPIs.length-1] || 0)),
             variant: 'heading2xl',
             byLineComponent: observeFunc.generateByLineComponent(totalAPIsDelta, func.timeDifference(startTimestamp, endTimestamp)),
             smoothChartComponent: (<SmoothAreaChart tickPositions={totalAPIs} />)
         },
         {
             title: 'Issues',
-            data: observeFunc.formatNumberWithCommas(openIssues[openIssues.length-1]),
+            data: observeFunc.formatNumberWithCommas((openIssues[openIssues.length-1] || 0)),
             variant: 'heading2xl',
             color: 'critical',
             byLineComponent: observeFunc.generateByLineComponent(openIssuesDelta, func.timeDifference(startTimestamp, endTimestamp)),

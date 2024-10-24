@@ -79,6 +79,9 @@ public class DashboardAction extends UserAction {
 
     List<Integer> totalIssuesCountDayWise;
     public String findTotalIssues() {
+        if(endTimeStamp == 0) {
+            endTimeStamp = Context.now();
+        }
         long daysBetween = (endTimeStamp - startTimeStamp) / ONE_DAY_TIMESTAMP;
         List<Bson> pipeline = new ArrayList<>();
 
@@ -87,13 +90,11 @@ public class DashboardAction extends UserAction {
         Bson filters = Filters.and(
                 notIncludedCollections,
                 Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
-                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
+                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN.name())
         );
 
-        Bson openIssuesMatchStage = Aggregates.match(Filters.and(
-                filters,
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN.name())
-        ));
+        Bson openIssuesMatchStage = Aggregates.match(filters);
 
         pipeline.add(openIssuesMatchStage);
         totalIssuesCountDayWise = new ArrayList<>();
@@ -112,6 +113,9 @@ public class DashboardAction extends UserAction {
 
     List<HistoricalData> historicalData;
     public String fetchAllHistoricalData() {
+        if(endTimeStamp == 0) {
+            endTimeStamp = Context.now();
+        }
         long daysBetween = (endTimeStamp - startTimeStamp) / ONE_DAY_TIMESTAMP;
 
         List<Bson> pipeline = new ArrayList<>();
@@ -119,8 +123,8 @@ public class DashboardAction extends UserAction {
         Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated(HistoricalData.API_COLLECTION_ID);
         Bson filter = Filters.and(
                 notIncludedCollections,
-                Filters.gte("time", startTimeStamp),
-                Filters.lte("time", endTimeStamp)
+                Filters.gte(HistoricalData.TIME, startTimeStamp),
+                Filters.lte(HistoricalData.TIME, endTimeStamp)
         );
         pipeline.add(Aggregates.match(filter));
 

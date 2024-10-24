@@ -715,7 +715,6 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
             while(endpointsCursor.hasNext()) {
                 BasicDBObject doc = endpointsCursor.next();
-                if(doc.isEmpty()) continue;
                 timeUnitCountMap.add(doc.getInt("count"));
             }
             endpointsCursor.close();
