@@ -36,6 +36,21 @@ public class DependencyAction extends UserAction {
     private Collection<Node> result;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DependencyAction.class);
+    private boolean dependencyGraphExists = false;
+    public String checkIfDependencyGraphAvailable() {
+
+        Node node = DependencyFlowNodesDao.instance.findOne(
+                Filters.and(
+                        Filters.eq("apiCollectionId", apiCollectionId + ""),
+                        Filters.eq("url", url),
+                        Filters.eq("method", method),
+                        Filters.ne("maxDepth", 0)
+                ), Projections.include("_id")
+        );
+
+        dependencyGraphExists = node != null;
+        return SUCCESS.toUpperCase();
+    }
 
     @Override
     public String execute()  {
@@ -286,4 +301,14 @@ public class DependencyAction extends UserAction {
     public int getNewCollectionId() {
         return newCollectionId;
     }
+
+    public boolean isDependencyGraphExists() {
+        return dependencyGraphExists;
+    }
+
+    public boolean getDependencyGraphExists() {
+        return dependencyGraphExists;
+    }
+
+    
 }

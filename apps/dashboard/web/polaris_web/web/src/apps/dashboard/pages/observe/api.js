@@ -768,6 +768,16 @@ export default {
                 name: name,
             }
         })
-    }
+    },
+
+    async checkIfDependencyGraphAvailable(apiCollectionId, url, method) {
+        return await request({
+            url: '/api/checkIfDependencyGraphAvailable',
+            method: 'post',
+            data: {
+                apiCollectionId, url, method
+            }
+        })
+    },
 
 }

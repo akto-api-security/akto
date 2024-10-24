@@ -30,6 +30,7 @@ function ApiDetails(props) {
     const [badgeActive, setBadgeActive] = useState(false)
     const [showMoreActions, setShowMoreActions] = useState(false)
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
+    const [disabledTabs, setDisabledTabs] = useState([])
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -48,6 +49,13 @@ function ApiDetails(props) {
             setLoading(true)
             const { apiCollectionId, endpoint, method } = apiDetail
             setSelectedUrl({ url: endpoint, method: method })
+            api.checkIfDependencyGraphAvailable(apiCollectionId, endpoint, method).then((resp) => {
+                if (!resp.dependencyGraphExists) {
+                    setDisabledTabs(["dependency"])
+                } else {
+                    setDisabledTabs([])
+                }
+            })
             let commonMessages = []
             await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
                 api.fetchSensitiveSampleData(endpoint, apiCollectionId, method).then(async (resp) => {
@@ -276,6 +284,7 @@ function ApiDetails(props) {
             key="tabs"
             tabs={[ValuesTab, SchemaTab, DependencyTab]}
             currTab={() => { }}
+            disabledTabs={disabledTabs}
         />
     ]
 
