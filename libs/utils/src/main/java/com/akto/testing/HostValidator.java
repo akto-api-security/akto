@@ -70,7 +70,7 @@ public class HostValidator {
         return true;
     }
 
-    private static String getUniformUrl(String url){
+    public static String getUniformUrl(String url){
         try {
             HttpUrl uniformUrl = HttpUrl.get(url);
             return getUniformUrlUtil(uniformUrl);
