@@ -83,12 +83,12 @@ export default {
             }
         })
     },
-    createJiraTicket(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId) {
+    createJiraTicket(jiraMetaData, projId, issueType) {
         return request({
             url: '/api/createJiraIssue',
             method: 'post',
             data: {
-                hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId
+                jiraMetaData, issueType, projId
             }
         })
     },
@@ -439,6 +439,13 @@ export default {
             url: '/api/updateIgnoreTimeForSummaries',
             method: 'post',
             data: {deltaTimeForScheduledSummaries}
+        })
+    },
+    fetchIssuesByStatusAndSummaryId(latestTestingRunSummaryId, issueStatusQuery) {
+        return request({
+            url: '/api/fetchIssuesByStatusAndSummaryId',
+            method: 'post',
+            data: { latestTestingRunSummaryId, issueStatusQuery }
         })
     }
 }

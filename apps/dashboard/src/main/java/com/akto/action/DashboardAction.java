@@ -8,11 +8,14 @@ import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.listener.RuntimeListener;
+import com.akto.util.GroupByTimeRange;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.*;
 import org.bouncycastle.util.test.Test;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.context.Context;
@@ -26,6 +29,8 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.opensymphony.xwork2.Action;
+
+import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
 
 public class DashboardAction extends UserAction {
 
@@ -72,39 +77,96 @@ public class DashboardAction extends UserAction {
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
-    private long totalIssuesCount = 0;
-    private long oldOpenCount = 0;
+    List<Integer> totalIssuesCountDayWise;
     public String findTotalIssues() {
-        Set<Integer> demoCollections = new HashSet<>();
-        demoCollections.addAll(deactivatedCollections);
-        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
-        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+        if(endTimeStamp == 0) {
+            endTimeStamp = Context.now();
+        }
+        long daysBetween = (endTimeStamp - startTimeStamp) / ONE_DAY_TIMESTAMP;
+        List<Bson> pipeline = new ArrayList<>();
 
-        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
-        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
+        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated("_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID);
 
-
-        if (startTimeStamp == 0) startTimeStamp = Context.now() - 24 * 1 * 60 * 60;
-        // totoal issues count = issues that were created before endtimestamp and are either still open or fixed but last updated is after endTimestamp
-        totalIssuesCount = TestingRunIssuesDao.instance.count(
-            Filters.and(
+        Bson filters = Filters.and(
+                notIncludedCollections,
+                Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
-                Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
-                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.OPEN))       
-            );
-
-        // issues that have been created till start timestamp
-        oldOpenCount = TestingRunIssuesDao.instance.count(
-                Filters.and(
-                        Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
-                        Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp),
-                        Filters.ne(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.IGNORED)
-                )
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN.name())
         );
+
+        Bson openIssuesMatchStage = Aggregates.match(filters);
+
+        pipeline.add(openIssuesMatchStage);
+        totalIssuesCountDayWise = new ArrayList<>();
+
+        GroupByTimeRange.groupByAllRange(daysBetween, pipeline, TestingRunIssues.CREATION_TIME, "totalIssues");
+        MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while (cursor.hasNext()) {
+            BasicDBObject document = cursor.next();
+            if(document.isEmpty()) continue;
+            totalIssuesCountDayWise.add(document.getInt("totalIssues"));
+        }
+        cursor.close();
 
         return SUCCESS.toUpperCase();
     }
 
+    List<HistoricalData> historicalData;
+    public String fetchAllHistoricalData() {
+        if(endTimeStamp == 0) {
+            endTimeStamp = Context.now();
+        }
+        long daysBetween = (endTimeStamp - startTimeStamp) / ONE_DAY_TIMESTAMP;
+
+        List<Bson> pipeline = new ArrayList<>();
+
+        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated(HistoricalData.API_COLLECTION_ID);
+        Bson filter = Filters.and(
+                notIncludedCollections,
+                Filters.gte(HistoricalData.TIME, startTimeStamp),
+                Filters.lte(HistoricalData.TIME, endTimeStamp)
+        );
+        pipeline.add(Aggregates.match(filter));
+
+        historicalData = new ArrayList<>();
+
+        if(daysBetween > 30 && daysBetween <= 210) {
+            addGroupAndProjectStages(pipeline, "week");
+        } else if(daysBetween > 210) {
+            addGroupAndProjectStages(pipeline, "month");
+        }
+
+        MongoCursor<HistoricalData> cursor = HistoricalDataDao.instance.getMCollection().aggregate(pipeline, HistoricalData.class).cursor();
+        while(cursor.hasNext()) {
+            historicalData.add(cursor.next());
+        }
+        cursor.close();
+
+        return SUCCESS.toUpperCase();
+    }
+
+    private void addGroupAndProjectStages(List<Bson> pipeline, String dateUnit) {
+        Bson groupStage = Aggregates.group(
+                new Document(dateUnit, new Document("$" + dateUnit, new Document("$toDate", new Document("$multiply", Arrays.asList("$time", 1000))))),
+                Accumulators.avg("avgTotalApis", "$totalApis"),
+                Accumulators.avg("avgApisTested", "$apisTested"),
+                Accumulators.avg("avgRiskScore", "$riskScore"),
+                Accumulators.avg("avgTime", "$time")
+        );
+
+        Bson projectStage = Aggregates.project(new Document(dateUnit, "$" + dateUnit)
+                .append("totalApis", new Document("$round", "$avgTotalApis"))
+                .append("apisTested", new Document("$round", "$avgApisTested"))
+                .append("riskScore", new Document("$round", "$avgRiskScore"))
+                .append("time", new Document("$round", "$avgTime"))
+        );
+
+        pipeline.add(groupStage);
+        pipeline.add(projectStage);
+
+        Bson sortStage = Aggregates.sort(Sorts.ascending("time"));
+        pipeline.add(sortStage);
+    }
 
     private List<HistoricalData> finalHistoricalData = new ArrayList<>();
     private List<HistoricalData> initialHistoricalData = new ArrayList<>();
@@ -305,6 +367,8 @@ public class DashboardAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private String userEmail;
+
     public Map<Integer, Integer> getRiskScoreCountMap() {
         return riskScoreCountMap;
     }
@@ -373,14 +437,6 @@ public class DashboardAction extends UserAction {
         return trendData;
     }
 
-    public long getTotalIssuesCount() {
-        return totalIssuesCount;
-    }
-
-    public long getOldOpenCount() {
-        return oldOpenCount;
-    }
-
     public List<HistoricalData> getFinalHistoricalData() {
         return finalHistoricalData;
     }
@@ -403,5 +459,17 @@ public class DashboardAction extends UserAction {
 
     public void setOrganization(String organization) {
         this.organization = organization;
+    }
+
+    public List<Integer> getTotalIssuesCountDayWise() {
+        return totalIssuesCountDayWise;
+    }
+
+    public List<HistoricalData> getHistoricalData() {
+        return historicalData;
+    }
+    
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
     }
 }

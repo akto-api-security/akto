@@ -11,13 +11,11 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
-import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingEndpoints.Operator;
 import com.akto.dto.testing.TestingRun.State;
@@ -36,15 +34,21 @@ import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.rules.RequiredConfigs;
+import com.akto.task.Cluster;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.util.DbMode;
 import com.akto.util.EmailAccountName;
+import com.akto.util.Util;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.DeleteResult;
+
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
@@ -58,12 +62,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public class Main {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.TESTING);
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    public static final ScheduledExecutorService deleteScheduler = Executors.newScheduledThreadPool(1);
 
     public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
 
@@ -168,7 +173,7 @@ public class Main {
 
         Bson filter2 = Filters.and(
             Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5*60),
+            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 20*60),
             Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
         );
 
@@ -418,7 +423,7 @@ public class Main {
                     RequiredConfigs.initiate();
                     testExecutor.init(testingRun, summaryId, syncLimit);
                     raiseMixpanelEvent(summaryId, testingRun, accountId);
-                } catch (Exception e) {
+            } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error in init " + e);
                 }
                 Bson completedUpdate = Updates.combine(
@@ -453,6 +458,23 @@ public class Main {
 
                 loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds for account: " + accountId, LogDb.TESTING);
 
+                /*
+                 * In case the testing run results start overflowing
+                 * due to being a capped collection,
+                 * we will start deleting non-vulnerable results,
+                 * since we cap on size as well as number of documents.
+                 */
+                deleteScheduler.execute(() -> {
+                    Context.accountId.set(accountId);
+                    try {
+                        deleteNonVulnerableResults();
+                        // TODO: fix clean testing job (CleanTestingJob) for more scale and add here.
+
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error in deleting testing run results");
+                    }
+                });
+                
                 Organization organization = OrganizationsDao.instance.findOne(
                         Filters.in(Organization.ACCOUNTS, Context.accountId.get()));
 
@@ -662,4 +684,165 @@ public class Main {
         AktoMixpanel aktoMixpanel = new AktoMixpanel();
         aktoMixpanel.sendEvent(distinct_id, "Test executed", props);
     }
+
+    private static void deleteNonVulnerableResults() {
+        if (shouldDeleteNonVulnerableResults()) {
+            /*
+             * Since this is a heavy job,
+             * running it for only one account on one instance at a time.
+             */
+            boolean dibs = Cluster.callDibs(Cluster.DELETE_TESTING_RUN_RESULTS, 60 * 60, 60);
+            if (!dibs) {
+                return;
+            }
+            loggerMaker.infoAndAddToDb(
+                    String.format("%s dibs acquired, starting", Cluster.DELETE_TESTING_RUN_RESULTS));
+
+            deleteNonVulnerableResultsUtil();
+            loggerMaker.infoAndAddToDb(
+                    "deleteNonVulnerableResults Completed deleting non-vulnerable TestingRunResults");
+        }
+    }
+
+    private static boolean shouldDeleteNonVulnerableResults() {
+        long count = -1;
+        long size = -1;
+
+        if (DbMode.allowCappedCollections()) {
+            Document stats = TestingRunResultDao.instance.getCollectionStats();
+            count = Util.getLongValue(stats.get(MCollection._COUNT));
+            size = Util.getLongValue(stats.get(MCollection._SIZE));
+        } else {
+            /*
+             * db.runCommand not supported for DBs excluding mongoDB
+             */
+            count = TestingRunResultDao.instance.getMCollection().estimatedDocumentCount();
+        }
+
+        loggerMaker.infoAndAddToDb(String.format(
+                "shouldDeleteNonVulnerableResults non-vulnerable TestingRunResults, current stats: size: %s count: %s",
+                size, count));
+
+        // Deleting only in case of capped collection limits about to breach
+        if ((size >= (TestingRunResultDao.CLEAN_THRESHOLD * TestingRunResultDao.sizeInBytes) / 100) ||
+                (count >= (TestingRunResultDao.CLEAN_THRESHOLD * TestingRunResultDao.maxDocuments) / 100)) {
+
+            /*
+             * We delete non-vulnerable results,
+             * per summary, starting from the oldest one.
+             */
+            return true;
+        }
+        return false;
+    }
+
+    private static void deleteNonVulnerableResultsUtil() {
+
+        final int LIMIT = 1000;
+        final int BATCH_LIMIT = 5;
+        int skip = 0;
+
+        do {
+
+            // oldest first.
+            List<TestingRunResultSummary> summaries = TestingRunResultSummariesDao.instance.findAll(
+                    Filters.empty(), skip, LIMIT, Sorts.ascending(TestingRunResultSummary.END_TIMESTAMP),
+                    Projections.exclude(TestingRunResultSummary.METADATA_STRING));
+
+            if (summaries == null || summaries.isEmpty()) {
+                break;
+            }
+
+            loggerMaker.infoAndAddToDb(String.format(
+                    "deleteNonVulnerableResultsUtil Fetched %s summaries for deleting TestingRunResults",
+                    summaries.size()));
+            List<ObjectId> ids = new ArrayList<>();
+
+            boolean done = false;
+            for (TestingRunResultSummary summary : summaries) {
+                ids.add(summary.getId());
+                if (ids.size() >= BATCH_LIMIT) {
+                    if (actuallyDeleteTestingRunResults(ids)) {
+                        done = true;
+                        break;
+                    }
+                    ids = new ArrayList<>();
+                }
+            }
+
+            if (!done && ids.size() > 0) {
+                if (actuallyDeleteTestingRunResults(ids)) {
+                    break;
+                }
+            }
+
+            skip += LIMIT;
+        } while (true);
+
+        runCompactIfPossible();
+    }
+
+    private static void runCompactIfPossible() {
+        if (!DbMode.allowCappedCollections()) {
+            /*
+             * db.runCommand not supported for DBs excluding mongoDB
+             */
+            return;
+        }
+
+        loggerMaker.infoAndAddToDb("deleteNonVulnerableResultsUtil Running compact to reclaim space");
+        Document compactResult = TestingRunResultDao.instance.compactCollection();
+        loggerMaker.infoAndAddToDb(
+                String.format("deleteNonVulnerableResultsUtil compact result: %s", compactResult.toString()));
+    }
+
+    private static boolean actuallyDeleteTestingRunResults(List<ObjectId> ids) {
+
+        if (ids == null || ids.isEmpty()) {
+            return false;
+        }
+
+        DeleteResult res = TestingRunResultDao.instance.deleteAll(
+                Filters.and(
+                        Filters.in(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, ids),
+                        Filters.eq(TestingRunResult.VULNERABLE, false)));
+
+        loggerMaker.infoAndAddToDb(String.format(
+                "actuallyDeleteTestingRunResults Deleted %s TestingRunResults",
+                res.getDeletedCount()));
+        if (deletePurposeSuccessful()) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean deletePurposeSuccessful() {
+        long count = -1;
+        long size = -1;
+
+        if (DbMode.allowCappedCollections()) {
+            Document stats = TestingRunResultDao.instance.getCollectionStats();
+            count = Util.getLongValue(stats.get(MCollection._COUNT));
+            size = Util.getLongValue(stats.get(MCollection._SIZE));
+        } else {
+            /*
+             * db.runCommand not supported for DBs excluding mongoDB
+             */
+            count = TestingRunResultDao.instance.getMCollection().estimatedDocumentCount();
+        }
+
+        loggerMaker.infoAndAddToDb(String.format(
+                "actuallyDeleteTestingRunResults stats: size: %s count: %s",
+                size, count));
+
+        if ((size != -1 &&
+                (size <= (TestingRunResultDao.DESIRED_THRESHOLD * TestingRunResultDao.sizeInBytes) / 100)) ||
+                (count != -1 &&
+                        (count <= (TestingRunResultDao.DESIRED_THRESHOLD * TestingRunResultDao.maxDocuments) / 100))) {
+
+            return true;
+        }
+        return false;
+    }
+
 }

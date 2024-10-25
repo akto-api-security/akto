@@ -62,5 +62,14 @@ export default {
                 email, password, invitationCode
             }
         })
+    },
+    triggerGoogleSSO: function(userEmail){
+        return request({
+            url: '/trigger-google-sso',
+            method: 'post',
+            data: {
+                userEmail
+            }
+        })
     }
 }

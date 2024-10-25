@@ -54,6 +54,11 @@ function Integrations() {
         name:'Webhooks',
         source: '/public/webhooks_logo.svg'
     }
+    let teamsWebhooksObj={
+      id: 'teamsWebhooks',
+      name:'Microsoft Teams Webhooks',
+      source: '/public/ms_teams.svg'
+  }
     let githubSsoObj={
       id: 'github_sso',
       name:'Github SSO',
@@ -81,12 +86,15 @@ function Integrations() {
       source: '/public/github_icon.svg'
     }
 
-    let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, githubAppObj]
-
-    let allItems = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj, jiraObj]
-    if (window.DASHBOARD_MODE === "ON_PREM") {
-        allItems = [...allItems, ...ssoItems]
+    let googleWorkSpaceObj={
+      id: 'google_workspace_sso',
+      name: 'Google Workspace SSO',
+      source: '/public/gcp.svg'
     }
+
+    let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, githubAppObj, googleWorkSpaceObj]
+
+    let allItems = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj, jiraObj, ...ssoItems]
     let currObjs = allItems
     const [currItems , setCurrentItems] = useState(getTabItems('all'))
     const tabs = [
@@ -132,8 +140,7 @@ function Integrations() {
     const trafficItems = [burpSuiteObj, postmanObj];
     const reportingItems = [githubAppObj];
     const aiItems = [aktoGptObj];
-    const ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj];
-    const alertsItems = [slackObj, webhooksObj];
+    const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj];
     switch (tabId) {
       case 'traffic':
@@ -166,7 +173,7 @@ function Integrations() {
           allItems = [...allItems, ...alertsItems, ...automationItems]
         }
         if(func.checkOnPrem()){
-          allItems = [...allItems, ...ssoItems, ...reportingItems]
+          allItems = [...allItems, ...reportingItems]
         }
         return allItems;
     }

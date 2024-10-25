@@ -10,7 +10,10 @@ import javax.servlet.http.HttpServletRequest;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.ConfigsDao;
-import com.akto.utils.AzureLogin;
+import com.akto.dao.SSOConfigsDao;
+import com.akto.dto.Config.ConfigType;
+import com.akto.dto.sso.SAMLConfig;
+import com.akto.util.Constants;
 import com.akto.utils.CustomHttpsWrapper;
 import com.mongodb.client.model.Filters;
 
@@ -21,6 +24,12 @@ public class SsoUtils {
                 .map(entry -> entry.getKey() + "=" + entry.getValue())
                 .collect(Collectors.joining("&"));
     }
+
+    public static boolean isAnySsoActive(int accountId){
+        String configId = String.valueOf(accountId);
+        long count = SSOConfigsDao.instance.count(Filters.eq(Constants.ID, configId));
+        return count > 0;
+    }
     
     public static boolean isAnySsoActive(){
         List<String> ssoList = Arrays.asList("OKTA-ankush", "GITHUB-ankush", "AZURE-ankush");
@@ -28,10 +37,10 @@ public class SsoUtils {
         return ConfigsDao.instance.count(filter) > 0;
     }
 
-    public static HttpServletRequest getWrappedRequest(HttpServletRequest servletRequest){
+    public static HttpServletRequest getWrappedRequest(HttpServletRequest servletRequest, ConfigType configType, int accountId){
         String requestUri = servletRequest.getRequestURL().toString();
-        String savedRequestUri = AzureLogin.getInstance().getAzureConfig().getAcsUrl();
-
+        String savedRequestUri = CustomSamlSettings.getInstance(configType, accountId).getSamlConfig().getAcsUrl();
+        
         if(requestUri.equals(savedRequestUri)){
             return servletRequest;
         }
@@ -43,5 +52,16 @@ public class SsoUtils {
         }else{
             return servletRequest;
         }
+    }
+
+    public static SAMLConfig findSAMLConfig(ConfigType configType, int accountId){
+        String idString = String.valueOf(accountId);
+        SAMLConfig config = (SAMLConfig) SSOConfigsDao.instance.findOne(
+            Filters.and(
+                Filters.eq(Constants.ID, idString),
+                Filters.eq("configType", configType.name())
+            )
+        );
+        return config;
     }
 }

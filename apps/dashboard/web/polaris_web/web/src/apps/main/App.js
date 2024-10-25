@@ -54,7 +54,7 @@ import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
 import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
-import AzureSso from "../dashboard/pages/settings/integrations/AzureSso";
+import AzureSso from "../dashboard/pages/settings/integrations/sso/AzureSso";
 
 import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
 import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
@@ -72,6 +72,12 @@ import ThreatDetectionPage from "../dashboard/pages/threat_detection/ThreatDetec
 import { PollingProvider } from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
+import GoogleSamlSso from "../dashboard/pages/settings/integrations/sso/GoogleSamlSso";
+import SignUpWithSSO from "../signup/components/SignUpWithSSO";
+
+import TeamsWebhooks from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhooks";
+import TeamsWebhook from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhook";
+import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -237,6 +243,10 @@ const router = createBrowserRouter([
             element: <AzureSso />
           },
           {
+            path: "integrations/google_workspace_sso",
+            element: <GoogleSamlSso />
+          },
+          {
             path: "integrations/github_app",
             element: <GithubAppIntegration />
           },
@@ -256,6 +266,19 @@ const router = createBrowserRouter([
             path: "integrations/webhooks/create_custom_webhook",
             element: <Webhook />,
           },
+          {
+            path: "integrations/teamsWebhooks",
+            element: <TeamsWebhooks />,
+          },
+          {
+            path: "integrations/teamsWebhooks/:webhookId",
+            element: <TeamsWebhook />,
+          },
+          {
+            path: "integrations/teamsWebhooks/create_custom_webhook",
+            element: <TeamsWebhook />,
+          },
+
           {
             path: "logs",
             element: <HealthLogs />,
@@ -295,6 +318,10 @@ const router = createBrowserRouter([
           {
             path: "self-hosted",
             element: <SelfHosted/>
+          },
+          {
+            path: 'audit-logs',
+            element: <AuditLogs/>
           }
         ]
       },
@@ -340,6 +367,10 @@ const router = createBrowserRouter([
   {
     path: "/business-email",
     element: <PageBusinessEmail />
+  },
+  {
+    path: "/sign-in-with-sso",
+    element: <SignUpWithSSO />
   },
   // catches all undefined paths and redirects to homepage.
   {

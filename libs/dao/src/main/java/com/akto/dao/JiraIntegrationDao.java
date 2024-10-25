@@ -1,6 +1,6 @@
 package com.akto.dao;
 
-import com.akto.dto.JiraIntegration;
+import com.akto.dto.jira_integration.JiraIntegration;
 
 public class JiraIntegrationDao extends AccountsContextDao<JiraIntegration> {
     

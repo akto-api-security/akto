@@ -656,7 +656,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return finalArrList;
     }
 
-    public long fetchEndpointsCount(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections) {
+    public List<Integer> fetchEndpointsCount(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections) {
         List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
         nonHostApiCollectionIds.addAll(deactivatedCollections);
 
@@ -668,7 +668,9 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 hostFilterQ
         );
 
-        long count = SingleTypeInfoDao.instance.count(filterQWithTs);
+//        long count = SingleTypeInfoDao.instance.count(filterQWithTs);
+
+        List<Integer> timeUnitCountMap = new ArrayList<>();
 
         nonHostApiCollectionIds.removeAll(deactivatedCollections);
 
@@ -677,7 +679,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
             pipeline.add(Aggregates.match(Filters.in("apiCollectionId", nonHostApiCollectionIds)));
 
-            BasicDBObject groupedId = 
+            BasicDBObject groupedId =
                 new BasicDBObject("apiCollectionId", "$apiCollectionId")
                 .append("url", "$url")
                 .append("method", "$method");
@@ -685,14 +687,58 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             pipeline.add(Aggregates.match(Filters.gte("startTs", startTimestamp)));
             pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
             pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+
+            long daysBetween = (endTimestamp - startTimestamp) / (24 * 3600);
+
+            if (daysBetween <= 30) {
+                Bson addFieldsStage = Aggregates.addFields(
+                        new Field<>("day", new BasicDBObject("$dateToString",
+                                new BasicDBObject("format", "%Y-%m-%d")
+                                        .append("date", new BasicDBObject("$toDate",
+                                                new BasicDBObject("$multiply", Arrays.asList(
+                                                        new BasicDBObject("$toLong", "$timestamp"), 1000
+                                                ))
+                                        ))
+                        ))
+                );
+                Bson groupStage = Aggregates.group("$day", Accumulators.sum("count", 1));
+                Bson sortStage = Aggregates.sort(new BasicDBObject("_id", 1));
+                pipeline.add(addFieldsStage);
+                pipeline.add(groupStage);
+                pipeline.add(sortStage);
+            } else if (daysBetween <= 210) {
+                addFieldsGroupAndSort(pipeline, "week");
+            } else {
+                addFieldsGroupAndSort(pipeline, "month");
+            }
+
             MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
             while(endpointsCursor.hasNext()) {
-                count += 1;
-                endpointsCursor.next();
+                BasicDBObject doc = endpointsCursor.next();
+                timeUnitCountMap.add(doc.getInt("count"));
             }
+            endpointsCursor.close();
         }
 
-        return count;
+        return timeUnitCountMap;
+    }
+
+    private void addFieldsGroupAndSort(List<Bson> pipeline, String period) {
+        Bson addFieldsStage = Aggregates.addFields(
+                new Field<>(period, new BasicDBObject("$" + period, new BasicDBObject("$toDate",
+                        new BasicDBObject("$multiply", Arrays.asList(
+                                new BasicDBObject("$toLong", "$timestamp"), 1000
+                        ))
+                )))
+        );
+
+        Bson groupStage = Aggregates.group("$" + period, Accumulators.sum("count", 1));
+
+        Bson sortStage = Aggregates.sort(new BasicDBObject("_id", 1));
+
+        pipeline.add(addFieldsStage);
+        pipeline.add(groupStage);
+        pipeline.add(sortStage);
     }
 
     public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections){

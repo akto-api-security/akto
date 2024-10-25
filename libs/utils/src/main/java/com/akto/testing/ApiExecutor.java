@@ -366,7 +366,6 @@ public class ApiExecutor {
 
     private static void calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest, boolean executeScript) {
         if (!executeScript) {
-            loggerMaker.infoAndAddToDb("invalid context for hash calculation, returning");
             return;
         }
         int accountId = Context.accountId.get();
@@ -383,9 +382,10 @@ public class ApiExecutor {
             if (testScript != null && testScript.getJavascript() != null) {
                 script = testScript.getJavascript();
             } else {
-                loggerMaker.infoAndAddToDb("returning from calculateHashAndAddAuth, no test script present");
+                // loggerMaker.infoAndAddToDb("returning from calculateHashAndAddAuth, no test script present");
                 return;
             }
+            loggerMaker.infoAndAddToDb("Starting calculateHashAndAddAuth");
 
             ScriptEngineManager manager = new ScriptEngineManager();
             ScriptEngine engine = manager.getEngineByName("nashorn");

@@ -594,7 +594,7 @@ const transform = {
     return conditions;
   },
   async setTestMetadata() {
-    const resp = await api.fetchAllSubCategories(true, "Dashboard");
+    const resp = await api.fetchAllSubCategories(false, "Dashboard");
     let subCategoryMap = {};
     resp.subCategories.forEach((x) => {
       subCategoryMap[x.name] = x;
@@ -858,7 +858,7 @@ getTestingRunResultUrl(testingResult){
   return methodObj.method + " " + truncatedUrl
   
 },
-getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
+getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
   let auth_type = apiInfo["allAuthTypesFound"].join(", ")
   let access_type = null
   let access_types = apiInfo["apiAccessTypes"]
@@ -896,7 +896,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
   const rowItems = [
     {
       title: 'Severity',
-      value: <Text fontWeight="semibold"><span style={{color: observeFunc.getColor(severity)}}>{severity}</span></Text>,
+      value: isIgnored ? <Text fontWeight="semibold">Ignored</Text> : <Text fontWeight="semibold"><span style={{color: observeFunc.getColor(severity)}}>{severity}</span></Text>,
       tooltipContent: "Severity of the test run result"
     },
     {

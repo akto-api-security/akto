@@ -31,6 +31,8 @@ import com.akto.dto.*;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
+import com.akto.dto.Config.AzureConfig;
+import com.akto.dto.Config.ConfigType;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.User.AktoUIMode;
 import com.akto.dto.data_types.Conditions;
@@ -43,11 +45,13 @@ import com.akto.dto.events.EventsMetrics;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.notifications.CustomWebhook.WebhookOptions;
+import com.akto.dto.notifications.CustomWebhook.WebhookType;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.settings.DefaultPayload;
+import com.akto.dto.sso.SAMLConfig;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.*;
@@ -107,6 +111,7 @@ import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
 import com.akto.utils.notifications.TrafficUpdates;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.akto.billing.UsageMetricUtils;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
@@ -910,19 +915,33 @@ public class InitializerListener implements ServletContextListener {
 
         boolean sendApiThreats = false;
         List<SuspectSampleData> suspectSampleData = new ArrayList<>();
-        for (WebhookOptions option : webhook.getSelectedWebhookOptions()) {
-            if (WebhookOptions.API_THREAT_PAYLOADS.equals(option)) {
-                // Fetch one record to see if data exists
-                suspectSampleData = SuspectSampleDataDao.instance.findAll(
-                        Filters.and(
-                                Filters.gte(SuspectSampleData._DISCOVERED, webhook.getLastSentTimestamp()),
-                                Filters.lt(SuspectSampleData._DISCOVERED, now)),
-                        0, 1, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID),
-                        Projections.exclude(SuspectSampleData._SAMPLE));
-                if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
-                    sendApiThreats = true;
+        if (webhook.getSelectedWebhookOptions() != null) {
+            for (WebhookOptions option : webhook.getSelectedWebhookOptions()) {
+                if (WebhookOptions.API_THREAT_PAYLOADS.equals(option)) {
+                    // Fetch one record to see if data exists
+                    suspectSampleData = SuspectSampleDataDao.instance.findAll(
+                            Filters.and(
+                                    Filters.gte(SuspectSampleData._DISCOVERED, webhook.getLastSentTimestamp()),
+                                    Filters.lt(SuspectSampleData._DISCOVERED, now)),
+                            0, 1, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID),
+                            Projections.exclude(SuspectSampleData._SAMPLE));
+                    if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
+                        sendApiThreats = true;
+                    }
+                    break;
                 }
-                break;
+            }
+        } 
+
+        if (webhook.getBody() != null && !sendApiThreats) {
+            suspectSampleData = SuspectSampleDataDao.instance.findAll(
+                    Filters.and(
+                            Filters.gte(SuspectSampleData._DISCOVERED, webhook.getLastSentTimestamp()),
+                            Filters.lt(SuspectSampleData._DISCOVERED, now)),
+                    0, 1, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID),
+                    Projections.exclude(SuspectSampleData._SAMPLE));
+            if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
+                sendApiThreats = webhook.getBody().contains("AKTO.changes_info.apiThreatPayloads");
             }
         }
 
@@ -987,12 +1006,153 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    private static final ObjectMapper mapper = new ObjectMapper();
+    private static String createMicrosoftTeamsWorkflowWebhookPayload(CustomWebhook webhook, Map<String, Object> valueMap){
+        StringBuilder body = new StringBuilder();
+        body.append("{\n" +
+                "    \"type\": \"message\",\n" +
+                "    \"attachments\": [\n" +
+                "        {\n" +
+                "            \"contentType\": \"application/vnd.microsoft.card.adaptive\",\n" +
+                "            \"content\": {\n" +
+                "                \"type\": \"AdaptiveCard\",\n" +
+                "                \"$schema\": \"http://adaptivecards.io/schemas/adaptive-card.json\",\n" +
+                "                \"version\": \"1.5\",\n" +
+                "\"msteams\": { \"width\": \"full\" }," +
+                "                \"body\": [");
+        
+        if (webhook.getSelectedWebhookOptions() != null) {
+            for (WebhookOptions webhookOption : webhook.getSelectedWebhookOptions()) {
+    
+                String replaceString = webhookOption.getOptionReplaceString().substring(2, webhookOption.getOptionReplaceString().length() - 1);
+                String name = webhookOption.getOptionName();
+    
+                Object value = valueMap.get(replaceString);
+                if (value instanceof List) {
+                    body.append("        {\n" +
+                            "            \"type\": \"TextBlock\",\n" +
+                            "            \"text\": \"" + name + "\",\n" +
+                            "            \"wrap\": true\n" +
+                            "        },");
+                    
+                    List<Object> list = (List<Object>) value;
+                    boolean headerAdded = false;
+    
+                    for (Object obj : list) {
+                        Map<String, Object> data = mapper.convertValue(obj, HashMap.class);
+                        
+                        if (!headerAdded) {
+                            // Add the table headers (first row)
+                            body.append("        {\n" +
+                                    "            \"type\": \"Table\",\n" +
+                                    "            \"columns\": [\n");
+    
+                            for (String key : data.keySet()) {
+                                if(key=="id" || key=="sample"){
+                                    continue;
+                                }
+
+                                body.append("                {\"width\": 1},\n");
+                            }
+    
+                            body.append("            ],\n" +
+                                    "            \"rows\": [\n" +
+                                    "                {\n" +
+                                    "                    \"type\": \"TableRow\",\n" +
+                                    "                    \"cells\": [\n");
+    
+                            // Add header row (keys)
+                            for (String key : data.keySet()) {
+                                if(key=="id" || key=="sample"){
+                                    continue;
+                                }
+                                body.append("                        {\n" +
+                                        "                            \"type\": \"TableCell\",\n" +
+                                        "                            \"items\": [\n" +
+                                        "                                {\n" +
+                                        "                                    \"type\": \"TextBlock\",\n" +
+                                        "                                    \"text\": \"" + key + "\",\n" +
+                                        "                                    \"wrap\": true\n" +
+                                        "                                }\n" +
+                                        "                            ]\n" +
+                                        "                        },\n");
+                            }
+    
+                            body.append("                    ]\n" +
+                                    "                },\n");
+    
+                            headerAdded = true;
+                        }
+    
+                        // Add each data row (values)
+                        body.append("                {\n" +
+                                "                    \"type\": \"TableRow\",\n" +
+                                "                    \"cells\": [\n");
+    
+                        for (Entry<String,Object> entry : data.entrySet()) {
+                            if(entry.getKey()=="id" || entry.getKey()=="sample"){
+                                continue;
+                            }
+                            body.append("                        {\n" +
+                                    "                            \"type\": \"TableCell\",\n" +
+                                    "                            \"items\": [\n" +
+                                    "                                {\n" +
+                                    "                                    \"type\": \"TextBlock\",\n" +
+                                    "                                    \"text\": \"" + entry.getValue() + "\",\n" +
+                                    "                                    \"wrap\": true\n" +
+                                    "                                }\n" +
+                                    "                            ]\n" +
+                                    "                        },\n");
+                        }
+    
+                        body.append("                    ]\n" +
+                                "                },\n");
+                    }
+    
+                    // Close the table structure
+                    body.append("            ]\n" +
+                            "        },\n");
+                    
+                } else {
+                    body.append("        {\n" +
+                            "            \"type\": \"TextBlock\",\n" +
+                            "            \"text\": \"" + name + "\",\n" +
+                            "            \"wrap\": true\n" +
+                            "        },");
+                }
+            }
+        }
+    
+        body.append("]\n" +
+                "            }\n" +
+                "        }\n" +
+                "    ]\n" +
+                "}\n" +
+                "");
+    
+        return body.toString();
+    }
+        
     private static void actuallySendWebhook(CustomWebhook webhook, Map<String, Object> valueMap, int now){
         List<String> errors = new ArrayList<>();
         String payload = null;
 
         try {
-            payload = Utils.replaceVariables(webhook.getBody(), valueMap, false);
+            if(webhook.getWebhookType()!=null && WebhookType.MICROSOFT_TEAMS.equals(webhook.getWebhookType())){
+                if (webhook.getSelectedWebhookOptions() != null && !webhook.getSelectedWebhookOptions().isEmpty()){
+                    // in case the operation is provided but body is not available the we create the
+                    // formatted body
+                    // for Microsoft teams workflow webhooks
+                    payload = createMicrosoftTeamsWorkflowWebhookPayload(webhook, valueMap);
+                } else {
+                    // in case the body is provided, then the data needs to escaped.
+                    // for Microsoft teams workflow webhooks
+                    payload = Utils.replaceVariables(webhook.getBody(), valueMap, true);
+                } 
+            } else {
+                // default case.
+                payload = Utils.replaceVariables(webhook.getBody(), valueMap, false);
+            }
         } catch (Exception e) {
             errors.add("Failed to replace variables");
         }
@@ -2648,6 +2808,45 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void moveAzureSamlConfig(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getMoveAzureSamlToNormalSaml() == 0){
+
+            if(DashboardMode.isOnPremDeployment()){
+                Bson filterQ = Filters.eq(Constants.ID, AzureConfig.CONFIG_ID);
+                Config.AzureConfig azureConfig = (AzureConfig) ConfigsDao.instance.findOne(filterQ);
+                if(azureConfig != null){
+                    String adminEmail = "";
+                    Organization org = OrganizationsDao.instance.findOne(Filters.empty());
+                    if(org == null){
+                        RBAC rbac = RBACDao.instance.findOne(Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN.name()));
+                        User adminUser = UsersDao.instance.findOne(Filters.eq("login", rbac.getUserId()));
+                        adminEmail = adminUser.getLogin();
+                    }else{
+                        adminEmail = org.getAdminEmail();
+                    }
+                    
+                    String domain = "";
+                    if(!adminEmail.isEmpty()){
+                        domain = OrganizationUtils.determineEmailDomain(adminEmail);
+                    }
+
+                    SAMLConfig samlConfig = SAMLConfig.convertAzureConfigToSAMLConfig(azureConfig);
+                    samlConfig.setId("1000000");
+                    samlConfig.setOrganizationDomain(domain);
+                    if(SSOConfigsDao.instance.estimatedDocumentCount() == 0){
+                        SSOConfigsDao.instance.insertOne(samlConfig);
+                    }
+                    ConfigsDao.instance.deleteAll(filterQ);
+                }
+            }
+            
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.MOVE_AZURE_SAML, Context.now())
+            );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
@@ -2677,6 +2876,7 @@ public class InitializerListener implements ServletContextListener {
         makeFirstUserAdmin(backwardCompatibility);
         dropSpecialCharacterApiCollections(backwardCompatibility);
         addDefaultAdvancedFilters(backwardCompatibility);
+        moveAzureSamlConfig(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {

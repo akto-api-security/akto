@@ -70,6 +70,10 @@ public class Executor {
         if (node.getChildNodes().size() < 2) {
             testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "executor child nodes is less than 2, returning empty execution result"));
             loggerMaker.errorAndAddToDb("executor child nodes is less than 2, returning empty execution result " + logId, LogDb.TESTING);
+            /*
+             * Do not store messages in case the execution block is invalid.
+             */
+            invalidExecutionResult.setOriginalMessage(null);
             result.add(invalidExecutionResult);
             yamlTestResult = new YamlTestResult(result, workflowTest);
             return yamlTestResult;
@@ -120,6 +124,7 @@ public class Executor {
                 loggerMaker.infoAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
             }
         }
+        origRawApi = sampleRawApi.copy();
 
         boolean requestSent = false;
 
@@ -199,12 +204,18 @@ public class Executor {
         }
         
         if(result.isEmpty()){
+            String message = rawApi.getOriginalMessage();
             if(requestSent){
                 error_messages.add(TestError.API_REQUEST_FAILED.getMessage());
             } else {
                 error_messages.add(TestError.NO_API_REQUEST.getMessage());
+                /*
+                 * In case no API requests are created,
+                 * do not store the original message
+                 */
+                message = "";
             }
-            result.add(new TestResult(null, rawApi.getOriginalMessage(), error_messages, 0, false, TestResult.Confidence.HIGH, null));
+            result.add(new TestResult(null, message, error_messages, 0, false, TestResult.Confidence.HIGH, null));
         }
 
         yamlTestResult = new YamlTestResult(result, workflowTest);
