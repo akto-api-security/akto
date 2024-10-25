@@ -80,6 +80,8 @@ function LoginForm({ step, setSteps }) {
                         <TextField id={"headers"} label="Headers" value={step.headers} onChange={(headers) => updateForm("headers", headers)} />
                         <br />
                         <TextField id={"body"} label="Body" value={step.body} onChange={(body) => updateForm("body", body)} />
+                        <br />
+                        <TextField id={"regex"} label="Regex" value={step.regex} onChange={(regex) => updateForm("regex", regex)} />
                     </div>
                 </div>
 

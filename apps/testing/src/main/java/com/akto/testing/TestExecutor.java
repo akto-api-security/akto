@@ -388,16 +388,16 @@ public class TestExecutor {
 
             int waitTime = 0;
             WorkflowNodeDetails.Type nodeType = WorkflowNodeDetails.Type.API;
-            if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString())) {
+            if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString()) || data.getUrl().contains("fetchOtpData")) {
                 nodeType = WorkflowNodeDetails.Type.OTP;
                 if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
-                    waitTime = 60;
+                    waitTime = 20;
                 }
+                data.setOtpRefUuid(data.getUrl().substring(data.getUrl().lastIndexOf('/') + 1));
             }
             if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.RECORDED_FLOW.toString())) {
                 nodeType = WorkflowNodeDetails.Type.RECORDED;
             }
-
             WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),
                     URLMethods.Method.fromString(data.getMethod()), "", sampleData, nodeType,
                     true, waitTime, 0, 0, data.getRegex(), data.getOtpRefUuid());
