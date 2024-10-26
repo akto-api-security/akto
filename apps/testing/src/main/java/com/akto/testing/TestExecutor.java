@@ -390,9 +390,7 @@ public class TestExecutor {
             WorkflowNodeDetails.Type nodeType = WorkflowNodeDetails.Type.API;
             if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString()) || data.getUrl().contains("fetchOtpData")) {
                 nodeType = WorkflowNodeDetails.Type.OTP;
-                if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
-                    waitTime = 20;
-                }
+                waitTime = 20;
                 data.setOtpRefUuid(data.getUrl().substring(data.getUrl().lastIndexOf('/') + 1));
             }
             if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.RECORDED_FLOW.toString())) {

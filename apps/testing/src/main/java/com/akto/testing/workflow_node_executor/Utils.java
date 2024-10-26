@@ -52,7 +52,7 @@ public class Utils {
         BasicDBObject data = new BasicDBObject();
         String message;
 
-        OtpTestData otpTestData = fetchOtpTestData(node, 7);
+        OtpTestData otpTestData = fetchOtpTestData(node, 10);
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
         String uuid = workflowNodeDetails.getOtpRefUuid();
 
