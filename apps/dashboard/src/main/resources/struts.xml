@@ -3900,6 +3900,25 @@
             </result>
         </action>
 
+        <action name="api/fetchTestCoverageData" class="com.akto.action.testing_issues.IssuesAction" method="fetchTestCoverageData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">TEST_RESULTS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/updateIssueStatus" class="com.akto.action.testing_issues.IssuesAction" method="updateIssueStatus">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -6875,23 +6894,6 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS"  type="json">
-            </result>
-        </action>
-
-        <action name="api/fetchAllHistoricalData" class="com.akto.action.DashboardAction" method="fetchAllHistoricalData">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-                <param name="root">historicalData</param>
             </result>
         </action>
         <action name="api/addAdvancedFiltersForTraffic" class="com.akto.action.settings.AdvancedTrafficFiltersAction" method="saveYamlTemplateForTrafficFilters">
