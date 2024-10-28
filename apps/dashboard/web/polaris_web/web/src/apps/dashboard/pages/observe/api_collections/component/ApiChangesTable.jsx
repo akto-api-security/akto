@@ -59,12 +59,9 @@ function ApiChangesTable(props) {
   const fetchData = async() => {
     setLoading(true)
     if(selectedTab.includes('param')){
-      await api.fetchRecentParams(startTimeStamp, endTimeStamp).then((res) => {
+      api.fetchRecentParams(startTimeStamp, endTimeStamp).then((res) => {
         const ret = res.data.endpoints.map((x,index) => transform.prepareEndpointForTable(x,index));
-        setData((prev) => {
-          prev.new_params = ret
-          return prev
-        })
+        setData({new_params: ret, new_endpoints: newEndpoints})
       })
     }else{
       setData((prev) => {
@@ -80,6 +77,7 @@ function ApiChangesTable(props) {
   },[selectedTab, newEndpoints])
 
   const key = selectedTab + startTimeStamp + endTimeStamp
+  console.log("data", data)
 
   return (
     <GithubSimpleTable 

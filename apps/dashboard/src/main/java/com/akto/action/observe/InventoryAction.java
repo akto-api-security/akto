@@ -22,9 +22,6 @@ import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
 import com.akto.util.Constants;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
-import com.google.common.base.Charsets;
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -725,10 +722,9 @@ public class InventoryAction extends UserAction {
         
         Bson useFilter = countApiInfosValid >= countApiInfosInvalid ? Filters.not(apiInfoFilter) : apiInfoFilter;
         List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(useFilter, Projections.include(Constants.ID));
-        BloomFilter<CharSequence> apiInfoHash = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 50_000, 0.001);
-
+        Set<String> apiInfosHash = new HashSet<>();
         for(ApiInfo apiInfo: apiInfos){
-            apiInfoHash.put(apiInfo.getId().toString());
+            apiInfosHash.add(apiInfo.getId().toString());
         }
 
         List<Bson> pipeline = new ArrayList<>();
@@ -747,11 +743,11 @@ public class InventoryAction extends UserAction {
             SingleTypeInfo sti = cursor.next();
             ApiInfoKey apiInfoKey = new ApiInfoKey(sti.getApiCollectionId(), sti.getUrl(), Method.fromString(sti.getMethod()));
             if(countApiInfosValid >= countApiInfosInvalid){
-                if(!apiInfoHash.mightContain(apiInfoKey.toString())){
+                if(!apiInfosHash.contains(apiInfoKey.toString())){
                     singleTypeInfos.add(sti);
                 }
             }else{
-                if(apiInfoHash.mightContain(apiInfoKey.toString())){
+                if(apiInfosHash.contains(apiInfoKey.toString())){
                     singleTypeInfos.add(sti);
                 }
             }
