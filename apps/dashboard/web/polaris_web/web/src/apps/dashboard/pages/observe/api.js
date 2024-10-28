@@ -25,6 +25,16 @@ export default {
         })
         return resp.response.data
     },
+    fetchRecentParams(startTimestamp, endTimestamp){
+        return request({
+            url: '/api/fetchRecentParams',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
     async fetchDataTypeNames() {
         const resp = await request({
             url: '/api/fetchDataTypeNames',

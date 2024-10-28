@@ -22,6 +22,9 @@ import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
 import com.akto.util.Constants;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
+import com.google.common.base.Charsets;
+import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -710,6 +713,51 @@ public class InventoryAction extends UserAction {
 
         response.put("data", new BasicDBObject("endpoints", singleTypeInfos ).append("total", totalParams));
 
+        return Action.SUCCESS.toUpperCase();
+    }
+    public String fetchRecentParams (){
+
+        // ignore time for new params detection {15 days}
+        Bson apiInfoFilter = Filters.lt(ApiInfo.DISCOVERED_TIMESTAMP, this.startTimestamp - (Utils.DELTA_PERIOD_VALUE/4));
+
+        long countApiInfosValid = ApiInfoDao.instance.count(apiInfoFilter);
+        long countApiInfosInvalid = ApiInfoDao.instance.count(Filters.not(apiInfoFilter));
+        
+        Bson useFilter = countApiInfosValid >= countApiInfosInvalid ? Filters.not(apiInfoFilter) : apiInfoFilter;
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(useFilter, Projections.include(Constants.ID));
+        BloomFilter<CharSequence> apiInfoHash = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 50_000, 0.001);
+
+        for(ApiInfo apiInfo: apiInfos){
+            apiInfoHash.put(apiInfo.getId().toString());
+        }
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
+        pipeline.add(Aggregates.match(
+            Filters.and(
+                Filters.gte(SingleTypeInfo._TIMESTAMP, this.startTimestamp),
+                Filters.lte(SingleTypeInfo._TIMESTAMP, this.endTimestamp)
+            )
+        ));
+        pipeline.add(Aggregates.project(Projections.exclude(SingleTypeInfo._VALUES)));
+        List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
+
+        MongoCursor<SingleTypeInfo> cursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, SingleTypeInfo.class).cursor();
+        while (cursor.hasNext()) {
+            SingleTypeInfo sti = cursor.next();
+            ApiInfoKey apiInfoKey = new ApiInfoKey(sti.getApiCollectionId(), sti.getUrl(), Method.fromString(sti.getMethod()));
+            if(countApiInfosValid >= countApiInfosInvalid){
+                if(!apiInfoHash.mightContain(apiInfoKey.toString())){
+                    singleTypeInfos.add(sti);
+                }
+            }else{
+                if(apiInfoHash.mightContain(apiInfoKey.toString())){
+                    singleTypeInfos.add(sti);
+                }
+            }
+        }
+        response = new BasicDBObject();
+        response.put("data", new BasicDBObject("endpoints", singleTypeInfos ));
         return Action.SUCCESS.toUpperCase();
     }
 
