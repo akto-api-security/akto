@@ -1121,9 +1121,7 @@ public class APICatalogSync {
 
                 String endpoint = url.getUrl();
                 if(makeApisCaseInsensitive){
-                    URLStatic tempStatic = new URLStatic(endpoint.toLowerCase(), url.getMethod());
-                    boolean containsInDbCatalog = dbCatalog.getStrictURLToMethods().containsKey(tempStatic);
-                    if(lowerCaseApisSet.contains(endpoint.toLowerCase()) || containsInDbCatalog){
+                    if(lowerCaseApisSet.contains(endpoint.toLowerCase())){
                         iterator.remove();
                         continue;
                     }
