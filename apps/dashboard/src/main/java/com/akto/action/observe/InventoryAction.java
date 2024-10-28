@@ -77,7 +77,6 @@ public class InventoryAction extends UserAction {
 
     long newCount = 0;
     long oldCount = 0;
-    List<Integer> endpointsCountDayWise;
     public String fetchEndpointsCount() {
         if (endTimestamp == 0) endTimestamp = Context.now();
 
@@ -88,8 +87,9 @@ public class InventoryAction extends UserAction {
 
         ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
         if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
-
-        endpointsCountDayWise = SingleTypeInfoDao.instance.fetchEndpointsCount(startTimestamp, endTimestamp, demoCollections);
+        
+        newCount = SingleTypeInfoDao.instance.fetchEndpointsCount(0, endTimestamp, demoCollections);
+        oldCount = SingleTypeInfoDao.instance.fetchEndpointsCount(0, startTimestamp, demoCollections);
         return SUCCESS.toUpperCase();
     }
 
@@ -994,9 +994,5 @@ public class InventoryAction extends UserAction {
 
     public void setSearchString(String searchString) {
         this.searchString = searchString;
-    }
-
-    public List<Integer> getEndpointsCountDayWise() {
-        return endpointsCountDayWise;
     }
 }
