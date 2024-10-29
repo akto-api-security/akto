@@ -1,4 +1,4 @@
-import { Card, Divider, HorizontalStack, Text, VerticalStack } from "@shopify/polaris"
+import { Card, Divider, Text, VerticalStack } from "@shopify/polaris"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { useEffect, useReducer, useState } from "react";
 import api from "../api";
@@ -22,12 +22,12 @@ function ApiChanges() {
     const allCollections = PersistStore(state => state.allCollections);
     const collectionsMap = PersistStore(state => state.collectionsMap);
     const [newEndpoints, setNewEndpoints] = useState({prettify: [], normal: []})
-    const [newParametersCount, setNewParametersCount] = useState(0)
     const [parametersTrend, setParametersTrend] = useState([])
     const [sensitiveParams, setSensitiveParams] = useState([])
     const [loading, setLoading] = useState(true);
     const [apiDetail, setApiDetail] = useState({})
     const [tableHeaders,setTableHeaders] = useState([])
+    const [newParams, setNewParams] = useState([])
 
     const location = useLocation()
     const showDetails = ObserveStore(state => state.inventoryFlyout)
@@ -78,7 +78,6 @@ function ApiChanges() {
         apiInfoList = endpointsFromApiInfos.apiInfoList
 
         const trendObj = transform.findNewParametersCountTrend(parametersResp, startTimestamp, endTimestamp)
-        setNewParametersCount(trendObj.count)
         setParametersTrend(trendObj.trend)
 
         let data = func.mergeApiInfoAndApiCollection(apiCollection, apiInfoList, collectionsMap);
@@ -94,6 +93,11 @@ function ApiChanges() {
             data = func.mergeApiInfoAndApiCollection(apiCollection, apiInfoList, collectionsMap);
             prettifiedData = transform.prettifyEndpointsData(data)
             setNewEndpoints({prettify: prettifiedData, normal: data});
+        })
+
+        await api.fetchRecentParams(startTimestamp, endTimestamp).then((res) => {
+            const ret = res.data.endpoints.map((x,index) => transform.prepareEndpointForTable(x,index));
+            setNewParams(ret)
         })
     }
 
@@ -116,7 +120,7 @@ function ApiChanges() {
         },
         {
             title: "New parameters",
-            data: transform.formatNumberWithCommas(newParametersCount)
+            data: transform.formatNumberWithCommas(newParams.length)
         },
         {
             title: "New sensitive parameters",
@@ -133,9 +137,9 @@ function ApiChanges() {
             startTimeStamp={startTimestamp}
             endTimeStamp={endTimestamp}
             newEndpoints={newEndpoints.prettify}
-            parametersCount={newParametersCount}
             key="table"
             tab={(location.state)?(location.state.tab):0 }
+            newParams={newParams}
         />
     )
 
@@ -164,7 +168,7 @@ function ApiChanges() {
             {
                 data: parametersTrend,
                 color: "#fca130",
-                name: "New parameters"
+                name: "Parameters detected"
             }
         ]
     }

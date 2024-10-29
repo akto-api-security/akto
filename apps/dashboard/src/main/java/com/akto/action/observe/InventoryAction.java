@@ -712,6 +712,50 @@ public class InventoryAction extends UserAction {
 
         return Action.SUCCESS.toUpperCase();
     }
+    public String fetchRecentParams (){
+
+        // ignore time for new params detection {15 days}
+        Bson apiInfoFilter = Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, this.startTimestamp - (Utils.DELTA_PERIOD_VALUE/4));
+
+        long totalCount = ApiInfoDao.instance.estimatedDocumentCount();
+        long countApiInfosInvalid = ApiInfoDao.instance.count(apiInfoFilter);
+        
+        Bson useFilter = totalCount >= (2 * countApiInfosInvalid) ? apiInfoFilter : Filters.lt(ApiInfo.DISCOVERED_TIMESTAMP, this.startTimestamp - (Utils.DELTA_PERIOD_VALUE/4));
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(useFilter, 0, 10000, Sorts.descending(ApiInfo.DISCOVERED_TIMESTAMP), Projections.include(Constants.ID));
+        Set<String> apiInfosHash = new HashSet<>();
+        for(ApiInfo apiInfo: apiInfos){
+            apiInfosHash.add(apiInfo.getId().toString());
+        }
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
+        pipeline.add(Aggregates.match(
+            Filters.and(
+                Filters.gte(SingleTypeInfo._TIMESTAMP, this.startTimestamp),
+                Filters.lte(SingleTypeInfo._TIMESTAMP, this.endTimestamp)
+            )
+        ));
+        pipeline.add(Aggregates.project(Projections.exclude(SingleTypeInfo._VALUES)));
+        List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
+
+        MongoCursor<SingleTypeInfo> cursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, SingleTypeInfo.class).cursor();
+        while (cursor.hasNext()) {
+            SingleTypeInfo sti = cursor.next();
+            ApiInfoKey apiInfoKey = new ApiInfoKey(sti.getApiCollectionId(), sti.getUrl(), Method.fromString(sti.getMethod()));
+            if(totalCount >= (2 * countApiInfosInvalid)){
+                if(!apiInfosHash.contains(apiInfoKey.toString())){
+                    singleTypeInfos.add(sti);
+                }
+            }else{
+                if(apiInfosHash.contains(apiInfoKey.toString())){
+                    singleTypeInfos.add(sti);
+                }
+            }
+        }
+        response = new BasicDBObject();
+        response.put("data", new BasicDBObject("endpoints", singleTypeInfos ));
+        return Action.SUCCESS.toUpperCase();
+    }
 
     public String fetchSubTypeCountMap() {
         Map<String,Map<String, Integer>> subTypeCountMap = buildSubTypeCountMap(startTimestamp, endTimestamp);
