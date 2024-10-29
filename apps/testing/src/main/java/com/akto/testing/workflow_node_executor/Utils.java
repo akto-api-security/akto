@@ -52,7 +52,7 @@ public class Utils {
         BasicDBObject data = new BasicDBObject();
         String message;
 
-        OtpTestData otpTestData = fetchOtpTestData(node, 4);
+        OtpTestData otpTestData = fetchOtpTestData(node, 10);
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
         String uuid = workflowNodeDetails.getOtpRefUuid();
 
@@ -257,8 +257,20 @@ public class Utils {
             JSONObject respString = new JSONObject();
             Map<String, Map<String, Object>> json = gson.fromJson(nodeResult.getMessage(), Map.class);
 
-            respString.put("headers", json.get("response").get("headers"));
-            respString.put("body", json.get("response").get("body"));
+            if (json.get("response").get("headers") != null) {
+                String jsonString = gson.toJson(json.get("response").get("headers"));
+                respString.put("headers", jsonString);
+            } else {
+                String hStr = "{}";
+                respString.put("headers", hStr);
+            }
+            if (json.get("response").get("body") != null) {
+                String jsonString = gson.toJson(json.get("response").get("body"));
+                respString.put("body", jsonString);
+            } else {
+                respString.put("body", json.get("response").get("body"));
+            }
+            // respString.put("body", json.get("response").get("body").toString());
             responses.add(respString.toString());
             
             if (nodeResult.getErrors().size() > 0) {

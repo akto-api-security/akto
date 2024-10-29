@@ -173,7 +173,7 @@ public class Main {
 
         Bson filter2 = Filters.and(
             Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5*60),
+            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 20*60),
             Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
         );
 

@@ -368,7 +368,6 @@ public class ApiExecutor {
         if (!executeScript) {
             return;
         }
-        loggerMaker.infoAndAddToDb("Starting calculateHashAndAddAuth");
         int accountId = Context.accountId.get();
         try {
             String script;
@@ -383,9 +382,10 @@ public class ApiExecutor {
             if (testScript != null && testScript.getJavascript() != null) {
                 script = testScript.getJavascript();
             } else {
-                loggerMaker.infoAndAddToDb("returning from calculateHashAndAddAuth, no test script present");
+                // loggerMaker.infoAndAddToDb("returning from calculateHashAndAddAuth, no test script present");
                 return;
             }
+            loggerMaker.infoAndAddToDb("Starting calculateHashAndAddAuth");
 
             ScriptEngineManager manager = new ScriptEngineManager();
             ScriptEngine engine = manager.getEngineByName("nashorn");
@@ -483,7 +483,12 @@ public class ApiExecutor {
 
         if (payload == null) payload = "";
         if (body == null) {// body not created by GRPC block yet
-            body = RequestBody.create(payload, MediaType.parse(contentType));
+            if (request.getHeaders().containsKey("charset")) {
+                body = RequestBody.create(payload, null);
+                request.getHeaders().remove("charset");
+            } else {
+                body = RequestBody.create(payload, MediaType.parse(contentType));
+            }
         }
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
