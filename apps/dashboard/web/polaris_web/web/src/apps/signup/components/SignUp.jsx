@@ -1,4 +1,4 @@
-import { Button, Form,  HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Button, Form,  HorizontalStack, Modal, Text, TextField, VerticalStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import SSOTextfield from './SSOTextfield'
 import PasswordTextField from '../../dashboard/components/layouts/PasswordTextField'
@@ -282,6 +282,7 @@ function SignUp() {
         {ssoCard}
         {!func.checkLocal() ? <SSOTextfield onClickFunc={() => window.location.href="/sign-in-with-sso"} logos={['/public/azure_logo.svg', '/public/gcp.svg']} text={"Sign in with SSO"} /> : null}
         {signupEmailCard}
+        {loginActive && isOnPrem && resetPasswordComp}
       </VerticalStack>
     </VerticalStack>
   )
