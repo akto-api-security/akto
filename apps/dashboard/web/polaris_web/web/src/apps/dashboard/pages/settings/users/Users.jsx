@@ -67,6 +67,10 @@ const Users = () => {
         }
     ] : []
 
+    const websiteHostName = window.location.origin
+    const notOnPremHostnames = ["app.akto.io", "localhost", "127.0.0.1", "[::1]"]
+    const isOnPrem = websiteHostName && !notOnPremHostnames.includes(window.location.hostname)
+
     const rolesOptions = [
         {
             items: [
@@ -81,7 +85,7 @@ const Users = () => {
         },
         {
             items: [
-                {
+                isOnPrem && {
                     destructive: false,
                     content: 'Reset Password',
                     role: 'RESET_PASSWORD',

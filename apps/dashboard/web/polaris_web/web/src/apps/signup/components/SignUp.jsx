@@ -148,6 +148,10 @@ function SignUp() {
     await api.sendPasswordResetLink(email).then((resp) => {
       func.setToast(true, false, "Reset password link has been sent!")
     }).catch((error) => {
+      if(error?.code === "ERR_NETWORK") {
+        func.setToast(true, true, "Unable to send email. Please contact your account admin to reset your password.")
+        return
+      }
       const errorMessage = error?.response?.data || "Reset password link has been sent!"
       const errorStatus = error?.response?.data !== undefined && error?.response?.data.length > 0
       func.setToast(true, errorStatus, errorMessage)
@@ -255,7 +259,7 @@ function SignUp() {
       <Form onSubmit={loginFunc}>
         <VerticalStack gap={4}>
           <div className='form-class'>
-            <TextField onChange={setEmail} inputMode='email' value={email} label="Email" placeholder="name@workemail.com" monospaced={true}/>
+            <TextField onChange={setEmail} inputMode='email' value={forgotPasswordState.isForgotPasswordActive ? "" : email} label="Email" placeholder="name@workemail.com" monospaced={true}/>
           </div>
           <div className='form-class'>
             <PasswordTextField setField={(val) => setPassword(val)} onFunc={true} field={password} label="Password" monospaced={true}/>

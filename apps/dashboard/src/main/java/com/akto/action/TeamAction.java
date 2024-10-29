@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
+
 public class TeamAction extends UserAction implements ServletResponseAware, ServletRequestAware {
 
     int id;
@@ -229,8 +231,8 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
 
         int lastPasswordResetToken = forgotPasswordUser.getLastPasswordResetToken();
         int timeElapsed = Context.now() - lastPasswordResetToken;
-        if(timeElapsed < 1800) {
-            int remainingTime = (1800 - timeElapsed) / 60;
+        if(timeElapsed < TWO_HOURS_TIMESTAMP) {
+            int remainingTime = (TWO_HOURS_TIMESTAMP - timeElapsed) / 60;
             addActionError("Please wait " + remainingTime + " minute" + (remainingTime > 1 ? "s" : "") + " for another password reset.");
             return Action.ERROR.toUpperCase();
         }

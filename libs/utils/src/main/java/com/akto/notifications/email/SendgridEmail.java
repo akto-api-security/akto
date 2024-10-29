@@ -125,9 +125,9 @@ public class SendgridEmail {
         content.setValue("Hello,");
         mail.addContent(content);
 
-        mail.setTemplateId(""); // TODO("Replace with actual template ID")
+        mail.setTemplateId("d-266210cb361b4b659289a72aef04edfa");
 
-        personalization.addDynamicTemplateData("resetUrl", passwordResetTokenUrl);
+        personalization.addDynamicTemplateData("aktoUrl", passwordResetTokenUrl);
         personalization.addDynamicTemplateData("supportEmail", "support@akto.io");
 
         return mail;

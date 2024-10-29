@@ -43,6 +43,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
+import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
 
 // Validates user from the supplied username and password
 // Generates refresh token jwt using the username if valid user
@@ -265,7 +266,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         }
 
         int lastPasswordResetToken = user.getLastPasswordResetToken();
-        if(Context.now() - lastPasswordResetToken < 1800) {
+        if(Context.now() - lastPasswordResetToken < TWO_HOURS_TIMESTAMP) {
             return Action.ERROR.toUpperCase();
         }
 
@@ -324,7 +325,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         }
 
         int getLastPasswordResetToken = user.getLastPasswordResetToken();
-        if(Context.now() - getLastPasswordResetToken > 1800) {
+        if(Context.now() - getLastPasswordResetToken > TWO_HOURS_TIMESTAMP) {
             code = "Token is expired or invalid.";
             return Action.ERROR.toUpperCase();
         }
