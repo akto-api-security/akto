@@ -715,13 +715,13 @@ public class InventoryAction extends UserAction {
     public String fetchRecentParams (){
 
         // ignore time for new params detection {15 days}
-        Bson apiInfoFilter = Filters.lt(ApiInfo.DISCOVERED_TIMESTAMP, this.startTimestamp - (Utils.DELTA_PERIOD_VALUE/4));
+        Bson apiInfoFilter = Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, this.startTimestamp - (Utils.DELTA_PERIOD_VALUE/4));
 
-        long countApiInfosValid = ApiInfoDao.instance.count(apiInfoFilter);
-        long countApiInfosInvalid = ApiInfoDao.instance.count(Filters.not(apiInfoFilter));
+        long totalCount = ApiInfoDao.instance.estimatedDocumentCount();
+        long countApiInfosInvalid = ApiInfoDao.instance.count(apiInfoFilter);
         
-        Bson useFilter = countApiInfosValid >= countApiInfosInvalid ? Filters.not(apiInfoFilter) : apiInfoFilter;
-        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(useFilter, Projections.include(Constants.ID));
+        Bson useFilter = totalCount >= (2 * countApiInfosInvalid) ? apiInfoFilter : Filters.lt(ApiInfo.DISCOVERED_TIMESTAMP, this.startTimestamp - (Utils.DELTA_PERIOD_VALUE/4));
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(useFilter, 0, 10000, Sorts.descending(ApiInfo.DISCOVERED_TIMESTAMP), Projections.include(Constants.ID));
         Set<String> apiInfosHash = new HashSet<>();
         for(ApiInfo apiInfo: apiInfos){
             apiInfosHash.add(apiInfo.getId().toString());
@@ -742,7 +742,7 @@ public class InventoryAction extends UserAction {
         while (cursor.hasNext()) {
             SingleTypeInfo sti = cursor.next();
             ApiInfoKey apiInfoKey = new ApiInfoKey(sti.getApiCollectionId(), sti.getUrl(), Method.fromString(sti.getMethod()));
-            if(countApiInfosValid >= countApiInfosInvalid){
+            if(totalCount >= (2 * countApiInfosInvalid)){
                 if(!apiInfosHash.contains(apiInfoKey.toString())){
                     singleTypeInfos.add(sti);
                 }

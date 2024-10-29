@@ -3,14 +3,13 @@ import transform from '../../transform';
 import apiChangesData from '../data/apiChanges';
 import PersistStore from '../../../../../main/PersistStore';
 import func from '@/util/func';
-import api from '../../api';
 import { IndexFiltersMode } from '@shopify/polaris';
 import useTable from '../../../../components/tables/TableContext';
 import GithubSimpleTable from '../../../../components/tables/GithubSimpleTable';
 
 function ApiChangesTable(props) {
 
-  const { handleRowClick, tableLoading, startTimeStamp, endTimeStamp, newEndpoints } = props ;
+  const { handleRowClick, tableLoading, startTimeStamp, endTimeStamp, newEndpoints, newParams } = props ;
   const [selectedTab, setSelectedTab] = useState("new_endpoints") ;
   const [selected, setSelected] = useState(0) ;
   const apiCollectionMap = PersistStore(state => state.collectionsMap)
@@ -58,23 +57,13 @@ function ApiChangesTable(props) {
 
   const fetchData = async() => {
     setLoading(true)
-    if(selectedTab.includes('param')){
-      api.fetchRecentParams(startTimeStamp, endTimeStamp).then((res) => {
-        const ret = res.data.endpoints.map((x,index) => transform.prepareEndpointForTable(x,index));
-        setData({new_params: ret, new_endpoints: newEndpoints})
-      })
-    }else{
-      setData((prev) => {
-        prev.new_endpoints = newEndpoints
-        return prev
-      })
-    }
+    setData({new_params: newParams, new_endpoints: newEndpoints})
     setLoading(false)
   }
 
   useEffect(()=>{
     fetchData()
-  },[selectedTab, newEndpoints])
+  },[newEndpoints, newParams])
 
   const key = selectedTab + startTimeStamp + endTimeStamp
 
