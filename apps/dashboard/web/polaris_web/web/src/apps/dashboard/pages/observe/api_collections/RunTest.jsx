@@ -100,7 +100,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         })
         testRoles.unshift({"label": "No test role selected", "value": ""})
         setTestRolesArr(testRoles)
-        const businessLogicSubcategories = allSubCategoriesResponse.subCategories
+
+        const customOnly =  allSubCategoriesResponse.subCategories.filter((x) => x.author !== 'AKTO')
+        const aktoOnly = allSubCategoriesResponse.subCategories.filter((x) => x.author === 'AKTO')
+        aktoOnly.sort((a,b)=>{
+            return a.updatedTs - b.updatedTs
+        })
+
+        const businessLogicSubcategories = func.checkLocal() ? [...customOnly, ...aktoOnly.slice(0, aktoOnly.length - 200)] : allSubCategoriesResponse.subCategories
         const categories = allSubCategoriesResponse.categories
         const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(businessLogicSubcategories)
         // Store all tests

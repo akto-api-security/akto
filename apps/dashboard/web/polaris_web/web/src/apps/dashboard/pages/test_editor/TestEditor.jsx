@@ -18,6 +18,7 @@ import { learnMoreObject } from "../../../main/onboardingData"
 import LearnPopoverComponent from "../../components/layouts/LearnPopoverComponent"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import LocalStore from "../../../main/LocalStorageStore"
+import func from "@/util/func"
 
 const TestEditor = () => {
     const navigate = useNavigate()
@@ -48,7 +49,13 @@ const TestEditor = () => {
                     subCategoryMap[x.name] = x;
                 });
                 setSubCategoryMap(subCategoryMap);
-                const obj = convertFunc.mapCategoryToSubcategory(allSubCategoriesResponse.subCategories)
+                const customOnly =  allSubCategoriesResponse.subCategories.filter((x) => x.author !== 'AKTO')
+                const aktoOnly = allSubCategoriesResponse.subCategories.filter((x) => x.author === 'AKTO')
+                aktoOnly.sort((a,b)=>{
+                    return a.updatedTs - b.updatedTs
+                })
+                const finalArr = func.checkLocal() ? [...customOnly, ...aktoOnly.slice(0, aktoOnly.length - 200)] : allSubCategoriesResponse.subCategories
+                const obj = convertFunc.mapCategoryToSubcategory(finalArr)
                 setTestsObj(obj)
     
                 const testName = obj.mapIdtoTest[testId]
