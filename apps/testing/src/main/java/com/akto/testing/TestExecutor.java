@@ -216,14 +216,9 @@ public class TestExecutor {
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
         String hostName;
-        for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
-            TestConfig testConfig = testConfigMap.get(testSubCategory);
-            if (testConfig == null) {
-                continue;
-            }
-            Map<String, Object> wordListsMap = (Map) testConfig.getWordlists();
-            //VariableResolver.resolveWordList(wordListsMap, testingUtil.getSampleMessageStore().getSampleDataMap(), ap);
-        }
+
+        loggerMaker.infoAndAddToDb("Started filling hostname map with categories at :" + Context.now());
+        int timeNow = Context.now();
         for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
             TestConfig testConfig = testConfigMap.get(testSubCategory);
             if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
@@ -235,6 +230,9 @@ public class TestExecutor {
                     if (hostName == null) {
                         continue;
                     }
+                    if(hostsToApiCollectionMap.get(hostName) == null) {
+                        hostsToApiCollectionMap.put(hostName, apiInfoKey.getApiCollectionId());
+                    }
                     apiInfoKeyToHostMap.put(apiInfoKey, hostName);
                     subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, hostName);
                 } catch (URISyntaxException e) {
@@ -242,18 +240,11 @@ public class TestExecutor {
                 }
             }
         }
+        loggerMaker.infoAndAddToDb("Completed filling hostname map with categories in :" + (Context.now() - timeNow));
 
         final int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); // if nothing specified wait for 30 minutes
 
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
-            try {
-                hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
-                if (hostName != null && hostsToApiCollectionMap.get(hostName) == null) {
-                    hostsToApiCollectionMap.put(hostName, apiInfoKey.getApiCollectionId());
-                }
-            } catch (URISyntaxException e) {
-                loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
-            }
             try {
                  Future<Void> future = threadPool.submit(
                          () -> startWithLatch(apiInfoKey,
@@ -408,16 +399,14 @@ public class TestExecutor {
 
             int waitTime = 0;
             WorkflowNodeDetails.Type nodeType = WorkflowNodeDetails.Type.API;
-            if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString())) {
+            if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString()) || data.getUrl().contains("fetchOtpData")) {
                 nodeType = WorkflowNodeDetails.Type.OTP;
-                if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
-                    waitTime = 60;
-                }
+                waitTime = 20;
+                data.setOtpRefUuid(data.getUrl().substring(data.getUrl().lastIndexOf('/') + 1));
             }
             if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.RECORDED_FLOW.toString())) {
                 nodeType = WorkflowNodeDetails.Type.RECORDED;
             }
-
             WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),
                     URLMethods.Method.fromString(data.getMethod()), "", sampleData, nodeType,
                     true, waitTime, 0, 0, data.getRegex(), data.getOtpRefUuid());
@@ -572,7 +561,7 @@ public class TestExecutor {
         for (String testSubCategory: testSubCategories) {
             loggerMaker.infoAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(testRunResultSummaryId) );
             if(GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId, true)){
-                loggerMaker.infoAndAddToDb("Entered tests for api.");
+                loggerMaker.infoAndAddToDb("Entered tests for api: " + apiInfoKey.toString() + " : " + testSubCategory);
                 if (Context.now() - startTime > timeToKill) {
                     loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
                     return;
@@ -582,7 +571,7 @@ public class TestExecutor {
                 TestConfig testConfig = testConfigMap.get(testSubCategory);
                 
                 if (testConfig == null) {
-                    loggerMaker.infoAndAddToDb("Found testing config null.");
+                    loggerMaker.infoAndAddToDb("Found testing config null: " + apiInfoKey.toString() + " : " + testSubCategory);
                     continue;
                 }
                 TestingRunResult testingRunResult = null;
@@ -673,6 +662,7 @@ public class TestExecutor {
         List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
         if (messages == null || messages.isEmpty()){
             List<GenericTestResult> testResults = new ArrayList<>();
+            loggerMaker.infoAndAddToDb("Skipping test, messages empty: "  + apiInfoKey.toString(), LogDb.TESTING);
             testResults.add(new TestResult(null, null, Collections.singletonList(TestError.NO_PATH.getMessage()),0, false, Confidence.HIGH, null));
             return new TestingRunResult(
                 testRunId, apiInfoKey, testSuperType, testSubType ,testResults,
@@ -690,6 +680,7 @@ public class TestExecutor {
             boolean isGraphQlPayload = filterGraphQlPayload(rawApi, apiInfoKey);
             if (isGraphQlPayload) testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "GraphQL payload found"));
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Exception in filterGraphQlPayload: " + e.getMessage());
             testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, e.getMessage()));
         }
 
