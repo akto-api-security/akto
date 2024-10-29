@@ -77,7 +77,6 @@ function ApiChangesTable(props) {
   },[selectedTab, newEndpoints])
 
   const key = selectedTab + startTimeStamp + endTimeStamp
-  console.log("data", data)
 
   return (
     <GithubSimpleTable 
