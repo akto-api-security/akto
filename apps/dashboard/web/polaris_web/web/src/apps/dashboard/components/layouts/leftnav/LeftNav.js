@@ -106,10 +106,10 @@ export default function LeftNav(){
                     label: 'Active Testing',
                     onClick: ()=>{
                       navigate('/dashboard/testing/active-testing')
-                      handleSelect('dashboard_active_testing')
+                      handleSelect('dashboard_testing_active_testing')
                       setActive('active')
                     },
-                    selected: leftNavSelected === 'dashboard_active_testing'
+                    selected: leftNavSelected === 'dashboard_testing_active_testing'
                   },
                   {
                     label: 'Results',
@@ -137,6 +137,15 @@ export default function LeftNav(){
                       setActive('active')
                     },
                     selected: leftNavSelected === 'dashboard_testing_user_config'
+                  },
+                  {
+                    label: 'Test Suite',
+                    onClick: ()=>{
+                      navigate('/dashboard/testing/test-suite')
+                      handleSelect('dashboard_testing_test_suite')
+                      setActive('active')
+                    },
+                    selected: leftNavSelected === 'dashboard_testing_test_suite'
                   }
                 ],
                 key: '4',

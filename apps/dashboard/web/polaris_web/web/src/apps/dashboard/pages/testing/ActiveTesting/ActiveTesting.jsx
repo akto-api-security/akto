@@ -70,12 +70,16 @@ const ActiveTesting = () => {
     return func.convertToDisambiguateLabelObj(value, null, 3)
   }
 
+  const handleOnRunTest = (event, collectionId) => {
+    event.stopPropagation()
+  }
+
   const fetchActiveTestingData = () => {
     let temp = {}
     temp.allTemplates = [
-      {id: 0, templateName: <Text fontWeight='semibold'>Juice Shop 01</Text>, totalEndpoints: 50, testCoverage: 1, testRawCoverage: "1%", categoriesCovered: <HorizontalStack gap={2}><Badge>BOLA</Badge> <Badge>BUA</Badge></HorizontalStack>, categoriesCoveredRaw: ["BOLA", "BUA"], runTestAction: <Link removeUnderline>Run Test</Link>},
-      {id: 1, templateName: <Text fontWeight='semibold'>Juice Shop 02</Text>, totalEndpoints: 120, testCoverage: 2, testRawCoverage: "2%", categoriesCovered: <HorizontalStack gap={2}><Badge>BOLA</Badge> <Badge>Security misconfig</Badge></HorizontalStack>, categoriesCoveredRaw: ["BOLA", "Security misconfig"], runTestAction: <Link removeUnderline>Run Test</Link>},
-      {id: 2, templateName: <Text fontWeight='semibold'>Juice Shop BOLA</Text>, totalEndpoints: 400, testCoverage: 18, testRawCoverage: "18%", categoriesCovered: <HorizontalStack gap={2}><Badge>SSRF</Badge> <Badge>CSRF</Badge></HorizontalStack>, categoriesCoveredRaw: ["SSRF", "CSRF"], runTestAction: <Link removeUnderline>Run Test</Link>}
+      // {id: 1111111111, templateName: <Text fontWeight='semibold'>Juice Shop 01</Text>, totalEndpoints: 50, testCoverage: 1, testRawCoverage: "1%", categoriesCovered: <HorizontalStack gap={2}><Badge>BOLA</Badge> <Badge>BUA</Badge></HorizontalStack>, categoriesCoveredRaw: ["BOLA", "BUA"], runTestAction: <Link onClick={(e) => handleOnRunTest(e, 1111111111)} removeUnderline>Run Test</Link>},
+      // {id: 1729586938, templateName: <Text fontWeight='semibold'>Juice Shop 02</Text>, totalEndpoints: 120, testCoverage: 2, testRawCoverage: "2%", categoriesCovered: <HorizontalStack gap={2}><Badge>BOLA</Badge> <Badge>Security misconfig</Badge></HorizontalStack>, categoriesCoveredRaw: ["BOLA", "Security misconfig"], runTestAction: <Link onClick={(e) => handleOnRunTest(e, 1729586938)} removeUnderline>Run Test</Link>},
+      // {id: 1729499499, templateName: <Text fontWeight='semibold'>Juice Shop BOLA</Text>, totalEndpoints: 400, testCoverage: 18, testRawCoverage: "18%", categoriesCovered: <HorizontalStack gap={2}><Badge>SSRF</Badge> <Badge>CSRF</Badge></HorizontalStack>, categoriesCoveredRaw: ["SSRF", "CSRF"], runTestAction: <Link onClick={(e) => handleOnRunTest(e, 1729499499)} removeUnderline>Run Test</Link>}
     ]
     setCountMap({allTemplates: temp.allTemplates.length})
     setTemplatesData(temp)
@@ -87,6 +91,11 @@ const ActiveTesting = () => {
 
   const handleClickOnNewTest = () => {
     navigate("/dashboard/testing/new-active-testing")
+  }
+
+  const onRowClick = (data) => {
+    const collectionId = data.id
+    navigate("/dashboard/testing/active-testing/inventory/" + collectionId)
   }
 
   const components = [
@@ -106,6 +115,7 @@ const ActiveTesting = () => {
       useNewRow={true}
       condensedHeight={true}
       hasRowActions={true}
+      onRowClick={onRowClick}
       selectable= {true}
       mode={IndexFiltersMode.Default}
       showFooter={false}
@@ -117,7 +127,7 @@ const ActiveTesting = () => {
         title={
           <TitleWithInfo
             titleText={"Active Testing"}
-            tooltipContent={"See active testing."}
+            tooltipContent={"Create, run, and automate API tests from scratch with customizable settings in just a few clicks."}
           />
         }
         isFirstPage={true}

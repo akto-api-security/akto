@@ -80,6 +80,7 @@ import TeamsWebhook from "../dashboard/pages/settings/integrations/teamsWebhooks
 import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
 import ActiveTesting from "../dashboard/pages/testing/ActiveTesting/ActiveTesting";
 import NewActiveTest from "../dashboard/pages/testing/ActiveTesting/NewActiveTest";
+import TestSuite from "../dashboard/pages/testing/ActiveTesting/TestSuite";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -137,6 +138,14 @@ const router = createBrowserRouter([
               {
                 path:"new-active-testing",
                 element:<NewActiveTest/>
+              },
+              {
+                path: "active-testing/inventory/:apiCollectionId",
+                element: <ApiEndpoints/>
+              },
+              {
+                path: "test-suite",
+                element: <TestSuite/>
               },
             ]
           },

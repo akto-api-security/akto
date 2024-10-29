@@ -147,6 +147,8 @@ function ApiEndpoints(props) {
     const { endpointListFromConditions, sensitiveParamsForQuery, isQueryPage } = props
     const params = useParams()
     const location = useLocation()
+    const currentPath = location.pathname
+    const isFromActiveTest = currentPath.includes("active-testing")
     const apiCollectionId = params.apiCollectionId
     const navigate = useNavigate()
 
@@ -391,6 +393,7 @@ function ApiEndpoints(props) {
     }
 
     function handleRowClick(data) {
+        if(isFromActiveTest) return
         
         let tmp = { ...data, endpointComp: "", sensitiveTagsComp: "" }
         
@@ -714,7 +717,7 @@ function ApiEndpoints(props) {
 
             {isApiGroup &&collectionsObj?.automated !== true ? <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> : null}
 
-            {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null}
+            {isGptActive && !isFromActiveTest ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null}
                     
             <RunTest
                 apiCollectionId={apiCollectionId}
@@ -726,6 +729,10 @@ function ApiEndpoints(props) {
                 selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
             />
         </HorizontalStack>
+    )
+
+    const secondaryActiveTestingActionsComponent = (
+        <Button primary onClick={() => {}}>Run Test</Button>
     )
 
     const handleSelectedTab = (selectedIndex) => {
@@ -847,7 +854,7 @@ function ApiEndpoints(props) {
         useNewRow={true}
         condensedHeight={true}
         tableTabs={tableTabs}
-        selectable={true}
+        selectable={!isFromActiveTest ?? true}
         promotedBulkActions={promotedBulkActions}
         loading={tableLoading || loading}
         setSelectedResourcesForPrimaryAction={setSelectedResourcesForPrimaryAction}
@@ -881,7 +888,7 @@ function ApiEndpoints(props) {
                     learnText={"inventory"}
                     docsUrl={ENDPOINTS_PAGE_DOCS_URL}
                 />] : [
-                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true} /> : null),
+                (!isFromActiveTest && (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true} /> : null),
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
                       <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
@@ -914,8 +921,8 @@ function ApiEndpoints(props) {
                             <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
                         </Box>
                     }
-                    backUrl="/dashboard/observe/inventory"
-                    secondaryActions={secondaryActionsComponent}
+                    backUrl= {isFromActiveTest ? "/dashboard/testing/active-testing" : "/dashboard/observe/inventory"}
+                    secondaryActions={!isFromActiveTest ? secondaryActionsComponent : secondaryActiveTestingActionsComponent}
                     components={components}
                 />
             }
