@@ -184,7 +184,7 @@ function HomeDashboard() {
         const riskScoreRawData = historicalDataResp.map(item => item.riskScore)
 
         observeFunc.setIssuesState(testCoverageRawData, setTestCoverage, setTestCoverageDelta, false)
-        observeFunc.setIssuesState(riskScoreRawData, setRiskScore, setRiskScoreDelta, true)
+        observeFunc.setIssuesState(riskScoreRawData, setRiskScore, setRiskScoreDelta, false)
     }
 
     function generateChangeComponent(val, invertColor) {
