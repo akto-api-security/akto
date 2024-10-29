@@ -17,9 +17,9 @@ const SummaryInfo = ({ startTimestamp, endTimestamp }) => {
 
     const getIssuesGraphData = async () => {
         const issuesGraphDataRes = await api.findTotalIssuesByDay(startTimestamp, endTimestamp)
-        const testCoverageDataRes = await api.fetchAllHistoricalData(startTimestamp, endTimestamp)
+        const testCoverageDataRes = await api.fetchTestCoverageData(startTimestamp, endTimestamp)
         
-        const testCoverageData = testCoverageDataRes.map(item => {
+        const testCoverageData = testCoverageDataRes.historicalData.map(item => {
             const totalCoverageVal = (((100 * item.apisTested) / item.totalApis).toFixed(2))
             return parseFloat(totalCoverageVal)
         })
@@ -68,7 +68,7 @@ const SummaryInfo = ({ startTimestamp, endTimestamp }) => {
             title: 'Test Coverage',
             data: (testCoverage[testCoverage.length-1] || 0).toFixed(2) + "%",
             variant: 'heading2xl',
-            color: (testCoverage[testCoverage.length-1] || 0) > 80 ? 'success' : 'warning',
+            color: 'warning',
             byLineComponent: observeFunc.generateByLineComponent(testCoverageDelta.toFixed(2), func.timeDifference(startTimestamp, endTimestamp)),
             smoothChartComponent: (<SmoothAreaChart tickPositions={testCoverage} />)
         }
