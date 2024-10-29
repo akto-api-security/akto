@@ -145,7 +145,7 @@ function SignUp() {
       <Text alignment="center" variant="heading2xl">{activeObject.headingText}</Text>
       <VerticalStack gap={5}>
         {ssoCard}
-        <SSOTextfield onClickFunc={() => window.location.href="/sign-in-with-sso"} logos={['/public/azure_logo.svg', '/public/gcp.svg']} text={"Sign in with SSO"} />
+        {!func.checkLocal() ? <SSOTextfield onClickFunc={() => window.location.href="/sign-in-with-sso"} logos={['/public/azure_logo.svg', '/public/gcp.svg']} text={"Sign in with SSO"} /> : null}
         {signupEmailCard}
       </VerticalStack>
     </VerticalStack>
