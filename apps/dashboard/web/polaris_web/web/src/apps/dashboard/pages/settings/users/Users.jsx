@@ -1,6 +1,6 @@
-import { ActionList, Avatar, Banner, Box, Button, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text } from "@shopify/polaris"
-import { DeleteMajor, TickMinor } from "@shopify/polaris-icons"
-import { useEffect, useState } from "react";
+import { ActionList, Avatar, Banner, Box, Button, Icon, LegacyCard, Link, Modal, Page, Popover, ResourceItem, ResourceList, Text, TextField } from "@shopify/polaris"
+import { DeleteMajor, TickMinor, PasskeyMajor } from "@shopify/polaris-icons"
+import { useEffect, useRef, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
@@ -23,6 +23,39 @@ const Users = () => {
 
     const [roleSelectionPopup, setRoleSelectionPopup] = useState({})
 
+    const [passwordResetState, setPasswordResetState] = useState({
+        passwordResetLogin: "",
+        confirmPasswordResetActive: false,
+        passwordResetLinkActive: false,
+        passwordResetLink: ""
+    })
+      
+    const setPasswordResetStateHelper = (field, value) => {
+        setPasswordResetState(prevState => ({
+            ...prevState,
+            [field]: value
+        }))
+    }
+
+    const ref = useRef(null)
+
+    const resetPassword = async () => {
+        await settingRequests.resetUserPassword(passwordResetState.passwordResetLogin).then((resetPasswordLink) => {
+            setPasswordResetStateHelper("passwordResetLinkActive", true)
+            setPasswordResetStateHelper("passwordResetLink", resetPasswordLink)
+        })
+    }
+
+    const closePasswordResetToggle = () => {
+        setPasswordResetStateHelper("passwordResetLinkActive", false)
+        setPasswordResetStateHelper("confirmPasswordResetActive", false)
+        setPasswordResetStateHelper("passwordResetLink", "")
+    }
+
+    const handleCopyPasswordResetLink = () => {
+        func.copyToClipboard(passwordResetState.passwordResetLink, ref, "Password reset link copied to clipboard")
+    }
+
     let paidFeatureRoleOptions =  rbacAccess ? [
         {
             content: 'Developer',
@@ -33,6 +66,10 @@ const Users = () => {
             role: 'GUEST',
         }
     ] : []
+
+    const websiteHostName = window.location.origin
+    const notOnPremHostnames = ["app.akto.io", "localhost", "127.0.0.1", "[::1]"]
+    const isOnPrem = websiteHostName && !notOnPremHostnames.includes(window.location.hostname)
 
     const rolesOptions = [
         {
@@ -47,12 +84,20 @@ const Users = () => {
             }, ...paidFeatureRoleOptions]
         },
         {
-            items: [{
-                destructive: true,
-                content: 'Remove',
-                role: 'REMOVE',
-                icon: DeleteMajor
-            }]
+            items: [
+                isOnPrem && {
+                    destructive: false,
+                    content: 'Reset Password',
+                    role: 'RESET_PASSWORD',
+                    icon: PasskeyMajor
+                },
+                {
+                    destructive: true,
+                    content: 'Remove',
+                    role: 'REMOVE',
+                    icon: DeleteMajor
+                }
+            ]
         }
     ]
 
@@ -63,6 +108,7 @@ const Users = () => {
         }
         if(window.USER_ROLE === 'ADMIN'){
             roleHierarchyResp.push('REMOVE')
+            roleHierarchyResp.push('RESET_PASSWORD')
         }
         setRoleHierarchy(roleHierarchyResp)
         
@@ -80,6 +126,13 @@ const Users = () => {
             await handleRemoveUser(login)
             toggleRoleSelectionPopup(id)
             setUsers(users.filter(user => user.login !== login))
+            return
+        }
+
+        if(newRole === 'RESET_PASSWORD') {
+            setPasswordResetStateHelper("confirmPasswordResetActive", true)
+            setPasswordResetStateHelper("passwordResetLogin", login)
+            toggleRoleSelectionPopup(id)
             return
         }
 
@@ -103,7 +156,7 @@ const Users = () => {
             ...section,
             items: section.items.filter((c) => roleHierarchy.includes(c.role)).map(item => ({
                 ...item,
-                prefix: item.role === "REMOVE"?  <Box><Icon source={DeleteMajor}/></Box> : item.role === currentRole ? <Box><Icon source={TickMinor}/></Box> : <div style={{padding: "10px"}}/>
+                prefix: item.role === "REMOVE"?  <Box><Icon source={DeleteMajor}/></Box> : item.role === "RESET_PASSWORD" ? <Box><Icon source={PasskeyMajor}/></Box> : item.role === currentRole ? <Box><Icon source={TickMinor}/></Box> : <div style={{padding: "10px"}}/>
             }))
         }));
         return tempArr
@@ -147,7 +200,7 @@ const Users = () => {
         await settingRequests.makeAdmin(login, roleVal)
         func.setToast(true, false, "Role updated for " + login + " successfully")
     }
-    
+
     return (
         <Page
             title="Users"
@@ -242,6 +295,52 @@ const Users = () => {
                     roleHierarchy={roleHierarchy}
                     rolesOptions={rolesOptions}
                 />
+                <Modal
+                    small
+                    open={passwordResetState.confirmPasswordResetActive}
+                    onClose={() => setPasswordResetStateHelper("confirmPasswordResetActive", false)}
+                    title="Password Reset"
+                    primaryAction={{
+                        content: 'Generate',
+                        onAction: resetPassword,
+                    }}
+                    secondaryActions={[
+                        {
+                        content: 'Cancel',
+                        onAction: () => setPasswordResetStateHelper("confirmPasswordResetActive", false),
+                        },
+                    ]}
+                >
+                    <Modal.Section>
+                        <Text>Are you sure you want to generate a link to reset the password for <b>{passwordResetState.passwordResetLogin}</b>?</Text>
+                    </Modal.Section>
+                </Modal>
+
+                <Modal
+                    small
+                    open={passwordResetState.passwordResetLinkActive}
+                    onClose={closePasswordResetToggle}
+                    title="Password Reset"
+                    primaryAction={{
+                        content: 'Copy link',
+                        onAction: handleCopyPasswordResetLink,
+                    }}
+                    secondaryActions={[
+                        {
+                        content: 'Cancel',
+                        onAction: closePasswordResetToggle,
+                        },
+                    ]}
+                >
+                    <Modal.Section>
+                        <TextField
+                            label="Password reset link"
+                            disabled={true}
+                            value={passwordResetState.passwordResetLink}
+                        />
+                        <div ref={ref} />
+                    </Modal.Section>
+                </Modal>
             </div>}
 
         </Page>

@@ -21,6 +21,8 @@ public class RateLimitFilter implements Filter {
             val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.SIGN_IN);
         } else if (path.startsWith("/tools/")) {
             val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.ANONYMOUS_LOGIN);
+        } else if (path.equals("/auth/sendPasswordResetLink") || path.equals("/auth/resetPassword")) {
+            val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.PASSWORD_RESET);
         } else {
             val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.SEND_EMAIL);
         }
