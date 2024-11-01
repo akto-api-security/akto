@@ -18,6 +18,7 @@ import { learnMoreObject } from "../../../main/onboardingData"
 import LearnPopoverComponent from "../../components/layouts/LearnPopoverComponent"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import LocalStore from "../../../main/LocalStorageStore"
+import func from "../../../../util/func"
 
 const TestEditor = () => {
     const navigate = useNavigate()
@@ -43,11 +44,6 @@ const TestEditor = () => {
         const allSubCategoriesResponse = await testEditorRequests.fetchAllSubCategories("testEditor")
         if (allSubCategoriesResponse) {
             try {
-                let subCategoryMap = {};
-                allSubCategoriesResponse?.subCategories.forEach((x) => {
-                    subCategoryMap[x.name] = x;
-                });
-                setSubCategoryMap(subCategoryMap);
                 const obj = convertFunc.mapCategoryToSubcategory(allSubCategoriesResponse.subCategories)
                 setTestsObj(obj)
     
@@ -64,6 +60,13 @@ const TestEditor = () => {
                 setVulnerableRequestMap(requestObj)
                 const vulnerableRequest = allSubCategoriesResponse?.vulnerableRequests?.length > 0 ? allSubCategoriesResponse?.vulnerableRequests[0]?.id : {}
                 setDefaultRequest(vulnerableRequest)
+
+                let subCategoryMap = {};
+                allSubCategoriesResponse?.subCategories.forEach((x) => {
+                    subCategoryMap[x.name] = x;
+                    func.trimContentFromSubCategory(x)
+                });
+                setSubCategoryMap(subCategoryMap);
     
                 setLoading(false) 
             } catch (error) {

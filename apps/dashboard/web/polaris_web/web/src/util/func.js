@@ -1703,7 +1703,12 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
 
     return true
-  }
+  },
+
+  trimContentFromSubCategory(subcategory) {
+      subcategory["content"] = ""
+  },
+
 }
 
 export default func
