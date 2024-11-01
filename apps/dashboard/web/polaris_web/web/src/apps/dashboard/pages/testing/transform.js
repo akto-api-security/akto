@@ -597,6 +597,7 @@ const transform = {
     const resp = await api.fetchAllSubCategories(false, "Dashboard");
     let subCategoryMap = {};
     resp.subCategories.forEach((x) => {
+      func.trimContentFromSubCategory(x)
       subCategoryMap[x.name] = x;
     });
     let subCategoryFromSourceConfigMap = {};
