@@ -266,7 +266,7 @@ function APIQuery() {
         <PageWithMultipleCards
             title={
                 <TitleWithInfo
-                    tooltipContent={"Via explore mode, you can explore api's and create a API Groups"}
+                    tooltipContent={"Query across your API ecosystem and create meaningful groups effortlessly"}
                     titleText={"Explore Mode"}
                 />
             }
