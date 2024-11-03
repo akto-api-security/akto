@@ -260,13 +260,13 @@ function APIQuery() {
         }
     }
 
-    const primaryActionLabel = isUpdate ? 'Update conditions' : 'Save as Collection'
+    const primaryActionLabel = isUpdate ? 'Update conditions' : 'Save as API Group'
 
     return (
         <PageWithMultipleCards
             title={
                 <TitleWithInfo
-                    tooltipContent={"Via explore mode, you can explore api's and create a collection"}
+                    tooltipContent={"Via explore mode, you can explore api's and create a API Groups"}
                     titleText={"Explore Mode"}
                 />
             }
