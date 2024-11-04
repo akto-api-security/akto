@@ -90,7 +90,31 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
         })
 
-        const allSubCategoriesResponse = await testingApi.fetchAllSubCategories(true, "runTests")
+        let categories = []
+        let businessLogicSubcategories = []
+        const limit = 200
+        let skip = 0
+        for (let i = 0; i < 10; i++) {
+            const allSubCategoriesResponse = await testingApi.fetchAllSubCategories(true, "runTests", skip, limit)
+            if (!allSubCategoriesResponse) {
+                break
+            }
+            skip += limit
+
+            if (categories.length == 0 && allSubCategoriesResponse.categories) {
+                categories = allSubCategoriesResponse.categories
+            }
+
+            const subCategories = allSubCategoriesResponse.subCategories
+            if (subCategories && subCategories.length > 0) {
+                businessLogicSubcategories.push(...subCategories)
+            }
+
+            if (subCategories.length < limit) {
+                break
+            }
+        }
+
         const testRolesResponse = await testingApi.fetchTestRoles()
         var testRoles = testRolesResponse.testRoles.map(testRole => {
             return {
@@ -100,8 +124,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         })
         testRoles.unshift({"label": "No test role selected", "value": ""})
         setTestRolesArr(testRoles)
-        const businessLogicSubcategories = allSubCategoriesResponse.subCategories
-        const categories = allSubCategoriesResponse.categories
         const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(businessLogicSubcategories)
         // Store all tests
         const processMapCategoryToSubcategory = {}
