@@ -32,6 +32,7 @@ import org.junit.Test;
 
 import java.util.*;
 
+import static com.akto.parsers.TestDBSync.*;
 import static com.akto.parsers.TestDump2.createList;
 import static com.akto.runtime.APICatalogSync.mergeUrlsAndSave;
 import static com.akto.runtime.APICatalogSync.tryMergeURLsInCollection;
@@ -87,22 +88,17 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
         APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize(parser));
+        assertEquals(0, getStaticURLsSize(123));
 
         parser.syncFunction(responseParams.subList(15,20), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
         APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
         APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
-        assertEquals(0, getStaticURLsSize(parser));
 
-
-
-        Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
-
-
-        assertEquals(1, urlTemplateMap.size());
-        assertEquals(0, getStaticURLsSize(parser));
+        Map<String, Integer> staticAndTemplateUrlsCount = fetchStaticAndTemplateUrlsCount(123);
+        assertEquals(0, (int) staticAndTemplateUrlsCount.get(STATIC_URLS));
+        assertEquals(1,  (int) staticAndTemplateUrlsCount.get(TEMPLATE_URLS));
 
     }
 
@@ -133,12 +129,10 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
         APICatalogSync.mergeUrlsAndSave(123, true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(true, true);
-        Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
-        Map<URLStatic, RequestTemplate> strictUrlMap = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods();
 
-
-        assertEquals(1, urlTemplateMap.size());
-        assertEquals(3, strictUrlMap.size());
+        Map<String, Integer> staticAndTemplateUrlsCount = fetchStaticAndTemplateUrlsCount(123);
+        assertEquals(3, (int) staticAndTemplateUrlsCount.get(STATIC_URLS));
+        assertEquals(1,  (int) staticAndTemplateUrlsCount.get(TEMPLATE_URLS));
     }
 
     @Test
@@ -168,24 +162,28 @@ public class TestMergingNew extends MongoBasedTest {
 
         parser.syncFunction(responseParams.subList(0,23), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
-        assertEquals(23, getStaticURLsSize(parser));
+        assertEquals(23, getStaticURLsSize(123));
 
         parser.syncFunction(responseParams.subList(23,28), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
         APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(28, getStaticURLsSize(parser));
+        assertEquals(28, getStaticURLsSize(123));
 
         parser.syncFunction(responseParams.subList(28,33), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
-        assertEquals(33, getStaticURLsSize(parser));
+        assertEquals(33, getStaticURLsSize(123));
     }
 
 
-    public int getStaticURLsSize(HttpCallParser parser) {
-        Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods();
+    public int getStaticURLsSize(int apiCollectionId) {
+        Map<String, Integer> staticAndTemplateUrlsCount = fetchStaticAndTemplateUrlsCount(apiCollectionId);
+        return staticAndTemplateUrlsCount.get(STATIC_URLS);
+    }
 
-        return urlStaticMap.size();
+    public int getTemplateURLsSize(int apiCollectionId) {
+        Map<String, Integer> staticAndTemplateUrlsCount = fetchStaticAndTemplateUrlsCount(apiCollectionId);
+        return staticAndTemplateUrlsCount.get(TEMPLATE_URLS);
     }
 
 
@@ -217,37 +215,48 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false,true, SyncLimit.noLimit);
         APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize(parser));
+        assertEquals(0, getStaticURLsSize(123));
 
         parser.syncFunction(responseParams.subList(1,2), false,true, null);
         parser.apiCatalogSync.syncWithDB(false,true, SyncLimit.noLimit);
         APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize(parser));
 
-        Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
-        assertEquals(1, templateURLToMethods.size());
+        Map<String, Integer> staticAndTemplateUrlsCount = fetchStaticAndTemplateUrlsCount(123);
+        assertEquals(0, (int) staticAndTemplateUrlsCount.get(STATIC_URLS));
+        assertEquals(1,  (int) staticAndTemplateUrlsCount.get(TEMPLATE_URLS));
 
         parser.syncFunction(responseParams.subList(3,10), false,true, null);
-        parser.syncFunction(Collections.singletonList(createDifferentHttpResponseParams(10000, 
-        url + "avneesh@akto.io" + "/subproduct/" + "avneesh@akto.io" + "/subitem/" + "avneesh@akto.io" + "/id/" + "112"
+        parser.syncFunction(Collections.singletonList(createDifferentHttpResponseParams(10000,
+                url + "avneesh@akto.io" + "/subproduct/" + "avneesh@akto.io" + "/subitem/" + "avneesh@akto.io" + "/id/" + "112"
         )), false,true, null); // adding this just to see if multiple subTypes of urlParams are recorded or not (not for UUID merging)
         parser.apiCatalogSync.syncWithDB(false,true, SyncLimit.noLimit);
         APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize(parser));
+        assertEquals(0, getStaticURLsSize(123));
 
-        templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
         URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(
-        url + "STRING" + "/subproduct/" + "STRING" + "/subitem/" + "STRING" + "/id/" + "INTEGER"
-        , URLMethods.Method.GET);
-        RequestTemplate requestTemplate = templateURLToMethods.get(urlTemplate);
-        Map<Integer, KeyTypes> keyTypesMap = requestTemplate.getUrlParams();
-        KeyTypes keyTypes = keyTypesMap.get(2);
+                url + "STRING" + "/subproduct/" + "STRING" + "/subitem/" + "STRING" + "/id/" + "INTEGER"
+                , URLMethods.Method.GET);
 
-        SingleTypeInfo singleTypeInfo1 = keyTypes.getOccurrences().get(SingleTypeInfo.UUID);
+        SingleTypeInfo singleTypeInfo1 = SingleTypeInfoDao.instance.findOne(Filters.and(
+                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, 123),
+                Filters.eq(SingleTypeInfo._URL, urlTemplate.getTemplateString()),
+                Filters.eq(SingleTypeInfo._METHOD, urlTemplate.getMethod().name()),
+                Filters.eq(SingleTypeInfo._PARAM, "2"),
+                Filters.eq("subType", SingleTypeInfo.UUID.getName()),
+                Filters.eq(SingleTypeInfo._IS_URL_PARAM, true)
+        ));
         assertNotNull(singleTypeInfo1);
-        SingleTypeInfo singleTypeInfo2 = keyTypes.getOccurrences().get(SingleTypeInfo.EMAIL);
+
+        SingleTypeInfo singleTypeInfo2 = SingleTypeInfoDao.instance.findOne(Filters.and(
+                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, 123),
+                Filters.eq(SingleTypeInfo._URL, urlTemplate.getTemplateString()),
+                Filters.eq(SingleTypeInfo._METHOD, urlTemplate.getMethod().name()),
+                Filters.eq(SingleTypeInfo._PARAM, "2"),
+                Filters.eq("subType", SingleTypeInfo.EMAIL.getName()),
+                Filters.eq(SingleTypeInfo._IS_URL_PARAM, true)
+        ));
         assertNotNull(singleTypeInfo2);
     }
 
@@ -273,9 +282,10 @@ public class TestMergingNew extends MongoBasedTest {
 
         parser.syncFunction(responseParams, false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
-        parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(1, parser.apiCatalogSync.getDbState(123).getStrictURLToMethods().size());
-        assertEquals(3, parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods().size());
+
+        Map<String, Integer> staticAndTemplateUrlsCount = fetchStaticAndTemplateUrlsCount(123);
+        assertEquals(1, (int) staticAndTemplateUrlsCount.get(STATIC_URLS));
+        assertEquals(3,  (int) staticAndTemplateUrlsCount.get(TEMPLATE_URLS));
 
     }
 
@@ -304,34 +314,43 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
         APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize(parser));
+        assertEquals(0, getStaticURLsSize(123));
 
         parser.syncFunction(responseParams.subList(1,2), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
         APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize(parser));
+        assertEquals(0, getStaticURLsSize(123));
 
-        Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
-        assertEquals(1, templateURLToMethods.size());
+        assertEquals(1, getTemplateURLsSize(123));
 
         parser.syncFunction(responseParams.subList(3,10), false, true, null);
         parser.syncFunction(Collections.singletonList(createDifferentHttpResponseParams(10000, url+"avneesh@akto.io"+"/received")), false, true, null); // adding this just to see if multiple subTypes of urlParams are recorded or not (not for UUID merging)
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
         APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize(parser));
+        assertEquals(0, getStaticURLsSize(123));
 
-        templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
         URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url+"STRING"+"/received", URLMethods.Method.GET);
-        RequestTemplate requestTemplate = templateURLToMethods.get(urlTemplate);
-        Map<Integer, KeyTypes> keyTypesMap = requestTemplate.getUrlParams();
-        KeyTypes keyTypes = keyTypesMap.get(2);
 
-//        assertEquals(2, keyTypes.getOccurrences().size());
-        SingleTypeInfo singleTypeInfo1 = keyTypes.getOccurrences().get(SingleTypeInfo.UUID);
+        SingleTypeInfo singleTypeInfo1 = SingleTypeInfoDao.instance.findOne(Filters.and(
+                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, 123),
+                Filters.eq(SingleTypeInfo._URL, urlTemplate.getTemplateString()),
+                Filters.eq(SingleTypeInfo._METHOD, urlTemplate.getMethod().name()),
+                Filters.eq(SingleTypeInfo._PARAM, "2"),
+                Filters.eq("subType", SingleTypeInfo.UUID.getName()),
+                Filters.eq(SingleTypeInfo._IS_URL_PARAM, true)
+        ));
         assertNotNull(singleTypeInfo1);
-        SingleTypeInfo singleTypeInfo2 = keyTypes.getOccurrences().get(SingleTypeInfo.EMAIL);
+
+        SingleTypeInfo singleTypeInfo2 = SingleTypeInfoDao.instance.findOne(Filters.and(
+                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, 123),
+                Filters.eq(SingleTypeInfo._URL, urlTemplate.getTemplateString()),
+                Filters.eq(SingleTypeInfo._METHOD, urlTemplate.getMethod().name()),
+                Filters.eq(SingleTypeInfo._PARAM, "2"),
+                Filters.eq("subType", SingleTypeInfo.EMAIL.getName()),
+                Filters.eq(SingleTypeInfo._IS_URL_PARAM, true)
+        ));
         assertNotNull(singleTypeInfo2);
     }
 
@@ -356,17 +375,18 @@ public class TestMergingNew extends MongoBasedTest {
 
         parser.syncFunction(responseParams.subList(0,23), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
-        assertEquals(23, getStaticURLsSize(parser));
+        assertEquals(23, getStaticURLsSize(123));
 
         parser.syncFunction(responseParams.subList(23,28), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
         APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
-        assertEquals(0, getStaticURLsSize(parser));
+        assertEquals(0, getStaticURLsSize(123));
 
         parser.syncFunction(responseParams.subList(28,33), false, true, null);
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
-        assertEquals(0, getStaticURLsSize(parser));
+        APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
+        assertEquals(0, getStaticURLsSize(123));
     }
 
     @Test
@@ -400,11 +420,10 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.buildFromDB(false, true);
 
 
-        Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
-        Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods();
+        Map<String, Integer> staticAndTemplateUrlsCount = fetchStaticAndTemplateUrlsCount(123);
+        assertEquals(0, (int)staticAndTemplateUrlsCount.get(STATIC_URLS));
+        assertEquals(1,  (int) staticAndTemplateUrlsCount.get(TEMPLATE_URLS));
 
-        assertEquals(urlTemplateMap.size(), 1);
-        assertEquals(urlStaticMap.size(), 0);
 
     }
 
@@ -438,11 +457,9 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.buildFromDB(false, true);
 
 
-        Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
-        Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods();
-
-        assertEquals(urlTemplateMap.size(), 30);
-        assertEquals(urlStaticMap.size(), 0);
+        Map<String, Integer> staticAndTemplateUrlsCount = fetchStaticAndTemplateUrlsCount(123);
+        assertEquals(0, (int) staticAndTemplateUrlsCount.get(STATIC_URLS));
+        assertEquals(30,  (int) staticAndTemplateUrlsCount.get(TEMPLATE_URLS));
 
     }
 
@@ -478,12 +495,9 @@ public class TestMergingNew extends MongoBasedTest {
         APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
 
-
-        Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
-        Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods();
-
-        assertEquals(1,urlTemplateMap.size());
-        assertEquals(0, urlStaticMap.size());
+        Map<String, Integer> staticAndTemplateUrlsCount = fetchStaticAndTemplateUrlsCount(123);
+        assertEquals(0, (int) staticAndTemplateUrlsCount.get(STATIC_URLS));
+        assertEquals(1,  (int) staticAndTemplateUrlsCount.get(TEMPLATE_URLS));
     }
 
     @Test
@@ -514,11 +528,9 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.buildFromDB(false, true);
 
 
-        Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
-        Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods();
-
-        assertEquals(1,urlTemplateMap.keySet().size());
-        assertEquals(0, urlStaticMap.keySet().size());
+        Map<String, Integer> staticAndTemplateUrlsCount = fetchStaticAndTemplateUrlsCount(123);
+        assertEquals(0, (int)staticAndTemplateUrlsCount.get(STATIC_URLS));
+        assertEquals(1,  (int) staticAndTemplateUrlsCount.get(TEMPLATE_URLS));
 
         boolean merged = true;
         for (SingleTypeInfo singleTypeInfo: SingleTypeInfoDao.instance.findAll(new BasicDBObject())) {
@@ -691,7 +703,7 @@ public class TestMergingNew extends MongoBasedTest {
         parser.syncFunction(responseParams, false, true, null);
     }
 
-//    @Test
+    //    @Test
     public void testUrlParamSingleTypeInfoAndValues() {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
@@ -722,7 +734,7 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.buildFromDB(false, true);
 
         // Now dbState has template URLs so urlParam values are now stored
-        assertEquals(0,getStaticURLsSize(parser));
+        assertEquals(0,getStaticURLsSize(123));
         testSampleSizeAndDomainOfSti(parser,55, 55, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
 
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
@@ -786,8 +798,8 @@ public class TestMergingNew extends MongoBasedTest {
         parser.syncFunction(Arrays.asList(httpResponseParams1, httpResponseParams2, httpResponseParams3), false, true, null);
 
         parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
-        Collection<RequestTemplate> requestTemplates = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods().values();
-        validateMinMax(requestTemplates, 2500, 2, -98, -200);
+        List<SingleTypeInfo> all = SingleTypeInfoDao.instance.findAll(Filters.empty());
+        validateMinMax(all, 2500, 2, -98, -200);
 
         // merge the urls
         float reqMax = 2500.9f;
@@ -823,19 +835,20 @@ public class TestMergingNew extends MongoBasedTest {
         // using the new or old parser shouldn't change the result
         HttpCallParser parserNew = new HttpCallParser("userIdentifier", 1, 1, 1, true);
 
-        assertEquals(0,parserNew.apiCatalogSync.getDbState(123).getStrictURLToMethods().size());
-        assertEquals(1,parserNew.apiCatalogSync.getDbState(123).getTemplateURLToMethods().size());
+        Map<String, Integer> staticAndTemplateUrlsCount = fetchStaticAndTemplateUrlsCount(123);
+        assertEquals(0, (int) staticAndTemplateUrlsCount.get(STATIC_URLS));
+        assertEquals(1,  (int) staticAndTemplateUrlsCount.get(TEMPLATE_URLS));
 
-        requestTemplates = parserNew.apiCatalogSync.getDbState(123).getTemplateURLToMethods().values();
-        validateMinMax(requestTemplates, Double.valueOf(reqMax+"").longValue(), Double.valueOf(reqMin+"").longValue(), Double.valueOf(respMax+"").longValue(), Double.valueOf(respMin+"").longValue());
+        all = SingleTypeInfoDao.instance.findAll(Filters.empty());
+        validateMinMax(all, Double.valueOf(reqMax+"").longValue(), Double.valueOf(reqMin+"").longValue(), Double.valueOf(respMax+"").longValue(), Double.valueOf(respMin+"").longValue());
 
         httpResponseParams = createHttpResponseForMinMax(url+"books10", 19000f, -190f);
         parserNew.syncFunction(Collections.singletonList(httpResponseParams), false, true, null);
         httpResponseParams = createHttpResponseForMinMax(url+"books15", 19f, -19000f);
         parserNew.syncFunction(Collections.singletonList(httpResponseParams), false, true, null);
         parserNew.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
-        requestTemplates = parserNew.apiCatalogSync.getDbState(123).getTemplateURLToMethods().values();
-        validateMinMax(requestTemplates, 19000, Double.valueOf(reqMin+"").longValue(), Double.valueOf(respMax+"").longValue(), -19000);
+        all = SingleTypeInfoDao.instance.findAll(Filters.regex(SingleTypeInfo._URL, "STRING|INTEGER"));
+        validateMinMax(all, 19000, Double.valueOf(reqMin+"").longValue(), Double.valueOf(respMax+"").longValue(), -19000);
 
     }
 
@@ -849,18 +862,16 @@ public class TestMergingNew extends MongoBasedTest {
         return new HttpResponseParams("", 200,"", new HashMap<>(), respRet.toJson(),httpRequestParams, 0,"0",false, HttpResponseParams.Source.MIRRORING,"", "");
     }
 
-    private void validateMinMax(Collection<RequestTemplate> requestTemplateCollections, long reqMaxValue, long reqMinValue,
+    private void validateMinMax(Collection<SingleTypeInfo> singleTypeInfos, long reqMaxValue, long reqMinValue,
                                 long respMaxValue, long respMinValue) {
-        for (RequestTemplate requestTemplate: requestTemplateCollections) {
-            for (SingleTypeInfo singleTypeInfo: requestTemplate.getAllTypeInfo()) {
-                if (singleTypeInfo.isIsHeader() || singleTypeInfo.getIsUrlParam()) continue;
-                if (singleTypeInfo.getResponseCode() == -1) {
-                    assertEquals(reqMaxValue, singleTypeInfo.getMaxValue());
-                    assertEquals(reqMinValue, singleTypeInfo.getMinValue());
-                } else {
-                    assertEquals(respMaxValue, singleTypeInfo.getMaxValue());
-                    assertEquals(respMinValue, singleTypeInfo.getMinValue());
-                }
+        for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+            if (singleTypeInfo.isIsHeader() || singleTypeInfo.getIsUrlParam()) continue;
+            if (singleTypeInfo.getResponseCode() == -1) {
+                assertEquals(reqMaxValue, singleTypeInfo.getMaxValue());
+                assertEquals(reqMinValue, singleTypeInfo.getMinValue());
+            } else {
+                assertEquals(respMaxValue, singleTypeInfo.getMaxValue());
+                assertEquals(respMinValue, singleTypeInfo.getMinValue());
             }
         }
     }
@@ -878,7 +889,7 @@ public class TestMergingNew extends MongoBasedTest {
 
         HttpResponseParams httpResponseParams1 = createHttpResponseForMinMax(url+"books1", 23.4F,-98F );
         parser.syncFunction(Collections.singletonList(httpResponseParams1),true, true, null);
-        assertEquals(1, parser.apiCatalogSync.getDbState(collectionId).getStrictURLToMethods().size());
+        assertEquals(1, getStaticURLsSize(123));
 
         APICatalogSync.DbUpdateReturn dbUpdateReturn1 = cleanSync(httpResponseParams1, collectionId);
 //        assertEquals(0, dbUpdateReturn1.bulkUpdatesForSingleTypeInfo.size()); // because no change in minMax
@@ -967,7 +978,7 @@ public class TestMergingNew extends MongoBasedTest {
         httpCallParser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
 
         sampleData1 = SampleDataDao.instance.findOne(filter1);
-        assertEquals(1, sampleData1.getSamples().size());
+        assertEquals(2, sampleData1.getSamples().size());
 
 
         // url = https://petstore.swagger.io/v2/books/1 ; method = post
@@ -1144,9 +1155,8 @@ public class TestMergingNew extends MongoBasedTest {
         APICatalogSync.mergeUrlsAndSave(123,true, false, parser.apiCatalogSync.existingAPIsInDb);
         parser.apiCatalogSync.buildFromDB(false, true);
 
-        APICatalog dbState = parser.apiCatalogSync.getDbState(123);
-        assertEquals(urls.size(), dbState.getStrictURLToMethods().size());
-        assertEquals(0, dbState.getTemplateURLToMethods().size());
+        assertEquals(urls.size(), getStaticURLsSize(123));
+        assertEquals(0,getTemplateURLsSize(123));
 
     }
     @Test
@@ -1165,11 +1175,10 @@ public class TestMergingNew extends MongoBasedTest {
         parser.syncFunction(responseParams, true, true, null);
         parser.apiCatalogSync.syncWithDB(true, true, SyncLimit.noLimit);
 
-        Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
-        assertEquals(1, templateURLToMethods.size());
+        assertEquals(1, getTemplateURLsSize(123));
 
-        URLTemplate urlTemplate = (URLTemplate)  templateURLToMethods.keySet().toArray()[0];
-        assertEquals("api/books/INTEGER/cars/INTEGER", urlTemplate.getTemplateString());
+        long count = SingleTypeInfoDao.instance.count(Filters.eq(SingleTypeInfo._URL, "api/books/INTEGER/cars/INTEGER"));
+        assertTrue(count > 0);
 
         parser.syncFunction(responseParams, true, true, null);
         parser.apiCatalogSync.syncWithDB(true, true, SyncLimit.noLimit);
@@ -1191,11 +1200,10 @@ public class TestMergingNew extends MongoBasedTest {
         parser.syncFunction(responseParams, true, true, null);
         parser.apiCatalogSync.syncWithDB(true, true, SyncLimit.noLimit);
 
-        Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
-        assertEquals(1, templateURLToMethods.size());
+        assertEquals(1, getTemplateURLsSize(123));
 
-        URLTemplate urlTemplate = (URLTemplate)  templateURLToMethods.keySet().toArray()[0];
-        assertEquals("api/books/FLOAT/cars/FLOAT", urlTemplate.getTemplateString());
+        long count = SingleTypeInfoDao.instance.count(Filters.eq(SingleTypeInfo._URL, "api/books/FLOAT/cars/FLOAT"));
+        assertTrue(count > 0);
 
         parser.syncFunction(responseParams, true, true, null);
         parser.apiCatalogSync.syncWithDB(true, true, SyncLimit.noLimit);
