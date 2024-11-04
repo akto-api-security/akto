@@ -3411,6 +3411,28 @@
             </result>
         </action>
 
+        <action name="api/fetchVulnerableRequests" class="com.akto.action.testing_issues.IssuesAction" method="fetchVulnerableRequests">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="enumAsBean">true</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="tools/fetchVulnerableRequests" class="com.akto.action.testing_issues.IssuesAction" method="fetchVulnerableRequests">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="enumAsBean">true</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="tools/fetchSampleData" class="com.akto.action.TrafficAction" method="fetchSampleData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

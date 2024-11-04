@@ -38,13 +38,73 @@ const TestEditor = () => {
         setActive('active')
     }
 
+    const fetchVulnerableRequests = async () => {
+        let vulnerableRequests = []
+
+        let skip = 0
+        const limit = 100
+        for (let i = 0; i < 10; i++) {
+            const allSubCategoriesResponse = await testEditorRequests.fetchVulnerableRequests(skip, limit)
+            skip += limit
+            
+            if (!allSubCategoriesResponse) {
+                break
+            }
+
+            let arr1 = allSubCategoriesResponse.vulnerableRequests
+            if (arr1 && arr1.length > 0) {
+                vulnerableRequests.push(...arr1)
+            }
+
+            if (!arr1 || arr1.length < limit) {
+                break
+            }
+        }
+
+        return vulnerableRequests
+    }
+
+    const fetchSubcategories = async () => {
+        let subCategories = []
+
+        let skip = 0
+        const limit = 200
+        for (let i = 0; i < 10; i++) {
+            const allSubCategoriesResponse = await testEditorRequests.fetchAllSubCategories("testEditor", skip, limit)
+            skip += limit
+
+            if (!allSubCategoriesResponse) {
+                break
+            }
+
+            let arr1 = allSubCategoriesResponse.subCategories
+            if (arr1 && arr1.length > 0) {
+                subCategories.push(...arr1)
+            }
+
+            if (!arr1 || arr1.length < limit) {
+                break
+            }
+        }
+
+        return subCategories
+    }
+
     const fetchAllTests = async () => {
         const testId = window.location.pathname.split('/').pop();
 
-        const allSubCategoriesResponse = await testEditorRequests.fetchAllSubCategories("testEditor")
-        if (allSubCategoriesResponse) {
+
+        const subCategories = await fetchSubcategories()
+        let vulnerableRequests = []
+        try {
+            vulnerableRequests = await fetchVulnerableRequests()
+        } catch (err) {
+            console.error(err)
+        }
+
+        if (subCategories && subCategories.length > 0) {
             try {
-                const obj = convertFunc.mapCategoryToSubcategory(allSubCategoriesResponse.subCategories)
+                const obj = convertFunc.mapCategoryToSubcategory(subCategories)
                 setTestsObj(obj)
     
                 const testName = obj.mapIdtoTest[testId]
@@ -56,13 +116,13 @@ const TestEditor = () => {
                 }
                 setSelectedTest(selectedTestObj)
     
-                const requestObj = convertFunc.mapVulnerableRequests(allSubCategoriesResponse.vulnerableRequests)
+                const requestObj = convertFunc.mapVulnerableRequests(vulnerableRequests)
                 setVulnerableRequestMap(requestObj)
-                const vulnerableRequest = allSubCategoriesResponse?.vulnerableRequests?.length > 0 ? allSubCategoriesResponse?.vulnerableRequests[0]?.id : {}
+                const vulnerableRequest = vulnerableRequests?.length > 0 ? vulnerableRequests[0]?.id : {}
                 setDefaultRequest(vulnerableRequest)
 
                 let subCategoryMap = {};
-                allSubCategoriesResponse?.subCategories.forEach((x) => {
+                subCategories.forEach((x) => {
                     subCategoryMap[x.name] = x;
                     func.trimContentFromSubCategory(x)
                 });

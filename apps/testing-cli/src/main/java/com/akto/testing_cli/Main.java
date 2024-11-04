@@ -138,7 +138,7 @@ public class Main {
             logger.info(versionError);
         }
 
-        res = callDashboardApi("api/fetchAllSubCategories", body);
+        res = callDashboardApi("api/fetchAllSubCategories", "{'skip': 0, 'limit': 2000}");
         doc = Document.parse(res);
         List<Document> subCategoriesList = doc.getList("subCategories", Document.class, new ArrayList<>());
 
