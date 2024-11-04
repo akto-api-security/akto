@@ -46,7 +46,7 @@ public class RecordedLoginFlowUtil {
             TimeoutObject timeoutObj = new TimeoutObject(300, 300, 300);
             JsonNode node = ApiRequest.postRequestWithTimeout(new HashMap<>(), url, reqData, timeoutObj);
 
-            String token = node.get("token").textValue();
+            String token = node.toString();  //node.get("token").textValue();
 
             FileUtils.writeStringToFile(new File(outputFilePath), token, (String) null);
 
