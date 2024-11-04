@@ -537,7 +537,7 @@ public class StartTestAction extends UserAction {
                     break;
                 case SKIPPED_EXEC_API_REQUEST_FAILED:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
-                    testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, TestResult.API_CALL_FAILED_ERROR_STRING));
+                    testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, TestResult.API_CALL_FAILED_ERROR_STRING, TestResult.API_CALL_FAILED_ERROR_STRING_UNREACHABLE));
                     break;
                 case SKIPPED_EXEC:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));

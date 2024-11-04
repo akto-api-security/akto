@@ -1658,7 +1658,57 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
         .join(' ')
 
     return capitalizedEndpoint
-  }
+  },
+  validatePassword(password, confirmPassword) {
+    if (password.length < 8) {
+        func.setToast(true, true, "Minimum of 8 characters required")
+        return false
+    }
+
+    if (password.length >= 40) {
+        func.setToast(true, true, "Maximum of 40 characters allowed")
+        return false
+    }
+
+    if (password !== confirmPassword) {
+        func.setToast(true, true, "Passwords do not match")
+        return false
+    }
+
+    let numbersFlag = false
+    let lettersFlag = false
+
+    const allowedSpecialChars = new Set([
+        "+", "@", "*", "#", "$", "%", "&", "/", "(", ")", "=", "?", "^", "!",
+        "[", "]", "{", "}", "-", "_", ":", ";", ">", "<", "|", ",", "."
+    ])
+
+    for (let i = 0; i < password.length; i++) {
+        const ch = password.charAt(i)
+        const upperCaseCh = ch.toUpperCase()
+
+        if (ch >= '0' && ch <= '9') {
+            numbersFlag = true
+        } else if (upperCaseCh >= 'A' && upperCaseCh <= 'Z') {
+            lettersFlag = true
+        } else if (!allowedSpecialChars.has(ch)) {
+            func.setToast(true, true,  "Invalid character")
+            return false
+        }
+    }
+
+    if (!numbersFlag || !lettersFlag) {
+        func.setToast(true, true, "Must contain letters and numbers")
+        return false
+    }
+
+    return true
+  },
+
+  trimContentFromSubCategory(subcategory) {
+      subcategory["content"] = ""
+  },
+
 }
 
 export default func

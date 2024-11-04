@@ -448,6 +448,13 @@ const settingRequests = {
             }
         })
     },
+    resetUserPassword(userEmail) {
+        return request({
+            url: '/api/resetUserPassword',
+            method: 'post',
+            data: {userEmail}
+        })
+    },
     fetchApiAuditLogsFromDb(skip, limit, sortOrder, startTimestamp, endTimestamp) {
         return request({
             url: '/api/fetchApiAuditLogsFromDb',

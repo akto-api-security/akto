@@ -71,5 +71,24 @@ export default {
                 userEmail
             }
         })
+    },
+    sendPasswordResetLink: function(email) {
+        return request({
+            url: 'auth/sendPasswordResetLink',
+            method: 'post',
+            data: {
+                forgotPasswordEmail: email
+            }
+        })
+    },
+    resetPassword: function(token, newPassword) {
+        return request({
+            url: 'auth/resetPassword',
+            method: 'post',
+            data: {
+                resetPasswordToken: token,
+                newPassword
+            }
+        })
     }
 }
