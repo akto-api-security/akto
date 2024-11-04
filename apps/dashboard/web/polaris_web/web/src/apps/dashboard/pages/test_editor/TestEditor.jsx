@@ -45,10 +45,18 @@ const TestEditor = () => {
         const limit = 100
         for (let i = 0; i < 10; i++) {
             const allSubCategoriesResponse = await testEditorRequests.fetchVulnerableRequests(skip, limit)
-            let arr1 = allSubCategoriesResponse.vulnerableRequests
-            vulnerableRequests.push(...arr1)
             skip += limit
-            if (arr1.length < limit) {
+            
+            if (!allSubCategoriesResponse) {
+                break
+            }
+
+            let arr1 = allSubCategoriesResponse.vulnerableRequests
+            if (arr1 && arr1.length > 0) {
+                vulnerableRequests.push(...arr1)
+            }
+
+            if (!arr1 || arr1.length < limit) {
                 break
             }
         }
@@ -63,10 +71,18 @@ const TestEditor = () => {
         const limit = 200
         for (let i = 0; i < 10; i++) {
             const allSubCategoriesResponse = await testEditorRequests.fetchAllSubCategories("testEditor", skip, limit)
-            let arr1 = allSubCategoriesResponse.subCategories
-            subCategories.push(...arr1)
             skip += limit
-            if (arr1.length < limit) {
+
+            if (!allSubCategoriesResponse) {
+                break
+            }
+
+            let arr1 = allSubCategoriesResponse.subCategories
+            if (arr1 && arr1.length > 0) {
+                subCategories.push(...arr1)
+            }
+
+            if (!arr1 || arr1.length < limit) {
                 break
             }
         }
