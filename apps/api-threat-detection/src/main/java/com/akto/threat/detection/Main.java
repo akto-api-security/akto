@@ -4,6 +4,7 @@ import java.util.*;
 
 import com.akto.malicious_request.MaliciousRequest;
 import com.akto.message_service.kafka.MaliciousRequestMessageService;
+import com.akto.threat.detection.dto.ResponseWrapper;
 import com.akto.threat.detection.properties.KafkaProperties;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -37,22 +38,24 @@ public class Main {
 
         KafkaProperties kfProperties = KafkaProperties.generate();
 
-        Properties kafkaProperties = Utils.configProperties(
-                kfProperties.getBrokerUrl(),
-                kfProperties.getGroupId(),
-                kfProperties.getMaxPollRecords());
+        Properties kafkaProperties =
+                Utils.configProperties(
+                        kfProperties.getBrokerUrl(),
+                        kfProperties.getGroupId(),
+                        kfProperties.getMaxPollRecords());
 
         Consumer<String, String> kafkaConsumer = new KafkaConsumer<>(kafkaProperties);
 
-        MaliciousRequestMessageService maliciousRequestMessageService = new MaliciousRequestMessageService(
-                kafkaProperties);
+        MaliciousRequestMessageService maliciousRequestMessageService =
+                new MaliciousRequestMessageService(kafkaProperties);
 
         KafkaRunner.init(
                 kafkaConsumer,
                 module,
                 Collections.singletonList(kfProperties.getTopicName()),
                 records -> {
-                    List<MaliciousRequest> maliciousRequests = processAndGenerateMaliciousRequests(records);
+                    ResponseWrapper resp = processRecords(records);
+                    List<MaliciousRequest> maliciousRequests = resp.getMaliciousRequests();
 
                     if (!maliciousRequests.isEmpty()) {
                         maliciousRequestMessageService.pushMessages(maliciousRequests);
@@ -62,8 +65,7 @@ public class Main {
                 });
     }
 
-    public static List<MaliciousRequest> processAndGenerateMaliciousRequests(
-            ConsumerRecords<String, String> records) {
+    public static ResponseWrapper processRecords(ConsumerRecords<String, String> records) {
         long start = System.currentTimeMillis();
 
         // TODO: what happens if exception
@@ -105,19 +107,22 @@ public class Main {
             Context.accountId.set(accountIdInt);
 
             if (!httpCallFilterMap.containsKey(accountId)) {
-                HttpCallFilter filter = new HttpCallFilter(sync_threshold_count, sync_threshold_time);
+                HttpCallFilter filter =
+                        new HttpCallFilter(sync_threshold_count, sync_threshold_time);
                 httpCallFilterMap.put(accountId, filter);
                 loggerMaker.infoAndAddToDb("New filter created for account: " + accountId);
             }
 
             HttpCallFilter filter = httpCallFilterMap.get(accountId);
             List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
-            List<MaliciousRequest> accWiseMaliciousRequests = filter.generateMaliciousRequests(accWiseResponse);
-            maliciousRequests.addAll(accWiseMaliciousRequests);
+
+            // Get acc wise response wrappers and then merge them
+            ResponseWrapper resp = filter.processRequests(accWiseResponse);
+            maliciousRequests.addAll(resp.getMaliciousRequests());
         }
 
         AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis() - start);
 
-        return maliciousRequests;
+        return ResponseWrapper.builder().withMaliciousRequests(maliciousRequests).build();
     }
 }

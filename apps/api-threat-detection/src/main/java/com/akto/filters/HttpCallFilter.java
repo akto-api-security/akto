@@ -25,9 +25,11 @@ import com.akto.rules.TestPlugin;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.akto.threat.detection.dto.ResponseWrapper;
 
 public class HttpCallFilter {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallFilter.class, LogDb.THREAT_DETECTION);
+    private static final LoggerMaker loggerMaker =
+            new LoggerMaker(HttpCallFilter.class, LogDb.THREAT_DETECTION);
 
     private Map<String, FilterConfig> apiFilters;
     private final List<BulkUpdates> bulkUpdates;
@@ -52,8 +54,7 @@ public class HttpCallFilter {
         this.httpCallParser = new HttpCallParser(sync_threshold_count, sync_threshold_time);
     }
 
-    public List<MaliciousRequest> generateMaliciousRequests(
-            List<HttpResponseParams> responseParams) {
+    public ResponseWrapper processRequests(List<HttpResponseParams> responseParams) {
 
         int now = Context.now();
         if ((lastFilterFetch + FILTER_REFRESH_INTERVAL) < now) {
@@ -77,13 +78,14 @@ public class HttpCallFilter {
                         int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
                         responseParam.requestParams.setApiCollectionId(apiCollectionId);
 
-                        List<MaliciousRequest> maliciousRequestsPerResponseParams = MaliciousRequestGenerator.INSTANCE
-                                .generateIfAny(responseParam);
+                        List<MaliciousRequest> maliciousRequestsPerResponseParams =
+                                MaliciousRequestGenerator.INSTANCE.generateIfAny(responseParam);
 
                         boolean isMalicious = !maliciousRequestsPerResponseParams.isEmpty();
 
                         String url = responseParam.getRequestParams().getURL();
-                        Method method = Method.fromString(responseParam.getRequestParams().getMethod());
+                        Method method =
+                                Method.fromString(responseParam.getRequestParams().getMethod());
                         ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
                         Map<String, Object> varMap = apiFilter.resolveVarMap();
                         VariableResolver.resolveWordList(
@@ -95,25 +97,28 @@ public class HttpCallFilter {
                                 },
                                 apiInfoKey);
                         String filterExecutionLogId = UUID.randomUUID().toString();
-                        ValidationResult res = TestPlugin.validateFilter(
-                                apiFilter.getFilter().getNode(),
-                                rawApi,
-                                apiInfoKey,
-                                varMap,
-                                filterExecutionLogId);
+                        ValidationResult res =
+                                TestPlugin.validateFilter(
+                                        apiFilter.getFilter().getNode(),
+                                        rawApi,
+                                        apiInfoKey,
+                                        varMap,
+                                        filterExecutionLogId);
 
                         if (res.getIsValid() || isMalicious) {
                             now = Context.now();
-                            SuspectSampleData sampleData = new SuspectSampleData(
-                                    sourceIps,
-                                    apiCollectionId,
-                                    url,
-                                    method,
-                                    message,
-                                    now,
-                                    filterId);
+                            SuspectSampleData sampleData =
+                                    new SuspectSampleData(
+                                            sourceIps,
+                                            apiCollectionId,
+                                            url,
+                                            method,
+                                            message,
+                                            now,
+                                            filterId);
                             Map<String, Object> filterMap = new HashMap<>();
-                            UpdatePayload updatePayload = new UpdatePayload("obj", sampleData, "set");
+                            UpdatePayload updatePayload =
+                                    new UpdatePayload("obj", sampleData, "set");
                             ArrayList<String> updates = new ArrayList<>();
                             updates.add(updatePayload.toString());
                             bulkUpdates.add(new BulkUpdates(filterMap, updates));
@@ -142,6 +147,6 @@ public class HttpCallFilter {
             bulkUpdates.clear();
         }
 
-        return maliciousRequests;
+        return ResponseWrapper.builder().withMaliciousRequests(maliciousRequests).build();
     }
 }
