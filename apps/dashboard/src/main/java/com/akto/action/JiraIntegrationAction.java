@@ -74,6 +74,12 @@ public class JiraIntegrationAction extends UserAction {
     public String testIntegration() {
 
         String url = baseUrl + META_ENDPOINT;
+        if(apiToken.contains("******")){
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(Filters.empty());
+            if(jiraIntegration != null){
+                setApiToken(jiraIntegration.getApiToken());
+            }
+        }
         String authHeader = Base64.getEncoder().encodeToString((userEmail + ":" + apiToken).getBytes());
         try {
 
@@ -87,12 +93,13 @@ public class JiraIntegrationAction extends UserAction {
             try {
                 response = call.execute();
                 responsePayload = response.body().string();
-                loggerMaker.errorAndAddToDb("error while testing jira integration, received null response", LoggerMaker.LogDb.DASHBOARD);
                 if (responsePayload == null) {
                     addActionError("Error while testing jira integration, received null response");
+                    loggerMaker.errorAndAddToDb("error while testing jira integration, received null response", LoggerMaker.LogDb.DASHBOARD);
                     return Action.ERROR.toUpperCase();
                 }
             } catch (Exception e) {
+                e.printStackTrace();
                 addActionError("Error while testing jira integration, error making call\"");
                 loggerMaker.errorAndAddToDb("error while testing jira integration, error making call" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
                 return Action.ERROR.toUpperCase();
@@ -102,7 +109,7 @@ public class JiraIntegrationAction extends UserAction {
                 }
             }
             BasicDBObject payloadObj;
-            setProjId(projId.trim());
+            setProjId(projId.replaceAll("\\s+", ""));
             Set<String> inputProjectIds = new HashSet(Arrays.asList(this.projId.split(",")));
             this.projectAndIssueMap = new HashMap<>();
             try {
