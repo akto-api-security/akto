@@ -141,7 +141,10 @@ public class TestExecutor {
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
         sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(testingRun.getTestingEndpoints().returnApis()));
-        AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
+
+        List<RawApi> rawApis = sampleMessageStore.findSampleMessages(1);
+        RawApi randomRawApi = !rawApis.isEmpty() ? rawApis.get(0) : null;
+        AuthMechanismStore authMechanismStore = AuthMechanismStore.create(randomRawApi);
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
