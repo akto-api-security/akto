@@ -558,7 +558,12 @@ public class Executor {
                 if (!authParamList.isEmpty()) {
                     ExecutorSingleOperationResp ret = null;
                     for (AuthParam authParam1: authParamList) {
-                        ret = Operations.modifyHeader(rawApi, authParam1.getKey().toLowerCase(), authParam1.getValue());
+                        if(authParam1.authTokenPresent(rawApi.getRequest())){
+                            authParam1.addAuthTokens(rawApi.getRequest());
+                            ret = new ExecutorSingleOperationResp(true, "");
+                        } else {
+                            ret = new ExecutorSingleOperationResp(true, "key not present " + authParam1.getKey().toLowerCase());
+                        }
                     }
 
                     return ret;
@@ -692,7 +697,9 @@ public class Executor {
 
                     for (AuthParam authParam: authMechanism.getAuthParams()) {
                         authVal = authParam.getValue();
-                        ExecutorSingleOperationResp result = Operations.modifyHeader(rawApi, authParam.getKey(), authVal, true);
+                        ExecutorSingleOperationResp result = new ExecutorSingleOperationResp(true, "");
+                        boolean ret = authParam.addAuthTokens(rawApi.getRequest());
+                        result.setSuccess(ret);
                         modifiedAtLeastOne = modifiedAtLeastOne || result.getSuccess();
                     }
                 }
