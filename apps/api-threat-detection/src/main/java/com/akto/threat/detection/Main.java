@@ -2,6 +2,8 @@ package com.akto.threat.detection;
 
 import java.util.*;
 
+import com.akto.malicious_request.MaliciousRequest;
+import com.akto.message_service.kafka.MaliciousRequestMessageService;
 import com.akto.threat.detection.properties.KafkaProperties;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -35,27 +37,35 @@ public class Main {
 
     public static void main(String[] args) {
 
-        KafkaProperties kafkaProperties = KafkaProperties.generate();
+        KafkaProperties kfProperties = KafkaProperties.generate();
 
-        Properties properties =
-                Utils.configProperties(
-                        kafkaProperties.getBrokerUrl(),
-                        kafkaProperties.getGroupId(),
-                        kafkaProperties.getMaxPollRecords());
+        Properties kafkaProperties = Utils.configProperties(
+                kfProperties.getBrokerUrl(),
+                kfProperties.getGroupId(),
+                kfProperties.getMaxPollRecords());
 
-        Consumer<String, String> kafkaConsumer = new KafkaConsumer<>(properties);
+        Consumer<String, String> kafkaConsumer = new KafkaConsumer<>(kafkaProperties);
+
+        MaliciousRequestMessageService maliciousRequestMessageService = new MaliciousRequestMessageService(
+                kafkaProperties);
 
         KafkaRunner.init(
                 kafkaConsumer,
                 module,
-                Collections.singletonList(kafkaProperties.getTopicName()),
+                Collections.singletonList(kfProperties.getTopicName()),
                 records -> {
-                    processRecords(records);
+                    List<MaliciousRequest> maliciousRequests = processAndGenerateMaliciousRequests(records);
+
+                    if (!maliciousRequests.isEmpty()) {
+                        maliciousRequestMessageService.pushMessages(maliciousRequests);
+                    }
+
                     return null;
                 });
     }
 
-    public static void processRecords(ConsumerRecords<String, String> records) {
+    public static List<MaliciousRequest> processAndGenerateMaliciousRequests(
+            ConsumerRecords<String, String> records) {
         long start = System.currentTimeMillis();
 
         // TODO: what happens if exception
@@ -83,6 +93,8 @@ public class Main {
             responseParamsToAccountMap.get(accountId).add(httpResponseParams);
         }
 
+        List<MaliciousRequest> maliciousRequests = new ArrayList<>();
+
         for (String accountId : responseParamsToAccountMap.keySet()) {
             int accountIdInt;
             try {
@@ -95,19 +107,20 @@ public class Main {
             Context.accountId.set(accountIdInt);
 
             if (!httpCallFilterMap.containsKey(accountId)) {
-                HttpCallFilter filter =
-                        new HttpCallFilter(
-                                createRedisClient(), sync_threshold_count, sync_threshold_time);
+                HttpCallFilter filter = new HttpCallFilter(sync_threshold_count, sync_threshold_time);
                 httpCallFilterMap.put(accountId, filter);
                 loggerMaker.infoAndAddToDb("New filter created for account: " + accountId);
             }
 
             HttpCallFilter filter = httpCallFilterMap.get(accountId);
             List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
-            filter.filterFunction(accWiseResponse);
+            List<MaliciousRequest> accWiseMaliciousRequests = filter.generateMaliciousRequests(accWiseResponse);
+            maliciousRequests.addAll(accWiseMaliciousRequests);
         }
 
         AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis() - start);
+
+        return maliciousRequests;
     }
 
     private static RedisClient createRedisClient() {
