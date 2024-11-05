@@ -40,28 +40,21 @@ const TestEditor = () => {
     }
 
     const fetchVulnerableRequests = async () => {
-        let vulnerableRequests = []
-
-        let skip = 0
-        const limit = 100
-        for (let i = 0; i < 10; i++) {
-            const allSubCategoriesResponse = await testEditorRequests.fetchVulnerableRequests(skip, limit)
-            skip += limit
-            
-            if (!allSubCategoriesResponse) {
-                break
-            }
-
-            let arr1 = allSubCategoriesResponse.vulnerableRequests
-            if (arr1 && arr1.length > 0) {
-                vulnerableRequests.push(...arr1)
-            }
-
-            if (!arr1 || arr1.length < limit) {
-                break
-            }
+        let vulnerableRequests = [], promises = []
+        const limit = 50
+        for (let i = 0; i < 20; i++) {
+            promises.push(
+                testEditorRequests.fetchVulnerableRequests(i*limit, limit)
+            )
         }
-
+        const allResults = await Promise.allSettled(promises);
+        for (const result of allResults) {
+            if (result.status === "fulfilled"){
+              if(result.value.vulnerableRequests && result.value.vulnerableRequests !== undefined && result.value.vulnerableRequests.length > 0){
+                vulnerableRequests.push(...result.value.vulnerableRequests)
+              }
+            }
+          }
         return vulnerableRequests
     }
 
