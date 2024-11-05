@@ -3164,6 +3164,9 @@ public class InitializerListener implements ServletContextListener {
 
                 if(!DashboardMode.isMetered()){
                     loggerMaker.infoAndAddToDb("Deleting " + multiNodesIds.size() + " templates for local deployment", LogDb.DASHBOARD);
+                    YamlTemplateDao.instance.deleteAll(
+                        Filters.in(Constants.ID, multiNodesIds)
+                    );
                 }
 
                 if (countTotalTemplates != countUnchangedTemplates) {
