@@ -157,7 +157,7 @@ public class Utils {
         for (String param: flattened.keySet()) {
             String key = node.getId() + ".response.body" + "." + param;
             valuesMap.put(key, flattened.get(param));
-	    System.out.println("kv pair: " + key + " " + flattened.get(param));
+	        System.out.println("kv pair: " + key + " " + flattened.get(param));
         }	
 
         data.put("token", token);

@@ -27,6 +27,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.util.Constants;
+import com.akto.util.JSONUtils;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -504,14 +505,23 @@ public class Executor {
                 if (authWithCond.getRecordedLoginFlowInput() != null) {
                     // handle json recording
                     RecordedLoginFlowInput recordedLoginFlowInput = authWithCond.getRecordedLoginFlowInput();
+                    Map<String, Object> valuesMap = new HashMap<>();
 
                     String token = com.akto.testing.workflow_node_executor.Utils.fetchToken(recordedLoginFlowInput, 5);
                     if (token == null) {
                         return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: ");
+                    } else {
+                        System.out.println("flattened here: " + token);
+                        BasicDBObject flattened = JSONUtils.flattenWithDots(BasicDBObject.parse(token));
+
+                        for (String param: flattened.keySet()) {
+                            String key = "x1.response.body." + param;
+                            valuesMap.put(key, flattened.get(param));
+                            System.out.println("kv pair: " + key + " " + flattened.get(param));
+                        }	
+
                     }
 
-                    Map<String, Object> valuesMap = new HashMap<>();
-                    valuesMap.put("x1.response.body.token", token);
         
                     for (AuthParam param : authMechanismForRole.getAuthParams()) {
                         try {
