@@ -54,7 +54,7 @@ function AdvancedTrafficFilters() {
         }
 
         const handleDryRun = async(content) => {
-            if(window.IS_SAAS === "false"){
+            if(window.IS_SAAS !== "true" ||  window.USER_NAME.includes("akto")){
                 await trafficFiltersRequest.dryRunAdvancedFilters(content).then((res)=> {
                     window.open("/dashboard/settings/logs", "_blank")
                 })
