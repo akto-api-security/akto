@@ -19,6 +19,7 @@ import LearnPopoverComponent from "../../components/layouts/LearnPopoverComponen
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import LocalStore from "../../../main/LocalStorageStore"
 import func from "../../../../util/func"
+import transform from "../testing/transform"
 
 const TestEditor = () => {
     const navigate = useNavigate()
@@ -65,29 +66,8 @@ const TestEditor = () => {
     }
 
     const fetchSubcategories = async () => {
-        let subCategories = []
-
-        let skip = 0
-        const limit = 200
-        for (let i = 0; i < 10; i++) {
-            const allSubCategoriesResponse = await testEditorRequests.fetchAllSubCategories("testEditor", skip, limit)
-            skip += limit
-
-            if (!allSubCategoriesResponse) {
-                break
-            }
-
-            let arr1 = allSubCategoriesResponse.subCategories
-            if (arr1 && arr1.length > 0) {
-                subCategories.push(...arr1)
-            }
-
-            if (!arr1 || arr1.length < limit) {
-                break
-            }
-        }
-
-        return subCategories
+        const metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor")
+        return metaDataObj.subCategories
     }
 
     const fetchAllTests = async () => {

@@ -8,6 +8,7 @@ import Dropdown from "../../../components/layouts/Dropdown";
 import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
+import transform from "../../testing/transform";
 
 function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction }) {
 
@@ -90,31 +91,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
         })
 
-        let categories = []
-        let businessLogicSubcategories = []
-        const limit = 200
-        let skip = 0
-        for (let i = 0; i < 10; i++) {
-            const allSubCategoriesResponse = await testingApi.fetchAllSubCategories(true, "runTests", skip, limit)
-            if (!allSubCategoriesResponse) {
-                break
-            }
-            skip += limit
-
-            if (categories.length == 0 && allSubCategoriesResponse.categories) {
-                categories = allSubCategoriesResponse.categories
-            }
-
-            const subCategories = allSubCategoriesResponse.subCategories
-            if (subCategories && subCategories.length > 0) {
-                businessLogicSubcategories.push(...subCategories)
-            }
-
-            if (subCategories.length < limit) {
-                break
-            }
-        }
-
+        const metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+        let categories = metaDataObj.categories
+        let businessLogicSubcategories = metaDataObj.subCategories
         const testRolesResponse = await testingApi.fetchTestRoles()
         var testRoles = testRolesResponse.testRoles.map(testRole => {
             return {
