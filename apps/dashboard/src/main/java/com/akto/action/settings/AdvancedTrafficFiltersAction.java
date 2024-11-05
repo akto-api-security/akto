@@ -3,6 +3,7 @@ package com.akto.action.settings;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -17,6 +18,8 @@ import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.usage.UsageMetric;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.utils.TrafficFilterUtil;
 import com.akto.utils.jobs.CleanInventory;
@@ -105,8 +108,10 @@ public class AdvancedTrafficFiltersAction extends UserAction {
                 throw new Exception("filter field cannot be empty");
             }
 
+            Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
             List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
-                Filters.empty(), Projections.include(ApiCollection.HOST_NAME, ApiCollection.NAME));
+                Filters.nin(Constants.ID, deactivatedCollections), Projections.include(ApiCollection.HOST_NAME, ApiCollection.NAME));
             YamlTemplate yamlTemplate = new YamlTemplate(filterConfig.getId(), Context.now(), getSUser().getLogin(), Context.now(), this.yamlContent, null);
             int accountId = Context.accountId.get();
             executorService.schedule( new Runnable() {
