@@ -2259,7 +2259,8 @@ public class InitializerListener implements ServletContextListener {
                 }
 
                 setDashboardMode();
-                updateGlobalAktoVersion();
+                cleanInventoryJobRunner();
+                // updateGlobalAktoVersion();
 
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
@@ -2299,7 +2300,6 @@ public class InitializerListener implements ServletContextListener {
                     // setUpAktoMixpanelEndpointsScheduler();
                     setUpDailyScheduler();
                     setUpWebhookScheduler();
-                    cleanInventoryJobRunner();
                     setUpDefaultPayloadRemover();
                     setUpTestEditorTemplatesScheduler();
                     setUpDependencyFlowScheduler();
