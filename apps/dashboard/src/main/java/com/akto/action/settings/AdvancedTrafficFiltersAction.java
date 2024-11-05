@@ -3,6 +3,9 @@ package com.akto.action.settings;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.bson.conversions.Bson;
 
@@ -30,6 +33,8 @@ public class AdvancedTrafficFiltersAction extends UserAction {
     private String yamlContent;
     private String templateId;
     private boolean inactive;
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public String fetchAllFilterTemplates(){
         List<YamlTemplate> yamlTemplates =  AdvancedTrafficFiltersDao.instance.findAll(
@@ -103,8 +108,19 @@ public class AdvancedTrafficFiltersAction extends UserAction {
             List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
                 Filters.empty(), Projections.include(ApiCollection.HOST_NAME, ApiCollection.NAME));
             YamlTemplate yamlTemplate = new YamlTemplate(filterConfig.getId(), Context.now(), getSUser().getLogin(), Context.now(), this.yamlContent, null);
+            int accountId = Context.accountId.get();
+            executorService.schedule( new Runnable() {
+                public void run() {
+                    Context.accountId.set(accountId);
+                    try {
+                        CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections,Arrays.asList(yamlTemplate),new ArrayList<>() , "", false, true);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }, 0 , TimeUnit.SECONDS);
 
-            CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections,Arrays.asList(yamlTemplate),new ArrayList<>() , "", false, true);
+            
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();
