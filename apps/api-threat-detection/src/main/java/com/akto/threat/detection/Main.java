@@ -5,7 +5,6 @@ import java.util.*;
 import com.akto.malicious_request.MaliciousRequest;
 import com.akto.message_service.kafka.MaliciousRequestMessageService;
 import com.akto.threat.detection.dto.ResponseWrapper;
-import com.akto.threat.detection.properties.KafkaProperties;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -36,13 +35,28 @@ public class Main {
 
     public static void main(String[] args) {
 
-        KafkaProperties kfProperties = KafkaProperties.generate();
+        String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+        if (topicName == null) {
+            String defaultTopic = "akto.api.protection";
+            loggerMaker.infoAndAddToDb(
+                    String.format(
+                            "Kafka topic is not defined, using default topic : %s", defaultTopic));
+            topicName = defaultTopic;
+        }
+
+        String kafkaBrokerUrl = "kafka1:19092";
+        String isKubernetes = System.getenv("IS_KUBERNETES");
+        if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
+            loggerMaker.infoAndAddToDb("is_kubernetes: true");
+            kafkaBrokerUrl = "127.0.0.1:29092";
+        }
+        String groupId = System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
+        int maxPollRecords =
+                Integer.parseInt(
+                        System.getenv().getOrDefault("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "100"));
 
         Properties kafkaProperties =
-                Utils.configProperties(
-                        kfProperties.getBrokerUrl(),
-                        kfProperties.getGroupId(),
-                        kfProperties.getMaxPollRecords());
+                Utils.configProperties(kafkaBrokerUrl, groupId, maxPollRecords);
 
         Consumer<String, String> kafkaConsumer = new KafkaConsumer<>(kafkaProperties);
 
@@ -52,7 +66,7 @@ public class Main {
         KafkaRunner.init(
                 kafkaConsumer,
                 module,
-                Collections.singletonList(kfProperties.getTopicName()),
+                Collections.singletonList(topicName),
                 records -> {
                     ResponseWrapper resp = processRecords(records);
                     List<MaliciousRequest> maliciousRequests = resp.getMaliciousRequests();
@@ -93,7 +107,7 @@ public class Main {
             responseParamsToAccountMap.get(accountId).add(httpResponseParams);
         }
 
-        List<MaliciousRequest> maliciousRequests = new ArrayList<>();
+        ResponseWrapper resp = ResponseWrapper.builder().build();
 
         for (String accountId : responseParamsToAccountMap.keySet()) {
             int accountIdInt;
@@ -117,12 +131,12 @@ public class Main {
             List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
 
             // Get acc wise response wrappers and then merge them
-            ResponseWrapper resp = filter.processRequests(accWiseResponse);
-            maliciousRequests.addAll(resp.getMaliciousRequests());
+            ResponseWrapper accWiseResp = filter.processRequests(accWiseResponse);
+            resp = resp.merge(accWiseResp);
         }
 
         AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis() - start);
 
-        return ResponseWrapper.builder().withMaliciousRequests(maliciousRequests).build();
+        return resp;
     }
 }

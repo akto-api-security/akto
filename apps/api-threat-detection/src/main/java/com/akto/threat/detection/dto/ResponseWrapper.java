@@ -31,4 +31,9 @@ public class ResponseWrapper {
             return new ResponseWrapper(this);
         }
     }
+
+    public ResponseWrapper merge(ResponseWrapper responseWrapper) {
+        this.maliciousRequests.addAll(responseWrapper.getMaliciousRequests());
+        return this;
+    }
 }
