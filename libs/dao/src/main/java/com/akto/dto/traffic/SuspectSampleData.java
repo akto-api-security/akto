@@ -1,7 +1,9 @@
 package com.akto.dto.traffic;
 
 import java.util.List;
+import java.util.Optional;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.bson.types.ObjectId;
 
 import com.akto.dto.type.URLMethods.Method;
@@ -23,7 +25,7 @@ public class SuspectSampleData {
      * we retrospectively match all sus-samples' url
      * with the urls present in the db to match them.
      */
-    public final static String MATCHING_URL = "matchingUrl";
+    public static final String MATCHING_URL = "matchingUrl";
     String matchingUrl;
 
     /*
@@ -31,11 +33,18 @@ public class SuspectSampleData {
      */
     String filterId;
 
-    public SuspectSampleData() {
-    }
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public SuspectSampleData(List<String> sourceIPs, int apiCollectionId, String url, Method method, String sample,
-            int discovered, String filterId) {
+    public SuspectSampleData() {}
+
+    public SuspectSampleData(
+            List<String> sourceIPs,
+            int apiCollectionId,
+            String url,
+            Method method,
+            String sample,
+            int discovered,
+            String filterId) {
         this.sourceIPs = sourceIPs;
         this.apiCollectionId = apiCollectionId;
         this.url = url;
@@ -123,16 +132,46 @@ public class SuspectSampleData {
 
     @Override
     public String toString() {
-        return "{" +
-                " \"apiCollectionId\":\"" + getApiCollectionId() + "\"" +
-                ", \"url\":\"" + getUrl() + "\"" +
-                ", \"method\":\"" + getMethod() + "\"" +
-                ", \"matchingUrl\":\"" + (getMatchingUrl() != null ? getMatchingUrl() : "/") + "\"" +
-                ", \"discovered\":\"" + getDiscovered() + "\"" +
-                ", \"filter\":\"" + getFilterId() + "\"" +
-                ", \"IPs\":\"" + (getSourceIPs() !=null ? getSourceIPs() : "[]" )+ "\"" +
-                ", \"sample\":" + getSample() +
-                "}";
+        return "{"
+                + " \"apiCollectionId\":\""
+                + getApiCollectionId()
+                + "\""
+                + ", \"url\":\""
+                + getUrl()
+                + "\""
+                + ", \"method\":\""
+                + getMethod()
+                + "\""
+                + ", \"matchingUrl\":\""
+                + (getMatchingUrl() != null ? getMatchingUrl() : "/")
+                + "\""
+                + ", \"discovered\":\""
+                + getDiscovered()
+                + "\""
+                + ", \"filter\":\""
+                + getFilterId()
+                + "\""
+                + ", \"IPs\":\""
+                + (getSourceIPs() != null ? getSourceIPs() : "[]")
+                + "\""
+                + ", \"sample\":"
+                + getSample()
+                + "}";
     }
 
+    public Optional<String> marshall() {
+        try {
+            return Optional.of(objectMapper.writeValueAsString(this));
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    public Optional<SampleData> unmarshall() {
+        try {
+            return Optional.of(objectMapper.readValue(sample, SampleData.class));
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
 }
