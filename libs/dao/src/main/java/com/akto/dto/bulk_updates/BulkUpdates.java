@@ -4,34 +4,31 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-
 public class BulkUpdates {
 
     private Map<String, Object> filters;
-    private ArrayList<String> updates;
+    private List<String> updates;
 
-    public BulkUpdates() {
-    }
+    public BulkUpdates() {}
 
-    public BulkUpdates(Map<String, Object> filters, ArrayList<String> updates) {
+    public BulkUpdates(Map<String, Object> filters, List<String> updates) {
         this.filters = filters;
         this.updates = updates;
     }
 
-    public Map<String,Object> getFilters() {
+    public Map<String, Object> getFilters() {
         return this.filters;
     }
 
-    public void setFilters(Map<String,Object> filters) {
+    public void setFilters(Map<String, Object> filters) {
         this.filters = filters;
     }
 
-    public ArrayList<String> getUpdates() {
+    public List<String> getUpdates() {
         return this.updates;
     }
 
     public void setUpdates(ArrayList<String> updates) {
         this.updates = updates;
     }
-
 }

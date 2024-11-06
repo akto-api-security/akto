@@ -22,10 +22,10 @@ public class Kafka {
         }
     }
 
-    public void send(String message,String topic) {
+    public void send(String message, String topic) {
         if (!this.producerReady) return;
 
-        ProducerRecord<String, String> record = new ProducerRecord<>(topic,message);
+        ProducerRecord<String, String> record = new ProducerRecord<>(topic, message);
         producer.send(record, new DemoProducerCallback());
     }
 
@@ -70,7 +70,4 @@ public class Kafka {
             }
         }
     }
-
 }
-
-
