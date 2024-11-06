@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
+import org.bson.conversions.Bson;
 
 import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.context.Context;
@@ -162,19 +163,23 @@ public class JiraIntegrationAction extends UserAction {
 
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
+        Bson tokenUpdate = Updates.set("apiToken", apiToken);
+        Bson integrationUpdate = Updates.combine(
+            Updates.set("baseUrl", baseUrl),
+            Updates.set("projId", projId),
+            Updates.set("userEmail", userEmail),
+            Updates.set("issueType", issueType),
+            Updates.setOnInsert("createdTs", Context.now()),
+            Updates.set("updatedTs", Context.now()),
+            Updates.set("projectIdsMap", projectAndIssueMap)
+        );
+        if(!apiToken.contains("******")){
+            integrationUpdate = Updates.combine(integrationUpdate, tokenUpdate);
+        }
 
         JiraIntegrationDao.instance.getMCollection().updateOne(
                 new BasicDBObject(),
-                Updates.combine(
-                        Updates.set("baseUrl", baseUrl),
-                        Updates.set("projId", projId),
-                        Updates.set("userEmail", userEmail),
-                        Updates.set("apiToken", apiToken),
-                        Updates.set("issueType", issueType),
-                        Updates.setOnInsert("createdTs", Context.now()),
-                        Updates.set("updatedTs", Context.now()),
-                        Updates.set("projectIdsMap", projectAndIssueMap)
-                ),
+                integrationUpdate,
                 updateOptions
         );
 
