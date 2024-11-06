@@ -128,15 +128,13 @@ public class Utils {
         return verificationCode;
     }
 
-    public static WorkflowTestResult.NodeResult processRecorderNode(Node node, Map<String, Object> valuesMap) {
+    public static WorkflowTestResult.NodeResult processRecorderNode(Node node, Map<String, Object> valuesMap, RecordedLoginFlowInput recordedLoginFlowInput) {
 
         List<String> testErrors = new ArrayList<>();
         BasicDBObject resp = new BasicDBObject();
         BasicDBObject body = new BasicDBObject();
         BasicDBObject data = new BasicDBObject();
         String message;
-
-        RecordedLoginFlowInput recordedLoginFlowInput = RecordedLoginInputDao.instance.findOne(new BasicDBObject());
         
         String token = fetchToken(recordedLoginFlowInput, 5);
 
@@ -199,8 +197,17 @@ public class Utils {
     }
 
     public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
+        RecordedLoginFlowInput recordedLoginFlowInput = RecordedLoginInputDao.instance.findOne(new BasicDBObject());
+        return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, recordedLoginFlowInput);
+    }
+
+    public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, AuthMechanism authMechanism) {
+        return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, authMechanism.getRecordedLoginFlowInput());
+    }
+
+    public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, RecordedLoginFlowInput recordedLoginFlowInput) {
         if (node.getWorkflowNodeDetails().getType() == WorkflowNodeDetails.Type.RECORDED) {
-            return processRecorderNode(node, valuesMap);
+            return processRecorderNode(node, valuesMap, recordedLoginFlowInput);
         }
         else if (node.getWorkflowNodeDetails().getType() == WorkflowNodeDetails.Type.OTP) {
             return processOtpNode(node, valuesMap);
@@ -209,7 +216,6 @@ public class Utils {
             return processApiNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory);
         }
     }
-
 
     public static WorkflowTestResult.NodeResult processApiNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         
@@ -255,7 +261,7 @@ public class Utils {
                 if (authMechanism.getRequestData() != null && authMechanism.getRequestData().size() > 0 && authMechanism.getRequestData().get(index).getAllowAllStatusCodes()) {
                     allowAllStatusCodes = authMechanism.getRequestData().get(0).getAllowAllStatusCodes();
                 }
-                nodeResult = processNode(node, valuesMap, allowAllStatusCodes, false, new ArrayList<>(), null);
+                nodeResult = processNode(node, valuesMap, allowAllStatusCodes, false, new ArrayList<>(), null, authMechanism);
             } catch (Exception e) {
                 ;
                 List<String> testErrors = new ArrayList<>();
