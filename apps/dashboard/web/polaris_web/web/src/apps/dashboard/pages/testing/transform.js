@@ -609,7 +609,9 @@ const transform = {
         }
 
         if(result?.value?.categories && result?.value?.categories !== undefined && result?.value?.categories.length > 0){
-          categories.push(...result.value.categories);
+          if(categories.length === 0){
+            categories.push(...result.value.categories);
+          }
         }
       }
     }
