@@ -41,7 +41,7 @@ import com.mongodb.client.model.Updates;
 
 public class Utils {
     
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.TESTING);
     private static final Gson gson = new Gson();
 
     public static WorkflowTestResult.NodeResult processOtpNode(Node node, Map<String, Object> valuesMap) {
@@ -157,7 +157,7 @@ public class Utils {
         for (String param: flattened.keySet()) {
             String key = node.getId() + ".response.body" + "." + param;
             valuesMap.put(key, flattened.get(param));
-	        System.out.println("kv pair: " + key + " " + flattened.get(param));
+	        loggerMaker.infoAndAddToDb("kv pair: " + key + " " + flattened.get(param));
         }	
 
         data.put("token", token);

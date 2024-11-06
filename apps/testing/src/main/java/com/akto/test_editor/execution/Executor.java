@@ -49,7 +49,7 @@ import org.bson.types.ObjectId;
 
 public class Executor {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class, LogDb.TESTING);
 
     public final String _HOST = "host";
 
@@ -511,13 +511,13 @@ public class Executor {
                     if (token == null) {
                         return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: ");
                     } else {
-                        System.out.println("flattened here: " + token);
+                        loggerMaker.infoAndAddToDb("flattened here: " + token);
                         BasicDBObject flattened = JSONUtils.flattenWithDots(BasicDBObject.parse(token));
 
                         for (String param: flattened.keySet()) {
                             String key = "x1.response.body." + param;
                             valuesMap.put(key, flattened.get(param));
-                            System.out.println("kv pair: " + key + " " + flattened.get(param));
+                            loggerMaker.infoAndAddToDb("kv pair: " + key + " " + flattened.get(param));
                         }	
 
                     }
