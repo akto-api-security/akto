@@ -13,6 +13,7 @@ import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.*;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.runtime.APICatalogSync;
 import com.akto.types.CappedSet;
 import com.akto.util.filter.DictionaryFilter;
@@ -139,6 +140,51 @@ public class TestMergingNew extends MongoBasedTest {
 
         assertEquals(1, urlTemplateMap.size());
         assertEquals(3, strictUrlMap.size());
+    }
+
+    @Test
+    public void testCaseInsensitiveApisMerging(){
+        testInitializer();
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
+
+        String baseUrl = "/api/";
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+        List<String> urls = Arrays.asList(
+                baseUrl + "demo",
+                baseUrl + "DeMo",
+                baseUrl + "demO",
+                baseUrl + "dEmo",
+                baseUrl + "v1/demo",
+                baseUrl + "v1/Demo"
+        );
+
+        for (String c : urls) {
+            HttpResponseParams resp = createSampleParams("user1", c);
+            responseParams.add(resp);
+        }
+
+        for (String c : urls) {
+            HttpResponseParams resp = createSampleParams("user1", c);
+            responseParams.add(resp);
+        }
+
+        parser.syncFunction(responseParams, false, true, null);
+        parser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
+        APICatalogSync.mergeUrlsAndSave(123, true, false, parser.apiCatalogSync.existingAPIsInDb, true);
+        parser.apiCatalogSync.buildFromDB(true, true);
+        Map<URLStatic, RequestTemplate> strictUrlMap = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods();
+
+        URLStatic urlStatic1 = new URLStatic(urls.get(0), Method.POST);
+        URLStatic urlStatic2 = new URLStatic(urls.get(4), Method.POST);
+        URLStatic urlStatic3 = new URLStatic(urls.get(1), Method.POST);
+
+        assertEquals(2, strictUrlMap.size());
+        assertEquals(false, strictUrlMap.containsKey(urlStatic1));
+        assertEquals(false, strictUrlMap.containsKey(urlStatic2));
+        assertEquals(true, strictUrlMap.containsKey(urlStatic3));
+        
     }
 
     @Test
