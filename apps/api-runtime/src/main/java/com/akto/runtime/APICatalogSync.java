@@ -198,7 +198,7 @@ public class APICatalogSync {
         return users.size();
     }
 
-    public void computeDelta(URLAggregator origAggregator, boolean triggerTemplateGeneration, int apiCollectionId) {
+    public void computeDelta(URLAggregator origAggregator, boolean triggerTemplateGeneration, int apiCollectionId, boolean makeApisCaseInsensitive) {
         long start = System.currentTimeMillis();
 
         APICatalog deltaCatalog = this.delta.get(apiCollectionId);
@@ -231,7 +231,7 @@ public class APICatalogSync {
         }
 
         start = System.currentTimeMillis();
-        processKnownStaticURLs(aggregator, deltaCatalog, dbCatalog);
+        processKnownStaticURLs(aggregator, deltaCatalog, dbCatalog, makeApisCaseInsensitive);
         logger.info("processKnownStaticURLs: " +  (System.currentTimeMillis() - start));
 
         start = System.currentTimeMillis();
@@ -284,7 +284,7 @@ public class APICatalogSync {
     }
 
 
-    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb) {
+    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb, boolean ignoreCaseInsensitiveApis) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
         Bson filterQ = null;
@@ -340,11 +340,23 @@ public class APICatalogSync {
                 templateUrls.add(s);
             }
 
+            // handle case sensitive apis in here only
+            Set<String> seenStaticUrls = new HashSet<>();
+
             Iterator<String> iterator = staticUrlToSti.keySet().iterator();
             while (iterator.hasNext()) {
                 String staticURL = iterator.next();
                 Method staticMethod = Method.fromString(staticURL.split(" ")[0]);
                 String staticEndpoint = staticURL.split(" ")[1];
+                String tempEndpoint = staticEndpoint.toLowerCase();
+
+                if(ignoreCaseInsensitiveApis){
+                    if(!seenStaticUrls.isEmpty() && seenStaticUrls.contains(tempEndpoint)){
+                        finalResult.deleteStaticUrls.add(staticURL);
+                        iterator.remove();
+                        continue;
+                    }
+                }
 
                 for (String templateURL: templateUrls) {
                     Method templateMethod = Method.fromString(templateURL.split(" ")[0]);
@@ -356,6 +368,9 @@ public class APICatalogSync {
                         iterator.remove();
                         break;
                     }
+                }
+                if(ignoreCaseInsensitiveApis){
+                    seenStaticUrls.add(tempEndpoint);
                 }
             }
 
@@ -846,10 +861,10 @@ public class APICatalogSync {
 
     }
 
-    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb) {
+    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb,boolean ignoreCaseInsensitiveApis) {
         if (apiCollectionId == LLM_API_COLLECTION_ID || apiCollectionId == VULNERABLE_API_COLLECTION_ID) return;
 
-        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled, mergeUrlsBasic, existingAPIsInDb);
+        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled, mergeUrlsBasic, existingAPIsInDb, ignoreCaseInsensitiveApis);
 
         String deletedStaticUrlsString = "";
         int counter = 0;
@@ -1091,14 +1106,27 @@ public class APICatalogSync {
         return ret;
     }
 
-    private void processKnownStaticURLs(URLAggregator aggregator, APICatalog deltaCatalog, APICatalog dbCatalog) {
+    private void processKnownStaticURLs(URLAggregator aggregator, APICatalog deltaCatalog, APICatalog dbCatalog, boolean makeApisCaseInsensitive) {
         Iterator<Map.Entry<URLStatic, Set<HttpResponseParams>>> iterator = aggregator.urls.entrySet().iterator();
         List<SingleTypeInfo> deletedInfo = deltaCatalog.getDeletedInfo();
+
+        // handle case insensitive apis here in the same aggregator
+        Set<String> lowerCaseApisSet = new HashSet<>();
+
         try {
             while (iterator.hasNext()) {
                 Map.Entry<URLStatic, Set<HttpResponseParams>> entry = iterator.next();
                 URLStatic url = entry.getKey();
                 Set<HttpResponseParams> responseParamsList = entry.getValue();
+
+                String endpoint = url.getUrl();
+                if(makeApisCaseInsensitive){
+                    if(lowerCaseApisSet.contains(endpoint.toLowerCase())){
+                        iterator.remove();
+                        continue;
+                    }
+                    lowerCaseApisSet.add(endpoint.toLowerCase());
+                }
 
                 RequestTemplate strictMatch = dbCatalog.getStrictURLToMethods().get(url);
                 if (strictMatch != null) {
@@ -1498,20 +1526,25 @@ public class APICatalogSync {
                     try {
                         List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        boolean makeApisCaseInsensitive = false;
+                        if(accountSettings != null){
+                            makeApisCaseInsensitive = accountSettings.getHandleApisCaseInsensitive();
+                        }
+                        
                         Boolean urlRegexMatchingEnabled = accountSettings == null || accountSettings.getUrlRegexMatchingEnabled();
                         loggerMaker.infoAndAddToDb("url regex matching enabled status is " + urlRegexMatchingEnabled, LogDb.RUNTIME);
                         for(ApiCollection apiCollection: allCollections) {
                             int start = Context.now();
                             loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollection.getId(), LogDb.RUNTIME);
                             try {
-                                mergeUrlsAndSave(apiCollection.getId(), true, true, existingAPIsInDb);
+                                mergeUrlsAndSave(apiCollection.getId(), true, true, existingAPIsInDb, makeApisCaseInsensitive);
                                 loggerMaker.infoAndAddToDb("Finished merging API collection basic " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
                             }
 
                             try {
-                                mergeUrlsAndSave(apiCollection.getId(), true, false, existingAPIsInDb);
+                                mergeUrlsAndSave(apiCollection.getId(), true, false, existingAPIsInDb, makeApisCaseInsensitive);
                                 loggerMaker.infoAndAddToDb("Finished merging API collection all" + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
