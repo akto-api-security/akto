@@ -2577,6 +2577,26 @@
             </result>
         </action>
 
+        <action name="api/fetchRecentParams" class="com.akto.action.observe.InventoryAction" method="fetchRecentParams">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/saveCustomDataType" class="com.akto.action.CustomDataTypeAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -3410,6 +3430,28 @@
             </result>
         </action>
 
+        <action name="api/fetchVulnerableRequests" class="com.akto.action.testing_issues.IssuesAction" method="fetchVulnerableRequests">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="enumAsBean">true</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="tools/fetchVulnerableRequests" class="com.akto.action.testing_issues.IssuesAction" method="fetchVulnerableRequests">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="enumAsBean">true</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="tools/fetchSampleData" class="com.akto.action.TrafficAction" method="fetchSampleData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -3723,8 +3765,10 @@
             <result name="SUCCESS" type="json">
                 <param name="enumAsBean">true</param>
             </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 
@@ -7205,7 +7249,74 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
 
+        <action name="api/checkIfDependencyGraphAvailable" class="com.akto.action.DependencyAction" method="checkIfDependencyGraphAvailable">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="auth/sendPasswordResetLink" class="com.akto.action.LoginAction" method="sendPasswordResetLink">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="root">code</param>
+            </result>
+        </action>
+
+        <action name="auth/resetPassword" class="com.akto.action.LoginAction" method="resetPassword">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="root">code</param>
+            </result>
+        </action>
+
+        <action name="api/resetUserPassword" class="com.akto.action.TeamAction" method="resetUserPassword">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+                <param name="root">passwordResetToken</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>

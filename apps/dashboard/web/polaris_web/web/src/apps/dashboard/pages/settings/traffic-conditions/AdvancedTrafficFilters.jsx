@@ -54,7 +54,7 @@ function AdvancedTrafficFilters() {
         }
 
         const handleDryRun = async(content) => {
-            if(window.IS_SAAS === "false"){
+            if(window.IS_SAAS !== "true" ||  window.USER_NAME.includes("akto")){
                 await trafficFiltersRequest.dryRunAdvancedFilters(content).then((res)=> {
                     window.open("/dashboard/settings/logs", "_blank")
                 })
@@ -184,7 +184,7 @@ function AdvancedTrafficFilters() {
                 open={modalActive}
                 onClose={() => setModalActive(false)}
                 primaryAction={{content: 'Save', onAction: () => {handleSave(currentTemplate); setModalActive(false)}}}
-                secondaryActions={window.IS_SAAS !== "true" ? [{content: 'Dry run', onAction: () => handleDryRun(currentTemplate)}]: []}
+                secondaryActions={(window.IS_SAAS !== "true" ||  window.USER_NAME.includes("akto"))? [{content: 'Dry run', onAction: () => handleDryRun(currentTemplate)}]: []}
                 title={"Add advanced filters"}
             >
                 <Modal.Section>

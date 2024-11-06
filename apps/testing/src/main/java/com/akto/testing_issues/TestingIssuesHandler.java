@@ -140,7 +140,7 @@ public class TestingIssuesHandler {
                 }
             }
 
-            if(shouldCountIssue) {
+            if(shouldCountIssue || !doesExists) {
                 int count = countIssuesMap.getOrDefault(severity.toString(), 0);
                 countIssuesMap.put(severity.toString(), count + 1);
             }

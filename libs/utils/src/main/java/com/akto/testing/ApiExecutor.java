@@ -256,18 +256,19 @@ public class ApiExecutor {
         return sendRequest(request, followRedirects, null, debug, testLogs, skipSSRFCheck);
     }
 
-    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
-        // don't lowercase url because query params will change and will result in incorrect request
-
+    public static Request buildRequest(OriginalHttpRequest request, TestingRunConfig testingRunConfig) throws Exception{
         String url = prepareUrl(request, testingRunConfig);
-
-        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
-            loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
-        }
         request.setUrl(url);
-
         Request.Builder builder = new Request.Builder();
-        String type = request.findContentType();
+        addHeaders(request, builder);
+        builder = builder.url(request.getFullUrlWithParams());
+        boolean executeScript = testingRunConfig != null;
+        calculateHashAndAddAuth(request, executeScript);
+        Request okHttpRequest = builder.build();
+        return okHttpRequest;
+    }
+
+    private static void addHeaders(OriginalHttpRequest request, Request.Builder builder){
         // add headers
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         Map<String, List<String>> headersMap = request.getHeaders();
@@ -283,6 +284,22 @@ public class ApiExecutor {
                 builder.addHeader(headerName, headerValue);
             }
         }
+    }
+
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+        // don't lowercase url because query params will change and will result in incorrect request
+
+        String url = prepareUrl(request, testingRunConfig);
+
+        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
+            loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
+        }
+        request.setUrl(url);
+
+        Request.Builder builder = new Request.Builder();
+        addHeaders(request, builder);
+
+        String type = request.findContentType();
         URLMethods.Method method = URLMethods.Method.fromString(request.getMethod());
 
         builder = builder.url(request.getFullUrlWithParams());
@@ -291,6 +308,8 @@ public class ApiExecutor {
         calculateHashAndAddAuth(request, executeScript);
 
         OriginalHttpResponse response = null;
+        HostValidator.validate(url);
+
         switch (method) {
             case GET:
             case HEAD:
@@ -368,7 +387,6 @@ public class ApiExecutor {
         if (!executeScript) {
             return;
         }
-        loggerMaker.infoAndAddToDb("Starting calculateHashAndAddAuth");
         int accountId = Context.accountId.get();
         try {
             String script;
@@ -383,9 +401,10 @@ public class ApiExecutor {
             if (testScript != null && testScript.getJavascript() != null) {
                 script = testScript.getJavascript();
             } else {
-                loggerMaker.infoAndAddToDb("returning from calculateHashAndAddAuth, no test script present");
+                // loggerMaker.infoAndAddToDb("returning from calculateHashAndAddAuth, no test script present");
                 return;
             }
+            loggerMaker.infoAndAddToDb("Starting calculateHashAndAddAuth");
 
             ScriptEngineManager manager = new ScriptEngineManager();
             ScriptEngine engine = manager.getEngineByName("nashorn");
@@ -483,7 +502,12 @@ public class ApiExecutor {
 
         if (payload == null) payload = "";
         if (body == null) {// body not created by GRPC block yet
-            body = RequestBody.create(payload, MediaType.parse(contentType));
+            if (request.getHeaders().containsKey("charset")) {
+                body = RequestBody.create(payload, null);
+                request.getHeaders().remove("charset");
+            } else {
+                body = RequestBody.create(payload, MediaType.parse(contentType));
+            }
         }
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();

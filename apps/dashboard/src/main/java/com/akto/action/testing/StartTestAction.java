@@ -120,7 +120,7 @@ public class StartTestAction extends UserAction {
             }
         }
 
-        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
+        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0, null);
         if (authMechanism == null && testIdConfig == 0) {
             addActionError("Please set authentication mechanism before you test any APIs");
             return null;
@@ -395,7 +395,7 @@ public class StartTestAction extends UserAction {
 
     public String retrieveAllCollectionTests() {
 
-        this.authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
+        this.authMechanism = TestRolesDao.instance.fetchAttackerToken(0, null);
 
         ArrayList<Bson> testingRunFilters = new ArrayList<>();
         Bson testingRunTypeFilter = getTestingRunTypeFilter(testingRunType);
@@ -537,7 +537,7 @@ public class StartTestAction extends UserAction {
                     break;
                 case SKIPPED_EXEC_API_REQUEST_FAILED:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
-                    testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, TestResult.API_CALL_FAILED_ERROR_STRING));
+                    testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, TestResult.API_CALL_FAILED_ERROR_STRING, TestResult.API_CALL_FAILED_ERROR_STRING_UNREACHABLE));
                     break;
                 case SKIPPED_EXEC:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));

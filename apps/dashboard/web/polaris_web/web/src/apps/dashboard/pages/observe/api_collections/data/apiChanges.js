@@ -63,6 +63,7 @@ const newParametersHeaders = [
         text: 'Name',
         value: 'name',
         title: 'Parameter Name',
+        showFilter: true
     },
     {
         text: 'Type',
@@ -70,6 +71,7 @@ const newParametersHeaders = [
         title: 'Parameter Type',
         type: CellType.TEXT,
         maxWidth: '100px',
+        showFilter: true,
         tooltipContent: "Data type associated with the parameter"
     },
     {
@@ -77,7 +79,6 @@ const newParametersHeaders = [
         title: 'Discovered',
         value: 'added',
         sortKey: 'timestamp',
-        showFilterMenu: true,
         type: CellType.TEXT,
         maxWidth: '120px',
         sortActive: true
@@ -103,8 +104,8 @@ const newParametersHeaders = [
         text: 'Location',
         title: 'Location',
         value: 'location',
+        showFilter: true,
         sortKey: 'isHeader',
-        showFilterMenu: true,
         type: CellType.TEXT,
         maxWidth: '120px',
         tooltipContent: "Location (request/response) of where the parameter is detected."
@@ -114,7 +115,7 @@ const newParametersHeaders = [
         title: 'Values',
         value: 'domain',
         maxWidth: '150px',
-        showFilterMenu: true,
+        showFilter: true,
         type: CellType.TEXT,
         tooltipContent: "Value of the parameter as detected in location"
     }
@@ -164,45 +165,6 @@ const parameterSortOptions = [
     { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp', columnIndex: 3 },
 ];
 
-let paramFilters = [
-    {
-        key: 'apiCollectionId',
-        label: 'Collection',
-        title: 'Collection',
-        choices: [],
-    },
-    {
-        key: 'method',
-        label: 'Method',
-        title: 'Method',
-        choices: [
-            { label: "GET",value: "GET"},
-            { label: "POST",value: "POST"},
-            { label: "PUT",value: "PUT"},
-            { label: "PATCH",value: "PATCH"},
-            { label: "DELETE",value: "DELETE"},
-            { label: "OPTIONS",value: "OPTIONS"},
-            { label: "HEAD",value: "HEAD"},
-        ]
-    },
-    {
-        key: 'subType',
-        label: 'Type',
-        title: 'Type',
-        choices: []
-    },
-    {
-        key:'location',
-        label:'Location',
-        title:'Location',
-        choices:[
-            {label:"Header", value:"header"},
-            {label:"Payload", value:"payload"},
-            {label:"URL param", value:"urlParam"}
-        ],
-    }
-]
-
 const apiChangesData = {
     getData(key){
         if(key.includes('param')){
@@ -222,9 +184,6 @@ const apiChangesData = {
             }
             return obj;
         }
-    },
-    getParamFilters(){
-        return paramFilters;
     }
 }
 

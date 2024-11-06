@@ -8,6 +8,7 @@ import Dropdown from "../../../components/layouts/Dropdown";
 import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
+import transform from "../../testing/transform";
 
 function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction }) {
 
@@ -90,7 +91,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
         })
 
-        const allSubCategoriesResponse = await testingApi.fetchAllSubCategories(true, "runTests")
+        const metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+        let categories = metaDataObj.categories
+        let businessLogicSubcategories = metaDataObj.subCategories
         const testRolesResponse = await testingApi.fetchTestRoles()
         var testRoles = testRolesResponse.testRoles.map(testRole => {
             return {
@@ -100,8 +103,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         })
         testRoles.unshift({"label": "No test role selected", "value": ""})
         setTestRolesArr(testRoles)
-        const businessLogicSubcategories = allSubCategoriesResponse.subCategories
-        const categories = allSubCategoriesResponse.categories
         const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(businessLogicSubcategories)
         // Store all tests
         const processMapCategoryToSubcategory = {}

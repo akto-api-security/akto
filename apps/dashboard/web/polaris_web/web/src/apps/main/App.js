@@ -369,7 +369,7 @@ const router = createBrowserRouter([
     element: <PageBusinessEmail />
   },
   {
-    path: "/sign-in-with-sso",
+    path: "/sso-login",
     element: <SignUpWithSSO />
   },
   // catches all undefined paths and redirects to homepage.

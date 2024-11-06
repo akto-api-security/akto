@@ -10,6 +10,7 @@ import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.password_reset.PasswordResetUtils;
 import com.akto.util.Pair;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -18,15 +19,21 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
 import com.opensymphony.xwork2.Action;
 
+import org.apache.struts2.interceptor.ServletRequestAware;
+import org.apache.struts2.interceptor.ServletResponseAware;
 import org.bson.conversions.Bson;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class TeamAction extends UserAction {
+import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
+
+public class TeamAction extends UserAction implements ServletResponseAware, ServletRequestAware {
 
     int id;
     BasicDBList users;
@@ -202,6 +209,53 @@ public class TeamAction extends UserAction {
         }
     }
 
+    String userEmail;
+    String passwordResetToken;
+    public String resetUserPassword() {
+        if(userEmail == null || userEmail.isEmpty()) {
+            addActionError("Email cannot be null or empty");
+            return Action.ERROR.toUpperCase();
+        }
+
+        User user = getSUser();
+        if(user == null) {
+            addActionError("User cannot be null or empty");
+            return Action.ERROR.toUpperCase();
+        }
+
+        User forgotPasswordUser = UsersDao.instance.findOne(Filters.eq(User.LOGIN, userEmail));
+        if(forgotPasswordUser == null) {
+            addActionError("User not found.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        int lastPasswordResetToken = forgotPasswordUser.getLastPasswordResetToken();
+        int timeElapsed = Context.now() - lastPasswordResetToken;
+        if(timeElapsed < TWO_HOURS_TIMESTAMP) {
+            int remainingTime = (TWO_HOURS_TIMESTAMP - timeElapsed) / 60;
+            addActionError("Please wait " + remainingTime + " minute" + (remainingTime > 1 ? "s" : "") + " for another password reset.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        String scheme = servletRequest.getScheme();
+        String serverName = servletRequest.getServerName();
+        int serverPort = servletRequest.getServerPort();
+        String websiteHostName;
+        if (serverPort == 80 || serverPort == 443) {
+            websiteHostName = scheme + "://" + serverName;
+        } else {
+            websiteHostName = scheme + "://" + serverName + ":" + serverPort;
+        }
+
+        passwordResetToken = PasswordResetUtils.insertPasswordResetToken(userEmail, websiteHostName);
+
+        if(passwordResetToken == null || passwordResetToken.isEmpty()) {
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public int getId() {
         return id;
     }
@@ -234,4 +288,23 @@ public class TeamAction extends UserAction {
         return userRoleHierarchy;
     }
 
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
+    }
+
+    public String getPasswordResetToken() {
+        return passwordResetToken;
+    }
+
+    protected HttpServletResponse servletResponse;
+    @Override
+    public void setServletResponse(HttpServletResponse httpServletResponse) {
+        this.servletResponse= httpServletResponse;
+    }
+
+    protected HttpServletRequest servletRequest;
+    @Override
+    public void setServletRequest(HttpServletRequest httpServletRequest) {
+        this.servletRequest = httpServletRequest;
+    }
 }

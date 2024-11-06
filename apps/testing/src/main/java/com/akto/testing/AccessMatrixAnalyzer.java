@@ -97,8 +97,11 @@ public class AccessMatrixAnalyzer {
             loggerMaker.infoAndAddToDb("Role found: " + roleFromTask, LogDb.TESTING);
             List<TestRoles> testRoles = TestRolesDao.instance.findAll(TestRoles.NAME, roleFromTask);
 
-            AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
+            List<RawApi> rawApis = sampleMessageStore.findSampleMessages(1);
+            RawApi randomRawApi = !rawApis.isEmpty() ? rawApis.get(0) : null;
+            AuthMechanismStore authMechanismStore = AuthMechanismStore.create(randomRawApi);
             AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
+
             List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
             TestingUtil testingUtil = new TestingUtil(authMechanism,sampleMessageStore, testRoles,"", customAuthTypes);
 

@@ -21,7 +21,7 @@ export default function LayoutWithTabs(props){
         <LegacyTabs
             selected={current}
             onSelect={setCurrentTab}
-            tabs={props.tabs}
+            tabs={!props.disabledTabs ? props.tabs : props.tabs.filter(obj => !props.disabledTabs.includes(obj.id))}
         >
             {loading ? <SpinnerCentered/> : props.tabs[current].component }
         </LegacyTabs>

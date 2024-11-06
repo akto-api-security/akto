@@ -162,7 +162,8 @@ public class YamlNodeExecutor extends NodeExecutor {
                     memory.reset(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
                 }
                 tsAfterReq = Context.nowInMillis();
-                responseTimeArr.add(tsAfterReq - tsBeforeReq);
+                int responseTime = tsAfterReq - tsBeforeReq;
+                responseTimeArr.add(responseTime);
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                 TestResult res = executor.validate(attempt, sampleRawApi, varMap, logId, validatorNode, yamlNodeDetails.getApiInfoKey());
                 if (res != null) {
@@ -170,7 +171,7 @@ public class YamlNodeExecutor extends NodeExecutor {
                 }
                 vulnerable = res.getVulnerable();
                 try {
-                    message.add(convertOriginalReqRespToString(testReq.getRequest(), testResponse));
+                    message.add(convertOriginalReqRespToString(testReq.getRequest(), testResponse, responseTime));
                 } catch (Exception e) {
                     ;
                 }
@@ -265,7 +266,7 @@ public class YamlNodeExecutor extends NodeExecutor {
     public WorkflowTestResult.NodeResult processYamlNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, YamlNodeDetails yamlNodeDetails, boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
         String testSubCategory = yamlNodeDetails.getTestId();
-        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false);
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, 0, 10_000);
         TestConfig testConfig = testConfigMap.get(testSubCategory);
 
         ExecutorNode executorNode = yamlNodeDetails.getExecutorNode();
