@@ -350,6 +350,52 @@ const awsApiGatewayObj = {
     key: "AWS_API_GATEWAY",
 }
 
+const ecsObj = {
+    icon: '/public/ecs.svg',
+    label: "AWS ECS",
+    text: "You can deploy Akto in AWS and collect traffic through containers on your AWS ECS cluster.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/aws-services/aws-ecs',
+    component: <AddOnComponenet/>,
+    key: "ECS",
+}
+
+const mulesoftObj = {
+    icon: '/public/mulesoft.svg',
+    label: "MuleSoft",
+    text: "Mulesoft setup is recommended if you are using API management and ESB capabilities to manage, secure, and analyze your APIs.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/mulesoft-flex',
+    component: <AddOnComponenet/>,
+    key: "mulesoft",
+}
+
+const citrixObj = {
+    icon: '/public/citrix.svg',
+    label: "Citrix",
+    text: "Citrix setup is recommended if you are using ADC (NetScaler) to manage, secure, and optimize your API traffic.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/mulesoft-flex',
+    component: <AddOnComponenet/>,
+    key: "citrix",
+}
+
+const azureappserviceObj = {
+    icon: '/public/azureappservice.svg',
+    label: "Azure App Services",
+    text: "Azure App Services setup is recommended if you are using Microsoft's web app service with sidecar containers to collect and analyze your API traffic.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/azure-services/azure-app-service',
+    component: <AddOnComponenet/>,
+    key: "azureappservice",
+}
+
+const ibmapiconnectObj = {
+    icon: '/public/ibmapiconnect.svg',
+    label: "IBM API Connect",
+    text: "This setup is recommended if your APIs are managed by IBM API Connect",
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-ibm-connect',
+    component: <AddOnComponenet/>,
+    key: "IBM API connect",
+}
+
+
 const quick_start_policy_lines= [
     `{`,
     `    "Version": "2012-10-17",`,
@@ -906,7 +952,7 @@ const quickStartFunc = {
 
         // API Gateways
         const apiGateways = [
-            apigeeObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj
+            apigeeObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
         ];
 
         // Mirroring
@@ -916,7 +962,7 @@ const quickStartFunc = {
 
         // AWS Services
         const awsServices = [
-            awsApiGatewayObj, eksObj, fargateObj, beanStalkObj
+            awsApiGatewayObj, eksObj, fargateObj, beanStalkObj, ecsObj
         ];
 
         // Manual
