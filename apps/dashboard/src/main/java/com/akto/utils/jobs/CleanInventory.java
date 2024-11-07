@@ -46,6 +46,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.test_editor.execution.ParseAndExecute;
 import com.akto.util.AccountTask;
+import com.akto.util.DashboardMode;
 import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -154,7 +155,9 @@ public class CleanInventory {
 
                     ApiCollection apiCollection = apiCollectionMap.get(sampleData.getId().getApiCollectionId());
                     if (apiCollection == null) {
-                        logger.info("[BadApisRemover] No apiCollection found for : " + sampleData.getId());
+                        if(!DashboardMode.isMetered()){
+                            logger.info("[BadApisRemover] No apiCollection found for : " + sampleData.getId());
+                        }
                         continue;
                     }
 

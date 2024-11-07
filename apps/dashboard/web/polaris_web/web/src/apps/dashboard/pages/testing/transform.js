@@ -593,6 +593,33 @@ const transform = {
     }
     return conditions;
   },
+  async getAllSubcategoriesData(fetchActive,type){
+    let finalDataSubCategories = [], promises = [], categories = [];
+    const limit = 50;
+    for(var i = 0 ; i < 20; i++){
+      promises.push(
+        api.fetchAllSubCategories(fetchActive, type, i * limit, limit)
+      )
+    }
+    const allResults = await Promise.allSettled(promises);
+    for (const result of allResults) {
+      if (result.status === "fulfilled"){
+        if(result?.value?.subCategories && result?.value?.subCategories !== undefined && result?.value?.subCategories.length > 0){
+          finalDataSubCategories.push(...result.value.subCategories);
+        }
+
+        if(result?.value?.categories && result?.value?.categories !== undefined && result?.value?.categories.length > 0){
+          if(categories.length === 0){
+            categories.push(...result.value.categories);
+          }
+        }
+      }
+    }
+    return {
+      categories: categories,
+      subCategories: finalDataSubCategories
+    }
+  },
   async setTestMetadata() {
     const resp = await api.fetchAllSubCategories(false, "Dashboard");
     let subCategoryMap = {};

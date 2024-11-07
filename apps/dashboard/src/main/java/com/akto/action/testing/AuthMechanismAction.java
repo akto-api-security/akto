@@ -141,7 +141,7 @@ public class AuthMechanismAction extends UserAction {
 
     public String fetchAuthMechanismData() {
 
-        authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
+        authMechanism = TestRolesDao.instance.fetchAttackerToken(0, null);
         return SUCCESS.toUpperCase();
     }
 

@@ -410,8 +410,12 @@ public class IssuesAction extends UserAction {
     private boolean fetchOnlyActive;
     private String mode;
 
-    public String fetchAllSubCategories() {
+    public String fetchVulnerableRequests() {
+        vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty(), skip, limit, Sorts.ascending("_id"));
+        return SUCCESS.toUpperCase();
+    }
 
+    public String fetchAllSubCategories() {
         boolean includeYamlContent = false;
 
         switch (mode) {
@@ -420,17 +424,15 @@ public class IssuesAction extends UserAction {
                 break;
             case "testEditor":
                 includeYamlContent = true;
-                vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
                 break;
             default:
                 includeYamlContent = true;
                 categories = GlobalEnums.TestCategory.values();
-                vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
                 testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(includeYamlContent,
-                fetchOnlyActive);
+                fetchOnlyActive, skip, limit);
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             try {

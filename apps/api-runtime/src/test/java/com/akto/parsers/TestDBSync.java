@@ -92,9 +92,9 @@ public class TestDBSync extends MongoBasedTest {
         for (int i = 2; i <= 30; i ++ ) {
             aggr.addURL(TestDump2.createSampleParams("user"+i, url+i));
         }
-        sync.computeDelta(aggr, true, 0);
+        sync.computeDelta(aggr, true, 0, false);
         sync.syncWithDB(false, true, SyncLimit.noLimit);
-        APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb);
+        APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb, false);
         sync.buildFromDB(false, true);
 
 
@@ -133,7 +133,7 @@ public class TestDBSync extends MongoBasedTest {
         parser.syncFunction(responseParams, false, true, null);
         assertTrue(parser.getSyncCount() == 0);
 
-        APICatalogSync.mergeUrlsAndSave(123, true, false, parser.apiCatalogSync.existingAPIsInDb);
+        APICatalogSync.mergeUrlsAndSave(123, true, false, parser.apiCatalogSync.existingAPIsInDb, false);
         parser.apiCatalogSync.buildFromDB(false, true);
 
         SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
@@ -230,7 +230,7 @@ public class TestDBSync extends MongoBasedTest {
         for (int i = 1; i <= 30; i ++ ) {
             aggr.addURL(TestDump2.createSampleParams("user"+i, "/payment/id"+i));
         }
-        sync.computeDelta(aggr, true, 123);
+        sync.computeDelta(aggr, true, 123, false);
         sync.syncWithDB(false, true, SyncLimit.noLimit);
 
 
@@ -245,9 +245,9 @@ public class TestDBSync extends MongoBasedTest {
         URLAggregator aggr2 = new URLAggregator();
         aggr2.addURL(resp2);
         
-        sync.computeDelta(aggr2, true, 123);
+        sync.computeDelta(aggr2, true, 123, false);
         sync.syncWithDB(false, true, SyncLimit.noLimit);
-        APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb);
+        APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb, false);
         sync.buildFromDB(false, true);
 
 
