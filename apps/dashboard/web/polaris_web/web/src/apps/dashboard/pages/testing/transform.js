@@ -595,6 +595,7 @@ const transform = {
   },
   async getAllSubcategoriesData(fetchActive,type){
     let finalDataSubCategories = [], promises = [], categories = [];
+    let testSourceConfigs = []
     const limit = 50;
     for(var i = 0 ; i < 20; i++){
       promises.push(
@@ -611,15 +612,22 @@ const transform = {
         if(result?.value?.categories && result?.value?.categories !== undefined && result?.value?.categories.length > 0){
           categories.push(...result.value.categories);
         }
+
+        if (result?.value?.testSourceConfigs &&
+          result?.value?.testSourceConfigs !== undefined &&
+          result?.value?.testSourceConfigs.length > 0) {
+          testSourceConfigs = result?.value?.testSourceConfigs
+        }
       }
     }
     return {
       categories: categories,
-      subCategories: finalDataSubCategories
+      subCategories: finalDataSubCategories,
+      testSourceConfigs: testSourceConfigs
     }
   },
   async setTestMetadata() {
-    const resp = await api.fetchAllSubCategories(false, "Dashboard");
+    const resp = await this.getAllSubcategoriesData(false, "Dashboard")
     let subCategoryMap = {};
     resp.subCategories.forEach((x) => {
       func.trimContentFromSubCategory(x)
