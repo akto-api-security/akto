@@ -2,6 +2,7 @@ package com.akto.test_editor.execution;
 
 import com.akto.dao.billing.OrganizationsDao;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -522,7 +523,6 @@ public class Executor {
 
                     }
 
-        
                     for (AuthParam param : authMechanismForRole.getAuthParams()) {
                         try {
                             String value = com.akto.testing.workflow_node_executor.Utils.executeCode(param.getValue(), valuesMap);
@@ -536,6 +536,12 @@ public class Executor {
                     }
 
                     authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
+                    /*
+                     * We set the recorded login flow null
+                     * so that we calculate the tokens only once
+                     * and use them every time.
+                     */
+                    authWithCond.setRecordedLoginFlowInput(null);
                 } else {
                     if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
                         try {
@@ -574,6 +580,20 @@ public class Executor {
         return null;
     }
 
+    private static ConcurrentHashMap<String, TestRoles> roleCache = new ConcurrentHashMap<>();
+
+    private synchronized static TestRoles fetchOrFindTestRole(String name) {
+        if (roleCache == null) {
+            roleCache = new ConcurrentHashMap<>();
+        }
+        if (roleCache.containsKey(name)) {
+            return roleCache.get(name);
+        }
+        TestRoles testRole = TestRolesDao.instance.findOne(TestRoles.NAME, name);
+        roleCache.put(name, testRole);
+        return roleCache.get(name);
+    }
+
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
         switch (operationType.toLowerCase()) {
             case "send_ssrf_req":
@@ -605,12 +625,14 @@ public class Executor {
 
                     keyStr = keyStr.replace(ACCESS_ROLES_CONTEXT, "");
                     keyStr = keyStr.substring(0,keyStr.length()-1).trim();
-                    TestRoles testRole = TestRolesDao.instance.findOne(TestRoles.NAME, keyStr);
+                    TestRoles testRole = fetchOrFindTestRole(keyStr);
                     if (testRole == null) {
                         return new ExecutorSingleOperationResp(false, "Test Role " + keyStr +  " Doesn't Exist ");
                     }
-
-                    ExecutorSingleOperationResp insertedAuthResp = modifyAuthTokenInRawApi(testRole, rawApi);
+                    ExecutorSingleOperationResp insertedAuthResp = new ExecutorSingleOperationResp(true, "");
+                    synchronized (testRole) {
+                        insertedAuthResp = modifyAuthTokenInRawApi(testRole, rawApi);
+                    }
                     if (insertedAuthResp != null) {
                         return insertedAuthResp;
                     }

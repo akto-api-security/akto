@@ -6,7 +6,6 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
-import com.akto.dto.testing.info.BFLATestInfo;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.TestingUtil;
@@ -21,7 +20,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -74,6 +72,9 @@ public class BFLATest {
                 if (allHeadersMatched) {
                     AuthMechanism authMechanismForRole = authWithCond.getAuthMechanism();
                     if (authMechanismForRole.getType().equalsIgnoreCase(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.name())) {
+                        if (authWithCond.getRecordedLoginFlowInput() != null) {
+                            authMechanismForRole.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
+                        }
                         LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null);
                         if (!loginFlowResponse.getSuccess()) throw new Exception(loginFlowResponse.getError());
 
