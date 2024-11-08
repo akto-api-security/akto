@@ -251,9 +251,13 @@ public class ApiExecutor {
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean useTestingRunConfig) throws Exception {
         if(useTestingRunConfig) {
             return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
+        }else{
+            TestingRunConfig runConfig = new TestingRunConfig();
+            runConfig.setOverriddenTestAppUrl("");
+            return sendRequest(request, followRedirects, runConfig, debug, testLogs, skipSSRFCheck);
         }
 
-        return sendRequest(request, followRedirects, null, debug, testLogs, skipSSRFCheck);
+        
     }
 
     public static Request buildRequest(OriginalHttpRequest request, TestingRunConfig testingRunConfig) throws Exception{
