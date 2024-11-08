@@ -67,7 +67,7 @@ abstract public class SourceCodeAnalyserRepo {
         Request.Builder builder = new Request.Builder();
         builder.url(finalUrl);
         builder.get();
-        builder.addHeader("Authorization", "Bearer " + token);
+//        builder.addHeader("Authorization", "Bearer " + token);
         Request request = builder.build();
 
         try {
@@ -158,6 +158,13 @@ abstract public class SourceCodeAnalyserRepo {
             syncRepoToDashboard(originalHttpResponse.getBody(), repoToBeAnalysed);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while fetching api's from code-analysis for repository:" + repoToBeAnalysed);
+        } finally {
+            if (repositoryPath != null) {
+                File file = new File(repositoryPath);
+                if(file.delete()) {
+                    loggerMaker.infoAndAddToDb("successfully deleted the zip file", LoggerMaker.LogDb.RUNTIME);
+                }
+            }
         }
     }
 
