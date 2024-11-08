@@ -35,6 +35,7 @@ import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.rules.RequiredConfigs;
 import com.akto.task.Cluster;
+import com.akto.test_editor.execution.Executor;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -318,6 +319,12 @@ public class Main {
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
                 // saving the initial usageLeft, to calc delta later.
                 int usageLeft = syncLimit.getUsageLeft();
+
+                /*
+                 * Since the role cache is static
+                 * so to prevent it from being shared across accounts.
+                 */
+                Executor.clearRoleCache();
 
                 try {
                     fillTestingEndpoints(testingRun);

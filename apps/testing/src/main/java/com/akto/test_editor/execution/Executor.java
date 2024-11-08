@@ -582,6 +582,12 @@ public class Executor {
 
     private static ConcurrentHashMap<String, TestRoles> roleCache = new ConcurrentHashMap<>();
 
+    public static void clearRoleCache() {
+        if (roleCache != null) {
+            roleCache.clear();
+        }
+    }
+
     private synchronized static TestRoles fetchOrFindTestRole(String name) {
         if (roleCache == null) {
             roleCache = new ConcurrentHashMap<>();
