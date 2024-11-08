@@ -1,6 +1,7 @@
 package com.akto.test_editor.execution;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,6 +29,7 @@ import com.akto.rules.TestPlugin;
 import com.akto.test_editor.OrgUtils;
 import com.akto.test_editor.Utils;
 import com.akto.util.Constants;
+import com.akto.util.JSONUtils;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -485,14 +487,20 @@ public class Executor {
                 if (authWithCond.getRecordedLoginFlowInput() != null) {
                     // handle json recording
                     RecordedLoginFlowInput recordedLoginFlowInput = authWithCond.getRecordedLoginFlowInput();
-
+                    Map<String, Object> valuesMap = new HashMap<>();
                     String token = com.akto.testing.workflow_node_executor.Utils.fetchToken(recordedLoginFlowInput, 5);
                     if (token == null) {
                         return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: ");
-                    }
+                    } else {
+                        loggerMaker.infoAndAddToDb("flattened here: " + token);
+                        BasicDBObject flattened = JSONUtils.flattenWithDots(BasicDBObject.parse(token));
 
-                    Map<String, Object> valuesMap = new HashMap<>();
-                    valuesMap.put("x1.response.body.token", token);
+                        for (String param: flattened.keySet()) {
+                            String key = "x1.response.body." + param;
+                            valuesMap.put(key, flattened.get(param));
+                            loggerMaker.infoAndAddToDb("kv pair: " + key + " " + flattened.get(param));
+                        }
+                    }
         
                     for (AuthParam param : authMechanismForRole.getAuthParams()) {
                         try {
@@ -507,6 +515,12 @@ public class Executor {
                     }
 
                     authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
+                    /*
+                     * We set the recorded login flow null
+                     * so that we calculate the tokens only once
+                     * and use them every time.
+                     */
+                    authWithCond.setRecordedLoginFlowInput(null);
                 } else {
                     if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
                         try {
@@ -529,7 +543,12 @@ public class Executor {
                 if (!authParamList.isEmpty()) {
                     ExecutorSingleOperationResp ret = null;
                     for (AuthParam authParam1: authParamList) {
-                        ret = Operations.modifyHeader(rawApi, authParam1.getKey().toLowerCase(), authParam1.getValue());
+                        if(authParam1.authTokenPresent(rawApi.getRequest())){
+                            authParam1.addAuthTokens(rawApi.getRequest());
+                            ret = new ExecutorSingleOperationResp(true, "");
+                        } else {
+                            ret = new ExecutorSingleOperationResp(true, "key not present " + authParam1.getKey().toLowerCase());
+                        }
                     }
 
                     return ret;
@@ -538,6 +557,20 @@ public class Executor {
         }
 
         return null;
+    }
+
+    private static ConcurrentHashMap<String, TestRoles> roleCache = new ConcurrentHashMap<>();
+
+    private synchronized static TestRoles fetchOrFindTestRole(String name) {
+        if (roleCache == null) {
+            roleCache = new ConcurrentHashMap<>();
+        }
+        if (roleCache.containsKey(name)) {
+            return roleCache.get(name);
+        }
+        TestRoles testRole = dataActor.fetchTestRole(name);
+        roleCache.put(name, testRole);
+        return roleCache.get(name);
     }
 
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
@@ -607,12 +640,15 @@ public class Executor {
 
                     keyStr = keyStr.replace(ACCESS_ROLES_CONTEXT, "");
                     keyStr = keyStr.substring(0,keyStr.length()-1).trim();
-                    TestRoles testRole = dataActor.fetchTestRole(keyStr);
+                    TestRoles testRole = fetchOrFindTestRole(keyStr);
                     if (testRole == null) {
                         return new ExecutorSingleOperationResp(false, "Test Role " + keyStr +  " Doesn't Exist ");
                     }
 
-                    ExecutorSingleOperationResp insertedAuthResp = modifyAuthTokenInRawApi(testRole, rawApi);
+                    ExecutorSingleOperationResp insertedAuthResp = new ExecutorSingleOperationResp(true, "");
+                    synchronized (testRole) {
+                        insertedAuthResp = modifyAuthTokenInRawApi(testRole, rawApi);
+                    }
                     if (insertedAuthResp != null) {
                         return insertedAuthResp;
                     }
@@ -714,7 +750,9 @@ public class Executor {
 
                     for (AuthParam authParam: authMechanism.getAuthParams()) {
                         authVal = authParam.getValue();
-                        ExecutorSingleOperationResp result = Operations.modifyHeader(rawApi, authParam.getKey(), authVal);
+                        ExecutorSingleOperationResp result = new ExecutorSingleOperationResp(true, "");
+                        boolean ret = authParam.addAuthTokens(rawApi.getRequest());
+                        result.setSuccess(ret);
                         modifiedAtLeastOne = modifiedAtLeastOne || result.getSuccess();
                     }
                 }
