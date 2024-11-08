@@ -247,12 +247,16 @@ public class HttpCallParser {
         Pattern regexPattern = Utils.createRegexPatternFromList(redundantList);
         filteredResponseParams = filterHttpResponseParams(filteredResponseParams, redundantList, regexPattern);
         
+        boolean makeApisCaseInsensitive = false;
+        if(accountSettings != null){
+            makeApisCaseInsensitive = accountSettings.getHandleApisCaseInsensitive();
+        }
 
         boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
 
         for (int apiCollectionId: aggregatorMap.keySet()) {
             URLAggregator aggregator = aggregatorMap.get(apiCollectionId);
-            apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
+            apiCatalogSync.computeDelta(aggregator, false, apiCollectionId, makeApisCaseInsensitive);
         }
 
         if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
@@ -582,6 +586,7 @@ public class HttpCallParser {
             }else{
                 httpResponseParam = param;
             }
+
             int apiCollectionId = createApiCollectionId(httpResponseParam);
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);

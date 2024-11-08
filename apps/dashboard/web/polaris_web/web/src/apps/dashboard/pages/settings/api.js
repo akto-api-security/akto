@@ -448,6 +448,15 @@ const settingRequests = {
             }
         })
     },
+    updateApisCaseInsensitive(toggleCaseSensitiveApis){
+        return request({
+            url: '/api/toggleCaseSensitiveApis',
+            method: "post",
+            data: {
+                toggleCaseSensitiveApis
+            }
+        })
+    },
     resetUserPassword(userEmail) {
         return request({
             url: '/api/resetUserPassword',

@@ -114,6 +114,9 @@ public class AccountSettings {
     public static final String DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES = "timeForScheduledSummaries";
     private int timeForScheduledSummaries;
 
+    public static final String HANDLE_APIS_CASE_INSENSITIVE = "handleApisCaseInsensitive";
+    private boolean handleApisCaseInsensitive;
+
     public AccountSettings() {
     }
 
@@ -433,5 +436,13 @@ public class AccountSettings {
 
     public void setTimeForScheduledSummaries(int timeForScheduledSummaries) {
         this.timeForScheduledSummaries = timeForScheduledSummaries;
+    }
+
+    public boolean getHandleApisCaseInsensitive() {
+        return handleApisCaseInsensitive;
+    }
+
+    public void setHandleApisCaseInsensitive(boolean handleApisCaseInsensitive) {
+        this.handleApisCaseInsensitive = handleApisCaseInsensitive;
     }
 }
