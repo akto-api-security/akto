@@ -3047,6 +3047,7 @@ public class InitializerListener implements ServletContextListener {
 
                 int countTotalTemplates = 0;
                 int countUnchangedTemplates = 0;
+                Set<String> multiNodesIds = new HashSet<>();
 
                 while ((entry = zipInputStream.getNextEntry()) != null) {
                     if (!entry.isDirectory()) {
@@ -3070,16 +3071,20 @@ public class InitializerListener implements ServletContextListener {
 
                         TestConfig testConfig = null;
                         countTotalTemplates++;
+                        List<YamlTemplate> existingTemplatesInDb = new ArrayList<>();
                         try {
                             testConfig = TestConfigYamlParser.parseTemplate(templateContent);
                             String testConfigId = testConfig.getId();
 
-                            List<YamlTemplate> existingTemplatesInDb = mapIdToHash.get(testConfigId);
+                            existingTemplatesInDb = mapIdToHash.get(testConfigId);
 
                             if (existingTemplatesInDb != null && existingTemplatesInDb.size() == 1) {
                                 int existingTemplateHash = existingTemplatesInDb.get(0).getHash();
                                 if (existingTemplateHash == templateContent.hashCode()) {
                                     countUnchangedTemplates++;
+                                    if(TestConfig.isTestMultiNode(testConfig)){
+                                        multiNodesIds.add(testConfigId);
+                                    }
                                     continue;
                                 } else {
                                     loggerMaker.infoAndAddToDb("Updating test yaml: " + testConfigId, LogDb.DASHBOARD);
@@ -3092,10 +3097,19 @@ public class InitializerListener implements ServletContextListener {
                                     LogDb.DASHBOARD);
                         }
 
+                        // new or updated template
                         if (testConfig != null) {
                             String id = testConfig.getId();
                             int createdAt = Context.now();
                             int updatedAt = Context.now();
+
+                            if (TestConfig.isTestMultiNode(testConfig)) {
+                                if(existingTemplatesInDb != null && existingTemplatesInDb.size() == 1){
+                                    multiNodesIds.add(id);
+                                }else if(!DashboardMode.isMetered()){
+                                    continue;
+                                }
+                            }
 
                             List<Bson> updates = new ArrayList<>(
                                     Arrays.asList(
@@ -3146,6 +3160,13 @@ public class InitializerListener implements ServletContextListener {
 
                     // Close the current entry to proceed to the next one
                     zipInputStream.closeEntry();
+                }
+
+                if(!DashboardMode.isMetered()){
+                    loggerMaker.infoAndAddToDb("Deleting " + multiNodesIds.size() + " templates for local deployment", LogDb.DASHBOARD);
+                    YamlTemplateDao.instance.deleteAll(
+                        Filters.in(Constants.ID, multiNodesIds)
+                    );
                 }
 
                 if (countTotalTemplates != countUnchangedTemplates) {

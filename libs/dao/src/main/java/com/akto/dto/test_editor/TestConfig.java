@@ -47,6 +47,19 @@ public class TestConfig {
 
     public TestConfig() { }
 
+    public static boolean isTestMultiNode(TestConfig testConfig){
+        if(testConfig == null || testConfig.getExecute() == null){
+            return false;
+        }
+        try {
+            return testConfig.getExecute().getNode().getChildNodes().get(0).getValues().equals("multiple");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+        
+    }
+
     public String getId() {
         return id;
     }
