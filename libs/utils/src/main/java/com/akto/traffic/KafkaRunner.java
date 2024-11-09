@@ -3,7 +3,6 @@ package com.akto.traffic;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -27,19 +26,25 @@ import com.akto.runtime.utils.Utils;
 import com.mongodb.ConnectionString;
 
 public class KafkaRunner {
-    private Consumer<String, String> consumer;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(KafkaRunner.class, LogDb.RUNTIME);
+    private final Consumer<String, String> consumer;
+    private final LogDb module;
+    private final LoggerMaker loggerMaker = new LoggerMaker(KafkaRunner.class, LogDb.RUNTIME);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
-    public static void processKafkaRecords(LogDb module, List<String> topics,
+    public KafkaRunner(LogDb module, Consumer<String, String> consumer) {
+        this.consumer = consumer;
+        this.module = module;
+        this.loggerMaker.setDb(module);
+    }
+
+    public void consume(
+            List<String> topics,
             FailableFunction<ConsumerRecords<String, String>, Void, Exception> recordProcessor) {
 
-        loggerMaker.setDb(module);
-
         boolean hybridSaas = RuntimeMode.isHybridDeployment();
-        boolean connected =false;
+        boolean connected = false;
         if (hybridSaas) {
             AccountSettings accountSettings = dataActor.fetchAccountSettings();
             if (accountSettings != null) {
@@ -55,30 +60,17 @@ public class KafkaRunner {
         }
 
         if (connected) {
-            loggerMaker.infoAndAddToDb(String.format("Starting module for account : %d", Context.accountId.get()));
-            AllMetrics.instance.init(module);
+            loggerMaker.infoAndAddToDb(
+                    String.format("Starting module for account : %d", Context.accountId.get()));
+            AllMetrics.instance.init(this.module);
         }
-
-        String kafkaBrokerUrl = "kafka1:19092";
-        String isKubernetes = System.getenv("IS_KUBERNETES");
-        if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
-            loggerMaker.infoAndAddToDb("is_kubernetes: true");
-            kafkaBrokerUrl = "127.0.0.1:29092";
-        }
-        String groupIdConfig = System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
-        int maxPollRecordsConfig = Integer
-                .parseInt(System.getenv().getOrDefault("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "100"));
-
-        Properties properties = Utils.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
-        final KafkaRunner main = new KafkaRunner();
-        main.consumer = new KafkaConsumer<>(properties);
 
         final Thread mainThread = Thread.currentThread();
         final AtomicBoolean exceptionOnCommitSync = new AtomicBoolean(false);
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
-                main.consumer.wakeup();
+                consumer.wakeup();
                 try {
                     if (!exceptionOnCommitSync.get()) {
                         mainThread.join();
@@ -92,21 +84,17 @@ public class KafkaRunner {
         });
 
         scheduler.scheduleAtFixedRate(() -> {
-            try {
-                logKafkaMetrics(main, module);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e,
-                        String.format("Failed to get kafka metrics for %s error: %s", module.name(), e.toString()));
-            }
+            logKafkaMetrics();
         }, 0, 1, TimeUnit.MINUTES);
 
         try {
-            main.consumer.subscribe(topics);
-            loggerMaker.infoAndAddToDb(String.format("Consumer subscribed for topics : %s", topics.toString()));
+            consumer.subscribe(topics);
+            loggerMaker.infoAndAddToDb(
+                    String.format("Consumer subscribed for topics : %s", topics.toString()));
             while (true) {
-                ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
+                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(10000));
                 try {
-                    main.consumer.commitSync();
+                    consumer.commitSync();
                 } catch (Exception e) {
                     throw e;
                 }
@@ -126,35 +114,49 @@ public class KafkaRunner {
             e.printStackTrace();
             System.exit(0);
         } finally {
-            main.consumer.close();
+            consumer.close();
         }
     }
 
-    private static void logKafkaMetrics(KafkaRunner main, LogDb module) {
-        Map<MetricName, ? extends Metric> metrics = main.consumer.metrics();
-        for (Map.Entry<MetricName, ? extends Metric> entry : metrics.entrySet()) {
-            MetricName key = entry.getKey();
-            Metric value = entry.getValue();
+    public void logKafkaMetrics() {
+        try {
+            Map<MetricName, ? extends Metric> metrics = this.consumer.metrics();
+            for (Map.Entry<MetricName, ? extends Metric> entry : metrics.entrySet()) {
+                MetricName key = entry.getKey();
+                Metric value = entry.getValue();
 
-            if (key.name().equals("records-lag-max")) {
-                double val = value.metricValue().equals(Double.NaN) ? 0d : (double) value.metricValue();
-                AllMetrics.instance.setKafkaRecordsLagMax((float) val);
-            }
-            if (key.name().equals("records-consumed-rate")) {
-                double val = value.metricValue().equals(Double.NaN) ? 0d : (double) value.metricValue();
-                AllMetrics.instance.setKafkaRecordsConsumedRate((float) val);
-            }
+                if (key.name().equals("records-lag-max")) {
+                    double val = value.metricValue().equals(Double.NaN)
+                            ? 0d
+                            : (double) value.metricValue();
+                    AllMetrics.instance.setKafkaRecordsLagMax((float) val);
+                }
+                if (key.name().equals("records-consumed-rate")) {
+                    double val = value.metricValue().equals(Double.NaN)
+                            ? 0d
+                            : (double) value.metricValue();
+                    AllMetrics.instance.setKafkaRecordsConsumedRate((float) val);
+                }
 
-            if (key.name().equals("fetch-latency-avg")) {
-                double val = value.metricValue().equals(Double.NaN) ? 0d : (double) value.metricValue();
-                AllMetrics.instance.setKafkaFetchAvgLatency((float) val);
-            }
+                if (key.name().equals("fetch-latency-avg")) {
+                    double val = value.metricValue().equals(Double.NaN)
+                            ? 0d
+                            : (double) value.metricValue();
+                    AllMetrics.instance.setKafkaFetchAvgLatency((float) val);
+                }
 
-            if (key.name().equals("bytes-consumed-rate")) {
-                double val = value.metricValue().equals(Double.NaN) ? 0d : (double) value.metricValue();
-                AllMetrics.instance.setKafkaBytesConsumedRate((float) val);
+                if (key.name().equals("bytes-consumed-rate")) {
+                    double val = value.metricValue().equals(Double.NaN)
+                            ? 0d
+                            : (double) value.metricValue();
+                    AllMetrics.instance.setKafkaBytesConsumedRate((float) val);
+                }
             }
+        } catch (Exception e) {
+            this.loggerMaker.errorAndAddToDb(
+                    e,
+                    String.format(
+                            "Failed to get kafka metrics for %s error: %s", this.module.name(), e));
         }
     }
-
 }
