@@ -48,7 +48,7 @@ public class UsageInterceptor extends AbstractInterceptor {
 
             HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
 
-            if(featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
+            if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
                 throw new Exception("feature map not found or empty for organization " + organization.getId());
             }
 
@@ -58,7 +58,7 @@ public class UsageInterceptor extends AbstractInterceptor {
             for (String feature : features) {
                 feature = feature.trim();
 
-                if(feature.isEmpty()) {
+                if (feature.isEmpty()) {
                     continue;
                 }
 
