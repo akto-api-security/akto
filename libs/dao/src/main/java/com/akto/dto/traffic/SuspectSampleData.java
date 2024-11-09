@@ -1,9 +1,7 @@
 package com.akto.dto.traffic;
 
 import java.util.List;
-import java.util.Optional;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.bson.types.ObjectId;
 
 import com.akto.dto.type.URLMethods.Method;
@@ -32,8 +30,6 @@ public class SuspectSampleData {
      * Corresponding filter which marked it sus.
      */
     String filterId;
-
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public SuspectSampleData() {}
 
@@ -157,21 +153,5 @@ public class SuspectSampleData {
                 + ", \"sample\":"
                 + getSample()
                 + "}";
-    }
-
-    public Optional<String> marshall() {
-        try {
-            return Optional.of(objectMapper.writeValueAsString(this));
-        } catch (Exception e) {
-            return Optional.empty();
-        }
-    }
-
-    public Optional<SampleData> unmarshall() {
-        try {
-            return Optional.of(objectMapper.readValue(sample, SampleData.class));
-        } catch (Exception e) {
-            return Optional.empty();
-        }
     }
 }
