@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import StepsComponent from '../components/StepsComponent';
-import { Button, Form, FormLayout, HorizontalStack, LegacyCard, Tag, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Button, Form, FormLayout, HorizontalStack, LegacyCard, Link, Tag, Text, TextField, VerticalStack } from '@shopify/polaris';
 import FileUpload from '../../../../components/shared/FileUpload';
 import SpinnerCentered from '../../../../components/progress/SpinnerCentered';
 import IntegrationsLayout from '../IntegrationsLayout';
@@ -106,10 +106,21 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
             {componentType === 0 ? stepsComponent : componentType === 1 ? formComponent : <Details values={listValues} onClickFunc={() => setShowDeleteModal(true)} /> }
         </LegacyCard>
     )
+
+    const useCardContent = (
+        <VerticalStack gap={"2"}>
+            <Text>{cardContent}</Text>
+            <HorizontalStack gap={"1"}>
+                <Text>Use</Text>
+                <Link>https://app.akto.io/sso-login</Link>
+                <Text>for signing into AKTO dashboard via SSO.</Text>
+            </HorizontalStack>
+        </VerticalStack>
+    )
     
     return (
         <>
-            <IntegrationsLayout title={pageTitle} cardContent={cardContent} component={azureSSOComponent} docsUrl={"https://docs.akto.io/sso/" + samlUrlDocs} />
+            <IntegrationsLayout title={pageTitle} cardContent={useCardContent} component={azureSSOComponent} docsUrl={"https://docs.akto.io/sso/" + samlUrlDocs} />
             <DeleteModal setShowDeleteModal={setShowDeleteModal} showDeleteModal={showDeleteModal} SsoType={ssoType} onAction={handleDelete} />
         </>
     )
