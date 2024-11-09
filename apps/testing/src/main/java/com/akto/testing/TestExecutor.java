@@ -402,12 +402,15 @@ public class TestExecutor {
 
             int waitTime = 0;
             WorkflowNodeDetails.Type nodeType = WorkflowNodeDetails.Type.API;
-            if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString()) || data.getUrl().contains("fetchOtpData")) {
+            if ((data.getType() != null
+                    && data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString()))
+                    || (data.getUrl() != null && data.getUrl().contains("fetchOtpData"))) {
                 nodeType = WorkflowNodeDetails.Type.OTP;
                 waitTime = 20;
                 data.setOtpRefUuid(data.getUrl().substring(data.getUrl().lastIndexOf('/') + 1));
             }
-            if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.RECORDED_FLOW.toString())) {
+            if (data.getType() != null
+                    && data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.RECORDED_FLOW.toString())) {
                 nodeType = WorkflowNodeDetails.Type.RECORDED;
             }
             WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),

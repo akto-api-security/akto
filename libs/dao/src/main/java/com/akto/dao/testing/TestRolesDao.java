@@ -66,7 +66,11 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
         TestRoles testRoles = TestRolesDao.instance.findOne(TestRoles.NAME, "ATTACKER_TOKEN_ALL");
         if (testRoles != null && testRoles.getAuthWithCondList().size() > 0) {
             List<AuthWithCond> authWithCondList = testRoles.getAuthWithCondList();
-            AuthMechanism defaultAuthMechanism = authWithCondList.get(0).getAuthMechanism();
+            AuthWithCond firstAuth = authWithCondList.get(0);
+            AuthMechanism defaultAuthMechanism = firstAuth.getAuthMechanism();
+            if(firstAuth.getRecordedLoginFlowInput()!=null){
+                defaultAuthMechanism.setRecordedLoginFlowInput(firstAuth.getRecordedLoginFlowInput());
+            }
             if (rawApi == null) {
                 return defaultAuthMechanism;
             } else {
@@ -88,7 +92,11 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
                         }
 
                         if (allHeadersMatched) {
-                            return authWithCond.getAuthMechanism();
+                            defaultAuthMechanism = authWithCond.getAuthMechanism();
+                            if(authWithCond.getRecordedLoginFlowInput()!=null){
+                                defaultAuthMechanism.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
+                            }
+                            return defaultAuthMechanism;
                         }
                     }
                 } catch (Exception e) {

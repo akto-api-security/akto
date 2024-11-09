@@ -41,7 +41,7 @@ import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 public abstract class TestPlugin {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
-    static final LoggerMaker loggerMaker = new LoggerMaker(TestPlugin.class);
+    static final LoggerMaker loggerMaker = new LoggerMaker(TestPlugin.class, LogDb.TESTING);
 
     private static final Logger logger = LoggerFactory.getLogger(TestPlugin.class);
     private static final Gson gson = new Gson();
@@ -52,7 +52,8 @@ public abstract class TestPlugin {
     public abstract String subTestName();
 
     public static boolean isStatusGood(int statusCode) {
-        return statusCode >= 200 && statusCode<300;
+        // TODO: 250 status code is for a client. To be verified later.
+        return statusCode >= 200 && statusCode < 300 && statusCode != 250;
     }
 
     public static void extractAllValuesFromPayload(String payload, Map<String,Set<String>> payloadMap) throws Exception{
