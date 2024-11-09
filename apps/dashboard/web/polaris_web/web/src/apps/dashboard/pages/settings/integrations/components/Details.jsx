@@ -13,11 +13,6 @@ function Details({onClickFunc, values}) {
                             <LineComponent title={x.title} value={x.value} key={index}/>
                         )
                     })}
-                    <HorizontalStack gap={"1"}>
-                        <Text>Use</Text>
-                        <Link>https://app.akto.io/sso-login</Link>
-                        <Text>for signing into AKTO dashboard via SSO.</Text>
-                    </HorizontalStack>
                 </VerticalStack>
                 <HorizontalStack align="end">
                     <Button primary onClick={onClickFunc} >Delete SSO</Button>
