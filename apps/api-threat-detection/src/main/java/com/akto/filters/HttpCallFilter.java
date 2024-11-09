@@ -20,12 +20,12 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
+import com.akto.suspect_data.Message;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 
 public class HttpCallFilter {
-    private static final LoggerMaker loggerMaker =
-            new LoggerMaker(HttpCallFilter.class, LogDb.THREAT_DETECTION);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallFilter.class, LogDb.THREAT_DETECTION);
 
     private Map<String, FilterConfig> apiFilters;
     private final HttpCallParser httpCallParser;
@@ -69,7 +69,7 @@ public class HttpCallFilter {
             return;
         }
 
-        List<SuspectSampleData> maliciousSamples = new ArrayList<>();
+        List<Message> maliciousSamples = new ArrayList<>();
         for (HttpResponseParams responseParam : responseParams) {
             for (FilterConfig apiFilter : apiFilters.values()) {
                 boolean hasPassedFilter = validateFilterForRequest(responseParam, apiFilter);
@@ -82,14 +82,16 @@ public class HttpCallFilter {
                     Method method = Method.fromString(requestParams.getMethod());
 
                     maliciousSamples.add(
-                            new SuspectSampleData(
-                                    sourceIps,
-                                    requestParams.getApiCollectionId(),
-                                    requestParams.getURL(),
-                                    method,
-                                    responseParam.getOrig(),
-                                    Context.now(),
-                                    apiFilter.getId()));
+                            new Message(
+                                    responseParam.getAccountId(),
+                                    new SuspectSampleData(
+                                            sourceIps,
+                                            requestParams.getApiCollectionId(),
+                                            requestParams.getURL(),
+                                            method,
+                                            responseParam.getOrig(),
+                                            Context.now(),
+                                            apiFilter.getId())));
 
                     // Later we will also add aggregation support
                     // Eg: 100 4xx requests in last 10 minutes.
@@ -101,14 +103,18 @@ public class HttpCallFilter {
 
         // Should we push all the messages in one go
         // or call kafka.send for each HttpRequestParams
-        maliciousSamples.forEach(
-                sample -> {
-                    sample.marshall()
-                            .ifPresent(
-                                    s -> {
-                                        kafka.send(s, KAFKA_MALICIOUS_TOPIC);
-                                    });
-                });
+        try {
+            maliciousSamples.forEach(
+                    sample -> {
+                        sample.marshall()
+                                .ifPresent(
+                                        s -> {
+                                            kafka.send(s, KAFKA_MALICIOUS_TOPIC);
+                                        });
+                    });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private boolean validateFilterForRequest(
@@ -131,13 +137,12 @@ public class HttpCallFilter {
                     },
                     apiInfoKey);
             String filterExecutionLogId = UUID.randomUUID().toString();
-            ValidationResult res =
-                    TestPlugin.validateFilter(
-                            apiFilter.getFilter().getNode(),
-                            rawApi,
-                            apiInfoKey,
-                            varMap,
-                            filterExecutionLogId);
+            ValidationResult res = TestPlugin.validateFilter(
+                    apiFilter.getFilter().getNode(),
+                    rawApi,
+                    apiInfoKey,
+                    varMap,
+                    filterExecutionLogId);
 
             return res.getIsValid();
         } catch (Exception e) {
