@@ -92,10 +92,7 @@ function Integrations() {
       source: '/public/gcp.svg'
     }
 
-    let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, githubAppObj, googleWorkSpaceObj]
-
-    let allItems = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj, jiraObj, ...ssoItems]
-    let currObjs = allItems
+    let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, googleWorkSpaceObj]
     const [currItems , setCurrentItems] = useState(getTabItems('all'))
     const tabs = [
         {
@@ -146,7 +143,7 @@ function Integrations() {
       case 'traffic':
         return trafficItems;
       case 'reporting':
-        if (func.checkLocal()) {
+        if (!func.checkOnPrem()) {
           return emptyItem;
         }
         return reportingItems;
@@ -170,7 +167,7 @@ function Integrations() {
       default:
         let allItems = [...trafficItems, ...aiItems]
         if (!func.checkLocal()){
-          allItems = [...allItems, ...alertsItems, ...automationItems]
+          allItems = [...allItems, ...alertsItems, ...automationItems, ...ssoItems]
         }
         if(func.checkOnPrem()){
           allItems = [...allItems, ...reportingItems]
