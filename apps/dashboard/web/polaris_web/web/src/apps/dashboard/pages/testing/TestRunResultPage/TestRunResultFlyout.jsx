@@ -177,7 +177,7 @@ function TestRunResultFlyout(props) {
                             <Button removeUnderline plain monochrome onClick={() => openTest()}>
                                 <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
                             </Button>
-                            {severity.length > 0 ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
+                            {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
                         </div>
                     </Box>
                     <HorizontalStack gap={"2"}>
@@ -394,7 +394,7 @@ function TestRunResultFlyout(props) {
 
     const tabsComponent = (
         <LayoutWithTabs
-            key="tab-comp"
+            key={issueDetails?.id}
             tabs={issueDetails?.id ? [overviewTab,timelineTab,ValuesTab]: [attemptTab]}
             currTab = {() => {}}
         />

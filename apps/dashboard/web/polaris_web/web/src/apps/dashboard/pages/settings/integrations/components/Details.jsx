@@ -1,4 +1,4 @@
-import { Button, HorizontalStack, LegacyCard, Link, Text, VerticalStack } from '@shopify/polaris'
+import { Button, HorizontalStack, LegacyCard, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import LineComponent from './LineComponent'
 
