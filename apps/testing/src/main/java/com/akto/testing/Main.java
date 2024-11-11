@@ -345,7 +345,7 @@ public class Main {
                         }
                     }
                     setTestingRunConfig(testingRun, trrs);
-
+                    boolean maxRetriesReached = false;
                     if (isSummaryRunning || isTestingRunRunning) {
                         loggerMaker.infoAndAddToDb("TRRS or TR is in running state, checking if it should run it or not");
                         TestingRunResultSummary testingRunResultSummary;
@@ -354,9 +354,7 @@ public class Main {
                         } else {
                             Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRun.getId()));
                             testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
-                        }
-
-                        boolean maxRetriesReached = false;
+                        }                   
 
                         if (testingRunResultSummary != null) {
                             List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), 1);
@@ -421,7 +419,6 @@ public class Main {
                             // add max retries here and then mark last summary as completed when results > 0
                             if(maxRetriesReached){
                                 loggerMaker.infoAndAddToDb("Exiting out as maxRetries have been reached for testingRun: " + testingRun.getHexId(), LogDb.TESTING);
-                                return;
                             }else{
                                 if (summaryId != null) {
                                     trrs.setId(new ObjectId());
@@ -455,8 +452,11 @@ public class Main {
                         }
                     }
                     RequiredConfigs.initiate();
-                    testExecutor.init(testingRun, summaryId, syncLimit);
-                    raiseMixpanelEvent(summaryId, testingRun, accountId);
+                    if(!maxRetriesReached){
+                        testExecutor.init(testingRun, summaryId, syncLimit);
+                        raiseMixpanelEvent(summaryId, testingRun, accountId);
+                    }
+                    
             } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error in init " + e);
                 }
