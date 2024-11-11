@@ -71,7 +71,12 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
 
     public AuthMechanism fetchAttackerToken(int apiCollectionId, TestRoles testRoles) {
         if (testRoles != null && testRoles.getAuthWithCondList().size() > 0) {
-            return testRoles.getAuthWithCondList().get(0).getAuthMechanism();
+            AuthWithCond authWithCond = testRoles.getAuthWithCondList().get(0);
+            AuthMechanism authMechanism = authWithCond.getAuthMechanism();
+            if (authWithCond.getRecordedLoginFlowInput() != null) {
+                authMechanism.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
+            }
+            return authMechanism;
         } else {
             // return AuthMechanismsDao.instance.findOne(new BasicDBObject());
             return null;
