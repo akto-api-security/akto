@@ -136,6 +136,7 @@ public class Main {
     }
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
     private static final int DEFAULT_DELTA_IGNORE_TIME = 2*60*60;
+    private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
 
     private static TestingRun findPendingTestingRun(int userDeltaTime) {
         int deltaPeriod = userDeltaTime == 0 ? DEFAULT_DELTA_IGNORE_TIME : userDeltaTime;
@@ -355,6 +356,8 @@ public class Main {
                             testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
                         }
 
+                        boolean maxRetriesReached = false;
+
                         if (testingRunResultSummary != null) {
                             List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), 1);
                             if (testingRunResults != null && !testingRunResults.isEmpty()) {
@@ -366,12 +369,30 @@ public class Main {
                                 } else {
                                     loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
                                             + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+
+                                    int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); 
+                                    Bson filterQ = Filters.and(
+                                        Filters.gte(TestingRunResultSummary.START_TIMESTAMP, (Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime))),
+                                        Filters.eq(TestingRunResultSummary.STATE, State.FAILED)
+                                    );
+
+                                    int countFailedSummaries = (int) TestingRunResultSummariesDao.instance.count(filterQ);
+                                    Bson updateForSummary = Updates.set(TestingRunResultSummary.STATE, State.FAILED);
+                                    if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
+                                        updateForSummary = Updates.combine(
+                                            Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                                            Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now())
+                                        );
+                                        loggerMaker.infoAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
+                                        maxRetriesReached = true;
+                                    }
+
                                     TestingRunResultSummary summary = TestingRunResultSummariesDao.instance.updateOneNoUpsert(
                                             Filters.and(
                                                     Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()),
                                                     Filters.eq(TestingRunResultSummary.STATE, State.RUNNING)
                                             ),
-                                            Updates.set(TestingRunResultSummary.STATE, State.FAILED)
+                                            updateForSummary
                                     );
                                     if (summary == null) {
                                         loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
@@ -397,17 +418,23 @@ public class Main {
                             }
 
                             // insert new summary based on old summary
-                            if (summaryId != null) {
-                                trrs.setId(new ObjectId());
-                                trrs.setStartTimestamp(start);
-                                trrs.setState(State.RUNNING);
-                                trrs.setTestResultsCount(0);
-                                trrs.setCountIssues(emptyCountIssuesMap);
-                                TestingRunResultSummariesDao.instance.insertOne(trrs);
-                                summaryId = trrs.getId();
-                            } else {
-                                trrs = createTRRSummaryIfAbsent(testingRun, start);
-                                summaryId = trrs.getId();
+                            // add max retries here and then mark last summary as completed when results > 0
+                            if(maxRetriesReached){
+                                loggerMaker.infoAndAddToDb("Exiting out as maxRetries have been reached for testingRun: " + testingRun.getHexId(), LogDb.TESTING);
+                                return;
+                            }else{
+                                if (summaryId != null) {
+                                    trrs.setId(new ObjectId());
+                                    trrs.setStartTimestamp(start);
+                                    trrs.setState(State.RUNNING);
+                                    trrs.setTestResultsCount(0);
+                                    trrs.setCountIssues(emptyCountIssuesMap);
+                                    TestingRunResultSummariesDao.instance.insertOne(trrs);
+                                    summaryId = trrs.getId();
+                                } else {
+                                    trrs = createTRRSummaryIfAbsent(testingRun, start);
+                                    summaryId = trrs.getId();
+                                }
                             }
                         } else {
                             loggerMaker.infoAndAddToDb("No summary found. Let's run it as usual");
