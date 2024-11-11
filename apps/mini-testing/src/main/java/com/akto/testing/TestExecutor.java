@@ -401,13 +401,16 @@ public class TestExecutor {
 
             int waitTime = 0;
             WorkflowNodeDetails.Type nodeType = WorkflowNodeDetails.Type.API;
-            if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString())) {
+            if ((data.getType() != null
+                    && data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString()))
+                    || (data.getUrl() != null && data.getUrl().contains("fetchOtpData"))) {
                 nodeType = WorkflowNodeDetails.Type.OTP;
                 if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
                     waitTime = 60;
                 }
             }
-            if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.RECORDED_FLOW.toString())) {
+            if (data.getType() != null
+                    && data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.RECORDED_FLOW.toString())) {
                 nodeType = WorkflowNodeDetails.Type.RECORDED;
             }
 
