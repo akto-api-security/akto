@@ -3,6 +3,7 @@ package com.akto.traffic;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -30,13 +31,27 @@ public class KafkaRunner {
     private final LogDb module;
     private final LoggerMaker loggerMaker = new LoggerMaker(KafkaRunner.class, LogDb.RUNTIME);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
+    private static final String KAFKA_GROUP_ID = "akto-threat-detection";
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
-    public KafkaRunner(LogDb module, Consumer<String, String> consumer) {
-        this.consumer = consumer;
+    public KafkaRunner(LogDb module) {
         this.module = module;
         this.loggerMaker.setDb(module);
+        this.consumer = new KafkaConsumer<>(generateKafkaProperties());
+    }
+
+    private Properties generateKafkaProperties() {
+        String kafkaBrokerUrl = "127.0.0.1:29092";
+        String isKubernetes = System.getenv("IS_KUBERNETES");
+        if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
+            loggerMaker.infoAndAddToDb("is_kubernetes: true");
+            kafkaBrokerUrl = "127.0.0.1:29092";
+        }
+        int maxPollRecords = Integer.parseInt(
+                System.getenv().getOrDefault("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "100"));
+
+        return Utils.configProperties(kafkaBrokerUrl, KAFKA_GROUP_ID, maxPollRecords);
     }
 
     public void consume(
