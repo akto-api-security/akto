@@ -54,14 +54,8 @@ public class HttpCallFilter {
         this.lastFilterFetch = 0;
         this.httpCallParser = new HttpCallParser(sync_threshold_count, sync_threshold_time);
 
-        String kafkaBootstrapServers = "localhost:29092";
-        String isKubernetes = System.getenv("IS_KUBERNETES");
-        if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
-            loggerMaker.infoAndAddToDb("is_kubernetes: true");
-            kafkaBootstrapServers = "127.0.0.1:29092";
-        }
-
-        this.kafka = new Kafka(kafkaBootstrapServers, KAFKA_BATCH_LINGER_MS, KAFKA_BATCH_SIZE);
+        String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
+        this.kafka = new Kafka(kafkaBrokerUrl, KAFKA_BATCH_LINGER_MS, KAFKA_BATCH_SIZE);
         this.windowBasedThresholdNotifier = new WindowBasedThresholdNotifier(
                 new RedisWriteBackCache<>(redisClient, "wbt"),
                 new WindowBasedThresholdNotifier.Config(100, 10 * 60));
