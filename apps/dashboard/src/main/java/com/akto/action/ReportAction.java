@@ -60,6 +60,7 @@ public class ReportAction extends UserAction {
                 String url = System.getenv("PUPPETEER_REPLAY_SERVICE_URL") + "/downloadReportPDF";
                 JSONObject requestBody = new JSONObject();
                 requestBody.put("reportId", reportId);
+                requestBody.put("username", user.getName());
                 requestBody.put("accessToken", accessToken);
                 requestBody.put("jsessionId", jsessionId);
                 requestBody.put("organizationName", organizationName);

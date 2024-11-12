@@ -302,7 +302,7 @@ function SampleData(props) {
 
     return (
       <div>
-        <div ref={ref} style={{height:minHeight}} className={'editor ' + (data.headersMap ? 'new-diff' : '')}/>
+        <div ref={ref} style={{height:minHeight, width: props?.minWidth}} className={'editor ' + (data.headersMap ? 'new-diff' : '')}/>
         <Modal
             open={showActionsModal}
             onClose={() => setShowActionsModal(false)}

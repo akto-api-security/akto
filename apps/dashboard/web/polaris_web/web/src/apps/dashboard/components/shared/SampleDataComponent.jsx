@@ -201,7 +201,7 @@ function SampleDataComponent(props) {
     let currentLineActive = lineNumbers && lineNumbers[type].length > 0 ? lineNumbers[type][currentIndex[type]] : 1
     return (
 
-        <Box>
+        <Box id='sample-data-editor-container'>
             <LegacyCard.Section flush>
                 <Box padding={"2"}>
                     <HorizontalStack padding="2" align='space-between'>
@@ -246,7 +246,7 @@ function SampleDataComponent(props) {
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers}/>
+                <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} minWidth={props?.minWidth || ''} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers}/>
             </LegacyCard.Section>
         </Box>
     )
