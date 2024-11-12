@@ -1,11 +1,10 @@
-package com.akto.malicious_request;
+package com.akto.dto.threat_detection;
 
 import java.util.Optional;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public class Request {
-
+public class DetectedThreatAlert {
     private String id;
 
     private String filterId;
@@ -16,10 +15,10 @@ public class Request {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public Request() {
+    public DetectedThreatAlert() {
     }
 
-    public Request(String id, String filterId, String actor, long detectedAt) {
+    public DetectedThreatAlert(String id, String filterId, String actor, long detectedAt) {
         this.id = id;
         this.filterId = filterId;
         this.detectedAt = detectedAt;
