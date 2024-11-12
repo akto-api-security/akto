@@ -7,6 +7,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
@@ -14,6 +15,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.runtime.utils.Utils;
 import com.akto.traffic.KafkaRunner;
+import com.mongodb.ConnectionString;
 
 import io.lettuce.core.RedisClient;
 
@@ -33,6 +35,11 @@ public class Main {
     private static final RedisClient redisClient = createRedisClient();
 
     public static void main(String[] args) {
+        // We have a separate Mongo for storing threat detection data
+        // Metadata is stored in the main Mongo, which we call using API
+        // So we always need to enable hybrid mode for this module
+        String mongoURI = System.getenv("AKTO_THREAT_DETECTION_MONGO_CONN");
+        DaoInit.init(new ConnectionString(mongoURI));
 
         // Flush Messages task
         FlushMessagesTask.instance.init();
@@ -46,8 +53,8 @@ public class Main {
             topicName = defaultTopic;
         }
 
-        KafkaRunner recordRunner = new KafkaRunner(module);
-        recordRunner.consume(
+        KafkaRunner.consume(
+                module,
                 Collections.singletonList(topicName),
                 records -> {
                     processRecords(records);
@@ -110,7 +117,7 @@ public class Main {
     }
 
     public static RedisClient createRedisClient() {
-        String host = System.getenv("AKTO_PROTECTION_REDIS_HOST");
+        String host = System.getenv().getOrDefault("AKTO_PROTECTION_REDIS_HOST", "localhost");
         int port = Integer.parseInt(System.getenv().getOrDefault("AKTO_PROTECTION_REDIS_PORT", "6379"));
         int database = Integer.parseInt(System.getenv().getOrDefault("AKTO_PROTECTION_REDIS_DB", "0"));
 
