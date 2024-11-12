@@ -2,6 +2,7 @@ package com.akto.filters;
 
 import java.util.*;
 
+import com.akto.cache.RedisWriteBackCache;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.DataActor;
@@ -14,15 +15,21 @@ import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.filters.aggregators.key_generator.SourceIPKeyGenerator;
+import com.akto.filters.aggregators.window_based.WindowBasedThresholdNotifier;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.malicious_request.Request;
+import com.akto.malicious_request.notifier.SaveRedisNotifier;
 import com.akto.rules.TestPlugin;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.suspect_data.Message;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+
+import io.lettuce.core.RedisClient;
 
 public class HttpCallFilter {
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallFilter.class, LogDb.THREAT_DETECTION);
@@ -40,12 +47,16 @@ public class HttpCallFilter {
 
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
-    public HttpCallFilter(int sync_threshold_count, int sync_threshold_time) {
+    private final WindowBasedThresholdNotifier windowBasedThresholdNotifier;
+
+    private final SaveRedisNotifier saveRedisNotifier;
+
+    public HttpCallFilter(RedisClient redisClient, int sync_threshold_count, int sync_threshold_time) {
         this.apiFilters = new HashMap<>();
         this.lastFilterFetch = 0;
         this.httpCallParser = new HttpCallParser(sync_threshold_count, sync_threshold_time);
 
-        String kafkaBootstrapServers = "kafka1:19092";
+        String kafkaBootstrapServers = "localhost:29092";
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
             loggerMaker.infoAndAddToDb("is_kubernetes: true");
@@ -53,6 +64,11 @@ public class HttpCallFilter {
         }
 
         this.kafka = new Kafka(kafkaBootstrapServers, KAFKA_BATCH_LINGER_MS, KAFKA_BATCH_SIZE);
+        this.windowBasedThresholdNotifier = new WindowBasedThresholdNotifier(
+                new RedisWriteBackCache<>(redisClient, "wbt"),
+                new WindowBasedThresholdNotifier.Config(100, 10 * 60));
+
+        this.saveRedisNotifier = new SaveRedisNotifier(redisClient);
     }
 
     public void filterFunction(List<HttpResponseParams> responseParams) {
@@ -97,6 +113,24 @@ public class HttpCallFilter {
                     // Eg: 100 4xx requests in last 10 minutes.
                     // But regardless of whether request falls in aggregation or not,
                     // we still push malicious requests to kafka
+
+                    SourceIPKeyGenerator.instance.generate(responseParam).ifPresent(aggKey -> {
+                        boolean thresholdBreached = this.windowBasedThresholdNotifier.shouldNotify(aggKey,
+                                responseParam);
+
+                        if (!thresholdBreached) {
+                            return;
+                        }
+
+                        Request request = new Request(
+                                UUID.randomUUID().toString(),
+                                apiFilter.getId(),
+                                aggKey,
+                                System.currentTimeMillis());
+
+                        // For now just writing breached IP to redis
+                        this.saveRedisNotifier.notifyRequest(request);
+                    });
                 }
             }
         }

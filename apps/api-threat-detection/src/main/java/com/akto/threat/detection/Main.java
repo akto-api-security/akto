@@ -4,7 +4,6 @@ import java.util.*;
 import com.akto.suspect_data.FlushMessagesTask;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,6 +14,9 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.runtime.utils.Utils;
 import com.akto.traffic.KafkaRunner;
+
+import io.lettuce.core.RedisClient;
+
 import com.akto.filters.HttpCallFilter;
 import com.akto.parsers.HttpCallParser;
 
@@ -27,6 +29,8 @@ public class Main {
     private static long lastSyncOffset = 0;
 
     private static final Map<String, HttpCallFilter> httpCallFilterMap = new HashMap<>();
+
+    private static final RedisClient redisClient = createRedisClient();
 
     public static void main(String[] args) {
 
@@ -42,19 +46,7 @@ public class Main {
             topicName = defaultTopic;
         }
 
-        String kafkaBrokerUrl = "127.0.0.1:29092";
-        String isKubernetes = System.getenv("IS_KUBERNETES");
-        if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
-            loggerMaker.infoAndAddToDb("is_kubernetes: true");
-            kafkaBrokerUrl = "127.0.0.1:29092";
-        }
-        String groupId = "akto-threat-detection";
-        int maxPollRecords = Integer.parseInt(
-                System.getenv().getOrDefault("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "100"));
-
-        Properties kafkaRecordProperties = Utils.configProperties(kafkaBrokerUrl, groupId, maxPollRecords);
-
-        KafkaRunner recordRunner = new KafkaRunner(module, new KafkaConsumer<>(kafkaRecordProperties));
+        KafkaRunner recordRunner = new KafkaRunner(module);
         recordRunner.consume(
                 Collections.singletonList(topicName),
                 records -> {
@@ -103,7 +95,8 @@ public class Main {
             Context.accountId.set(accountIdInt);
 
             if (!httpCallFilterMap.containsKey(accountId)) {
-                HttpCallFilter filter = new HttpCallFilter(sync_threshold_count, sync_threshold_time);
+                HttpCallFilter filter = new HttpCallFilter(redisClient, sync_threshold_count,
+                        sync_threshold_time);
                 httpCallFilterMap.put(accountId, filter);
                 loggerMaker.infoAndAddToDb("New filter created for account: " + accountId);
             }
@@ -114,5 +107,13 @@ public class Main {
         }
 
         AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis() - start);
+    }
+
+    public static RedisClient createRedisClient() {
+        String host = System.getenv("AKTO_PROTECTION_REDIS_HOST");
+        int port = Integer.parseInt(System.getenv().getOrDefault("AKTO_PROTECTION_REDIS_PORT", "6379"));
+        int database = Integer.parseInt(System.getenv().getOrDefault("AKTO_PROTECTION_REDIS_DB", "0"));
+
+        return RedisClient.create("redis://" + host + ":" + port + "/" + database);
     }
 }
