@@ -24,24 +24,16 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.runtime.utils.Utils;
-import com.mongodb.ConnectionString;
 
 public class KafkaRunner {
-    private final Consumer<String, String> consumer;
-    private final LogDb module;
-    private final LoggerMaker loggerMaker = new LoggerMaker(KafkaRunner.class, LogDb.RUNTIME);
+    private Consumer<String, String> consumer;
+    private static final LoggerMaker loggerMaker = new LoggerMaker(KafkaRunner.class, LogDb.RUNTIME);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
     private static final String KAFKA_GROUP_ID = "akto-threat-detection";
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
-    public KafkaRunner(LogDb module) {
-        this.module = module;
-        this.loggerMaker.setDb(module);
-        this.consumer = new KafkaConsumer<>(generateKafkaProperties());
-    }
-
-    private Properties generateKafkaProperties() {
+    private static Properties generateKafkaProperties() {
         String kafkaBrokerUrl = "127.0.0.1:29092";
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
@@ -54,30 +46,30 @@ public class KafkaRunner {
         return Utils.configProperties(kafkaBrokerUrl, KAFKA_GROUP_ID, maxPollRecords);
     }
 
-    public void consume(
-            List<String> topics,
+    public static void consume(LogDb module, List<String> topics,
             FailableFunction<ConsumerRecords<String, String>, Void, Exception> recordProcessor) {
+
+        loggerMaker.setDb(module);
+
+        final KafkaRunner main = new KafkaRunner();
+        main.consumer = new KafkaConsumer<>(generateKafkaProperties());
 
         boolean hybridSaas = RuntimeMode.isHybridDeployment();
         boolean connected = false;
-        if (hybridSaas) {
-            AccountSettings accountSettings = dataActor.fetchAccountSettings();
-            if (accountSettings != null) {
-                int acc = accountSettings.getId();
-                Context.accountId.set(acc);
-                connected = true;
-            }
-        } else {
-            String mongoURI = System.getenv("AKTO_MONGO_CONN");
-            DaoInit.init(new ConnectionString(mongoURI));
-            Context.accountId.set(1_000_000);
+        if (!hybridSaas) {
+            throw new RuntimeException("Hybrid mode is required for this module");
+        }
+
+        AccountSettings accountSettings = dataActor.fetchAccountSettings();
+        if (accountSettings != null) {
+            int acc = accountSettings.getId();
+            Context.accountId.set(acc);
             connected = true;
         }
 
         if (connected) {
-            loggerMaker.infoAndAddToDb(
-                    String.format("Starting module for account : %d", Context.accountId.get()));
-            AllMetrics.instance.init(this.module);
+            loggerMaker.infoAndAddToDb(String.format("Starting module for account : %d", Context.accountId.get()));
+            AllMetrics.instance.init(module);
         }
 
         final Thread mainThread = Thread.currentThread();
@@ -85,7 +77,7 @@ public class KafkaRunner {
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
-                consumer.wakeup();
+                main.consumer.wakeup();
                 try {
                     if (!exceptionOnCommitSync.get()) {
                         mainThread.join();
@@ -99,17 +91,17 @@ public class KafkaRunner {
         });
 
         scheduler.scheduleAtFixedRate(() -> {
-            logKafkaMetrics();
+            main.logKafkaMetrics(module);
         }, 0, 1, TimeUnit.MINUTES);
 
         try {
-            consumer.subscribe(topics);
+            main.consumer.subscribe(topics);
             loggerMaker.infoAndAddToDb(
                     String.format("Consumer subscribed for topics : %s", topics.toString()));
             while (true) {
-                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(10000));
+                ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 try {
-                    consumer.commitSync();
+                    main.consumer.commitSync();
                 } catch (Exception e) {
                     throw e;
                 }
@@ -129,11 +121,11 @@ public class KafkaRunner {
             e.printStackTrace();
             System.exit(0);
         } finally {
-            consumer.close();
+            main.consumer.close();
         }
     }
 
-    public void logKafkaMetrics() {
+    public void logKafkaMetrics(LogDb module) {
         try {
             Map<MetricName, ? extends Metric> metrics = this.consumer.metrics();
             for (Map.Entry<MetricName, ? extends Metric> entry : metrics.entrySet()) {
@@ -168,10 +160,10 @@ public class KafkaRunner {
                 }
             }
         } catch (Exception e) {
-            this.loggerMaker.errorAndAddToDb(
+            loggerMaker.errorAndAddToDb(
                     e,
                     String.format(
-                            "Failed to get kafka metrics for %s error: %s", this.module.name(), e));
+                            "Failed to get kafka metrics for %s error: %s", module.name(), e));
         }
     }
 }
