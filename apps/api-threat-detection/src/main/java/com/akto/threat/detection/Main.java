@@ -117,9 +117,9 @@ public class Main {
     }
 
     public static RedisClient createRedisClient() {
-        String host = System.getenv().getOrDefault("AKTO_PROTECTION_REDIS_HOST", "localhost");
-        int port = Integer.parseInt(System.getenv().getOrDefault("AKTO_PROTECTION_REDIS_PORT", "6379"));
-        int database = Integer.parseInt(System.getenv().getOrDefault("AKTO_PROTECTION_REDIS_DB", "0"));
+        String host = System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_HOST", "localhost");
+        int port = Integer.parseInt(System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_PORT", "6379"));
+        int database = Integer.parseInt(System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_DB", "0"));
 
         return RedisClient.create("redis://" + host + ":" + port + "/" + database);
     }
