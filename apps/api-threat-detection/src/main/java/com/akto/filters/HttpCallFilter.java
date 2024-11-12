@@ -5,6 +5,7 @@ import java.util.*;
 import com.akto.cache.RedisWriteBackCache;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dao.threat_detection.DetectedThreatAlertDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -13,6 +14,7 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApi;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.threat_detection.DetectedThreatAlert;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.filters.aggregators.key_generator.SourceIPKeyGenerator;
@@ -21,8 +23,6 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.malicious_request.Request;
-import com.akto.malicious_request.notifier.SaveRedisNotifier;
 import com.akto.rules.TestPlugin;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.suspect_data.Message;
@@ -49,8 +49,6 @@ public class HttpCallFilter {
 
     private final WindowBasedThresholdNotifier windowBasedThresholdNotifier;
 
-    private final SaveRedisNotifier saveRedisNotifier;
-
     public HttpCallFilter(RedisClient redisClient, int sync_threshold_count, int sync_threshold_time) {
         this.apiFilters = new HashMap<>();
         this.lastFilterFetch = 0;
@@ -67,8 +65,6 @@ public class HttpCallFilter {
         this.windowBasedThresholdNotifier = new WindowBasedThresholdNotifier(
                 new RedisWriteBackCache<>(redisClient, "wbt"),
                 new WindowBasedThresholdNotifier.Config(100, 10 * 60));
-
-        this.saveRedisNotifier = new SaveRedisNotifier(redisClient);
     }
 
     public void filterFunction(List<HttpResponseParams> responseParams) {
@@ -118,18 +114,16 @@ public class HttpCallFilter {
                         boolean thresholdBreached = this.windowBasedThresholdNotifier.shouldNotify(aggKey,
                                 responseParam);
 
-                        if (!thresholdBreached) {
-                            return;
+                        // TODO: Add window id with each suspect sample data and alert
+                        if (thresholdBreached) {
+                            DetectedThreatAlert alert = new DetectedThreatAlert(
+                                    UUID.randomUUID().toString(),
+                                    apiFilter.getId(),
+                                    aggKey,
+                                    System.currentTimeMillis());
+
+                            DetectedThreatAlertDao.instance.insertOne(alert);
                         }
-
-                        Request request = new Request(
-                                UUID.randomUUID().toString(),
-                                apiFilter.getId(),
-                                aggKey,
-                                System.currentTimeMillis());
-
-                        // For now just writing breached IP to redis
-                        this.saveRedisNotifier.notifyRequest(request);
                     });
                 }
             }
