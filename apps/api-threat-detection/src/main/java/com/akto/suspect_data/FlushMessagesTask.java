@@ -29,12 +29,7 @@ public class FlushMessagesTask {
     private final Consumer<String, String> consumer;
 
     private FlushMessagesTask() {
-        String kafkaBrokerUrl = "127.0.0.1:29092";
-        String isKubernetes = System.getenv("IS_KUBERNETES");
-        if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
-            kafkaBrokerUrl = "127.0.0.1:29092";
-        }
-
+        String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
         String groupId = "akto-flush-malicious-messages";
 
         Properties properties = Utils.configProperties(kafkaBrokerUrl, groupId, 100);

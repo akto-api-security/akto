@@ -34,12 +34,7 @@ public class KafkaRunner {
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     private static Properties generateKafkaProperties() {
-        String kafkaBrokerUrl = "127.0.0.1:29092";
-        String isKubernetes = System.getenv("IS_KUBERNETES");
-        if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
-            loggerMaker.infoAndAddToDb("is_kubernetes: true");
-            kafkaBrokerUrl = "127.0.0.1:29092";
-        }
+        String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
         int maxPollRecords = Integer.parseInt(
                 System.getenv().getOrDefault("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "100"));
 
