@@ -371,6 +371,7 @@ public class Main {
                                     int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); 
                                     Bson filterQ = Filters.and(
                                         Filters.gte(TestingRunResultSummary.START_TIMESTAMP, (Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime))),
+                                        Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
                                         Filters.eq(TestingRunResultSummary.STATE, State.FAILED)
                                     );
 
