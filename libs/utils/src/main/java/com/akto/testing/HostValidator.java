@@ -101,7 +101,7 @@ public class HostValidator {
                 String attemptUrl = getUniformUrlUtil(actualRequest.url());
                 loggerMaker.infoAndAddToDb("checking reachability for host: " + attemptUrl);
                 if(!hostReachabilityMap.containsKey(attemptUrl)){
-                    boolean reachable = checkDomainReach(actualRequest, true, type);
+                    boolean reachable = checkDomainReach(actualRequest, false, type);
                     hostReachabilityMap.put(attemptUrl, reachable);
                 }
             } catch (Exception e) {

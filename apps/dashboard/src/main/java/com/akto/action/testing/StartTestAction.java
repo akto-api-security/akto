@@ -547,6 +547,7 @@ public class StartTestAction extends UserAction {
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
                     List<String> errorsToSkipTest = TestResult.TestError.getErrorsToSkipTests();
                     errorsToSkipTest.add(TestResult.API_CALL_FAILED_ERROR_STRING);
+                    errorsToSkipTest.add(TestResult.API_CALL_FAILED_ERROR_STRING_UNREACHABLE);
                     testingRunResultFilters.add(
                         Filters.or(
                             Filters.exists(WorkflowTestingEndpoints._WORK_FLOW_TEST),
