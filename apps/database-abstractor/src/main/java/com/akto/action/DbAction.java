@@ -156,6 +156,7 @@ public class DbAction extends ActionSupport {
     Set<MergedUrls> mergedUrls;
     List<TestingRunResultSummary> currentlyRunningTests;
     String state;
+    Bson filter;
 
     public BasicDBList getIssuesIds() {
         return issuesIds;
@@ -2246,6 +2247,11 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String countTestingRunResultSummaries() {
+        count = DbLayer.countTestingRunResultSummaries(filter);
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -3271,6 +3277,10 @@ public class DbAction extends ActionSupport {
 
     public void setRemoveZeroLevel(boolean removeZeroLevel) {
         this.removeZeroLevel = removeZeroLevel;
+    }
+    
+    public void setFilter(Bson filter) {
+        this.filter = filter;
     }
 
 }
