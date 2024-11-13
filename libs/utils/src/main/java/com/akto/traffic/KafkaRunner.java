@@ -14,7 +14,6 @@ import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.errors.WakeupException;
-import com.akto.DaoInit;
 import com.akto.RuntimeMode;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
