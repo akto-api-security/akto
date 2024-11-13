@@ -97,6 +97,9 @@ public class BackwardCompatibility {
     public static final String MOVE_AZURE_SAML = "moveAzureSamlToNormalSaml";
     private int moveAzureSamlToNormalSaml;
 
+    public static final String DELETE_OPTIONS_API = "deleteOptionsAPIs";
+    private int deleteOptionsAPIs;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -106,7 +109,7 @@ public class BackwardCompatibility {
                                  int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
                                  int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
-                                 int addDefaultFilters, int moveAzureSamlToNormalSaml) {
+                                 int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -137,6 +140,7 @@ public class BackwardCompatibility {
         this.dropSpecialCharacterApiCollections = dropSpecialCharacterApiCollections;
         this.fixApiAccessType = fixApiAccessType;
         this.moveAzureSamlToNormalSaml = moveAzureSamlToNormalSaml;
+        this.deleteOptionsAPIs = deleteOptionsAPIs;
     }
 
     public BackwardCompatibility() {
@@ -412,5 +416,13 @@ public class BackwardCompatibility {
 
     public void setMoveAzureSamlToNormalSaml(int moveAzureSamlToNormalSaml) {
         this.moveAzureSamlToNormalSaml = moveAzureSamlToNormalSaml;
+    }
+
+    public int getDeleteOptionsAPIs() {
+        return deleteOptionsAPIs;
+    }
+
+    public void setDeleteOptionsAPIs(int deleteOptionsAPIs) {
+        this.deleteOptionsAPIs = deleteOptionsAPIs;
     }
 }

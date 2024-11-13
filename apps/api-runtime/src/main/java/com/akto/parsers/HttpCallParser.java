@@ -245,7 +245,11 @@ public class HttpCallParser {
             redundantList = accountSettings.getAllowRedundantEndpointsList();
         }
         Pattern regexPattern = Utils.createRegexPatternFromList(redundantList);
-        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, redundantList, regexPattern);
+        boolean shouldIgnoreOptionsApi = true;
+        if(accountSettings != null){
+            shouldIgnoreOptionsApi = !accountSettings.getAllowOptionsAPIs();
+        }
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, redundantList, regexPattern, shouldIgnoreOptionsApi);
         
         boolean makeApisCaseInsensitive = false;
         if(accountSettings != null){
@@ -516,7 +520,7 @@ public class HttpCallParser {
         return res;
     }
 
-    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, List<String> redundantUrlsList, Pattern pattern) {
+    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, List<String> redundantUrlsList, Pattern pattern, Boolean shouldIgnoreOptionsApi) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
 
@@ -539,6 +543,11 @@ public class HttpCallParser {
             
             String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(),Constants.AKTO_IGNORE_FLAG);
             if (ignoreAktoFlag != null) continue;
+            
+            String method = httpResponseParam.getRequestParams().getMethod();
+            if(shouldIgnoreOptionsApi && method.equalsIgnoreCase("OPTIONS")){
+                continue;
+            }
 
             // check for garbage points here
             if(redundantUrlsList != null && !redundantUrlsList.isEmpty()){
@@ -557,7 +566,7 @@ public class HttpCallParser {
                 try {
                     List<String> responseContentTypeList = (List<String>) httpResponseParam.getHeaders().getOrDefault("content-type", new ArrayList<>());
                     String allContentTypes = responseContentTypeList.toString();
-                    String method = httpResponseParam.getRequestParams().getMethod();
+                    
                     String responseBody = httpResponseParam.getPayload();
                     boolean ignore = false;
                     for (String extension : redundantUrlsList) {

@@ -2850,6 +2850,18 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void deleteOptionsAPIs(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getDeleteOptionsAPIs() == 0){
+            List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.nin(Constants.ID,UsageMetricCalculator.getDeactivated()),
+                                Projections.include(Constants.ID, ApiCollection.NAME, ApiCollection.HOST_NAME));
+            CleanInventory.deleteOptionsAPIs(apiCollections);
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DELETE_OPTIONS_API, Context.now())
+            );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
@@ -2871,6 +2883,7 @@ public class InitializerListener implements ServletContextListener {
         createRiskScoreGroups(backwardCompatibility);
         setApiCollectionAutomatedField(backwardCompatibility);
         createAutomatedAPIGroups(backwardCompatibility);
+        deleteOptionsAPIs(backwardCompatibility);
         deleteAccessListFromApiToken(backwardCompatibility);
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
