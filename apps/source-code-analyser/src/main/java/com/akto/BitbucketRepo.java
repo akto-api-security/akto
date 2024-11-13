@@ -96,6 +96,7 @@ public class BitbucketRepo extends SourceCodeAnalyserRepo{
         requestBody.put("repoName",this.getRepoToBeAnalysed().getRepoName());
         requestBody.put("bitbucketHost",BITBUCKET_URL);
         requestBody.put("is_bitbucket",true);
+        requestBody.put("is_aktogpt",false);
         return requestBody;
     }
 

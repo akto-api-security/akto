@@ -88,11 +88,11 @@ public class Main {
         boolean isConnectedToMongo = connectToMongo();//When mongo connection, fetch for all accounts
 
         while (true) {
-            if (!BitbucketRepo.doesEnvVariablesExists() && !GithubRepo.doesEnvVariablesExists()) {
-                loggerMaker.infoAndAddToDb("No tokens found");
-                Thread.sleep(SLEEP_TIME);
-                continue;
-            }
+//            if (!BitbucketRepo.doesEnvVariablesExists() && !GithubRepo.doesEnvVariablesExists()) {
+//                loggerMaker.infoAndAddToDb("No tokens found");
+//                Thread.sleep(SLEEP_TIME);
+//                continue;
+//            }
             if (isConnectedToMongo) {
                 AccountTask.instance.executeTask(t -> {
                     List<CodeAnalysisRepo> repos = fetchReposToSync();

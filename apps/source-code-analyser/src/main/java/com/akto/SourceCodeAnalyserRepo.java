@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 
 abstract public class SourceCodeAnalyserRepo {
     private CodeAnalysisRepo repoToBeAnalysed;
+    private boolean isAktoGPTEnabled;
     private static final LoggerMaker loggerMaker = new LoggerMaker(SourceCodeAnalyserRepo.class, LoggerMaker.LogDb.RUNTIME);
     abstract public String getToken();
     abstract public String getRepoUrl();
@@ -58,7 +59,7 @@ abstract public class SourceCodeAnalyserRepo {
     public String downloadRepository () {
         String finalUrl = this.getRepoUrl();
         String token = this.getToken();
-        if (finalUrl == null || token == null) {
+        if (finalUrl == null) {
             return null;
         }
         String outputFilePath = System.getenv("DOCKER_VOLUME") + repoToBeAnalysed.getRepoName()+ ".zip"; // The local file where the repository will be saved
@@ -67,7 +68,9 @@ abstract public class SourceCodeAnalyserRepo {
         Request.Builder builder = new Request.Builder();
         builder.url(finalUrl);
         builder.get();
-//        builder.addHeader("Authorization", "Bearer " + token);
+        if (token != null) {
+            builder.addHeader("Authorization", "Bearer " + token);
+        }
         Request request = builder.build();
 
         try {
@@ -178,5 +181,13 @@ abstract public class SourceCodeAnalyserRepo {
 
     public void setRepoToBeAnalysed(CodeAnalysisRepo repoToBeAnalysed) {
         this.repoToBeAnalysed = repoToBeAnalysed;
+    }
+
+    public boolean isAktoGPTEnabled() {
+        return isAktoGPTEnabled;
+    }
+
+    public void setAktoGPTEnabled(boolean aktoGPTEnabled) {
+        isAktoGPTEnabled = aktoGPTEnabled;
     }
 }
