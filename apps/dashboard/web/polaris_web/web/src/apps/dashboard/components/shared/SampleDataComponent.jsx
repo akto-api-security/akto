@@ -246,7 +246,7 @@ function SampleDataComponent(props) {
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} minWidth={props?.minWidth || ''} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers}/>
+                <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers}/>
             </LegacyCard.Section>
         </Box>
     )
