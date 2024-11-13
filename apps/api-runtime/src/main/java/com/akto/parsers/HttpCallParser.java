@@ -545,7 +545,7 @@ public class HttpCallParser {
             if (ignoreAktoFlag != null) continue;
             
             String method = httpResponseParam.getRequestParams().getMethod();
-            if(shouldIgnoreOptionsApi && method.equalsIgnoreCase("OPTIONS")){
+            if(shouldIgnoreOptionsApi && method != null && method.equalsIgnoreCase("OPTIONS")){
                 continue;
             }
 
