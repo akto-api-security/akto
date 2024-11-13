@@ -1,10 +1,8 @@
 package com.akto.filters.aggregators.window_based;
 
-import com.akto.cache.TypeValueCache;
+import com.akto.cache.CounterCache;
 import com.akto.dto.HttpResponseParams;
 import com.akto.filters.aggregators.RealTimeThresholdNotifier;
-
-import java.util.List;
 
 public class WindowBasedThresholdNotifier extends RealTimeThresholdNotifier {
 
@@ -12,75 +10,43 @@ public class WindowBasedThresholdNotifier extends RealTimeThresholdNotifier {
 
     public static class Config {
         private final int threshold;
-        private final int windowInSeconds;
+        private final int windowSizeInMinutes;
 
         public Config(int threshold, int windowInSeconds) {
             this.threshold = threshold;
-            this.windowInSeconds = windowInSeconds;
+            this.windowSizeInMinutes = windowInSeconds;
         }
 
         public int getThreshold() {
             return threshold;
         }
 
-        public int getWindowInSeconds() {
-            return windowInSeconds;
+        public int getWindowSizeInMinutes() {
+            return windowSizeInMinutes;
         }
     }
 
-    private final TypeValueCache<Data> cache;
+    private final CounterCache cache;
 
-    public WindowBasedThresholdNotifier(TypeValueCache<Data> cache, Config config) {
+    public WindowBasedThresholdNotifier(CounterCache cache, Config config) {
         this.cache = cache;
         this.config = config;
     }
 
     @Override
-    public boolean shouldNotify(String aggKey, HttpResponseParams responseParam) {
-        long now = System.currentTimeMillis();
+    public boolean shouldNotify(String actor, HttpResponseParams responseParam) {
+        int requestTimeSeconds = responseParam.getTime();
 
-        Data data = this.cache.getOrDefault(aggKey, new Data());
-        List<Data.Request> requests = data.getRequests();
-        requests.add(new Data.Request(responseParam.getTime() * 1000L));
+        int minuteOfYear = (int) Math.ceil(requestTimeSeconds / (60L));
 
-        // Check if the current request is in the same window as previous requests
-        boolean sameWindow = now - requests.get(0).getReceivedAt() <= this.config.getWindowInSeconds() * 1000L;
+        String bucketKey = actor + "|" + minuteOfYear;
+        this.cache.increment(bucketKey);
 
-        // Qualify request for notification pending last notified verification
-        boolean thresholdCrossedForWindow = false;
-
-        if (!sameWindow) {
-            // Remove all the requests that are outside the window
-            while (!requests.isEmpty()
-                    && now - requests.get(0).getReceivedAt() > this.config.getWindowInSeconds() * 1000L) {
-                requests.remove(0);
-            }
-        } else {
-            thresholdCrossedForWindow = requests.size() >= this.config.getThreshold();
-
-            // This is to ensure that we don't keep on adding requests to the list
-            // Eg: 10k requests in 1 second qualify. So we keep only last N requests
-            // where N is the threshold
-            while (requests.size() > this.config.getThreshold()) {
-                requests.remove(0);
-            }
+        long windowCount = 0L;
+        for (int i = minuteOfYear; i >= minuteOfYear - this.config.getWindowSizeInMinutes(); i--) {
+            windowCount += this.cache.get(actor + "|" + i);
         }
 
-        boolean shouldNotify = thresholdCrossedForWindow;
-        // Note: This also has a dependency on the cache expiry. If cache expiry is less
-        // than notification cooldown, then this will not work as expected.
-        // Eg: If cache expiry is 1 minute and notification cooldown is 1 hour, then
-        // this will always notify.
-        if (thresholdCrossedForWindow) {
-            if (now - data.getLastNotifiedAt() >= NOTIFICATION_COOLDOWN_MINUTES * 60 * 1000L) {
-                data.setLastNotifiedAt(now);
-            } else {
-                shouldNotify = false;
-            }
-        }
-
-        data.setRequests(requests);
-        this.cache.put(aggKey, data);
-        return shouldNotify;
+        return windowCount >= this.config.getThreshold();
     }
 }
