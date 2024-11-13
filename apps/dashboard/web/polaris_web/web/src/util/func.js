@@ -341,7 +341,6 @@ prettifyEpoch(epoch) {
   copyToClipboard(text, ref, toastMessage) {
     if (!navigator.clipboard) {
       // Fallback for older browsers (e.g., Internet Explorer)
-      console.log("reached here")
       const textarea = document.createElement('textarea');
       textarea.value = text;
       textarea.style.position = 'fixed';
