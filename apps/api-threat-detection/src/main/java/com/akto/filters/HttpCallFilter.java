@@ -2,7 +2,7 @@ package com.akto.filters;
 
 import java.util.*;
 
-import com.akto.cache.RedisWriteBackCache;
+import com.akto.cache.RedisBackedCounterCache;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.threat_detection.DetectedThreatAlertDao;
@@ -57,7 +57,7 @@ public class HttpCallFilter {
         String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
         this.kafka = new Kafka(kafkaBrokerUrl, KAFKA_BATCH_LINGER_MS, KAFKA_BATCH_SIZE);
         this.windowBasedThresholdNotifier = new WindowBasedThresholdNotifier(
-                new RedisWriteBackCache<>(redisClient, "wbt"),
+                new RedisBackedCounterCache(redisClient, "wbt"),
                 new WindowBasedThresholdNotifier.Config(100, 10 * 60));
     }
 
