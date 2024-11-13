@@ -268,4 +268,6 @@ public abstract class DataActor {
 
     public abstract List<Node> fetchNodesForCollectionIds(List<Integer> apiCollectionsIds, boolean removeZeroLevel, int skip);
 
+    public abstract long countTestingRunResultSummaries(Bson filter);
+
 }
