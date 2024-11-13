@@ -148,6 +148,7 @@ public class DbAction extends ActionSupport {
     List<YamlTemplate> activeAdvancedFilters;
     List<TestingRunResultSummary> currentlyRunningTests;
     String state;
+    Bson filter;
 
     public BasicDBList getIssuesIds() {
         return issuesIds;
@@ -1697,6 +1698,11 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String countTestingRunResultSummaries() {
+        count = DbLayer.countTestingRunResultSummaries(filter);
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -2605,6 +2611,10 @@ public class DbAction extends ActionSupport {
 
     public void setVpcId(String vpcId) {
         this.vpcId = vpcId;
+    }
+
+    public void setFilter(Bson filter) {
+        this.filter = filter;
     }
 
 }
