@@ -6629,6 +6629,46 @@
             </result>
         </action>
 
+        <action name="api/saveReportPDF" class="com.akto.action.ReportAction" method="saveReportPDF">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="reports/downloadReportPDF" class="com.akto.action.PublicAction" method="accessReportPublic" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="stream">
+                <param name="contentType">application/pdf</param>
+                <param name="inputName">inputStream</param>
+                <param name="contentDisposition">attachment;filename="${filename}"</param>
+                <param name="bufferSize">1024</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/toggleTestRunSaveReport" class="com.akto.action.testing.StartTestAction" method="toggleTestRunSaveReport">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/send_event" class="com.akto.action.EventMetricsAction" method="sendEventToIntercomFromUI">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

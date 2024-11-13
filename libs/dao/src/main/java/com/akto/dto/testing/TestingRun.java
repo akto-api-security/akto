@@ -43,6 +43,9 @@ public class TestingRun {
     public static final String SEND_SLACK_ALERT = "sendSlackAlert";
     private boolean sendSlackAlert = false;
 
+    public static final String _SAVE_REPORT = "saveReport";
+    private boolean saveReport;
+
     public TestingRun() { }
 
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, String triggeredBy, boolean sendSlackAlert) {
@@ -206,6 +209,14 @@ public class TestingRun {
 
     public void setSendSlackAlert(boolean sendSlackAlert) {
         this.sendSlackAlert = sendSlackAlert;
+    }
+
+    public boolean getSaveReport() {
+        return saveReport;
+    }
+
+    public void setSaveReport(boolean saveReport) {
+        this.saveReport = saveReport;
     }
 
     @Override

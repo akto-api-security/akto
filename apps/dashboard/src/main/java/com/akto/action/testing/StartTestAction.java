@@ -80,6 +80,8 @@ public class StartTestAction extends UserAction {
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
 
     private String testRoleId;
+    private boolean saveReports;
+
     private static final Gson gson = new Gson();
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
@@ -923,6 +925,14 @@ public class StartTestAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String toggleTestRunSaveReport() {
+        if (testingRunHexId != null) {
+            TestingRunDao.instance.updateOne(
+                    Filters.eq(Constants.ID, new ObjectId(testingRunHexId)),
+                    Updates.set(TestingRun._SAVE_REPORT, saveReports));
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
 
     public void setType(TestingEndpoints.Type type) {
         this.type = type;
@@ -1264,5 +1274,13 @@ public class StartTestAction extends UserAction {
 
     public void setSendSlackAlert(boolean sendSlackAlert) {
         this.sendSlackAlert = sendSlackAlert;
+    }
+
+    public boolean getSaveReports() {
+        return saveReports;
+    }
+
+    public void setSaveReports(boolean saveReports) {
+        this.saveReports = saveReports;
     }
 }
