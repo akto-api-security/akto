@@ -131,8 +131,7 @@ const editorSetup = {
     findErrors: function(Editor,keywords){
         // a key may start with spaces and may have a "-" before starting
         // it will end with ":" and may have spaces at the end.
-        let keyRegex = /(?<=^\s*-?\s*)(\w+)(?=:( *)$)/
-
+        let keyRegex = /^\s*-?\s*(\w+)(?=:( *)$)/
         Editor.onDidChangeModelContent(() => {
             const model = Editor.getModel();
             const markers = model.getValue().split('\n').flatMap((line, index) => {

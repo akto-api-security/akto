@@ -353,15 +353,15 @@ prettifyEpoch(epoch) {
       return;
     }
 
-    // Using the Clipboard API for modern browsers
-    navigator.clipboard.writeText(text)
-      .then(() => {
-        // Add toast here
+    setTimeout(() => {
+      navigator.clipboard.writeText(text).then(() => {
         this.setToast(true,false, toastMessage ? toastMessage : 'Text copied to clipboard successfully!');
       })
       .catch((err) => {
         this.setToast(true,true,`Failed to copy text to clipboard: ${err}`);
       });
+    }, 0)
+      
   },
   epochToDateTime(timestamp) {
     var date = new Date(timestamp * 1000);
