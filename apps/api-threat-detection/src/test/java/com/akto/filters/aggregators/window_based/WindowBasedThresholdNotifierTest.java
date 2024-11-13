@@ -1,57 +1,41 @@
 package com.akto.filters.aggregators.window_based;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
-
 import java.util.HashMap;
-import java.util.Optional;
-
+import java.util.Map;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.junit.Test;
 
-import com.akto.cache.TypeValueCache;
+import com.akto.cache.CounterCache;
 
-class MemCache<V> implements TypeValueCache<V> {
+class MemCache implements CounterCache {
 
-    private final ConcurrentHashMap<String, V> cache;
+    private final ConcurrentHashMap<String, Long> cache;
 
     public MemCache() {
         this.cache = new ConcurrentHashMap<>();
     }
 
     @Override
-    public Optional<V> get(String key) {
-        return Optional.ofNullable(cache.get(key));
+    public void incrementBy(String key, long val) {
+        cache.put(key, cache.getOrDefault(key, 0L) + val);
     }
 
     @Override
-    public V getOrDefault(String key, V defaultValue) {
-        return this.cache.getOrDefault(key, defaultValue);
+    public void increment(String key) {
+        incrementBy(key, 1);
     }
 
     @Override
-    public boolean containsKey(String key) {
-        return this.cache.containsKey(key);
+    public long get(String key) {
+        return cache.getOrDefault(key, 0L);
     }
 
-    @Override
-    public void put(String key, V value) {
-        this.cache.put(key, value);
-    }
-
-    @Override
-    public long size() {
-        return this.cache.size();
-    }
-
-    @Override
-    public void destroy() {
-        this.cache.clear();
+    public Map<String, Long> internalCache() {
+        return cache;
     }
 }
 
@@ -81,7 +65,7 @@ public class WindowBasedThresholdNotifierTest {
     @Test
     public void testShouldNotify() throws InterruptedException {
 
-        MemCache<Data> cache = new MemCache<>();
+        MemCache cache = new MemCache();
         WindowBasedThresholdNotifier notifier = new WindowBasedThresholdNotifier(
                 cache, new WindowBasedThresholdNotifier.Config(10, 1));
 
@@ -89,30 +73,19 @@ public class WindowBasedThresholdNotifierTest {
         String ip = "192.168.0.1";
 
         for (int i = 0; i < 1000; i++) {
-            shouldNotify = shouldNotify
-                    || notifier.shouldNotify(
-                            ip,
-                            WindowBasedThresholdNotifierTest
-                                    .generateResponseParamsForStatusCode(400));
+            boolean _shouldNotify = notifier.shouldNotify(
+                    ip,
+                    WindowBasedThresholdNotifierTest
+                            .generateResponseParamsForStatusCode(400));
+            shouldNotify = shouldNotify || _shouldNotify;
         }
 
-        Data data = cache.get(ip).orElse(new Data());
-        assertEquals(10, data.getRequests().size());
+        long count = 0;
+        for (Map.Entry<String, Long> entry : cache.internalCache().entrySet()) {
+            count += entry.getValue();
+        }
 
-        long lastNotifiedAt = data.getLastNotifiedAt();
-        assertNotEquals(lastNotifiedAt, 0);
-
-        assertTrue(shouldNotify);
-
-        Thread.sleep(2000L);
-
-        shouldNotify = notifier.shouldNotify(
-                ip,
-                WindowBasedThresholdNotifierTest.generateResponseParamsForStatusCode(401));
-        assertFalse(shouldNotify);
-
-        data = cache.get(ip).orElse(new Data());
-
+        assertEquals(1000, count);
     }
 
 }
