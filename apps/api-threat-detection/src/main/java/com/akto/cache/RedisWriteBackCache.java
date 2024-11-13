@@ -62,7 +62,7 @@ public class RedisWriteBackCache<V> implements TypeValueCache<V> {
         this.scheduler.scheduleAtFixedRate(
                 this::syncWrite, WRITE_SYNC_INTERVAL, WRITE_SYNC_INTERVAL, TimeUnit.SECONDS);
         this.scheduler.scheduleAtFixedRate(
-                this::syncRead, READ_SYNC_INTERVAL, READ_SYNC_INTERVAL, TimeUnit.SECONDS);
+                this::syncRead, 0, READ_SYNC_INTERVAL, TimeUnit.SECONDS);
 
         this.inMemoryCache = Caffeine.newBuilder()
                 .maximumSize(MAX_CACHE_SIZE)
@@ -95,7 +95,11 @@ public class RedisWriteBackCache<V> implements TypeValueCache<V> {
     }
 
     public long size() {
-        return inMemoryCache.estimatedSize();
+        try {
+            return inMemoryCache.estimatedSize();
+        } catch (Exception e) {
+            return 0L;
+        }
     }
 
     public void put(String key, V value) {
