@@ -331,4 +331,32 @@ public class CleanInventory {
         }
     }
 
+    public static void deleteOptionsAPIs(List<ApiCollection> apiCollections){
+        for (ApiCollection apiCollection: apiCollections) {
+            List<Key> toBeDeleted = new ArrayList<>();
+            if (apiCollection.getHostName() == null) {
+                continue;
+            }
+            List<BasicDBObject> endpoints = com.akto.action.observe.Utils.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0);
+
+            if (endpoints == null || endpoints.isEmpty()) {
+                continue;
+            }
+            for (BasicDBObject singleTypeInfo: endpoints) {
+                singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
+                int apiCollectionId = singleTypeInfo.getInt("apiCollectionId");
+                String url = singleTypeInfo.getString("url");
+                String method = singleTypeInfo.getString("method");
+
+                Key key = new Key(apiCollectionId, url, Method.fromString(method), -1, 0, 0);
+
+                if (method.equalsIgnoreCase("options")) {
+                    toBeDeleted.add(key);
+                    continue;
+                }
+            }
+            deleteApis(toBeDeleted);
+        }
+    }
+
 }
