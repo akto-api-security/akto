@@ -38,10 +38,12 @@ function GithubServerTable(props) {
   const setFiltersMap = PersistStore(state => state.setFiltersMap)
   const tableInitialState = PersistStore(state => state.tableInitialState)
   const setTableInitialState = PersistStore(state => state.setTableInitialState)
+  const tableSelectedMap = PersistStore(state => state.tableSelectedTab)
+  const setTableSelectedMap = PersistStore(state => state.setTableSelectedTab)
   const currentPageKey = props?.filterStateUrl || (window.location.pathname + "/" +  window.location.hash)
   const pageFiltersMap = filtersMap[currentPageKey];
 
-  const { selectedItems, selectItems } = useTable();
+  const { selectedItems, selectItems, applyFilter } = useTable();
 
   const handleRemoveAppliedFilter = (key) => {
     let temp = appliedFilters
@@ -73,7 +75,6 @@ function GithubServerTable(props) {
   const pageLimit = props?.pageLimit || 20;
   const [appliedFilters, setAppliedFilters] = useState(initialStateFilters);
   const [queryValue, setQueryValue] = useState('');
-  const { applyFilter } = useTable()
   const [fullDataIds, setFullDataIds] = useState([])
 
   const [sortableColumns, setSortableColumns] = useState([])
@@ -132,6 +133,11 @@ function GithubServerTable(props) {
   const handleSelectedTab = (x) => {
     const tableTabs = props.tableTabs ? props.tableTabs : props.tabs
     if(tableTabs){
+      const id = tableTabs[x]?.id;
+      setTableSelectedMap({
+        ...tableSelectedMap,
+        [window.location.pathname]: id
+      })
       const primitivePath = window.location.origin + window.location.pathname + window.location?.search
       const newUrl = primitivePath + "#" +  tableTabs[x].id
       window.history.replaceState(null, null, newUrl)
