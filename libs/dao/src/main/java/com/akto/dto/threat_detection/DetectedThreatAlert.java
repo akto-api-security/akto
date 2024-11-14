@@ -13,16 +13,23 @@ public class DetectedThreatAlert {
 
     private String actor;
 
+    private int bucketStart;
+
+    private int bucketEnd;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DetectedThreatAlert() {
     }
 
-    public DetectedThreatAlert(String id, String filterId, String actor, long detectedAt) {
+    public DetectedThreatAlert(String id, String filterId, String actor, long detectedAt, int bucketStart,
+            int bucketEnd) {
         this.id = id;
         this.filterId = filterId;
         this.detectedAt = detectedAt;
         this.actor = actor;
+        this.bucketStart = bucketStart;
+        this.bucketEnd = bucketEnd;
     }
 
     public String getId() {
@@ -55,6 +62,22 @@ public class DetectedThreatAlert {
 
     public void setActor(String actor) {
         this.actor = actor;
+    }
+
+    public int getBucketStart() {
+        return bucketStart;
+    }
+
+    public void setBucketStart(int bucketStart) {
+        this.bucketStart = bucketStart;
+    }
+
+    public int getBucketEnd() {
+        return bucketEnd;
+    }
+
+    public void setBucketEnd(int bucketEnd) {
+        this.bucketEnd = bucketEnd;
     }
 
     public Optional<String> marshall() {
