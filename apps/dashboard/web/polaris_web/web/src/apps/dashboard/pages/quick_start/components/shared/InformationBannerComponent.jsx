@@ -8,12 +8,12 @@ function InformationBannerComponent({docsUrl,content}) {
     }
     return (
         <div className='card-items'>
-            <Banner status="info">
+            <Banner tone="info">
                 <span>{content}</span>
                 {docsUrl !== '' ?  <Button plain onClick={() => openLink()}>here</Button>: ""}
             </Banner>
         </div>
-    )
+    );
 }
 
 export default InformationBannerComponent

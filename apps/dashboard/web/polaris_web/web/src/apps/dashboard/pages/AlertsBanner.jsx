@@ -3,7 +3,7 @@ import React from 'react'
 
 function AlertsBanner({severity, content, type, onDismiss, index}) {
     return (
-        <Banner status={severity} onDismiss={() => onDismiss(index)}>
+        <Banner tone={severity} onDismiss={() => onDismiss(index)}>
             <Box width="280px">
                 <VerticalStack>
                     <Text variant="headingMd">{type}</Text>
@@ -11,7 +11,7 @@ function AlertsBanner({severity, content, type, onDismiss, index}) {
                 </VerticalStack>
             </Box>
         </Banner>
-    )
+    );
 }
 
 export default AlertsBanner

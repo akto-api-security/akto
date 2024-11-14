@@ -219,7 +219,7 @@ const Users = () => {
                         url: 'https://docs.akto.io/getting-started/quick-start-with-akto-cloud',
                         target: "_blank"
                     }}
-                    status="info"
+                    tone="info"
                 >
                     <p>Inviting team members is disabled in local. Collaborate with your team by using Akto cloud or AWS/GCP deploy.</p>
                 </Banner>

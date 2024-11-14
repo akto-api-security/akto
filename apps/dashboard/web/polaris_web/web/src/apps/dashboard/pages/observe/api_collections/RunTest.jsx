@@ -516,7 +516,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                             content: 'Configure authentication mechanism',
                                             onAction: () => navigate("/dashboard/testing/user-config")
                                         }}
-                                    status="critical"
+                                    tone="critical"
                                 >
 
                                     <Text variant="bodyMd">
@@ -748,7 +748,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 }
             </Modal>
         </div>
-    )
+    );
 }
 
 export default RunTest

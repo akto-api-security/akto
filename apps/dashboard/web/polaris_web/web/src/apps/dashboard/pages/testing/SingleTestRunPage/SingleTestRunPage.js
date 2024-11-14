@@ -373,7 +373,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
   const bannerComp = (
     missingConfigs.length > 0 ? 
     <div className="banner-wrapper">
-      <Banner status="critical">
+      <Banner tone="critical">
         <HorizontalStack gap={3}>
           <Box>
             <Text fontWeight="semibold">
