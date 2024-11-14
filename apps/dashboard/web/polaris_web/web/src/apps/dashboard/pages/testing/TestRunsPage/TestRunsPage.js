@@ -132,10 +132,28 @@ const endTimestamp = getTimeEpoch("until") + 86400
 
 
 const [loading, setLoading] = useState(true);
-const [currentTab, setCurrentTab] = useState("one_time");
 const [updateTable, setUpdateTable] = useState(false);
 const [countMap, setCountMap] = useState({});
-const [selected, setSelected] = useState(1);
+
+const definedTableTabs = ['All', 'One time', 'Continuous Testing', 'Scheduled', 'CI/CD']
+const initialCount = [countMap['allTestRuns'], countMap['oneTime'], countMap['continuous'], countMap['scheduled'], countMap['cicd']]
+
+const { tabsInfo } = useTable()
+const tableSelectedTab = PersistStore.getState().tableSelectedTab[window.location.pathname]
+const initialSelectedTab = tableSelectedTab || "one_time";
+const [currentTab, setCurrentTab] = useState(initialSelectedTab);
+let initialVal = 1;
+for(let x = 0; x < definedTableTabs.length; x++) {
+    const tempId = func.getKeyFromName(definedTableTabs[x]);
+    if (tempId === initialSelectedTab) {
+        initialVal = x;
+        break;
+    }
+}
+const [selected, setSelected] = useState(initialVal);
+
+const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
+const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setCurrentTab, currentTab, tabsInfo)
 
 const [severityCountMap, setSeverityCountMap] = useState({
   HIGH: {text : 0, color: func.getColorForCharts("HIGH")},
@@ -245,13 +263,6 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
       setSeverityCountMap(tempMap)
     })
   }
-
-  const definedTableTabs = ['All', 'One time', 'Continuous Testing', 'Scheduled', 'CI/CD']
-  const initialCount = [countMap['allTestRuns'], countMap['oneTime'], countMap['continuous'], countMap['scheduled'], countMap['cicd']]
-
-  const { tabsInfo } = useTable()
-  const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
-  const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setCurrentTab, currentTab, tabsInfo)
 
   const fetchTotalCount = () =>{
     setLoading(true)

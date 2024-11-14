@@ -195,8 +195,8 @@ function ApiCollections() {
     const [data, setData] = useState({'hostname':[]})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
-    const [selectedTab, setSelectedTab] = useState("hostname")
-    const [selected, setSelected] = useState(1)
+    
+   
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
@@ -211,6 +211,19 @@ function ApiCollections() {
     const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated']
 
     const { tabsInfo, selectItems } = useTable()
+    const tableSelectedTab = PersistStore.getState().tableSelectedTab[window.location.pathname]
+    const initialSelectedTab = tableSelectedTab || "hostname";
+    const [selectedTab, setSelectedTab] = useState(initialSelectedTab)
+    let initialVal = 1;
+    for(let x = 0; x < definedTableTabs.length; x++) {
+        const tempId = func.getKeyFromName(definedTableTabs[x]);
+        if (tempId === initialSelectedTab) {
+            initialVal = x;
+            break;
+        }
+    }
+    const [selected, setSelected] = useState(initialVal)
+    
     const tableCountObj = func.getTabsCount(definedTableTabs, data)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
@@ -273,7 +286,7 @@ function ApiCollections() {
         res.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated)
         res.custom = res.all.filter(x => !res.hostname.includes(x) && !x.deactivated && !res.groups.includes(x));
         setData(res);
-        if (res.hostname.length === 0) {
+        if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
             setTimeout(() => {
                 setSelectedTab("custom");
                 setSelected(3);
