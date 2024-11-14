@@ -87,6 +87,8 @@ public class HttpCallFilter {
                     List<String> sourceIps = ApiAccessTypePolicy.getSourceIps(responseParam);
                     Method method = Method.fromString(requestParams.getMethod());
 
+                    int currentBucket = (int) (responseParam.getTime() / 60);
+
                     maliciousSamples.add(
                             new Message(
                                     responseParam.getAccountId(),
@@ -97,7 +99,8 @@ public class HttpCallFilter {
                                             method,
                                             responseParam.getOrig(),
                                             Context.now(),
-                                            apiFilter.getId())));
+                                            apiFilter.getId()),
+                                    currentBucket));
 
                     // Later we will also add aggregation support
                     // Eg: 100 4xx requests in last 10 minutes.
@@ -112,11 +115,15 @@ public class HttpCallFilter {
 
                         // TODO: Add window id with each suspect sample data and alert
                         if (registerThreatAlert) {
+                            int windowStartBucket = currentBucket
+                                    - this.windowBasedThresholdNotifier.getConfig().getWindowSizeInMinutes();
                             DetectedThreatAlert alert = new DetectedThreatAlert(
                                     UUID.randomUUID().toString(),
                                     apiFilter.getId(),
                                     aggKey,
-                                    System.currentTimeMillis());
+                                    System.currentTimeMillis(),
+                                    windowStartBucket,
+                                    currentBucket);
 
                             DetectedThreatAlertDao.instance.insertOne(alert);
                         }
