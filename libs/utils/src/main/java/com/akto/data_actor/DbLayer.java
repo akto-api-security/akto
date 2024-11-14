@@ -1013,6 +1013,10 @@ public class DbLayer {
                 NODE_LIMIT);
     }
 
+    public static long countTestingRunResultSummaries(Bson filter){
+        return TestingRunResultSummariesDao.instance.count(filter);
+    }
+
 
     public static TestScript fetchTestScript(){
         return TestScriptsDao.instance.fetchTestScript();
