@@ -1,4 +1,4 @@
-import { Avatar, Badge, Box, Button, HorizontalGrid, HorizontalStack, LegacyCard, ProgressBar, ResourceItem, ResourceList, Scrollable, Text, VerticalStack, VideoThumbnail } from '@shopify/polaris'
+import { Avatar, Badge, Box, Button, HorizontalGrid, InlineStack, LegacyCard, ProgressBar, ResourceItem, ResourceList, Scrollable, Text, VerticalStack, VideoThumbnail } from '@shopify/polaris'
 import React, { useState } from 'react'
 import quickStartFunc from '../transform'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
@@ -138,12 +138,12 @@ function NewConnection() {
                 <LegacyCard.Section>
                     <VerticalStack gap="5">
                         <p>Use this personalized guide to get your traffic and start testing.</p>
-                        <HorizontalStack gap="3">
+                        <InlineStack gap="3">
                             <Text variant='bodyMd' color='subdued' fontWeight="medium">{tasksCompleted} of {totalTasks} tasks completed</Text>
                             <Box width='36vw'>
                                 <ProgressBar color='success' progress={calculateWidth()} size='small'/>
                             </Box>
-                        </HorizontalStack>
+                        </InlineStack>
                     </VerticalStack>
                 </LegacyCard.Section>
 
@@ -151,7 +151,7 @@ function NewConnection() {
                     <VerticalStack gap="5">
                         {tasksList.map((element,index) => (
                             <VerticalStack gap="5" key={element?.id}>
-                                <HorizontalStack gap="3">
+                                <InlineStack gap="3">
                                     <Button   onClick={() => setTasksCompleted(index)} variant="monochromePlain">
                                         <Avatar customer name='circle' size="xs"
                                             source={tasksCompleted > index ? "/public/circle_check.svg" : "/public/circle_icon.svg"}
@@ -159,7 +159,7 @@ function NewConnection() {
                                     </Button>
                                     <Text variant='bodyMd' fontWeight={tasksCompleted === index ? "semibold" : "medium"}>{element?.label}</Text>
                                     {tasksCompleted === index ? element?.component : null}
-                                </HorizontalStack>
+                                </InlineStack>
                             </VerticalStack>
                         
                         ))}

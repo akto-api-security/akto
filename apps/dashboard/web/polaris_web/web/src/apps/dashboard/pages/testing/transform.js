@@ -11,7 +11,7 @@ import {ResourcesMajor,
   PlayMinor,
 } from '@shopify/polaris-icons';
 import React from 'react'
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon, Avatar, Tag, Tooltip} from '@shopify/polaris';
+import { Text,InlineStack, Badge, Link, List, Box, Icon, Avatar, Tag, Tooltip} from '@shopify/polaris';
 import { history } from "@/util/history";
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
@@ -221,16 +221,16 @@ const transform = {
       return obj;
     },
     prettifyTestName: (testName, icon, iconColor, iconToolTipContent)=>{
-      return(
-        <HorizontalStack gap={4}>
+      return (
+        <InlineStack gap={4}>
           <Tooltip content={iconToolTipContent} hoverDelay={"300"} dismissOnMouseOut>
             <Box><Icon source={icon} color={iconColor}/></Box>
           </Tooltip>
           <Box maxWidth="350px">
             <TooltipText text={testName} tooltip={testName} textProps={{fontWeight: 'medium'}} />
           </Box>
-        </HorizontalStack>
-      )
+        </InlineStack>
+      );
     },
     filterObjectByValueGreaterThanZero: (obj)=> {
       const result = {};
@@ -402,14 +402,14 @@ const transform = {
     const jiraComponent = jiraIssueUrl?.length > 0 ? (
       <Box>
               <Tag>
-                  <HorizontalStack gap={1}>
+                  <InlineStack gap={1}>
                     <Avatar size="xs" shape='round' source="/public/logo_jira.svg" />
                     <Link url={jiraIssueUrl}>
                       <Text>
                         {key}
                       </Text>
                     </Link>
-                  </HorizontalStack>
+                  </InlineStack>
                 </Tag>
           </Box>
     ) : <Text> No Jira ticket created. Click on the top right button to create a new ticket.</Text>
@@ -444,11 +444,11 @@ const transform = {
             return;
           }
           sectionLocal.content = (
-            <HorizontalStack gap="2">
+            <InlineStack gap="2">
               {
                 transform.tagList(category?.issueTags)
               }
-            </HorizontalStack>
+            </InlineStack>
           )
           break;
         case "CWE":
@@ -456,11 +456,11 @@ const transform = {
             return;
           }
           sectionLocal.content = (
-            <HorizontalStack gap="2">
+            <InlineStack gap="2">
               {
                 transform.tagList(category?.cwe, "CWE")
               }
-            </HorizontalStack>
+            </InlineStack>
           )
           break;
         case "CVE":
@@ -468,11 +468,11 @@ const transform = {
             return;
           }
           sectionLocal.content = (
-            <HorizontalStack gap="2">
+            <InlineStack gap="2">
               {
                 transform.tagList(category?.cve, "CVE")
               }
-            </HorizontalStack>
+            </InlineStack>
           )
           break;
         case "References":
@@ -762,16 +762,16 @@ getUrlComp(url){
   const method = arr[0]
   const endpoint = arr[1]
 
-  return(
-    <HorizontalStack gap={1}>
+  return (
+    <InlineStack gap={1}>
       <Box width="54px">
-        <HorizontalStack align="end">
+        <InlineStack align="end">
           <Text variant="bodyMd" fontWeight="medium" color="subdued">{method}</Text>
-        </HorizontalStack>
+        </InlineStack>
       </Box>
       <div style={{fontSize: '14px', lineHeight: '20px', color: '#202223'}} data-testid="affected_endpoints">{endpoint}</div>
-    </HorizontalStack>
-  )
+    </InlineStack>
+  );
 },
 
 getCollapsibleRow(urls, severity){
@@ -819,7 +819,7 @@ getPrettifiedTestRunResults(testRunResults){
         const baseUrl = window.location.origin+"/dashboard/testing/roles/details?system="
         const missingConfigs = func.toSentenceCase(test.errorsList[0].split(errorsObject["ROLE_NOT_FOUND"])[0]).split(" ");
         error_message = (
-          <HorizontalStack gap={"1"}>
+          <InlineStack gap={"1"}>
             {missingConfigs.map((config, index) => {
               return(
                 config.length > 0 ?
@@ -829,7 +829,7 @@ getPrettifiedTestRunResults(testRunResults){
                 : null
               )
             })}
-          </HorizontalStack>
+          </InlineStack>
         )
       }else{
         error_message = errorsObject[errorType]
@@ -870,13 +870,13 @@ getPrettifiedTestRunResults(testRunResults){
       ...obj,
       nameComp: <div data-testid={obj.name}><Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box></div>,
       severityComp: obj?.vulnerable === true ? <Badge size="small" tone={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge> : <Text>-</Text>,
-      cweDisplayComp: obj?.cweDisplay?.length > 0 ? <HorizontalStack gap={1} wrap={false}>
+      cweDisplayComp: obj?.cweDisplay?.length > 0 ? <InlineStack gap={1} wrap={false}>
         {obj.cweDisplay.map((ele,index)=>{
           return(
             <Badge size="small" tone={func.getTestResultStatus(ele)} key={index}>{ele}</Badge>
           )
         })}
-      </HorizontalStack> : <Text>-</Text>,
+      </InlineStack> : <Text>-</Text>,
       totalUrls: obj.urls.length,
       scanned_time_comp: <Text variant="bodyMd">{func.prettifyEpoch(obj?.endTimestamp)}</Text>,
       collapsibleRow: this.getCollapsibleRow(obj.urls, obj?.severity[0]),
@@ -917,14 +917,14 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
   const jiraComponent = jiraIssueUrl?.length > 0 ? (
     <Box>
       <Tag>
-          <HorizontalStack gap={1}>
+          <InlineStack gap={1}>
             <Avatar size="xs" shape='round' source="/public/logo_jira.svg" />
             <Link url={jiraIssueUrl}>
               <Text>
                 {key}
               </Text>
             </Link>
-          </HorizontalStack>
+          </InlineStack>
         </Tag>
     </Box>
   ) : null
@@ -938,10 +938,10 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
     {
       title: "API",
       value: (
-        <HorizontalStack gap={"1"}>
+        <InlineStack gap={"1"}>
           <Text color="subdued" fontWeight="semibold">{apiInfo.id.method}</Text>
           <TextComp value={observeFunc.getTruncatedUrl(apiInfo.id.url)} />
-        </HorizontalStack>
+        </InlineStack>
       ),
       tooltipContent: "Name of the api on which test is run"
     },

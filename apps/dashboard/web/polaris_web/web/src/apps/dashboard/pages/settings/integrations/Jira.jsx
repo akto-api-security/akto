@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import {Box, Button, Collapsible, Divider, HorizontalStack, Icon, LegacyCard, List, Scrollable, Text, TextField, VerticalStack} from '@shopify/polaris';
+import {Box, Button, Collapsible, Divider, InlineStack, Icon, LegacyCard, List, Scrollable, Text, TextField, VerticalStack} from '@shopify/polaris';
 import settingFunctions from '../module';
 import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
@@ -39,10 +39,10 @@ function Jira() {
                         removeUnderline
                         onClick={() => setCollapsibleOpen(!collapsibleOpen)}
                         variant="monochromePlain">
-                        <HorizontalStack gap={"4"}>
+                        <InlineStack gap={"4"}>
                             <Text variant="headingSm">Found {Object.keys(projectIssueMap).length} projects out of {projId.split(',').length}</Text>
                             <Box><Icon source={collapsibleOpen ? ChevronUpMinor : ChevronDownMinor} /></Box>
-                        </HorizontalStack>
+                        </InlineStack>
                     </Button>
                 </Box>
                 

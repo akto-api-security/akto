@@ -1,4 +1,4 @@
-import { Avatar, Box, HorizontalStack, Link, Popover, Text, Tooltip } from '@shopify/polaris'
+import { Avatar, Box, InlineStack, Link, Popover, Text, Tooltip } from '@shopify/polaris'
 import React, { useState } from 'react'
 
 function TitleWithInfo({titleComp, textProps, titleText, tooltipContent, docsUrl}) {
@@ -13,7 +13,7 @@ function TitleWithInfo({titleComp, textProps, titleText, tooltipContent, docsUrl
     const [active, setActive] = useState(false)
     const [contentActive,setContentActive] = useState(false)
     return (
-        <HorizontalStack gap={"1"}>
+        <InlineStack gap={"1"}>
             {titleComp ? titleComp : <Text variant="headingLg" {...textProps}>{titleText}</Text>}
             {docsUrl ?<Popover 
                 active={active || contentActive}
@@ -46,7 +46,7 @@ function TitleWithInfo({titleComp, textProps, titleText, tooltipContent, docsUrl
                             <Avatar shape="round" size="xs" source='/public/info_filled_icon.svg'/>
                         </div> </Tooltip> : null
             }
-        </HorizontalStack>
+        </InlineStack>
     );
 }
 

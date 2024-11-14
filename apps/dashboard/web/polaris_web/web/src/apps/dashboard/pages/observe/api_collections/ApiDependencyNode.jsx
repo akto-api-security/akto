@@ -1,4 +1,4 @@
-import { Box, Card, HorizontalStack, Icon, Text, VerticalStack } from '@shopify/polaris';
+import { Box, Card, InlineStack, Icon, Text, VerticalStack } from '@shopify/polaris';
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import ReactFlow, {
     Background,
@@ -19,34 +19,31 @@ function ApiDependencyNode({ data }) {
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const apiCollectionName = collectionsMap[apiCollectionId]
 
-    return (
-        <>
-            {!isFirstNode ? <Handle type="target" position={Position.Top} /> : null}
-            <div onClick={() => { !isCurrentNode && openTargetUrl(apiCollectionId, endpoint, method) }} style={isCurrentNode ? { "cursor": "default" } : { "cursor": "pointer" }}>
-                <VerticalStack gap={2}>
-                    <Card padding={0}>
-                        <Box padding={3}>
-                            <VerticalStack gap={1}>
-                                <Box width='250px'>
-                                    <TooltipText tooltip={apiCollectionName} text={apiCollectionName} textProps={{ color: "subdued", variant: "bodySm" }} />
+    return <>
+        {!isFirstNode ? <Handle type="target" position={Position.Top} /> : null}
+        <div onClick={() => { !isCurrentNode && openTargetUrl(apiCollectionId, endpoint, method) }} style={isCurrentNode ? { "cursor": "default" } : { "cursor": "pointer" }}>
+            <VerticalStack gap={2}>
+                <Card padding={0}>
+                    <Box padding={3}>
+                        <VerticalStack gap={1}>
+                            <Box width='250px'>
+                                <TooltipText tooltip={apiCollectionName} text={apiCollectionName} textProps={{ color: "subdued", variant: "bodySm" }} />
+                            </Box>
+                            <InlineStack gap={1}>
+                                <Box width='230px'>
+                                    {StyledEndpoint(methodPlusUrl, "12px", "bodySm")}
                                 </Box>
-                                <HorizontalStack gap={1}>
-                                    <Box width='230px'>
-                                        {StyledEndpoint(methodPlusUrl, "12px", "bodySm")}
-                                    </Box>
-                                    <div style={{ transform: 'rotate(45deg)', width: "20px" }}>
-                                        {!isCurrentNode && <Icon source={ArrowUpMinor} color="subdued" />}
-                                    </div>
-
-                                </HorizontalStack>
-                            </VerticalStack>
-                        </Box>
-                    </Card>
-                </VerticalStack>
-            </div>
-            {!isCurrentNode ? <Handle type="source" position={Position.Bottom} id="b" /> : null}
-        </>
-    );
+                                <div style={{ transform: 'rotate(45deg)', width: "20px" }}>
+                                    {!isCurrentNode && <Icon source={ArrowUpMinor} color="subdued" />}
+                                </div>
+                            </InlineStack>
+                        </VerticalStack>
+                    </Box>
+                </Card>
+            </VerticalStack>
+        </div>
+        {!isCurrentNode ? <Handle type="source" position={Position.Bottom} id="b" /> : null}
+    </>;
 }
 
 function openTargetUrl(apiCollectionId, url, method) {

@@ -3,7 +3,7 @@ import {
     Text,
     Badge,
     VerticalStack,
-    HorizontalStack,
+    InlineStack,
     Button,
     Popover,
     ActionList,
@@ -110,19 +110,19 @@ function GithubRow(props) {
                         <Text variant='bodyMd' fontWeight="medium">
                             {header.text}
                         </Text>
-                        <HorizontalStack>
+                        <InlineStack>
                             <Badge key={header.text}>
                                 {data[header.value]}
                             </Badge>
-                        </HorizontalStack>
+                        </InlineStack>
                     </VerticalStack>
                 </IndexTable.Cell>
-            )
+            );
         })
         }
         {hasRowActions &&
             <IndexTable.Cell >
-                <HorizontalStack align='end'>
+                <InlineStack align='end'>
                     {
                         <Popover
                             active={popoverActive === data.id}
@@ -140,7 +140,7 @@ function GithubRow(props) {
                             />
                         </Popover>
                     }
-                </HorizontalStack>
+                </InlineStack>
             </IndexTable.Cell>
         }
     </>;
@@ -174,7 +174,7 @@ function GithubRow(props) {
     function ActionCell() {
         return (
             <IndexTable.Cell key={"actions"}>
-                <HorizontalStack align='end'>
+                <InlineStack align='end'>
                     {
                         <Popover
                             active={popoverActive === data.id}
@@ -192,7 +192,7 @@ function GithubRow(props) {
                             />
                         </Popover>
                     }
-                </HorizontalStack>
+                </InlineStack>
             </IndexTable.Cell>
         );
     }
@@ -205,13 +205,13 @@ function GithubRow(props) {
         return (
             <IndexTable.Cell key={"collapsible"}>
                 <Box maxWidth={treeView ? "180px": ''} >
-                    <HorizontalStack align={treeView ? "start" : "end"} wrap={false} gap={"2"}>
+                    <InlineStack align={treeView ? "start" : "end"} wrap={false} gap={"2"}>
                         <Box><Icon source={iconSource} /></Box>
-                        {treeView ? value : null} 
-                    </HorizontalStack>
+                        {treeView ? value : null}
+                    </InlineStack>
                 </Box>
             </IndexTable.Cell>
-        )
+        );
     }
 
     function getHeader(header){

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
-import { Box, Button, Checkbox, HorizontalStack, Icon, LegacyCard, Modal, Popover, Text, Tooltip, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Checkbox, InlineStack, Icon, LegacyCard, Modal, Popover, Text, Tooltip, VerticalStack } from '@shopify/polaris'
 import trafficFiltersRequest from './api'
 import func from "@/util/func"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
@@ -107,7 +107,7 @@ function AdvancedTrafficFilters() {
         const tooltipText= currentState ? "Mark as Active" : "Mark as Deactive"
 
         const titleComp = (
-            <HorizontalStack align="space-between">
+            <InlineStack align="space-between">
                 <Text variant="headingSm">Add or modify filters</Text>
                 <Popover
                     activator={<Button disclosure size="slim" onClick={() => setPopoverActive(!popoverActive)}>Actions</Button>}
@@ -130,7 +130,7 @@ function AdvancedTrafficFilters() {
                         </VerticalStack>
                     </Popover.Section>
                 </Popover>
-            </HorizontalStack>
+            </InlineStack>
         )
 
         return <>
@@ -161,7 +161,7 @@ function AdvancedTrafficFilters() {
                 <Box paddingBlockStart={4} paddingBlockEnd={4}>
                     <VerticalStack gap={"1"}>
                         <Box paddingInlineEnd={"4"}>
-                            <HorizontalStack align="end" gap={"2"}>
+                            <InlineStack align="end" gap={"2"}>
                                 <Button
 
 
@@ -183,7 +183,7 @@ function AdvancedTrafficFilters() {
                                         <Box><Icon source={DeleteMajor} /></Box>
                                     </Tooltip>
                                 </Button>
-                            </HorizontalStack>
+                            </InlineStack>
                         </Box>
                         <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="240px" readOnly={false} getEditorData={setCurrentTemplate} />
                     </VerticalStack>

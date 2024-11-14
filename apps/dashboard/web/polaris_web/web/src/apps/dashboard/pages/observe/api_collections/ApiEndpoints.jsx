@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox } from "@shopify/polaris"
+import { Text, InlineStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -635,8 +635,7 @@ function ApiEndpoints(props) {
     const isApiGroup = collectionsObj?.type === 'API_GROUP'
 
     const secondaryActionsComponent = (
-        <HorizontalStack gap="2">
-
+        <InlineStack gap="2">
             <Popover
                 active={exportOpen}
                 activator={(
@@ -711,11 +710,8 @@ function ApiEndpoints(props) {
                     </Popover.Section>
                 </Popover.Pane>
             </Popover>
-
             {isApiGroup &&collectionsObj?.automated !== true ? <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> : null}
-
             {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null}
-                    
             <RunTest
                 apiCollectionId={apiCollectionId}
                 endpoints={filteredEndpoints}
@@ -725,7 +721,7 @@ function ApiEndpoints(props) {
                 disabled={showEmptyScreen}
                 selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
             />
-        </HorizontalStack>
+        </InlineStack>
     )
 
     const handleSelectedTab = (selectedIndex) => {

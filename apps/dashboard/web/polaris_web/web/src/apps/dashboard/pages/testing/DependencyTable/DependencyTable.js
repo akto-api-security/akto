@@ -1,4 +1,4 @@
-import { Box, Button, HorizontalStack, Icon, Link, Modal, Select, Spinner, Text, TextField, VerticalStack } from "@shopify/polaris";
+import { Box, Button, InlineStack, Icon, Link, Modal, Select, Spinner, Text, TextField, VerticalStack } from "@shopify/polaris";
 import { useEffect, useRef, useState } from "react";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
@@ -271,11 +271,11 @@ function DependencyTable() {
             const url = "/dashboard/observe/inventory/" + newCollectionId
 
             const forwardLink = (
-                <HorizontalStack gap={1}>
+                <InlineStack gap={1}>
                     <Text> API collection created successfully. Click </Text>
                     <Link url={url}>here</Link>
                     <Text> to view collection.</Text>
-                </HorizontalStack>
+                </InlineStack>
             )
 
             func.setToast(true, false, forwardLink)

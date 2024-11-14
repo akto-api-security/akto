@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Button, Modal, HorizontalStack, IndexFiltersMode, Text, Badge, Thumbnail, HorizontalGrid, Box } from "@shopify/polaris"
+import { Button, Modal, InlineStack, IndexFiltersMode, Text, Badge, Thumbnail, HorizontalGrid, Box } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState } from "react"
 import func from "@/util/func"
@@ -305,10 +305,10 @@ function AllSensitiveData() {
     }
 
     const secondaryActionsComp = (
-        <HorizontalStack gap={"2"}>
+        <InlineStack gap={"2"}>
             { (func.checkOnPrem() && window?.USER_NAME !== undefined && window.USER_NAME.includes("razorpay")) ? <Button onClick={resetSampleData}>Reset Sample Data</Button> : <></>}
             <Button onClick={displayGPT}>Ask AktoGPT</Button>
-        </HorizontalStack>
+        </InlineStack>
     )
 
     const graphComponents = (

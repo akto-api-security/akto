@@ -1,6 +1,6 @@
 import func from "@/util/func";
 import observeFunc from "../observe/transform"
-import { Badge, Button, Text , HorizontalStack, Box} from "@shopify/polaris";
+import { Badge, Button, Text , InlineStack, Box} from "@shopify/polaris";
 import LocalStore from "../../../main/LocalStorageStore";
 
 const subCategoryMap = LocalStore.getState().subCategoryMap;
@@ -248,10 +248,10 @@ const transform = {
                 <Button onClick={()=>setActive(true)}   removeUnderline variant="monochromePlain">
 
                   <Box width='250px'  > 
-                 <HorizontalStack align="space-between" gap="2">
+                 <InlineStack align="space-between" gap="2">
                      <Text>{collectionsMap[c.id]}</Text>
                      <Badge tone={c.status} size="small">{c.score.toString()}</Badge>
-                 </HorizontalStack>   
+                 </InlineStack>   
                 </Box>
                 </Button>
             

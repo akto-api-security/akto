@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, HorizontalStack, Link, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, InlineStack, Link, Text, VerticalStack } from '@shopify/polaris'
 import React, { useEffect, useState, useRef } from 'react'
 import {useNavigate} from "react-router-dom"
 import api from '../api'
@@ -80,18 +80,18 @@ function BurpSource() {
                 <Box paddingInlineStart={2}>
                     <VerticalStack gap={1}>
                         <div ref={ref}/>
-                        <HorizontalStack gap={1}>
+                        <InlineStack gap={1}>
                             <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_IP:</Text>
                             <Button onClick={() => copyText(aktoIp, "AKTO_IP")}  variant="plain">
                                 <div style={{maxWidth: "260px"}} className='overflow-text'>{aktoIp}</div>
                             </Button>
-                        </HorizontalStack>
-                        <HorizontalStack gap={1}>
+                        </InlineStack>
+                        <InlineStack gap={1}>
                             <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_TOKEN:</Text>
                             <Button onClick={() => copyText(aktoToken, "AKTO_TOKEN")}  variant="plain">
                                 <div style={{maxWidth: "210px"}} className='overflow-text'>{aktoToken}</div>
                             </Button>
-                        </HorizontalStack>
+                        </InlineStack>
                     </VerticalStack>
                 </Box>
             )
@@ -99,11 +99,11 @@ function BurpSource() {
         {
             text: "Start Burp proxy and browse any website.",
             component: (
-                <HorizontalStack gap={1}>
+                <InlineStack gap={1}>
                     <Text variant="bodyMd">You will see traffic in</Text>
                     {burpCollectionURL.length > 0 ? <Button  onClick={()=> navigate(burpCollectionURL)} variant="plain">Burp</Button> : <Text>Burp</Text>}
                     <Text>collection.</Text>
-                </HorizontalStack>
+                </InlineStack>
             )
         }
     ]
@@ -122,10 +122,10 @@ function BurpSource() {
     },[])
 
     const content = (
-        <HorizontalStack gap={1}>
+        <InlineStack gap={1}>
             <Text variant="bodyMd">Akto Burp plugin will work post</Text>
             <Link target="_blank" url='https://portswigger.net/burp/releases/professional-community-2024-1-1-1'>v2024.1.1.1</Link>
-        </HorizontalStack>
+        </InlineStack>
     )
 
     return (
@@ -139,11 +139,11 @@ function BurpSource() {
             <VerticalStack gap="1">
                 {steps.map((element,index) => (
                     <VerticalStack gap="1" key={index}>
-                        <HorizontalStack gap="1" wrap={false} key={element.text}>
+                        <InlineStack gap="1" wrap={false} key={element.text}>
                             {element?.text ?<Text>{index + 1}.</Text> : null}
                             {element?.text ?<Text variant="bodyMd">{element?.text}</Text> : null}
                             {element?.textComponent}
-                        </HorizontalStack>
+                        </InlineStack>
                         <Box paddingInlineStart={2}>
                             {element?.component}
                         </Box>

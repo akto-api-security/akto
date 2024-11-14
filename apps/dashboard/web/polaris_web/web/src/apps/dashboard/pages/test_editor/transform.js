@@ -1,5 +1,5 @@
 import func from "@/util/func"
-import {Tooltip, Box, Icon, Text, HorizontalStack} from "@shopify/polaris"
+import {Tooltip, Box, Icon, Text, InlineStack} from "@shopify/polaris"
 import {FolderMajor} from "@shopify/polaris-icons"
 
 const convertFunc = {
@@ -64,14 +64,14 @@ const convertFunc = {
                     let item = {
                         label: (
                             <Tooltip content={testObj?.customTests[key][0]?.category} dismissOnMouseOut width="wide">
-                                <HorizontalStack gap="2">
+                                <InlineStack gap="2">
                                     <Box>
                                         <Icon source={FolderMajor} color="base"/>
                                     </Box>
                                     <Text truncate variant="bodyMd" as="h5">
                                         {testObj?.customTests[key][0]?.category}
                                     </Text>
-                                </HorizontalStack>
+                                </InlineStack>
                             </Tooltip>
                         ),
                         badge: testObj?.customTests[key]?.length.toString(),
@@ -94,14 +94,14 @@ const convertFunc = {
                     let item = {
                         label: (
                             <Tooltip content={testObj?.aktoTests[key][0]?.category} dismissOnMouseOut width="wide">
-                                <HorizontalStack gap="2">
+                                <InlineStack gap="2">
                                     <Box>
                                         <Icon source={FolderMajor} color="base"/>
                                     </Box>
                                     <Text truncate variant="bodyMd" as="h5">
                                       {testObj?.aktoTests[key][0]?.category}
                                    </Text>
-                                </HorizontalStack>
+                                </InlineStack>
                             </Tooltip>
                         ),
                         badge: testObj.aktoTests[key]?.length.toString(),

@@ -1,4 +1,4 @@
-import {Box, DataTable,HorizontalStack, Scrollable, Text, VerticalStack } from '@shopify/polaris'
+import {Box, DataTable,InlineStack, Scrollable, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import DonutChart from '../../../components/shared/DonutChart'
 import ConcentricCirclesChart from '../../../components/shared/ConcentricCirclesChart'
@@ -19,12 +19,12 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                         </div>
                     </Box>
                 ),
-                <HorizontalStack gap={1} wrap={false}>
+                <InlineStack gap={1} wrap={false}>
                     <Box width='30px'>
                         <Text>{observeFunc.formatNumberWithCommas(data[key]?.text)}</Text>
                     </Box>
                     {data[key].dataTableComponent ? data[key].dataTableComponent : null}
-                </HorizontalStack>
+                </InlineStack>
             ]
             tableRows.push(comp)
         })
@@ -42,7 +42,7 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
 
     return (
         <Box padding={boxPadding != undefined ? boxPadding : 4}>
-            <HorizontalStack gap={8}>
+            <InlineStack gap={8}>
                 {chartOnLeft ? chartComponent: null}
                 <VerticalStack gap="2">
                     <Text fontWeight="semibold" variant="bodySm">{title}</Text>
@@ -61,9 +61,9 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                     </Scrollable>
                 </VerticalStack>
                 {!chartOnLeft ? chartComponent: null}
-            </HorizontalStack>
+            </InlineStack>
         </Box>
-    )
+    );
 }
 
 export default ChartypeComponent

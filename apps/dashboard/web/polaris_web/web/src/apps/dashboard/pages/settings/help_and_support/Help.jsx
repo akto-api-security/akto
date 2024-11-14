@@ -1,12 +1,12 @@
 import React from 'react'
-import {Text, ButtonGroup, Button, HorizontalStack, VerticalStack, LegacyCard, Box } from '@shopify/polaris'
+import {Text, ButtonGroup, Button, InlineStack, VerticalStack, LegacyCard, Box } from '@shopify/polaris'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 
 
 function Help() {
     const titleComp = (
         <LegacyCard key={"titleComp"} sectioned={true}>
-            <HorizontalStack align="space-between" gap="2" blockAlign="center">
+            <InlineStack align="space-between" gap="2" blockAlign="center">
                 <VerticalStack align="space-between" gap="4">
                     <Text variant="headingMd">Need Assistance?</Text>
                     <Box width="450px">
@@ -23,7 +23,7 @@ function Help() {
                 <VerticalStack gap="4">
                     <img src="/public/chat_major_help.svg" alt="Help" width="100" height="100" />
                 </VerticalStack>
-            </HorizontalStack>
+            </InlineStack>
         </LegacyCard>
     )
 

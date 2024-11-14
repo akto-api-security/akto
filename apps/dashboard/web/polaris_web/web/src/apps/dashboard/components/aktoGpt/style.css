@@ -26,6 +26,6 @@
     font-size: 14px !important;
 }
 
-.response-message .Polaris-HorizontalStack {
+.response-message .Polaris-InlineStack {
     align-items: flex-start !important;
 }

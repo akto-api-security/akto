@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Avatar, Box, Button, HorizontalStack, Icon, Scrollable, Spinner,Text,TextField, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Avatar, Box, Button, InlineStack, Icon, Scrollable, Spinner,Text,TextField, Tooltip, VerticalStack } from "@shopify/polaris"
 import { SendMajor } from "@shopify/polaris-icons"
 import PromptContainer from './PromptContainer'
 import "./style.css"
@@ -135,20 +135,20 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                 <div style={{flex: 6.5}}>
                     {buttonState > 0 ? <Box ref={chatLogRef}>
                         <Box padding="5" maxWidth="65vw">
-                            <HorizontalStack gap="6">
+                            <InlineStack gap="6">
                                 <Avatar name={username} initials={func.initials(username)} size="md"/>
                                 <Text variant="bodyMd" fontWeight="semibold" color="subdued">{activePrompt.split("${input}")[0] + inputPrompt}</Text>
-                            </HorizontalStack>
+                            </InlineStack>
                         </Box>
                         <Scrollable shadow style={{height: '35vh'}} focusable>
                             <Box padding="5" maxWidth="65vw" background="bg-subdued">
                                 <div className="response-message">
-                                    <HorizontalStack gap="6" align="start">
+                                    <InlineStack gap="6" align="start">
                                         <Avatar name="Akto" source='/public/akto_colored.svg' size="md"/>
                                         {loading ? <Spinner size="small" /> 
                                             : <ResponseComponent response={func.getResponse(response,queryType)} chatLogRef={chatLogRef} onCompletion={() => handleCompletion()}/>
                                         }
-                                    </HorizontalStack>
+                                    </InlineStack>
                                 </div>
                             </Box>
                             {buttonState === 2 ? 

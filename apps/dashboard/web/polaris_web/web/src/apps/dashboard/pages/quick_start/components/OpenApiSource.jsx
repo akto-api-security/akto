@@ -1,4 +1,4 @@
-import { HorizontalStack, Text, Badge, VerticalStack, ButtonGroup, Button, Modal, DescriptionList, RadioButton, Icon, Tooltip } from "@shopify/polaris";
+import { InlineStack, Text, Badge, VerticalStack, ButtonGroup, Button, Modal, DescriptionList, RadioButton, Icon, Tooltip } from "@shopify/polaris";
 import { CancelMajor } from "@shopify/polaris-icons"
 import { useState } from "react";
 import FileUpload from "../../../components/shared/FileUpload";
@@ -146,20 +146,19 @@ function OpenApiSource() {
                 Use openAPI/swagger file to add API endpoints. If you like what you see, we highly recommend using AWS or GCP traffic mirroring to get real user data for a smooth, automated and minimum false positive experience.
             </Text>
 
-            <HorizontalStack gap="2" >
+            <InlineStack gap="2">
                 {files ?
                     <Badge size='medium' tone='success'>
                         {files.name}
                         <Button icon={CancelMajor}  onClick={() => setFiles(null)} variant="plain" />
                     </Badge>
-                    : null}
-                File: <FileUpload
-                    fileType="file"
-                    acceptString=".json , .yaml, .yml"
-                    setSelectedFile={setFilesCheck}
-                    allowMultiple={false}
-                    allowedSize={5*1024*1024} />
-            </HorizontalStack>
+                    : null}File:<FileUpload
+                        fileType="file"
+                        acceptString=".json , .yaml, .yml"
+                        setSelectedFile={setFilesCheck}
+                        allowMultiple={false}
+                        allowedSize={5*1024*1024} />
+            </InlineStack>
 
             <VerticalStack gap="2">
                 <ButtonGroup>

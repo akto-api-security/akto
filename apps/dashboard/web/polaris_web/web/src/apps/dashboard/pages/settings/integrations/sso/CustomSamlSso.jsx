@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import StepsComponent from '../components/StepsComponent';
-import { Button, Form, FormLayout, HorizontalStack, LegacyCard, Link, Tag, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Button, Form, FormLayout, InlineStack, LegacyCard, Link, Tag, Text, TextField, VerticalStack } from '@shopify/polaris';
 import FileUpload from '../../../../components/shared/FileUpload';
 import SpinnerCentered from '../../../../components/progress/SpinnerCentered';
 import IntegrationsLayout from '../IntegrationsLayout';
@@ -58,20 +58,20 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
                                 />
                             </VerticalStack> : null
                         }
-                        <HorizontalStack gap="3">
+                        <InlineStack gap="3">
                             {files ? 
                                 <Tag>
-                                    <HorizontalStack gap={1}>
+                                    <InlineStack gap={1}>
                                         <Text variant="bodyMd" fontWeight="medium">{files.name}</Text>
                                         <Button onClick={() => setFiles(null)}  icon={CancelMajor} variant="plain" />
-                                    </HorizontalStack>
+                                    </InlineStack>
                                 </Tag>
                             : <Text variant="bodyLg" fontWeight="medium" color="subdued">{"Drop your " + certificateName + " file here."}</Text>}
                             <FileUpload fileType="file" acceptString=".xml" setSelectedFile={setFilesCheck} allowMultiple={false} />
-                        </HorizontalStack>
-                        <HorizontalStack align="end">
+                        </InlineStack>
+                        <InlineStack align="end">
                             <Button submit  size="medium" variant="primary">Submit</Button>
-                        </HorizontalStack>
+                        </InlineStack>
                     </VerticalStack>
                 </FormLayout>
             </Form>
@@ -110,11 +110,11 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
     const useCardContent = (
         <VerticalStack gap={"2"}>
             <Text>{cardContent}</Text>
-            <HorizontalStack gap={"1"}>
+            <InlineStack gap={"1"}>
                 <Text>Use</Text>
                 <Link>https://app.akto.io/sso-login</Link>
                 <Text>for signing into AKTO dashboard via SSO.</Text>
-            </HorizontalStack>
+            </InlineStack>
         </VerticalStack>
     )
     

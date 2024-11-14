@@ -1,6 +1,6 @@
 import React from 'react'
 import transform from '../transform'
-import { Box, Card, Divider, HorizontalStack, ProgressBar, Scrollable, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Card, Divider, InlineStack, ProgressBar, Scrollable, Text, VerticalStack } from '@shopify/polaris'
 
 function CoverageCard({coverageObj, collections, collectionsMap}) {
 
@@ -17,12 +17,12 @@ function CoverageCard({coverageObj, collections, collectionsMap}) {
                                 <Text variant="bodyMd" breakWord truncate>
                                     {collectionsMap[collectionObj.id]}
                                 </Text>
-                                <HorizontalStack gap={2}>
+                                <InlineStack gap={2}>
                                     <Box width='85%'>
                                         <ProgressBar size="small" color={collectionObj.status} progress={collectionObj.coverage} />
                                     </Box>
                                     <Text breakWord color="subdued" variant="bodyMd">{collectionObj.coverage}%</Text>
-                                </HorizontalStack>
+                                </InlineStack>
                                 {index < (collections.length - 1) ? <Divider/> : null }
                             </VerticalStack>
                         </Box>
@@ -30,8 +30,8 @@ function CoverageCard({coverageObj, collections, collectionsMap}) {
                     </Box>
                 </Scrollable>
             </VerticalStack>
-        </Card>        
-    )
+        </Card>
+    );
 }
 
 export default CoverageCard

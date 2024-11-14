@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Box, Button, Divider, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Box, Button, Divider, InlineStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris"
 import { InfoMinor, ClipboardMinor, CircleTickMinor, CircleCancelMinor } from "@shopify/polaris-icons"
 
 import Store from "../../../store";
@@ -143,7 +143,7 @@ const YamlEditor = ({ fetchAllTests }) => {
     return (
         <VerticalStack>
             <div className="editor-header">
-                <HorizontalStack gap={"1"}>
+                <InlineStack gap={"1"}>
                     <div ref={ref} />
                     <Tooltip content={selectedTest.label + '.yaml'} width="wide">
                         <Text variant="headingSm" as="h5" truncate>{selectedTest.label + '.yaml'}</Text>
@@ -153,15 +153,15 @@ const YamlEditor = ({ fetchAllTests }) => {
                     </Tooltip>
                     <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="below">
                         <Button icon={ClipboardMinor}  onClick={copyTestName} variant="plain" />
-                    </Tooltip>  
+                    </Tooltip>
                     <Tooltip content={`Set as ${selectedTest.inactive ? "active" : "inactive" }`} dismissOnMouseOut preferredPosition="below">
                         <Button
                             icon={selectedTest.inactive ? CircleTickMinor : CircleCancelMinor}
 
                             onClick={setTestInactive}
                             variant="plain" />
-                    </Tooltip>  
-                </HorizontalStack>
+                    </Tooltip>
+                </InlineStack>
         
                 <Button id={"save-button"} disabled={!isEdited} onClick={handleSave} size="slim">Save</Button>
             </div>

@@ -3,7 +3,7 @@ import {
   Text,
   Button,
   VerticalStack,
-  HorizontalStack,
+  InlineStack,
   Icon,
   Badge,
   Box,
@@ -374,20 +374,20 @@ const promotedBulkActions = (selectedDataHexIds) => {
     missingConfigs.length > 0 ? 
     <div className="banner-wrapper">
       <Banner tone="critical">
-        <HorizontalStack gap={3}>
+        <InlineStack gap={3}>
           <Box>
             <Text fontWeight="semibold">
               {`${missingConfigs.length} configuration${missingConfigs.length > 1 ? 's' : ''} missing: `}  
             </Text>
           </Box>
-          <HorizontalStack gap={2}>
+          <InlineStack gap={2}>
             {missingConfigs.map((config) => {
               return(<Link url={baseUrl + config.toUpperCase()} key={config} target="_blank">
                 {config}
               </Link>) 
             })}
-          </HorizontalStack>
-        </HorizontalStack>
+          </InlineStack>
+        </InlineStack>
       </Banner>
     </div> : null
   )
@@ -461,14 +461,14 @@ const promotedBulkActions = (selectedDataHexIds) => {
       {
         selectedTestRun.metadata ? Object.keys(selectedTestRun.metadata).map((key) => {
           return (
-            <HorizontalStack key={key} spacing="tight">
+            <InlineStack key={key} spacing="tight">
               <Text>{key} : {selectedTestRun.metadata[key]}</Text>
-            </HorizontalStack>
-          )
+            </InlineStack>
+          );
         }) : ""
       }
     </LegacyCard>
-    )
+    );
   }
 
   const progress = useMemo(() => {
@@ -498,21 +498,21 @@ const runningTestsComp = useMemo(() => (
   }
 
   const EmptyData = () => {
-    return(
+    return (
       <div style={{margin: 'auto', marginTop: '20vh'}}>
         <Box width="300px" padding={4}>
           <VerticalStack gap={5}>
-            <HorizontalStack align="center">
+            <InlineStack align="center">
               <div style={{borderRadius: '50%', border: '6px solid white', padding: '4px', display: 'flex', alignItems: 'center', height: '50px', width: '50px'}}>
                 <Icon source={CircleInformationMajor} />
               </div>
-            </HorizontalStack>
+            </InlineStack>
             <VerticalStack gap={2}>
-            <HorizontalStack align="center">
-                <Text variant="bodyLg" fontWeight="semibold">
-                  No test run data found
-                </Text>
-              </HorizontalStack>
+            <InlineStack align="center">
+              <Text variant="bodyLg" fontWeight="semibold">
+                No test run data found
+              </Text>
+            </InlineStack>
               <Text variant="bodyMd" alignment="center">
                 The next summary will be ready with the upcoming test.
               </Text>
@@ -520,7 +520,7 @@ const runningTestsComp = useMemo(() => (
           </VerticalStack>
         </Box>
       </div>
-    )
+    );
   }
 
   const allResultsLength = testRunResults.skipped.length + testRunResults.need_configurations.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length + testRunResults.ignored_issues.length + progress
@@ -528,7 +528,7 @@ const runningTestsComp = useMemo(() => (
   const headingComp = (
     <Box paddingBlockStart={1}>
       <VerticalStack gap="2">
-        <HorizontalStack gap="2" align="start">
+        <InlineStack gap="2" align="start">
           { selectedTestRun?.icon && <Box>
             <Icon color={selectedTestRun.iconColor} source={selectedTestRun.icon }></Icon>
           </Box>
@@ -549,27 +549,27 @@ const runningTestsComp = useMemo(() => (
               </Text>
             </Badge>
             )}
-            <Button   onClick={() => fetchData(true)} variant="monochromePlain"><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
-        </HorizontalStack>
-        <HorizontalStack gap={"2"}>
-          <HorizontalStack gap={"1"}>
+          <Button   onClick={() => fetchData(true)} variant="monochromePlain"><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
+        </InlineStack>
+        <InlineStack gap={"2"}>
+          <InlineStack gap={"1"}>
             <Box><Icon color="subdued" source={CustomersMinor}/></Box>
             <Text color="subdued" fontWeight="medium" variant="bodyMd">created by:</Text>
             <Text color="subdued" variant="bodyMd">{selectedTestRun.userEmail}</Text>
-          </HorizontalStack>
+          </InlineStack>
           <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
           <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
-            <HorizontalStack gap={"1"}>
+            <InlineStack gap={"1"}>
               <Box><Icon color="subdued" source={ArchiveMinor}/></Box>
               <Text color="subdued" variant="bodyMd">{collectionsMap[selectedTestRun?.apiCollectionId]}</Text>
-            </HorizontalStack>
+            </InlineStack>
           </Link>
           <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
-          <HorizontalStack gap={"1"}>
+          <InlineStack gap={"1"}>
             <Box><Icon color="subdued" source={PriceLookupMinor}/></Box>
             <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
-          </HorizontalStack>
-        </HorizontalStack>
+          </InlineStack>
+        </InlineStack>
       </VerticalStack>
     </Box>
   )

@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, HorizontalStack, Scrollable, TextField, Tag, Form, Tooltip } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, InlineStack, Scrollable, TextField, Tag, Form, Tooltip } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
@@ -521,7 +521,7 @@ function About() {
         }
 
         const isError = checkError(value, type)
-        return(
+        return (
             <LegacyCard title={<TitleComponent title={title} description={description} />}
                 actions={[
                     { content: 'Apply', onAction: onApply }
@@ -533,7 +533,7 @@ function About() {
                         <Form onSubmit={() => onFormSubmit(value)}>
                             <TextField onChange={setValue} value={value} label={<Text color="subdued" fontWeight="medium" variant="bodySm">{labelText}</Text>} {...isError ? {error: "Invalid address"} : {}}/>
                         </Form>
-                        <HorizontalStack gap={"2"}>
+                        <InlineStack gap={"2"}>
                             {ipsList && ipsList.length > 0 && ipsList.map((ip, index) => {
                                 return(
                                     <Tag key={index} onRemove={() => onRemove(ip)}>
@@ -541,11 +541,11 @@ function About() {
                                     </Tag>
                                 )
                             })}
-                        </HorizontalStack>
+                        </InlineStack>
                     </VerticalStack>
                 </LegacyCard.Section>
             </LegacyCard>
-        )
+        );
     }
 
     const components = [accountInfoComponent, 

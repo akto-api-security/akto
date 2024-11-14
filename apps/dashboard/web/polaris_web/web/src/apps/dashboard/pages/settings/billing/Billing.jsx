@@ -1,4 +1,4 @@
-import { Box, Card, Divider, LegacyCard, Page, Text, Button, HorizontalStack } from '@shopify/polaris'
+import { Box, Card, Divider, LegacyCard, Page, Text, Button, InlineStack } from '@shopify/polaris'
 import { Paywall, StiggProvider, SubscribeIntentionType, useStiggContext } from '@stigg/react-sdk'
 import {
   CustomerPortalProvider,
@@ -58,14 +58,14 @@ function Billing() {
 
     const usageTitle = (
         <Box paddingBlockEnd="4">
-            <HorizontalStack align="space-between" blockAlign="center">
+            <InlineStack align="space-between" blockAlign="center">
                 <Box>
                     <Text variant="headingMd">Your plan</Text>
                 </Box>
                 <Button onClick={() => refreshUsageData()}>
                     Sync usage data
                 </Button>
-            </HorizontalStack>
+            </InlineStack>
         </Box>
     )
 

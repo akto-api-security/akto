@@ -1,4 +1,4 @@
-import { HorizontalStack, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
+import { InlineStack, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import api from "../../api";
 import func from "@/util/func";
@@ -134,17 +134,17 @@ function SourceCodeRepos({type, typeName, orgName}) {
                             { content: "Run", onAction: () => { runRepo(repo) } },
                         ]} sectioned={true}
                     >
-                        <HorizontalStack align="space-between">
+                        <InlineStack align="space-between">
                             <Text variant="bodyMd">{repo.project}</Text>
                             <Text variant="bodyMd">
                                 {repo.lastRun >= repo.scheduleTime ? func.prettifyEpoch(repo.lastRun) : "scheduled"}
                             </Text>
-                        </HorizontalStack>
+                        </InlineStack>
                     </LegacyCard>
                 ))}
             </VerticalStack>
         </div>
-    )
+    );
 }
 
 

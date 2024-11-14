@@ -2,7 +2,7 @@ import React from 'react'
 import {useRef} from 'react'
 import CompleteSetup from './CompleteSetup'
 import QuickStartStore from '../quickStartStore'
-import { HorizontalStack, VerticalStack } from '@shopify/polaris'
+import { InlineStack, VerticalStack } from '@shopify/polaris'
 import JsonComponent from './shared/JsonComponent'
 import func from '@/util/func'
 
@@ -47,10 +47,10 @@ function Kubernetes({bannerTitle, docsUrl}) {
           <JsonComponent title="Command" toolTipContent="Copy the command" onClickFunc={()=> copyText()} dataString="kubectl apply -f akto-daemonset-deploy.yaml -n <NAMESPACE>" language="text/plain" minHeight="50px"/>
         </VerticalStack>
 
-        <HorizontalStack gap="1">
+        <InlineStack gap="1">
           <span>4. Add traffic sources from our docs. Click</span>
           <a href='dashboard/observe/inventory'>here</a>
-        </HorizontalStack>
+        </InlineStack>
       </VerticalStack>
     )
 

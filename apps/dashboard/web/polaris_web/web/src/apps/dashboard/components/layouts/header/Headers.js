@@ -1,4 +1,4 @@
-import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
+import { TopBar, Icon, Text, ActionList, Modal, TextField, InlineStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
 import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor, PhoneMajor, ChatMajor } from '@shopify/polaris-icons';
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -15,13 +15,13 @@ import homeFunctions from '../../../../dashboard/pages/home/module';
 
 function ContentWithIcon({icon,text, isAvatar= false}) {
     return (
-        <HorizontalStack gap={2}>
+        <InlineStack gap={2}>
             <Box width='20px'>
                 {isAvatar ? <div className='reduce-size'><Avatar size="xs" source={icon} /> </div>:
                 <Icon source={icon} color="base" />}
             </Box>
             <Text>{text}</Text>
-        </HorizontalStack>
+        </InlineStack>
     );
 }
 
@@ -196,9 +196,9 @@ export default function Header() {
 
 
     const secondaryMenuMarkup = (
-        <HorizontalStack gap={"4"}>
+        <InlineStack gap={"4"}>
             {(Object.keys(currentTestsObj).length > 0 && currentTestsObj?.testRunsArr?.length !== 0 && currentTestsObj?.totalTestsCompleted > 0) ? 
-            <HorizontalStack gap={"2"}>
+            <InlineStack gap={"2"}>
                 <Button   onClick={() => {handleTestingNavigate()}} variant="monochromePlain">
                  <SemiCircleProgress key={"progress"} progress={progress} size={60} height={55} width={75}/>
                 </Button>
@@ -206,16 +206,16 @@ export default function Header() {
                     <Text fontWeight="medium">Test run status</Text>
                     <Text color="subdued" variant="bodySm">{`${currentTestsObj.totalTestsQueued} tests queued`}</Text>
                 </VerticalStack>
-            </HorizontalStack> : null}
-             <TopBar.Menu
-                activatorContent={
-                    <span id="beamer-btn">
-                        <Icon source={NotificationMajor} />
-                    </span>
-                }
-                actions={[]}
-            />
-        </HorizontalStack>
+            </InlineStack> : null}
+            <TopBar.Menu
+               activatorContent={
+                   <span id="beamer-btn">
+                       <Icon source={NotificationMajor} />
+                   </span>
+               }
+               actions={[]}
+           />
+        </InlineStack>
         
     );
 

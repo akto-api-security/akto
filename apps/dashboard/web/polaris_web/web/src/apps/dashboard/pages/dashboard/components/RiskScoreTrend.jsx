@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import NullData from './NullData'
-import { Badge, Box, Button, Card, Divider, HorizontalGrid, HorizontalStack, Link, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Box, Button, Card, Divider, HorizontalGrid, InlineStack, Link, Text, VerticalStack } from '@shopify/polaris'
 import HighchartsReact from 'highcharts-react-official'
 import transform from '../transform'
 import Highcharts from "highcharts"
@@ -38,7 +38,7 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
                         {riskScoreRanges.map((range)=>{
                             return (
                                 <VerticalStack gap={1} key={range.text} >
-                                    <HorizontalStack align="space-between">
+                                    <InlineStack align="space-between">
                                         <Button
 
 
@@ -48,7 +48,7 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
                                                 <Text variant="bodyMd" color="semibold" >{range.text}</Text>
                                         </Button>
                                         <Badge tone={range.status}>{range.range}</Badge>
-                                    </HorizontalStack>
+                                    </InlineStack>
                                     <Divider />
                                 </VerticalStack>
                             );

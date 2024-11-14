@@ -1,17 +1,17 @@
-import { Box, HorizontalStack, Text } from '@shopify/polaris'
+import { Box, InlineStack, Text } from '@shopify/polaris'
 import React from 'react'
 
 function LineComponent({title,value}){
-    return(
-        <HorizontalStack gap={5}>
+    return (
+        <InlineStack gap={5}>
             <Box width='180px'>
-                <HorizontalStack align="end">
+                <InlineStack align="end">
                     <Text variant="headingSm">{title}: </Text>
-                </HorizontalStack>
+                </InlineStack>
             </Box>
             <Text variant="bodyLg">{value}</Text>
-        </HorizontalStack>
-    )
+        </InlineStack>
+    );
 }
 
 export default LineComponent

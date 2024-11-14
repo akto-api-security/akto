@@ -6,7 +6,7 @@ import {
   IndexFiltersMode,
   useIndexResourceState,
   Pagination,
-  HorizontalStack,
+  InlineStack,
   Key,
   ChoiceList,
   Tabs,
@@ -427,8 +427,7 @@ function GithubServerTable(props) {
             </div>
             </LegacyCard.Section>
             {(total !== 0 && !props?.hidePagination) && <LegacyCard.Section>
-              <HorizontalStack
-                align="center">
+              <InlineStack align="center">
                 <Pagination
                   label={
                     total == 0 ? 'No data found' :
@@ -443,20 +442,20 @@ function GithubServerTable(props) {
                   nextKeys={[Key.RightArrow]}
                   onNext={onPageNext}
                 />
-              </HorizontalStack>
+              </InlineStack>
             </LegacyCard.Section>}
           </div>
         }
 
       </LegacyCard>
-      {(props?.showFooter !== false) && <HorizontalStack gap="1" align="center">
+      {(props?.showFooter !== false) && <InlineStack gap="1" align="center">
         <Text>Stuck? feel free to</Text>
         <Link onClick={() => {
           window?.Intercom("show")
         }}>Contact us</Link>
         <Text>or</Text>
         <Link url="https://akto.io/api-security-demo" target="_blank">Book a call</Link>
-      </HorizontalStack>}
+      </InlineStack>}
     </div>
   );
 }

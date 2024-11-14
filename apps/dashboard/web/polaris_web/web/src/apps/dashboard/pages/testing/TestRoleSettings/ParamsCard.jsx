@@ -1,4 +1,4 @@
-import { Box, Button, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, InlineStack, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import TooltipText from "../../../components/shared/TooltipText"
 import { DeleteMajor } from "@shopify/polaris-icons"
@@ -27,20 +27,20 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
     }
 
     function ParamsList({valuesList}){
-        return(
+        return (
             <VerticalStack align="start" gap={1}>
                 {valuesList.map((param,index) => {
-                    return(
-                        <HorizontalStack blockAlign="start" gap={"4"} key={index}>
+                    return (
+                        <InlineStack blockAlign="start" gap={"4"} key={index}>
                             <LineComponent title={(param.key || '-') + " :"} value={(param.value || '-')} />
                             {param.showHeader !== null ? 
-                                <HorizontalStack blockAlign="start" gap={1}><Box borderInlineEndWidth='1' borderColor="border-subdued" minHeight='20px'/><LineComponent title={"Position :"} value={param.where}/></HorizontalStack>
+                                <InlineStack blockAlign="start" gap={1}><Box borderInlineEndWidth='1' borderColor="border-subdued" minHeight='20px'/><LineComponent title={"Position :"} value={param.where}/></InlineStack>
                             :null}
-                        </HorizontalStack>
-                    )
+                        </InlineStack>
+                    );
                 })}
             </VerticalStack>
-        )
+        );
     }
 
     return (
@@ -67,10 +67,10 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
                     </VerticalStack>
 
                 </VerticalStack>
-                <HorizontalStack gap={"2"} align="end">
+                <InlineStack gap={"2"} align="end">
                     <Button size="slim" onClick={handleDelete} icon={DeleteMajor}><div data-testid="delete_button">Delete</div></Button>
                     {authMechanism?.type?.toLowerCase() === 'hardcoded' ? <Button size="slim"  onClick={() => showEdit()} variant="primary">Edit</Button> : null}
-                </HorizontalStack>
+                </InlineStack>
             </VerticalStack>
         </Box>
     );

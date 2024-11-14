@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, DatePicker, HorizontalGrid, HorizontalStack, Icon, OptionList, Popover, Scrollable, Select, TextField, VerticalStack, useBreakpoints } from "@shopify/polaris";
+import { Box, Button, ButtonGroup, DatePicker, HorizontalGrid, InlineStack, Icon, OptionList, Popover, Scrollable, Select, TextField, VerticalStack, useBreakpoints } from "@shopify/polaris";
 import {useRef, useState } from "react";
 import { CalendarMinor, ArrowRightMinor } from "@shopify/polaris-icons"
 
@@ -187,7 +187,7 @@ function DateRangePicker(props) {
               </Box>
               <Box padding={{ xs: 5 }} maxWidth={mdDown ? "320px" : "516px"}>
                 <VerticalStack gap="4">
-                  <HorizontalStack gap="2">
+                  <InlineStack gap="2">
                     <div style={{ flexGrow: 1 }}>
                       <TextField
                         role="combobox"
@@ -213,7 +213,7 @@ function DateRangePicker(props) {
                         autoComplete="off"
                       />
                     </div>
-                  </HorizontalStack>
+                  </InlineStack>
                   <div>
                     <DatePicker
                       month={month}
@@ -234,14 +234,14 @@ function DateRangePicker(props) {
           </Popover.Pane>
           <Popover.Pane fixed>
             <Popover.Section>
-              <HorizontalStack align="end">
+              <InlineStack align="end">
                 <ButtonGroup>
                 <Button onClick={cancel}>Cancel</Button>
                 <Button  onClick={apply} variant="primary">
                   Apply
                 </Button>
                 </ButtonGroup>
-              </HorizontalStack>
+              </InlineStack>
             </Popover.Section>
           </Popover.Pane>
           </Box>

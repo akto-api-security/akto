@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react'
 import SignUpPageLayout from './SignUpPageLayout';
-import { Button, Form, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Button, Form, InlineStack, Text, TextField, VerticalStack } from '@shopify/polaris';
 
 function SignUpWithSSO() {
 
@@ -20,9 +20,9 @@ function SignUpWithSSO() {
                         <div className='form-class'>
                             <TextField onChange={setEmail} value={email} label="Email" placeholder="name@workemail.com" monospaced={true}/>
                         </div>
-                        <HorizontalStack align="end">
+                        <InlineStack align="end">
                             <Button size="medium" onClick={handleSubmit}  variant="primary">Submit</Button>
-                        </HorizontalStack>
+                        </InlineStack>
                     </VerticalStack>
                 </Form>
             </VerticalStack>

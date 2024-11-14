@@ -1,4 +1,4 @@
-import { LegacyCard, Tabs, Text, Button, ButtonGroup, Divider, HorizontalStack, Checkbox } from '@shopify/polaris';
+import { LegacyCard, Tabs, Text, Button, ButtonGroup, Divider, InlineStack, Checkbox } from '@shopify/polaris';
 import { useState, useEffect } from 'react';
 import SpinnerCentered from '../../../components/progress/SpinnerCentered';
 import DropdownSearch from '../../../components/shared/DropdownSearch';
@@ -176,14 +176,14 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                     <LegacyCard>
                         <div style={{ display: "grid", gridTemplateColumns: "auto max-content", alignItems: "center", padding: "10px" }}>
                             <Tabs tabs={stepsTabs} selected={selectedStep} onSelect={handleStepChange}></Tabs>
-                            <HorizontalStack gap={"2"}>
+                            <InlineStack gap={"2"}>
                                 <Checkbox
                                     label='Allow All Status codes'
                                     checked={steps[selectedStep].allowAllStatusCodes}
                                     onChange={() => handleStatusCodeToggle(!steps[selectedStep].allowAllStatusCodes)}
                                 />
                                 <Button id={"add-step-button"}  onClick={handleAddStep} variant="primary">Add step</Button>
-                            </HorizontalStack>
+                            </InlineStack>
                         </div>
 
                         <Divider />

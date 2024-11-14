@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { Box, Button, Frame, HorizontalGrid, HorizontalStack, TopBar } from "@shopify/polaris"
+import { Box, Button, Frame, HorizontalGrid, InlineStack, TopBar } from "@shopify/polaris"
 import { ExitMajor } from "@shopify/polaris-icons"
 
 import TestEditorFileExplorer from "./components/TestEditorFileExplorer"
@@ -118,12 +118,12 @@ const TestEditor = () => {
 
     const headerComp = (
         <div className="header-css">
-            <HorizontalStack gap="5">
+            <InlineStack gap="5">
                 <Button onClick={handleExit} icon={ExitMajor}  variant="plain" />
-                <HorizontalStack gap={"2"}>
+                <InlineStack gap={"2"}>
                     <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={"Test Editor"} />
-                </HorizontalStack>
-            </HorizontalStack>
+                </InlineStack>
+            </InlineStack>
 
             <LearnPopoverComponent learnMoreObj={learnMoreObjEditor} />
         </div>

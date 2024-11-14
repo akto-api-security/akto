@@ -1,4 +1,4 @@
-import { Text, Button, HorizontalStack, Badge, Box } from "@shopify/polaris"
+import { Text, Button, InlineStack, Badge, Box } from "@shopify/polaris"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubServerTable from "../../../components/tables/GithubServerTable"
 import { useReducer, useState } from "react"
@@ -127,7 +127,7 @@ const convertDataIntoTableFormat = (endpoint, apiCollectionMap) => {
     temp['keyValueComp'] = (
         <Badge key={id} tone="critical" size="slim">
             <Box maxWidth="270px">
-                <HorizontalStack gap={"1"} wrap={false}>
+                <InlineStack gap={"1"} wrap={false}>
                     <Box as="span" maxWidth="180px">
                         <TooltipText tooltip={key} text={key} />
                     </Box>
@@ -135,7 +135,7 @@ const convertDataIntoTableFormat = (endpoint, apiCollectionMap) => {
                     <Box maxWidth="150px">
                         <TooltipText tooltip={value} text={value}/>
                     </Box> */}
-                </HorizontalStack>
+                </InlineStack>
             </Box>
         </Badge>
     )
@@ -260,11 +260,11 @@ const handleReset = async () => {
 }
 
 const primaryActions = (
-    <HorizontalStack gap={"2"}>
+    <InlineStack gap={"2"}>
         <Button id={"reset-data-type"} onClick={handleReset}>Reset</Button>
         <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
         <Button id={"all-data-types"}  onClick={() => setModal(!modal)} variant="primary">Create API group</Button>
-    </HorizontalStack>
+    </InlineStack>
 )
 
     return (

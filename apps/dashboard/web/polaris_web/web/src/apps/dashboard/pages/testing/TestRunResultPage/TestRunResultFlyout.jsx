@@ -5,7 +5,7 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, Modal } from '@shopify/polaris'
+import { Badge, Box, Button, Divider, InlineStack, Icon, Popover, Text, VerticalStack, Link, Modal } from '@shopify/polaris'
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import GridRows from '../../../components/shared/GridRows'
@@ -181,15 +181,14 @@ function TestRunResultFlyout(props) {
                                 <Badge size="small" tone={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
                         </div>
                     </Box>
-                    <HorizontalStack gap={"2"}>
+                    <InlineStack gap={"2"}>
                         <Text color="subdued" variant="bodySm">{transform.getTestingRunResultUrl(selectedTestRunResult)}</Text>
                         <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
                         <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
-                    </HorizontalStack>
+                    </InlineStack>
                 </VerticalStack>
-                <HorizontalStack gap={2} wrap={false}>
+                <InlineStack gap={2} wrap={false}>
                     <ActionsComp />
-
                     {selectedTestRunResult && selectedTestRunResult.vulnerable && 
                         <Modal
                             activator={<Button
@@ -230,7 +229,7 @@ function TestRunResultFlyout(props) {
                             </Modal.Section>
                         </Modal>
                     }
-                </HorizontalStack>
+                </InlineStack>
             </div>
         );
     }
@@ -271,22 +270,22 @@ function TestRunResultFlyout(props) {
         infoStateFlyout.length > 0 ?
         <VerticalStack gap={"5"}>
             {infoStateFlyout.map((item, index) => {
-                return(
+                return (
                     <VerticalStack gap={"5"} key={index}>
                         <VerticalStack gap={"2"} >
-                            <HorizontalStack gap="1_5-experimental">
+                            <InlineStack gap="1_5-experimental">
                                 <Box><Icon source={item.icon} color='subdued'/></Box>
                                 <TitleWithInfo
                                     textProps={{variant:"bodyMd", fontWeight:"semibold", color:"subdued"}}
                                     titleText={item.title}
                                     tooltipContent={item.tooltipContent}
                                 />
-                            </HorizontalStack>
+                            </InlineStack>
                             {item?.content}
                         </VerticalStack>
                         {index !== infoStateFlyout.length - 1 ? <Divider /> : null}
                     </VerticalStack>
-                )
+                );
             })}
         </VerticalStack>
         : null

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import quickStartFunc from '../transform';
-import { Badge,HorizontalStack, Page, Tag, Text, VerticalStack, Divider} from '@shopify/polaris';
+import { Badge,InlineStack, Page, Tag, Text, VerticalStack, Divider} from '@shopify/polaris';
 import RowCard from './RowCard';
 import GridRows from '../../../components/shared/GridRows';
 import QuickStartStore from '../quickStartStore';
@@ -31,10 +31,10 @@ function UpdateConnections(props) {
     },[])
 
     const components = [
-        currentCardObj ? <HorizontalStack gap="1">
+        currentCardObj ? <InlineStack gap="1">
             <Text variant="headingMd" as="h6">{currentCardObj.label} </Text>
             {currentCardObj.badge ? <Badge size='small' tone='info'>{currentCardObj.badge}</Badge> : null}
-        </HorizontalStack> : null,
+        </InlineStack> : null,
         currentCardObj ? currentCardObj.component : null
     ]
 
@@ -52,17 +52,17 @@ function UpdateConnections(props) {
                     {Object.keys(obj).map((key, index) => {
                         return (
                             <VerticalStack gap="4" key={key}>
-                            <HorizontalStack gap={"3"}>
+                            <InlineStack gap={"3"}>
                                 <Text variant="headingMd" as="h6" color=""> {key} </Text>
                                 <Tag>{obj[key].length.toString()}</Tag>
-                            </HorizontalStack>
+                            </InlineStack>
                             <Divider/>
                             <GridRows CardComponent={RowCard} columns="3" 
                             items={obj[key]} buttonText="Connect" onButtonClick={onButtonClick}     
                             changedColumns={newCol} 
                             />
                             </VerticalStack>
-                        )
+                        );
                     })}
                 </VerticalStack>
             </div>
@@ -82,7 +82,7 @@ function UpdateConnections(props) {
                     setShow={() => {}}
                 />: null}
         </Page>
-    )
+    );
 }
 
 export default UpdateConnections

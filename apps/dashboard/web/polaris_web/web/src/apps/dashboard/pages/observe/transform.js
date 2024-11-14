@@ -1,5 +1,5 @@
 import func from "@/util/func";
-import { Badge, Box, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
+import { Badge, Box, InlineStack, Icon, Text, Tooltip } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
@@ -399,7 +399,7 @@ const transform = {
 
     getIssuesList(severityInfo){
         return (
-            <HorizontalStack gap="1" wrap={false}>
+            <InlineStack gap="1" wrap={false}>
                 {
                     Object.keys(severityInfo).length > 0 ? Object.keys(severityInfo).map((key,index)=>{
                         return(
@@ -408,8 +408,8 @@ const transform = {
                     }):
                     <Text fontWeight="regular" variant="bodyMd" color="subdued">-</Text>
                 }
-            </HorizontalStack>
-        )
+            </InlineStack>
+        );
     },
 
     getIssuesListText(severityInfo){
@@ -424,9 +424,9 @@ const transform = {
     },
 
     prettifySubtypes(sensitiveTags, deactivated){
-        return(
+        return (
             <Box maxWidth="200px">
-                <HorizontalStack gap={1} wrap={false}>
+                <InlineStack gap={1} wrap={false}>
                     {sensitiveTags.map((item,index)=>{
                         return (index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index + item}><Box>
                             <div className={deactivated ? "icon-deactivated" : ""}>
@@ -435,9 +435,9 @@ const transform = {
                         </Box></Tooltip> : null)
                     })}
                     {sensitiveTags.length > 4 ? <Badge size="small" tone="warning" key={"more"}>{'+' + (sensitiveTags.length - 4).toString() + 'more'}</Badge> : null}
-                </HorizontalStack>
+                </InlineStack>
             </Box>
-        )
+        );
     },
 
     prettifyCollectionsData(newData, isLoading){
@@ -647,14 +647,14 @@ const transform = {
         }
         const source = val > 0 ? ArrowUpMinor : ArrowDownMinor
         return (
-            <HorizontalStack gap={1}>
+            <InlineStack gap={1}>
                 <Box>
                     <Icon source={source} color='subdued' />
                 </Box>
                 <Text color='subdued' fontWeight='medium'>{Math.abs(val)}</Text>
                 <Text color='subdued' fontWeight='semibold'>{time}</Text>
-            </HorizontalStack>
-        )
+            </InlineStack>
+        );
     },
     getCumulativeData: (data) => {
         let cumulative = []

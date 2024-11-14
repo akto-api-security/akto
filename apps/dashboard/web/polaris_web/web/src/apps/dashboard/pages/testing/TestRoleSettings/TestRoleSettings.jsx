@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { LegacyCard, HorizontalGrid, TextField, Divider, Collapsible, LegacyStack, Button, FormLayout, HorizontalStack, Tooltip, Icon, Text, VerticalStack, Modal, Box } from '@shopify/polaris'
+import { LegacyCard, HorizontalGrid, TextField, Divider, Collapsible, LegacyStack, Button, FormLayout, InlineStack, Tooltip, Icon, Text, VerticalStack, Modal, Box } from '@shopify/polaris'
 import { useLocation, useNavigate } from 'react-router-dom'
 import TestRolesConditionsPicker from '../../../components/TestRolesConditionsPicker';
 import func from "@/util/func";
@@ -294,9 +294,9 @@ function TestRoleSettings() {
     }
 
     const addAuthButton = (
-        <HorizontalStack align="end" key="auth-button">
+        <InlineStack align="end" key="auth-button">
             {isNew ? <Tooltip content= "Save the role first"><Button disabled>Add auth</Button></Tooltip> : <Button  onClick={() => setShowAuthComponent(true)} variant="primary"><div data-testid="add_auth_button">Add auth</div></Button>}
-        </HorizontalStack>
+        </InlineStack>
     )
 
     const handleCancel = () => {
@@ -413,12 +413,12 @@ function TestRoleSettings() {
                                     <TextField
                                         id={"auth-header-key-field"}
                                         label={(
-                                            <HorizontalStack gap="2">
+                                            <InlineStack gap="2">
                                                 <Text>Header key</Text>
                                                 <Tooltip content="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization" dismissOnMouseOut width="wide" preferredPosition="below">
                                                     <Icon source={InfoMinor} color="base" />
                                                 </Tooltip>
-                                            </HorizontalStack>
+                                            </InlineStack>
                                         )}
                                         value={headerKey}
                                         onChange={setHeaderKey}
@@ -426,12 +426,12 @@ function TestRoleSettings() {
                                     <TextField 
                                         id={"auth-header-value-field"}
                                         label={(
-                                            <HorizontalStack gap="2">
+                                            <InlineStack gap="2">
                                                 <Text>Header value</Text>
                                                 <Tooltip content="Please enter the value of the auth token." dismissOnMouseOut width="wide" preferredPosition="below">
                                                     <Icon source={InfoMinor} color="base" />
                                                 </Tooltip>
-                                            </HorizontalStack>
+                                            </InlineStack>
                                         )}
                                         value={headerValue}
                                         onChange={setHeaderValue}

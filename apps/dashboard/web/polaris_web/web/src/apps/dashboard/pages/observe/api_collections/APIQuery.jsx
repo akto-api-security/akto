@@ -1,6 +1,6 @@
 import CollectionComponent from "../../../components/CollectionComponent"
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
-import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon } from "@shopify/polaris";
+import { VerticalStack, Card, Button, InlineStack, Collapsible, Text, Box, Icon } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import React, { useState, useReducer, useCallback, useMemo, useEffect } from 'react'
@@ -178,14 +178,14 @@ function APIQuery() {
     const collapsibleComponent =
         <VerticalStack gap={"0"} key="conditions-filters">
             <Box background={"bg-subdued"} width="100%" padding={"2"} onClick={handleToggle} key="collapsible-component-header">
-                <HorizontalStack align="space-between">
+                <InlineStack align="space-between">
                     <Text variant="headingSm">
                         {endpointListFromConditions.data ? apiCount > 200 ? `Listing 200 sample endpoints out of total ` + apiCount + ` endpoints` : `Listing total ` + apiCount + ` endpoints` : "Select filters to see endpoints"}
                     </Text>
                     <Box>
                         <Icon source={open ? ChevronDownMinor : ChevronUpMinor} />
                     </Box>
-                </HorizontalStack>
+                </InlineStack>
             </Box>
             <Collapsible
                 key="basic-collapsible"
@@ -219,15 +219,15 @@ function APIQuery() {
                                     />
                                 ))
                             }
-                            <HorizontalStack gap={4} align="start">
+                            <InlineStack gap={4} align="start">
                                 <Button onClick={handleAddField}>Add condition</Button>
                                 {
                                     conditions.length > 0 ? <Button   onClick={handleClearFunction} variant="plain" tone="critical">Clear all</Button> : null
                                 }
-                            </HorizontalStack>
-                            <HorizontalStack gap={4} align="end">
+                            </InlineStack>
+                            <InlineStack gap={4} align="end">
                                 <Button onClick={exploreEndpoints}>Explore endpoints</Button>
-                            </HorizontalStack>
+                            </InlineStack>
                         </VerticalStack>
                     </Card>
                 </VerticalStack>

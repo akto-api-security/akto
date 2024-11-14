@@ -3,7 +3,7 @@
     overflow-x: hidden !important;
 }
 
-.editor-navbar .Polaris-HorizontalStack{
+.editor-navbar .Polaris-InlineStack{
     flex-wrap: unset !important;
 }
 .editor-navbar .Polaris-Navigation__ItemInnerWrapper{

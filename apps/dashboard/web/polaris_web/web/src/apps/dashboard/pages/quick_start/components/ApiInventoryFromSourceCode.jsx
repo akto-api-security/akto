@@ -1,4 +1,4 @@
-import { Box, HorizontalStack, LegacyCard, Text, VerticalStack } from "@shopify/polaris";
+import { Box, InlineStack, LegacyCard, Text, VerticalStack } from "@shopify/polaris";
 import JsonComponent from "./shared/JsonComponent";
 import { useRef } from "react";
 import func from '@/util/func'

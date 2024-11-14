@@ -1,4 +1,4 @@
-import { Badge, Button, ButtonGroup, Checkbox, HorizontalStack, RadioButton, Text, VerticalStack, Modal, DescriptionList, Tooltip, Icon } from '@shopify/polaris'
+import { Badge, Button, ButtonGroup, Checkbox, InlineStack, RadioButton, Text, VerticalStack, Modal, DescriptionList, Tooltip, Icon } from '@shopify/polaris'
 import React, { useCallback, useEffect, useState } from 'react'
 import Dropdown from '../../../components/layouts/Dropdown'
 import settingFunctions from '../../settings/module'
@@ -131,7 +131,7 @@ function PostmanSource() {
             <VerticalStack gap="1">
                 <span>4. Upload postman collection:</span>
                 
-                <HorizontalStack gap="2" >
+                <InlineStack gap="2">
                     {files ? 
                         <Badge size='medium' tone='success'>
                             {files.name}
@@ -139,7 +139,7 @@ function PostmanSource() {
                         </Badge> 
                     : null}
                     <FileUpload fileType="file" acceptString=".json" setSelectedFile={setFilesCheck} allowMultiple={false} allowedSize={20*1024*1024}/>
-                </HorizontalStack>
+                </InlineStack>
             </VerticalStack>
         </div>
     )
@@ -303,10 +303,10 @@ function PostmanSource() {
 
             <VerticalStack gap="1">
                 {steps.map((element,index) => (
-                    <HorizontalStack gap="1" wrap={false} key={element.text}>
+                    <InlineStack gap="1" wrap={false} key={element.text}>
                         <span>{index + 1}.</span>
                         <span>{element.text}</span>
-                    </HorizontalStack>
+                    </InlineStack>
                 ))}
                 {type === "api" ? 
                    apiActionComponent

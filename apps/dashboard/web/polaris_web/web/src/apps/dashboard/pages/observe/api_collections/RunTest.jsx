@@ -1,4 +1,4 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,HorizontalGrid, HorizontalStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList } from "@shopify/polaris";
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,HorizontalGrid, InlineStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList } from "@shopify/polaris";
 import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons"
 import { useEffect, useRef, useState } from "react";
 import { default as observeApi } from "../api";
@@ -436,11 +436,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
         setActive(false)
         const forwardLink = (
-            <HorizontalStack gap={1}>
+            <InlineStack gap={1}>
                 <Text> Test run created successfully. Click </Text>
                 <Link url="/dashboard/testing">here</Link>
                 <Text> to view results.</Text>
-            </HorizontalStack>
+            </InlineStack>
         )
 
         func.setToast(true, false, <div data-testid="test_run_created_message">{forwardLink}</div>)
@@ -484,14 +484,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     function generateLabelForSlackIntegration() {
-        return <HorizontalStack gap={1}>
-            <Link url='/dashboard/settings/integrations/slack' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
-                Enable
-            </Link>
-            <Text>
-                Slack integration to send alerts post completion
-            </Text>
-        </HorizontalStack>
+        return (
+            <InlineStack gap={1}>
+                <Link url='/dashboard/settings/integrations/slack' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
+                    Enable
+                </Link>
+                <Text>
+                    Slack integration to send alerts post completion
+                </Text>
+            </InlineStack>
+        );
     }
 
     return (
@@ -578,14 +580,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             </div>
                             <div>
                                 <div style={{ padding: !showSearch ? "13px" : "9px", alignItems: "center", justifyContent: 'space-between', display: 'flex' }}>
-                                    <HorizontalStack gap={"2"}>
+                                    <InlineStack gap={"2"}>
                                         <Checkbox
                                             checked={allTestsSelectedOfCategory}
                                             onChange={(val) => toggleTestsSelection(val)}
                                         />
                                         <Text variant="headingMd">Tests</Text>
-                                    </HorizontalStack>
-                                    <HorizontalStack gap={"2"}>
+                                    </InlineStack>
+                                    <InlineStack gap={"2"}>
                                         <Popover
                                             activator={<Button
 
@@ -609,7 +611,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         <Tooltip content={"Click to search"} dismissOnMouseOut>
                                             <Button size="slim" icon={SearchMinor} onClick={() => setShowSearch(!showSearch)}/>
                                         </Tooltip>
-                                    </HorizontalStack>
+                                    </InlineStack>
                                 </div>
                                 <Divider />
                                 <div style={{ maxHeight: "35vh", overflowY: "auto", paddingTop: "5px" }}>

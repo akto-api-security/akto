@@ -1,4 +1,4 @@
-import { Card, DataTable, Scrollable, Text,HorizontalStack , VerticalStack,Modal,Button } from '@shopify/polaris'
+import { Card, DataTable, Scrollable, Text,InlineStack , VerticalStack,Modal,Button } from '@shopify/polaris'
 import React , {useState} from 'react'
 import transform from '../transform'
 import { useNavigate, Link} from "react-router-dom"
@@ -45,7 +45,7 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
             >
                 <Modal.Section>
                     <VerticalStack gap={2}>
-                        <HorizontalStack gap={2} align="start">
+                        <InlineStack gap={2} align="start">
                             <Text breakWord truncate>
                             Akto's integration with GitHub enterprise and Github.com allows you to maintain API security through GitHub pull requests itself. &nbsp;
 
@@ -53,7 +53,7 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
                                 Learn More
                             </Link>
                             </Text>
-                        </HorizontalStack>
+                        </InlineStack>
                     </VerticalStack>
                 </Modal.Section>
             </Modal>

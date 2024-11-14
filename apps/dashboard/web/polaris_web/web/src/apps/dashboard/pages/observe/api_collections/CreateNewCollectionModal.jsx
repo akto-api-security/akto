@@ -1,4 +1,4 @@
-import { Text, Modal, TextField, VerticalStack, HorizontalStack, Button, Card } from "@shopify/polaris"
+import { Text, Modal, TextField, VerticalStack, InlineStack, Button, Card } from "@shopify/polaris"
 import api from "../api"
 import func from "@/util/func"
 import CollectionComponent from "../../../components/CollectionComponent";
@@ -170,7 +170,7 @@ function CreateNewCollectionModal(props) {
                                         />
                                     ))
                                 }
-                            <HorizontalStack gap={4} align="start">
+                            <InlineStack gap={4} align="start">
                                 <Button onClick={() => handleAddField()}>Add condition</Button>
                                 <Button
 
@@ -178,7 +178,7 @@ function CreateNewCollectionModal(props) {
                                     onClick={() => dispatchConditions({ type: "clear" })}
                                     variant="plain"
                                     tone="critical">Clear all</Button>
-                            </HorizontalStack>
+                            </InlineStack>
                             </VerticalStack>
                         </Card> : null
                     }

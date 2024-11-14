@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, InlineStack, Text, VerticalStack } from '@shopify/polaris'
 import React, { useEffect, useState, useRef } from 'react'
 import {useNavigate} from "react-router-dom"
 import api from '../api'

@@ -3,7 +3,7 @@ import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, InlineStack, Icon, Link, Scrollable, Text, VerticalStack } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import testingTransform from "../testing/transform"
 import StackedChart from '../../components/charts/StackedChart';
@@ -246,13 +246,13 @@ function HomeDashboard() {
         if (val === 0) return null
         const color = !invertColor && val > 0 ? "success" : "critical"
         return (
-            <HorizontalStack wrap={false}>
+            <InlineStack wrap={false}>
                 <Icon source={source} color={color} />
                 <div className='custom-color'>
                     <Text color={color}>{Math.abs(val)}</Text>
                 </div>
-            </HorizontalStack>
-        )
+            </InlineStack>
+        );
     }
 
     const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
@@ -481,15 +481,15 @@ function HomeDashboard() {
 
     const genreateDataTableRows = (collections) => {
         return collections.map((collection, index) => ([
-            <HorizontalStack align='space-between'>
-                <HorizontalStack gap={2}>
+            <InlineStack align='space-between'>
+                <InlineStack gap={2}>
                     <Box maxWidth='287px'>
                         <TooltipText tooltip={collection.name} text={collection.name}/>
                     </Box>
                     <Text variant='bodySm' color='subdued'>{(collection.totalApis === 0 ? 0 : Math.floor(100.0 * collection.apisTested / collection.totalApis))}% test coverage</Text>
-                </HorizontalStack>
+                </InlineStack>
                 <Text>{collection.totalApis}</Text>
-            </HorizontalStack>
+            </InlineStack>
         ]
         ));
     }

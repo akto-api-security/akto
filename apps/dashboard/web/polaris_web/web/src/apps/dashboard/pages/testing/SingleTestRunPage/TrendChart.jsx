@@ -7,7 +7,7 @@ import {
     LegacyCard,
     ChoiceList,
     Collapsible,
-    HorizontalStack, 
+    InlineStack, 
     Text,
     Button,
     Box,
@@ -302,7 +302,7 @@ function TrendChart(props) {
     return (
         <LegacyCard>
             <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
-                <HorizontalStack align="space-between">
+                <InlineStack align="space-between">
                     <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
                     <Button
 
@@ -310,7 +310,7 @@ function TrendChart(props) {
                         icon={iconSource}
                         onClick={() => setCollapsible(!collapsible)}
                         variant="monochromePlain" />
-                </HorizontalStack>
+                </InlineStack>
                 <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
                     <Box paddingBlockStart={3}><Divider/></Box>
                     <LegacyCard.Section flush>

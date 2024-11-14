@@ -1,7 +1,7 @@
 
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { useParams } from "react-router-dom"
-import { Button, Text, Box, Popover, ActionList, VerticalStack, HorizontalStack, Icon } from "@shopify/polaris"
+import { Button, Text, Box, Popover, ActionList, VerticalStack, InlineStack, Icon } from "@shopify/polaris"
 import api from "../api";
 import { useEffect, useState } from "react";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -71,29 +71,29 @@ function SingleRequest(){
         <PageWithMultipleCards
             title={
                 <VerticalStack gap="3">
-                <HorizontalStack gap="2" align="start" blockAlign='start'>
+                <InlineStack gap="2" align="start" blockAlign='start'>
                     <Box maxWidth="50vw">
                         <Text variant='headingLg' truncate>
                             {`${subType} in ${method} ${url}`}
                         </Text>
                     </Box>
-                </HorizontalStack>
-                <HorizontalStack gap='2' align="start" >
-                  {
-                    headerDetails?.map((header) => {
-                      return (
-                        <HorizontalStack key={header.value} gap="1">
-                          <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
-                            <Icon source={header.icon} color="subdued" />
-                          </div>
-                          <Text as="div" variant="bodySm" color="subdued" fontWeight='regular'>
-                            {endpointData[header.value]}
-                          </Text>
-                        </HorizontalStack>
-                      )
-                    })
-                  }
-                </HorizontalStack>
+                </InlineStack>
+                <InlineStack gap='2' align="start">
+                    {
+                      headerDetails?.map((header) => {
+                        return (
+                            <InlineStack key={header.value} gap="1">
+                                <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
+                                  <Icon source={header.icon} color="subdued" />
+                                </div>
+                                <Text as="div" variant="bodySm" color="subdued" fontWeight='regular'>
+                                  {endpointData[header.value]}
+                                </Text>
+                            </InlineStack>
+                        );
+                      })
+                    }
+                </InlineStack>
               </VerticalStack>
                 
             }
@@ -137,7 +137,7 @@ function SingleRequest(){
               />,
             ]}
         />
-    )
+    );
 }
 
 export default SingleRequest

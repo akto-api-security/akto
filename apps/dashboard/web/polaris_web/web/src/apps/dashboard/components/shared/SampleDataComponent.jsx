@@ -3,7 +3,7 @@ import {
     ClipboardMinor,ArrowDownMinor, ArrowUpMinor
 } from '@shopify/polaris-icons';
 import {
-    HorizontalStack, Box, LegacyCard,
+    InlineStack, Box, LegacyCard,
     Button, Popover, ActionList, Icon, Text, Tooltip
 } from '@shopify/polaris';
 import SampleData from './SampleData';
@@ -203,15 +203,15 @@ function SampleDataComponent(props) {
         <Box>
             <LegacyCard.Section flush>
                 <Box padding={"2"}>
-                    <HorizontalStack padding="2" align='space-between'>
-                        {func.toSentenceCase(type)} 
+                    <InlineStack padding="2" align='space-between'>
+                        {func.toSentenceCase(type)}
                         { type=="response" && responseTime ? (` (${responseTime} ms)`) : "" }
-                        <HorizontalStack gap={2}>
-                        {isNewDiff ? <HorizontalStack gap="2">
+                        <InlineStack gap={2}>
+                            {isNewDiff ? <InlineStack gap="2">
                                 <Box borderInlineEndWidth='1' borderColor="border-subdued" padding="1">
                                     <Text variant="bodyMd" color="subdued">{ lineNumbers[type].length } changes</Text>
                                 </Box>
-                                <HorizontalStack gap="1">
+                                <InlineStack gap="1">
                                     <Button
 
 
@@ -232,9 +232,9 @@ function SampleDataComponent(props) {
                                             <Icon source={ArrowDownMinor} />
                                         </Box>
                                     </Button>
-                                </HorizontalStack>
-                            </HorizontalStack> 
-                            : null}
+                                </InlineStack>
+                            </InlineStack> 
+                                : null}
                             <Tooltip content={`Copy ${type}`}>
                             <Popover
                                 zIndexOverride={"600"}
@@ -254,8 +254,8 @@ function SampleDataComponent(props) {
                                 />
                             </Popover>
                             </Tooltip>
-                        </HorizontalStack>
-                    </HorizontalStack>
+                        </InlineStack>
+                    </InlineStack>
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>

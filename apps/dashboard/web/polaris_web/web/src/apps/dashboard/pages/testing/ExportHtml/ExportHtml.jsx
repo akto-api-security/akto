@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import issuesApi from '../../issues/api';
 import api from '../api';
 import PersistStore from '../../../../main/PersistStore';
-import { Avatar, Box, Frame, HorizontalGrid, HorizontalStack, LegacyCard, Text, TopBar, VerticalStack, Icon } from '@shopify/polaris'
+import { Avatar, Box, Frame, HorizontalGrid, InlineStack, LegacyCard, Text, TopBar, VerticalStack, Icon } from '@shopify/polaris'
 import './styles.css'
 import transform from '../transform';
 import LocalStore from '../../../../main/LocalStorageStore';
@@ -126,12 +126,12 @@ function ExportHtml() {
     const headerComp = (
         <div className="header-css">
             <Box width="60%">
-                <HorizontalStack align="space-between">
+                <InlineStack align="space-between">
                     <Box paddingBlockStart={3}>
                         <Avatar size="md" shape="square" source="/public/akto_colored.svg" customer name='aktoLogo' />
                     </Box>
                     <Text variant="headingXl">Akto Vulnerabilities Report</Text>
-                </HorizontalStack>
+                </InlineStack>
             </Box>
         </div>
     )
@@ -163,7 +163,7 @@ function ExportHtml() {
     const cardTitleComponent = (item) => {
         return (
             <Box borderWidth="1" background={getColor(item)}>
-                <HorizontalStack>
+                <InlineStack>
                     <Box borderInlineEndWidth='1' width='35%'>
                         <Box padding={1}>
                             <Text variant="headingMd">Vulnerability</Text>
@@ -174,9 +174,9 @@ function ExportHtml() {
                             <Text variant="headingMd">{item?.category.testName}</Text>
                         </Box>
                     </Box>
-                </HorizontalStack>
+                </InlineStack>
             </Box>
-        )
+        );
     }
 
     return (
@@ -189,43 +189,43 @@ function ExportHtml() {
                         <Box borderWidth="2" borderRadius="1" width="40%">
                             <HorizontalGrid columns={2}>
                                 <div style={{ background: "#666666", borderRight: '2px solid white', borderBottom: '2px solid white' }}>
-                                    <HorizontalStack align="center">
+                                    <InlineStack align="center">
                                         <Box padding="1">
                                             <Text variant="bodyLg" fontWeight="medium" color="text-inverse">
                                                 Severity
                                             </Text>
                                         </Box>
-                                    </HorizontalStack>
+                                    </InlineStack>
                                 </div>
                                 <div style={{ background: "#666666", borderBottom: '2px solid white' }}>
-                                    <HorizontalStack align="center">
+                                    <InlineStack align="center">
                                         <Box padding="1">
                                             <Text variant="bodyLg" fontWeight="medium" color="text-inverse">
                                                 Vulnerable APIs
                                             </Text>
                                         </Box>
-                                    </HorizontalStack>
+                                    </InlineStack>
                                 </div>
                             </HorizontalGrid>
                             {Object.keys(severitiesCount)?.map((element, index) => (
                                 <HorizontalGrid columns={2} key={index}>
                                     <div style={{ background: "#e8e8e8", borderRight: '2px solid white', borderBottom: (index < 2 ? "2px solid white" : "") }}>
-                                        <HorizontalStack align="center">
+                                        <InlineStack align="center">
                                             <Box padding="1">
                                                 <Text variant="bodyMd" fontWeight="medium">
                                                     {element}
                                                 </Text>
                                             </Box>
-                                        </HorizontalStack>
+                                        </InlineStack>
                                     </div>
                                     <div style={{ background: "#e8e8e8", borderBottom: (index < 2 ? "2px solid white" : "") }}>
-                                        <HorizontalStack align="center">
+                                        <InlineStack align="center">
                                             <Box padding="1">
                                                 <Text variant="bodyMd" fontWeight="medium">
                                                     {severitiesCount[element]}
                                                 </Text>
                                             </Box>
-                                        </HorizontalStack>
+                                        </InlineStack>
                                     </div>
                                 </HorizontalGrid>
                             ))}
@@ -253,7 +253,7 @@ function ExportHtml() {
                 </VerticalStack>
             </div>
         </Frame>
-    )
+    );
 }
 
 function VulnerableMultiStepTestDetails(props) {
@@ -287,15 +287,15 @@ function VulnerableMultiStepTestDetails(props) {
                         return (
                             <div key={index}>
                                 <div className="row-div-1">
-                                    <HorizontalStack gap={1}>
+                                    <InlineStack gap={1}>
                                         <span className="api-text">
                                             Vulnerable endpoint:
                                         </span>
                                         <span className="url-text">
                                             {step.apiInfoKey.url}
                                         </span>
-                                    </HorizontalStack>
-                                    <HorizontalStack>
+                                    </InlineStack>
+                                    <InlineStack>
                                         <Box paddingInlineEnd={4}>
                                             <span className="api-text">
                                                 Collection name: {" "}
@@ -304,7 +304,7 @@ function VulnerableMultiStepTestDetails(props) {
                                                 {props.collectionsMap[step.apiInfoKey.apiCollectionId]}
                                             </span>
                                         </Box>
-                                    </HorizontalStack>
+                                    </InlineStack>
                                 </div>
                                 <div>
                                     <div className="row-div">
@@ -341,14 +341,13 @@ function VulnerableMultiStepTestDetails(props) {
                                     </div>
                                 </div>
                             </div>
-
-                        )
+                        );
                     }
                 })}
 
             </div>
         </div>
-    )
+    );
 
 }
 
@@ -376,15 +375,15 @@ function VulnerableEndpointDetails(props) {
     return (
         <div className="attempts-div" key={props.index}>
             <div className="row-div-1" key={props.index}>
-                <HorizontalStack gap={1}>
+                <InlineStack gap={1}>
                     <span className="api-text">
                         Vulnerable endpoint:
                     </span>
                     <span className="url-text">
                         {props.testingRun.apiInfoKey.url}
                     </span>
-                </HorizontalStack>
-                <HorizontalStack>
+                </InlineStack>
+                <InlineStack>
                     <Box paddingInlineEnd={4}>
                         <span className="api-text">
                             Collection name: {" "}
@@ -393,7 +392,7 @@ function VulnerableEndpointDetails(props) {
                             {props.collectionsMap[props.testingRun.apiInfoKey.apiCollectionId]}
                         </span>
                     </Box>
-                </HorizontalStack>
+                </InlineStack>
             </div>
             {props.testingRun?.testResults?.map((testRun, index1) => (
                 <div key={index1}>
@@ -432,7 +431,7 @@ function VulnerableEndpointDetails(props) {
                 </div>
             ))}
         </div>
-    )
+    );
 
 }
 
@@ -444,19 +443,21 @@ function MoreInformationComponent(props) {
                 <LegacyCard.Section>
                     {
                         props.sections?.map((section, index) => {
-                            return (<LegacyCard.Subsection key={index}>
-                                <VerticalStack gap="3">
-                                    <HorizontalStack gap="2" align="start" blockAlign='start'>
-                                        <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
-                                            {section?.icon && <Icon source={section.icon}></Icon>}
-                                        </div>
-                                        <Text variant='headingSm'>
-                                            {section.title || "Heading"}
-                                        </Text>
-                                    </HorizontalStack>
-                                    {section.content}
-                                </VerticalStack>
-                            </LegacyCard.Subsection>)
+                            return (
+                                <LegacyCard.Subsection key={index}>
+                                    <VerticalStack gap="3">
+                                        <InlineStack gap="2" align="start" blockAlign='start'>
+                                            <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
+                                                {section?.icon && <Icon source={section.icon}></Icon>}
+                                            </div>
+                                            <Text variant='headingSm'>
+                                                {section.title || "Heading"}
+                                            </Text>
+                                        </InlineStack>
+                                        {section.content}
+                                    </VerticalStack>
+                                </LegacyCard.Subsection>
+                            );
                         })
                     }
                 </LegacyCard.Section>
@@ -479,7 +480,7 @@ function MoreInformationComponent(props) {
                 </LegacyCard.Section>
             </LegacyCard>
         </VerticalStack>
-    )
+    );
 }
 
 

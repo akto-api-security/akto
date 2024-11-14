@@ -1,4 +1,4 @@
-import { VerticalStack, Box, Button, ButtonGroup, HorizontalStack, Icon, Text, Collapsible, Scrollable, DataTable, Badge } from "@shopify/polaris"
+import { VerticalStack, Box, Button, ButtonGroup, InlineStack, Icon, Text, Collapsible, Scrollable, DataTable, Badge } from "@shopify/polaris"
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
 import func from "@/util/func"
@@ -19,7 +19,7 @@ function prepareTableData (data, handleBadgeClick) {
         let paramText = element.param.replaceAll("#", ".").replaceAll(".$", "")
         let isSensitive = func.isSubTypeSensitive(element)
         let nonSensitiveDataType = element?.nonSensitiveDataType
-        let comp = [(<HorizontalStack gap={"2"} key={index}>
+        let comp = [(<InlineStack gap={"2"} key={index}>
             <Text fontWeight="regular" variant="bodyMd">
                 {paramText}
             </Text>
@@ -45,7 +45,7 @@ function prepareTableData (data, handleBadgeClick) {
                         </Button> : null)
 
             }
-            </HorizontalStack>), <Text variant="bodySm" fontWeight="regular" color="subdued">{func.prepareValuesTooltip(element)}</Text>
+        </InlineStack>), <Text variant="bodySm" fontWeight="regular" color="subdued">{func.prepareValuesTooltip(element)}</Text>
         ]
         if(element.isHeader){
             if(isSensitive){
@@ -100,14 +100,14 @@ function ApiSingleSchema(props) {
     return (
         <VerticalStack gap={"2"}>
             <Box background={"bg-subdued"} width="100%" padding={"2"} onClick={handleToggle}>
-                <HorizontalStack align="space-between">
+                <InlineStack align="space-between">
                     <Text variant="headingSm">
                         {title}
                     </Text>
                     <Box>
                         <Icon source={open ? ChevronDownMinor : ChevronUpMinor} />
                     </Box>
-                </HorizontalStack>
+                </InlineStack>
             </Box>
             <Collapsible
                 open={open}
@@ -119,22 +119,22 @@ function ApiSingleSchema(props) {
                     <ButtonGroup variant="segmented">
                         <Button {...(activeTab? {variant:"primary", tone:"success" } : {})} onClick={() => {setBadgeActive(false); setIsHeader(true)}} size="slim">
                             <Box paddingBlockStart="05" paddingBlockEnd="05"> 
-                                <HorizontalStack gap="2">
+                                <InlineStack gap="2">
                                     <Text variant="bodyMd">Header</Text>
                                     <span style={{padding: '4px 8px', width: 'fit-content', color: '#202223', background:(isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px'}}>
                                         {headerCount}
                                     </span>
-                                </HorizontalStack>
+                                </InlineStack>
                             </Box>
                         </Button>
                         <Button {...(activeTab? {variant:"primary", tone:"success" } : {})} onClick={() => {setBadgeActive(false); setIsHeader(false)}} size="slim">
                             <Box paddingBlockStart="05" paddingBlockEnd="05"> 
-                                <HorizontalStack gap="2">
+                                <InlineStack gap="2">
                                     <Text variant="bodyMd">Payload</Text>
                                     <span style={{padding: '4px 8px', width: 'fit-content', color: '#202223', background:(!isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px'}}>
                                         {payloadCount}
                                     </span>
-                                </HorizontalStack>
+                                </InlineStack>
                             </Box>
                         </Button>
                     </ButtonGroup>

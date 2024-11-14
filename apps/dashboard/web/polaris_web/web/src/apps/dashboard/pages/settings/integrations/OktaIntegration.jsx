@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import CopyCommand from '../../../components/shared/CopyCommand';
 import IntegrationsLayout from './IntegrationsLayout';
-import { Button, Form, FormLayout, HorizontalStack, LegacyCard, Text, TextField } from '@shopify/polaris';
+import { Button, Form, FormLayout, InlineStack, LegacyCard, Text, TextField } from '@shopify/polaris';
 import func from "@/util/func"
 import settingRequests from '../api';
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
@@ -82,9 +82,9 @@ function OktaIntegration() {
                                 onChange={setOktaDomain}
                                 value={oktaDomain}
                     />
-                    <HorizontalStack align="end">
+                    <InlineStack align="end">
                         <Button submit  size="medium" variant="primary">Submit</Button>
-                    </HorizontalStack>
+                    </InlineStack>
                 </FormLayout>
             </Form>
         </LegacyCard.Section>

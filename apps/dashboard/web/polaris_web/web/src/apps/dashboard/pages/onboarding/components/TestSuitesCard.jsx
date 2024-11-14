@@ -1,4 +1,4 @@
-import { Badge, Box, Card, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from '@shopify/polaris'
+import { Badge, Box, Card, InlineStack, Icon, Text, Tooltip, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import onFunc from '../transform'
 import { InfoMinor } from "@shopify/polaris-icons"
@@ -10,24 +10,24 @@ function TestSuitesCard({cardObj}) {
     return (
         <Card>
             <VerticalStack gap="2">
-                <HorizontalStack align="space-between">
-                    <HorizontalStack gap="1">
-                    <div style={{color: color, fontSize: '16px', fontWeight: 600}}>
-                        {cardObj?.method}
-                    </div>
+                <InlineStack align="space-between">
+                    <InlineStack gap="1">
+                        <div style={{color: color, fontSize: '16px', fontWeight: 600}}>
+                            {cardObj?.method}
+                        </div>
                         <Text variant="headingMd" as='h4'>{cardObj.path}</Text>
-                    </HorizontalStack>
+                    </InlineStack>
                     <Badge tone={status} size="large-experimental">{cardObj.severity}</Badge>
-                </HorizontalStack>
+                </InlineStack>
 
-                <HorizontalStack gap="2">
+                <InlineStack gap="2">
                     <Text variant='bodyLg' fontWeight="medium">{cardObj.vulnerability}</Text>
                     <Tooltip content={cardObj.testName}>
                         <Box>
                             <Icon source = {InfoMinor} color="base"/>
                         </Box>
                     </Tooltip>
-                </HorizontalStack>
+                </InlineStack>
             </VerticalStack>
         </Card>
     );

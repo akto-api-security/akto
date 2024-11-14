@@ -1,4 +1,4 @@
-import { ResourceList, LegacyCard, ResourceItem, Modal, Text, Button, TextField, HorizontalStack, List, Link } from "@shopify/polaris";
+import { ResourceList, LegacyCard, ResourceItem, Modal, Text, Button, TextField, InlineStack, List, Link } from "@shopify/polaris";
 import { useEffect, useState, useCallback } from "react";
 import settingsApi from "../api";
 import api from "./api";
@@ -159,7 +159,7 @@ function TestLibrary() {
             >
                 <Modal.Section>
                     <div onKeyDown={(e) => func.handleKeyPress(e, addTestLibrary)}>
-                        <HorizontalStack gap={2}>
+                        <InlineStack gap={2}>
                             <div style={{ flexGrow: 1 }}>
                                 <TextField
                                     id={"repo-url"}
@@ -171,7 +171,7 @@ function TestLibrary() {
                                     autoComplete="off"
                                 />
                             </div>
-                        </HorizontalStack>
+                        </InlineStack>
                     </div>
                 </Modal.Section>
             </Modal>

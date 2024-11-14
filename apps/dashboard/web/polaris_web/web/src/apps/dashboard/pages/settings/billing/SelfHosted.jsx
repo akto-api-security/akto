@@ -1,6 +1,6 @@
 import { TextField } from '@shopify/polaris';
 import { useState, useEffect } from 'react';
-import { Box, Card, Divider, LegacyCard, Page, Text, Button, HorizontalStack } from '@shopify/polaris'
+import { Box, Card, Divider, LegacyCard, Page, Text, Button, InlineStack } from '@shopify/polaris'
 import { Paywall, StiggProvider, SubscribeIntentionType, useStiggContext } from '@stigg/react-sdk'
 import {
   CustomerPortalProvider,

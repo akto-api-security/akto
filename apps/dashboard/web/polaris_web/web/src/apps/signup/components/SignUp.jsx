@@ -1,4 +1,4 @@
-import { Button, Form,  HorizontalStack, Modal, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Button, Form,  InlineStack, Modal, Text, TextField, VerticalStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import SSOTextfield from './SSOTextfield'
 import PasswordTextField from '../../dashboard/components/layouts/PasswordTextField'
@@ -87,13 +87,13 @@ function SignUp() {
             return (
               <VerticalStack gap={5} key={index}>
                 <SSOTextfield onClickFunc={sso.onClickFunc} logos={[sso.logo]} text={sso.text} />
-                <HorizontalStack gap={3}>
+                <InlineStack gap={3}>
                   <div style={{ flexGrow: 1, borderBottom: '1px solid #c9cccf' }}></div>
                   <Text variant="bodySm" color="subdued">or</Text>
                   <div style={{ flexGrow: 1, borderBottom: '1px solid #c9cccf' }}></div>
-                </HorizontalStack>
+                </InlineStack>
               </VerticalStack>
-            )
+            );
           })
         }
       </VerticalStack>
@@ -277,13 +277,13 @@ function SignUp() {
             variant="primary"><div data-testid="signin_signup_button">{activeObject.buttonText}</div></Button>
         </VerticalStack>
       </Form>
-      <HorizontalStack align="center" gap={1}>
+      <InlineStack align="center" gap={1}>
         <Text>{activeObject.descriptionText}</Text>
         <Button
 
           onClick={() => {setLoginActive(!loginActive); navigate(activeObject.targetUrl)}}
           variant="plain">{activeObject.linkText}</Button>
-      </HorizontalStack>
+      </InlineStack>
     </VerticalStack>
   )
 

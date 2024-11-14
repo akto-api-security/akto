@@ -1,4 +1,4 @@
-import { Box, Card, HorizontalGrid, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Card, HorizontalGrid, InlineStack, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import TitleWithInfo from '../../../components/shared/TitleWithInfo'
 
@@ -9,7 +9,7 @@ function SummaryCard({ summaryItems }) {
                 <HorizontalGrid columns={summaryItems.length} gap={4}>
                     {summaryItems.map((item, index) => (
                         <Box borderInlineEndWidth={index < (summaryItems.length - 1) ? "1" : ""} key={index} borderColor="transparent">
-                            <HorizontalStack>
+                            <InlineStack>
                                 <VerticalStack gap="4">
                                     <TitleWithInfo
                                         titleComp={
@@ -34,13 +34,13 @@ function SummaryCard({ summaryItems }) {
                                         {item.smoothChartComponent ? item.smoothChartComponent : null}
                                     </HorizontalGrid>
                                 </VerticalStack>
-                            </HorizontalStack>
+                            </InlineStack>
                         </Box>
                     ))}
                 </HorizontalGrid>
             </Box>
         </Card>
-    )
+    );
 }
 
 export default SummaryCard

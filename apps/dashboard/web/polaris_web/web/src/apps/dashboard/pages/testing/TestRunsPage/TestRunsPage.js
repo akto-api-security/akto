@@ -1,5 +1,5 @@
 import GithubServerTable from "../../../components/tables/GithubServerTable";
-import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider} from '@shopify/polaris';
+import {Text,IndexFiltersMode, LegacyCard, InlineStack, Button, Collapsible, HorizontalGrid, Box, Divider} from '@shopify/polaris';
 import { ChevronDownMinor , ChevronUpMinor } from '@shopify/polaris-icons';
 import api from "../api";
 import { useEffect, useReducer, useState } from 'react';
@@ -281,7 +281,7 @@ const SummaryCardComponent = () =>{
   return (
     <LegacyCard>
       <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
-        <HorizontalStack align="space-between">
+        <InlineStack align="space-between">
           <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
           <Button
 
@@ -289,7 +289,7 @@ const SummaryCardComponent = () =>{
             icon={iconSource}
             onClick={() => setCollapsible(!collapsible)}
             variant="monochromePlain" />
-        </HorizontalStack>
+        </InlineStack>
         {totalVulnerabilities > 0 ? 
         <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
           <LegacyCard.Subsection>

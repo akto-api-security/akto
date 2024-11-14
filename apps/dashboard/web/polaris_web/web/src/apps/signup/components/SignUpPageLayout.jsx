@@ -1,4 +1,4 @@
-import { Avatar, Box, Button, Frame, HorizontalStack, Page, VerticalStack } from '@shopify/polaris'
+import { Avatar, Box, Button, Frame, InlineStack, Page, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import ToastComponent from './ToastComponent'
 
@@ -9,19 +9,19 @@ function SignUpPageLayout({customComponent}) {
         <Page fullWidth >
           <Box padding="10" paddingBlockStart={"24"}>
             <div style={{display: "flex", justifyContent: 'space-between', flexDirection: "column"}}>
-              <HorizontalStack align="center">
+              <InlineStack align="center">
                 <Box width='400px'>
                   <VerticalStack gap={8}>
-                    <HorizontalStack align='center'>
+                    <InlineStack align='center'>
                       <div className="akto-logo">
                         <Avatar source="/public/akto_name_with_logo.svg" shape="round" size="xl" />
                       </div>
-                    </HorizontalStack>
+                    </InlineStack>
                     {customComponent}
 
                   </VerticalStack>
                   <div style={{bottom: "40px", position: "absolute", width: '400px'}}>
-                    <HorizontalStack gap={3} align="center">
+                    <InlineStack gap={3} align="center">
                       <Button
 
                         onClick={() => window.open("https://www.akto.io/terms-and-policies","_blank")}
@@ -31,10 +31,10 @@ function SignUpPageLayout({customComponent}) {
 
                         onClick={() => window.open("https://www.akto.io/terms/privacy","_blank")}
                         variant="plain">Privacy policy</Button>
-                    </HorizontalStack>
+                    </InlineStack>
                   </div>
                 </Box>
-              </HorizontalStack>
+              </InlineStack>
             </div>
           </Box>
         </Page>

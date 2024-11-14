@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import {  LegacyCard, TextField, Modal, Text, HorizontalStack, VerticalStack } from '@shopify/polaris';
+import {  LegacyCard, TextField, Modal, Text, InlineStack, VerticalStack } from '@shopify/polaris';
 import func from '@/util/func';
 import IntegrationsLayout from './IntegrationsLayout';
 import settingRequests from '../api';

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { LegacyCard, HorizontalGrid, TextField, VerticalStack, Text, Form, HorizontalStack, Tag, Button, Box, Checkbox } from '@shopify/polaris'
+import { LegacyCard, HorizontalGrid, TextField, VerticalStack, Text, Form, InlineStack, Tag, Button, Box, Checkbox } from '@shopify/polaris'
 import Dropdown from '../../../components/layouts/Dropdown'
 import "./DataTypes.css"
 import ConditionsPicker from '../../../components/ConditionsPicker'
@@ -259,21 +259,21 @@ function DataTypes() {
                 <Form onSubmit={() => handleTagsChange(tagValue, 'add')}>
                     <TextField onChange={setTagValue} value={tagValue} label={<Text color="subdued" fontWeight="medium" variant="bodySm">Datatype Tags</Text>}/>
                 </Form>
-                <HorizontalStack gap={"2"}>
-                    {currState.categoriesList && currState.categoriesList.length > 0 && currState.categoriesList.map((tag, index) => {
-                        return(
-                            <Tag key={index} onRemove={() => handleTagsChange(tagValue, 'remove')}>
-                                <Text>{tag}</Text>
-                            </Tag>
-                        )
-                    })}
-                </HorizontalStack>
+                <InlineStack gap={"2"}>
+                  {currState.categoriesList && currState.categoriesList.length > 0 && currState.categoriesList.map((tag, index) => {
+                      return(
+                          <Tag key={index} onRemove={() => handleTagsChange(tagValue, 'remove')}>
+                              <Text>{tag}</Text>
+                          </Tag>
+                      )
+                  })}
+                </InlineStack>
             </VerticalStack>
             {currState.dataType === 'Custom' && <Box>
               <Text variant="bodyMd">
                 Choose Icon
               </Text>
-              <HorizontalStack gap={2}>
+              <InlineStack gap={2}>
                 {displayIcons.map((icon, index) => {
                   return (
                     <div className="tag-button" key={index}>
@@ -281,8 +281,7 @@ function DataTypes() {
                     </div>
                   );
                 })}
-                
-              </HorizontalStack>
+              </InlineStack>
             </Box>}
           </HorizontalGrid>
         </VerticalStack>

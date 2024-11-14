@@ -1,4 +1,4 @@
-import { Avatar, Button, Card, Text, VerticalStack, HorizontalStack, Badge, Box } from '@shopify/polaris';
+import { Avatar, Button, Card, Text, VerticalStack, InlineStack, Badge, Box } from '@shopify/polaris';
 
 function RowCard(props) {
 
@@ -28,10 +28,10 @@ function RowCard(props) {
                         <Text variant="bodyMd" color='subdued'>{cardObj.text}</Text>
                     </Box>
                 </VerticalStack>
-                <HorizontalStack gap={"4"} align='start'>
+                <InlineStack gap={"4"} align='start'>
                     <Button onClick={handleAction}>{buttonText}</Button>
                     <Button  onClick={goToDocs} size='medium' variant="plain">See Docs</Button>
-                </HorizontalStack>
+                </InlineStack>
             </VerticalStack>
         </Card>
     );

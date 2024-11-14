@@ -1,4 +1,4 @@
-import { Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip} from "@shopify/polaris"
+import { Box, Button, Divider, Frame, InlineStack, LegacyTabs, Modal, Text, Tooltip} from "@shopify/polaris"
 import {ChevronUpMinor } from "@shopify/polaris-icons"
 
 import { useEffect, useState } from "react";
@@ -242,7 +242,7 @@ const SampleApi = () => {
                 <div className="req-resp-tabs">
                     <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
                 </div>
-                <HorizontalStack gap={2}>
+                <InlineStack gap={2}>
                     <Button id={"select-sample-api"} onClick={toggleSelectApiActive} size="slim">
                         <Box maxWidth="200px">
                             <Tooltip content={copySelectedApiEndpoint} hoverDelay={"100"}>
@@ -257,7 +257,7 @@ const SampleApi = () => {
                         onClick={runTest}
                         size="slim"
                         variant="primary">Run Test</Button>
-                </HorizontalStack>
+                </InlineStack>
             </div>
 
             <Divider />

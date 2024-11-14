@@ -1,4 +1,4 @@
-import { Avatar, Box, Button, Card, HorizontalStack, Link, Text, VerticalStack } from '@shopify/polaris'
+import { Avatar, Box, Button, Card, InlineStack, Link, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import "../shared/style.css"
 import { useNavigate } from 'react-router-dom'
@@ -10,43 +10,40 @@ function EmptyScreensLayout({iconSrc,headingText,description, buttonText, redire
       <VerticalStack gap={5}>
           <Card padding={5}>
               <Box paddingBlockStart={5} paddingBlockEnd={16}>
-                  <HorizontalStack align="center">
+                  <InlineStack align="center">
                       <Box width='400px'>
                           <VerticalStack gap={8}>
-                              <HorizontalStack align="center">
+                              <InlineStack align="center">
                                   <Box width='162px' minHeight='162px' borderRadius="full" background="bg-subdued">
                                       <div className="empty-icon-container">
                                           <Avatar source={iconSrc} size=""/>
                                       </div>
                                   </Box>
-                              </HorizontalStack>
+                              </InlineStack>
                               <VerticalStack gap={4}>
-                                  <HorizontalStack align='center'>
+                                  <InlineStack align='center'>
                                       <Text variant="headingLg" alignment={"center"}>{headingText}</Text>
-                                  </HorizontalStack>
+                                  </InlineStack>
                                   
                                   <Text color="subdued" variant="bodyMd" alignment="center">{description}</Text>
                                   
-                                  <HorizontalStack align='center'>
+                                  <InlineStack align='center'>
                                       {redirectUrl ? <Box paddingBlockStart={2}>
                                           <Button  onClick={() => navigate(redirectUrl)} variant="primary">{buttonText}</Button>
                                       </Box> : null}
                                       {bodyComponent}
-                                  </HorizontalStack>
+                                  </InlineStack>
                               </VerticalStack>
                           </VerticalStack>
                       </Box>
-                  
-                  </HorizontalStack>
+                  </InlineStack>
               </Box>
           </Card>
           { learnText ? 
-          <HorizontalStack align="center">
-              <HorizontalStack gap="1">
-                  Learn more about
-                  <Link url={docsUrl} target="_blank">{learnText}</Link>
-              </HorizontalStack>
-          </HorizontalStack>
+          <InlineStack align="center">
+              <InlineStack gap="1">Learn more about<Link url={docsUrl} target="_blank">{learnText}</Link>
+              </InlineStack>
+          </InlineStack>
           : <></>}
           {infoItems ? <InfoComponent title={infoTitle} items={infoItems} /> : null}
       </VerticalStack>

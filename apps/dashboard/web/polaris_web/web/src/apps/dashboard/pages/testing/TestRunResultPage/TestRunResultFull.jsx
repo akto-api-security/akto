@@ -1,4 +1,4 @@
-import { Box, Button, Collapsible, Divider, HorizontalStack, Icon, LegacyCard, Scrollable, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Collapsible, Divider, InlineStack, Icon, LegacyCard, Scrollable, Text, VerticalStack } from '@shopify/polaris'
 import React, { useState } from 'react'
 import SpinnerCentered from '../../../components/progress/SpinnerCentered'
 import {ChevronDownMinor ,ChevronUpMinor} from '@shopify/polaris-icons';
@@ -18,25 +18,27 @@ function MoreInformationComponent(props) {
           <LegacyCard.Section>
             {
               props?.sections?.map((section) => {
-                return (<LegacyCard.Subsection key={section.title}>
-                  <VerticalStack gap="3">
-                    <HorizontalStack gap="2" align="start" blockAlign='start'>
-                      <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
-                        {section?.icon && <Icon source={section.icon}></Icon>}
-                      </div>
-                      <Text variant='headingSm'>
-                        {section?.title || "Heading"}
-                      </Text>
-                    </HorizontalStack>
-                    {section.content}
-                  </VerticalStack>
-                </LegacyCard.Subsection>)
+                return (
+                  <LegacyCard.Subsection key={section.title}>
+                    <VerticalStack gap="3">
+                      <InlineStack gap="2" align="start" blockAlign='start'>
+                        <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
+                          {section?.icon && <Icon source={section.icon}></Icon>}
+                        </div>
+                        <Text variant='headingSm'>
+                          {section?.title || "Heading"}
+                        </Text>
+                      </InlineStack>
+                      {section.content}
+                    </VerticalStack>
+                  </LegacyCard.Subsection>
+                );
               })
             }
           </LegacyCard.Section>
         </LegacyCard>
       </VerticalStack>
-    )
+    );
   }
 
 function TestRunResultFull(props) {
@@ -62,7 +64,7 @@ function TestRunResultFull(props) {
       const testLogsComponent = (
         <LegacyCard key="testLogsComponent">
           <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued"></Text>}>
-            <HorizontalStack align="space-between">
+            <InlineStack align="space-between">
               <Text fontWeight="semibold" variant="bodyMd">Test Logs</Text>
               <Button
 
@@ -70,7 +72,7 @@ function TestRunResultFull(props) {
                 icon={iconSource}
                 onClick={() => setTestLogsCollapsibleOpen(!testLogsCollapsibleOpen)}
                 variant="monochromePlain" />
-            </HorizontalStack>
+            </InlineStack>
               <Collapsible open={testLogsCollapsibleOpen} transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}>
                 <LegacyCard.Subsection>
                   <Box paddingBlockStart={3}><Divider /></Box>

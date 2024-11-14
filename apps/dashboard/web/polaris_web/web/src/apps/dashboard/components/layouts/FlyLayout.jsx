@@ -1,4 +1,4 @@
-import { Button, HorizontalStack, Text, VerticalStack, Box, Spinner, Divider, Scrollable } from "@shopify/polaris"
+import { Button, InlineStack, Text, VerticalStack, Box, Spinner, Divider, Scrollable } from "@shopify/polaris"
 import {
     CancelMajor
 } from '@shopify/polaris-icons';
@@ -21,14 +21,14 @@ function FlyLayout(props) {
                     { loading ? <div style={{position: "absolute", right: "25vw" , top: "50vh"}}><Spinner size="large" /></div>:
                     <VerticalStack gap={"5"}>
                         <Box padding={"4"} paddingBlockEnd={"0"} >
-                            <HorizontalStack align="space-between">
+                            <InlineStack align="space-between">
                                 {titleComp ? titleComp : 
                                     <Text variant="headingMd">
                                         {title}
                                     </Text>
                                 }
                                 <Button icon={CancelMajor} onClick={() => { handleExit()}}  variant="plain"></Button>
-                            </HorizontalStack>
+                            </InlineStack>
                         </Box>
                         <Scrollable style={{ height: "92vh" }} shadow>
                         <Box paddingBlockEnd={"20"}>

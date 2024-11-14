@@ -1,4 +1,4 @@
-import { Avatar, Box, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
+import { Avatar, Box, InlineStack, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 
 function ActivityTracker({ latestActivity }) {
@@ -32,15 +32,15 @@ function ActivityTracker({ latestActivity }) {
             <VerticalStack>
                 {Object.keys(groupedActivity).map((date, dateIndex) => (
                     <Box key={dateIndex}>
-                        <HorizontalStack gap={4}>
+                        <InlineStack gap={4}>
                             <Box borderColor='border-subdued' borderInlineEndWidth='2' width='0' paddingInlineStart={3} minHeight='44px' />
                             <Text variant="bodySm" color="subdued" style={{ marginBottom: '10px' }}>
                                 {date}
                             </Text>
-                        </HorizontalStack>
+                        </InlineStack>
                         {groupedActivity[date].map((event, eventIndex) => (
-                            <HorizontalStack key={eventIndex} align='space-between'>
-                                <HorizontalStack gap={3}>
+                            <InlineStack key={eventIndex} align='space-between'>
+                                <InlineStack gap={3}>
                                     <Box>
                                         <div style={{marginBlock: '5px'}}><Avatar shape="round" size="xs" source="/public/issues-event-icon.svg" /></div>
                                         {eventIndex < (groupedActivity[date].length - 1) ? (
@@ -50,13 +50,13 @@ function ActivityTracker({ latestActivity }) {
                                     <Box>
                                         <div style={{marginBlock: '5px'}}><Text variant="bodyMd">{event.description}</Text></div>
                                     </Box>
-                                </HorizontalStack>
+                                </InlineStack>
                                 <div style={{marginBlock: '5px'}}>
                                     <Text variant="bodySm" color="subdued">
                                         {formatDate(event.timestamp)[1]}
                                     </Text>
                                 </div>
-                            </HorizontalStack>
+                            </InlineStack>
                         ))}
                     </Box>
                 ))}

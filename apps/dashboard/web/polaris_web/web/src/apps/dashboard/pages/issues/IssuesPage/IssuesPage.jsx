@@ -6,7 +6,7 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { Button, HorizontalGrid, HorizontalStack, IndexFiltersMode } from "@shopify/polaris";
+import { Button, HorizontalGrid, InlineStack, IndexFiltersMode } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -445,12 +445,12 @@ function IssuesPage() {
     return <>
     <PageWithMultipleCards
         title={
-            <HorizontalStack gap={4}>
+            <InlineStack gap={4}>
                 <TitleWithInfo
                     titleText={"Issues"}
                     tooltipContent={"Issues are created when a test from test library has passed validation and thus a potential vulnerability is found."}
                 />
-            </HorizontalStack>
+            </InlineStack>
         }
         isFirstPage={true}
         components = {loading ? [<SpinnerCentered />] : [

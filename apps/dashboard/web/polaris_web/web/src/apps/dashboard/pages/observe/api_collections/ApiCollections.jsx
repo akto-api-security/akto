@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, HorizontalStack, Icon} from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, InlineStack, Icon} from "@shopify/polaris"
 import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import api from "../api"
 import { useEffect,useState, useRef } from "react"
@@ -552,7 +552,7 @@ function ApiCollections() {
     ]
 
     const secondaryActionsComp = (
-        <HorizontalStack gap={2}>
+        <InlineStack gap={2}>
             <Popover
                 active={moreActions}
                 activator={(
@@ -567,10 +567,10 @@ function ApiCollections() {
                 <Popover.Pane fixed>
                     <Popover.Section>
                         <Button   onClick={() =>exportCsv()} removeUnderline variant="monochromePlain">
-                            <HorizontalStack gap={"2"}>
+                            <InlineStack gap={"2"}>
                                 <Box><Icon source={FileMinor} /></Box>
                                 <Text>Export as CSV</Text>
-                            </HorizontalStack>
+                            </InlineStack>
                         </Button>
                         </Popover.Section>
                     <Popover.Section>
@@ -580,16 +580,16 @@ function ApiCollections() {
                             onClick={() => setTreeView(!treeView)}
                             removeUnderline
                             variant="monochromePlain">
-                            <HorizontalStack gap={"2"}>
+                            <InlineStack gap={"2"}>
                                 <Box><Icon source={treeView ? HideMinor : ViewMinor} /></Box>
                                 <Text>{treeView ? "Hide tree view": "Display tree view"}</Text>
-                            </HorizontalStack>
+                            </InlineStack>
                         </Button>
                     </Popover.Section>
                 </Popover.Pane>
             </Popover>
             <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>
-        </HorizontalStack>
+        </InlineStack>
     )
 
 

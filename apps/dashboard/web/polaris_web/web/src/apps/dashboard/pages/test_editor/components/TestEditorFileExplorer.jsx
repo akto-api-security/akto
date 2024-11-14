@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { Badge, Box, Button, HorizontalStack, Icon, Navigation, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Badge, Box, Button, InlineStack, Icon, Navigation, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
 import {ChevronDownMinor, ChevronRightMinor, SearchMinor, CirclePlusMinor} from "@shopify/polaris-icons"
 
 import TestEditorStore from "../testEditorStore"
@@ -176,8 +176,8 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                             removeUnderline
                             fullWidth
                             variant="monochromePlain">
-                            <HorizontalStack align="space-between">
-                                <HorizontalStack gap={"1"}>
+                            <InlineStack align="space-between">
+                                <InlineStack gap={"1"}>
                                     <Box>
                                         <Icon source={showCustom ? ChevronDownMinor : ChevronRightMinor}/>
                                     </Box>
@@ -187,14 +187,14 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                                         textProps={{variant: 'headingMd'}} 
                                         docsUrl={"https://docs.akto.io/test-editor/concepts/custom-test"}
                                     />
-                                </HorizontalStack>
+                                </InlineStack>
                                 <div style={{marginRight: '-2px'}}>
                                     <Badge size="small" tone="new">{customItems.count.toString()}</Badge>
                                 </div>
                                 {/* <Box onClick={(e) => addCustomTest(e)}>
                                     <Icon source={CirclePlusMinor} />
                                 </Box> */}
-                            </HorizontalStack>
+                            </InlineStack>
                         </Button>
                         {showCustom ? <Navigation.Section items={getItems(customItems.items)} /> : null}
                     </Box>
@@ -206,8 +206,8 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                             removeUnderline
                             fullWidth
                             variant="monochromePlain">
-                            <HorizontalStack align="space-between">
-                                <HorizontalStack gap="1">
+                            <InlineStack align="space-between">
+                                <InlineStack gap="1">
                                     <Box>
                                         <Icon source={showAkto ? ChevronDownMinor : ChevronRightMinor}/>
                                     </Box>
@@ -217,11 +217,11 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                                         textProps={{variant: 'headingMd'}} 
                                         docsUrl={"https://docs.akto.io/test-editor/concepts/test-library"}
                                     />
-                                </HorizontalStack>
+                                </InlineStack>
                                 <div style={{marginRight: '-2px'}}>
                                     <Badge size="small" tone="new">{aktoItems.count.toString()}</Badge>
                                 </div>
-                            </HorizontalStack>
+                            </InlineStack>
                         </Button>
                         {showAkto ? <Navigation.Section items={getItems(aktoItems.items)} /> : null}
                     </Box>
