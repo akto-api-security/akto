@@ -22,6 +22,7 @@ import com.akto.dto.testing.OtpTestData;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
@@ -536,6 +537,14 @@ public class DbActor extends DataActor {
 
     public List<Node> fetchNodesForCollectionIds(List<Integer> apiCollectionsIds, boolean removeZeroLevel, int skip){
         return DbLayer.fetchNodesForCollectionIds(apiCollectionsIds, removeZeroLevel, skip);
+    }
+
+    public long countTestingRunResultSummaries(Bson filter){
+        return DbLayer.countTestingRunResultSummaries(filter);
+    }
+
+    public TestScript fetchTestScript(){
+        return DbLayer.fetchTestScript();
     }
 
 }
