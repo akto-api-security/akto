@@ -59,6 +59,9 @@ public class WindowBasedThresholdNotifier {
         String bucketKey = getBucketKey(groupKey, actor, minuteOfYear);
         this.cache.increment(bucketKey);
 
+        // Set expiry if not set (3 times window size)
+        this.cache.setExpiryIfNotSet(bucketKey, 3 * this.config.getWindowSizeInMinutes() * 60);
+
         long windowCount = 0L;
         for (int i = minuteOfYear; i >= minuteOfYear - this.config.getWindowSizeInMinutes(); i--) {
             windowCount += this.cache.get(getBucketKey(groupKey, actor, minuteOfYear));
