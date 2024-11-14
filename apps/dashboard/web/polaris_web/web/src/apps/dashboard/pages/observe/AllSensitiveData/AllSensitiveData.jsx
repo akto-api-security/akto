@@ -135,7 +135,7 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
 
 function AllSensitiveData() {
 
-    const [data, setData] = useState({"enabled":[]})
+    const [data, setData] = useState({'all': [], "enabled":[], 'disabled': []})
     const [mapData, setMapData] = useState({})
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
