@@ -46,6 +46,7 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
+import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -3434,6 +3435,59 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb("error in fetchNodesForCollectionIds" + e, LoggerMaker.LogDb.RUNTIME);
         }
         return nodeList;
+    }
+
+    public long countTestingRunResultSummaries(Bson filter) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("filter", filter);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/countTestingRunResultSummaries", "", "POST",  obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in countTestingRunResultSummaries", LoggerMaker.LogDb.TESTING);
+                return 0;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                int cnt = Integer.parseInt((String) payloadObj.get("count").toString());
+                return Long.valueOf(cnt);
+            } catch(Exception e) {
+                return 0;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in countTestingRunResultSummaries" + e, LoggerMaker.LogDb.RUNTIME);
+            return 0;
+        }
+    }
+
+    public TestScript fetchTestScript(){
+        TestScript testScript = null;
+
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchTestScript", "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in fetchTestScript", LoggerMaker.LogDb.RUNTIME);
+                return testScript;
+            }
+            BasicDBObject payloadObj;
+
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBObject testScriptObj = (BasicDBObject) payloadObj.get("testScript");
+                testScript = objectMapper.readValue(testScriptObj.toJson(), TestScript.class);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchTestScript" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchTestScript" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return testScript;
     }
 
 }
