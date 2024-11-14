@@ -2,9 +2,8 @@ package com.akto.filters.aggregators.window_based;
 
 import com.akto.cache.CounterCache;
 import com.akto.dto.HttpResponseParams;
-import com.akto.filters.aggregators.RealTimeThresholdNotifier;
 
-public class WindowBasedThresholdNotifier extends RealTimeThresholdNotifier {
+public class WindowBasedThresholdNotifier {
 
     private final Config config;
 
@@ -33,18 +32,21 @@ public class WindowBasedThresholdNotifier extends RealTimeThresholdNotifier {
         this.config = config;
     }
 
-    @Override
-    public boolean shouldNotify(String actor, HttpResponseParams responseParam) {
+    private static String getBucketKey(String actor, String groupKey, int minuteOfYear) {
+        return groupKey + "|" + actor + "|" + minuteOfYear;
+    }
+
+    public boolean shouldNotify(String groupKey, String actor, HttpResponseParams responseParam) {
         int requestTimeSeconds = responseParam.getTime();
 
-        int minuteOfYear = (int) Math.ceil(requestTimeSeconds / (60L));
+        int minuteOfYear = requestTimeSeconds / 60;
 
-        String bucketKey = actor + "|" + minuteOfYear;
+        String bucketKey = getBucketKey(groupKey, actor, minuteOfYear);
         this.cache.increment(bucketKey);
 
         long windowCount = 0L;
         for (int i = minuteOfYear; i >= minuteOfYear - this.config.getWindowSizeInMinutes(); i--) {
-            windowCount += this.cache.get(actor + "|" + i);
+            windowCount += this.cache.get(getBucketKey(groupKey, actor, minuteOfYear));
         }
 
         return windowCount >= this.config.getThreshold();
