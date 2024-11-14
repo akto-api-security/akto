@@ -116,7 +116,7 @@ function ApiSingleSchema(props) {
                 expandOnPrint
             >
                 <VerticalStack gap={"2"}>
-                    <ButtonGroup segmented>
+                    <ButtonGroup variant="segmented">
                         <Button {...(activeTab? {variant:"primary", tone:"success" } : {})} onClick={() => {setBadgeActive(false); setIsHeader(true)}} size="slim">
                             <Box paddingBlockStart="05" paddingBlockEnd="05"> 
                                 <HorizontalStack gap="2">

@@ -80,27 +80,25 @@ function ResultsSummary() {
         fetchTestsSummary()
     },[testingRunHexId])
 
-    return (
-        loading ? <SpinnerCentered /> :   
-        <VerticalStack gap="5">
-            {fetchTests ? <div style={{margin : "auto"}}> <Spinner size="small" /> </div> : null}
-            <ButtonGroup segmented>
-                {severities.map((item,index)=> {
-                    return(
-                        <Button onClick={()=> setActiveTab(item)} key={index} pressed={item === activeTab}>
-                            <div style={{display: "flex", justifyContent: "center", width: "9.4vw"}}>
-                                <HorizontalStack gap="2">
-                                    <Text variant="bodyLg" fontWeight="medium">{item}</Text>
-                                    <Badge>{countIssues[item.toUpperCase()]?.toString()}</Badge>
-                                </HorizontalStack>
-                            </div>
-                        </Button>
-                    )
-                })}
-            </ButtonGroup>
-            <GridRows columns={1} items={groupedResults[activeTab]?.items} CardComponent={TestSuitesCard} />
-        </VerticalStack>
-    )
+    return loading ? <SpinnerCentered /> :   
+    <VerticalStack gap="5">
+        {fetchTests ? <div style={{margin : "auto"}}> <Spinner size="small" /> </div> : null}
+        <ButtonGroup variant="segmented">
+            {severities.map((item,index)=> {
+                return(
+                    <Button onClick={()=> setActiveTab(item)} key={index} pressed={item === activeTab}>
+                        <div style={{display: "flex", justifyContent: "center", width: "9.4vw"}}>
+                            <HorizontalStack gap="2">
+                                <Text variant="bodyLg" fontWeight="medium">{item}</Text>
+                                <Badge>{countIssues[item.toUpperCase()]?.toString()}</Badge>
+                            </HorizontalStack>
+                        </div>
+                    </Button>
+                )
+            })}
+        </ButtonGroup>
+        <GridRows columns={1} items={groupedResults[activeTab]?.items} CardComponent={TestSuitesCard} />
+    </VerticalStack>;
 }
 
 export default ResultsSummary

@@ -106,7 +106,7 @@ const Logs = () => {
                     initial="Dashboard"
                     selected={handleSelectLogGroup}
                     />
-                <ButtonGroup segmented>
+                <ButtonGroup variant="segmented">
                     <Button onClick={handleRefresh} disabled={!logGroupSelected}>Refresh</Button>
                     <Button onClick={handlePreviousFiveMinutesLogs} disabled={!logGroupSelected}>-5 minutes</Button>
                 </ButtonGroup>
@@ -122,7 +122,7 @@ const Logs = () => {
             }
 
         </LegacyCard>
-    )
+    );
 }
 
 export default Logs

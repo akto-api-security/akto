@@ -239,10 +239,10 @@ function About() {
     }
 
     function ToggleComponent({text,onToggle,initial}){
-        return(
+        return (
             <VerticalStack gap={1}>
                 <Text color="subdued">{text}</Text>
-                <ButtonGroup segmented>
+                <ButtonGroup variant="segmented">
                     <Button size="slim" onClick={() => onToggle(true)} pressed={initial === true}>
                         True
                     </Button>
@@ -251,7 +251,7 @@ function About() {
                     </Button>
                 </ButtonGroup>
             </VerticalStack>
-        )
+        );
     }
 
 
