@@ -14,11 +14,14 @@ function AddOnComponenet() {
                     </Text>
                 </VerticalStack>
                 <Box paddingBlockStart={3}>
-                    <Button primary onClick={
-                        () => {
-                        window.open("https://calendly.com/ankita-akto/akto-demo", "_blank");
+                    <Button
+
+                        onClick={
+                            () => {
+                            window.open("https://calendly.com/ankita-akto/akto-demo", "_blank");
+                        }
                     }
-                }>
+                        variant="primary">
                     Contact Us
                 </Button>
                 </Box>

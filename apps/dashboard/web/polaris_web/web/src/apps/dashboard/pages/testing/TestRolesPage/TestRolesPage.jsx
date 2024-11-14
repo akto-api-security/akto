@@ -93,7 +93,7 @@ function TestRolesPage(){
     return (
         <PageWithMultipleCards
         title={"Test roles"}
-        primaryAction = {<Button primary onClick={handleRedirect}><div data-testid="new_test_role_button">Create new test role</div></Button>}
+        primaryAction = {<Button  onClick={handleRedirect} variant="primary"><div data-testid="new_test_role_button">Create new test role</div></Button>}
         isFirstPage={true}
         components={[
             showEmptyScreen ? 
@@ -119,7 +119,7 @@ function TestRolesPage(){
                 />
         ]}
         />
-    )
+    );
 }
 
 export default TestRolesPage

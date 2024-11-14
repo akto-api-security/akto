@@ -119,7 +119,7 @@ const TestEditor = () => {
     const headerComp = (
         <div className="header-css">
             <HorizontalStack gap="5">
-                <Button onClick={handleExit} icon={ExitMajor} plain/>
+                <Button onClick={handleExit} icon={ExitMajor}  variant="plain" />
                 <HorizontalStack gap={"2"}>
                     <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={"Test Editor"} />
                 </HorizontalStack>

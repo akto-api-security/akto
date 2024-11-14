@@ -112,11 +112,14 @@ function WorkflowTests({ apiCollectionId, endpointsList }) {
             <LegacyCard.Header 
             title={
                 <ButtonGroup>
-                    <Button icon={MobileBackArrowMajor} plain onClick={() => {
-                            setShowWorkflowbuilder(false)
-                            setWorkflowTest(null)
-                        }}
-                    />
+                    <Button
+                        icon={MobileBackArrowMajor}
+
+                        onClick={() => {
+                                setShowWorkflowbuilder(false)
+                                setWorkflowTest(null)
+                            }}
+                        variant="plain" />
                     <Text variant="headingMd">
                         { workflowTest ? workflowTest.id : "Create workflow" }
                     </Text>

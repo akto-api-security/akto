@@ -549,7 +549,7 @@ const runningTestsComp = useMemo(() => (
               </Text>
             </Badge>
             )}
-            <Button plain monochrome onClick={() => fetchData(true)}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
+            <Button   onClick={() => fetchData(true)} variant="monochromePlain"><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
         </HorizontalStack>
         <HorizontalStack gap={"2"}>
           <HorizontalStack gap={"1"}>
@@ -597,21 +597,22 @@ const runningTestsComp = useMemo(() => (
     </Popover>
   )
 
-  return (
-    <>
-      <PageWithMultipleCards
-        title={headingComp}
-        backUrl={`/dashboard/testing/`}
-        primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() => 
+  return <>
+    <PageWithMultipleCards
+      title={headingComp}
+      backUrl={`/dashboard/testing/`}
+      primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button
+
+        onClick={() => 
           func.downloadAsCSV((testRunResultsText[selectedTab]), selectedTestRun)
-          }>Export results</Button></Box>: undefined}
-        secondaryActions={!workflowTest ? moreActionsComp: undefined}
-        components={useComponents}
-      />
-      <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false}/>
-      {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
-    </>
-  );
+          }
+        variant="primary">Export results</Button></Box>: undefined}
+      secondaryActions={!workflowTest ? moreActionsComp: undefined}
+      components={useComponents}
+    />
+    <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false}/>
+    {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
+  </>;
 }
 
 export default SingleTestRunPage

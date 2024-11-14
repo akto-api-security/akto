@@ -8,16 +8,16 @@ function JsonComponent({dataString, onClickFunc, title, toolTipContent, language
   let data = {message:dataString}
 
   return (
-    <VerticalStack gap="1">  
-        <div className='copyRequest'>
-            <Text>{title}</Text>
-            <Tooltip dismissOnMouseOut preferredPosition='above' content={toolTipContent}>
-                <Button icon={ClipboardMinor} plain  onClick={() => onClickFunc()}/>
-            </Tooltip>
-        </div>
-        <SampleData data={data} language={language} minHeight={minHeight}/>
-    </VerticalStack>
-  )
+      <VerticalStack gap="1">  
+          <div className='copyRequest'>
+              <Text>{title}</Text>
+              <Tooltip dismissOnMouseOut preferredPosition='above' content={toolTipContent}>
+                  <Button icon={ClipboardMinor}  onClick={() => onClickFunc()} variant="plain" />
+              </Tooltip>
+          </div>
+          <SampleData data={data} language={language} minHeight={minHeight}/>
+      </VerticalStack>
+  );
 }
 
 export default JsonComponent

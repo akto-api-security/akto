@@ -87,7 +87,12 @@ function InitialSteps({initialSteps}) {
                             <Text variant="bodyMd" color={isCompleted(step.id) ? 'subdued' : ''} fontWeight={isCompleted(step.id) ? "" : 'medium'}>
                                 {step.title}
                             </Text>
-                            <Button plain monochrome icon={index === dropdownActive ? ChevronUpMinor : ChevronDownMinor} onClick={()=> expandContent(index)} />        
+                            <Button
+
+
+                                icon={index === dropdownActive ? ChevronUpMinor : ChevronDownMinor}
+                                onClick={()=> expandContent(index)}
+                                variant="monochromePlain" />        
                         </HorizontalStack>
                     </Box>
                 </HorizontalStack>
@@ -97,7 +102,7 @@ function InitialSteps({initialSteps}) {
                             <Text variant="bodyMd">{step.text}</Text>
                         <HorizontalStack gap={2}>
                             <Button onClick={()=> navigate(step.url)} size="slim">Configure now</Button>
-                            <Button plain onClick={()=> markAsComplete(step.id)} size="slim">Skip step</Button>
+                            <Button  onClick={()=> markAsComplete(step.id)} size="slim" variant="plain">Skip step</Button>
                         </HorizontalStack>
                         <br/>
                     </VerticalStack>

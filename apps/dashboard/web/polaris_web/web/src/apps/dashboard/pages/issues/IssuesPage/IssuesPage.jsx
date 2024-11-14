@@ -442,41 +442,43 @@ function IssuesPage() {
         </>
     )
     
-    return (
-        <>
-        <PageWithMultipleCards
-            title={
-                <HorizontalStack gap={4}>
-                    <TitleWithInfo
-                        titleText={"Issues"}
-                        tooltipContent={"Issues are created when a test from test library has passed validation and thus a potential vulnerability is found."}
-                    />
-                </HorizontalStack>
-            }
-            isFirstPage={true}
-            components = {loading ? [<SpinnerCentered />] : [
-                showEmptyScreen ? 
-                <EmptyScreensLayout key={"emptyScreen"}
-                    iconSrc={"/public/alert_hexagon.svg"}
-                    headingText={"No issues yet!"}
-                    description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
-                    buttonText={"Run test"}
-                    infoItems={infoItems}
-                    infoTitle={"Once you have issues:"}
-                    learnText={"issues"}
-                    docsUrl={ISSUES_PAGE_DOCS_URL}
-                    bodyComponent={<SelectCollectionComponent />}
+    return <>
+    <PageWithMultipleCards
+        title={
+            <HorizontalStack gap={4}>
+                <TitleWithInfo
+                    titleText={"Issues"}
+                    tooltipContent={"Issues are created when a test from test library has passed validation and thus a potential vulnerability is found."}
                 />
+            </HorizontalStack>
+        }
+        isFirstPage={true}
+        components = {loading ? [<SpinnerCentered />] : [
+            showEmptyScreen ? 
+            <EmptyScreensLayout key={"emptyScreen"}
+                iconSrc={"/public/alert_hexagon.svg"}
+                headingText={"No issues yet!"}
+                description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
+                buttonText={"Run test"}
+                infoItems={infoItems}
+                infoTitle={"Once you have issues:"}
+                learnText={"issues"}
+                docsUrl={ISSUES_PAGE_DOCS_URL}
+                bodyComponent={<SelectCollectionComponent />}
+            />
 
-            
-            : components
-            ]}
-            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export results</Button>}
-            secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
-        />
-            {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
-        </>
-    )
+        
+        : components
+        ]}
+        primaryAction={<Button
+
+            onClick={() => openVulnerabilityReport()}
+            disabled={showEmptyScreen}
+            variant="primary">Export results</Button>}
+        secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+    />
+        {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
+    </>;
 }
 
 export default IssuesPage

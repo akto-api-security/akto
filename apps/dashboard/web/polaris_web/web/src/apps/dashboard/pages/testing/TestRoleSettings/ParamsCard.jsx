@@ -69,11 +69,11 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
                 </VerticalStack>
                 <HorizontalStack gap={"2"} align="end">
                     <Button size="slim" onClick={handleDelete} icon={DeleteMajor}><div data-testid="delete_button">Delete</div></Button>
-                    {authMechanism?.type?.toLowerCase() === 'hardcoded' ? <Button size="slim" primary onClick={() => showEdit()}>Edit</Button> : null}
+                    {authMechanism?.type?.toLowerCase() === 'hardcoded' ? <Button size="slim"  onClick={() => showEdit()} variant="primary">Edit</Button> : null}
                 </HorizontalStack>
             </VerticalStack>
         </Box>
-    )
+    );
 }
 
 export default ParamsCard

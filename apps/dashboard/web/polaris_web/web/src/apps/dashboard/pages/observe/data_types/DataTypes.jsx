@@ -275,11 +275,11 @@ function DataTypes() {
               </Text>
               <HorizontalStack gap={2}>
                 {displayIcons.map((icon, index) => {
-                  return(
+                  return (
                     <div className="tag-button" key={index}>
-                      <Button monochrome icon={icon} onClick={() => handleChange({iconString: icon})} pressed={(currState?.iconString === icon || currState?.iconString === icon?.displayName)} />
+                      <Button  icon={icon} onClick={() => handleChange({iconString: icon})} pressed={(currState?.iconString === icon || currState?.iconString === icon?.displayName)} />
                     </div>
-                  )
+                  );
                 })}
                 
               </HorizontalStack>

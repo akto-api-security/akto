@@ -63,14 +63,14 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
                                 <Tag>
                                     <HorizontalStack gap={1}>
                                         <Text variant="bodyMd" fontWeight="medium">{files.name}</Text>
-                                        <Button onClick={() => setFiles(null)} plain icon={CancelMajor} />
+                                        <Button onClick={() => setFiles(null)}  icon={CancelMajor} variant="plain" />
                                     </HorizontalStack>
                                 </Tag>
                             : <Text variant="bodyLg" fontWeight="medium" color="subdued">{"Drop your " + certificateName + " file here."}</Text>}
                             <FileUpload fileType="file" acceptString=".xml" setSelectedFile={setFilesCheck} allowMultiple={false} />
                         </HorizontalStack>
                         <HorizontalStack align="end">
-                            <Button submit primary size="medium">Submit</Button>
+                            <Button submit  size="medium" variant="primary">Submit</Button>
                         </HorizontalStack>
                     </VerticalStack>
                 </FormLayout>

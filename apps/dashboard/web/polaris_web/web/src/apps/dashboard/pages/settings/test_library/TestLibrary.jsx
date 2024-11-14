@@ -181,7 +181,6 @@ function TestLibrary() {
     const components = [titleComp, bodyComp]
 
     return (
-
         <PageWithMultipleCards
             components={components}
             title={
@@ -189,11 +188,11 @@ function TestLibrary() {
                     Test library
                 </Text>
             }
-            primaryAction={<Button primary onClick={showAddTestLibraryModal}>Add new test library</Button>}
+            primaryAction={<Button  onClick={showAddTestLibraryModal} variant="primary">Add new test library</Button>}
             isFirstPage={true}
             divider={true}
         />
-    )
+    );
 }
 
 export default TestLibrary;

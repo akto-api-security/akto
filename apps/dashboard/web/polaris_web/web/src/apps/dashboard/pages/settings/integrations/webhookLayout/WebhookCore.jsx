@@ -420,19 +420,16 @@ function WebhookCore(props) {
                     <Button onClick={handleDiscard} disabled={!hasChanges}>Discard</Button>
                     {webhookId ?
                         <Button
-                            primary
+
                             onClick={saveWebhook}
                             connectedDisclosure={{
                                 accessibilityLabel: 'Other save actions',
                                 actions: [{ content: 'Run once', onAction: () => runOnce() }],
                             }}
-                        >
+                            variant="primary">
                             Save
                         </Button>
-                        : <Button
-                            primary
-                            onClick={saveWebhook}
-                        >
+                        : <Button  onClick={saveWebhook} variant="primary">
                             Save
                         </Button>
                     }

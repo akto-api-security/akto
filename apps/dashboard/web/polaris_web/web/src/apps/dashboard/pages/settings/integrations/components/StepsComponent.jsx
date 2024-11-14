@@ -17,11 +17,16 @@ function StepsComponent({integrationSteps, onClickFunc, buttonActive}) {
                     )
                 })}
                 <HorizontalStack align="end">
-                    <Button primary size="medium" onClick={onClickFunc} disabled={!buttonActive}>Next</Button>
+                    <Button
+
+                        size="medium"
+                        onClick={onClickFunc}
+                        disabled={!buttonActive}
+                        variant="primary">Next</Button>
                 </HorizontalStack>
             </VerticalStack>
         </LegacyCard.Section>
-    )
+    );
 }
 
 export default StepsComponent

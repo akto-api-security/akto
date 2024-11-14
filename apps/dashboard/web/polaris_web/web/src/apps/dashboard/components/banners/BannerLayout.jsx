@@ -31,7 +31,7 @@ function BannerLayout({title, text, buttonText, buttonUrl, bodyComponent, videoT
                 {containerComp}
             </VerticalStack>
         </Card>
-    )
+    );
 }
 
 export default BannerLayout

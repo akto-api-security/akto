@@ -263,7 +263,7 @@ const primaryActions = (
     <HorizontalStack gap={"2"}>
         <Button id={"reset-data-type"} onClick={handleReset}>Reset</Button>
         <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
-        <Button id={"all-data-types"} primary onClick={() => setModal(!modal)}>Create API group</Button>
+        <Button id={"all-data-types"}  onClick={() => setModal(!modal)} variant="primary">Create API group</Button>
     </HorizontalStack>
 )
 

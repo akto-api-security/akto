@@ -22,9 +22,15 @@ function SignUpPageLayout({customComponent}) {
                   </VerticalStack>
                   <div style={{bottom: "40px", position: "absolute", width: '400px'}}>
                     <HorizontalStack gap={3} align="center">
-                      <Button plain onClick={() => window.open("https://www.akto.io/terms-and-policies","_blank")}>Terms of use</Button>
+                      <Button
+
+                        onClick={() => window.open("https://www.akto.io/terms-and-policies","_blank")}
+                        variant="plain">Terms of use</Button>
                       <div style={{width: '1px', height: '24px', background: "#E1E3E5"}} />
-                      <Button plain onClick={() => window.open("https://www.akto.io/terms/privacy","_blank")}>Privacy policy</Button>
+                      <Button
+
+                        onClick={() => window.open("https://www.akto.io/terms/privacy","_blank")}
+                        variant="plain">Privacy policy</Button>
                     </HorizontalStack>
                   </div>
                 </Box>

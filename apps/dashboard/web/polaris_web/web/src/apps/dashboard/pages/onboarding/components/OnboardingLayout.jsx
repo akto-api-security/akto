@@ -30,9 +30,9 @@ function OnboardingLayout({stepObj, requestStepChange, currentStep, skipOnboardi
                 <Box padding="2"/>
             </LegacyCard>
 
-            <Button plain onClick={() => skipOnboarding()} fullWidth>I'm a ninja!! I dont need onboarding.</Button>
+            <Button  onClick={() => skipOnboarding()} fullWidth variant="plain">I'm a ninja!! I dont need onboarding.</Button>
         </div>
-    )
+    );
 }
 
 export default OnboardingLayout

@@ -38,7 +38,7 @@ function FilterComponent() {
                 <Box padding={"2"}>
                     <HorizontalStack padding="2" align='space-between'>
                         Threat detection filter
-                        <Button plain monochrome removeUnderline onClick={onSave}>
+                        <Button   removeUnderline onClick={onSave} variant="monochromePlain">
                             Save
                         </Button>
                     </HorizontalStack>
@@ -72,7 +72,7 @@ function FilterComponent() {
                 <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="240px" readOnly={false} getEditorData={setData} />
             </LegacyCard.Section>
         </LegacyCard>
-    )
+    );
 
 }
 

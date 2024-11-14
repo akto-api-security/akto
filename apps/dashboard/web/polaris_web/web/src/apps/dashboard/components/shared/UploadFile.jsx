@@ -23,11 +23,11 @@ function UploadFile({ fileFormat, fileChanged, tooltipText, label, primary, plai
 
 
     return (
-        <Tooltip content={tooltipText}>
+        (<Tooltip content={tooltipText}>
             <Button 
                 // icon={UploadMajor} 
-                primary={primary !== undefined ? primary : true}
-                plain={plain === undefined ? true: plain}
+                {...((primary === undefined || primary === true) ? { variant: "primary" } : {})}
+                {...((plain === undefined || plain === true) ? { variant: "plain" } : {})}
                 monochrome removeUnderline
                 onClick={onPickFile}>
                 {label}
@@ -39,8 +39,8 @@ function UploadFile({ fileFormat, fileChanged, tooltipText, label, primary, plai
                     onChange={onFilePicked} 
                 />
             </Button>
-        </Tooltip>
-    )
+        </Tooltip>)
+    );
 }
 
 export default UploadFile

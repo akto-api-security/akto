@@ -222,7 +222,7 @@ function APIQuery() {
                             <HorizontalStack gap={4} align="start">
                                 <Button onClick={handleAddField}>Add condition</Button>
                                 {
-                                    conditions.length > 0 ? <Button plain destructive onClick={handleClearFunction}>Clear all</Button> : null
+                                    conditions.length > 0 ? <Button   onClick={handleClearFunction} variant="plain" tone="critical">Clear all</Button> : null
                                 }
                             </HorizontalStack>
                             <HorizontalStack gap={4} align="end">
@@ -270,11 +270,16 @@ function APIQuery() {
                     titleText={"Explore Mode"}
                 />
             }
-            primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={handleClick}>{primaryActionLabel}</Button>}
+            primaryAction={<Button
+                id={"explore-mode-query-page"}
+
+                secondaryActions
+                onClick={handleClick}
+                variant="primary">{primaryActionLabel}</Button>}
             components={components}
             backUrl="/dashboard/observe/inventory"
         />
-    )
+    );
 }
 
 export default APIQuery

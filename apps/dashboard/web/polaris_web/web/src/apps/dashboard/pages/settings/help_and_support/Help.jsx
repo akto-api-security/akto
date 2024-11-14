@@ -14,7 +14,10 @@ function Help() {
                     </Box>
                     <ButtonGroup>
                         <Button onClick={() => window.open("mailto:support@akto.io", "_blank")}>Mail us</Button>
-                        <Button plain onClick={() => window.Intercom && window.Intercom('show')}>Contact us</Button>
+                        <Button
+
+                            onClick={() => window.Intercom && window.Intercom('show')}
+                            variant="plain">Contact us</Button>
                     </ButtonGroup>
                 </VerticalStack>
                 <VerticalStack gap="4">

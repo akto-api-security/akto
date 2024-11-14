@@ -199,7 +199,7 @@ export default function Header() {
         <HorizontalStack gap={"4"}>
             {(Object.keys(currentTestsObj).length > 0 && currentTestsObj?.testRunsArr?.length !== 0 && currentTestsObj?.totalTestsCompleted > 0) ? 
             <HorizontalStack gap={"2"}>
-                <Button plain monochrome onClick={() => {handleTestingNavigate()}}>
+                <Button   onClick={() => {handleTestingNavigate()}} variant="monochromePlain">
                  <SemiCircleProgress key={"progress"} progress={progress} size={60} height={55} width={75}/>
                 </Button>
                 <VerticalStack gap={"0"}>

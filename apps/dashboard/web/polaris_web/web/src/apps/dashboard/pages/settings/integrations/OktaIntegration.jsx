@@ -83,7 +83,7 @@ function OktaIntegration() {
                                 value={oktaDomain}
                     />
                     <HorizontalStack align="end">
-                        <Button submit primary size="medium">Submit</Button>
+                        <Button submit  size="medium" variant="primary">Submit</Button>
                     </HorizontalStack>
                 </FormLayout>
             </Form>

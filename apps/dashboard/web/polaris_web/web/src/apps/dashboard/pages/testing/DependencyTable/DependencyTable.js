@@ -283,7 +283,7 @@ function DependencyTable() {
     }
 
     const secondaryActionsComponent = (
-        <Button onClick={invokeDependencyTable} primary  >
+        <Button onClick={invokeDependencyTable}  variant="primary">
             {invokeLoading ? <Spinner size="small" /> : "Invoke"}
         </Button>
     )

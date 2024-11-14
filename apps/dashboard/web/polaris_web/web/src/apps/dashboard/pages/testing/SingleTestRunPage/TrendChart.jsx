@@ -304,7 +304,12 @@ function TrendChart(props) {
             <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
                 <HorizontalStack align="space-between">
                     <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
-                    <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
+                    <Button
+
+
+                        icon={iconSource}
+                        onClick={() => setCollapsible(!collapsible)}
+                        variant="monochromePlain" />
                 </HorizontalStack>
                 <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
                     <Box paddingBlockStart={3}><Divider/></Box>
@@ -344,7 +349,7 @@ function TrendChart(props) {
                 <SummaryTable setSummary={setSummary} testingRunResultSummaries={testingRunResultSummaries} />
             </LegacyCard.Section>
         </LegacyCard>
-    )
+    );
 
 }
 

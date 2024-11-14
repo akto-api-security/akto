@@ -168,9 +168,14 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                     />
 
                     <Box>
-                        <Button id={"create-custom-test-button"}
-                            plain monochrome onClick={()=> toggleFunc("CUSTOM")} removeUnderline fullWidth
-                        >
+                        <Button
+                            id={"create-custom-test-button"}
+
+
+                            onClick={()=> toggleFunc("CUSTOM")}
+                            removeUnderline
+                            fullWidth
+                            variant="monochromePlain">
                             <HorizontalStack align="space-between">
                                 <HorizontalStack gap={"1"}>
                                     <Box>
@@ -194,7 +199,13 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                         {showCustom ? <Navigation.Section items={getItems(customItems.items)} /> : null}
                     </Box>
                     <Box>
-                        <Button plain monochrome onClick={() => toggleFunc("Akto")} removeUnderline fullWidth>
+                        <Button
+
+
+                            onClick={() => toggleFunc("Akto")}
+                            removeUnderline
+                            fullWidth
+                            variant="monochromePlain">
                             <HorizontalStack align="space-between">
                                 <HorizontalStack gap="1">
                                     <Box>

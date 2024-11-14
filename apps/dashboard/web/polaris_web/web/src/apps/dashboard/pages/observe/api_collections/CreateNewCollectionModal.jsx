@@ -103,83 +103,90 @@ function CreateNewCollectionModal(props) {
         }
     }
 
-    return (<Modal
-        large
-        key="modal"
-        activator={createCollectionModalActivatorRef}
-        open={active}
-        onClose={() => setActive(false)}
-        title="New collection"
-        primaryAction={{
-            id: "create-new-collection",
-            content: 'Create',
-            onAction: createNewCollection,
-            disabled: isCreateButtonDisabled
-        }}
-        secondaryActions={showApiSelector ? [{
-            id: "verify-new-collection",
-                content: 'Verify',
-                onAction: VerifyConditions,
-        }] : []}
-    >
-        <Modal.Section>
-            <VerticalStack gap={3}>
-                <TextField
-                    id={"new-collection-input"}
-                    label="Name"
-                    value={newCollectionName}
-                    onChange={handleNewCollectionNameChange}
-                    autoComplete="off"
-                    maxLength="24"
-                    suffix={(
-                        <Text>{newCollectionName.length}/24</Text>
-                    )}
-                    autoFocus
-                />
-                <span>
-                    <Button plain onClick={() => setShowApiSelector(!showApiSelector)}>
-                        {showApiSelector ? "Create empty collection" : "Add endpoints"}
-                    </Button>
-                </span>
-                {
-                    ApiCountComponent()
-                }
-                {
-                    showApiSelector ? <Card background="bg-subdued">
-                        <VerticalStack gap={2}>
-                            {
-                                conditions.length > 0 && conditions.map((condition, index) => (
-                                    <CollectionComponent
-                                        condition={condition}
-                                        index={index}
-                                        dispatch={dispatchConditions}
-                                        operatorComponent={<OperatorDropdown
-                                            items={[{
-                                                label: 'OR',
-                                                value: 'OR',
-                                            },
-                                            {
-                                                label: 'AND',
-                                                value: 'AND'
-                                            }]}
-                                            label={condition.operator}
-                                            selected={(value) => {
-                                                dispatchConditions({ type: "updateKey", index: index, key: "operator", obj: value })
-                                            }} />}
-                                    />
-                                ))
-                            }
-                        <HorizontalStack gap={4} align="start">
-                            <Button onClick={() => handleAddField()}>Add condition</Button>
-                            <Button plain destructive onClick={() => dispatchConditions({ type: "clear" })}>Clear all</Button>
-                        </HorizontalStack>
-                        </VerticalStack>
-                    </Card> : null
-                }
-            </VerticalStack>
-        </Modal.Section>
+    return (
+        <Modal
+            large
+            key="modal"
+            activator={createCollectionModalActivatorRef}
+            open={active}
+            onClose={() => setActive(false)}
+            title="New collection"
+            primaryAction={{
+                id: "create-new-collection",
+                content: 'Create',
+                onAction: createNewCollection,
+                disabled: isCreateButtonDisabled
+            }}
+            secondaryActions={showApiSelector ? [{
+                id: "verify-new-collection",
+                    content: 'Verify',
+                    onAction: VerifyConditions,
+            }] : []}
+        >
+            <Modal.Section>
+                <VerticalStack gap={3}>
+                    <TextField
+                        id={"new-collection-input"}
+                        label="Name"
+                        value={newCollectionName}
+                        onChange={handleNewCollectionNameChange}
+                        autoComplete="off"
+                        maxLength="24"
+                        suffix={(
+                            <Text>{newCollectionName.length}/24</Text>
+                        )}
+                        autoFocus
+                    />
+                    <span>
+                        <Button  onClick={() => setShowApiSelector(!showApiSelector)} variant="plain">
+                            {showApiSelector ? "Create empty collection" : "Add endpoints"}
+                        </Button>
+                    </span>
+                    {
+                        ApiCountComponent()
+                    }
+                    {
+                        showApiSelector ? <Card background="bg-subdued">
+                            <VerticalStack gap={2}>
+                                {
+                                    conditions.length > 0 && conditions.map((condition, index) => (
+                                        <CollectionComponent
+                                            condition={condition}
+                                            index={index}
+                                            dispatch={dispatchConditions}
+                                            operatorComponent={<OperatorDropdown
+                                                items={[{
+                                                    label: 'OR',
+                                                    value: 'OR',
+                                                },
+                                                {
+                                                    label: 'AND',
+                                                    value: 'AND'
+                                                }]}
+                                                label={condition.operator}
+                                                selected={(value) => {
+                                                    dispatchConditions({ type: "updateKey", index: index, key: "operator", obj: value })
+                                                }} />}
+                                        />
+                                    ))
+                                }
+                            <HorizontalStack gap={4} align="start">
+                                <Button onClick={() => handleAddField()}>Add condition</Button>
+                                <Button
 
-    </Modal>)
+
+                                    onClick={() => dispatchConditions({ type: "clear" })}
+                                    variant="plain"
+                                    tone="critical">Clear all</Button>
+                            </HorizontalStack>
+                            </VerticalStack>
+                        </Card> : null
+                    }
+                </VerticalStack>
+            </Modal.Section>
+
+        </Modal>
+    );
 
 }
 

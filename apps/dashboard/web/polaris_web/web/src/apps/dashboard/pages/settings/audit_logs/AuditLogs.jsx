@@ -158,12 +158,12 @@ const AuditLogs = () => {
                     titleText={"Audit logs"} 
                 />
             }
-            primaryAction={<Button loading={loading} primary onClick={exportAuditLogsCSV}>Export as CSV</Button>}
+            primaryAction={<Button loading={loading}  onClick={exportAuditLogsCSV} variant="primary">Export as CSV</Button>}
             secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
             isFirstPage={true}
             components={[auditLogsTable]}
         />
-    )
+    );
 }
 
 export default AuditLogs

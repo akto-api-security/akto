@@ -150,7 +150,7 @@ function OpenApiSource() {
                 {files ?
                     <Badge size='medium' tone='success'>
                         {files.name}
-                        <Button icon={CancelMajor} plain onClick={() => setFiles(null)} />
+                        <Button icon={CancelMajor}  onClick={() => setFiles(null)} variant="plain" />
                     </Badge>
                     : null}
                 File: <FileUpload
@@ -163,11 +163,12 @@ function OpenApiSource() {
 
             <VerticalStack gap="2">
                 <ButtonGroup>
-                    <Button 
-                    onClick={uploadFile} 
-                    primary 
-                    disabled={files === null} 
-                    loading={loading}>
+                    <Button
+                        onClick={uploadFile}
+
+                        disabled={files === null}
+                        loading={loading}
+                        variant="primary">
                         Upload
                     </Button>
                     <Button onClick={goToDocs}>Go to docs</Button>

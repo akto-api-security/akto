@@ -250,14 +250,19 @@ function ApiDetails(props) {
                 />
                 <Box>
                     <Tooltip content="Open URL in test editor" dismissOnMouseOut>
-                        <Button monochrome onClick={() => openTest()} icon={FileMinor} />
+                        <Button  onClick={() => openTest()} icon={FileMinor} />
                     </Tooltip>
                 </Box>
                 {
                     isGptActive || isDemergingActive ? <Popover
                         active={showMoreActions}
                         activator={
-                            <Tooltip content="More actions" dismissOnMouseOut ><Button plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowMoreActions(!showMoreActions)} /></Tooltip>
+                            <Tooltip content="More actions" dismissOnMouseOut ><Button
+
+
+                                icon={HorizontalDotsMinor}
+                                onClick={() => setShowMoreActions(!showMoreActions)}
+                                variant="monochromePlain" /></Tooltip>
                         }
                         autofocusTarget="first-node"
                         onClose={() => setShowMoreActions(false)}
@@ -265,8 +270,20 @@ function ApiDetails(props) {
                         <Popover.Pane fixed>
                             <Popover.Section>
                                 <VerticalStack gap={"2"}>
-                                    {isGptActive ? <Button plain monochrome removeUnderline onClick={displayGPT} size="slim">Ask AktoGPT</Button> : null}
-                                    {isDemergingActive ? <Button plain monochrome removeUnderline size="slim" onClick={deMergeApis}>De merge</Button> : null}
+                                    {isGptActive ? <Button
+
+
+                                        removeUnderline
+                                        onClick={displayGPT}
+                                        size="slim"
+                                        variant="monochromePlain">Ask AktoGPT</Button> : null}
+                                    {isDemergingActive ? <Button
+
+
+                                        removeUnderline
+                                        size="slim"
+                                        onClick={deMergeApis}
+                                        variant="monochromePlain">De merge</Button> : null}
                                 </VerticalStack>
                             </Popover.Section>
                         </Popover.Pane>

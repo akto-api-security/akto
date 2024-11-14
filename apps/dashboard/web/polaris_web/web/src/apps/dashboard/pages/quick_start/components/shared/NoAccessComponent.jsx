@@ -20,7 +20,7 @@ function NoAccessComponent({steps , dataString, onClickFunc, toolTipContent, tit
                     </HorizontalStack>
                 </VerticalStack>
             ))}
-            <span>6. Click <Button plain onClick={() => navigate(0)}>here</Button> to refresh.</span>
+            <span>6. Click <Button  onClick={() => navigate(0)} variant="plain">here</Button> to refresh.</span>
         </VerticalStack>
     )
 

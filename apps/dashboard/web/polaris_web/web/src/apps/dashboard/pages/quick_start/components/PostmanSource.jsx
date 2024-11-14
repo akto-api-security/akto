@@ -135,7 +135,7 @@ function PostmanSource() {
                     {files ? 
                         <Badge size='medium' tone='success'>
                             {files.name}
-                            <Button icon={CancelMajor} plain onClick={() => setFiles(null)} />
+                            <Button icon={CancelMajor}  onClick={() => setFiles(null)} variant="plain" />
                         </Badge> 
                     : null}
                     <FileUpload fileType="file" acceptString=".json" setSelectedFile={setFilesCheck} allowMultiple={false} allowedSize={20*1024*1024}/>
@@ -317,14 +317,22 @@ function PostmanSource() {
             <VerticalStack gap="2">
                 <Checkbox label="Allow Akto to replay API requests if responses are not found." checked={allowResponses} onChange={toggleResponse} />
                 <ButtonGroup>
-                    <Button onClick={primaryAction} primary disabled={!buttonActive} loading={loading}>{primaryText}</Button>
+                    <Button
+                        onClick={primaryAction}
+
+                        disabled={!buttonActive}
+                        loading={loading}
+                        variant="primary">{primaryText}</Button>
                     <Button onClick={goToDocs}>Go to docs</Button>
                 </ButtonGroup>
                 <ButtonGroup>
-                    <Button plain onClick={(event) => { 
-                                event.stopPropagation(); 
-                                window.open('https://docs.akto.io/traffic-connections/traffic-data-sources/postman#troubleshooting-guide')
-                            }}>postman trouble-shooting guide</Button>
+                    <Button
+
+                        onClick={(event) => { 
+                                    event.stopPropagation(); 
+                                    window.open('https://docs.akto.io/traffic-connections/traffic-data-sources/postman#troubleshooting-guide')
+                                }}
+                        variant="plain">postman trouble-shooting guide</Button>
                 </ButtonGroup>
             </VerticalStack>
             <Modal
@@ -354,7 +362,7 @@ function PostmanSource() {
                 </Modal.Section>
             </Modal>
         </div>
-    )
+    );
 }
 
 export default PostmanSource

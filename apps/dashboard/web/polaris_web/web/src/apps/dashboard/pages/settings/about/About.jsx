@@ -344,13 +344,17 @@ function About() {
             <Scrollable horizontal={false} style={{maxHeight: '100px'}} shadow>
                 <VerticalStack gap={1}>
                     {Object.keys(trafficFiltersMap).map((key)=> {
-                        return(
+                        return (
                             <HorizontalGrid gap={2} columns={3} key={key}>
                                 <TooltipText textProps={{variant:"bodyMd", fontWeight:"medium"}} tooltip={key} text={key}/>
                                 <TooltipText textProps={{variant:"bodyMd", color: "subdued"}} tooltip={trafficFiltersMap[key]} text={trafficFiltersMap[key]}/>
-                                <Button plain icon={DeleteMajor} onClick={() => deleteFilterHeader(key)}/>
+                                <Button
+
+                                    icon={DeleteMajor}
+                                    onClick={() => deleteFilterHeader(key)}
+                                    variant="plain" />
                             </HorizontalGrid>
-                        )
+                        );
                     })}
                 </VerticalStack>
             </Scrollable>
@@ -371,7 +375,7 @@ function About() {
                     value={headerValue}
                     setValue={setHeaderValue}
                 />
-            {checkSaveActive('filterHeader') ? <Box paddingBlockStart={5} width="100px"><Button onClick={saveFilterHeader} size="medium" primary>Save</Button></Box> : null}
+            {checkSaveActive('filterHeader') ? <Box paddingBlockStart={5} width="100px"><Button onClick={saveFilterHeader} size="medium"  variant="primary">Save</Button></Box> : null}
             </HorizontalGrid>
         </VerticalStack>
     )
@@ -385,13 +389,17 @@ function About() {
                         const { headerName, newName, regex } = apiCollectionNameMapper[key]
                         const headerLine = headerName + "=" + regex
 
-                        return(
+                        return (
                             <HorizontalGrid gap={2} columns={3} key={key}>
                                 <TooltipText textProps={{variant:"bodyMd", fontWeight:"medium"}} tooltip={headerLine} text={headerLine}/>
                                 <TooltipText textProps={{variant:"bodyMd", color: "subdued"}} tooltip={newName} text={newName}/>
-                                <Button plain icon={DeleteMajor} onClick={() => deleteApiCollectionNameMapper(regex)}/>
+                                <Button
+
+                                    icon={DeleteMajor}
+                                    onClick={() => deleteApiCollectionNameMapper(regex)}
+                                    variant="plain" />
                             </HorizontalGrid>
-                        )
+                        );
                     })}
                 </VerticalStack>
             </Scrollable>
@@ -420,7 +428,7 @@ function About() {
                     value={replaceNewCollectionName}
                     setValue={setReplaceNewCollectionName}
                 />
-            {checkSaveActive('replaceCollection') ? <Box paddingBlockStart={5} width="100px"><Button onClick={addApiCollectionNameMapper} size="medium" primary>Save</Button></Box> : null}
+            {checkSaveActive('replaceCollection') ? <Box paddingBlockStart={5} width="100px"><Button onClick={addApiCollectionNameMapper} size="medium"  variant="primary">Save</Button></Box> : null}
             </HorizontalGrid>
         </VerticalStack>
     )

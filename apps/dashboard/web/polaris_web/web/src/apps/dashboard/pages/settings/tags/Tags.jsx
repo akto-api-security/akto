@@ -79,7 +79,7 @@ function Tags(){
     return (
         <PageWithMultipleCards
         title={"Tags"}
-        primaryAction={<Button primary onClick={handleRedirect}>Create new tags</Button>}
+        primaryAction={<Button  onClick={handleRedirect} variant="primary">Create new tags</Button>}
         isFirstPage={true}
         components={[
 
@@ -106,7 +106,7 @@ function Tags(){
             />
         ]}
     />
-    )
+    );
 }
 
 export default Tags

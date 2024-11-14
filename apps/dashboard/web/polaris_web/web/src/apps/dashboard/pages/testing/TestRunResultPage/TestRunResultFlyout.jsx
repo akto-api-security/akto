@@ -174,7 +174,7 @@ function TestRunResultFlyout(props) {
                 <VerticalStack gap={"2"}>
                     <Box width="100%">
                         <div style={{display: 'flex', gap: '4px'}} className='test-title'>
-                            <Button removeUnderline plain monochrome onClick={() => openTest()}>
+                            <Button removeUnderline   onClick={() => openTest()} variant="monochromePlain">
                                 <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
                             </Button>
                             {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}>
@@ -192,7 +192,12 @@ function TestRunResultFlyout(props) {
 
                     {selectedTestRunResult && selectedTestRunResult.vulnerable && 
                         <Modal
-                            activator={<Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button>}
+                            activator={<Button
+                                id={"create-jira-ticket-button"}
+
+                                onClick={handleJiraClick}
+                                disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}
+                                variant="primary">Create Jira Ticket</Button>}
                             open={modalActive}
                             onClose={() => setModalActive(false)}
                             size="small"
@@ -320,7 +325,7 @@ function TestRunResultFlyout(props) {
                         {
                             getDescriptionText(fullDescription) 
                         }
-                        <Button plain onClick={() => setFullDescription(!fullDescription)}> {fullDescription ? "Less" : "More"} information</Button>
+                        <Button  onClick={() => setFullDescription(!fullDescription)} variant="plain"> {fullDescription ? "Less" : "More"} information</Button>
                     </Box>
                 </VerticalStack>
                 <Divider />

@@ -27,7 +27,7 @@ function FlyLayout(props) {
                                         {title}
                                     </Text>
                                 }
-                                <Button icon={CancelMajor} onClick={() => { handleExit()}} plain></Button>
+                                <Button icon={CancelMajor} onClick={() => { handleExit()}}  variant="plain"></Button>
                             </HorizontalStack>
                         </Box>
                         <Scrollable style={{ height: "92vh" }} shadow>
@@ -59,7 +59,7 @@ function FlyLayout(props) {
                 </Box>      
             </div>
         </div>
-    )
+    );
 }
 
 export default FlyLayout

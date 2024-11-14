@@ -222,9 +222,14 @@ const SampleApi = () => {
 
     const resultComponent = (
         <Box background={getColor()} width="100%" padding={"2"}>
-            <Button id={"test-results"} removeUnderline monochrome plain 
-            onClick={testResult ? showResults : () => {}}
-            icon={testResult ? ChevronUpMinor : undefined}>
+            <Button
+                id={"test-results"}
+                removeUnderline
+
+
+                onClick={testResult ? showResults : () => {}}
+                icon={testResult ? ChevronUpMinor : undefined}
+                variant="monochromePlain">
                 {getResultDescription()}
             </Button>
         </Box>
@@ -245,7 +250,13 @@ const SampleApi = () => {
                             </Tooltip>
                         </Box>
                     </Button>
-                    <Button id={"run-test"} loading={loading} primary onClick={runTest} size="slim">Run Test</Button>
+                    <Button
+                        id={"run-test"}
+                        loading={loading}
+
+                        onClick={runTest}
+                        size="slim"
+                        variant="primary">Run Test</Button>
                 </HorizontalStack>
             </div>
 
@@ -314,7 +325,7 @@ const SampleApi = () => {
                 </Modal.Section>
             </Modal>
         </div>
-    )
+    );
 }
 
 export default SampleApi

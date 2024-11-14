@@ -33,7 +33,12 @@ function Jira() {
         >
             <VerticalStack gap={"4"}>
                 <Box>
-                    <Button plain monochrome removeUnderline onClick={() => setCollapsibleOpen(!collapsibleOpen)}>
+                    <Button
+
+
+                        removeUnderline
+                        onClick={() => setCollapsibleOpen(!collapsibleOpen)}
+                        variant="monochromePlain">
                         <HorizontalStack gap={"4"}>
                             <Text variant="headingSm">Found {Object.keys(projectIssueMap).length} projects out of {projId.split(',').length}</Text>
                             <Box><Icon source={collapsibleOpen ? ChevronUpMinor : ChevronDownMinor} /></Box>

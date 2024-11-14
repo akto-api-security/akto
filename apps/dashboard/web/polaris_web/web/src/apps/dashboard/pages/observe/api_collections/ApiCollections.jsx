@@ -566,7 +566,7 @@ function ApiCollections() {
             >
                 <Popover.Pane fixed>
                     <Popover.Section>
-                        <Button plain monochrome onClick={() =>exportCsv()} removeUnderline>
+                        <Button   onClick={() =>exportCsv()} removeUnderline variant="monochromePlain">
                             <HorizontalStack gap={"2"}>
                                 <Box><Icon source={FileMinor} /></Box>
                                 <Text>Export as CSV</Text>
@@ -574,7 +574,12 @@ function ApiCollections() {
                         </Button>
                         </Popover.Section>
                     <Popover.Section>
-                        <Button plain monochrome onClick={() => setTreeView(!treeView)} removeUnderline>
+                        <Button
+
+
+                            onClick={() => setTreeView(!treeView)}
+                            removeUnderline
+                            variant="monochromePlain">
                             <HorizontalStack gap={"2"}>
                                 <Box><Icon source={treeView ? HideMinor : ViewMinor} /></Box>
                                 <Text>{treeView ? "Hide tree view": "Display tree view"}</Text>
@@ -625,7 +630,7 @@ function ApiCollections() {
 
     const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
 
-    return(
+    return (
         <PageWithMultipleCards
             title={
                 <TitleWithInfo 
@@ -634,12 +639,17 @@ function ApiCollections() {
                     docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                 />
             }
-            primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
+            primaryAction={<Button
+                id={"explore-mode-query-page"}
+
+                secondaryActions
+                onClick={navigateToQueryPage}
+                variant="primary">Explore mode</Button>}
             isFirstPage={true}
             components={components}
             secondaryActions={secondaryActionsComp}
         />
-    )
+    );
 }
 
 export default ApiCollections 

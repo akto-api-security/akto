@@ -166,7 +166,10 @@ function SignUp() {
       small
       activator={
         <div style={{textAlign: 'end'}}>
-          <Button plain onClick={() => setForgotPasswordStateHelper("isForgotPasswordActive", true)}>Forgot Password?</Button>
+          <Button
+
+            onClick={() => setForgotPasswordStateHelper("isForgotPasswordActive", true)}
+            variant="plain">Forgot Password?</Button>
         </div>
       }
       open={forgotPasswordState.isForgotPasswordActive}
@@ -265,12 +268,21 @@ function SignUp() {
             <PasswordTextField setField={(val) => setPassword(val)} onFunc={true} field={password} label="Password" monospaced={true}/>
             {loginActive && isOnPrem && forgotPasswordComp}
           </div>
-          <Button fullWidth primary onClick={loginFunc} size="large" loading={loading}><div data-testid="signin_signup_button">{activeObject.buttonText}</div></Button>
+          <Button
+            fullWidth
+
+            onClick={loginFunc}
+            size="large"
+            loading={loading}
+            variant="primary"><div data-testid="signin_signup_button">{activeObject.buttonText}</div></Button>
         </VerticalStack>
       </Form>
       <HorizontalStack align="center" gap={1}>
         <Text>{activeObject.descriptionText}</Text>
-        <Button plain onClick={() => {setLoginActive(!loginActive); navigate(activeObject.targetUrl)}}>{activeObject.linkText}</Button>
+        <Button
+
+          onClick={() => {setLoginActive(!loginActive); navigate(activeObject.targetUrl)}}
+          variant="plain">{activeObject.linkText}</Button>
       </HorizontalStack>
     </VerticalStack>
   )

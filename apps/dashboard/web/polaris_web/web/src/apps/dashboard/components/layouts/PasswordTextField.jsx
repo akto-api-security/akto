@@ -20,7 +20,7 @@ function PasswordTextField(props) {
     let buttonIcon = isTextVisible ? HideMinor : ViewMinor
 
     const toggleButton = (
-        <Button icon={buttonIcon} onClick={toggleTextVisibility} plain />
+        <Button icon={buttonIcon} onClick={toggleTextVisibility}  variant="plain" />
     )
 
     return (

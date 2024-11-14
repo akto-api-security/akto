@@ -25,12 +25,20 @@ function prepareTableData (data, handleBadgeClick) {
             </Text>
             {
                 isSensitive ?
-                    <Button plain monochrome onClick={() => {handleBadgeClick(element.subType.name, "")}}>
+                    <Button
+
+
+                        onClick={() => {handleBadgeClick(element.subType.name, "")}}
+                        variant="monochromePlain">
                         <Badge tone="warning">
                             {element.subType.name}
                         </Badge>
                     </Button> : (nonSensitiveDataType ?
-                        <Button plain monochrome onClick={() => { handleBadgeClick(element.subType.name, "") }}>
+                        <Button
+
+
+                            onClick={() => { handleBadgeClick(element.subType.name, "") }}
+                            variant="monochromePlain">
                             <Badge tone="info">
                                 {element.subType.name}
                             </Badge>
@@ -109,7 +117,7 @@ function ApiSingleSchema(props) {
             >
                 <VerticalStack gap={"2"}>
                     <ButtonGroup segmented>
-                        <Button primarySuccess={activeTab} onClick={() => {setBadgeActive(false); setIsHeader(true)}} size="slim">
+                        <Button {...(activeTab? {variant:"primary", tone:"success" } : {})} onClick={() => {setBadgeActive(false); setIsHeader(true)}} size="slim">
                             <Box paddingBlockStart="05" paddingBlockEnd="05"> 
                                 <HorizontalStack gap="2">
                                     <Text variant="bodyMd">Header</Text>
@@ -119,7 +127,7 @@ function ApiSingleSchema(props) {
                                 </HorizontalStack>
                             </Box>
                         </Button>
-                        <Button primarySuccess={!activeTab} onClick={() => {setBadgeActive(false); setIsHeader(false)}} size="slim">
+                        <Button {...(activeTab? {variant:"primary", tone:"success" } : {})} onClick={() => {setBadgeActive(false); setIsHeader(false)}} size="slim">
                             <Box paddingBlockStart="05" paddingBlockEnd="05"> 
                                 <HorizontalStack gap="2">
                                     <Text variant="bodyMd">Payload</Text>
@@ -146,7 +154,7 @@ function ApiSingleSchema(props) {
                 </VerticalStack>
             </Collapsible>
         </VerticalStack>
-    )
+    );
 }
 
 function ApiSchema(props) {

@@ -22,7 +22,7 @@ function SettingsHeader() {
                 </Box>
                 <Text variant="headingMd" as="h4">Settings</Text>
             </HorizontalStack>
-            <Button plain icon={CancelMajor} onClick={handleSettingsClose} />
+            <Button  icon={CancelMajor} onClick={handleSettingsClose} variant="plain" />
         </div>
     )
 

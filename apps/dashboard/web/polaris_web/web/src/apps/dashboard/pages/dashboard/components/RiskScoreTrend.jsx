@@ -39,8 +39,12 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
                             return (
                                 <VerticalStack gap={1} key={range.text} >
                                     <HorizontalStack align="space-between">
-                                        <Button plain monochrome removeUnderline 
-                                            onClick={() => navigate(`/dashboard/observe/inventory/${range.apiCollectionId}`)}>
+                                        <Button
+
+
+                                            removeUnderline
+                                            onClick={() => navigate(`/dashboard/observe/inventory/${range.apiCollectionId}`)}
+                                            variant="monochromePlain">
                                                 <Text variant="bodyMd" color="semibold" >{range.text}</Text>
                                         </Button>
                                         <Badge tone={range.status}>{range.range}</Badge>

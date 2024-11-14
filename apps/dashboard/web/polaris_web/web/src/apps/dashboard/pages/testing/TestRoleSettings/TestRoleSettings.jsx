@@ -295,7 +295,7 @@ function TestRoleSettings() {
 
     const addAuthButton = (
         <HorizontalStack align="end" key="auth-button">
-            {isNew ? <Tooltip content= "Save the role first"><Button disabled>Add auth</Button></Tooltip> : <Button primary onClick={() => setShowAuthComponent(true)}><div data-testid="add_auth_button">Add auth</div></Button>}
+            {isNew ? <Tooltip content= "Save the role first"><Button disabled>Add auth</Button></Tooltip> : <Button  onClick={() => setShowAuthComponent(true)} variant="primary"><div data-testid="add_auth_button">Add auth</div></Button>}
         </HorizontalStack>
     )
 

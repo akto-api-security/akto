@@ -129,14 +129,18 @@ function DefaultPayloads() {
                         }
                         {
                             <div className='footer-save'>
-                                <Button primary onClick={savePattern} disabled={patternText === '' || selectedDDefaultPayload === patternText}>Save</Button>
+                                <Button
+
+                                    onClick={savePattern}
+                                    disabled={patternText === '' || selectedDDefaultPayload === patternText}
+                                    variant="primary">Save</Button>
                             </div>
                         }
                     </VerticalStack>
                 </LegacyCard.Section>
             </LegacyCard>
         </Page>
-    )
+    );
 }
 
 export default DefaultPayloads

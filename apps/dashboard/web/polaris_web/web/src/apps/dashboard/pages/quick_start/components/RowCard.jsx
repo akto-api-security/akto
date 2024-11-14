@@ -30,7 +30,7 @@ function RowCard(props) {
                 </VerticalStack>
                 <HorizontalStack gap={"4"} align='start'>
                     <Button onClick={handleAction}>{buttonText}</Button>
-                    <Button plain onClick={goToDocs} size='medium'>See Docs</Button>
+                    <Button  onClick={goToDocs} size='medium' variant="plain">See Docs</Button>
                 </HorizontalStack>
             </VerticalStack>
         </Card>

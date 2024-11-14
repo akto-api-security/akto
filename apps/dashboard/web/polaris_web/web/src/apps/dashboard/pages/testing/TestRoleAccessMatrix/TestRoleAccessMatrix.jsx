@@ -89,10 +89,14 @@ function TestRoleAccessMatrix() {
             secondaryActions={
                 [
                     <Button key="deleteAccessMatrix" onClick={handleDeleteAccessMatrix}>Delete access matrix</Button>,
-                    <Button key="createAccessMatrix" primary onClick={handleCreateAccessMatrix}>Create access matrix</Button>
+                    <Button
+                        key="createAccessMatrix"
+
+                        onClick={handleCreateAccessMatrix}
+                        variant="primary">Create access matrix</Button>
                 ]}
         />
-    )
+    );
 }
 
 export default TestRoleAccessMatrix

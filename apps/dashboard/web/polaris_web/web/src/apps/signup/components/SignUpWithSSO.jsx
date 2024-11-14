@@ -21,7 +21,7 @@ function SignUpWithSSO() {
                             <TextField onChange={setEmail} value={email} label="Email" placeholder="name@workemail.com" monospaced={true}/>
                         </div>
                         <HorizontalStack align="end">
-                            <Button size="medium" onClick={handleSubmit} primary>Submit</Button>
+                            <Button size="medium" onClick={handleSubmit}  variant="primary">Submit</Button>
                         </HorizontalStack>
                     </VerticalStack>
                 </Form>

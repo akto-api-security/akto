@@ -192,14 +192,18 @@ function Dashboard() {
             {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner">
                 <Banner hideIcon={true}> 
                     <Text variant="headingMd">Need a 1:1 experience?</Text>
-                    <Button plain monochrome onClick={() => {
-                        window.open("https://akto.io/api-security-demo", "_blank")
-                    }}><Text variant="bodyMd">Book a call</Text></Button>
+                    <Button
+
+
+                        onClick={() => {
+                            window.open("https://akto.io/api-security-demo", "_blank")
+                        }}
+                        variant="monochromePlain"><Text variant="bodyMd">Book a call</Text></Button>
                 </Banner>
             </div> : null}
         </Frame>
         </div>
-    )
+    );
 }
 
 export default Dashboard

@@ -200,7 +200,6 @@ function SampleDataComponent(props) {
 
     let currentLineActive = lineNumbers && lineNumbers[type].length > 0 ? lineNumbers[type][currentIndex[type]] : 1
     return (
-
         <Box>
             <LegacyCard.Section flush>
                 <Box padding={"2"}>
@@ -213,12 +212,22 @@ function SampleDataComponent(props) {
                                     <Text variant="bodyMd" color="subdued">{ lineNumbers[type].length } changes</Text>
                                 </Box>
                                 <HorizontalStack gap="1">
-                                    <Button plain monochrome disabled={!checkButtonActive("prev")} onClick={() => changeIndex("prev")}>
+                                    <Button
+
+
+                                        disabled={!checkButtonActive("prev")}
+                                        onClick={() => changeIndex("prev")}
+                                        variant="monochromePlain">
                                         <Box padding="05" borderWidth="1" borderColor="border" borderRadius="1">
                                             <Icon source={ArrowUpMinor} />
                                         </Box>
                                     </Button>
-                                    <Button plain monochrome disabled={!checkButtonActive("next")} onClick={() => changeIndex("next")}>
+                                    <Button
+
+
+                                        disabled={!checkButtonActive("next")}
+                                        onClick={() => changeIndex("next")}
+                                        variant="monochromePlain">
                                         <Box padding="05" borderWidth="1" borderColor="border" borderRadius="1">
                                             <Icon source={ArrowDownMinor} />
                                         </Box>
@@ -230,8 +239,12 @@ function SampleDataComponent(props) {
                             <Popover
                                 zIndexOverride={"600"}
                                 active={popoverActive[type]}
-                                activator={<Button icon={ClipboardMinor} plain onClick={() => 
-                                    setPopoverActive({ [type]: !popoverActive[type] })} />}
+                                activator={<Button
+                                    icon={ClipboardMinor}
+
+                                    onClick={() => 
+                                        setPopoverActive({ [type]: !popoverActive[type] })}
+                                    variant="plain" />}
                                 onClose={() => setPopoverActive(false)}
                             >
                                 <div ref={ref}/>
@@ -249,7 +262,7 @@ function SampleDataComponent(props) {
                 <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers}/>
             </LegacyCard.Section>
         </Box>
-    )
+    );
 
 }
 

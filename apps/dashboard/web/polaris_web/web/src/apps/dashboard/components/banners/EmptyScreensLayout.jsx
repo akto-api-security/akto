@@ -29,7 +29,7 @@ function EmptyScreensLayout({iconSrc,headingText,description, buttonText, redire
                                   
                                   <HorizontalStack align='center'>
                                       {redirectUrl ? <Box paddingBlockStart={2}>
-                                          <Button primary onClick={() => navigate(redirectUrl)}>{buttonText}</Button>
+                                          <Button  onClick={() => navigate(redirectUrl)} variant="primary">{buttonText}</Button>
                                       </Box> : null}
                                       {bodyComponent}
                                   </HorizontalStack>

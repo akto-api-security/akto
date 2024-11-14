@@ -133,69 +133,78 @@ function AdvancedTrafficFilters() {
             </HorizontalStack>
         )
 
-        return(
-            <>
-            <LegacyCard 
-                title={titleComp} 
-                footerActionAlignment="right"
-                primaryFooterAction={{content: 'Save', onAction: () => setModalActive(true), 
-                    disabled: (currentTemplate?.message !== undefined && currentTemplate.message.length === 0) || (typeof (currentTemplate) === 'string' && currentTemplate.length === 0)
-                }}
-                secondaryFooterActions={[{content: 'Add new', onAction: () => resetFunc()}]}
-            >
-                <LegacyCard.Section>
-                    <DropdownSearch
-                        placeholder={"Search existing filters"}
-                        optionsList={templateList && templateList.map(x => {
-                            return {
-                                label: x.id === "DEFAULT_BLOCK_FILTER" ? "DEFAULT_IGNORE_FILTER" : x.id,
-                                value: x.id
-                            }
-                        })}
-                        setSelected={(value) => {
-                            handleSelection(value)
-                        }}
-                        value={currentId === "DEFAULT_BLOCK_FILTER" ? "DEFAULT_IGNORE_FILTER" : currentId }
-                    />
-                </LegacyCard.Section>
-                <LegacyCard.Section flush>
-                    <Box paddingBlockStart={4} paddingBlockEnd={4}>
-                        <VerticalStack gap={"1"}>
-                            <Box paddingInlineEnd={"4"}>
-                                <HorizontalStack align="end" gap={"2"}>
-                                    <Button plain monochrome disabled={currentId.length === 0} onClick={() => changeStateOfFilter()}>
-                                        <Tooltip content={tooltipText} dismissOnMouseOut>
-                                            <Box><Icon source={currentState ? CircleTickMajor : CircleCancelMajor} /></Box>
-                                        </Tooltip>
-                                    </Button>
-                                    <Button plain destructive disabled={currentId.length === 0} onClick={() => handleDelete()}>
-                                        <Tooltip content="Delete template" dismissOnMouseOut>
-                                            <Box><Icon source={DeleteMajor} /></Box>
-                                        </Tooltip>
-                                    </Button>
-                                </HorizontalStack>
-                            </Box>
-                            <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="240px" readOnly={false} getEditorData={setCurrentTemplate} />
-                        </VerticalStack>
-                    </Box>
-                </LegacyCard.Section>
-            </LegacyCard>
-            <Modal
-                open={modalActive}
-                onClose={() => setModalActive(false)}
-                primaryAction={{content: 'Save', onAction: () => {handleSave(currentTemplate); setModalActive(false)}}}
-                secondaryActions={(window.IS_SAAS !== "true" ||  window.USER_NAME.includes("akto"))? [{content: 'Dry run', onAction: () => handleDryRun(currentTemplate)}]: []}
-                title={"Add advanced filters"}
-            >
-                <Modal.Section>
-                    <Text variant="bodyMd" color="subdued">
-                        Adding an filter will stop/modify traffic ingestion in the dashboard.
-                        Are you sure you want to add the filter?
-                    </Text>
-                </Modal.Section>
-            </Modal>
-            </>
-        )
+        return <>
+        <LegacyCard 
+            title={titleComp} 
+            footerActionAlignment="right"
+            primaryFooterAction={{content: 'Save', onAction: () => setModalActive(true), 
+                disabled: (currentTemplate?.message !== undefined && currentTemplate.message.length === 0) || (typeof (currentTemplate) === 'string' && currentTemplate.length === 0)
+            }}
+            secondaryFooterActions={[{content: 'Add new', onAction: () => resetFunc()}]}
+        >
+            <LegacyCard.Section>
+                <DropdownSearch
+                    placeholder={"Search existing filters"}
+                    optionsList={templateList && templateList.map(x => {
+                        return {
+                            label: x.id === "DEFAULT_BLOCK_FILTER" ? "DEFAULT_IGNORE_FILTER" : x.id,
+                            value: x.id
+                        }
+                    })}
+                    setSelected={(value) => {
+                        handleSelection(value)
+                    }}
+                    value={currentId === "DEFAULT_BLOCK_FILTER" ? "DEFAULT_IGNORE_FILTER" : currentId }
+                />
+            </LegacyCard.Section>
+            <LegacyCard.Section flush>
+                <Box paddingBlockStart={4} paddingBlockEnd={4}>
+                    <VerticalStack gap={"1"}>
+                        <Box paddingInlineEnd={"4"}>
+                            <HorizontalStack align="end" gap={"2"}>
+                                <Button
+
+
+                                    disabled={currentId.length === 0}
+                                    onClick={() => changeStateOfFilter()}
+                                    variant="monochromePlain">
+                                    <Tooltip content={tooltipText} dismissOnMouseOut>
+                                        <Box><Icon source={currentState ? CircleTickMajor : CircleCancelMajor} /></Box>
+                                    </Tooltip>
+                                </Button>
+                                <Button
+
+
+                                    disabled={currentId.length === 0}
+                                    onClick={() => handleDelete()}
+                                    variant="plain"
+                                    tone="critical">
+                                    <Tooltip content="Delete template" dismissOnMouseOut>
+                                        <Box><Icon source={DeleteMajor} /></Box>
+                                    </Tooltip>
+                                </Button>
+                            </HorizontalStack>
+                        </Box>
+                        <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="240px" readOnly={false} getEditorData={setCurrentTemplate} />
+                    </VerticalStack>
+                </Box>
+            </LegacyCard.Section>
+        </LegacyCard>
+        <Modal
+            open={modalActive}
+            onClose={() => setModalActive(false)}
+            primaryAction={{content: 'Save', onAction: () => {handleSave(currentTemplate); setModalActive(false)}}}
+            secondaryActions={(window.IS_SAAS !== "true" ||  window.USER_NAME.includes("akto"))? [{content: 'Dry run', onAction: () => handleDryRun(currentTemplate)}]: []}
+            title={"Add advanced filters"}
+        >
+            <Modal.Section>
+                <Text variant="bodyMd" color="subdued">
+                    Adding an filter will stop/modify traffic ingestion in the dashboard.
+                    Are you sure you want to add the filter?
+                </Text>
+            </Modal.Section>
+        </Modal>
+        </>;
     }
 
     const components = [<MainComp key={"main-comp-filter"} />]

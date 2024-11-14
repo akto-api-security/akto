@@ -82,13 +82,13 @@ function BurpSource() {
                         <div ref={ref}/>
                         <HorizontalStack gap={1}>
                             <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_IP:</Text>
-                            <Button onClick={() => copyText(aktoIp, "AKTO_IP")} plain>
+                            <Button onClick={() => copyText(aktoIp, "AKTO_IP")}  variant="plain">
                                 <div style={{maxWidth: "260px"}} className='overflow-text'>{aktoIp}</div>
                             </Button>
                         </HorizontalStack>
                         <HorizontalStack gap={1}>
                             <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_TOKEN:</Text>
-                            <Button onClick={() => copyText(aktoToken, "AKTO_TOKEN")} plain>
+                            <Button onClick={() => copyText(aktoToken, "AKTO_TOKEN")}  variant="plain">
                                 <div style={{maxWidth: "210px"}} className='overflow-text'>{aktoToken}</div>
                             </Button>
                         </HorizontalStack>
@@ -101,7 +101,7 @@ function BurpSource() {
             component: (
                 <HorizontalStack gap={1}>
                     <Text variant="bodyMd">You will see traffic in</Text>
-                    {burpCollectionURL.length > 0 ? <Button plain onClick={()=> navigate(burpCollectionURL)}>Burp</Button> : <Text>Burp</Text>}
+                    {burpCollectionURL.length > 0 ? <Button  onClick={()=> navigate(burpCollectionURL)} variant="plain">Burp</Button> : <Text>Burp</Text>}
                     <Text>collection.</Text>
                 </HorizontalStack>
             )
@@ -153,13 +153,13 @@ function BurpSource() {
 
             <VerticalStack gap="2">
                 <ButtonGroup>
-                    <Button onClick={primaryAction} primary>Check Connection</Button>
+                    <Button onClick={primaryAction}  variant="primary">Check Connection</Button>
                     <Button onClick={goToDocs}>Go to docs</Button>
                 </ButtonGroup>
             </VerticalStack>
 
         </div>
-    )
+    );
 }
 
 export default BurpSource

@@ -180,7 +180,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const activator = (
         <div ref={runTestRef}>
-            <Button onClick={toggleRunTest} primary disabled={disabled || testRun.selectedCategory.length === 0} ><div data-testid="run_test_button">Run test</div></Button>
+            <Button
+                onClick={toggleRunTest}
+
+                disabled={disabled || testRun.selectedCategory.length === 0}
+                variant="primary"><div data-testid="run_test_button">Run test</div></Button>
         </div>
     );
 
@@ -544,7 +548,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 />
                             </div>
 
-                            <Button icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Remove All</div></Button>
+                            <Button
+                                icon={CancelMajor}
+
+                                onClick={handleRemoveAll}
+                                disabled={checkRemoveAll()}
+                                variant="primary"
+                                tone="critical"><div data-testid="remove_all_tests">Remove All</div></Button>
                         </div>
 
                         <br />
@@ -577,7 +587,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     </HorizontalStack>
                                     <HorizontalStack gap={"2"}>
                                         <Popover
-                                            activator={<Button plain size="slim" onClick={() => setShowFiltersOption(!showFiltersOption)}>More filters</Button>}
+                                            activator={<Button
+
+                                                size="slim"
+                                                onClick={() => setShowFiltersOption(!showFiltersOption)}
+                                                variant="plain">More filters</Button>}
                                             onClose={() => setShowFiltersOption(false)}
                                             active={showFiltersOption}
                                         >

@@ -164,7 +164,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
         <SpinnerCentered />
         :
         <VerticalStack gap="2">
-            {isButtonActive ? <Button primary onClick={creatFargateStack} loading={loading}>{setupButtonText}</Button> : null}
+            {isButtonActive ? <Button  onClick={creatFargateStack} loading={loading} variant="primary">{setupButtonText}</Button> : null}
             <Text variant="bodyMd" as="h3">{statusText}</Text>
             {progressBar.show ? <ProgressBar progress={progressBar.value} size="small" color="primary" /> : null }
             {/* {stackCompleteComponent} */}

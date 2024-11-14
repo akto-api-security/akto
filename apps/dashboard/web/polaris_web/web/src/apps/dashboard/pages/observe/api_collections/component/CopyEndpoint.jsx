@@ -6,7 +6,10 @@ const CopyEndpoint = (apiDetail) => {
     const ref = useRef(null)
     return (
         <Box paddingBlockStart={"05"}>
-            <Button plain onClick={() => func.copyToClipboard(apiDetail, ref, "URL copied")}>
+            <Button
+
+                onClick={() => func.copyToClipboard(apiDetail, ref, "URL copied")}
+                variant="plain">
                 <Tooltip content="Copy endpoint" dismissOnMouseOut>
                     <div className="reduce-size">
                         <Avatar size="xs" source="/public/copy_icon.svg" />

@@ -101,7 +101,7 @@ function AuthTypes() {
         <Box>
         <PageWithMultipleCards
             title={"Auth types"}
-            primaryAction={<Button primary onClick={handleRedirect}>Create new auth type</Button>}
+            primaryAction={<Button  onClick={handleRedirect} variant="primary">Create new auth type</Button>}
             secondaryActions={
                 <Button onClick={() => handleResetModalChange()}>Reset</Button>
             }
@@ -150,7 +150,7 @@ function AuthTypes() {
                 </Modal.Section>
             </Modal>
         </Box>
-    )
+    );
 }
 
 export default AuthTypes

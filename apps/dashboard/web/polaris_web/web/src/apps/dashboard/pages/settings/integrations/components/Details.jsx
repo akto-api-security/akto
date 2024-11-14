@@ -3,7 +3,7 @@ import React from 'react'
 import LineComponent from './LineComponent'
 
 function Details({onClickFunc, values}) {
-    return (    
+    return (
         <LegacyCard.Section title="Integration details">
             <br/>
             <VerticalStack gap={3}>
@@ -15,11 +15,11 @@ function Details({onClickFunc, values}) {
                     })}
                 </VerticalStack>
                 <HorizontalStack align="end">
-                    <Button primary onClick={onClickFunc} >Delete SSO</Button>
+                    <Button  onClick={onClickFunc} variant="primary">Delete SSO</Button>
                 </HorizontalStack>
             </VerticalStack>
         </LegacyCard.Section>
-    )
+    );
 }
 
 export default Details

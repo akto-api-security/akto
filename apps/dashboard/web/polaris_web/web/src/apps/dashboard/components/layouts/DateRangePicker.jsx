@@ -237,7 +237,7 @@ function DateRangePicker(props) {
               <HorizontalStack align="end">
                 <ButtonGroup>
                 <Button onClick={cancel}>Cancel</Button>
-                <Button primary onClick={apply}>
+                <Button  onClick={apply} variant="primary">
                   Apply
                 </Button>
                 </ButtonGroup>

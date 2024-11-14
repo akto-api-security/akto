@@ -13,13 +13,13 @@ function NullData({text,url,description,urlText}) {
                     <Text variant="bodyMd">{description}</Text>
                     <HorizontalStack gap={1}>
                         <Text>Click</Text>
-                        <Button plain onClick={()=> navigate(url)}>here</Button>
+                        <Button  onClick={()=> navigate(url)} variant="plain">here</Button>
                         <Text>{urlText}</Text>
                     </HorizontalStack>
                 </VerticalStack>
             </LegacyCard.Section>
         </LegacyCard>
-    )
+    );
 }
 
 export default NullData

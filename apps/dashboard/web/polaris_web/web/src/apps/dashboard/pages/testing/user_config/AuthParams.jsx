@@ -66,17 +66,27 @@ function AuthParams({ authParams, setAuthParams, hideTitle }) {
                                     <TextField id={`auth-param-key-${index}`} value={authParam.key} onChange={(key) => handleUpdate(index, "key", key)} />
                                     <Text variant="bodyMd">Value: </Text>
                                     <TextField id={`auth-param-value-${index}`} value={authParam.value} onChange={(value) => handleUpdate(index, "value", value)} />
-                                    <Button id={`delete-auth-param-${index}`} icon={DeleteMajor} onClick={() => handleRemove(index)} plain />
+                                    <Button
+                                        id={`delete-auth-param-${index}`}
+                                        icon={DeleteMajor}
+                                        onClick={() => handleRemove(index)}
+
+                                        variant="plain" />
                                 </div>
                                 { index < authParams.length - 1 &&  <br /> }
                             </div>
-                    )})}
+                        );})}
                 </div>
                 <br />
-                <Button id={"add-auth-param"} icon={CirclePlusMajor} onClick={handleAdd} plain />
+                <Button
+                    id={"add-auth-param"}
+                    icon={CirclePlusMajor}
+                    onClick={handleAdd}
+
+                    variant="plain" />
             </LegacyCard.Section>
         </LegacyCard>
-    )
+    );
 }
 
 export default AuthParams

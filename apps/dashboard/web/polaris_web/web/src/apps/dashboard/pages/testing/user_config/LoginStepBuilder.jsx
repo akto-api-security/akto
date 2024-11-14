@@ -182,7 +182,7 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                                     checked={steps[selectedStep].allowAllStatusCodes}
                                     onChange={() => handleStatusCodeToggle(!steps[selectedStep].allowAllStatusCodes)}
                                 />
-                                <Button id={"add-step-button"} primary onClick={handleAddStep}>Add step</Button>
+                                <Button id={"add-step-button"}  onClick={handleAddStep} variant="primary">Add step</Button>
                             </HorizontalStack>
                         </div>
 
@@ -206,7 +206,12 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                                 {steps[selectedStep].type === "LOGIN_FORM" && <LoginForm step={steps[selectedStep]} setSteps={setSteps}/>}
                                 {steps[selectedStep].type === "OTP_VERIFICATION" && <OtpVerification step={steps[selectedStep]} setSteps={setSteps}/>}
                                 <br />
-                                <Button id={"remove-step-button"} destructive onClick={handleRemoveStep}>Remove step</Button>
+                                <Button
+                                    id={"remove-step-button"}
+
+                                    onClick={handleRemoveStep}
+                                    variant="primary"
+                                    tone="critical">Remove step</Button>
                             </div>
                         </LegacyCard.Section>
 
@@ -215,12 +220,12 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                     <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
 
                     <br />
-                    {showOnlyApi ? null :<Button id={"save-token"} primary onClick={handleSave}><div data-testid="save_token_automated">Save changes</div></Button>}
+                    {showOnlyApi ? null :<Button id={"save-token"}  onClick={handleSave} variant="primary"><div data-testid="save_token_automated">Save changes</div></Button>}
 
                 </div>
             }
         </div>
-    )
+    );
 }
 
 export default LoginStepBuilder

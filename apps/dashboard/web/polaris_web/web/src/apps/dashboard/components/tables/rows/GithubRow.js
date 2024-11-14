@@ -81,67 +81,69 @@ function GithubRow(props) {
     }, [dataObj,collapsibleActive])
 
     function OldCell(){
-        return(
-            <>
-            <IndexTable.Cell>
-                <div className='linkClass'>
-                    <Link
-                        monochrome
-                        removeUnderline
-                        onClick={() => handleRowClick(data)}
-                    >
-                        <GithubCell
-                            headers={headers}
-                            data={data}
-                            getStatus={getStatus}
-                            width="65vw"
-                            nameWidth="50vw"
-                        />
-                    </Link>
-                </div>
-            </IndexTable.Cell>
-            {headers?.filter((header) => {
-                return header.itemCell == 2
-            }).filter((header) => {
-                return data[header.value] != undefined
-            }).map((header) => {
-                return (
-                    <IndexTable.Cell key={header.text}>
-                        <VerticalStack gap="2">
-                            <Text variant='bodyMd' fontWeight="medium">
-                                {header.text}
-                            </Text>
-                            <HorizontalStack>
-                                <Badge key={header.text}>
-                                    {data[header.value]}
-                                </Badge>
-                            </HorizontalStack>
-                        </VerticalStack>
-                    </IndexTable.Cell>
-                )
-            })
-            }
-            {hasRowActions &&
-                <IndexTable.Cell >
-                    <HorizontalStack align='end'>
-                        {
-                            <Popover
-                                active={popoverActive === data.id}
-                                activator={<Button onClick={(e) => togglePopoverActive(e,data.id)} plain icon={HorizontalDotsMinor} />}
-                                autofocusTarget="first-node"
-                                onClose={(e) => togglePopoverActive(e,popoverActive)}
-                            >
-                                <ActionList
-                                    actionRole="menuitem"
-                                    sections={getActions(data)}
-                                />
-                            </Popover>
-                        }
-                    </HorizontalStack>
+        return <>
+        <IndexTable.Cell>
+            <div className='linkClass'>
+                <Link
+                    monochrome
+                    removeUnderline
+                    onClick={() => handleRowClick(data)}
+                >
+                    <GithubCell
+                        headers={headers}
+                        data={data}
+                        getStatus={getStatus}
+                        width="65vw"
+                        nameWidth="50vw"
+                    />
+                </Link>
+            </div>
+        </IndexTable.Cell>
+        {headers?.filter((header) => {
+            return header.itemCell == 2
+        }).filter((header) => {
+            return data[header.value] != undefined
+        }).map((header) => {
+            return (
+                <IndexTable.Cell key={header.text}>
+                    <VerticalStack gap="2">
+                        <Text variant='bodyMd' fontWeight="medium">
+                            {header.text}
+                        </Text>
+                        <HorizontalStack>
+                            <Badge key={header.text}>
+                                {data[header.value]}
+                            </Badge>
+                        </HorizontalStack>
+                    </VerticalStack>
                 </IndexTable.Cell>
-            }
-        </>
-        )
+            )
+        })
+        }
+        {hasRowActions &&
+            <IndexTable.Cell >
+                <HorizontalStack align='end'>
+                    {
+                        <Popover
+                            active={popoverActive === data.id}
+                            activator={<Button
+                                onClick={(e) => togglePopoverActive(e,data.id)}
+
+                                icon={HorizontalDotsMinor}
+                                variant="plain" />}
+                            autofocusTarget="first-node"
+                            onClose={(e) => togglePopoverActive(e,popoverActive)}
+                        >
+                            <ActionList
+                                actionRole="menuitem"
+                                sections={getActions(data)}
+                            />
+                        </Popover>
+                    }
+                </HorizontalStack>
+            </IndexTable.Cell>
+        }
+    </>;
     }
 
     function LinkCell(cellData, header, cellWidth) {
@@ -176,7 +178,11 @@ function GithubRow(props) {
                     {
                         <Popover
                             active={popoverActive === data.id}
-                            activator={<Button onClick={(e) => togglePopoverActive(e,data.id)} plain icon={HorizontalDotsMinor} />}
+                            activator={<Button
+                                onClick={(e) => togglePopoverActive(e,data.id)}
+
+                                icon={HorizontalDotsMinor}
+                                variant="plain" />}
                             autofocusTarget="first-node"
                             onClose={(e) => togglePopoverActive(e,popoverActive)}
                         >
@@ -188,7 +194,7 @@ function GithubRow(props) {
                     }
                 </HorizontalStack>
             </IndexTable.Cell>
-        )
+        );
     }
 
     function CollapsibleCell(treeView, value) {

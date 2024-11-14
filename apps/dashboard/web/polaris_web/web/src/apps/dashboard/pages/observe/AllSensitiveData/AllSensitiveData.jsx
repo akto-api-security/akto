@@ -395,15 +395,14 @@ function AllSensitiveData() {
                     docsUrl="https://docs.akto.io/api-inventory/concepts/sensitive-data" 
                 />
             }
-            primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
+            primaryAction={<Button id={"all-data-types"}  onClick={handleRedirect} variant="primary">Create custom data types</Button>}
             secondaryActions={secondaryActionsComp}
             isFirstPage={true}
             components={
                 loading ? [<SpinnerCentered key={"spinner"}/>] : componentsArr
             }
         />
-
-    )
+    );
 }
 
 export default AllSensitiveData

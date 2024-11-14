@@ -245,7 +245,7 @@ const transform = {
         let tableRows = []
         finalArr.forEach((c)=> {
             let tempRow = [
-                <Button onClick={()=>setActive(true)} plain monochrome removeUnderline  >
+                <Button onClick={()=>setActive(true)}   removeUnderline variant="monochromePlain">
 
                   <Box width='250px'  > 
                  <HorizontalStack align="space-between" gap="2">

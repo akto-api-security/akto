@@ -154,15 +154,15 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                             {buttonState === 2 ? 
                                 queryType === "generate_regex" && response?.responses[0]?.regex ?
                                     <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
-                                        <Button primary onClick={addRegex}>Add Regex to Akto</Button>
+                                        <Button  onClick={addRegex} variant="primary">Add Regex to Akto</Button>
                                     </div>
                                 : queryType === "suggest_tests" && response?.responses[0]?.tests ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
-                                    <Button primary onClick={runTests}>Run tests via Akto</Button>
+                                    <Button  onClick={runTests} variant="primary">Run tests via Akto</Button>
                                 </div>
                                 : queryType === "find_auth_related_tokens" && response?.responses?.length>0 ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
-                                    <Button primary onClick={() => addAuthTypes("", response.responses)}>Add above Auth Types</Button>
+                                    <Button  onClick={() => addAuthTypes("", response.responses)} variant="primary">Add above Auth Types</Button>
                                 </div>
                                 : queryType === "generate_curl_for_test" && response?.responses[0]?.curl ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
@@ -184,7 +184,12 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                         prefix={<Text color="subdued">{activePrompt.split("${input}")[0]}</Text>} 
                         suffix={
                             <div {...checkQuery() ? null : {style: {background: "#19C37D", padding: "4px", borderRadius: "4px"}}}>
-                                <Button plain disabled={checkQuery()} onClick={handleClick} icon={SendMajor}/>
+                                <Button
+
+                                    disabled={checkQuery()}
+                                    onClick={handleClick}
+                                    icon={SendMajor}
+                                    variant="plain" />
                             </div>
                         } 
                         placeholder={placeHolderText}

@@ -11,7 +11,7 @@ function BannerComponent({title,docsUrl,content}) {
             <Banner title={title} tone='warning'>
                 <span>{content}</span>
                 <br/>
-                <Button plain onClick={() => openLink()}>Go to docs</Button>
+                <Button  onClick={() => openLink()} variant="plain">Go to docs</Button>
             </Banner>
         </div>
     );

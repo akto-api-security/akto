@@ -152,10 +152,14 @@ const YamlEditor = ({ fetchAllTests }) => {
                         <Icon source={InfoMinor}/> 
                     </Tooltip>
                     <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="below">
-                        <Button icon={ClipboardMinor} plain onClick={copyTestName} />
+                        <Button icon={ClipboardMinor}  onClick={copyTestName} variant="plain" />
                     </Tooltip>  
                     <Tooltip content={`Set as ${selectedTest.inactive ? "active" : "inactive" }`} dismissOnMouseOut preferredPosition="below">
-                        <Button icon={selectedTest.inactive ? CircleTickMinor : CircleCancelMinor} plain onClick={setTestInactive} />
+                        <Button
+                            icon={selectedTest.inactive ? CircleTickMinor : CircleCancelMinor}
+
+                            onClick={setTestInactive}
+                            variant="plain" />
                     </Tooltip>  
                 </HorizontalStack>
         
@@ -166,8 +170,7 @@ const YamlEditor = ({ fetchAllTests }) => {
 
             <div style={{height: '92.7%', borderRight: '1px solid' , borderColor: '#E1E3E5'}} id={"yaml-editor"} ref={yamlEditorRef} />
         </VerticalStack>
-
-    )
+    );
 }
 
 export default YamlEditor

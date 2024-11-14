@@ -64,7 +64,12 @@ function TestRunResultFull(props) {
           <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued"></Text>}>
             <HorizontalStack align="space-between">
               <Text fontWeight="semibold" variant="bodyMd">Test Logs</Text>
-              <Button plain monochrome icon={iconSource} onClick={() => setTestLogsCollapsibleOpen(!testLogsCollapsibleOpen)} />
+              <Button
+
+
+                icon={iconSource}
+                onClick={() => setTestLogsCollapsibleOpen(!testLogsCollapsibleOpen)}
+                variant="monochromePlain" />
             </HorizontalStack>
               <Collapsible open={testLogsCollapsibleOpen} transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}>
                 <LegacyCard.Subsection>
@@ -90,7 +95,7 @@ function TestRunResultFull(props) {
             {
               getDescriptionText(fullDescription) 
             }
-            <Button plain onClick={() => setFullDescription(!fullDescription)}> {fullDescription ? "Less" : "More"} information</Button>
+            <Button  onClick={() => setFullDescription(!fullDescription)} variant="plain"> {fullDescription ? "Less" : "More"} information</Button>
           </LegacyCard>
         ,
         (testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].length > 0) ?  testLogsComponent : null,
@@ -114,25 +119,29 @@ function TestRunResultFull(props) {
       ] 
 
     return (
-        <PageWithMultipleCards
-            title = {
-                <GithubCell
-                key="heading"
-                width="65vw"
-                nameWidth="50vw"
-                data={selectedTestRunResult}
-                headers={headerDetails}
-                getStatus={func.getTestResultStatus}
-                divWrap={true}
-                />
-            }
-            divider= {true}
-            backUrl = {source === "editor" ? undefined : (hexId ==="issues" ? "/dashboard/issues" : `/dashboard/testing/${hexId}`)}
-            isFirstPage = {source === "editor"}
-            primaryAction = {<Button primary onClick={()=>createJiraTicket(issueDetails)} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"} >Create Jira Ticket</Button>} 
-            components = {components}
-        />
-    )
+      <PageWithMultipleCards
+          title = {
+              <GithubCell
+              key="heading"
+              width="65vw"
+              nameWidth="50vw"
+              data={selectedTestRunResult}
+              headers={headerDetails}
+              getStatus={func.getTestResultStatus}
+              divWrap={true}
+              />
+          }
+          divider= {true}
+          backUrl = {source === "editor" ? undefined : (hexId ==="issues" ? "/dashboard/issues" : `/dashboard/testing/${hexId}`)}
+          isFirstPage = {source === "editor"}
+          primaryAction = {<Button
+
+            onClick={()=>createJiraTicket(issueDetails)}
+            disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}
+            variant="primary">Create Jira Ticket</Button>} 
+          components = {components}
+      />
+    );
 }
 
 export default TestRunResultFull

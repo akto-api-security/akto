@@ -180,7 +180,12 @@ function AwsSource() {
             />
 
           <Box>
-            <Button onClick={saveFunc} disabled={func.deepComparison(preSelectedLBs,selectedLBs)} primary loading={loading}>Apply </Button>
+            <Button
+              onClick={saveFunc}
+              disabled={func.deepComparison(preSelectedLBs,selectedLBs)}
+
+              loading={loading}
+              variant="primary">Apply </Button>
           </Box>
           <Text variant="bodyMd" as="h3">{statusText}</Text>
           {progressBar.show ? <ProgressBar progress={progressBar.value} size="small" color="primary" /> : null }

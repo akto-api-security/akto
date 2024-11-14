@@ -278,12 +278,17 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
 const SummaryCardComponent = () =>{
   let totalVulnerabilities = severityCountMap?.HIGH?.text + severityCountMap?.MEDIUM?.text +  severityCountMap?.LOW?.text 
-  return(
+  return (
     <LegacyCard>
       <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
         <HorizontalStack align="space-between">
           <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
-          <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
+          <Button
+
+
+            icon={iconSource}
+            onClick={() => setCollapsible(!collapsible)}
+            variant="monochromePlain" />
         </HorizontalStack>
         {totalVulnerabilities > 0 ? 
         <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
@@ -299,7 +304,7 @@ const SummaryCardComponent = () =>{
         : null }
       </LegacyCard.Section>
     </LegacyCard>
-  )
+  );
 }
   const promotedBulkActions = (selectedTestRuns) => { 
     return [

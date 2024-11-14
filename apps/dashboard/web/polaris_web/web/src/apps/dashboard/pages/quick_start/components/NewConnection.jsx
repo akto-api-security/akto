@@ -30,7 +30,7 @@ function NewConnection() {
                 <Text variant='bodyMd'>
                     Akto is an open source, instant API security platform that takes only 60 secs to get started. Akto is used by security teams to maintain a continuous inventory of APIs, test APIs for vulnerabilities and find runtime issues. Akto offers tests for all OWASP top 10 and HackerOne Top 10 categories including BOLA, authentication, SSRF, XSS, security configurations, etc.
                 </Text>
-                <Button onClick={() => setTasksCompleted(1)} primary>Mark as complete</Button>
+                <Button onClick={() => setTasksCompleted(1)}  variant="primary">Mark as complete</Button>
             </VerticalStack>
             <VideoThumbnail
                 videoLength={195}
@@ -75,11 +75,13 @@ function NewConnection() {
                         {badge && badge.length > 0 ? <Badge size='small' tone='info'>{badge}</Badge> : null}
                     </Text>
                     <div className='see-docs'>
-                    <Button plain onClick={(event) => { 
-                            event.stopPropagation(); 
-                            openDocs(docsUrl); 
-                        }}    
-                    >
+                    <Button
+
+                        onClick={(event) => { 
+                                event.stopPropagation(); 
+                                openDocs(docsUrl); 
+                            }}
+                        variant="plain">
                         Go to docs
                     </Button>
                     </div>
@@ -150,7 +152,7 @@ function NewConnection() {
                         {tasksList.map((element,index) => (
                             <VerticalStack gap="5" key={element?.id}>
                                 <HorizontalStack gap="3">
-                                    <Button plain monochrome onClick={() => setTasksCompleted(index)}>
+                                    <Button   onClick={() => setTasksCompleted(index)} variant="monochromePlain">
                                         <Avatar customer name='circle' size="xs"
                                             source={tasksCompleted > index ? "/public/circle_check.svg" : "/public/circle_icon.svg"}
                                         />

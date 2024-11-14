@@ -31,10 +31,10 @@ function FileUpload(props) {
                 allowMultiple={allowMultiple}
                 validates={(file) => file.size <= limitSize}
             >
-                <Button plain icon={UploadMajor} />
+                <Button  icon={UploadMajor} variant="plain" />
             </DropZone>
         </div>
-    )
+    );
 }
 
 export default FileUpload
