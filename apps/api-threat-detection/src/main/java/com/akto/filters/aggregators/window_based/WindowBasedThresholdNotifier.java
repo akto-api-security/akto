@@ -35,6 +35,10 @@ public class WindowBasedThresholdNotifier {
         }
     }
 
+    public Config getConfig() {
+        return config;
+    }
+
     private final CounterCache cache;
 
     public WindowBasedThresholdNotifier(CounterCache cache, Config config) {
