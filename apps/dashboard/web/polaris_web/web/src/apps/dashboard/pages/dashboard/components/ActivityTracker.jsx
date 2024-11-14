@@ -42,7 +42,7 @@ function ActivityTracker({ latestActivity }) {
                             <HorizontalStack key={eventIndex} align='space-between'>
                                 <HorizontalStack gap={3}>
                                     <Box>
-                                        <div style={{marginBlock: '5px'}}><Avatar shape="round" size="extraSmall" source="/public/issues-event-icon.svg" /></div>
+                                        <div style={{marginBlock: '5px'}}><Avatar shape="round" size="xs" source="/public/issues-event-icon.svg" /></div>
                                         {eventIndex < (groupedActivity[date].length - 1) ? (
                                             <Box borderColor='border-subdued' borderInlineEndWidth='2' width='0' paddingInlineStart={3} minHeight='12px' />
                                         ) : null}
@@ -62,7 +62,7 @@ function ActivityTracker({ latestActivity }) {
                 ))}
             </VerticalStack>
         </Box>
-    )
+    );
 }
 
 export default ActivityTracker;

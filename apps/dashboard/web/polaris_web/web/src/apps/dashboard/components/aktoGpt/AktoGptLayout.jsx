@@ -136,7 +136,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                     {buttonState > 0 ? <Box ref={chatLogRef}>
                         <Box padding="5" maxWidth="65vw">
                             <HorizontalStack gap="6">
-                                <Avatar name={username} initials={func.initials(username)} size="medium"/>
+                                <Avatar name={username} initials={func.initials(username)} size="md"/>
                                 <Text variant="bodyMd" fontWeight="semibold" color="subdued">{activePrompt.split("${input}")[0] + inputPrompt}</Text>
                             </HorizontalStack>
                         </Box>
@@ -144,7 +144,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                             <Box padding="5" maxWidth="65vw" background="bg-subdued">
                                 <div className="response-message">
                                     <HorizontalStack gap="6" align="start">
-                                        <Avatar name="Akto" source='/public/akto_colored.svg' size="medium"/>
+                                        <Avatar name="Akto" source='/public/akto_colored.svg' size="md"/>
                                         {loading ? <Spinner size="small" /> 
                                             : <ResponseComponent response={func.getResponse(response,queryType)} chatLogRef={chatLogRef} onCompletion={() => handleCompletion()}/>
                                         }
@@ -194,7 +194,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                 </div>
             </div>
         </div>
-    )
+    );
 }
 
 export default AktoGptLayout

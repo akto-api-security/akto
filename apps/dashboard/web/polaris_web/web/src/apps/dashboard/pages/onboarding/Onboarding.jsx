@@ -11,7 +11,7 @@ function Onboarding() {
       window.open(url)
     }
     const avatar = (
-      <Avatar customer size='extraSmall' source='/public/discord.svg' name='discord' />
+      <Avatar customer size="xs" source='/public/discord.svg' name='discord' />
     )
 
     const topbarButtons = (

@@ -394,7 +394,7 @@ const transform = {
         }
       })
     })
-    return details.replace(/{{percentageMatch}}/g, func.prettifyShort(percentageMatch))
+    return details.replace(/{{percentageMatch}}/g, func.prettifyShort(percentageMatch));
   },
 
   fillMoreInformation(category, moreInfoSections, affectedEndpoints, jiraIssueUrl, createJiraTicket) {
@@ -403,7 +403,7 @@ const transform = {
       <Box>
               <Tag>
                   <HorizontalStack gap={1}>
-                    <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
+                    <Avatar size="xs" shape='round' source="/public/logo_jira.svg" />
                     <Link url={jiraIssueUrl}>
                       <Text>
                         {key}
@@ -918,7 +918,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
     <Box>
       <Tag>
           <HorizontalStack gap={1}>
-            <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
+            <Avatar size="xs" shape='round' source="/public/logo_jira.svg" />
             <Link url={jiraIssueUrl}>
               <Text>
                 {key}

@@ -27,7 +27,7 @@ function TitleWithInfo({titleComp, textProps, titleText, tooltipContent, docsUrl
                         },100)}
                     > 
                         <div className='reduce-size'>
-                            <Avatar shape="round" size="extraSmall" source='/public/info_filled_icon.svg'/>
+                            <Avatar shape="round" size="xs" source='/public/info_filled_icon.svg'/>
                         </div> 
                     </div>
                 }
@@ -43,11 +43,11 @@ function TitleWithInfo({titleComp, textProps, titleText, tooltipContent, docsUrl
                     </div>
                 </div>
             </Popover> : tooltipContent ? <Tooltip content={tooltipContent} dismissOnMouseOut><div className='reduce-size'>
-                            <Avatar shape="round" size="extraSmall" source='/public/info_filled_icon.svg'/>
+                            <Avatar shape="round" size="xs" source='/public/info_filled_icon.svg'/>
                         </div> </Tooltip> : null
             }
         </HorizontalStack>
-    )
+    );
 }
 
 export default TitleWithInfo

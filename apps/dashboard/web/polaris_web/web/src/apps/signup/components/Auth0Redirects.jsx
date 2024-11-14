@@ -37,7 +37,7 @@ function Auth0Redirects({bodyText, errorText}) {
                         <VerticalStack gap={"8"}>
                             <HorizontalStack align="center">
                                 <div className="akto-logo">
-                                    <Avatar source="/public/akto_name_with_logo.svg" shape="round" size="2xl-experimental" />
+                                    <Avatar source="/public/akto_name_with_logo.svg" shape="round" size="xl" />
                                 </div>
                             </HorizontalStack>
                             <VerticalStack gap={"6"}>
@@ -74,7 +74,7 @@ function Auth0Redirects({bodyText, errorText}) {
                 </div>
             </Box>
         </Page>
-    )
+    );
 }
 
 export default Auth0Redirects

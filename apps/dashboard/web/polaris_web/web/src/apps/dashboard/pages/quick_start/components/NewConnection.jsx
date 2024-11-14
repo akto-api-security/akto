@@ -64,7 +64,7 @@ function NewConnection() {
         const {icon,label,text,badge, docsUrl} = item
         const media = (
             <Box padding={"2"} borderWidth='1' borderColor='border-subdued' borderRadius='2'>
-                <Avatar customer size="extraSmall" name={label} source={icon} shape="square"/>
+                <Avatar customer size="xs" name={label} source={icon} shape="square"/>
             </Box>
         )
         return(
@@ -151,7 +151,7 @@ function NewConnection() {
                             <VerticalStack gap="5" key={element?.id}>
                                 <HorizontalStack gap="3">
                                     <Button plain monochrome onClick={() => setTasksCompleted(index)}>
-                                        <Avatar customer name='circle' size="extraSmall"
+                                        <Avatar customer name='circle' size="xs"
                                             source={tasksCompleted > index ? "/public/circle_check.svg" : "/public/circle_icon.svg"}
                                         />
                                     </Button>
@@ -165,7 +165,7 @@ function NewConnection() {
                 </LegacyCard.Section>
             </LegacyCard>
         </div>
-    )
+    );
 }
 
 export default NewConnection

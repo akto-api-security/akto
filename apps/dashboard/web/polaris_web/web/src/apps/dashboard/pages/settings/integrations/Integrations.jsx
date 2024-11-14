@@ -185,7 +185,7 @@ function Integrations() {
 
     function renderItem(item) {
         const {id, source, name} = item;
-        const media = <Avatar customer size="medium" name={name} source={source}/>;
+        const media = <Avatar customer size="md" name={name} source={source}/>;
         const sourceActions = (item) => {
             return [
               {

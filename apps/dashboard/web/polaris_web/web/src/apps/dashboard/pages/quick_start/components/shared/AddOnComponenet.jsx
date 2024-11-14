@@ -6,7 +6,7 @@ function AddOnComponenet() {
       <div className='card-items'>
            <Card background="bg-subdued">
             <VerticalStack gap='3' align="start">
-                <Avatar source="/public/PaymentsMajor.svg" size="small" shape='square'/>
+                <Avatar source="/public/PaymentsMajor.svg" size="sm" shape='square'/>
                 <VerticalStack gap='2'>
                     <Text variant='headingMd'>This is an add-on connector</Text>
                     <Text variant='bodyMd'>
@@ -25,7 +25,7 @@ function AddOnComponenet() {
             </VerticalStack>
            </Card>
         </div>
-  )
+  );
 }
 
 export default AddOnComponenet

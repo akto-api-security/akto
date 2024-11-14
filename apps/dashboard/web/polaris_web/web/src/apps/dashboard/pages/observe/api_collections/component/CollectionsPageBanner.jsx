@@ -20,11 +20,11 @@ function CollectionsPageBanner() {
         <HorizontalStack gap={"2"} align="start">
             <HorizontalStack>
                 {iconsList.map((iconUrl, index) => {
-                    return(
+                    return (
                         <div className="icons-style" style={{zIndex: `${index + 5}`,...(index > 0 ? {marginLeft: '-10px'} : {})}} key={iconUrl}>
-                            <Avatar shape="square" source={iconUrl} size="extraSmall" />
+                            <Avatar shape="square" source={iconUrl} size="xs" />
                         </div>
-                    )
+                    );
                 })}
             </HorizontalStack>
             <Text color="subdued" variant="bodyMd">{`+${Math.max(connectorsList.length - 4, 18)} more`}</Text>

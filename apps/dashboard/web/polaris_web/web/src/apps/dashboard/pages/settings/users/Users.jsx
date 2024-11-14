@@ -239,7 +239,7 @@ const Users = () => {
                         renderItem={(item) => {
                             const { id, name, login, role } = item;
                             const initials = func.initials(login)
-                            const media = <Avatar user size="medium" name={login} initials={initials} />
+                            const media = <Avatar user size="md" name={login} initials={initials} />
                             const shortcutActions = (username !== login && roleHierarchy.includes(role.toUpperCase())) ? 
                                 [
                                     {
@@ -344,8 +344,7 @@ const Users = () => {
             </div>}
 
         </Page>
-
-    )
+    );
 }
 
 export default Users

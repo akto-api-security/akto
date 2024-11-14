@@ -128,7 +128,7 @@ function ExportHtml() {
             <Box width="60%">
                 <HorizontalStack align="space-between">
                     <Box paddingBlockStart={3}>
-                        <Avatar size="medium" shape="square" source="/public/akto_colored.svg" customer name='aktoLogo' />
+                        <Avatar size="md" shape="square" source="/public/akto_colored.svg" customer name='aktoLogo' />
                     </Box>
                     <Text variant="headingXl">Akto Vulnerabilities Report</Text>
                 </HorizontalStack>

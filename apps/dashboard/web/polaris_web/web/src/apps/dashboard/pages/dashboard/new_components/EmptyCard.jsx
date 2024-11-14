@@ -10,7 +10,7 @@ function EmptyCard({ title, subTitleComponent }) {
                     <HorizontalStack align='center'>
                         <Box width='64px' minHeight='64px' borderRadius="full" background="bg-subdued">
                             <div style={{'height': '64px', 'width': '64px', 'alignItems': 'center', 'display': 'flex', 'justifyContent': 'center'}}>
-                                <Avatar source="/public/analytics.svg" size="medium" shape='round'/>
+                                <Avatar source="/public/analytics.svg" size="md" shape='round'/>
                             </div>
                         </Box>
                     </HorizontalStack>

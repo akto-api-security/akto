@@ -163,7 +163,7 @@ function DropdownSearch(props) {
             prefix={
                 <div style={{display: 'flex', gap: '4px', alignItems: 'center'}}>
                     <Icon source={SearchMinor} color="base" />
-                    {avatarIcon && avatarIcon.length > 0 ? <Avatar customer size="extraSmall" name={avatarIcon} source={avatarIcon}/> : null}
+                    {avatarIcon && avatarIcon.length > 0 ? <Avatar customer size="xs" name={avatarIcon} source={avatarIcon}/> : null}
                 </div>
             }
             suffix={<Icon source={ChevronDownMinor} color="base" />}

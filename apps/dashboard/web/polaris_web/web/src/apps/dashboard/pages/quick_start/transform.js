@@ -1015,7 +1015,7 @@ const quickStartFunc = {
         const arr = items.map((item,index)=> {
             let label = (
                 <div style={{display: 'flex', gap: '4px', alignItems: 'center'}}>
-                    <Avatar customer size="extraSmall" name={item.label} source={item.icon}/>
+                    <Avatar customer size="xs" name={item.label} source={item.icon}/>
                     {item.label}
                     {item.badge  ? <Badge size='small' status='success'>{item.badge}</Badge> : null}
                 </div>

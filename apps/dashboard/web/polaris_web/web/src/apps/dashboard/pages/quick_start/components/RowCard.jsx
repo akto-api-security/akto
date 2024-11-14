@@ -16,7 +16,7 @@ function RowCard(props) {
             <VerticalStack gap="5">
                 <div style={{display: 'flex' , justifyContent: 'space-between'}}>
                     <Box padding={"2"} borderWidth='1' borderColor='border-subdued' borderRadius='2'>
-                    <Avatar customer size="extraSmall" name={cardObj.label} source={cardObj.icon} shape='square'/>
+                    <Avatar customer size="xs" name={cardObj.label} source={cardObj.icon} shape='square'/>
                     </Box>
                     <Box paddingBlockStart="1">
                         {cardObj.badge ? <Badge size='small' status='info'>{cardObj.badge}</Badge> : null}
@@ -34,7 +34,7 @@ function RowCard(props) {
                 </HorizontalStack>
             </VerticalStack>
         </Card>
-    )
+    );
 }
 
 export default RowCard

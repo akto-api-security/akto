@@ -76,10 +76,10 @@ function InitialSteps({initialSteps}) {
     }
 
     function StepConnection({step,index}) {
-        return(
+        return (
             <VerticalStack gap={4}>
                 <HorizontalStack gap={2}>
-                    <Avatar customer name='circle' size="extraSmall"
+                    <Avatar customer name='circle' size="xs"
                         source={isCompleted(step.id) ? "/public/circle_check.svg" : "/public/circle_icon.svg"}
                     />
                     <Box width="85%">
@@ -104,7 +104,7 @@ function InitialSteps({initialSteps}) {
                 : null }
                 </Box>
             </VerticalStack>
-        )
+        );
     }
 
     return (

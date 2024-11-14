@@ -14,15 +14,15 @@ import LocalStore from '../../../../main/LocalStorageStore';
 import homeFunctions from '../../../../dashboard/pages/home/module';
 
 function ContentWithIcon({icon,text, isAvatar= false}) {
-    return(
+    return (
         <HorizontalStack gap={2}>
             <Box width='20px'>
-                {isAvatar ? <div className='reduce-size'><Avatar size="extraSmall" source={icon} /> </div>:
+                {isAvatar ? <div className='reduce-size'><Avatar size="xs" source={icon} /> </div>:
                 <Icon source={icon} color="base" />}
             </Box>
             <Text>{text}</Text>
         </HorizontalStack>
-    )
+    );
 }
 
 export default function Header() {
