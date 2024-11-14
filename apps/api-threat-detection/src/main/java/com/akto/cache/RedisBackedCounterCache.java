@@ -32,23 +32,26 @@ public class RedisBackedCounterCache implements CounterCache {
 
     private final Cache<String, Long> localCache;
 
-    private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
     private final ConcurrentLinkedQueue<Op> pendingOps;
     private final String prefix;
 
     public RedisBackedCounterCache(RedisClient redisClient, String prefix) {
         this.prefix = prefix;
         this.redis = redisClient.connect(new LongValueCodec());
-        this.localCache = Caffeine.newBuilder()
-                .maximumSize(100000)
-                .expireAfterWrite(1, TimeUnit.HOURS)
-                .build();
-        this.executor.scheduleAtFixedRate(this::syncToRedis, 60, 1, TimeUnit.SECONDS);
+        this.localCache =
+                Caffeine.newBuilder()
+                        .maximumSize(100000)
+                        .expireAfterWrite(1, TimeUnit.HOURS)
+                        .build();
+
+        ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+        executor.scheduleAtFixedRate(this::syncToRedis, 60, 1, TimeUnit.SECONDS);
+
         this.pendingOps = new ConcurrentLinkedQueue<>();
     }
 
     private String getKey(String key) {
-        return new StringBuilder().append(prefix).append("|").append(key).toString();
+        return prefix + "|" + key;
     }
 
     @Override

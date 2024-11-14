@@ -75,6 +75,7 @@ public class WindowBasedThresholdNotifierTest {
         for (int i = 0; i < 1000; i++) {
             boolean _shouldNotify = notifier.shouldNotify(
                     ip,
+                    "4XX_FILTER",
                     WindowBasedThresholdNotifierTest
                             .generateResponseParamsForStatusCode(400));
             shouldNotify = shouldNotify || _shouldNotify;
