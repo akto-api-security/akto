@@ -1,4 +1,4 @@
-import { Autocomplete, Avatar, Checkbox, Icon, TextContainer } from '@shopify/polaris';
+import { Autocomplete, Avatar, Checkbox, HorizontalStack, Icon, Link, Text, TextContainer } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import React, { useState, useCallback, useEffect } from 'react';
 import func from "@/util/func";
@@ -174,7 +174,7 @@ function DropdownSearch(props) {
     );
 
     const showSelectAll = (allowMultiple && optionsList.length > 5)
-    const checkboxLabel = checked ? "Deselect all" : "Select all"
+    const checkboxLabel = checked ? <Link removeUnderline>Deselect all</Link> : <Link removeUnderline>Select all</Link>
 
     const emptyState = (
         <React.Fragment>
@@ -196,7 +196,7 @@ function DropdownSearch(props) {
                 textField={textField}
                 preferredPosition='below'
                 {...(showSelectAll ? {actionBefore:{
-                    content:(<Checkbox label={checkboxLabel} checked={checked} onChange={() => selectAllFunc()}/>),
+                    content: checkboxLabel,
                     onAction: () => selectAllFunc(),
                 }} : {})}
             >

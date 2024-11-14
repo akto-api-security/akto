@@ -278,10 +278,10 @@ const transform = {
       obj['name'] = data.name || "Test"
       obj['number_of_tests'] = data.testIdConfig == 1 ? "-" : getTestsInfo(testingRunResultSummary?.testResultsCount, state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
-      obj['run_time_epoch'] = Math.max(data.scheduleTimestamp,data.endTimestamp)
+      obj['run_time_epoch'] = Math.max(data.scheduleTimestamp, (cicd ? testingRunResultSummary.endTimestamp : data.endTimestamp))
       obj['scheduleTimestamp'] = data.scheduleTimestamp
       obj['pickedUpTimestamp'] = data.pickedUpTimestamp
-      obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, state)
+      obj['run_time'] = getRuntime(data.scheduleTimestamp , (cicd ? testingRunResultSummary.endTimestamp : data.endTimestamp), state)
       obj['severity'] = func.getSeverity(testingRunResultSummary.countIssues)
       obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
