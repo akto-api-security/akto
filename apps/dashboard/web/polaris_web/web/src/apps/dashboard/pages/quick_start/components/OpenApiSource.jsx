@@ -95,7 +95,7 @@ function OpenApiSource() {
                             <RadioButton id="forceImport" label="Force import all APIs" checked={importType === "ALL_APIS"} onChange={()=>toggleImport("ALL_APIS")} />
                             <div style={{margin: "auto 12px"}}>
                                 <Tooltip content={`We will import ${uploadObj.correctlyParsedApis + uploadObj.apisWithErrorsAndParsed} apis i.e. all the apis that have been correctly parsed and apis which have errors and can still be imported`} dismissOnMouseOut width="wide">
-                                    <Icon source={QuestionMarkMinor} color="base" />
+                                    <Icon source={QuestionMarkMinor} tone="base" />
                                 </Tooltip>
                             </div>
                         </div>
@@ -103,7 +103,7 @@ function OpenApiSource() {
                             <RadioButton id="successFulApis" label="Import only correctly formatted APIs" checked={importType === "ONLY_SUCCESSFUL_APIS"} onChange={()=>toggleImport("ONLY_SUCCESSFUL_APIS")}/>
                             <div style={{margin: "auto 12px"}}>
                                 <Tooltip content={`We will import ${uploadObj.correctlyParsedApis} apis i.e. all the apis that have been correctly parsed only`} dismissOnMouseOut width="wide">
-                                    <Icon source={QuestionMarkMinor} color="base" />
+                                    <Icon source={QuestionMarkMinor} tone="base" />
                                 </Tooltip>
                             </div>
                         </div>

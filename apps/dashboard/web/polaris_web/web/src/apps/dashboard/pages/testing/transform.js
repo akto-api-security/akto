@@ -224,7 +224,8 @@ const transform = {
       return (
         <InlineStack gap={4}>
           <Tooltip content={iconToolTipContent} hoverDelay={"300"} dismissOnMouseOut>
-            <Box><Icon source={icon} color={iconColor}/></Box>
+            <Box>
+              <Icon source={icon} tone={iconColor}/></Box>
           </Tooltip>
           <Box maxWidth="350px">
             <TooltipText text={testName} tooltip={testName} textProps={{fontWeight: 'medium'}} />

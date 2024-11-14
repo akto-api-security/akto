@@ -19,7 +19,7 @@ function SuitesCard({cardObj}) {
                         </InlineStack>
                         <Tooltip content={cardObj?.description}>
                             <Box>
-                                <Icon color="base" source={QuestionMarkMinor} />
+                                <Icon tone="base" source={QuestionMarkMinor} />
                             </Box>
                         </Tooltip>
                     </InlineStack>

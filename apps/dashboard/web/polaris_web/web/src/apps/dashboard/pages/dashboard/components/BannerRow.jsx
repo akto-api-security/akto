@@ -10,14 +10,14 @@ function BannerRow(props) {
     const titleComp = (
         <InlineStack gap={1}>
             <Text fontWeight="semibold" color="subdued">{title}</Text>
-            {showRedirect ? <Box><Icon source={ChevronRightMinor} color="subdued"/></Box> : null}
+            {showRedirect ? <Box><Icon source={ChevronRightMinor} tone="subdued"/></Box> : null}
         </InlineStack>
     )
     
     return (
         <div style={{display: 'flex', gap: '12px'}}>
             <Box>
-                <Icon source={icon} color="base" />
+                <Icon source={icon} tone="base" />
             </Box>
             <VerticalStack gap={2}>
                 {redirectUrl ? <Link monochrome removeUnderline onClick={() => newTab ? window.open(redirectUrl, "_blank") : navigate(redirectUrl)}>
@@ -31,7 +31,7 @@ function BannerRow(props) {
                 </Text>
             </VerticalStack>
         </div>
-    )
+    );
 }
 
 export default BannerRow

@@ -416,7 +416,7 @@ function TestRoleSettings() {
                                             <InlineStack gap="2">
                                                 <Text>Header key</Text>
                                                 <Tooltip content="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization" dismissOnMouseOut width="wide" preferredPosition="below">
-                                                    <Icon source={InfoMinor} color="base" />
+                                                    <Icon source={InfoMinor} tone="base" />
                                                 </Tooltip>
                                             </InlineStack>
                                         )}
@@ -429,7 +429,7 @@ function TestRoleSettings() {
                                             <InlineStack gap="2">
                                                 <Text>Header value</Text>
                                                 <Tooltip content="Please enter the value of the auth token." dismissOnMouseOut width="wide" preferredPosition="below">
-                                                    <Icon source={InfoMinor} color="base" />
+                                                    <Icon source={InfoMinor} tone="base" />
                                                 </Tooltip>
                                             </InlineStack>
                                         )}

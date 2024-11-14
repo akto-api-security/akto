@@ -29,10 +29,10 @@ function GithubCell(props){
                                 {data.iconTooltip ? 
                                     <Tooltip content={data?.iconTooltip} dismissOnMouseOut>
                                         <div className='big-icon'>
-                                            <Icon source={data[header.value]} color={data.iconColor ? data.iconColor : "base"} />
+                                            <Icon source={data[header.value]} tone={data.iconColor ? data.iconColor : "base"} />
                                         </div>
                                     </Tooltip>
-                                    :<Icon source={data[header.value]} color={data.iconColor ? data.iconColor : "base"} />
+                                    :<Icon source={data[header.value]} tone={data.iconColor ? data.iconColor : "base"} />
                                 }
                             </Box>
                         </div>
@@ -105,7 +105,7 @@ function GithubCell(props){
                                 <InlineStack wrap={false} key={header.value} gap="1">
                                     <div style={{ maxWidth: "1rem", maxHeight: "1rem" }}>
                                         <Tooltip content={header.iconTooltip} dismissOnMouseOut>
-                                            <Icon source={header.icon} color="subdued" />
+                                            <Icon source={header.icon} tone="subdued" />
                                         </Tooltip>
                                     </div>
                                     <TooltipText

@@ -246,12 +246,12 @@ function HomeDashboard() {
         if (val === 0) return null
         const color = !invertColor && val > 0 ? "success" : "critical"
         return (
-            <InlineStack wrap={false}>
-                <Icon source={source} color={color} />
+            (<InlineStack wrap={false}>
+                <Icon source={source} tone={color} />
                 <div className='custom-color'>
                     <Text color={color}>{Math.abs(val)}</Text>
                 </div>
-            </InlineStack>
+            </InlineStack>)
         );
     }
 

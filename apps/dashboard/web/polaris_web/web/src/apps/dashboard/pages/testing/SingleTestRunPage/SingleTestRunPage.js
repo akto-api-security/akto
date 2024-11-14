@@ -530,7 +530,7 @@ const runningTestsComp = useMemo(() => (
       <VerticalStack gap="2">
         <InlineStack gap="2" align="start">
           { selectedTestRun?.icon && <Box>
-            <Icon color={selectedTestRun.iconColor} source={selectedTestRun.icon }></Icon>
+            <Icon tone={selectedTestRun.iconColor} source={selectedTestRun.icon }></Icon>
           </Box>
           }
           <Box maxWidth="35vw">
@@ -553,20 +553,20 @@ const runningTestsComp = useMemo(() => (
         </InlineStack>
         <InlineStack gap={"2"}>
           <InlineStack gap={"1"}>
-            <Box><Icon color="subdued" source={CustomersMinor}/></Box>
+            <Box><Icon tone="subdued" source={CustomersMinor}/></Box>
             <Text color="subdued" fontWeight="medium" variant="bodyMd">created by:</Text>
             <Text color="subdued" variant="bodyMd">{selectedTestRun.userEmail}</Text>
           </InlineStack>
           <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
           <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
             <InlineStack gap={"1"}>
-              <Box><Icon color="subdued" source={ArchiveMinor}/></Box>
+              <Box><Icon tone="subdued" source={ArchiveMinor}/></Box>
               <Text color="subdued" variant="bodyMd">{collectionsMap[selectedTestRun?.apiCollectionId]}</Text>
             </InlineStack>
           </Link>
           <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
           <InlineStack gap={"1"}>
-            <Box><Icon color="subdued" source={PriceLookupMinor}/></Box>
+            <Box><Icon tone="subdued" source={PriceLookupMinor}/></Box>
             <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
           </InlineStack>
         </InlineStack>

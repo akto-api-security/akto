@@ -66,7 +66,7 @@ const convertFunc = {
                             <Tooltip content={testObj?.customTests[key][0]?.category} dismissOnMouseOut width="wide">
                                 <InlineStack gap="2">
                                     <Box>
-                                        <Icon source={FolderMajor} color="base"/>
+                                        <Icon source={FolderMajor} tone="base"/>
                                     </Box>
                                     <Text truncate variant="bodyMd" as="h5">
                                         {testObj?.customTests[key][0]?.category}
@@ -96,7 +96,7 @@ const convertFunc = {
                             <Tooltip content={testObj?.aktoTests[key][0]?.category} dismissOnMouseOut width="wide">
                                 <InlineStack gap="2">
                                     <Box>
-                                        <Icon source={FolderMajor} color="base"/>
+                                        <Icon source={FolderMajor} tone="base"/>
                                     </Box>
                                     <Text truncate variant="bodyMd" as="h5">
                                       {testObj?.aktoTests[key][0]?.category}

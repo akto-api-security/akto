@@ -146,9 +146,9 @@ function DependencyTable() {
             let runResult = runResults[key]
             if (runResult) {
                 if (runResult["success"]) {
-                    icon = <Icon source={TickMinor} color="success" />
+                    icon = <Icon source={TickMinor} tone="success" />
                 } else {
-                    icon = <Icon source={CancelMinor} color="critical" />
+                    icon = <Icon source={CancelMinor} tone="critical" />
                 }
             }
 

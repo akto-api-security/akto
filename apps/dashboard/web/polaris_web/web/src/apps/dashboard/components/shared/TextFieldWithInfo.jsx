@@ -11,7 +11,7 @@ function TextFieldWithInfo({labelText, labelTextColor, labelTooltip, tooltipIcon
         <InlineStack gap="2">
             <Text color={labelTextColorV}>{labelText}</Text>
             <Tooltip content={labelTooltip} dismissOnMouseOut width="wide">
-                <Icon source={QuestionMarkMinor} color={tooltipIconColorV} />
+                <Icon source={QuestionMarkMinor} tone={tooltipIconColorV} />
             </Tooltip>
         </InlineStack>
     )

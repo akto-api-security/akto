@@ -274,7 +274,7 @@ function TestRunResultFlyout(props) {
                     <VerticalStack gap={"5"} key={index}>
                         <VerticalStack gap={"2"} >
                             <InlineStack gap="1_5-experimental">
-                                <Box><Icon source={item.icon} color='subdued'/></Box>
+                                <Box><Icon source={item.icon} tone='subdued'/></Box>
                                 <TitleWithInfo
                                     textProps={{variant:"bodyMd", fontWeight:"semibold", color:"subdued"}}
                                     titleText={item.title}

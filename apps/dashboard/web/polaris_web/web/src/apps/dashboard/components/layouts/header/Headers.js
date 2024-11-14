@@ -18,7 +18,7 @@ function ContentWithIcon({icon,text, isAvatar= false}) {
         <InlineStack gap={2}>
             <Box width='20px'>
                 {isAvatar ? <div className='reduce-size'><Avatar size="xs" source={icon} /> </div>:
-                <Icon source={icon} color="base" />}
+                <Icon source={icon} tone="base" />}
             </Box>
             <Text>{text}</Text>
         </InlineStack>

@@ -162,11 +162,11 @@ function DropdownSearch(props) {
             value={inputValue}
             prefix={
                 <div style={{display: 'flex', gap: '4px', alignItems: 'center'}}>
-                    <Icon source={SearchMinor} color="base" />
+                    <Icon source={SearchMinor} tone="base" />
                     {avatarIcon && avatarIcon.length > 0 ? <Avatar customer size="xs" name={avatarIcon} source={avatarIcon}/> : null}
                 </div>
             }
-            suffix={<Icon source={ChevronDownMinor} color="base" />}
+            suffix={<Icon source={ChevronDownMinor} tone="base" />}
             placeholder={placeholder}
             autoComplete="off"
             onFocus={handleFocusEvent}

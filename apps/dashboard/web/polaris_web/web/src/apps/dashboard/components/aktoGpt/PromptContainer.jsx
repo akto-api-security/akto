@@ -20,7 +20,7 @@ function PromptContainer({itemObj, activePrompt, setActivePrompt}) {
                 <Box background={activePrompt === itemObj.label ? "bg-active" : ""} padding="2" borderRadius="2">
                     <InlineStack gap={"2"}>
                         <Box>
-                            <Icon source={itemObj.icon} color="subdued"/>
+                            <Icon source={itemObj.icon} tone="subdued"/>
                         </Box>
                         <Box maxWidth="10vw">
                             <Text truncate variant="bodyMd" fontWeight="semibold" color="subdued">{(itemObj.label).split("${input}")[0]}</Text>

@@ -24,7 +24,7 @@ function TestSuitesCard({cardObj}) {
                     <Text variant='bodyLg' fontWeight="medium">{cardObj.vulnerability}</Text>
                     <Tooltip content={cardObj.testName}>
                         <Box>
-                            <Icon source = {InfoMinor} color="base"/>
+                            <Icon source = {InfoMinor} tone="base"/>
                         </Box>
                     </Tooltip>
                 </InlineStack>

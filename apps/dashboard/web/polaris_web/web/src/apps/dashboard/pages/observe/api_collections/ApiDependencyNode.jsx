@@ -34,7 +34,7 @@ function ApiDependencyNode({ data }) {
                                     {StyledEndpoint(methodPlusUrl, "12px", "bodySm")}
                                 </Box>
                                 <div style={{ transform: 'rotate(45deg)', width: "20px" }}>
-                                    {!isCurrentNode && <Icon source={ArrowUpMinor} color="subdued" />}
+                                    {!isCurrentNode && <Icon source={ArrowUpMinor} tone="subdued" />}
                                 </div>
                             </InlineStack>
                         </VerticalStack>

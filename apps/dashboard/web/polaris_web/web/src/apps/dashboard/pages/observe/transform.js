@@ -428,11 +428,11 @@ const transform = {
             <Box maxWidth="200px">
                 <InlineStack gap={1} wrap={false}>
                     {sensitiveTags.map((item,index)=>{
-                        return (index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index + item}><Box>
+                        return index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index + item}><Box>
                             <div className={deactivated ? "icon-deactivated" : ""}>
-                                <Icon color={deactivated ? "" : "subdued"} source={func.getSensitiveIcons(item)} />
+                                <Icon tone={deactivated ? "" : "subdued"} source={func.getSensitiveIcons(item)} />
                             </div>
-                        </Box></Tooltip> : null)
+                        </Box></Tooltip> : null;
                     })}
                     {sensitiveTags.length > 4 ? <Badge size="small" tone="warning" key={"more"}>{'+' + (sensitiveTags.length - 4).toString() + 'more'}</Badge> : null}
                 </InlineStack>
@@ -649,7 +649,7 @@ const transform = {
         return (
             <InlineStack gap={1}>
                 <Box>
-                    <Icon source={source} color='subdued' />
+                    <Icon source={source} tone='subdued' />
                 </Box>
                 <Text color='subdued' fontWeight='medium'>{Math.abs(val)}</Text>
                 <Text color='subdued' fontWeight='semibold'>{time}</Text>
