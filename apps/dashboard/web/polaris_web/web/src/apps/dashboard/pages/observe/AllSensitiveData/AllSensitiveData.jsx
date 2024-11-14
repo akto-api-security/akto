@@ -149,12 +149,21 @@ function AllSensitiveData() {
     })
     const [countMap, setCountMap] = useState({})
     const [severityCountMap, setSeverityCountMap] = useState([])
-
-    const [selectedTab, setSelectedTab] = useState("enabled")
-    const [selected, setSelected] = useState(1)
     const [loading, setLoading] = useState(false)
 
     const definedTableTabs = ["All", "Enabled", "Disabled"]
+    const tableSelectedTab = PersistStore.getState().tableSelectedTab[window.location.pathname]
+    const initialSelectedTab = tableSelectedTab || "enabled"
+    const [selectedTab, setSelectedTab] = useState(initialSelectedTab)
+    let initialVal = 1;
+    for(let x = 0; x < definedTableTabs.length; x++) {
+        const tempId = func.getKeyFromName(definedTableTabs[x]);
+        if (tempId === initialSelectedTab) {
+            initialVal = x;
+            break;
+        }
+    }
+    const [selected, setSelected] = useState(initialVal)
 
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, data)
