@@ -403,7 +403,7 @@ const transform = {
                 {
                     Object.keys(severityInfo).length > 0 ? Object.keys(severityInfo).map((key,index)=>{
                         return(
-                            <Badge size="small" status={this.getColor(key)} key={index}>{severityInfo[key].toString()}</Badge>
+                            <Badge size="small" tone={this.getColor(key)} key={index}>{severityInfo[key].toString()}</Badge>
                         )
                     }):
                     <Text fontWeight="regular" variant="bodyMd" color="subdued">-</Text>
@@ -434,7 +434,7 @@ const transform = {
                             </div>
                         </Box></Tooltip> : null)
                     })}
-                    {sensitiveTags.length > 4 ? <Badge size="small" status="warning" key={"more"}>{'+' + (sensitiveTags.length - 4).toString() + 'more'}</Badge> : null}
+                    {sensitiveTags.length > 4 ? <Badge size="small" tone="warning" key={"more"}>{'+' + (sensitiveTags.length - 4).toString() + 'more'}</Badge> : null}
                 </HorizontalStack>
             </Box>
         )
@@ -457,7 +457,7 @@ const transform = {
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: c.displayName,
                 displayNameComp: c.displayNameComp,
-                riskScoreComp: isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
+                riskScoreComp: isLoading ? loadingComp : <Badge key={c?.id} tone={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
                 coverage: isLoading ? '...' : calcCoverage,
                 issuesArr: isLoading ? loadingComp : this.getIssuesList(c.severityInfo),
                 issuesArrVal: this.getIssuesListText(c.severityInfo),
@@ -466,7 +466,7 @@ const transform = {
                 riskScore: c.riskScore,
                 deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
                 activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 )),
-                envTypeComp: isLoading ? loadingComp : c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null,
+                envTypeComp: isLoading ? loadingComp : c.envType ? <Badge size="small" tone="info">{func.toSentenceCase(c.envType)}</Badge> : null,
                 sensitiveSubTypesVal: c?.sensitiveInRespTypes.join(" ") ||  "-"
             }
         })
@@ -531,7 +531,7 @@ const transform = {
                 auth_type: url.auth_type,
                 endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} isNew={this.isNewEndpoint(url.lastSeenTs)} />,
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
-                riskScoreComp: <Badge status={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
+                riskScoreComp: <Badge tone={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
                 isNew: this.isNewEndpoint(url.lastSeenTs),
                 sensitiveDataTags: url?.sensitiveTags.join(" "),
                 codeAnalysisEndpoint: false,
@@ -632,7 +632,7 @@ const transform = {
 
     convertToPrettifyData(c){
         return{
-            riskScoreComp:<Badge key={c.level} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
+            riskScoreComp:<Badge key={c.level} tone={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
             coverage: c.urlsCount !== 0 ? Math.min( Math.floor((c.testedEndpoints * 100)/c.urlsCount), 100) + "%": '0%',
             issuesArr: this.getIssuesList(c.severityInfo),
             sensitiveSubTypes: this.prettifySubtypes(c?.sensitiveInRespTypes || []),

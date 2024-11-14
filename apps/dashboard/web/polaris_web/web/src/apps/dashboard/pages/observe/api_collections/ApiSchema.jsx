@@ -26,12 +26,12 @@ function prepareTableData (data, handleBadgeClick) {
             {
                 isSensitive ?
                     <Button plain monochrome onClick={() => {handleBadgeClick(element.subType.name, "")}}>
-                        <Badge status="warning">
+                        <Badge tone="warning">
                             {element.subType.name}
                         </Badge>
                     </Button> : (nonSensitiveDataType ?
                         <Button plain monochrome onClick={() => { handleBadgeClick(element.subType.name, "") }}>
-                            <Badge status="info">
+                            <Badge tone="info">
                                 {element.subType.name}
                             </Badge>
                         </Button> : null)

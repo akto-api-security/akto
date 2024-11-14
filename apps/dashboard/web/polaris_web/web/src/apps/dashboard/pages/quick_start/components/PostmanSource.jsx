@@ -133,7 +133,7 @@ function PostmanSource() {
                 
                 <HorizontalStack gap="2" >
                     {files ? 
-                        <Badge size='medium' status='success'>
+                        <Badge size='medium' tone='success'>
                             {files.name}
                             <Button icon={CancelMajor} plain onClick={() => setFiles(null)} />
                         </Badge> 

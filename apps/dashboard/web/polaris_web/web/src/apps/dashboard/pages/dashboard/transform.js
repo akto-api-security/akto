@@ -249,12 +249,9 @@ const transform = {
 
                   <Box width='250px'  > 
                  <HorizontalStack align="space-between" gap="2">
-                <Text>{collectionsMap[c.id]}</Text>  
-
-              
-        
-                <Badge status={c.status} size="small">{c.score.toString()}</Badge>
-                </HorizontalStack>   
+                     <Text>{collectionsMap[c.id]}</Text>
+                     <Badge tone={c.status} size="small">{c.score.toString()}</Badge>
+                 </HorizontalStack>   
                 </Box>
                 </Button>
             

@@ -148,7 +148,7 @@ function OpenApiSource() {
 
             <HorizontalStack gap="2" >
                 {files ?
-                    <Badge size='medium' status='success'>
+                    <Badge size='medium' tone='success'>
                         {files.name}
                         <Button icon={CancelMajor} plain onClick={() => setFiles(null)} />
                     </Badge>
@@ -200,7 +200,7 @@ function OpenApiSource() {
                 </Modal.Section>
             </Modal>
         </div>
-    )
+    );
 }
 
 export default OpenApiSource;

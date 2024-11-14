@@ -184,7 +184,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                                     />
                                 </HorizontalStack>
                                 <div style={{marginRight: '-2px'}}>
-                                    <Badge size="small" status="new">{customItems.count.toString()}</Badge>
+                                    <Badge size="small" tone="new">{customItems.count.toString()}</Badge>
                                 </div>
                                 {/* <Box onClick={(e) => addCustomTest(e)}>
                                     <Icon source={CirclePlusMinor} />
@@ -208,7 +208,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                                     />
                                 </HorizontalStack>
                                 <div style={{marginRight: '-2px'}}>
-                                    <Badge size="small" status="new">{aktoItems.count.toString()}</Badge>
+                                    <Badge size="small" tone="new">{aktoItems.count.toString()}</Badge>
                                 </div>
                             </HorizontalStack>
                         </Button>
@@ -217,7 +217,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                 </VerticalStack>
             </Navigation>
         </div>
-    )
+    );
 }
 
 export default TestEditorFileExplorer

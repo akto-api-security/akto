@@ -33,7 +33,7 @@ function PrettifyDisplayName({name, level, isTerminal, isOpen, selectItems, coll
         displayName = level.split("#")[len];
     }
     const icon = isOpen ? ChevronDownMinor : ChevronRightMinor
-    return(
+    return (
         <Box width='230px'>
             <div className="styled-name">
                 <HorizontalStack gap={"2"} wrap={false}>
@@ -46,14 +46,14 @@ function PrettifyDisplayName({name, level, isTerminal, isOpen, selectItems, coll
                                 <Box maxWidth="130px">
                                     <Text variant="headingSm" truncate>{displayName}</Text>
                                 </Box>
-                                {collectionIds.length > 1 ? <Badge size="small" status="new">{collectionIds.length}</Badge> : null}
+                                {collectionIds.length > 1 ? <Badge size="small" tone="new">{collectionIds.length}</Badge> : null}
                             </HorizontalStack>
                         </Tooltip>
                     </Box>
                 </HorizontalStack>
             </div>
         </Box>
-    )
+    );
 }
 
 export default PrettifyDisplayName

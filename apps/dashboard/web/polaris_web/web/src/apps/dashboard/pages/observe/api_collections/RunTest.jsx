@@ -79,7 +79,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const convertToLowerCaseWithUnderscores = (inputString) => {
         if(!inputString)
             return ""
-        return inputString?.toLowerCase()?.replace(/\s+/g, '_')
+        return inputString?.toLowerCase()?.replace(/\s+/g, '_');
     }
     const apiCollectionName = collectionsMap[apiCollectionId]
 
@@ -286,7 +286,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             const label = (
                 <span style={{display: 'flex', gap: '4px', alignItems: 'flex-start'}}>
                     <Text variant="bodyMd">{test.label}</Text>
-                    {isCustom ? <Box paddingBlockStart={"05"}><Badge status="warning" size="small">Custom</Badge></Box> : null}
+                    {isCustom ? <Box paddingBlockStart={"05"}><Badge tone="warning" size="small">Custom</Badge></Box> : null}
                 </span>
             )
             return ([(

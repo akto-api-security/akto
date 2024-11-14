@@ -67,12 +67,12 @@ function NewConnection() {
                 <Avatar customer size="xs" name={label} source={icon} shape="square"/>
             </Box>
         )
-        return(
+        return (
             <ResourceItem id={label} onClick={()=> connectorSelected(item)} media={media}>
                 <div className='connector-item'>
                     <Text fontWeight="semibold" variant="bodySm">
                         {label}
-                        {badge && badge.length > 0 ? <Badge size='small' status='info'>{badge}</Badge> : null}
+                        {badge && badge.length > 0 ? <Badge size='small' tone='info'>{badge}</Badge> : null}
                     </Text>
                     <div className='see-docs'>
                     <Button plain onClick={(event) => { 
@@ -86,7 +86,7 @@ function NewConnection() {
                 </div>
                 <Text variant='bodySm' color="subdued">{text}</Text>
             </ResourceItem>
-        )
+        );
     }
 
     const allConnectorsLabel = (

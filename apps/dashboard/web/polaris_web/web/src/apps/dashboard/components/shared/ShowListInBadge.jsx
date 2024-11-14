@@ -8,14 +8,14 @@ function ShowListInBadge({itemsArr, maxWidth, status, maxItems, itemWidth}) {
             <HorizontalStack gap={"1"} wrap={false}>
                 {itemsArr.slice(0,maxItems).map((item, index) => {
                     return(
-                        <Badge key={index + item} size="medium" status={status}>
+                        <Badge key={index + item} size="medium" tone={status}>
                             <Box maxWidth={itemWidth || maxWidth}>
                                 <TooltipText tooltip={item} text={item} />
                             </Box>
                         </Badge>
                     )
                 })}
-                {(itemsArr.length - maxItems) > 0 ? <Badge status={status} size="medium">+ {itemsArr.length - maxItems}</Badge> : null}
+                {(itemsArr.length - maxItems) > 0 ? <Badge tone={status} size="medium">+ {itemsArr.length - maxItems}</Badge> : null}
             </HorizontalStack>
         </Box>
     )

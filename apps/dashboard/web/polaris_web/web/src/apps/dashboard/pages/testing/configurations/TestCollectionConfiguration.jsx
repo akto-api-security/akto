@@ -106,7 +106,7 @@ function TestCollectionConfiguration() {
                         return {
                             formattedValues: propsFromConfig.values.join(", "),
                             formattedValuesComp: drawComponentToEdit(propsFromConfig, propertyIds),
-                            statusComp: <Badge status={isDefault ? "warning":"success"} progress="complete">{isDefault ? "Default":"Done"}</Badge>,
+                            statusComp: <Badge tone={isDefault ? "warning":"success"} progress="complete">{isDefault ? "Default":"Done"}</Badge>,
                             ...propsFromConfig,
                             ...ret
                         }
@@ -114,7 +114,7 @@ function TestCollectionConfiguration() {
                         return {
                             formattedValues: "-",
                             formattedValuesComp: drawComponentToCreateNew(propsFromPossible.type, propsFromPossible.id),
-                            statusComp: <Badge status="critical" progress="incomplete">Pending</Badge>,
+                            statusComp: <Badge tone="critical" progress="incomplete">Pending</Badge>,
                             ...ret
                         }
                     }

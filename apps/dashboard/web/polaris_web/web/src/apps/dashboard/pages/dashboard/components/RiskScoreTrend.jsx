@@ -36,18 +36,18 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
                 <Box paddingInlineEnd={4} paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
                     <VerticalStack gap={3}>
                         {riskScoreRanges.map((range)=>{
-                            return(
+                            return (
                                 <VerticalStack gap={1} key={range.text} >
                                     <HorizontalStack align="space-between">
                                         <Button plain monochrome removeUnderline 
                                             onClick={() => navigate(`/dashboard/observe/inventory/${range.apiCollectionId}`)}>
                                                 <Text variant="bodyMd" color="semibold" >{range.text}</Text>
                                         </Button>
-                                        <Badge status={range.status}>{range.range}</Badge>  
+                                        <Badge tone={range.status}>{range.range}</Badge>
                                     </HorizontalStack>
                                     <Divider />
                                 </VerticalStack>
-                            )
+                            );
                         })}
                     </VerticalStack>
                 </Box>

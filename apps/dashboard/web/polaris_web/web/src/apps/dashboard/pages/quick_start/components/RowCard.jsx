@@ -19,7 +19,7 @@ function RowCard(props) {
                     <Avatar customer size="xs" name={cardObj.label} source={cardObj.icon} shape='square'/>
                     </Box>
                     <Box paddingBlockStart="1">
-                        {cardObj.badge ? <Badge size='small' status='info'>{cardObj.badge}</Badge> : null}
+                        {cardObj.badge ? <Badge size='small' tone='info'>{cardObj.badge}</Badge> : null}
                     </Box>
                 </div>
                 <VerticalStack gap="1">

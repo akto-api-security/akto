@@ -77,14 +77,14 @@ function GithubCell(props){
                     ?.map((item) =>
                     isBadgeClickable ? 
                         <Button key={item} onClick={() =>badgeClicked()} plain monochrome>
-                            <Badge status={getStatus(item)}>
+                            <Badge tone={getStatus(item)}>
                                 <Text {...header.dataProps}>
                                     {item}
                                 </Text>
                             </Badge>
                         </Button>
                         
-                    : <Badge key={item} status={getStatus(item)}>
+                    : <Badge key={item} tone={getStatus(item)}>
                         <Text {...header.dataProps}>
                             {item}
                         </Text>
@@ -130,14 +130,14 @@ function GithubCell(props){
                 ?.map((item) =>
                 isBadgeClickable ? 
                     <div onClick={() =>badgeClicked()} style={{cursor: "pointer"}} key={item}>
-                        <Badge status={getStatus(item)}>
+                        <Badge tone={getStatus(item)}>
                             <Text {...header.dataProps}>
                                 {item}
                             </Text>
                         </Badge>
                     </div>
                     
-                : <Badge key={item} status={getStatus(item)}>
+                : <Badge key={item} tone={getStatus(item)}>
                     <Text {...header.dataProps} breakWord>
                         {item}
                     </Text>

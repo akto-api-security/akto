@@ -125,7 +125,7 @@ const convertDataIntoTableFormat = (endpoint, apiCollectionMap) => {
     temp['endpointComp'] = <GetPrettifyEndpoint key={id} maxWidth="300px" method={endpoint.method} url={endpoint.url} />
     temp["call"] = endpoint.responseCode < 0 ? "Request" : "Response"
     temp['keyValueComp'] = (
-        <Badge key={id} status="critical" size="slim">
+        <Badge key={id} tone="critical" size="slim">
             <Box maxWidth="270px">
                 <HorizontalStack gap={"1"} wrap={false}>
                     <Box as="span" maxWidth="180px">

@@ -18,9 +18,9 @@ function TestSummaryCard({ summaryItem }) {
                             <VerticalStack gap={2}>
                                 <Text color='subdued' variant='headingXs' fontWeight='semibold'>Issues Found</Text>
                                 <HorizontalStack gap={2}>
-                                    <Badge size="small" status="critical">{summaryItem.highCount}</Badge>
-                                    <Badge size="small" status="warning">{summaryItem.mediumCount}</Badge>
-                                    <Badge size="small" status="info">{summaryItem.lowCount}</Badge>
+                                    <Badge size="small" tone="critical">{summaryItem.highCount}</Badge>
+                                    <Badge size="small" tone="warning">{summaryItem.mediumCount}</Badge>
+                                    <Badge size="small" tone="info">{summaryItem.lowCount}</Badge>
                                 </HorizontalStack>
                             </VerticalStack>
                             <VerticalStack gap={2}>
@@ -33,7 +33,7 @@ function TestSummaryCard({ summaryItem }) {
                 </Box>
             </div>
         </LegacyCard>
-    )
+    );
 }
 
 export default TestSummaryCard

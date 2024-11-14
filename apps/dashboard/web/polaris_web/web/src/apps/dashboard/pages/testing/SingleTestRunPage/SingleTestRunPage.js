@@ -543,7 +543,7 @@ const runningTestsComp = useMemo(() => (
             selectedTestRun?.severity && 
             selectedTestRun.severity
             .map((item) =>
-            <Badge key={item} status={func.getTestResultStatus(item)}>
+            <Badge key={item} tone={func.getTestResultStatus(item)}>
               <Text fontWeight="regular">
                 {item}
               </Text>

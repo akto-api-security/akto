@@ -496,7 +496,7 @@ function ApiCollections() {
         Object.keys(copyObj).forEach((key) => {
             data[key].length > 0 && data[key].forEach((c) => {
                 c['envType'] = dataMap[c.id]
-                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" status="info">{func.toSentenceCase(dataMap[c.id])}</Badge> : null
+                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" tone="info">{func.toSentenceCase(dataMap[c.id])}</Badge> : null
             })
         })
         setData(copyObj)

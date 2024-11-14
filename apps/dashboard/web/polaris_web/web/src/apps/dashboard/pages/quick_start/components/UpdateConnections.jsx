@@ -33,7 +33,7 @@ function UpdateConnections(props) {
     const components = [
         currentCardObj ? <HorizontalStack gap="1">
             <Text variant="headingMd" as="h6">{currentCardObj.label} </Text>
-            {currentCardObj.badge ? <Badge size='small' status='info'>{currentCardObj.badge}</Badge> : null}
+            {currentCardObj.badge ? <Badge size='small' tone='info'>{currentCardObj.badge}</Badge> : null}
         </HorizontalStack> : null,
         currentCardObj ? currentCardObj.component : null
     ]

@@ -1017,7 +1017,7 @@ const quickStartFunc = {
                 <div style={{display: 'flex', gap: '4px', alignItems: 'center'}}>
                     <Avatar customer size="xs" name={item.label} source={item.icon}/>
                     {item.label}
-                    {item.badge  ? <Badge size='small' status='success'>{item.badge}</Badge> : null}
+                    {item.badge  ? <Badge size='small' tone='success'>{item.badge}</Badge> : null}
                 </div>
             )
             return{

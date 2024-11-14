@@ -17,8 +17,7 @@ function TestSuitesCard({cardObj}) {
                     </div>
                         <Text variant="headingMd" as='h4'>{cardObj.path}</Text>
                     </HorizontalStack>
-
-                    <Badge status={status} size="large-experimental">{cardObj.severity}</Badge>
+                    <Badge tone={status} size="large-experimental">{cardObj.severity}</Badge>
                 </HorizontalStack>
 
                 <HorizontalStack gap="2">
@@ -31,7 +30,7 @@ function TestSuitesCard({cardObj}) {
                 </HorizontalStack>
             </VerticalStack>
         </Card>
-    )
+    );
 }
 
 export default TestSuitesCard

@@ -23,7 +23,7 @@ function SampleDataList(props) {
             <Text variant='headingMd'>
               {heading}
             </Text>
-            {isVulnerable ? <Box paddingBlockStart={"05"}><Badge status="critical">Vulnerable</Badge></Box> : null}
+            {isVulnerable ? <Box paddingBlockStart={"05"}><Badge tone="critical">Vulnerable</Badge></Box> : null}
           </HorizontalStack>
         <Pagination
                 label={
@@ -58,7 +58,7 @@ function SampleDataList(props) {
           }
         </HorizontalGrid>
       </VerticalStack>
-    )
+    );
   }
 
   export default SampleDataList
