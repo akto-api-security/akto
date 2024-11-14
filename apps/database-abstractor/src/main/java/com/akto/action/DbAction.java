@@ -20,6 +20,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
@@ -91,6 +92,7 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForTestingRunIssues;
     List<BulkUpdates> writesForSuspectSampleData;
     List<DependencyNode> dependencyNodeList;
+    TestScript testScript;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
 
@@ -2252,6 +2254,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchTestScript() {
+        try {
+            testScript = DbLayer.fetchTestScript();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchTestScript " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -3281,6 +3293,10 @@ public class DbAction extends ActionSupport {
     
     public void setFilter(Bson filter) {
         this.filter = filter;
+    }
+
+    public TestScript getTestScript() {
+        return testScript;
     }
 
 }
