@@ -192,7 +192,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 function ApiCollections() {
 
     const navigate = useNavigate();
-    const [data, setData] = useState({'hostname':[]})
+    const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': []})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
     

@@ -163,7 +163,7 @@ function ApiEndpoints(props) {
     const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const [runTests, setRunTests ] = useState(false)
 
-    const [endpointData, setEndpointData] = useState({"all":[]})
+    const [endpointData, setEndpointData] = useState({"all":[], 'sensitive': [], 'new': [], 'high_risk': [], 'no_auth': [], 'shadow': []})
     const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
     const [selectedResourcesForPrimaryAction, setSelectedResourcesForPrimaryAction] = useState([])
