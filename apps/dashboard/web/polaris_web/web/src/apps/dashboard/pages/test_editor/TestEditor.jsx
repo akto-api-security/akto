@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { Box, Button, Frame, HorizontalGrid, InlineStack, TopBar } from "@shopify/polaris"
+import { Box, Button, Frame, InlineGrid, InlineStack, TopBar } from "@shopify/polaris"
 import { ExitMajor } from "@shopify/polaris-icons"
 
 import TestEditorFileExplorer from "./components/TestEditorFileExplorer"
@@ -148,24 +148,22 @@ const TestEditor = () => {
         fetchAllTests()
     }, [])
 
-    return (
-        loading ?
-            <SpinnerCentered />
-        : 
-        <Frame topBar={
-            headerEditor
-        }
-            navigation={ <TestEditorFileExplorer addCustomTest={(e) => addCustomTest(e)}/> }
-        >
-            <Box paddingInlineStart={12}>
-                <HorizontalGrid columns={2}>
-                    <YamlEditor fetchAllTests={fetchAllTests} />
-                    <SampleApi />
-                </HorizontalGrid>
-            </Box>
+    return loading ?
+        <SpinnerCentered />
+    : 
+    <Frame topBar={
+        headerEditor
+    }
+        navigation={ <TestEditorFileExplorer addCustomTest={(e) => addCustomTest(e)}/> }
+    >
+        <Box paddingInlineStart={12}>
+            <InlineGrid columns={2}>
+                <YamlEditor fetchAllTests={fetchAllTests} />
+                <SampleApi />
+            </InlineGrid>
+        </Box>
 
-        </Frame>
-    )
+    </Frame>;
 }
 
 export default TestEditor

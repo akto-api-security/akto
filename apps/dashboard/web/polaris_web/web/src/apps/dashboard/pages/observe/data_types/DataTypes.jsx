@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { LegacyCard, HorizontalGrid, TextField, VerticalStack, Text, Form, InlineStack, Tag, Button, Box, Checkbox } from '@shopify/polaris'
+import { LegacyCard, InlineGrid, TextField, VerticalStack, Text, Form, InlineStack, Tag, Button, Box, Checkbox } from '@shopify/polaris'
 import Dropdown from '../../../components/layouts/Dropdown'
 import "./DataTypes.css"
 import ConditionsPicker from '../../../components/ConditionsPicker'
@@ -233,7 +233,7 @@ function DataTypes() {
     <LegacyCard title="Details" key="desc">
       <LegacyCard.Section>
         <VerticalStack gap={"5"}>
-          <HorizontalGrid gap="4" columns={columnsForGrid}>
+          <InlineGrid gap="4" columns={columnsForGrid}>
             <TextField id={"name-field"} label="Name" helpText="Name the data type"
               value={currState.name} placeholder='NEW_CUSTOM_DATA_TYPE'
               {...pageTitle === "Add data type" ? {onChange: (val) => handleChange({name: val})} : {}}
@@ -252,9 +252,9 @@ function DataTypes() {
               selected={(val) => {handleChange({priority: val})}}
               label={"Select severity of data type"}
             />
-          </HorizontalGrid>
+          </InlineGrid>
 
-          <HorizontalGrid gap={"4"} columns={['twoThirds', 'oneThird']}>
+          <InlineGrid gap={"4"} columns={['twoThirds', 'oneThird']}>
             <VerticalStack gap={"2"}>
                 <Form onSubmit={() => handleTagsChange(tagValue, 'add')}>
                     <TextField onChange={setTagValue} value={tagValue} label={<Text color="subdued" fontWeight="medium" variant="bodySm">Datatype Tags</Text>}/>
@@ -283,7 +283,7 @@ function DataTypes() {
                 })}
               </InlineStack>
             </Box>}
-          </HorizontalGrid>
+          </InlineGrid>
         </VerticalStack>
         
       </LegacyCard.Section>
@@ -350,10 +350,10 @@ function DataTypes() {
         <LegacyCard.Section>
           <p>Mark the location where you want the data type to be sensitive</p>
           <br/>
-          <HorizontalGrid columns="4">
+          <InlineGrid columns="4">
             <Dropdown id={"sensitive-position"} menuItems = {requestItems} initial={currState.sensitiveState} 
             selected={(val) => { handleChange({ sensitiveState: val }) }}/>
-          </HorizontalGrid >
+          </InlineGrid>
         </LegacyCard.Section>
       </LegacyCard>
     </VerticalStack>
@@ -376,10 +376,10 @@ function DataTypes() {
         <LegacyCard.Section>
           <p>Redact this data type</p>
           <br/>
-          <HorizontalGrid columns="4">
+          <InlineGrid columns="4">
             <Dropdown id={"redact-position"} menuItems = {statusItems} initial={currState.redacted}
             selected={(val) => { handleChange({ redacted: val }) }}/>
-          </HorizontalGrid >
+          </InlineGrid>
         </LegacyCard.Section>
       </LegacyCard>
     </VerticalStack>

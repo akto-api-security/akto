@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Button, Modal, InlineStack, IndexFiltersMode, Text, Badge, Thumbnail, HorizontalGrid, Box } from "@shopify/polaris"
+import { Button, Modal, InlineStack, IndexFiltersMode, Text, Badge, Thumbnail, InlineGrid, Box } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState } from "react"
 import func from "@/util/func"
@@ -312,7 +312,7 @@ function AllSensitiveData() {
     )
 
     const graphComponents = (
-        <HorizontalGrid key={"graphs"} gap={"5"} columns={2}>
+        <InlineGrid key={"graphs"} gap={"5"} columns={2}>
             <InfoCard
                 title={"APIs by Sensitive data severity"}
                 titleToolTip={"Number of APIs per each category"}
@@ -351,7 +351,7 @@ function AllSensitiveData() {
                     </Box>
                 }
             />
-        </HorizontalGrid>
+        </InlineGrid>
     )
 
     const componentsArr = [

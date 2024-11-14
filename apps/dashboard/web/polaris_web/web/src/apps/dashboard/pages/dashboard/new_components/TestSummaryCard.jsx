@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Card, HorizontalGrid, InlineStack, LegacyCard, Link, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Box, Button, Card, InlineGrid, InlineStack, LegacyCard, Link, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import TooltipText from '../../../components/shared/TooltipText'
 

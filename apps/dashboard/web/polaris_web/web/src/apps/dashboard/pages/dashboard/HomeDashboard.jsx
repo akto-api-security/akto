@@ -3,7 +3,7 @@ import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, InlineStack, Icon, Link, Scrollable, Text, VerticalStack } from '@shopify/polaris';
+import { Box, DataTable, InlineGrid, InlineStack, Icon, Link, Scrollable, Text, VerticalStack } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import testingTransform from "../testing/transform"
 import StackedChart from '../../components/charts/StackedChart';
@@ -614,9 +614,9 @@ function HomeDashboard() {
         [apisByRiskscoreComponent, apisByAccessTypeComponent, apisByAuthTypeComponent, apisByTypeComponent, newDomainsComponent, criticalUnsecuredAPIsOverTime, vulnerableApisBySeverityComponent, criticalFindings]
 
     const gridComponent = (
-        <HorizontalGrid gap={5} columns={2}>
+        <InlineGrid gap={5} columns={2}>
             {gridComponents}
-        </HorizontalGrid>
+        </InlineGrid>
     )
 
     const components = [summaryComp, testSummaryCardsList, gridComponent]

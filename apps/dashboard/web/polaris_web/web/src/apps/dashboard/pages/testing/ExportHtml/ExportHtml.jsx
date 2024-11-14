@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import issuesApi from '../../issues/api';
 import api from '../api';
 import PersistStore from '../../../../main/PersistStore';
-import { Avatar, Box, Frame, HorizontalGrid, InlineStack, LegacyCard, Text, TopBar, VerticalStack, Icon } from '@shopify/polaris'
+import { Avatar, Box, Frame, InlineGrid, InlineStack, LegacyCard, Text, TopBar, VerticalStack, Icon } from '@shopify/polaris'
 import './styles.css'
 import transform from '../transform';
 import LocalStore from '../../../../main/LocalStorageStore';
@@ -187,7 +187,7 @@ function ExportHtml() {
                     <VerticalStack gap="3">
                         <Text variant="headingLg" fontWeight="medium">Summary of alerts</Text>
                         <Box borderWidth="2" borderRadius="1" width="40%">
-                            <HorizontalGrid columns={2}>
+                            <InlineGrid columns={2}>
                                 <div style={{ background: "#666666", borderRight: '2px solid white', borderBottom: '2px solid white' }}>
                                     <InlineStack align="center">
                                         <Box padding="1">
@@ -206,9 +206,9 @@ function ExportHtml() {
                                         </Box>
                                     </InlineStack>
                                 </div>
-                            </HorizontalGrid>
+                            </InlineGrid>
                             {Object.keys(severitiesCount)?.map((element, index) => (
-                                <HorizontalGrid columns={2} key={index}>
+                                <InlineGrid columns={2} key={index}>
                                     <div style={{ background: "#e8e8e8", borderRight: '2px solid white', borderBottom: (index < 2 ? "2px solid white" : "") }}>
                                         <InlineStack align="center">
                                             <Box padding="1">
@@ -227,7 +227,7 @@ function ExportHtml() {
                                             </Box>
                                         </InlineStack>
                                     </div>
-                                </HorizontalGrid>
+                                </InlineGrid>
                             ))}
                         </Box>
                     </VerticalStack>

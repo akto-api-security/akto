@@ -1,4 +1,4 @@
-import { Box, Card, HorizontalGrid, InlineStack, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Card, InlineGrid, InlineStack, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import TitleWithInfo from '../../../components/shared/TitleWithInfo'
 
@@ -6,7 +6,7 @@ function SummaryCard({ summaryItems }) {
     return (
         <Card padding={0} key="info">
             <Box padding={3} paddingInlineStart={5} paddingInlineEnd={5}>
-                <HorizontalGrid columns={summaryItems.length} gap={4}>
+                <InlineGrid columns={summaryItems.length} gap={4}>
                     {summaryItems.map((item, index) => (
                         <Box borderInlineEndWidth={index < (summaryItems.length - 1) ? "1" : ""} key={index} borderColor="transparent">
                             <InlineStack>
@@ -20,7 +20,7 @@ function SummaryCard({ summaryItems }) {
                                         docsUrl={item?.docsUrl}
                                         tooltipContent={item?.tooltipContent}
                                     />
-                                    <HorizontalGrid gap={1} columns={2}>
+                                    <InlineGrid gap={1} columns={2}>
                                         <VerticalStack gap={4}>
                                             {item?.isComp ? item.data : 
                                             <div className='custom-color'>
@@ -32,12 +32,12 @@ function SummaryCard({ summaryItems }) {
                                             {item.byLineComponent ? item.byLineComponent : null}
                                         </VerticalStack>
                                         {item.smoothChartComponent ? item.smoothChartComponent : null}
-                                    </HorizontalGrid>
+                                    </InlineGrid>
                                 </VerticalStack>
                             </InlineStack>
                         </Box>
                     ))}
-                </HorizontalGrid>
+                </InlineGrid>
             </Box>
         </Card>
     );

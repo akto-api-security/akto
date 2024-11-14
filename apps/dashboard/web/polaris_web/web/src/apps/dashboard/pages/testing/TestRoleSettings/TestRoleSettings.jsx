@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { LegacyCard, HorizontalGrid, TextField, Divider, Collapsible, LegacyStack, Button, FormLayout, InlineStack, Tooltip, Icon, Text, VerticalStack, Modal, Box } from '@shopify/polaris'
+import { LegacyCard, InlineGrid, TextField, Divider, Collapsible, LegacyStack, Button, FormLayout, InlineStack, Tooltip, Icon, Text, VerticalStack, Modal, Box } from '@shopify/polaris'
 import { useLocation, useNavigate } from 'react-router-dom'
 import TestRolesConditionsPicker from '../../../components/TestRolesConditionsPicker';
 import func from "@/util/func";
@@ -201,13 +201,13 @@ function TestRoleSettings() {
     const descriptionCard = (
         <LegacyCard title="Details" key="desc">
             <LegacyCard.Section>
-                <HorizontalGrid gap="4" columns={2}>
+                <InlineGrid gap="4" columns={2}>
                     <TextField
                         label="Name" value={roleName} disabled={systemRole}
                         placeholder='New test role name' onChange={isNew ? handleTextChange : () => { }}
                         requiredIndicator
                     />
-                </HorizontalGrid>
+                </InlineGrid>
             </LegacyCard.Section>
         </LegacyCard>
     )

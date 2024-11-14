@@ -8,7 +8,7 @@ import values from "@/util/values";
 import { produce } from "immer"
 import func from "@/util/func";
 import transform from "../observe/transform";
-import { HorizontalGrid } from "@shopify/polaris";
+import { InlineGrid } from "@shopify/polaris";
 import SampleDetails from "./components/SampleDetails";
 function ThreatDetectionPage() {
 
@@ -28,9 +28,9 @@ function ThreatDetectionPage() {
         }
     }
 
-    const horizontalComponent = <HorizontalGrid columns={1} gap={2}>
+    const horizontalComponent = <InlineGrid columns={1} gap={2}>
         <FilterComponent key={"filter-component"} />
-    </HorizontalGrid>
+    </InlineGrid>
 
     const components = [
         horizontalComponent,

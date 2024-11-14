@@ -1,4 +1,4 @@
-import { Box, Button, HorizontalGrid, IndexFiltersMode, LegacyCard, ResourceItem, ResourceList, Text, TextField } from '@shopify/polaris'
+import { Box, Button, InlineGrid, IndexFiltersMode, LegacyCard, ResourceItem, ResourceList, Text, TextField } from '@shopify/polaris'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import { useLocation } from 'react-router-dom'
 import api from '../api'

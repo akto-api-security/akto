@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, InlineStack, Scrollable, TextField, Tag, Form, Tooltip } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, InlineGrid, InlineStack, Scrollable, TextField, Tag, Form, Tooltip } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
@@ -140,7 +140,7 @@ function About() {
 
     const infoComponent = (
         <VerticalStack gap={4}>
-            <HorizontalGrid columns={"2"} gap={"3"}>
+            <InlineGrid columns={"2"} gap={"3"}>
                 <TextField 
                     disabled={window.USER_ROLE !== 'ADMIN'} 
                     connectedRight={(
@@ -160,7 +160,7 @@ function About() {
                     value={currentTimeZone}
                     sliceMaxVal={40}
                 />
-            </HorizontalGrid>
+            </InlineGrid>
             {objArr.map((item)=>(
                 <Box key={item.title} >
                     <VerticalStack gap={1}>
@@ -345,7 +345,7 @@ function About() {
                 <VerticalStack gap={1}>
                     {Object.keys(trafficFiltersMap).map((key)=> {
                         return (
-                            <HorizontalGrid gap={2} columns={3} key={key}>
+                            <InlineGrid gap={2} columns={3} key={key}>
                                 <TooltipText textProps={{variant:"bodyMd", fontWeight:"medium"}} tooltip={key} text={key}/>
                                 <TooltipText textProps={{variant:"bodyMd", color: "subdued"}} tooltip={trafficFiltersMap[key]} text={trafficFiltersMap[key]}/>
                                 <Button
@@ -353,12 +353,12 @@ function About() {
                                     icon={DeleteMajor}
                                     onClick={() => deleteFilterHeader(key)}
                                     variant="plain" />
-                            </HorizontalGrid>
+                            </InlineGrid>
                         );
                     })}
                 </VerticalStack>
             </Scrollable>
-            <HorizontalGrid gap={2} columns={3} alignItems="center">
+            <InlineGrid gap={2} columns={3} alignItems="center">
                 <TextFieldWithInfo 
                     labelText="Header key"
                     labelTextColor="subdued"
@@ -375,8 +375,8 @@ function About() {
                     value={headerValue}
                     setValue={setHeaderValue}
                 />
-            {checkSaveActive('filterHeader') ? <Box paddingBlockStart={5} width="100px"><Button onClick={saveFilterHeader} size="medium"  variant="primary">Save</Button></Box> : null}
-            </HorizontalGrid>
+                {checkSaveActive('filterHeader') ? <Box paddingBlockStart={5} width="100px"><Button onClick={saveFilterHeader} size="medium"  variant="primary">Save</Button></Box> : null}
+            </InlineGrid>
         </VerticalStack>
     )
 
@@ -390,7 +390,7 @@ function About() {
                         const headerLine = headerName + "=" + regex
 
                         return (
-                            <HorizontalGrid gap={2} columns={3} key={key}>
+                            <InlineGrid gap={2} columns={3} key={key}>
                                 <TooltipText textProps={{variant:"bodyMd", fontWeight:"medium"}} tooltip={headerLine} text={headerLine}/>
                                 <TooltipText textProps={{variant:"bodyMd", color: "subdued"}} tooltip={newName} text={newName}/>
                                 <Button
@@ -398,12 +398,12 @@ function About() {
                                     icon={DeleteMajor}
                                     onClick={() => deleteApiCollectionNameMapper(regex)}
                                     variant="plain" />
-                            </HorizontalGrid>
+                            </InlineGrid>
                         );
                     })}
                 </VerticalStack>
             </Scrollable>
-            <HorizontalGrid gap={2} columns={3} alignItems="center">
+            <InlineGrid gap={2} columns={3} alignItems="center">
                 <TextFieldWithInfo 
                     labelText="Header key"
                     labelTextColor="subdued"
@@ -428,8 +428,8 @@ function About() {
                     value={replaceNewCollectionName}
                     setValue={setReplaceNewCollectionName}
                 />
-            {checkSaveActive('replaceCollection') ? <Box paddingBlockStart={5} width="100px"><Button onClick={addApiCollectionNameMapper} size="medium"  variant="primary">Save</Button></Box> : null}
-            </HorizontalGrid>
+                {checkSaveActive('replaceCollection') ? <Box paddingBlockStart={5} width="100px"><Button onClick={addApiCollectionNameMapper} size="medium"  variant="primary">Save</Button></Box> : null}
+            </InlineGrid>
         </VerticalStack>
     )
 

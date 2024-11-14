@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Card, Checkbox, ContextualSaveBar, Divider, Frame, HorizontalGrid, LegacyCard, LegacyTabs, Tabs, Text, TextField, VerticalStack} from "@shopify/polaris"
+import { Button, ButtonGroup, Card, Checkbox, ContextualSaveBar, Divider, Frame, InlineGrid, LegacyCard, LegacyTabs, Tabs, Text, TextField, VerticalStack} from "@shopify/polaris"
 import PageWithMultipleCards from "../../../../components/layouts/PageWithMultipleCards"
 import { useNavigate, useParams } from "react-router-dom"
 import { useEffect, useState } from "react"

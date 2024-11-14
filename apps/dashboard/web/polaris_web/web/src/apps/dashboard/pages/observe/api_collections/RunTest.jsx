@@ -1,4 +1,4 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,HorizontalGrid, InlineStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList } from "@shopify/polaris";
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,InlineGrid, InlineStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList } from "@shopify/polaris";
 import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons"
 import { useEffect, useRef, useState } from "react";
 import { default as observeApi } from "../api";
@@ -631,28 +631,27 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         <br />
 
                         <VerticalStack gap={"4"}>
-                            <HorizontalGrid gap={"4"} columns={"3"}>
-                                    <Dropdown
-                                        label="Run Type"
-                                        menuItems={runTypeOptions}
-                                        initial={testRun.runTypeLabel}
-                                        selected={(runType) => {
-                                            let recurringDaily = false
-                                            let continuousTesting = false
+                            <InlineGrid gap={"4"} columns={"3"}>
+                                <Dropdown
+                                    label="Run Type"
+                                    menuItems={runTypeOptions}
+                                    initial={testRun.runTypeLabel}
+                                    selected={(runType) => {
+                                        let recurringDaily = false
+                                        let continuousTesting = false
 
-                                            if(runType === 'Continuously'){
-                                                continuousTesting = true;
-                                            }else if(runType === 'Daily'){
-                                                recurringDaily = true;
-                                            }
-                                           setTestRun(prev => ({
-                                                   ...prev,
-                                                   recurringDaily,
-                                                   continuousTesting,
-                                                   runTypeLabel: runType.label
-                                               }))
-                                        }} />
-
+                                        if(runType === 'Continuously'){
+                                            continuousTesting = true;
+                                        }else if(runType === 'Daily'){
+                                            recurringDaily = true;
+                                        }
+                                       setTestRun(prev => ({
+                                               ...prev,
+                                               recurringDaily,
+                                               continuousTesting,
+                                               runTypeLabel: runType.label
+                                           }))
+                                    }} />
                                 <Dropdown
                                     label="Select Time:"
                                     disabled={testRun.continuousTesting === true}
@@ -674,25 +673,25 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                             hourlyLabel: hourlyTime ? hourlyTime.label : ""
                                         }))
                                     }} />
-                                    <Dropdown
-                                        label="Test run time:"
-                                        menuItems={testRunTimeOptions}
-                                        initial={testRun.testRunTimeLabel}
-                                        selected={(timeInSeconds) => {
-                                            let testRunTime
-                                            if (timeInSeconds === "Till complete") testRunTime = -1
-                                            else testRunTime = timeInSeconds
+                                <Dropdown
+                                    label="Test run time:"
+                                    menuItems={testRunTimeOptions}
+                                    initial={testRun.testRunTimeLabel}
+                                    selected={(timeInSeconds) => {
+                                        let testRunTime
+                                        if (timeInSeconds === "Till complete") testRunTime = -1
+                                        else testRunTime = timeInSeconds
 
-                                            const testRunTimeOption = getLabel(testRunTimeOptions, timeInSeconds)
+                                        const testRunTimeOption = getLabel(testRunTimeOptions, timeInSeconds)
 
-                                            setTestRun(prev => ({
-                                                ...prev,
-                                                testRunTime: testRunTime,
-                                                testRunTimeLabel: testRunTimeOption.label
-                                            }))
-                                        }} />
-                            </HorizontalGrid>
-                            <HorizontalGrid gap={"4"} columns={"2"}>
+                                        setTestRun(prev => ({
+                                            ...prev,
+                                            testRunTime: testRunTime,
+                                            testRunTimeLabel: testRunTimeOption.label
+                                        }))
+                                    }} />
+                            </InlineGrid>
+                            <InlineGrid gap={"4"} columns={"2"}>
                                 <div style={{marginTop: '-10px'}}>
                                     <Text>Select Test Role</Text>
                                     <Dropdown
@@ -710,7 +709,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                             }))
                                         }} />
                                 </div>
-                                        
                                 <div style={{marginTop: '-10px'}}>
                                 <Text>Max Concurrent Requests</Text>
                                 <Dropdown
@@ -730,8 +728,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         }))
                                     }} />
                             </div>
-
-                            </HorizontalGrid>
+                            </InlineGrid>
 
                             <Checkbox
                                 label={slackIntegrated ? "Send slack alert post test completion" : generateLabelForSlackIntegration()}
@@ -740,7 +737,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 disabled={!slackIntegrated}
                             />
 
-                            <HorizontalGrid columns={2}>
+                            <InlineGrid columns={2}>
                                 <Checkbox
                                     label="Use different target for testing"
                                     checked={testRun.hasOverriddenTestAppUrl}
@@ -755,7 +752,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         />
                                     </div>
                                 }
-                            </HorizontalGrid>
+                            </InlineGrid>
 
 
                         </VerticalStack>

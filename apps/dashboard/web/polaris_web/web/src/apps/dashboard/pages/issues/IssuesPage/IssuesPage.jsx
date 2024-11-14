@@ -6,7 +6,7 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { Button, HorizontalGrid, InlineStack, IndexFiltersMode } from "@shopify/polaris";
+import { Button, InlineGrid, InlineStack, IndexFiltersMode } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -409,10 +409,10 @@ function IssuesPage() {
                 endTimestamp={endTimestamp}
             />
 
-            <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
+            <InlineGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
                 <CriticalUnsecuredAPIsOverTimeGraph linkText={""} linkUrl={""} />
                 <CriticalFindingsGraph linkText={""} linkUrl={""} />
-            </HorizontalGrid>
+            </InlineGrid>
 
             <GithubServerTable
                 key={key}

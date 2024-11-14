@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import NullData from './NullData'
-import { Badge, Box, Button, Card, Divider, HorizontalGrid, InlineStack, Link, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Box, Button, Card, Divider, InlineGrid, InlineStack, Link, Text, VerticalStack } from '@shopify/polaris'
 import HighchartsReact from 'highcharts-react-official'
 import transform from '../transform'
 import Highcharts from "highcharts"
@@ -27,35 +27,35 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
                     textProps={{variant: "headingMd"}}
                     docsUrl={"https://docs.akto.io/api-inventory/concepts/risk-score"}
                 />
-                <HorizontalGrid columns={2} gap={5}>
-                <HighchartsReact
-                    highcharts={Highcharts}
-                    options={transform.getRiskScoreTrendOptions(riskScoreRangeMap, riskScoreRanges, navigate)}
-                    ref={riskScoreTrendRef}
-                />
-                <Box paddingInlineEnd={4} paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
-                    <VerticalStack gap={3}>
-                        {riskScoreRanges.map((range)=>{
-                            return (
-                                <VerticalStack gap={1} key={range.text} >
-                                    <InlineStack align="space-between">
-                                        <Button
+                <InlineGrid columns={2} gap={5}>
+                    <HighchartsReact
+                        highcharts={Highcharts}
+                        options={transform.getRiskScoreTrendOptions(riskScoreRangeMap, riskScoreRanges, navigate)}
+                        ref={riskScoreTrendRef}
+                    />
+                    <Box paddingInlineEnd={4} paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
+                        <VerticalStack gap={3}>
+                            {riskScoreRanges.map((range)=>{
+                                return (
+                                    <VerticalStack gap={1} key={range.text} >
+                                        <InlineStack align="space-between">
+                                            <Button
 
 
-                                            removeUnderline
-                                            onClick={() => navigate(`/dashboard/observe/inventory/${range.apiCollectionId}`)}
-                                            variant="monochromePlain">
-                                                <Text variant="bodyMd" color="semibold" >{range.text}</Text>
-                                        </Button>
-                                        <Badge tone={range.status}>{range.range}</Badge>
-                                    </InlineStack>
-                                    <Divider />
-                                </VerticalStack>
-                            );
-                        })}
-                    </VerticalStack>
-                </Box>
-                </HorizontalGrid>
+                                                removeUnderline
+                                                onClick={() => navigate(`/dashboard/observe/inventory/${range.apiCollectionId}`)}
+                                                variant="monochromePlain">
+                                                    <Text variant="bodyMd" color="semibold" >{range.text}</Text>
+                                            </Button>
+                                            <Badge tone={range.status}>{range.range}</Badge>
+                                        </InlineStack>
+                                        <Divider />
+                                    </VerticalStack>
+                                );
+                            })}
+                        </VerticalStack>
+                    </Box>
+                </InlineGrid>
             </VerticalStack>
         </Card>
     )

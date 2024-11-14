@@ -1,4 +1,4 @@
-import { Avatar, Badge, Box, Button, HorizontalGrid, InlineStack, LegacyCard, ProgressBar, ResourceItem, ResourceList, Scrollable, Text, VerticalStack, VideoThumbnail } from '@shopify/polaris'
+import { Avatar, Badge, Box, Button, InlineGrid, InlineStack, LegacyCard, ProgressBar, ResourceItem, ResourceList, Scrollable, Text, VerticalStack, VideoThumbnail } from '@shopify/polaris'
 import React, { useState } from 'react'
 import quickStartFunc from '../transform'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
@@ -25,7 +25,7 @@ function NewConnection() {
     const thumbnailUrl = "https://img.youtube.com/vi/fRyusl8ppdY/sddefault.jpg"
 
     const knowMoreLabel = (
-        <HorizontalGrid gap="10" columns="2">
+        <InlineGrid gap="10" columns="2">
             <VerticalStack gap="4">
                 <Text variant='bodyMd'>
                     Akto is an open source, instant API security platform that takes only 60 secs to get started. Akto is used by security teams to maintain a continuous inventory of APIs, test APIs for vulnerabilities and find runtime issues. Akto offers tests for all OWASP top 10 and HackerOne Top 10 categories including BOLA, authentication, SSRF, XSS, security configurations, etc.
@@ -37,7 +37,7 @@ function NewConnection() {
                 thumbnailUrl={thumbnailUrl}
                 onClick={() => window.open("https://www.youtube.com/watch?v=fRyusl8ppdY&ab_channel=Akto")}
             />
-        </HorizontalGrid>
+        </InlineGrid>
     )
 
     const searchFunc = (items) => {

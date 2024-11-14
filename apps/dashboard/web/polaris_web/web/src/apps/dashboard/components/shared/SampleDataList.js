@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import {
   Text,
   VerticalStack,
-  InlineStack, Box, LegacyCard, HorizontalGrid,
+  InlineStack, Box, LegacyCard, InlineGrid,
   Pagination, Key, Badge} from '@shopify/polaris';
 import SampleDataComponent from './SampleDataComponent';
 
@@ -38,7 +38,7 @@ function SampleDataList(props) {
                   onNext={() => {setPage((old) => (old+1))}}
                 />
         </InlineStack>
-        <HorizontalGrid columns={vertical ? "1" : "2"} gap="2">
+        <InlineGrid columns={vertical ? "1" : "2"} gap="2">
           {
             ["request","response"].map((type) => {
               return (
@@ -56,7 +56,7 @@ function SampleDataList(props) {
               )
             })
           }
-        </HorizontalGrid>
+        </InlineGrid>
       </VerticalStack>
     );
   }
