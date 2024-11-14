@@ -7,4 +7,6 @@ public interface CounterCache {
     void increment(String key);
 
     long get(String key);
+
+    void setExpiryIfNotSet(String key, long seconds);
 }
