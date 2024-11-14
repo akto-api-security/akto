@@ -1709,6 +1709,18 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       subcategory["content"] = ""
   },
 
+  getTableTabIndexById(defaultTabIndex, definedTableTabs, selectedTabId) {
+    let initialIdx = defaultTabIndex;
+    for(let x = 0; x < definedTableTabs.length; x++) {
+        const tempId = func.getKeyFromName(definedTableTabs[x]);
+        if (tempId === selectedTabId) {
+            initialIdx = x;
+            break;
+        }
+    }
+    return initialIdx
+  },
+
 }
 
 export default func
