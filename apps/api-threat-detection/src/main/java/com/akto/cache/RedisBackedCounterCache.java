@@ -1,5 +1,6 @@
 package com.akto.cache;
 
+import io.lettuce.core.ExpireArgs;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 
@@ -38,11 +39,10 @@ public class RedisBackedCounterCache implements CounterCache {
     public RedisBackedCounterCache(RedisClient redisClient, String prefix) {
         this.prefix = prefix;
         this.redis = redisClient.connect(new LongValueCodec());
-        this.localCache =
-                Caffeine.newBuilder()
-                        .maximumSize(100000)
-                        .expireAfterWrite(1, TimeUnit.HOURS)
-                        .build();
+        this.localCache = Caffeine.newBuilder()
+                .maximumSize(100000)
+                .expireAfterWrite(1, TimeUnit.HOURS)
+                .build();
 
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
         executor.scheduleAtFixedRate(this::syncToRedis, 60, 1, TimeUnit.SECONDS);
@@ -69,6 +69,14 @@ public class RedisBackedCounterCache implements CounterCache {
     @Override
     public long get(String key) {
         return Optional.ofNullable(this.localCache.getIfPresent(getKey(key))).orElse(0L);
+    }
+
+    @Override
+    public void setExpiryIfNotSet(String key, long seconds) {
+        // We only set expiry for redis entry. For local cache we have lower expiry for
+        // all entries.
+        ExpireArgs args = ExpireArgs.Builder.nx();
+        redis.async().expire(getKey(key), seconds, args);
     }
 
     private void syncToRedis() {
