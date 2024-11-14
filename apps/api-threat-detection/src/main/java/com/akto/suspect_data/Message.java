@@ -9,15 +9,17 @@ import java.util.Optional;
 public class Message {
     private String accountId;
     private SuspectSampleData data;
+    private int bucketId;
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public Message() {
     }
 
-    public Message(String accountId, SuspectSampleData data) {
+    public Message(String accountId, SuspectSampleData data, int bucketId) {
         this.accountId = accountId;
         this.data = data;
+        this.bucketId = bucketId;
     }
 
     public String getAccountId() {
@@ -34,6 +36,14 @@ public class Message {
 
     public void setData(SuspectSampleData data) {
         this.data = data;
+    }
+
+    public int getBucketId() {
+        return bucketId;
+    }
+
+    public void setBucketId(int bucketId) {
+        this.bucketId = bucketId;
     }
 
     public static Optional<String> marshall(Message m) {
