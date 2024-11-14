@@ -105,7 +105,9 @@ public class HttpCallFilter {
                     // we still push malicious requests to kafka
 
                     SourceIPKeyGenerator.instance.generate(responseParam).ifPresent(aggKey -> {
-                        boolean thresholdBreached = this.windowBasedThresholdNotifier.shouldNotify(aggKey,
+                        boolean thresholdBreached = this.windowBasedThresholdNotifier.shouldNotify(
+                                apiFilter.getId(),
+                                aggKey,
                                 responseParam);
 
                         // TODO: Add window id with each suspect sample data and alert
