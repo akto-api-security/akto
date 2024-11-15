@@ -509,7 +509,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     onAction: handleRun,
                     disabled: !testRun.authMechanismPresent
                 }}
-                large
+                size="large"
             >
                 {loading ? <SpinnerCentered /> :
                     <Modal.Section>

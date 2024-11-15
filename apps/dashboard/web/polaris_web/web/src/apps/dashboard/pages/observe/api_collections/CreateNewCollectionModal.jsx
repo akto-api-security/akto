@@ -105,7 +105,7 @@ function CreateNewCollectionModal(props) {
 
     return (
         <Modal
-            large
+            size="large"
             key="modal"
             activator={createCollectionModalActivatorRef}
             open={active}

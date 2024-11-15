@@ -314,13 +314,13 @@ function ApiDetails(props) {
                 components={components}
                 loading={loading}
             />
-            <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
+            <Modal size="large" open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                 <Modal.Section flush>
                     <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} runCustomTests={(tests) => runTests(tests)} />
                 </Modal.Section>
             </Modal>
         </div>
-    )
+    );
 }
 
 export default ApiDetails

@@ -267,7 +267,7 @@ const SampleApi = () => {
                 open={showTestResult}
                 onClose={() => closeModal()}
                 title="Results"
-                large
+                size="large"
             >
                 <Frame >
                 <Box paddingBlockEnd={"8"}>

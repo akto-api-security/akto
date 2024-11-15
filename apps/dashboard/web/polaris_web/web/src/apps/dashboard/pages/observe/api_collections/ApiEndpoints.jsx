@@ -880,7 +880,7 @@ function ApiEndpoints(props) {
                 (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true} /> : null),
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
-                      <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
+                      <Modal size="large" open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                           <Modal.Section flush>
                               <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} />
                           </Modal.Section>

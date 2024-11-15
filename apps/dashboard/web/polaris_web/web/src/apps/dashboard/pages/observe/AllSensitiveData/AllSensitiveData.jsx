@@ -379,7 +379,7 @@ function AllSensitiveData() {
             selected={selected}
             lastColumnSticky={true}
         />,
-        <Modal key="modal" large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
+        <Modal key="modal" size="large" open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
             <Modal.Section flush>
                 <AktoGptLayout prompts={prompts} closeModal={()=> setIsGptScreenActive(false)} />
             </Modal.Section>

@@ -8,7 +8,7 @@ function SaveAsCollectionModal(props) {
     const [newCollectionName, setNewCollectionName] = useState(initialCollectionName || '');
     return (
         <Modal
-            large
+            size="large"
             key="modal"
             open={active}
             onClose={() => setActive(false)}
@@ -38,7 +38,7 @@ function SaveAsCollectionModal(props) {
                 </VerticalStack>
             </Modal.Section>
         </Modal>
-    )
+    );
 }
 
 export default SaveAsCollectionModal
