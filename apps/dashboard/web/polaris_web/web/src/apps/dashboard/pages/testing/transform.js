@@ -481,7 +481,7 @@ const transform = {
             return;
           }
           sectionLocal.content = (
-            <List type='bullet' spacing="extraTight">
+            <List type='bullet' gap="extraTight">
               {
                 category?.references?.map((reference) => {
                   return (
