@@ -1,4 +1,4 @@
-import { VerticalStack, Text, Modal, TextField } from "@shopify/polaris";
+import { BlockStack, Text, Modal, TextField } from "@shopify/polaris";
 import React, { useState } from 'react'
 
 
@@ -21,7 +21,7 @@ function SaveAsCollectionModal(props) {
             }}
         >
             <Modal.Section>
-                <VerticalStack gap={3}>
+                <BlockStack gap={3}>
                     <TextField
                         id={"new-collection-input"}
                         label="Name"
@@ -35,7 +35,7 @@ function SaveAsCollectionModal(props) {
                         autoFocus
                         {...newCollectionName.length === 0 ? { error: "Collection name cannot be empty" } : {}}
                     />
-                </VerticalStack>
+                </BlockStack>
             </Modal.Section>
         </Modal>
     );

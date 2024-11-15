@@ -1,4 +1,4 @@
-import { InlineGrid, VerticalStack } from '@shopify/polaris';
+import { InlineGrid, BlockStack } from '@shopify/polaris';
 import React from 'react'
 
 function GridRows(props) {
@@ -11,7 +11,7 @@ function GridRows(props) {
 
     return (
         <div style={{width: widthChanged }}>
-            <VerticalStack gap="5">
+            <BlockStack gap="5">
                 {Array.from({length: rows}).map((_,index)=>(
                     <InlineGrid
                         columns={{xs: 1, sm: Math.max(usedColumns - 2,1) , md: usedColumns - 1 , lg:usedColumns, xl: usedColumns}}
@@ -26,7 +26,7 @@ function GridRows(props) {
                         })}
                     </InlineGrid>
                 ))}
-            </VerticalStack>
+            </BlockStack>
         </div>
     );
 }

@@ -5,7 +5,7 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, InlineStack, Icon, Popover, Text, VerticalStack, Link, Modal } from '@shopify/polaris'
+import { Badge, Box, Button, Divider, InlineStack, Icon, Popover, Text, BlockStack, Link, Modal } from '@shopify/polaris'
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import GridRows from '../../../components/shared/GridRows'
@@ -142,36 +142,34 @@ function TestRunResultFlyout(props) {
     
     function ActionsComp (){
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
-        return(
-            issueDetails?.id &&
-        <Popover
-            activator={<Button disclosure onClick={() => setPopoverActive(!popoverActive)}>Triage</Button>}
-            active={popoverActive}
-            onClose={() => setPopoverActive(false)}
-            autofocusTarget="first-node"
-            preferredPosition="below"
-            preferredAlignment="left"
-        >
-            <Popover.Pane fixed>
-                <Popover.Section>
-                    <VerticalStack gap={"4"}>
-                        {issuesActions.map((issue, index) => {
-                            return(
-                                <div style={{cursor: 'pointer'}} onClick={() => {issue.onAction(); setPopoverActive(false)}} key={index}>
-                                    {issue.content}
-                                </div>
-                            )
-                        })}
-                    </VerticalStack>
-                </Popover.Section>
-            </Popover.Pane>
-        </Popover>
-    )}
+        return issueDetails?.id &&
+    <Popover
+        activator={<Button disclosure onClick={() => setPopoverActive(!popoverActive)}>Triage</Button>}
+        active={popoverActive}
+        onClose={() => setPopoverActive(false)}
+        autofocusTarget="first-node"
+        preferredPosition="below"
+        preferredAlignment="left"
+    >
+        <Popover.Pane fixed>
+            <Popover.Section>
+                <BlockStack gap={"4"}>
+                    {issuesActions.map((issue, index) => {
+                        return(
+                            <div style={{cursor: 'pointer'}} onClick={() => {issue.onAction(); setPopoverActive(false)}} key={index}>
+                                {issue.content}
+                            </div>
+                        )
+                    })}
+                </BlockStack>
+            </Popover.Section>
+        </Popover.Pane>
+    </Popover>;}
     function TitleComponent() {
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : ""
         return (
             <div style={{display: 'flex', justifyContent: "space-between", gap:"24px", padding: "16px", paddingTop: '0px'}}>
-                <VerticalStack gap={"2"}>
+                <BlockStack gap={"2"}>
                     <Box width="100%">
                         <div style={{display: 'flex', gap: '4px'}} className='test-title'>
                             <Button removeUnderline   onClick={() => openTest()} variant="monochromePlain">
@@ -186,7 +184,7 @@ function TestRunResultFlyout(props) {
                         <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
                         <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
                     </InlineStack>
-                </VerticalStack>
+                </BlockStack>
                 <InlineStack gap={2} wrap={false}>
                     <ActionsComp />
                     {selectedTestRunResult && selectedTestRunResult.vulnerable && 
@@ -207,7 +205,7 @@ function TestRunResultFlyout(props) {
                             }}
                         >
                             <Modal.Section>
-                                <VerticalStack gap={"3"}>
+                                <BlockStack gap={"3"}>
                                     <DropdownSearch
                                         disabled={jiraProjectMaps === undefined || Object.keys(jiraProjectMaps).length === 0}
                                         placeholder="Select JIRA project"
@@ -216,7 +214,6 @@ function TestRunResultFlyout(props) {
                                         preSelected={projId}
                                         value={projId}
                                     />
-
                                     <DropdownSearch
                                         disabled={Object.keys(jiraProjectMaps).length === 0 || projId.length === 0}
                                         placeholder="Select JIRA issue type"
@@ -224,8 +221,8 @@ function TestRunResultFlyout(props) {
                                         setSelected={setIssueType}
                                         preSelected={issueType}
                                         value={getValueFromIssueType(projId, issueType)}
-                                    />  
-                                </VerticalStack>
+                                    />
+                                </BlockStack>
                             </Modal.Section>
                         </Modal>
                     }
@@ -268,11 +265,11 @@ function TestRunResultFlyout(props) {
     }
     const moreInfoComponent = (
         infoStateFlyout.length > 0 ?
-        <VerticalStack gap={"5"}>
+        <BlockStack gap={"5"}>
             {infoStateFlyout.map((item, index) => {
                 return (
-                    <VerticalStack gap={"5"} key={index}>
-                        <VerticalStack gap={"2"} >
+                    <BlockStack gap={"5"} key={index}>
+                        <BlockStack gap={"2"}>
                             <InlineStack gap="1_5-experimental">
                                 <Box><Icon source={item.icon} tone='subdued'/></Box>
                                 <TitleWithInfo
@@ -282,29 +279,27 @@ function TestRunResultFlyout(props) {
                                 />
                             </InlineStack>
                             {item?.content}
-                        </VerticalStack>
+                        </BlockStack>
                         {index !== infoStateFlyout.length - 1 ? <Divider /> : null}
-                    </VerticalStack>
+                    </BlockStack>
                 );
             })}
-        </VerticalStack>
+        </BlockStack>
         : null
     )
 
     function RowComp ({cardObj}){
         const {title, value, tooltipContent} = cardObj
-        return(
-            value ? <Box width="224px">
-                <VerticalStack gap={"2"}>
-                    <TitleWithInfo
-                        textProps={{variant:"bodyMd", fontWeight:"semibold"}}
-                        titleText={title}
-                        tooltipContent={tooltipContent}
-                    />
-                    {value}
-                </VerticalStack>
-            </Box>: null
-        )
+        return value ? <Box width="224px">
+            <BlockStack gap={"2"}>
+                <TitleWithInfo
+                    textProps={{variant:"bodyMd", fontWeight:"semibold"}}
+                    titleText={title}
+                    tooltipContent={tooltipContent}
+                />
+                {value}
+            </BlockStack>
+        </Box>: null;
     }
 
     const testResultDetailsComp = (
@@ -313,8 +308,8 @@ function TestRunResultFlyout(props) {
 
     const overviewComp = (
         <Box padding={"4"}>
-            <VerticalStack gap={"5"}>
-                <VerticalStack gap={"2"}>
+            <BlockStack gap={"5"}>
+                <BlockStack gap={"2"}>
                     <TitleWithInfo
                         textProps={{variant:"bodyMd", fontWeight:"semibold", color:"subdued"}}
                         titleText={"Description"}
@@ -326,12 +321,12 @@ function TestRunResultFlyout(props) {
                         }
                         <Button  onClick={() => setFullDescription(!fullDescription)} variant="plain"> {fullDescription ? "Less" : "More"} information</Button>
                     </Box>
-                </VerticalStack>
+                </BlockStack>
                 <Divider />
                 {testResultDetailsComp}
                 <Divider />
-                {moreInfoComponent}  
-            </VerticalStack>
+                {moreInfoComponent}
+            </BlockStack>
         </Box>
     )
     const overviewTab = {

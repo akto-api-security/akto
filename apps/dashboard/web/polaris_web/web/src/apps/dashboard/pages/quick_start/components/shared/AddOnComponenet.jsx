@@ -1,18 +1,18 @@
-import { Card, VerticalStack, Button, Box, Avatar, Text } from '@shopify/polaris'
+import { Card, BlockStack, Button, Box, Avatar, Text } from '@shopify/polaris'
 import React from 'react'
 
 function AddOnComponenet() {
   return (
       <div className='card-items'>
            <Card background="bg-subdued">
-            <VerticalStack gap='3' align="start">
+            <BlockStack gap='3' align="start">
                 <Avatar source="/public/PaymentsMajor.svg" size="sm" shape='square'/>
-                <VerticalStack gap='2'>
+                <BlockStack gap='2'>
                     <Text variant='headingMd'>This is an add-on connector</Text>
                     <Text variant='bodyMd'>
                         In order to use this connector, please contact us.
                     </Text>
-                </VerticalStack>
+                </BlockStack>
                 <Box paddingBlockStart={3}>
                     <Button
 
@@ -25,7 +25,7 @@ function AddOnComponenet() {
                     Contact Us
                 </Button>
                 </Box>
-            </VerticalStack>
+            </BlockStack>
            </Card>
         </div>
   );

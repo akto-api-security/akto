@@ -1,4 +1,4 @@
-import { Card, Divider, Text, VerticalStack } from "@shopify/polaris"
+import { Card, Divider, Text, BlockStack } from "@shopify/polaris"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { useEffect, useReducer, useState } from "react";
 import api from "../api";
@@ -180,12 +180,12 @@ function ApiChanges() {
 
     const graphComponent = (
         <Card key={"graphComponent"}>
-            <VerticalStack gap={4}>
-                <VerticalStack gap={3}>
+            <BlockStack gap={4}>
+                <BlockStack gap={3}>
                     <Text variant="bodyMd" fontWeight="medium">Changes</Text>
                     <Divider />
-                </VerticalStack>
-                <VerticalStack gap={2}>
+                </BlockStack>
+                <BlockStack gap={2}>
                     <LineChart
                         key={`trend-chart`}
                         type='line'
@@ -201,8 +201,8 @@ function ApiChanges() {
                         noGap={true}
                         graphPointClick={graphPointClick}
                     />
-                </VerticalStack>
-            </VerticalStack>
+                </BlockStack>
+            </BlockStack>
         </Card>
     )
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import api from '../api'
 import quickStartFunc from '../transform'
-import { Box, Button, ProgressBar, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, ProgressBar, Text, BlockStack } from '@shopify/polaris'
 import func from '@/util/func'
 import Store from '../../../store'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
@@ -173,12 +173,11 @@ function AwsSource() {
       loading ? 
       <SpinnerCentered />
       :
-        <VerticalStack gap="2">
+        <BlockStack gap="2">
           <DropdownSearch itemName="load balancer" optionsList={lbList} placeholder="Select LBs to activate mirroring." 
             allowMultiple disabled={availableLBs.length === 0} preSelected={preSelected} value={`${selectedLBs.length} Load balancers selected`}
             setSelected={handleSelectedLBs}
             />
-
           <Box>
             <Button
               onClick={saveFunc}
@@ -189,7 +188,7 @@ function AwsSource() {
           </Box>
           <Text variant="bodyMd" as="h3">{statusText}</Text>
           {progressBar.show ? <ProgressBar progress={progressBar.value} size="small" tone="primary" /> : null }
-        </VerticalStack>
+        </BlockStack>
     )
 
     const selectedLBObj = {

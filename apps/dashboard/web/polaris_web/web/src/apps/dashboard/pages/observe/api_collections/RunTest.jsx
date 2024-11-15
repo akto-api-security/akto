@@ -1,4 +1,4 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,InlineGrid, InlineStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList } from "@shopify/polaris";
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,InlineGrid, InlineStack, Link, BlockStack, Tooltip, Popover, ActionMenu, OptionList } from "@shopify/polaris";
 import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons"
 import { useEffect, useRef, useState } from "react";
 import { default as observeApi } from "../api";
@@ -630,7 +630,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
                         <br />
 
-                        <VerticalStack gap={"4"}>
+                        <BlockStack gap={"4"}>
                             <InlineGrid gap={"4"} columns={"3"}>
                                 <Dropdown
                                     label="Run Type"
@@ -729,14 +729,12 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     }} />
                             </div>
                             </InlineGrid>
-
                             <Checkbox
                                 label={slackIntegrated ? "Send slack alert post test completion" : generateLabelForSlackIntegration()}
                                 checked={testRun.sendSlackAlert}
                                 onChange={() => setTestRun(prev => ({ ...prev, sendSlackAlert: !prev.sendSlackAlert}))}
                                 disabled={!slackIntegrated}
                             />
-
                             <InlineGrid columns={2}>
                                 <Checkbox
                                     label="Use different target for testing"
@@ -753,9 +751,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     </div>
                                 }
                             </InlineGrid>
-
-
-                        </VerticalStack>
+                        </BlockStack>
 
                     </Modal.Section>
                 }

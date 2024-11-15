@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import NullData from './NullData'
-import { Badge, Box, Button, Card, Divider, InlineGrid, InlineStack, Link, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Box, Button, Card, Divider, InlineGrid, InlineStack, Link, Text, BlockStack } from '@shopify/polaris'
 import HighchartsReact from 'highcharts-react-official'
 import transform from '../transform'
 import Highcharts from "highcharts"
@@ -20,7 +20,7 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
 
     const dataComponent = (
         <Card key="scoreTrend">
-            <VerticalStack gap={5}>
+            <BlockStack gap={5}>
                 <TitleWithInfo
                     titleText={"APIs by risk score"}
                     tooltipContent={"All your endpoints grouped on the basis of their risk score."}
@@ -34,10 +34,10 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
                         ref={riskScoreTrendRef}
                     />
                     <Box paddingInlineEnd={4} paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
-                        <VerticalStack gap={3}>
+                        <BlockStack gap={3}>
                             {riskScoreRanges.map((range)=>{
                                 return (
-                                    <VerticalStack gap={1} key={range.text} >
+                                    <BlockStack gap={1} key={range.text}>
                                         <InlineStack align="space-between">
                                             <Button
 
@@ -50,13 +50,13 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
                                             <Badge tone={range.status}>{range.range}</Badge>
                                         </InlineStack>
                                         <Divider />
-                                    </VerticalStack>
+                                    </BlockStack>
                                 );
                             })}
-                        </VerticalStack>
+                        </BlockStack>
                     </Box>
                 </InlineGrid>
-            </VerticalStack>
+            </BlockStack>
         </Card>
     )
 

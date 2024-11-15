@@ -1,4 +1,4 @@
-import { Box, Card, InlineStack, Icon, Text, VerticalStack } from '@shopify/polaris';
+import { Box, Card, InlineStack, Icon, Text, BlockStack } from '@shopify/polaris';
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import ReactFlow, {
     Background,
@@ -22,10 +22,10 @@ function ApiDependencyNode({ data }) {
     return <>
         {!isFirstNode ? <Handle type="target" position={Position.Top} /> : null}
         <div onClick={() => { !isCurrentNode && openTargetUrl(apiCollectionId, endpoint, method) }} style={isCurrentNode ? { "cursor": "default" } : { "cursor": "pointer" }}>
-            <VerticalStack gap={2}>
+            <BlockStack gap={2}>
                 <Card padding={0}>
                     <Box padding={3}>
-                        <VerticalStack gap={1}>
+                        <BlockStack gap={1}>
                             <Box width='250px'>
                                 <TooltipText tooltip={apiCollectionName} text={apiCollectionName} textProps={{ color: "subdued", variant: "bodySm" }} />
                             </Box>
@@ -37,10 +37,10 @@ function ApiDependencyNode({ data }) {
                                     {!isCurrentNode && <Icon source={ArrowUpMinor} tone="subdued" />}
                                 </div>
                             </InlineStack>
-                        </VerticalStack>
+                        </BlockStack>
                     </Box>
                 </Card>
-            </VerticalStack>
+            </BlockStack>
         </div>
         {!isCurrentNode ? <Handle type="source" position={Position.Bottom} id="b" /> : null}
     </>;

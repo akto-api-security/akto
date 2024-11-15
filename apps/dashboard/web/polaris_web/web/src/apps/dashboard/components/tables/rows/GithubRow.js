@@ -2,7 +2,7 @@ import {
     IndexTable,
     Text,
     Badge,
-    VerticalStack,
+    BlockStack,
     InlineStack,
     Button,
     Popover,
@@ -106,7 +106,7 @@ function GithubRow(props) {
         }).map((header) => {
             return (
                 <IndexTable.Cell key={header.text}>
-                    <VerticalStack gap="2">
+                    <BlockStack gap="2">
                         <Text variant='bodyMd' fontWeight="medium">
                             {header.text}
                         </Text>
@@ -115,7 +115,7 @@ function GithubRow(props) {
                                 {data[header.value]}
                             </Badge>
                         </InlineStack>
-                    </VerticalStack>
+                    </BlockStack>
                 </IndexTable.Cell>
             );
         })

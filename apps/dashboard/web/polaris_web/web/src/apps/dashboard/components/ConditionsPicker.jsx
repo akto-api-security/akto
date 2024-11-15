@@ -1,4 +1,4 @@
-import { Button, LegacyCard, VerticalStack } from '@shopify/polaris'
+import { Button, LegacyCard, BlockStack } from '@shopify/polaris'
 import React from 'react'
 import Dropdown from './layouts/Dropdown';
 import {DeleteMinor} from "@shopify/polaris-icons"
@@ -30,7 +30,7 @@ function ConditionsPicker(props) {
     }
 
     const fieldsComponent = (
-        <VerticalStack gap="4">
+        <BlockStack gap="4">
             {conditions.length > 0 && conditions.map((condition, index) => (
                 <div style={{ display: "flex", gap: "4px" }} key={index}>
                     {index > 0 ? (
@@ -55,7 +55,7 @@ function ConditionsPicker(props) {
                     <Button id={`${id}-delete-button-${index}`} icon={DeleteMinor} onClick={() => handleDelete(index)} />
                 </div>
             ))}
-        </VerticalStack>
+        </BlockStack>
     )
 
     return (

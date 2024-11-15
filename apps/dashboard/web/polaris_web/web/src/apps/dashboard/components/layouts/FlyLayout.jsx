@@ -1,4 +1,4 @@
-import { Button, InlineStack, Text, VerticalStack, Box, Spinner, Divider, Scrollable } from "@shopify/polaris"
+import { Button, InlineStack, Text, BlockStack, Box, Spinner, Divider, Scrollable } from "@shopify/polaris"
 import {
     CancelMajor
 } from '@shopify/polaris-icons';
@@ -19,7 +19,7 @@ function FlyLayout(props) {
             <div className="innerFlyLayout">
                 <Box borderColor="border-subdued" borderWidth="1" background="bg" width={divWidth} minHeight="100%">
                     { loading ? <div style={{position: "absolute", right: "25vw" , top: "50vh"}}><Spinner size="large" /></div>:
-                    <VerticalStack gap={"5"}>
+                    <BlockStack gap={"5"}>
                         <Box padding={"4"} paddingBlockEnd={"0"} >
                             <InlineStack align="space-between">
                                 {titleComp ? titleComp : 
@@ -32,29 +32,29 @@ function FlyLayout(props) {
                         </Box>
                         <Scrollable style={{ height: "92vh" }} shadow>
                         <Box paddingBlockEnd={"20"}>
-                        <VerticalStack>
-                        {
-                            show ?
-                                components.map((component, index) => {
-                                    return (
-                                        <Box key={index}>                                        
-                                            {newComp ? <Box>
-                                                {component}
-                                            </Box>:
-                                            <Box paddingInlineEnd={"4"} paddingInlineStart={"4"}>
-                                                {component}
+                        <BlockStack>
+                            {
+                                show ?
+                                    components.map((component, index) => {
+                                        return (
+                                            <Box key={index}>                                        
+                                                {newComp ? <Box>
+                                                    {component}
+                                                </Box>:
+                                                <Box paddingInlineEnd={"4"} paddingInlineStart={"4"}>
+                                                    {component}
+                                                </Box>
+                                                }
+                                                {(showDivider && index !== components.length - 1) ? <Divider /> : null}
                                             </Box>
-                                            }
-                                            {(showDivider && index !== components.length - 1) ? <Divider /> : null}
-                                        </Box>
-                                    )
-                                })
-                                :null
-                        }
-                        </VerticalStack>
+                                        )
+                                    })
+                                    :null
+                            }
+                        </BlockStack>
                         </Box>
                         </Scrollable>
-                    </VerticalStack>
+                    </BlockStack>
                     }
                 </Box>      
             </div>

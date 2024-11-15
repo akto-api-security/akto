@@ -1,6 +1,6 @@
 import {
     Badge,
-    VerticalStack,
+    BlockStack,
     InlineStack,
     Icon,
     Box, 
@@ -39,7 +39,7 @@ function GithubCell(props){
                     )
                 })
             }
-            <VerticalStack gap="2" inlineAlign='baseline'>
+            <BlockStack gap="2" inlineAlign='baseline'>
                 <InlineStack wrap={divWrap || false} gap="2" align='start'>
                     {
                         headers?.filter((header) => {
@@ -146,7 +146,7 @@ function GithubCell(props){
                         )}) 
                     }
                 </InlineStack>
-            </VerticalStack>
+            </BlockStack>
         </InlineStack>
     );
 }

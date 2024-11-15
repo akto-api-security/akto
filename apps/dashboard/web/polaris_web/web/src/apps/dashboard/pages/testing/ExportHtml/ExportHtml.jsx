@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import issuesApi from '../../issues/api';
 import api from '../api';
 import PersistStore from '../../../../main/PersistStore';
-import { Avatar, Box, Frame, InlineGrid, InlineStack, LegacyCard, Text, TopBar, VerticalStack, Icon } from '@shopify/polaris'
+import { Avatar, Box, Frame, InlineGrid, InlineStack, LegacyCard, Text, TopBar, BlockStack, Icon } from '@shopify/polaris'
 import './styles.css'
 import transform from '../transform';
 import LocalStore from '../../../../main/LocalStorageStore';
@@ -182,9 +182,8 @@ function ExportHtml() {
     return (
         <Frame topBar={headerEditor}>
             <div className="html-component" style={{ padding: "32px" }}>
-                <VerticalStack gap="5">
-
-                    <VerticalStack gap="3">
+                <BlockStack gap="5">
+                    <BlockStack gap="3">
                         <Text variant="headingLg" fontWeight="medium">Summary of alerts</Text>
                         <Box borderWidth="2" borderRadius="1" width="40%">
                             <InlineGrid columns={2}>
@@ -230,11 +229,10 @@ function ExportHtml() {
                                 </InlineGrid>
                             ))}
                         </Box>
-                    </VerticalStack>
-
-                    <VerticalStack gap={4}>
+                    </BlockStack>
+                    <BlockStack gap={4}>
                         <Text variant="headingLg" fontWeight="medium">Vulnerabilities details</Text>
-                        <VerticalStack gap={3}>
+                        <BlockStack gap={3}>
                             {vulnerableResultsMap?.map((item, index) => (
                                 <LegacyCard sectioned title={cardTitleComponent(item)} key={index}>
                                     <LegacyCard.Section>
@@ -248,9 +246,9 @@ function ExportHtml() {
                                     </LegacyCard.Section>
                                 </LegacyCard>
                             ))}
-                        </VerticalStack>
-                    </VerticalStack>
-                </VerticalStack>
+                        </BlockStack>
+                    </BlockStack>
+                </BlockStack>
             </div>
         </Frame>
     );
@@ -438,14 +436,14 @@ function VulnerableEndpointDetails(props) {
 function MoreInformationComponent(props) {
 
     return (
-        <VerticalStack gap={"4"}>
+        <BlockStack gap={"4"}>
             <LegacyCard>
                 <LegacyCard.Section>
                     {
                         props.sections?.map((section, index) => {
                             return (
                                 <LegacyCard.Subsection key={index}>
-                                    <VerticalStack gap="3">
+                                    <BlockStack gap="3">
                                         <InlineStack gap="2" align="start" blockAlign='start'>
                                             <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
                                                 {section?.icon && <Icon source={section.icon}></Icon>}
@@ -455,7 +453,7 @@ function MoreInformationComponent(props) {
                                             </Text>
                                         </InlineStack>
                                         {section.content}
-                                    </VerticalStack>
+                                    </BlockStack>
                                 </LegacyCard.Subsection>
                             );
                         })
@@ -479,7 +477,7 @@ function MoreInformationComponent(props) {
                     ))}
                 </LegacyCard.Section>
             </LegacyCard>
-        </VerticalStack>
+        </BlockStack>
     );
 }
 

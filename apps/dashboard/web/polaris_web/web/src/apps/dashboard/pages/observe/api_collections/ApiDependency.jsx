@@ -1,4 +1,4 @@
-import { VerticalStack, } from "@shopify/polaris"
+import { BlockStack, } from "@shopify/polaris"
 import React, { useState, useEffect, useRef } from 'react'
 import ReactFlow, {
     Background,
@@ -43,14 +43,14 @@ function ApiDependency(props) {
     }, [endpoint])
 
     return (
-        <VerticalStack gap="2">
+        <BlockStack gap="2">
             <div style={{ height: "800px" }}>
                 <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}>
                     <Background color="#aaa" gap={6} />
                 </ReactFlow>;
             </div>
-        </VerticalStack>
-    )
+        </BlockStack>
+    );
 
 }
 

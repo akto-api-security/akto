@@ -1,4 +1,4 @@
-import { Box, Card, InlineGrid, InlineStack, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Card, InlineGrid, InlineStack, Text, BlockStack } from '@shopify/polaris'
 import React from 'react'
 import TitleWithInfo from '../../../components/shared/TitleWithInfo'
 
@@ -10,7 +10,7 @@ function SummaryCard({ summaryItems }) {
                     {summaryItems.map((item, index) => (
                         <Box borderInlineEndWidth={index < (summaryItems.length - 1) ? "1" : ""} key={index} borderColor="transparent">
                             <InlineStack>
-                                <VerticalStack gap="4">
+                                <BlockStack gap="4">
                                     <TitleWithInfo
                                         titleComp={
                                         <Text variant="headingMd">
@@ -21,7 +21,7 @@ function SummaryCard({ summaryItems }) {
                                         tooltipContent={item?.tooltipContent}
                                     />
                                     <InlineGrid gap={1} columns={2}>
-                                        <VerticalStack gap={4}>
+                                        <BlockStack gap={4}>
                                             {item?.isComp ? item.data : 
                                             <div className='custom-color'>
                                                 <Text variant={item.variant ? item.variant : 'bodyLg'} color={item.color ? item.color : ""}>
@@ -30,10 +30,10 @@ function SummaryCard({ summaryItems }) {
                                             </div>
                                             }
                                             {item.byLineComponent ? item.byLineComponent : null}
-                                        </VerticalStack>
+                                        </BlockStack>
                                         {item.smoothChartComponent ? item.smoothChartComponent : null}
                                     </InlineGrid>
-                                </VerticalStack>
+                                </BlockStack>
                             </InlineStack>
                         </Box>
                     ))}

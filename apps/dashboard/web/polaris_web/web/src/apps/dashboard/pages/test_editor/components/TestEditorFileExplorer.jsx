@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { Badge, Box, Button, InlineStack, Icon, Navigation, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Badge, Box, Button, InlineStack, Icon, Navigation, Text, TextField, Tooltip, BlockStack } from "@shopify/polaris"
 import {ChevronDownMinor, ChevronRightMinor, SearchMinor, CirclePlusMinor} from "@shopify/polaris-icons"
 
 import TestEditorStore from "../testEditorStore"
@@ -158,7 +158,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
     return (
         <div className="editor-navbar" style={{'overflowY' : 'scroll', overflowX: 'hidden', width: '18rem'}}>
             <Navigation location="/">
-                <VerticalStack gap="4">
+                <BlockStack gap="4">
                     <TextField  
                         id={"test-search"}
                         prefix={<Icon source={SearchMinor} />} 
@@ -166,7 +166,6 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                         value={searchText}
                         placeholder={`Search for Tests`}
                     />
-
                     <Box>
                         <Button
                             id={"create-custom-test-button"}
@@ -225,7 +224,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                         </Button>
                         {showAkto ? <Navigation.Section items={getItems(aktoItems.items)} /> : null}
                     </Box>
-                </VerticalStack>
+                </BlockStack>
             </Navigation>
         </div>
     );

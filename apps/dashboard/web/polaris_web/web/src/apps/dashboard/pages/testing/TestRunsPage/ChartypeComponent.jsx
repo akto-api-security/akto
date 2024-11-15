@@ -1,4 +1,4 @@
-import {Box, DataTable,InlineStack, Scrollable, Text, VerticalStack } from '@shopify/polaris'
+import {Box, DataTable,InlineStack, Scrollable, Text, BlockStack } from '@shopify/polaris'
 import React from 'react'
 import DonutChart from '../../../components/shared/DonutChart'
 import ConcentricCirclesChart from '../../../components/shared/ConcentricCirclesChart'
@@ -44,7 +44,7 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
         <Box padding={boxPadding != undefined ? boxPadding : 4}>
             <InlineStack gap={8}>
                 {chartOnLeft ? chartComponent: null}
-                <VerticalStack gap="2">
+                <BlockStack gap="2">
                     <Text fontWeight="semibold" variant="bodySm">{title}</Text>
                     <Scrollable style={{maxHeight: boxHeight}} focusable shadow>
                         <Box width={dataTableWidth ? dataTableWidth : '260px'}>
@@ -59,7 +59,7 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                             />
                         </Box>
                     </Scrollable>
-                </VerticalStack>
+                </BlockStack>
                 {!chartOnLeft ? chartComponent: null}
             </InlineStack>
         </Box>

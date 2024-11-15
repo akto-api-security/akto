@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Modal, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Box, Button, Popover, Modal, Tooltip, BlockStack } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -269,7 +269,7 @@ function ApiDetails(props) {
                     >
                         <Popover.Pane fixed>
                             <Popover.Section>
-                                <VerticalStack gap={"2"}>
+                                <BlockStack gap={"2"}>
                                     {isGptActive ? <Button
 
 
@@ -284,7 +284,7 @@ function ApiDetails(props) {
                                         size="slim"
                                         onClick={deMergeApis}
                                         variant="monochromePlain">De merge</Button> : null}
-                                </VerticalStack>
+                                </BlockStack>
                             </Popover.Section>
                         </Popover.Pane>
                     </Popover> : null

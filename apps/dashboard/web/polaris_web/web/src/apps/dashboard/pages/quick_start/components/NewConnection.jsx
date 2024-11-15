@@ -1,4 +1,4 @@
-import { Avatar, Badge, Box, Button, InlineGrid, InlineStack, LegacyCard, ProgressBar, ResourceItem, ResourceList, Scrollable, Text, VerticalStack, VideoThumbnail } from '@shopify/polaris'
+import { Avatar, Badge, Box, Button, InlineGrid, InlineStack, LegacyCard, ProgressBar, ResourceItem, ResourceList, Scrollable, Text, BlockStack, VideoThumbnail } from '@shopify/polaris'
 import React, { useState } from 'react'
 import quickStartFunc from '../transform'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
@@ -26,12 +26,12 @@ function NewConnection() {
 
     const knowMoreLabel = (
         <InlineGrid gap="10" columns="2">
-            <VerticalStack gap="4">
+            <BlockStack gap="4">
                 <Text variant='bodyMd'>
                     Akto is an open source, instant API security platform that takes only 60 secs to get started. Akto is used by security teams to maintain a continuous inventory of APIs, test APIs for vulnerabilities and find runtime issues. Akto offers tests for all OWASP top 10 and HackerOne Top 10 categories including BOLA, authentication, SSRF, XSS, security configurations, etc.
                 </Text>
                 <Button onClick={() => setTasksCompleted(1)}  variant="primary">Mark as complete</Button>
-            </VerticalStack>
+            </BlockStack>
             <VideoThumbnail
                 videoLength={195}
                 thumbnailUrl={thumbnailUrl}
@@ -92,7 +92,7 @@ function NewConnection() {
     }
 
     const allConnectorsLabel = (
-        <VerticalStack gap="3">
+        <BlockStack gap="3">
             <SearchField getSearchedItems={searchFunc} placeholder={`Search within ${connectorsList.length} connectors available.`} items={connectorsList} />
             <Scrollable style={{height: '300px'}} focusable shadow>
                 <div className='items-list'>
@@ -102,15 +102,15 @@ function NewConnection() {
                     />
                 </div>
             </Scrollable>
-        </VerticalStack>
+        </BlockStack>
     )
 
     const trafficScreenLabel = (
         <div className='connector-container'>
-            <VerticalStack gap="4">
+            <BlockStack gap="4">
                 <DropdownSearch optionsList={dropdownList} value={connectors?.label} avatarIcon={connectors?.icon} setSelected={(item)=> setConnector(item)} dropdownSearchKey="value"/>
                 {connectors?.component}
-            </VerticalStack>
+            </BlockStack>
         </div>
     )
 
@@ -136,7 +136,7 @@ function NewConnection() {
         <div style={{padding: '32px 15vw'}}>
             <LegacyCard title="Your quick start guide">
                 <LegacyCard.Section>
-                    <VerticalStack gap="5">
+                    <BlockStack gap="5">
                         <p>Use this personalized guide to get your traffic and start testing.</p>
                         <InlineStack gap="3">
                             <Text variant='bodyMd' color='subdued' fontWeight="medium">{tasksCompleted} of {totalTasks} tasks completed</Text>
@@ -144,13 +144,13 @@ function NewConnection() {
                                 <ProgressBar tone='success' progress={calculateWidth()} size='small'/>
                             </Box>
                         </InlineStack>
-                    </VerticalStack>
+                    </BlockStack>
                 </LegacyCard.Section>
 
                 <LegacyCard.Section>
-                    <VerticalStack gap="5">
+                    <BlockStack gap="5">
                         {tasksList.map((element,index) => (
-                            <VerticalStack gap="5" key={element?.id}>
+                            <BlockStack gap="5" key={element?.id}>
                                 <InlineStack gap="3">
                                     <Button   onClick={() => setTasksCompleted(index)} variant="monochromePlain">
                                         <Avatar customer name='circle' size="xs"
@@ -160,10 +160,10 @@ function NewConnection() {
                                     <Text variant='bodyMd' fontWeight={tasksCompleted === index ? "semibold" : "medium"}>{element?.label}</Text>
                                     {tasksCompleted === index ? element?.component : null}
                                 </InlineStack>
-                            </VerticalStack>
+                            </BlockStack>
                         
                         ))}
-                    </VerticalStack>
+                    </BlockStack>
                 </LegacyCard.Section>
             </LegacyCard>
         </div>

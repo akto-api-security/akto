@@ -1,19 +1,19 @@
 import React from 'react'
 import transform from '../transform'
-import { Box, Card, Divider, InlineStack, ProgressBar, Scrollable, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Card, Divider, InlineStack, ProgressBar, Scrollable, Text, BlockStack } from '@shopify/polaris'
 
 function CoverageCard({coverageObj, collections, collectionsMap}) {
 
     const sortedCollectionElements = transform.formatCoverageData(coverageObj,collections)
     return (
         <Card>
-            <VerticalStack gap={5}>
+            <BlockStack gap={5}>
                 <Text variant="bodyLg" fontWeight="semibold">Test coverage</Text>
                 <Scrollable style={{maxHeight: '400px'}} shadow> 
                     <Box>
                     {sortedCollectionElements.map((collectionObj,index)=> (
                         <Box padding={2} key={collectionObj.id}>
-                            <VerticalStack gap={2}>
+                            <BlockStack gap={2}>
                                 <Text variant="bodyMd" breakWord truncate>
                                     {collectionsMap[collectionObj.id]}
                                 </Text>
@@ -24,12 +24,12 @@ function CoverageCard({coverageObj, collections, collectionsMap}) {
                                     <Text breakWord color="subdued" variant="bodyMd">{collectionObj.coverage}%</Text>
                                 </InlineStack>
                                 {index < (collections.length - 1) ? <Divider/> : null }
-                            </VerticalStack>
+                            </BlockStack>
                         </Box>
                     ))}
                     </Box>
                 </Scrollable>
-            </VerticalStack>
+            </BlockStack>
         </Card>
     );
 }

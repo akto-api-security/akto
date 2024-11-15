@@ -1,4 +1,4 @@
-import { Button, InlineStack, VerticalStack } from '@shopify/polaris'
+import { Button, InlineStack, BlockStack } from '@shopify/polaris'
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import JsonComponent from './JsonComponent'
@@ -6,9 +6,9 @@ import JsonComponent from './JsonComponent'
 function NoAccessComponent({steps , dataString, onClickFunc, toolTipContent, title}) {
     const navigate = useNavigate(0)
     const noAccessComponent = (
-        <VerticalStack gap="1">
+        <BlockStack gap="1">
             {steps.map((element,index) => (
-                <VerticalStack gap="1" key={index}>
+                <BlockStack gap="1" key={index}>
                     <InlineStack gap="1" wrap={false} key={element.text}>
                         <span>{index + 1}.</span>
                         <span>{element.text}</span>
@@ -18,10 +18,10 @@ function NoAccessComponent({steps , dataString, onClickFunc, toolTipContent, tit
                         <div/>
                         {element?.component}
                     </InlineStack>
-                </VerticalStack>
+                </BlockStack>
             ))}
             <span>6. Click <Button  onClick={() => navigate(0)} variant="plain">here</Button> to refresh.</span>
-        </VerticalStack>
+        </BlockStack>
     )
 
     return (

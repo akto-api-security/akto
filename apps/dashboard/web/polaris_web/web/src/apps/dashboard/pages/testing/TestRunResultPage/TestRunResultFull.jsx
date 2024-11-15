@@ -1,4 +1,4 @@
-import { Box, Button, Collapsible, Divider, InlineStack, Icon, LegacyCard, Scrollable, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Collapsible, Divider, InlineStack, Icon, LegacyCard, Scrollable, Text, BlockStack } from '@shopify/polaris'
 import React, { useState } from 'react'
 import SpinnerCentered from '../../../components/progress/SpinnerCentered'
 import {ChevronDownMinor ,ChevronUpMinor} from '@shopify/polaris-icons';
@@ -10,7 +10,7 @@ import func from  "@/util/func"
 
 function MoreInformationComponent(props) {
     return (
-      <VerticalStack gap={"4"}>
+      <BlockStack gap={"4"}>
         <Text variant='headingMd'>
           More information
         </Text>
@@ -20,7 +20,7 @@ function MoreInformationComponent(props) {
               props?.sections?.map((section) => {
                 return (
                   <LegacyCard.Subsection key={section.title}>
-                    <VerticalStack gap="3">
+                    <BlockStack gap="3">
                       <InlineStack gap="2" align="start" blockAlign='start'>
                         <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
                           {section?.icon && <Icon source={section.icon}></Icon>}
@@ -30,14 +30,14 @@ function MoreInformationComponent(props) {
                         </Text>
                       </InlineStack>
                       {section.content}
-                    </VerticalStack>
+                    </BlockStack>
                   </LegacyCard.Subsection>
                 );
               })
             }
           </LegacyCard.Section>
         </LegacyCard>
-      </VerticalStack>
+      </BlockStack>
     );
   }
 
@@ -78,12 +78,11 @@ function TestRunResultFull(props) {
                   <Box paddingBlockStart={3}><Divider /></Box>
     
                 <Scrollable style={{maxHeight: '40vh'}}>
-                  <VerticalStack gap={1}>
-                      
-                        {testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].map((x) => <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
-                          {"[" + x["timestamp"] + "] [" + x["testLogType"] + "] " +x["message"]}
-                          </div>)}
-                  </VerticalStack>
+                  <BlockStack gap={1}>
+                    {testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].map((x) => <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
+                      {"[" + x["timestamp"] + "] [" + x["testLogType"] + "] " +x["message"]}
+                      </div>)}
+                  </BlockStack>
                 </Scrollable>
                 </LegacyCard.Subsection>
               </Collapsible>

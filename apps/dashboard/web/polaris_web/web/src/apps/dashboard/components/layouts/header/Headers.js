@@ -1,4 +1,4 @@
-import { TopBar, Icon, Text, ActionList, Modal, TextField, InlineStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
+import { TopBar, Icon, Text, ActionList, Modal, TextField, InlineStack, Box, Avatar, BlockStack, Button, Scrollable } from '@shopify/polaris';
 import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor, PhoneMajor, ChatMajor } from '@shopify/polaris-icons';
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -202,10 +202,10 @@ export default function Header() {
                 <Button   onClick={() => {handleTestingNavigate()}} variant="monochromePlain">
                  <SemiCircleProgress key={"progress"} progress={progress} size={60} height={55} width={75}/>
                 </Button>
-                <VerticalStack gap={"0"}>
+                <BlockStack gap={"0"}>
                     <Text fontWeight="medium">Test run status</Text>
                     <Text color="subdued" variant="bodySm">{`${currentTestsObj.totalTestsQueued} tests queued`}</Text>
-                </VerticalStack>
+                </BlockStack>
             </InlineStack> : null}
             <TopBar.Menu
                activatorContent={

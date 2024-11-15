@@ -1,4 +1,4 @@
-import { Text, Modal, TextField, VerticalStack, InlineStack, Button, Card } from "@shopify/polaris"
+import { Text, Modal, TextField, BlockStack, InlineStack, Button, Card } from "@shopify/polaris"
 import api from "../api"
 import func from "@/util/func"
 import CollectionComponent from "../../../components/CollectionComponent";
@@ -124,7 +124,7 @@ function CreateNewCollectionModal(props) {
             }] : []}
         >
             <Modal.Section>
-                <VerticalStack gap={3}>
+                <BlockStack gap={3}>
                     <TextField
                         id={"new-collection-input"}
                         label="Name"
@@ -147,7 +147,7 @@ function CreateNewCollectionModal(props) {
                     }
                     {
                         showApiSelector ? <Card background="bg-subdued">
-                            <VerticalStack gap={2}>
+                            <BlockStack gap={2}>
                                 {
                                     conditions.length > 0 && conditions.map((condition, index) => (
                                         <CollectionComponent
@@ -170,19 +170,19 @@ function CreateNewCollectionModal(props) {
                                         />
                                     ))
                                 }
-                            <InlineStack gap={4} align="start">
-                                <Button onClick={() => handleAddField()}>Add condition</Button>
-                                <Button
+                                <InlineStack gap={4} align="start">
+                                    <Button onClick={() => handleAddField()}>Add condition</Button>
+                                    <Button
 
 
-                                    onClick={() => dispatchConditions({ type: "clear" })}
-                                    variant="plain"
-                                    tone="critical">Clear all</Button>
-                            </InlineStack>
-                            </VerticalStack>
+                                        onClick={() => dispatchConditions({ type: "clear" })}
+                                        variant="plain"
+                                        tone="critical">Clear all</Button>
+                                </InlineStack>
+                            </BlockStack>
                         </Card> : null
                     }
-                </VerticalStack>
+                </BlockStack>
             </Modal.Section>
 
         </Modal>

@@ -1,4 +1,4 @@
-import { Scrollable, Spinner, VerticalStack } from "@shopify/polaris";
+import { Scrollable, Spinner, BlockStack } from "@shopify/polaris";
 import func from "@/util/func";
 import { tokens } from "@shopify/polaris-tokens"
 
@@ -34,15 +34,15 @@ const LogsContainer = ({ logs }) => {
 
             <Scrollable style={{maxHeight: '40vh'}}>
                {logContent.map((logText, idx) => (
-                <VerticalStack gap={1} key={idx}>
+                <BlockStack gap={1} key={idx}>
                     <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
                         {logText}
                     </div>
-                </VerticalStack>
+                </BlockStack>
                ))}
             </Scrollable>
         </div>
-    )
+    );
 }
 
 export default LogsContainer

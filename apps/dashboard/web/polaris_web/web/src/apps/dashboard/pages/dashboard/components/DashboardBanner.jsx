@@ -1,18 +1,18 @@
 import React from 'react'
 import BannerLayout from '../../../components/banners/BannerLayout'
-import { Box, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Text, BlockStack } from '@shopify/polaris'
 import { AppsMinor, MarketingMinor, ResetMinor, CustomersMinor, EditMinor, NoteMinor, ReadTimeMinor, StarFilledMinor } from "@shopify/polaris-icons"
 import GridRows from '../../../components/shared/GridRows'
 import BannerRow from './BannerRow'
 import { HOMEDASHBOARD_VIDEO_LENGTH, HOMEDASHBOARD_VIDEO_THUMBNAIL, HOMEDASHBOARD_VIDEO_URL } from '../../../../main/onboardingData'
 
 function InfoComponent({title, items})  {
-    return(
-        <VerticalStack gap={4}>
+    return (
+        <BlockStack gap={4}>
             <Text variant="bodyLg" fontWeight="semibold">{title}</Text>
             <GridRows columns={3} items={items} CardComponent={BannerRow} />
-        </VerticalStack>
-    )
+        </BlockStack>
+    );
 }
 
 function DashboardBanner() {
@@ -83,14 +83,14 @@ function DashboardBanner() {
     
 
     const containerComp = (
-        <VerticalStack gap={8}>
+        <BlockStack gap={8}>
             <Box paddingBlockEnd={"5"} paddingBlockStart={"5"}>
                 <InfoComponent items={productGuides} title={"Get started guide"} />
             </Box>
             <Box paddingBlockEnd={16}>
                 <InfoComponent items={websiteGuides} title={"Resources"} />
             </Box>
-        </VerticalStack>
+        </BlockStack>
     )
 
     return (

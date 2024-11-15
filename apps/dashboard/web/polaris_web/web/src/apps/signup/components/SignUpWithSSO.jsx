@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react'
 import SignUpPageLayout from './SignUpPageLayout';
-import { Button, Form, InlineStack, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Button, Form, InlineStack, Text, TextField, BlockStack } from '@shopify/polaris';
 
 function SignUpWithSSO() {
 
@@ -12,21 +12,21 @@ function SignUpWithSSO() {
     }
 
     const customComponent = (
-        <VerticalStack gap={8}>
+        <BlockStack gap={8}>
             <Text alignment="center" variant="heading2xl">{"Sign in with SSO"}</Text>
-            <VerticalStack gap={5}>
+            <BlockStack gap={5}>
                 <Form onSubmit={() => handleSubmit()}>
-                    <VerticalStack gap={3}>
+                    <BlockStack gap={3}>
                         <div className='form-class'>
                             <TextField onChange={setEmail} value={email} label="Email" placeholder="name@workemail.com" monospaced={true}/>
                         </div>
                         <InlineStack align="end">
                             <Button size="medium" onClick={handleSubmit}  variant="primary">Submit</Button>
                         </InlineStack>
-                    </VerticalStack>
+                    </BlockStack>
                 </Form>
-            </VerticalStack>
-        </VerticalStack>
+            </BlockStack>
+        </BlockStack>
     )
 
     return (

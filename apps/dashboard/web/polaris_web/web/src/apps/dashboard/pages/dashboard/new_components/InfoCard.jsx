@@ -1,4 +1,4 @@
-import { Box, Card, InlineStack, Link, VerticalStack } from '@shopify/polaris';
+import { Box, Card, InlineStack, Link, BlockStack } from '@shopify/polaris';
 import React from 'react';
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 
@@ -6,7 +6,7 @@ function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight}
     return (
         <Card padding={5} key="info">
             <Box  minHeight={minHeight ? minHeight : "100%"}>
-                <VerticalStack gap={5} align='center'>
+                <BlockStack gap={5} align='center'>
                     <InlineStack align='space-between'>
                         <TitleWithInfo
                             tooltipContent={titleToolTip}
@@ -16,7 +16,7 @@ function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight}
                         <Link url={linkUrl} target="_blank">{linkText}</Link>
                     </InlineStack>
                     {component}
-                </VerticalStack>
+                </BlockStack>
             </Box>
         </Card>
     );

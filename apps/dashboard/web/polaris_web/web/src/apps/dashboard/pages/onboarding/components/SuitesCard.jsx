@@ -1,4 +1,4 @@
-import { Box, Card, InlineStack, Icon, RadioButton, Text, Tooltip, VerticalStack } from '@shopify/polaris'
+import { Box, Card, InlineStack, Icon, RadioButton, Text, Tooltip, BlockStack } from '@shopify/polaris'
 import { QuestionMarkMinor } from "@shopify/polaris-icons"
 import React from 'react'
 import OnboardingStore from '../OnboardingStore'
@@ -11,7 +11,7 @@ function SuitesCard({cardObj}) {
     return (
         <div onClick={() => setSelectedTest(cardObj._name)}>
             <Card>
-                <VerticalStack gap="2">
+                <BlockStack gap="2">
                     <InlineStack align="space-between">
                         <InlineStack gap="1">
                             <RadioButton checked={selectedTest === cardObj._name} />
@@ -23,13 +23,12 @@ function SuitesCard({cardObj}) {
                             </Box>
                         </Tooltip>
                     </InlineStack>
-
                     <Box as="span" paddingInlineStart="8">
                         <Text variant="bodyMd">
                             {cardObj?.tests?.length} Tests
                         </Text>
                     </Box>
-                </VerticalStack>
+                </BlockStack>
             </Card>
         </div>
     );

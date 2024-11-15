@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import {Box, Button, Collapsible, Divider, InlineStack, Icon, LegacyCard, List, Scrollable, Text, TextField, VerticalStack} from '@shopify/polaris';
+import {Box, Button, Collapsible, Divider, InlineStack, Icon, LegacyCard, List, Scrollable, Text, TextField, BlockStack} from '@shopify/polaris';
 import settingFunctions from '../module';
 import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
@@ -31,7 +31,7 @@ function Jira() {
         <Scrollable
             style={{maxHeight: '250px'}}
         >
-            <VerticalStack gap={"4"}>
+            <BlockStack gap={"4"}>
                 <Box>
                     <Button
 
@@ -45,7 +45,6 @@ function Jira() {
                         </InlineStack>
                     </Button>
                 </Box>
-                
                 <Collapsible
                     open={collapsibleOpen}
                     transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
@@ -56,8 +55,7 @@ function Jira() {
                         })}
                     </List>
                 </Collapsible>
-
-            </VerticalStack>
+            </BlockStack>
         </Scrollable>
     )
 
@@ -84,12 +82,12 @@ function Jira() {
           </LegacyCard.Section>
 
           <LegacyCard.Section>
-                <VerticalStack gap={"2"}>
+                <BlockStack gap={"2"}>
                     <TextField label="Base Url" value={baseUrl} helpText="Specify the base url of your jira project(for ex - https://jiraintegloc.atlassian.net)"  placeholder='Base Url' requiredIndicator onChange={setBaseUrl} />
                     <TextField label="Email" value={userEmail} helpText="Specify your email id for which api token will be generated" placeholder='Email' requiredIndicator onChange={setUserEmail} />
                     <PasswordTextField label="Api Token" helpText="Specify the api token created for your user email" field={apiToken} onFunc={true} setField={setApiToken} />
                     <TextField label="Add project ids" helpText="Specify the projects ids in comma separated string" value={projId} placeholder='Project Names' requiredIndicator onChange={setProjId} />
-                </VerticalStack>
+                </BlockStack>
           </LegacyCard.Section> 
           {Object.keys(projectIssueMap).length > 0 ? <LegacyCard.Section>
               {projectsComponent} 

@@ -1,4 +1,4 @@
-import { Avatar, Box, InlineStack, Text, VerticalStack } from '@shopify/polaris'
+import { Avatar, Box, InlineStack, Text, BlockStack } from '@shopify/polaris'
 import React from 'react'
 
 function ActivityTracker({ latestActivity }) {
@@ -29,7 +29,7 @@ function ActivityTracker({ latestActivity }) {
 
     return (
         <Box padding={5}>
-            <VerticalStack>
+            <BlockStack>
                 {Object.keys(groupedActivity).map((date, dateIndex) => (
                     <Box key={dateIndex}>
                         <InlineStack gap={4}>
@@ -60,7 +60,7 @@ function ActivityTracker({ latestActivity }) {
                         ))}
                     </Box>
                 ))}
-            </VerticalStack>
+            </BlockStack>
         </Box>
     );
 }

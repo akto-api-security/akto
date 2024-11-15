@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import Store from '../../../store'
 import BannerComponent from './shared/BannerComponent'
-import { Button, ProgressBar, Text, VerticalStack } from '@shopify/polaris'
+import { Button, ProgressBar, Text, BlockStack } from '@shopify/polaris'
 import quickStartFunc from '../transform'
 import api from '../api'
 import NoAccessComponent from './shared/NoAccessComponent'
@@ -163,7 +163,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
         loading ? 
         <SpinnerCentered />
         :
-        <VerticalStack gap="2">
+        <BlockStack gap="2">
             {isButtonActive ? <Button  onClick={creatFargateStack} loading={loading} variant="primary">{setupButtonText}</Button> : null}
             <Text variant="bodyMd" as="h3">{statusText}</Text>
             {progressBar.show ? <ProgressBar progress={progressBar.value} size="small" tone="primary" /> : null }
@@ -172,7 +172,7 @@ function CompleteSetup({deploymentMethod, localComponentText, bannerTitle, docsU
                 stackCompleteComponent
                 : null
             }
-        </VerticalStack>
+        </BlockStack>
     )
 
     const localDeployObj = {

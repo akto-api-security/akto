@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Box, Button, Divider, InlineStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Box, Button, Divider, InlineStack, Icon, Text, Tooltip, BlockStack } from "@shopify/polaris"
 import { InfoMinor, ClipboardMinor, CircleTickMinor, CircleCancelMinor } from "@shopify/polaris-icons"
 
 import Store from "../../../store";
@@ -141,7 +141,7 @@ const YamlEditor = ({ fetchAllTests }) => {
     }
 
     return (
-        <VerticalStack>
+        <BlockStack>
             <div className="editor-header">
                 <InlineStack gap={"1"}>
                     <div ref={ref} />
@@ -165,11 +165,9 @@ const YamlEditor = ({ fetchAllTests }) => {
         
                 <Button id={"save-button"} disabled={!isEdited} onClick={handleSave} size="slim">Save</Button>
             </div>
-
             <Divider />
-
             <div style={{height: '92.7%', borderRight: '1px solid' , borderColor: '#E1E3E5'}} id={"yaml-editor"} ref={yamlEditorRef} />
-        </VerticalStack>
+        </BlockStack>
     );
 }
 

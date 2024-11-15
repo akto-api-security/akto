@@ -1,4 +1,4 @@
-import { Box, Button, InlineStack, Icon, Link, Modal, Select, Spinner, Text, TextField, VerticalStack } from "@shopify/polaris";
+import { Box, Button, InlineStack, Icon, Link, Modal, Select, Spinner, Text, TextField, BlockStack } from "@shopify/polaris";
 import { useEffect, useRef, useState } from "react";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubServerTable from "../../../components/tables/GithubServerTable";

@@ -4,7 +4,7 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import api from "../api"
 import onFunc from '../transform'
 import TestSuitesCard from "./TestSuitesCard"
-import { Badge, Button, ButtonGroup, InlineStack, Spinner, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Button, ButtonGroup, InlineStack, Spinner, Text, BlockStack } from '@shopify/polaris'
 import testingApi from "../../testing/api"
 import GridRows from '../../../components/shared/GridRows'
 import PersistStore from '../../../../main/PersistStore'
@@ -81,7 +81,7 @@ function ResultsSummary() {
     },[testingRunHexId])
 
     return loading ? <SpinnerCentered /> :   
-    <VerticalStack gap="5">
+    <BlockStack gap="5">
         {fetchTests ? <div style={{margin : "auto"}}> <Spinner size="small" /> </div> : null}
         <ButtonGroup variant="segmented">
             {severities.map((item,index)=> {
@@ -98,7 +98,7 @@ function ResultsSummary() {
             })}
         </ButtonGroup>
         <GridRows columns={1} items={groupedResults[activeTab]?.items} CardComponent={TestSuitesCard} />
-    </VerticalStack>;
+    </BlockStack>;
 }
 
 export default ResultsSummary

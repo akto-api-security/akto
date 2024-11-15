@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Avatar, Box, Button, InlineStack, Icon, Scrollable, Spinner,Text,TextField, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Avatar, Box, Button, InlineStack, Icon, Scrollable, Spinner,Text,TextField, Tooltip, BlockStack } from "@shopify/polaris"
 import { SendMajor } from "@shopify/polaris-icons"
 import PromptContainer from './PromptContainer'
 import "./style.css"
@@ -124,11 +124,11 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                 </Box>
                 <br/>
 
-                <VerticalStack gap="2">
+                <BlockStack gap="2">
                     {prompts.map((item)=>(
                         <PromptContainer itemObj={item} activePrompt={activePrompt} setActivePrompt={(item) => setSelectedObj(item)} key={item.label}/>
                     ))}
-                </VerticalStack>
+                </BlockStack>
             </div>
 
             <div className='message-container'>

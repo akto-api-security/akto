@@ -1,13 +1,13 @@
-import { Box, Button, Divider,LegacyCard, Text, VerticalStack} from '@shopify/polaris'
+import { Box, Button, Divider,LegacyCard, Text, BlockStack} from '@shopify/polaris'
 import React from 'react'
 import StepperComponent from '../../../components/shared/StepperComponent'
 
 function OnboardingLayout({stepObj, requestStepChange, currentStep, skipOnboarding, next}) {
 
     const titleComponent = (
-        <VerticalStack gap="1">
+        <BlockStack gap="1">
             <Text variant="headingMd" as="h4">{stepObj.cardTitle}</Text>
-        </VerticalStack>
+        </BlockStack>
     )
 
     return (
@@ -22,9 +22,9 @@ function OnboardingLayout({stepObj, requestStepChange, currentStep, skipOnboardi
                     {...(currentStep > 1 && currentStep < 4) ? {secondaryFooterActions: [{content: "Back", onAction: ()=> requestStepChange(currentStep - 1)}]}: null}
             >
                 <LegacyCard.Section>
-                    <VerticalStack gap="3">
+                    <BlockStack gap="3">
                         {stepObj?.component}
-                    </VerticalStack>
+                    </BlockStack>
                 </LegacyCard.Section>
                 <Divider/>
                 <Box padding="2"/>

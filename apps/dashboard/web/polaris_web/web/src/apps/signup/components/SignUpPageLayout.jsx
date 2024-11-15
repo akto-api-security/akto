@@ -1,4 +1,4 @@
-import { Avatar, Box, Button, Frame, InlineStack, Page, VerticalStack } from '@shopify/polaris'
+import { Avatar, Box, Button, Frame, InlineStack, Page, BlockStack } from '@shopify/polaris'
 import React from 'react'
 import ToastComponent from './ToastComponent'
 
@@ -11,15 +11,14 @@ function SignUpPageLayout({customComponent}) {
             <div style={{display: "flex", justifyContent: 'space-between', flexDirection: "column"}}>
               <InlineStack align="center">
                 <Box width='400px'>
-                  <VerticalStack gap={8}>
+                  <BlockStack gap={8}>
                     <InlineStack align='center'>
                       <div className="akto-logo">
                         <Avatar source="/public/akto_name_with_logo.svg" shape="round" size="xl" />
                       </div>
                     </InlineStack>
                     {customComponent}
-
-                  </VerticalStack>
+                  </BlockStack>
                   <div style={{bottom: "40px", position: "absolute", width: '400px'}}>
                     <InlineStack gap={3} align="center">
                       <Button

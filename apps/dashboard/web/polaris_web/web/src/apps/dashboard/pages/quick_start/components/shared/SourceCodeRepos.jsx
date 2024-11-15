@@ -1,4 +1,4 @@
-import { InlineStack, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
+import { InlineStack, LegacyCard, Text, TextField, BlockStack } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import api from "../../api";
 import func from "@/util/func";
@@ -124,7 +124,7 @@ function SourceCodeRepos({type, typeName, orgName}) {
             </LegacyCard>
 
 
-            <VerticalStack gap="1">
+            <BlockStack gap="1">
                 {repoList.map((repo, index) => (
                     <LegacyCard 
                         key={index} 
@@ -142,7 +142,7 @@ function SourceCodeRepos({type, typeName, orgName}) {
                         </InlineStack>
                     </LegacyCard>
                 ))}
-            </VerticalStack>
+            </BlockStack>
         </div>
     );
 }

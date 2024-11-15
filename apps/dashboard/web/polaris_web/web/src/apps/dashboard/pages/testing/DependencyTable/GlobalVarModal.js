@@ -1,4 +1,4 @@
-import { Modal, Scrollable, VerticalStack } from "@shopify/polaris"
+import { Modal, Scrollable, BlockStack } from "@shopify/polaris"
 import { useEffect, useState } from "react"
 import api from "../api"
 import EditGlobalDataFields from "./EditGlobalDataFields"
@@ -51,11 +51,11 @@ function GlobalVarModal(props) {
         >
             <Scrollable style={{ maxHeight: "400px" }} shadow>
                 <Modal.Section>
-                    <VerticalStack gap={2}>
+                    <BlockStack gap={2}>
                         {globalVarsData.map((ele, index) => {
                             return EditGlobalDataFields(ele, handleTextFieldChange)
                         })}
-                    </VerticalStack>
+                    </BlockStack>
                 </Modal.Section>
             </Scrollable>
         </Modal>

@@ -1,4 +1,4 @@
-import { Page, LegacyCard, TextField, VerticalStack, Button } from '@shopify/polaris'
+import { Page, LegacyCard, TextField, BlockStack, Button } from '@shopify/polaris'
 import Dropdown from '../../../components/layouts/Dropdown'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import PersistStore from '@/apps/main/PersistStore';
@@ -96,7 +96,7 @@ function DefaultPayloads() {
         <Page title='Default payloads' divider>
             <LegacyCard>
                 <LegacyCard.Section>
-                    <VerticalStack gap={"4"}>
+                    <BlockStack gap={"4"}>
                         <DropdownSearch
                             id={"select-domain-name"}
                             placeholder="Select domain name"
@@ -105,7 +105,6 @@ function DefaultPayloads() {
                             preSelected={allOptions[0].label}
                             value={findSelectedDomainLabel()}
                         />
-
                         {
                             isAddYourOwnDomain() &&
                             <TextField
@@ -116,7 +115,6 @@ function DefaultPayloads() {
                                  autoComplete="off"
                              />
                         }
-
                         {
                             isDomainSelected() &&
                             <TextField
@@ -136,7 +134,7 @@ function DefaultPayloads() {
                                     variant="primary">Save</Button>
                             </div>
                         }
-                    </VerticalStack>
+                    </BlockStack>
                 </LegacyCard.Section>
             </LegacyCard>
         </Page>

@@ -1,7 +1,7 @@
 import React from 'react'
 import CompleteSetup from './CompleteSetup'
 import JsonComponent from './shared/JsonComponent'
-import { InlineStack, VerticalStack } from '@shopify/polaris'
+import { InlineStack, BlockStack } from '@shopify/polaris'
 import QuickStartStore from '../quickStartStore'
 import func from '@/util/func'
 import { useRef } from 'react'
@@ -22,16 +22,15 @@ function FargateSource({docsUrl,bannerTitle, innerUrl}) {
     const setupButtonText = "Setup traffic processors"
 
     const stackCompleteComponent = (
-        <VerticalStack gap="2">
+        <BlockStack gap="2">
             <div ref = {ref}/>
             <InlineStack gap="1">
                 <span>Your stack is ready. Now follow the steps mentioned 
                 {" "} <a target="_blank" href={innerUrl}>here</a>. You will need the following variables for the next steps.
                 </span>
             </InlineStack>
-
             <JsonComponent title="Variables" toolTipContent="Copy your variables" onClickFunc={()=> copyYaml()} dataString={yamlContent} language="yaml" minHeight="100px"/>
-        </VerticalStack>
+        </BlockStack>
     )
 
     return (

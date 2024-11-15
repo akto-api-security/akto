@@ -2,7 +2,7 @@ import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {
   Text,
   Button,
-  VerticalStack,
+  BlockStack,
   InlineStack,
   Icon,
   Badge,
@@ -478,13 +478,13 @@ const promotedBulkActions = (selectedDataHexIds) => {
 const runningTestsComp = useMemo(() => (
     currentTestObj.testingRunId !== -1 ? (
         <Card key={"test-progress"}>
-            <VerticalStack gap={"3"}>
-                <Text variant="headingSm">{`Running ${currentTestObj.testsInitiated} tests`}</Text>
-                <div style={{ display: "flex", gap: '4px', alignItems: 'center' }}>
-                    <ProgressBar progress={progress} tone="primary" size="small" />
-                    <Text color="subdued">{`${progress}%`}</Text>
-                </div>
-            </VerticalStack>
+            <BlockStack gap={"3"}>
+              <Text variant="headingSm">{`Running ${currentTestObj.testsInitiated} tests`}</Text>
+              <div style={{ display: "flex", gap: '4px', alignItems: 'center' }}>
+                  <ProgressBar progress={progress} tone="primary" size="small" />
+                  <Text color="subdued">{`${progress}%`}</Text>
+              </div>
+            </BlockStack>
         </Card>
     ) : null
 ), [currentTestObj, progress]);
@@ -501,23 +501,23 @@ const runningTestsComp = useMemo(() => (
     return (
       <div style={{margin: 'auto', marginTop: '20vh'}}>
         <Box width="300px" padding={4}>
-          <VerticalStack gap={5}>
+          <BlockStack gap={5}>
             <InlineStack align="center">
               <div style={{borderRadius: '50%', border: '6px solid white', padding: '4px', display: 'flex', alignItems: 'center', height: '50px', width: '50px'}}>
                 <Icon source={CircleInformationMajor} />
               </div>
             </InlineStack>
-            <VerticalStack gap={2}>
-            <InlineStack align="center">
-              <Text variant="bodyLg" fontWeight="semibold">
-                No test run data found
-              </Text>
-            </InlineStack>
+            <BlockStack gap={2}>
+              <InlineStack align="center">
+                <Text variant="bodyLg" fontWeight="semibold">
+                  No test run data found
+                </Text>
+              </InlineStack>
               <Text variant="bodyMd" alignment="center">
                 The next summary will be ready with the upcoming test.
               </Text>
-            </VerticalStack>
-          </VerticalStack>
+            </BlockStack>
+          </BlockStack>
         </Box>
       </div>
     );
@@ -527,7 +527,7 @@ const runningTestsComp = useMemo(() => (
   const useComponents = (!workflowTest && allResultsLength === 0 && (selectedTestRun.run_type && selectedTestRun.run_type ==='One-time')) ? [<EmptyData key="empty"/>] : components
   const headingComp = (
     <Box paddingBlockStart={1}>
-      <VerticalStack gap="2">
+      <BlockStack gap="2">
         <InlineStack gap="2" align="start">
           { selectedTestRun?.icon && <Box>
             <Icon tone={selectedTestRun.iconColor} source={selectedTestRun.icon }></Icon>
@@ -570,7 +570,7 @@ const runningTestsComp = useMemo(() => (
             <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
           </InlineStack>
         </InlineStack>
-      </VerticalStack>
+      </BlockStack>
     </Box>
   )
 

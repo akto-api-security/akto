@@ -1,4 +1,4 @@
-import { InlineStack, Text, Badge, VerticalStack, ButtonGroup, Button, Modal, DescriptionList, RadioButton, Icon, Tooltip } from "@shopify/polaris";
+import { InlineStack, Text, Badge, BlockStack, ButtonGroup, Button, Modal, DescriptionList, RadioButton, Icon, Tooltip } from "@shopify/polaris";
 import { CancelMajor } from "@shopify/polaris-icons"
 import { useState } from "react";
 import FileUpload from "../../../components/shared/FileUpload";
@@ -160,7 +160,7 @@ function OpenApiSource() {
                         allowedSize={5*1024*1024} />
             </InlineStack>
 
-            <VerticalStack gap="2">
+            <BlockStack gap="2">
                 <ButtonGroup>
                     <Button
                         onClick={uploadFile}
@@ -172,7 +172,7 @@ function OpenApiSource() {
                     </Button>
                     <Button onClick={goToDocs}>Go to docs</Button>
                 </ButtonGroup>
-            </VerticalStack>
+            </BlockStack>
             <Modal
                 open={showImportDetailsModal}
                 onClose={() => {closeModal()}}

@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, InlineStack, Link, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, InlineStack, Link, Text, BlockStack } from '@shopify/polaris'
 import React, { useEffect, useState, useRef } from 'react'
 import {useNavigate} from "react-router-dom"
 import api from '../api'
@@ -78,7 +78,7 @@ function BurpSource() {
             text: "Copy the AKTO_IP and AKTO_TOKEN and paste in the options tab.",
             component: (
                 <Box paddingInlineStart={2}>
-                    <VerticalStack gap={1}>
+                    <BlockStack gap={1}>
                         <div ref={ref}/>
                         <InlineStack gap={1}>
                             <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_IP:</Text>
@@ -92,7 +92,7 @@ function BurpSource() {
                                 <div style={{maxWidth: "210px"}} className='overflow-text'>{aktoToken}</div>
                             </Button>
                         </InlineStack>
-                    </VerticalStack>
+                    </BlockStack>
                 </Box>
             )
         },
@@ -136,9 +136,9 @@ function BurpSource() {
 
             <InformationBannerComponent content={content} docsUrl={""}/>
 
-            <VerticalStack gap="1">
+            <BlockStack gap="1">
                 {steps.map((element,index) => (
-                    <VerticalStack gap="1" key={index}>
+                    <BlockStack gap="1" key={index}>
                         <InlineStack gap="1" wrap={false} key={element.text}>
                             {element?.text ?<Text>{index + 1}.</Text> : null}
                             {element?.text ?<Text variant="bodyMd">{element?.text}</Text> : null}
@@ -147,16 +147,16 @@ function BurpSource() {
                         <Box paddingInlineStart={2}>
                             {element?.component}
                         </Box>
-                    </VerticalStack>
+                    </BlockStack>
                 ))}
-            </VerticalStack>
+            </BlockStack>
 
-            <VerticalStack gap="2">
+            <BlockStack gap="2">
                 <ButtonGroup>
                     <Button onClick={primaryAction}  variant="primary">Check Connection</Button>
                     <Button onClick={goToDocs}>Go to docs</Button>
                 </ButtonGroup>
-            </VerticalStack>
+            </BlockStack>
 
         </div>
     );

@@ -1,4 +1,4 @@
-import { Box, Card, InlineGrid, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Card, InlineGrid, Text, BlockStack } from '@shopify/polaris'
 import React from 'react'
 
 function SummaryCardInfo({summaryItems}) {
@@ -8,7 +8,7 @@ function SummaryCardInfo({summaryItems}) {
                 <InlineGrid columns={summaryItems.length} gap={4}>
                     {summaryItems.map((item, index) => (
                         <Box borderInlineEndWidth={index < (summaryItems.length - 1) ? "1" : ""} key={index} paddingBlockStart={1} paddingBlockEnd={1} borderColor="border-subdued">
-                            <VerticalStack gap="1">
+                            <BlockStack gap="1">
                                 <Text color="subdued" variant="headingSm">
                                     {item.title}
                                 </Text>
@@ -16,7 +16,7 @@ function SummaryCardInfo({summaryItems}) {
                                     {item.data}
                                 </Text>
                                 }
-                            </VerticalStack>
+                            </BlockStack>
                         </Box>
                     ))}
                 </InlineGrid>

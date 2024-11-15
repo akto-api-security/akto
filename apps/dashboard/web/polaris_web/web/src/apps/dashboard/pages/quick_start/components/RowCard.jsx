@@ -1,4 +1,4 @@
-import { Avatar, Button, Card, Text, VerticalStack, InlineStack, Badge, Box } from '@shopify/polaris';
+import { Avatar, Button, Card, Text, BlockStack, InlineStack, Badge, Box } from '@shopify/polaris';
 
 function RowCard(props) {
 
@@ -13,7 +13,7 @@ function RowCard(props) {
 
     return (
         <Card>
-            <VerticalStack gap="5">
+            <BlockStack gap="5">
                 <div style={{display: 'flex' , justifyContent: 'space-between'}}>
                     <Box padding={"2"} borderWidth='1' borderColor='border-subdued' borderRadius='2'>
                     <Avatar customer size="xs" name={cardObj.label} source={cardObj.icon} shape='square'/>
@@ -22,17 +22,17 @@ function RowCard(props) {
                         {cardObj.badge ? <Badge size='small' tone='info'>{cardObj.badge}</Badge> : null}
                     </Box>
                 </div>
-                <VerticalStack gap="1">
+                <BlockStack gap="1">
                     <Text variant="headingMd" as="h5">{cardObj.label}</Text>
                     <Box minHeight="80px">
                         <Text variant="bodyMd" color='subdued'>{cardObj.text}</Text>
                     </Box>
-                </VerticalStack>
+                </BlockStack>
                 <InlineStack gap={"4"} align='start'>
                     <Button onClick={handleAction}>{buttonText}</Button>
                     <Button  onClick={goToDocs} size='medium' variant="plain">See Docs</Button>
                 </InlineStack>
-            </VerticalStack>
+            </BlockStack>
         </Card>
     );
 }

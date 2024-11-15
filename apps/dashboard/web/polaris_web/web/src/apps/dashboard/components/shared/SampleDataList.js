@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import {
   Text,
-  VerticalStack,
+  BlockStack,
   InlineStack, Box, LegacyCard, InlineGrid,
   Pagination, Key, Badge} from '@shopify/polaris';
 import SampleDataComponent from './SampleDataComponent';
@@ -17,7 +17,7 @@ function SampleDataList(props) {
     }, [sampleData])
   
     return (
-      <VerticalStack gap="3">
+      <BlockStack gap="3">
         <InlineStack align='space-between'>
           <InlineStack gap="2">
             <Text variant='headingMd'>
@@ -57,7 +57,7 @@ function SampleDataList(props) {
             })
           }
         </InlineGrid>
-      </VerticalStack>
+      </BlockStack>
     );
   }
 

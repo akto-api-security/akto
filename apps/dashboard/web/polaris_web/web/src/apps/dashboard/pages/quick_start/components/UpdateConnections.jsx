@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import quickStartFunc from '../transform';
-import { Badge,InlineStack, Page, Tag, Text, VerticalStack, Divider} from '@shopify/polaris';
+import { Badge,InlineStack, Page, Tag, Text, BlockStack, Divider} from '@shopify/polaris';
 import RowCard from './RowCard';
 import GridRows from '../../../components/shared/GridRows';
 import QuickStartStore from '../quickStartStore';
@@ -48,23 +48,23 @@ function UpdateConnections(props) {
                     />}
         >
             <div>
-                <VerticalStack gap="8">
+                <BlockStack gap="8">
                     {Object.keys(obj).map((key, index) => {
                         return (
-                            <VerticalStack gap="4" key={key}>
-                            <InlineStack gap={"3"}>
-                                <Text variant="headingMd" as="h6" color=""> {key} </Text>
-                                <Tag>{obj[key].length.toString()}</Tag>
-                            </InlineStack>
-                            <Divider/>
-                            <GridRows CardComponent={RowCard} columns="3" 
-                            items={obj[key]} buttonText="Connect" onButtonClick={onButtonClick}     
-                            changedColumns={newCol} 
-                            />
-                            </VerticalStack>
+                            <BlockStack gap="4" key={key}>
+                                <InlineStack gap={"3"}>
+                                    <Text variant="headingMd" as="h6" color=""> {key} </Text>
+                                    <Tag>{obj[key].length.toString()}</Tag>
+                                </InlineStack>
+                                <Divider/>
+                                <GridRows CardComponent={RowCard} columns="3" 
+                                items={obj[key]} buttonText="Connect" onButtonClick={onButtonClick}     
+                                changedColumns={newCol} 
+                                />
+                            </BlockStack>
                         );
                     })}
-                </VerticalStack>
+                </BlockStack>
             </div>
                 {currentCardObj ?<FlyLayout
                     width={"27vw"}

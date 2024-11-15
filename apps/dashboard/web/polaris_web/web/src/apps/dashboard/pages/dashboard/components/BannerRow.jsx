@@ -1,4 +1,4 @@
-import { Box, Link, InlineStack, Icon, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Link, InlineStack, Icon, Text, BlockStack } from '@shopify/polaris'
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRightMinor } from "@shopify/polaris-icons"
@@ -19,7 +19,7 @@ function BannerRow(props) {
             <Box>
                 <Icon source={icon} tone="base" />
             </Box>
-            <VerticalStack gap={2}>
+            <BlockStack gap={2}>
                 {redirectUrl ? <Link monochrome removeUnderline onClick={() => newTab ? window.open(redirectUrl, "_blank") : navigate(redirectUrl)}>
                     {titleComp}
                 </Link>
@@ -29,7 +29,7 @@ function BannerRow(props) {
                 <Text color="subdued">
                     {description}
                 </Text>
-            </VerticalStack>
+            </BlockStack>
         </div>
     );
 }

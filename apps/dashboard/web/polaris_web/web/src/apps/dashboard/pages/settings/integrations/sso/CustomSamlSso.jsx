@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import StepsComponent from '../components/StepsComponent';
-import { Button, Form, FormLayout, InlineStack, LegacyCard, Link, Tag, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Button, Form, FormLayout, InlineStack, LegacyCard, Link, Tag, Text, TextField, BlockStack } from '@shopify/polaris';
 import FileUpload from '../../../../components/shared/FileUpload';
 import SpinnerCentered from '../../../../components/progress/SpinnerCentered';
 import IntegrationsLayout from '../IntegrationsLayout';
@@ -43,9 +43,9 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
         <LegacyCard.Section>
             <Form onSubmit={handleSubmit}>
                 <FormLayout>
-                    <VerticalStack gap={"4"}>
+                    <BlockStack gap={"4"}>
                         {showCustomInputs ? 
-                            <VerticalStack gap={"3"}>
+                            <BlockStack gap={"3"}>
                                 <TextField label={<Text fontWeight="medium" variant="bodySm">Enter sso url</Text>} 
                                     placeholder='Enter your SSO url'
                                     onChange={setSSOUrl}
@@ -56,7 +56,7 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
                                     onChange={setIdentifier}
                                     value={identifier}
                                 />
-                            </VerticalStack> : null
+                            </BlockStack> : null
                         }
                         <InlineStack gap="3">
                             {files ? 
@@ -72,7 +72,7 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
                         <InlineStack align="end">
                             <Button submit  size="medium" variant="primary">Submit</Button>
                         </InlineStack>
-                    </VerticalStack>
+                    </BlockStack>
                 </FormLayout>
             </Form>
         </LegacyCard.Section>
@@ -108,14 +108,14 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
     )
 
     const useCardContent = (
-        <VerticalStack gap={"2"}>
+        <BlockStack gap={"2"}>
             <Text>{cardContent}</Text>
             <InlineStack gap={"1"}>
                 <Text>Use</Text>
                 <Link>https://app.akto.io/sso-login</Link>
                 <Text>for signing into AKTO dashboard via SSO.</Text>
             </InlineStack>
-        </VerticalStack>
+        </BlockStack>
     )
     
     return (

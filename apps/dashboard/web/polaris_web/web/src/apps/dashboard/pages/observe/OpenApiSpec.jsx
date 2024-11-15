@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import FileUpload from '../../components/shared/FileUpload'
-import { Box, TextField, VerticalStack } from '@shopify/polaris';
+import { Box, TextField, BlockStack } from '@shopify/polaris';
 import api from './api';
 import func from '@/util/func';
 import SpinnerCentered from '../../components/progress/SpinnerCentered';
@@ -59,14 +59,13 @@ function OpenApiSpec({apiCollectionId}) {
     return (
         <Box padding="4">
             {loading ? <SpinnerCentered /> :
-                <VerticalStack gap={"4"}>
+                <BlockStack gap={"4"}>
                     <TextField placeholder="Upload JSON file here" value={fileName} prefix={UploadFile} />
                     {content ? <SampleData minHeight="60vh" data={data} language="json"/> : null}
-                </VerticalStack>
+                </BlockStack>
             }
         </Box>
-       
-    )
+    );
 }
 
 export default OpenApiSpec

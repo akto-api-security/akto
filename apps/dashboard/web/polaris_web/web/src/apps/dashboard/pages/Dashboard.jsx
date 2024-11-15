@@ -3,7 +3,7 @@ import { history } from "@/util/history";
 import Store from "../store";
 import homeFunctions from "./home/module";
 import { useEffect, useState, useRef} from "react";
-import { Frame, Toast, VerticalStack, Banner, Button, Text } from "@shopify/polaris";
+import { Frame, Toast, BlockStack, Banner, Button, Text } from "@shopify/polaris";
 import "./dashboard.css"
 import func from "@/util/func"
 import transform from "./testing/transform";
@@ -175,7 +175,7 @@ function Dashboard() {
             {toastMarkup}
             {ConfirmationModalMarkup}
             {displayItems.length > 0 ? <div className="alerts-banner">
-                    <VerticalStack gap={"2"}>
+                    <BlockStack gap={"2"}>
                         {displayItems.map((alert, index) => {
                             return(
                                 <AlertsBanner key={index} 
@@ -187,7 +187,7 @@ function Dashboard() {
                                 />
                             )
                         })}
-                    </VerticalStack>
+                    </BlockStack>
             </div> : null}
             {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner">
                 <Banner hideIcon={true}> 

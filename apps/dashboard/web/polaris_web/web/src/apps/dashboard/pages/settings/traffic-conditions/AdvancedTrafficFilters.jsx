@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
-import { Box, Button, Checkbox, InlineStack, Icon, LegacyCard, Modal, Popover, Text, Tooltip, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Checkbox, InlineStack, Icon, LegacyCard, Modal, Popover, Text, Tooltip, BlockStack } from '@shopify/polaris'
 import trafficFiltersRequest from './api'
 import func from "@/util/func"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
@@ -116,7 +116,7 @@ function AdvancedTrafficFilters() {
                     autofocusTarget="container"
                 >
                     <Popover.Section>
-                        <VerticalStack gap={"2"}>
+                        <BlockStack gap={"2"}>
                             <Checkbox
                                 checked={permissionsMap['allowFilterLogs']}
                                 label="Allow filtered urls in logs"
@@ -127,7 +127,7 @@ function AdvancedTrafficFilters() {
                                 checked={permissionsMap['allowDeletionOfUrls']}
                                 onChange={() => handleCheckboxClicked('allowDeletionOfUrls', !permissionsMap['allowDeletionOfUrls'])}
                             />
-                        </VerticalStack>
+                        </BlockStack>
                     </Popover.Section>
                 </Popover>
             </InlineStack>
@@ -159,7 +159,7 @@ function AdvancedTrafficFilters() {
             </LegacyCard.Section>
             <LegacyCard.Section flush>
                 <Box paddingBlockStart={4} paddingBlockEnd={4}>
-                    <VerticalStack gap={"1"}>
+                    <BlockStack gap={"1"}>
                         <Box paddingInlineEnd={"4"}>
                             <InlineStack align="end" gap={"2"}>
                                 <Button
@@ -186,7 +186,7 @@ function AdvancedTrafficFilters() {
                             </InlineStack>
                         </Box>
                         <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="240px" readOnly={false} getEditorData={setCurrentTemplate} />
-                    </VerticalStack>
+                    </BlockStack>
                 </Box>
             </LegacyCard.Section>
         </LegacyCard>

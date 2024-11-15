@@ -1,6 +1,6 @@
 import CollectionComponent from "../../../components/CollectionComponent"
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
-import { VerticalStack, Card, Button, InlineStack, Collapsible, Text, Box, Icon } from "@shopify/polaris";
+import { BlockStack, Card, Button, InlineStack, Collapsible, Text, Box, Icon } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import React, { useState, useReducer, useCallback, useMemo, useEffect } from 'react'
@@ -176,7 +176,7 @@ function APIQuery() {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const collapsibleComponent =
-        <VerticalStack gap={"0"} key="conditions-filters">
+        <BlockStack gap={"0"} key="conditions-filters">
             <Box background={"bg-subdued"} width="100%" padding={"2"} onClick={handleToggle} key="collapsible-component-header">
                 <InlineStack align="space-between">
                     <Text variant="headingSm">
@@ -193,9 +193,9 @@ function APIQuery() {
                 id="basic-collapsible"
                 transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
             >
-                <VerticalStack gap={"0"} key="conditions-component">
+                <BlockStack gap={"0"} key="conditions-component">
                     <Card>
-                        <VerticalStack gap="4">
+                        <BlockStack gap="4">
                             {
                                 conditions.length > 0 && conditions.map((condition, index) => (
                                     <CollectionComponent
@@ -228,11 +228,11 @@ function APIQuery() {
                             <InlineStack gap={4} align="end">
                                 <Button onClick={exploreEndpoints}>Explore endpoints</Button>
                             </InlineStack>
-                        </VerticalStack>
+                        </BlockStack>
                     </Card>
-                </VerticalStack>
+                </BlockStack>
             </Collapsible>
-        </VerticalStack>
+        </BlockStack>
 
     const components = useMemo(() => [
         modalComponent,

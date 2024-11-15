@@ -3,7 +3,7 @@ import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, InlineGrid, InlineStack, Icon, Link, Scrollable, Text, VerticalStack } from '@shopify/polaris';
+import { Box, DataTable, InlineGrid, InlineStack, Icon, Link, Scrollable, Text, BlockStack } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import testingTransform from "../testing/transform"
 import StackedChart from '../../components/charts/StackedChart';
@@ -622,11 +622,11 @@ function HomeDashboard() {
     const components = [summaryComp, testSummaryCardsList, gridComponent]
 
     const dashboardComp = (
-        <VerticalStack gap={4}>
+        <BlockStack gap={4}>
             {components.map((component) => {
                 return component
             })}
-        </VerticalStack>
+        </BlockStack>
     )
 
     const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : dashboardComp]

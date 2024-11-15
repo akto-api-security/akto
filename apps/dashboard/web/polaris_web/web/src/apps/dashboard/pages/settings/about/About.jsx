@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, InlineGrid, InlineStack, Scrollable, TextField, Tag, Form, Tooltip } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, BlockStack, InlineGrid, InlineStack, Scrollable, TextField, Tag, Form, Tooltip } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
@@ -139,7 +139,7 @@ function About() {
     
 
     const infoComponent = (
-        <VerticalStack gap={4}>
+        <BlockStack gap={4}>
             <InlineGrid columns={"2"} gap={"3"}>
                 <TextField 
                     disabled={window.USER_ROLE !== 'ADMIN'} 
@@ -163,13 +163,13 @@ function About() {
             </InlineGrid>
             {objArr.map((item)=>(
                 <Box key={item.title} >
-                    <VerticalStack gap={1}>
+                    <BlockStack gap={1}>
                         <Text fontWeight='semi-bold' color='subdued'>{item.title}</Text>
                         <Text fontWeight='bold'>{item.text}</Text>
-                    </VerticalStack>
+                    </BlockStack>
                 </Box>
             ))}
-        </VerticalStack>
+        </BlockStack>
     )
 
     const handleSelect = async(selected) => {
@@ -240,7 +240,7 @@ function About() {
 
     function ToggleComponent({text,onToggle,initial}){
         return (
-            <VerticalStack gap={1}>
+            <BlockStack gap={1}>
                 <Text color="subdued">{text}</Text>
                 <ButtonGroup variant="segmented">
                     <Button size="slim" onClick={() => onToggle(true)} pressed={initial === true}>
@@ -250,7 +250,7 @@ function About() {
                         False
                     </Button>
                 </ButtonGroup>
-            </VerticalStack>
+            </BlockStack>
         );
     }
 
@@ -320,7 +320,7 @@ function About() {
     }
 
     const redundantUrlComp = (
-        <VerticalStack gap={"4"}>
+        <BlockStack gap={"4"}>
             <Box width='220px'>
                 <DropdownSearch
                     label="Select redundant url types"
@@ -335,14 +335,14 @@ function About() {
                 />
             </Box>
             <ToggleComponent text={"Treat URLs as case insensitive"} onToggle={handleApisCaseInsensitive} initial={toggleCaseSensitiveApis} />
-        </VerticalStack>
+        </BlockStack>
     )
     
     const filterHeaderComponent = (
-        <VerticalStack gap={5}>
+        <BlockStack gap={5}>
             <Text color="subdued">Traffic filters</Text>
             <Scrollable horizontal={false} style={{maxHeight: '100px'}} shadow>
-                <VerticalStack gap={1}>
+                <BlockStack gap={1}>
                     {Object.keys(trafficFiltersMap).map((key)=> {
                         return (
                             <InlineGrid gap={2} columns={3} key={key}>
@@ -356,7 +356,7 @@ function About() {
                             </InlineGrid>
                         );
                     })}
-                </VerticalStack>
+                </BlockStack>
             </Scrollable>
             <InlineGrid gap={2} columns={3} alignItems="center">
                 <TextFieldWithInfo 
@@ -377,14 +377,14 @@ function About() {
                 />
                 {checkSaveActive('filterHeader') ? <Box paddingBlockStart={5} width="100px"><Button onClick={saveFilterHeader} size="medium"  variant="primary">Save</Button></Box> : null}
             </InlineGrid>
-        </VerticalStack>
+        </BlockStack>
     )
 
     const replaceCollectionComponent = (
-        <VerticalStack gap={5}>
+        <BlockStack gap={5}>
             <Text color="subdued">Replace collection</Text>
             <Scrollable horizontal={false} style={{maxHeight: '100px'}} shadow>
-                <VerticalStack gap={1}>
+                <BlockStack gap={1}>
                     {Object.keys(apiCollectionNameMapper).map((key)=> {
                         const { headerName, newName, regex } = apiCollectionNameMapper[key]
                         const headerLine = headerName + "=" + regex
@@ -401,7 +401,7 @@ function About() {
                             </InlineGrid>
                         );
                     })}
-                </VerticalStack>
+                </BlockStack>
             </Scrollable>
             <InlineGrid gap={2} columns={3} alignItems="center">
                 <TextFieldWithInfo 
@@ -430,7 +430,7 @@ function About() {
                 />
                 {checkSaveActive('replaceCollection') ? <Box paddingBlockStart={5} width="100px"><Button onClick={addApiCollectionNameMapper} size="medium"  variant="primary">Save</Button></Box> : null}
             </InlineGrid>
-        </VerticalStack>
+        </BlockStack>
     )
 
     const accountInfoComponent = (
@@ -446,8 +446,8 @@ function About() {
                   <LegacyCard.Section title={<Text variant="headingMd">More settings</Text>}>
                       <div style={{ display: 'flex' }}>
                           <div style={{ flex: "1" }}>
-                              <VerticalStack gap={5}>
-                                  <VerticalStack gap={1}>
+                              <BlockStack gap={5}>
+                                  <BlockStack gap={1}>
                                       <Text color="subdued">Setup type</Text>
                                       <Box width='120px'>
                                           <Dropdown
@@ -456,12 +456,12 @@ function About() {
                                               initial={setupType}
                                           />
                                       </Box>
-                                  </VerticalStack>
+                                  </BlockStack>
                                   <ToggleComponent text={"Redact sample data"} initial={redactPayload} onToggle={handleRedactPayload} />
                                   <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
                                   <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
                                   {redundantUrlComp}
-                                  <VerticalStack gap={1}>
+                                  <BlockStack gap={1}>
                                       <Text color="subdued">Traffic alert threshold</Text>
                                       <Box width='120px'>
                                           <Dropdown
@@ -470,8 +470,8 @@ function About() {
                                               initial={trafficThreshold}
                                           />
                                       </Box>
-                                  </VerticalStack>
-                              </VerticalStack>
+                                  </BlockStack>
+                              </BlockStack>
                           </div>
                           <div style={{ flex: '2' }}>
                               {filterHeaderComponent}
@@ -529,7 +529,7 @@ function About() {
             >
                 <Divider />
                 <LegacyCard.Section>
-                    <VerticalStack gap={"2"}>
+                    <BlockStack gap={"2"}>
                         <Form onSubmit={() => onFormSubmit(value)}>
                             <TextField onChange={setValue} value={value} label={<Text color="subdued" fontWeight="medium" variant="bodySm">{labelText}</Text>} {...isError ? {error: "Invalid address"} : {}}/>
                         </Form>
@@ -542,7 +542,7 @@ function About() {
                                 )
                             })}
                         </InlineStack>
-                    </VerticalStack>
+                    </BlockStack>
                 </LegacyCard.Section>
             </LegacyCard>
         );

@@ -1,4 +1,4 @@
-import { Avatar, Box, Button, Card, Divider, InlineStack, ProgressBar, Text, VerticalStack } from '@shopify/polaris'
+import { Avatar, Box, Button, Card, Divider, InlineStack, ProgressBar, Text, BlockStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
 import { useNavigate } from 'react-router-dom';
@@ -77,7 +77,7 @@ function InitialSteps({initialSteps}) {
 
     function StepConnection({step,index}) {
         return (
-            <VerticalStack gap={4}>
+            <BlockStack gap={4}>
                 <InlineStack gap={2}>
                     <Avatar customer name='circle' size="xs"
                         source={isCompleted(step.id) ? "/public/circle_check.svg" : "/public/circle_icon.svg"}
@@ -98,25 +98,25 @@ function InitialSteps({initialSteps}) {
                 </InlineStack>
                 <Box paddingInlineStart={6}>
                 {index === dropdownActive ?
-                    <VerticalStack gap={2}>
-                            <Text variant="bodyMd">{step.text}</Text>
+                    <BlockStack gap={2}>
+                        <Text variant="bodyMd">{step.text}</Text>
                         <InlineStack gap={2}>
                             <Button onClick={()=> navigate(step.url)} size="slim">Configure now</Button>
                             <Button  onClick={()=> markAsComplete(step.id)} size="slim" variant="plain">Skip step</Button>
                         </InlineStack>
                         <br/>
-                    </VerticalStack>
+                    </BlockStack>
                 : null }
                 </Box>
-            </VerticalStack>
+            </BlockStack>
         );
     }
 
     return (
         <Card padding={0}>
-            <VerticalStack gap={3}>
+            <BlockStack gap={3}>
                 <Box padding={5} background="bg-info-subdued-hover">
-                    <VerticalStack gap={3}>
+                    <BlockStack gap={3}>
                         <Text variant="bodyLg" fontWeight="semibold">Get started checklist</Text>
                         <InlineStack gap={1}>
                             <Box width='85%'>
@@ -124,7 +124,7 @@ function InitialSteps({initialSteps}) {
                             </Box>
                             <Text color="subdued" variant="bodyMd">{((stepsCompleted * 100) / 5)}%</Text>
                         </InlineStack>
-                    </VerticalStack>
+                    </BlockStack>
                 </Box>
                 <Box padding={3} paddingInlineEnd={5} paddingInlineStart={5}>
                     {steps.map((step, index)=>(
@@ -132,7 +132,7 @@ function InitialSteps({initialSteps}) {
                     ))}
                 </Box>
                 <Divider/>
-            </VerticalStack>
+            </BlockStack>
         
         </Card>
     );

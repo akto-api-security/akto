@@ -1,4 +1,4 @@
-import { VerticalStack, Box, Button, ButtonGroup, InlineStack, Icon, Text, Collapsible, Scrollable, DataTable, Badge } from "@shopify/polaris"
+import { BlockStack, Box, Button, ButtonGroup, InlineStack, Icon, Text, Collapsible, Scrollable, DataTable, Badge } from "@shopify/polaris"
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
 import func from "@/util/func"
@@ -98,7 +98,7 @@ function ApiSingleSchema(props) {
     const activeTab = badgeActive ? (dataObj.tabSensitive === "Header") : isHeader
 
     return (
-        <VerticalStack gap={"2"}>
+        <BlockStack gap={"2"}>
             <Box background={"bg-subdued"} width="100%" padding={"2"} onClick={handleToggle}>
                 <InlineStack align="space-between">
                     <Text variant="headingSm">
@@ -115,7 +115,7 @@ function ApiSingleSchema(props) {
                 transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
                 expandOnPrint
             >
-                <VerticalStack gap={"2"}>
+                <BlockStack gap={"2"}>
                     <ButtonGroup variant="segmented">
                         <Button {...(activeTab? {variant:"primary", tone:"success" } : {})} onClick={() => {setBadgeActive(false); setIsHeader(true)}} size="slim">
                             <Box paddingBlockStart="05" paddingBlockEnd="05"> 
@@ -151,9 +151,9 @@ function ApiSingleSchema(props) {
                         >
                         </DataTable>
                     </Scrollable>
-                </VerticalStack>
+                </BlockStack>
             </Collapsible>
-        </VerticalStack>
+        </BlockStack>
     );
 }
 
@@ -171,15 +171,14 @@ function ApiSchema(props) {
     }
 
     return (
-        <VerticalStack gap="2">
+        <BlockStack gap="2">
             {
                 ['Request', 'Response'].map((type, index) => {
                     return <ApiSingleSchema handleBadgeClick={handleBadgeClick} title={type} key={type} data={index == 0 ? reqData : resData} badgeActive={badgeActive} setBadgeActive={setBadgeActive}/>
                 })
             }
-
-        </VerticalStack>
-    )
+        </BlockStack>
+    );
 
 }
 

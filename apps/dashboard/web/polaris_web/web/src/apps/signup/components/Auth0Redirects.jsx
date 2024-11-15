@@ -1,5 +1,5 @@
 import React from 'react'
-import { Avatar, Box, Button, InlineStack, Page, Text, VerticalStack } from '@shopify/polaris'
+import { Avatar, Box, Button, InlineStack, Page, Text, BlockStack } from '@shopify/polaris'
 import { useSearchParams } from 'react-router-dom' 
 import "../styles.css"
 import axios from 'axios'
@@ -34,13 +34,13 @@ function Auth0Redirects({bodyText, errorText}) {
             <Box padding={"20"} paddingBlockEnd={"0"}>
                 <InlineStack align='center'>
                     <Box width='400px'>
-                        <VerticalStack gap={"8"}>
+                        <BlockStack gap={"8"}>
                             <InlineStack align="center">
                                 <div className="akto-logo">
                                     <Avatar source="/public/akto_name_with_logo.svg" shape="round" size="xl" />
                                 </div>
                             </InlineStack>
-                            <VerticalStack gap={"6"}>
+                            <BlockStack gap={"6"}>
                                 <InlineStack align='center'>
                                     <svg xmlns="http://www.w3.org/2000/svg" width="64" height="65" viewBox="0 0 64 65" fill="none">
                                         <g clipPath="url(#clip0_7639_55607)">
@@ -54,15 +54,15 @@ function Auth0Redirects({bodyText, errorText}) {
                                         </defs>
                                     </svg>
                                 </InlineStack>
-                                <VerticalStack gap={"2"}>
+                                <BlockStack gap={"2"}>
                                     <Text alignment="center" variant="headingLg">{errorText}</Text>
                                     <Text alignment="center" variant="bodyMd" color="subdued">{bodyText}</Text>
-                                </VerticalStack>
-                            </VerticalStack>
+                                </BlockStack>
+                            </BlockStack>
                             <Button fullWidth onClick={handleLogout}>
                                 Redirect to login
                             </Button>
-                        </VerticalStack>
+                        </BlockStack>
                     </Box>
                 </InlineStack>
                 <div style={{position: 'absolute' , bottom: '3vh', width: '84%'}}>

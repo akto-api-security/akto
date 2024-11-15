@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { LegacyCard, InlineGrid, TextField, Divider, Collapsible, LegacyStack, Button, FormLayout, InlineStack, Tooltip, Icon, Text, VerticalStack, Modal, Box } from '@shopify/polaris'
+import { LegacyCard, InlineGrid, TextField, Divider, Collapsible, LegacyStack, Button, FormLayout, InlineStack, Tooltip, Icon, Text, BlockStack, Modal, Box } from '@shopify/polaris'
 import { useLocation, useNavigate } from 'react-router-dom'
 import TestRolesConditionsPicker from '../../../components/TestRolesConditionsPicker';
 import func from "@/util/func";
@@ -268,13 +268,13 @@ function TestRoleSettings() {
             <br/>
             <Divider />
             <LegacyCard.Section>
-                <VerticalStack gap={6}>
+                <BlockStack gap={6}>
                     {getAuthWithCondList().map((authObj,index)=> {
                         return(
                             <ParamsCard showEdit={() => handleOpenEdit(authObj, index)} dataObj={authObj} key={JSON.stringify(authObj)} handleDelete={() => {setDeletedIndex(index); setShowAuthDeleteModal(true)}}/>
                         )
                     })}
-                </VerticalStack>
+                </BlockStack>
             </LegacyCard.Section>
             {deleteModalComp}
         </LegacyCard>
@@ -396,7 +396,7 @@ function TestRoleSettings() {
                     </LegacyStack>
                 </LegacyCard.Section>
                 <LegacyCard.Section title="More settings">
-                    <VerticalStack gap={"2"}>
+                    <BlockStack gap={"2"}>
                         <Box>
                             <Button disclosure={advancedHeaderSettingsOpen ? "up" : "down"} onClick={() => setAdvancedHeaderSettingsOpen(!advancedHeaderSettingsOpen)}>
                                 Advanced Settings
@@ -406,7 +406,7 @@ function TestRoleSettings() {
                             open={advancedHeaderSettingsOpen}
                             transition={{ duration: '300ms', timingFunction: 'ease-in-out' }}
                         >
-                            <VerticalStack gap={"2"}>
+                            <BlockStack gap={"2"}>
                                 <Text variant="headingMd">Api header conditions</Text>
                                 <FormLayout>
                                     <FormLayout.Group>
@@ -438,9 +438,9 @@ function TestRoleSettings() {
                                         />
                                     </FormLayout.Group>
                                 </FormLayout>
-                            </VerticalStack>
+                            </BlockStack>
                         </Collapsible>
-                    </VerticalStack>
+                    </BlockStack>
                 </LegacyCard.Section>
             </LegacyCard>
     )

@@ -1,4 +1,4 @@
-import { Button, Form,  InlineStack, Modal, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Button, Form,  InlineStack, Modal, Text, TextField, BlockStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import SSOTextfield from './SSOTextfield'
 import PasswordTextField from '../../dashboard/components/layouts/PasswordTextField'
@@ -81,22 +81,22 @@ function SignUp() {
 
   const ssoCard = (
     ssoList.length === 0 ? null :
-      <VerticalStack gap={5}>
+      <BlockStack gap={5}>
         {
           ssoList.map((sso, index) => {
             return (
-              <VerticalStack gap={5} key={index}>
+              <BlockStack gap={5} key={index}>
                 <SSOTextfield onClickFunc={sso.onClickFunc} logos={[sso.logo]} text={sso.text} />
                 <InlineStack gap={3}>
                   <div style={{ flexGrow: 1, borderBottom: '1px solid #c9cccf' }}></div>
                   <Text variant="bodySm" color="subdued">or</Text>
                   <div style={{ flexGrow: 1, borderBottom: '1px solid #c9cccf' }}></div>
                 </InlineStack>
-              </VerticalStack>
+              </BlockStack>
             );
           })
         }
-      </VerticalStack>
+      </BlockStack>
   )
 
   const loginFunc = async() => {
@@ -258,9 +258,9 @@ function SignUp() {
   const isOnPrem = websiteHostName && !notOnPremHostnames.includes(window.location.hostname)
 
   const signupEmailCard = (
-    <VerticalStack gap={4}>
+    <BlockStack gap={4}>
       <Form onSubmit={loginFunc}>
-        <VerticalStack gap={4}>
+        <BlockStack gap={4}>
           <div className='form-class'>
             <TextField onChange={setEmail} inputMode='email' value={forgotPasswordState.isForgotPasswordActive ? "" : email} label="Email" placeholder="name@workemail.com" monospaced={true}/>
           </div>
@@ -275,7 +275,7 @@ function SignUp() {
             size="large"
             loading={loading}
             variant="primary"><div data-testid="signin_signup_button">{activeObject.buttonText}</div></Button>
-        </VerticalStack>
+        </BlockStack>
       </Form>
       <InlineStack align="center" gap={1}>
         <Text>{activeObject.descriptionText}</Text>
@@ -284,19 +284,19 @@ function SignUp() {
           onClick={() => {setLoginActive(!loginActive); navigate(activeObject.targetUrl)}}
           variant="plain">{activeObject.linkText}</Button>
       </InlineStack>
-    </VerticalStack>
+    </BlockStack>
   )
 
   const customComponent = (
-    <VerticalStack gap={8}>
+    <BlockStack gap={8}>
       <Text alignment="center" variant="heading2xl">{activeObject.headingText}</Text>
-      <VerticalStack gap={5}>
+      <BlockStack gap={5}>
         {ssoCard}
         {!func.checkLocal() ? <SSOTextfield onClickFunc={() => window.location.href="/sso-login"} logos={['/public/azure_logo.svg', '/public/gcp.svg']} text={"Sign in with SSO"} /> : null}
         {signupEmailCard}
         {loginActive && isOnPrem && resetPasswordComp}
-      </VerticalStack>
-    </VerticalStack>
+      </BlockStack>
+    </BlockStack>
   )
 
   return (

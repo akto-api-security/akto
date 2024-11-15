@@ -1,4 +1,4 @@
-import { Box, Button, InlineStack, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, InlineStack, Text, BlockStack } from '@shopify/polaris'
 import React from 'react'
 import TooltipText from "../../../components/shared/TooltipText"
 import { DeleteMajor } from "@shopify/polaris-icons"
@@ -28,7 +28,7 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
 
     function ParamsList({valuesList}){
         return (
-            <VerticalStack align="start" gap={1}>
+            <BlockStack align="start" gap={1}>
                 {valuesList.map((param,index) => {
                     return (
                         <InlineStack blockAlign="start" gap={"4"} key={index}>
@@ -39,39 +39,36 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
                         </InlineStack>
                     );
                 })}
-            </VerticalStack>
+            </BlockStack>
         );
     }
 
     return (
         <Box borderWidth="1" borderRadius='2' padding={2} borderColor="border-subdued" >
-            <VerticalStack gap={2}>
-                <VerticalStack gap={3}>
-
-                    {headerKey.length > 0 ? <VerticalStack gap={2}>
+            <BlockStack gap={2}>
+                <BlockStack gap={3}>
+                    {headerKey.length > 0 ? <BlockStack gap={2}>
                         <TitleComponent title={"Api header conditions"} />
                         <Box paddingInlineStart={4}>{headerKey.length > 0 ? <LineComponent title={headerKey + " :"} value={headerValue}/> : <Text variant="headingMd">-</Text>}</Box>
-                    </VerticalStack> : null}
-
-                    <VerticalStack gap={2}>
+                    </BlockStack> : null}
+                    <BlockStack gap={2}>
                         <TitleComponent title={"Token details"} />
                         <Box paddingInlineStart={4}>
-                            <VerticalStack gap={2}>
+                            <BlockStack gap={2}>
                                 <LineComponent title={"Token type :"} value={authMechanism.type}/>
                                 <LineComponent title={"Token values :"} />
-                            </VerticalStack>
+                            </BlockStack>
                             <Box paddingInlineStart={4}>
                                 <ParamsList valuesList={authMechanism.authParams} />
                             </Box>
                         </Box>
-                    </VerticalStack>
-
-                </VerticalStack>
+                    </BlockStack>
+                </BlockStack>
                 <InlineStack gap={"2"} align="end">
                     <Button size="slim" onClick={handleDelete} icon={DeleteMajor}><div data-testid="delete_button">Delete</div></Button>
                     {authMechanism?.type?.toLowerCase() === 'hardcoded' ? <Button size="slim"  onClick={() => showEdit()} variant="primary">Edit</Button> : null}
                 </InlineStack>
-            </VerticalStack>
+            </BlockStack>
         </Box>
     );
 }

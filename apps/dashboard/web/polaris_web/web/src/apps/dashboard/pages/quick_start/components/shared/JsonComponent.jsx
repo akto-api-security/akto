@@ -1,4 +1,4 @@
-import { Button, Text, Tooltip, VerticalStack } from '@shopify/polaris'
+import { Button, Text, Tooltip, BlockStack } from '@shopify/polaris'
 import React from 'react'
 import SampleData from '../../../../components/shared/SampleData'
 import { ClipboardMinor } from "@shopify/polaris-icons"
@@ -8,7 +8,7 @@ function JsonComponent({dataString, onClickFunc, title, toolTipContent, language
   let data = {message:dataString}
 
   return (
-      <VerticalStack gap="1">  
+      <BlockStack gap="1">
           <div className='copyRequest'>
               <Text>{title}</Text>
               <Tooltip dismissOnMouseOut preferredPosition='above' content={toolTipContent}>
@@ -16,7 +16,7 @@ function JsonComponent({dataString, onClickFunc, title, toolTipContent, language
               </Tooltip>
           </div>
           <SampleData data={data} language={language} minHeight={minHeight}/>
-      </VerticalStack>
+      </BlockStack>
   );
 }
 

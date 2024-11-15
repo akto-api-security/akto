@@ -1,4 +1,4 @@
-import { Badge, Button, ButtonGroup, Checkbox, InlineStack, RadioButton, Text, VerticalStack, Modal, DescriptionList, Tooltip, Icon } from '@shopify/polaris'
+import { Badge, Button, ButtonGroup, Checkbox, InlineStack, RadioButton, Text, BlockStack, Modal, DescriptionList, Tooltip, Icon } from '@shopify/polaris'
 import React, { useCallback, useEffect, useState } from 'react'
 import Dropdown from '../../../components/layouts/Dropdown'
 import settingFunctions from '../../settings/module'
@@ -107,14 +107,14 @@ function PostmanSource() {
 
     const apiActionComponent = (
         <div>
-            <VerticalStack gap="1" >
+            <BlockStack gap="1">
                 <span>4. Paste your postman key here: </span>
                 <PasswordTextField setField={setPostmanKey} onFunc={true} field={postmanKey}/>
-            </VerticalStack>
-            <VerticalStack gap="1">
+            </BlockStack>
+            <BlockStack gap="1">
                 <span>5. Select workspace you wish to import:  </span>
                 <Dropdown menuItems={workspaces} selected={handleSelectChange} initial={selected}/>
-            </VerticalStack>
+            </BlockStack>
         </div>
     )
 
@@ -128,9 +128,8 @@ function PostmanSource() {
 
     const collectionComponent = (
         <div>
-            <VerticalStack gap="1">
+            <BlockStack gap="1">
                 <span>4. Upload postman collection:</span>
-                
                 <InlineStack gap="2">
                     {files ? 
                         <Badge size='medium' tone='success'>
@@ -140,7 +139,7 @@ function PostmanSource() {
                     : null}
                     <FileUpload fileType="file" acceptString=".json" setSelectedFile={setFilesCheck} allowMultiple={false} allowedSize={20*1024*1024}/>
                 </InlineStack>
-            </VerticalStack>
+            </BlockStack>
         </div>
     )
 
@@ -293,15 +292,15 @@ function PostmanSource() {
                 Use postman to send traffic to Akto and realize quick value. If you like what you see, we highly recommend using AWS or GCP traffic mirroring to get real user data for a smooth, automated and minimum false positive experience.
             </Text>
 
-            <VerticalStack gap="1">
+            <BlockStack gap="1">
                 <RadioButton id="api" label="Import using postman API key" checked={type === "api"} onChange={()=>handleChange("api")}/>
                 <RadioButton id="collection" label="Import using postman collection file" checked={type === "collection"} onChange={()=>handleChange("collection")}/>
-            </VerticalStack>
+            </BlockStack>
             <InformationBannerComponent docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/postman#pre-requisites-for-akto-postman-connection"
                     content="Please ensure the pre-requisites " 
             />
 
-            <VerticalStack gap="1">
+            <BlockStack gap="1">
                 {steps.map((element,index) => (
                     <InlineStack gap="1" wrap={false} key={element.text}>
                         <span>{index + 1}.</span>
@@ -312,9 +311,9 @@ function PostmanSource() {
                    apiActionComponent
                     : collectionComponent
                 }
-            </VerticalStack>
+            </BlockStack>
 
-            <VerticalStack gap="2">
+            <BlockStack gap="2">
                 <Checkbox label="Allow Akto to replay API requests if responses are not found." checked={allowResponses} onChange={toggleResponse} />
                 <ButtonGroup>
                     <Button
@@ -334,7 +333,7 @@ function PostmanSource() {
                                 }}
                         variant="plain">postman trouble-shooting guide</Button>
                 </ButtonGroup>
-            </VerticalStack>
+            </BlockStack>
             <Modal
                 open={showImportDetailsModal}
                 onClose={() => {closeModal()}}

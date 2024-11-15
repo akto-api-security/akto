@@ -1,4 +1,4 @@
-import {  InlineStack,  Page, VerticalStack } from "@shopify/polaris";
+import {  InlineStack,  Page, BlockStack } from "@shopify/polaris";
 import { useNavigate, useLocation } from "react-router-dom";
 import { learnMoreObject } from "../../../main/onboardingData"
 import LearnPopoverComponent from "./LearnPopoverComponent";
@@ -46,13 +46,13 @@ const PageWithMultipleCards = (props) => {
             secondaryActions={useSecondaryActions}
             divider={divider}
         >
-            <VerticalStack gap="4">
+            <BlockStack gap="4">
                 {components?.filter((component) => {
                     return component
                 })}
-            </VerticalStack>
+            </BlockStack>
         </Page>
-    )
+    );
 }
 
 export default PageWithMultipleCards
