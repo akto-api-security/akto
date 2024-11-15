@@ -110,7 +110,7 @@ public class KeyTypes {
         return true;
     }
 
-    private static SubType getSubtype(Object o,String key, boolean checkForSubtypes){
+    private static SubType getSubtype(Object o,String key, boolean checkForSubtypes, boolean isHeader){
         if (o == null) {
             return SingleTypeInfo.NULL;
         }
@@ -128,7 +128,7 @@ public class KeyTypes {
             }
         }
 
-        if (checkForSubtypes && isCreditCard(o.toString())) {
+        if (checkForSubtypes  && !isHeader && isCreditCard(o.toString())) {
             return SingleTypeInfo.CREDIT_CARD;
         }
 
@@ -189,7 +189,7 @@ public class KeyTypes {
 
     public static SubType findSubType(Object o,String key, ParamId paramId, boolean executeCheckForSubtypes){
         if(executeCheckForSubtypes){
-            return getSubtype(o, key, true);
+            return getSubtype(o, key, true, paramId == null ? false: paramId.isHeader());
         }else{
             return findSubType(o, key, paramId);
         }
@@ -208,7 +208,7 @@ public class KeyTypes {
             checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
         }
 
-        return getSubtype(o, key, checkForSubtypes);
+        return getSubtype(o, key, checkForSubtypes, paramId == null ? false: paramId.isHeader());
     }
 
     public Map<SubType,SingleTypeInfo> getOccurrences() {
