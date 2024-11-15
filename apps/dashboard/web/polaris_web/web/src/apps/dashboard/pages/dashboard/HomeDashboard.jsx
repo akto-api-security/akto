@@ -356,6 +356,7 @@ function HomeDashboard() {
 
         // Prepare the result array with values from 5 to 0
         const result = [
+            { "badgeValue": 5, "progressValue": "0%", "text": 0, "topColor": "#E45357", "backgroundColor": "#FFDCDD", "badgeColor": "critical" },
             { "badgeValue": 4, "progressValue": "0%", "text": 0, "topColor": "#EF864C", "backgroundColor": "#FFD9C4", "badgeColor": "attention" },
             { "badgeValue": 3, "progressValue": "0%", "text": 0, "topColor": "#F6C564", "backgroundColor": "#FFF1D4", "badgeColor": "warning" },
             { "badgeValue": 2, "progressValue": "0%", "text": 0, "topColor": "#F5D8A1", "backgroundColor": "#FFF6E6", "badgeColor": "info" },
@@ -365,7 +366,7 @@ function HomeDashboard() {
 
         // Update progress and text based on riskScoreMap values
         Object.keys(apiStats.riskScoreMap).forEach((key) => {
-            const badgeIndex = 4 - parseInt(key, 10);
+            const badgeIndex = 5 - parseInt(key, 10);
             const value = apiStats.riskScoreMap[key];
             result[badgeIndex].text = value ? value : 0;
             if (!totalApisCount || totalApisCount === 0) {
