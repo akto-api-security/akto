@@ -150,7 +150,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                         setSelectedTest(item)                        
                     }),
                     key: item.value
-                }
+                };
             })
         }))
         return arr
