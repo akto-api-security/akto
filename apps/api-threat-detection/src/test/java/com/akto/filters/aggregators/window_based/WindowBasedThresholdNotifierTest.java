@@ -5,6 +5,10 @@ import java.util.HashMap;
 import java.util.Map;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.monitoring.FilterConfig;
+import com.akto.dto.threat_detection.SampleRequest;
+import com.akto.filters.aggregators.window_based.WindowBasedThresholdNotifier.Result;
+
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.junit.Test;
@@ -72,13 +76,15 @@ public class WindowBasedThresholdNotifierTest {
         boolean shouldNotify = false;
         String ip = "192.168.0.1";
 
+        FilterConfig filterConfig = new FilterConfig();
+        filterConfig.setId("4XX_FILTER");
+
         for (int i = 0; i < 1000; i++) {
-            boolean _shouldNotify = notifier.shouldNotify(
-                    ip,
-                    "4XX_FILTER",
-                    WindowBasedThresholdNotifierTest
-                            .generateResponseParamsForStatusCode(400));
-            shouldNotify = shouldNotify || _shouldNotify;
+            Result res = notifier.shouldNotify(
+                    ip + "|" + "4XX_FILTER",
+                    new SampleRequest(
+                            filterConfig, ip, generateResponseParamsForStatusCode(400)));
+            shouldNotify = shouldNotify || res.shouldNotify();
         }
 
         long count = 0;
@@ -88,5 +94,4 @@ public class WindowBasedThresholdNotifierTest {
 
         assertEquals(1000, count);
     }
-
 }
