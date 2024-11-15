@@ -55,7 +55,7 @@ public class KeyTypes {
         String[] keyArr = key.split("\\.");
         String lastField = keyArr[keyArr.length - 1];
         ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, SingleTypeInfo.GENERIC, apiCollectionId, isUrlParam);
-        SubType subType = findSubType(object,lastField,paramId, isHeader);
+        SubType subType = findSubType(object,lastField,paramId);
 
         SingleTypeInfo singleTypeInfo = occurrences.get(subType);
         if (singleTypeInfo == null) {
