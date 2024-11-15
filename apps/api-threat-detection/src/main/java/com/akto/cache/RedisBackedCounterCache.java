@@ -64,6 +64,8 @@ public class RedisBackedCounterCache implements CounterCache {
         String _key = getKey(key);
         localCache.asMap().merge(_key, val, Long::sum);
         pendingOps.add(new Op(_key, val));
+
+        this.setExpiryIfNotSet(_key, 3 * 60 * 60); // added 3 hours expiry for now
     }
 
     @Override
@@ -72,7 +74,11 @@ public class RedisBackedCounterCache implements CounterCache {
     }
 
     @Override
-    public void setExpiryIfNotSet(String key, long seconds) {
+    public boolean exists(String key) {
+        return localCache.asMap().containsKey(getKey(key));
+    }
+
+    private void setExpiryIfNotSet(String key, long seconds) {
         // We only set expiry for redis entry. For local cache we have lower expiry for
         // all entries.
         ExpireArgs args = ExpireArgs.Builder.nx();

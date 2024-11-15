@@ -9,13 +9,12 @@ import com.akto.dao.threat_detection.DetectedThreatAlertDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApi;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.threat_detection.DetectedThreatAlert;
-import com.akto.dto.traffic.SuspectSampleData;
+import com.akto.dto.threat_detection.SampleRequest;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.filters.aggregators.key_generator.SourceIPKeyGenerator;
 import com.akto.filters.aggregators.window_based.WindowBasedThresholdNotifier;
@@ -24,7 +23,6 @@ import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
-import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.suspect_data.Message;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
@@ -49,7 +47,8 @@ public class HttpCallFilter {
 
     private final WindowBasedThresholdNotifier windowBasedThresholdNotifier;
 
-    public HttpCallFilter(RedisClient redisClient, int sync_threshold_count, int sync_threshold_time) {
+    public HttpCallFilter(
+            RedisClient redisClient, int sync_threshold_count, int sync_threshold_time) {
         this.apiFilters = new HashMap<>();
         this.lastFilterFetch = 0;
         this.httpCallParser = new HttpCallParser(sync_threshold_count, sync_threshold_time);
@@ -83,51 +82,41 @@ public class HttpCallFilter {
                 // If a request passes any of the filter, then it's a malicious request,
                 // and so we push it to kafka
                 if (hasPassedFilter) {
-                    HttpRequestParams requestParams = responseParam.getRequestParams();
-                    List<String> sourceIps = ApiAccessTypePolicy.getSourceIps(responseParam);
-                    Method method = Method.fromString(requestParams.getMethod());
-
-                    int currentBucket = (int) (responseParam.getTime() / 60);
-
-                    maliciousSamples.add(
-                            new Message(
-                                    responseParam.getAccountId(),
-                                    new SuspectSampleData(
-                                            sourceIps,
-                                            requestParams.getApiCollectionId(),
-                                            requestParams.getURL(),
-                                            method,
-                                            responseParam.getOrig(),
-                                            Context.now(),
-                                            apiFilter.getId()),
-                                    currentBucket));
-
                     // Later we will also add aggregation support
                     // Eg: 100 4xx requests in last 10 minutes.
                     // But regardless of whether request falls in aggregation or not,
                     // we still push malicious requests to kafka
 
-                    SourceIPKeyGenerator.instance.generate(responseParam).ifPresent(aggKey -> {
-                        boolean registerThreatAlert = this.windowBasedThresholdNotifier.shouldNotify(
-                                apiFilter.getId(),
-                                aggKey,
-                                responseParam);
+                    SourceIPKeyGenerator.instance
+                            .generate(responseParam)
+                            .ifPresent(
+                                    actor -> {
+                                        String groupKey = apiFilter.getId();
+                                        String aggKey = actor + "|" + groupKey;
+                                        SampleRequest sampleRequest = new SampleRequest(
+                                                apiFilter,
+                                                actor,
+                                                responseParam);
 
-                        // TODO: Add window id with each suspect sample data and alert
-                        if (registerThreatAlert) {
-                            int windowStartBucket = currentBucket
-                                    - this.windowBasedThresholdNotifier.getConfig().getWindowSizeInMinutes();
-                            DetectedThreatAlert alert = new DetectedThreatAlert(
-                                    UUID.randomUUID().toString(),
-                                    apiFilter.getId(),
-                                    aggKey,
-                                    System.currentTimeMillis(),
-                                    windowStartBucket,
-                                    currentBucket);
+                                        maliciousSamples.add(
+                                                new Message(
+                                                        responseParam.getAccountId(),
+                                                        sampleRequest));
 
-                            DetectedThreatAlertDao.instance.insertOne(alert);
-                        }
-                    });
+                                        WindowBasedThresholdNotifier.Result result = this.windowBasedThresholdNotifier
+                                                .shouldNotify(
+                                                        aggKey, sampleRequest);
+
+                                        if (result.shouldNotify()) {
+                                            DetectedThreatAlert alert = new DetectedThreatAlert(
+                                                    groupKey,
+                                                    actor,
+                                                    System.currentTimeMillis() / 1000L,
+                                                    result.getBins());
+
+                                            DetectedThreatAlertDao.instance.insertOne(alert);
+                                        }
+                                    });
                 }
             }
         }
