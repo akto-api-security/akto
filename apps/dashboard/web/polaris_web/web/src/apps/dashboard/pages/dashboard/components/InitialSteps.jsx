@@ -120,7 +120,7 @@ function InitialSteps({initialSteps}) {
                         <Text variant="bodyLg" fontWeight="semibold">Get started checklist</Text>
                         <InlineStack gap={1}>
                             <Box width='85%'>
-                                <ProgressBar size="small" progress={((stepsCompleted * 100) / 5)} color="primary" />
+                                <ProgressBar size="small" progress={((stepsCompleted * 100) / 5)} tone="primary" />
                             </Box>
                             <Text color="subdued" variant="bodyMd">{((stepsCompleted * 100) / 5)}%</Text>
                         </InlineStack>

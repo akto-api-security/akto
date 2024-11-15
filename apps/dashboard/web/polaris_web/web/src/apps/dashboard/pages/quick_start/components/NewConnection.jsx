@@ -141,7 +141,7 @@ function NewConnection() {
                         <InlineStack gap="3">
                             <Text variant='bodyMd' color='subdued' fontWeight="medium">{tasksCompleted} of {totalTasks} tasks completed</Text>
                             <Box width='36vw'>
-                                <ProgressBar color='success' progress={calculateWidth()} size='small'/>
+                                <ProgressBar tone='success' progress={calculateWidth()} size='small'/>
                             </Box>
                         </InlineStack>
                     </VerticalStack>

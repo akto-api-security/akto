@@ -481,7 +481,7 @@ const runningTestsComp = useMemo(() => (
             <VerticalStack gap={"3"}>
                 <Text variant="headingSm">{`Running ${currentTestObj.testsInitiated} tests`}</Text>
                 <div style={{ display: "flex", gap: '4px', alignItems: 'center' }}>
-                    <ProgressBar progress={progress} color="primary" size="small" />
+                    <ProgressBar progress={progress} tone="primary" size="small" />
                     <Text color="subdued">{`${progress}%`}</Text>
                 </div>
             </VerticalStack>

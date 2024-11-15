@@ -19,7 +19,7 @@ function CoverageCard({coverageObj, collections, collectionsMap}) {
                                 </Text>
                                 <InlineStack gap={2}>
                                     <Box width='85%'>
-                                        <ProgressBar size="small" color={collectionObj.status} progress={collectionObj.coverage} />
+                                        <ProgressBar size="small" tone={collectionObj.status} progress={collectionObj.coverage} />
                                     </Box>
                                     <Text breakWord color="subdued" variant="bodyMd">{collectionObj.coverage}%</Text>
                                 </InlineStack>

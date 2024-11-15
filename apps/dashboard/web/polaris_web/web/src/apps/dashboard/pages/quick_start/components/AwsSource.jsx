@@ -188,7 +188,7 @@ function AwsSource() {
               variant="primary">Apply </Button>
           </Box>
           <Text variant="bodyMd" as="h3">{statusText}</Text>
-          {progressBar.show ? <ProgressBar progress={progressBar.value} size="small" color="primary" /> : null }
+          {progressBar.show ? <ProgressBar progress={progressBar.value} size="small" tone="primary" /> : null }
         </VerticalStack>
     )
 
