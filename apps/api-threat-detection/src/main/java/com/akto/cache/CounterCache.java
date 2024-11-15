@@ -8,5 +8,5 @@ public interface CounterCache {
 
     long get(String key);
 
-    void setExpiryIfNotSet(String key, long seconds);
+    boolean exists(String key);
 }

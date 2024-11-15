@@ -1,6 +1,8 @@
 package com.akto.dto.threat_detection;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -13,23 +15,19 @@ public class DetectedThreatAlert {
 
     private String actor;
 
-    private int bucketStart;
-
-    private int bucketEnd;
+    private List<Bin> bins;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DetectedThreatAlert() {
     }
 
-    public DetectedThreatAlert(String id, String filterId, String actor, long detectedAt, int bucketStart,
-            int bucketEnd) {
-        this.id = id;
+    public DetectedThreatAlert(String filterId, String actor, long detectedAt, List<Bin> bins) {
+        this.id = UUID.randomUUID().toString();
         this.filterId = filterId;
         this.detectedAt = detectedAt;
         this.actor = actor;
-        this.bucketStart = bucketStart;
-        this.bucketEnd = bucketEnd;
+        this.bins = bins;
     }
 
     public String getId() {
@@ -64,20 +62,12 @@ public class DetectedThreatAlert {
         this.actor = actor;
     }
 
-    public int getBucketStart() {
-        return bucketStart;
+    public List<Bin> getBins() {
+        return bins;
     }
 
-    public void setBucketStart(int bucketStart) {
-        this.bucketStart = bucketStart;
-    }
-
-    public int getBucketEnd() {
-        return bucketEnd;
-    }
-
-    public void setBucketEnd(int bucketEnd) {
-        this.bucketEnd = bucketEnd;
+    public void setBins(List<Bin> bins) {
+        this.bins = bins;
     }
 
     public Optional<String> marshall() {
@@ -88,5 +78,4 @@ public class DetectedThreatAlert {
             return Optional.empty();
         }
     }
-
 }
