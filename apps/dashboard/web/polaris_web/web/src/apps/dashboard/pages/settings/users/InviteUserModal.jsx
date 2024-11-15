@@ -65,7 +65,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
     if (inviteUser.state !== "success") {
         return (
             <Modal
-                small
+                size="small"
                 open={inviteUser.isActive}
                 onClose={toggleInviteUserModal}
                 title="Add team member"
@@ -105,7 +105,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
     } else {
         return (
             <Modal
-                small
+                size="small"
                 open={inviteUser.isActive}
                 onClose={toggleInviteUserModal}
                 title="Add team member"

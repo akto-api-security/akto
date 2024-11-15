@@ -296,7 +296,7 @@ const Users = () => {
                     rolesOptions={rolesOptions}
                 />
                 <Modal
-                    small
+                    size="small"
                     open={passwordResetState.confirmPasswordResetActive}
                     onClose={() => setPasswordResetStateHelper("confirmPasswordResetActive", false)}
                     title="Password Reset"
@@ -317,7 +317,7 @@ const Users = () => {
                 </Modal>
 
                 <Modal
-                    small
+                    size="small"
                     open={passwordResetState.passwordResetLinkActive}
                     onClose={closePasswordResetToggle}
                     title="Password Reset"

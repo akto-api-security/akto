@@ -93,7 +93,7 @@ function DefaultPayloads() {
     }
 
     return (
-        <Page title='Default payloads' divider>
+        <Page title='Default payloads'>
             <LegacyCard>
                 <LegacyCard.Section>
                     <BlockStack gap={"4"}>

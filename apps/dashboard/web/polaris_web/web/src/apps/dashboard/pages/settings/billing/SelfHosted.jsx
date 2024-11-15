@@ -146,7 +146,6 @@ const SelfHosted = () => {
 
     return (<Page
             title="Self hosted plans"
-            divider
         >
         {
             !checkValidOrgId(customerId) &&

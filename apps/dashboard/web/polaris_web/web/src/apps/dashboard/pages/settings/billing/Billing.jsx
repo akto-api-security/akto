@@ -136,7 +136,6 @@ function Billing() {
   return (
     <Page
         title="Billing"
-        divider
     >
         <LegacyCard title={usageTitle}>
             <Divider />

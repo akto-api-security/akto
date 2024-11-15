@@ -44,7 +44,6 @@ const PageWithMultipleCards = (props) => {
             backAction={getBackAction()}
             primaryAction={primaryAction}
             secondaryActions={useSecondaryActions}
-            divider={divider}
         >
             <BlockStack gap="4">
                 {components?.filter((component) => {

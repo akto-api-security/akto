@@ -11,9 +11,9 @@ const LogsContainer = ({ logs }) => {
         return (
             <span>
                 <span>Fetched logs from </span>
-                <span style={{color: tokens.color["color-bg-success-strong"]}}>{d1}</span>
+                <span style={{color: tokens.color["color-bg-fill-success"]}}>{d1}</span>
                 <span > to </span>
-                <span style={{color: tokens.color["color-bg-success-strong"]}}>{d2}</span>
+                <span style={{color: tokens.color["color-bg-fill-success"]}}>{d2}</span>
             </span>
         )
     }

@@ -26,9 +26,18 @@ function UploadFile({ fileFormat, fileChanged, tooltipText, label, primary, plai
         (<Tooltip content={tooltipText}>
             <Button 
                 // icon={UploadMajor} 
-                {...((primary === undefined || primary === true) ? { variant: "primary" } : {})}
-                {...((plain === undefined || plain === true) ? { variant: "plain" } : {})}
-                monochrome removeUnderline
+                {
+                    ...(
+                      ((primary === undefined || primary === true) && (plain === undefined || plain === true))
+                        ? { variant: "tertiary" }
+                        : (
+                            (primary === false && plain === false)
+                              ? {}
+                              : (primary === false ? { variant: "monochromePlain" } : { variant: "primary" })
+                          )
+                    )
+                  }
+                removeUnderline
                 onClick={onPickFile}>
                 {label}
                 <input

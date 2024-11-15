@@ -81,7 +81,8 @@ function GithubRow(props) {
     }, [dataObj,collapsibleActive])
 
     function OldCell(){
-        return <>
+        return (
+        <>
         <IndexTable.Cell>
             <div className='linkClass'>
                 <Link
@@ -143,7 +144,7 @@ function GithubRow(props) {
                 </InlineStack>
             </IndexTable.Cell>
         }
-    </>;
+    </>);
     }
 
     function LinkCell(cellData, header, cellWidth) {

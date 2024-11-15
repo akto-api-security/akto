@@ -127,7 +127,7 @@ function ApiSingleSchema(props) {
                                 </InlineStack>
                             </Box>
                         </Button>
-                        <Button {...(activeTab? {variant:"primary", tone:"success" } : {})} onClick={() => {setBadgeActive(false); setIsHeader(false)}} size="slim">
+                        <Button {...(!activeTab? {variant:"primary", tone:"success" } : {})} onClick={() => {setBadgeActive(false); setIsHeader(false)}} size="slim">
                             <Box paddingBlockStart="05" paddingBlockEnd="05"> 
                                 <InlineStack gap="2">
                                     <Text variant="bodyMd">Payload</Text>

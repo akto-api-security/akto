@@ -163,7 +163,7 @@ function SignUp() {
 
   const forgotPasswordComp = (
     <Modal
-      small
+      size="small"
       activator={
         <div style={{textAlign: 'end'}}>
           <Button
@@ -219,7 +219,7 @@ function SignUp() {
 
   const resetPasswordComp = (
     <Modal
-      small
+      size="small"
       open={forgotPasswordState.passwordResetActive}
       onClose={() => setForgotPasswordStateHelper("passwordResetActive", false)}
       title="Reset Password"
