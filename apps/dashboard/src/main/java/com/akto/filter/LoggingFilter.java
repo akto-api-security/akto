@@ -27,7 +27,8 @@ public class LoggingFilter implements Filter {
 
             int statusCode = httpServletResponse.getStatus();
             String uri = httpServletRequest.getRequestURI();
-            if(uri.contains("fetchActiveLoaders")){
+            if (uri.contains("fetchActiveLoaders") ||
+                    uri.contains("fetchActiveTestRunsStatus") || uri.contains("metrics")) {
                 return;
             }
             String method = httpServletRequest.getMethod();
