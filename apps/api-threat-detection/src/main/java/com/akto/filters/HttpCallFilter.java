@@ -14,7 +14,7 @@ import com.akto.dto.RawApi;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.threat_detection.DetectedThreatAlert;
-import com.akto.dto.threat_detection.SampleRequest;
+import com.akto.dto.threat_detection.SampleMaliciousRequest;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.filters.aggregators.key_generator.SourceIPKeyGenerator;
 import com.akto.filters.aggregators.window_based.WindowBasedThresholdNotifier;
@@ -30,7 +30,8 @@ import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import io.lettuce.core.RedisClient;
 
 public class HttpCallFilter {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallFilter.class, LogDb.THREAT_DETECTION);
+    private static final LoggerMaker loggerMaker =
+            new LoggerMaker(HttpCallFilter.class, LogDb.THREAT_DETECTION);
 
     private Map<String, FilterConfig> apiFilters;
     private final HttpCallParser httpCallParser;
@@ -55,9 +56,10 @@ public class HttpCallFilter {
 
         String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
         this.kafka = new Kafka(kafkaBrokerUrl, KAFKA_BATCH_LINGER_MS, KAFKA_BATCH_SIZE);
-        this.windowBasedThresholdNotifier = new WindowBasedThresholdNotifier(
-                new RedisBackedCounterCache(redisClient, "wbt"),
-                new WindowBasedThresholdNotifier.Config(100, 10 * 60));
+        this.windowBasedThresholdNotifier =
+                new WindowBasedThresholdNotifier(
+                        new RedisBackedCounterCache(redisClient, "wbt"),
+                        new WindowBasedThresholdNotifier.Config(100, 10 * 60));
     }
 
     public void filterFunction(List<HttpResponseParams> responseParams) {
@@ -93,26 +95,26 @@ public class HttpCallFilter {
                                     actor -> {
                                         String groupKey = apiFilter.getId();
                                         String aggKey = actor + "|" + groupKey;
-                                        SampleRequest sampleRequest = new SampleRequest(
-                                                apiFilter,
-                                                actor,
-                                                responseParam);
+                                        SampleMaliciousRequest sampleMaliciousRequest =
+                                                new SampleMaliciousRequest(
+                                                        apiFilter, actor, responseParam);
 
                                         maliciousSamples.add(
                                                 new Message(
                                                         responseParam.getAccountId(),
-                                                        sampleRequest));
+                                                        sampleMaliciousRequest));
 
-                                        WindowBasedThresholdNotifier.Result result = this.windowBasedThresholdNotifier
-                                                .shouldNotify(
-                                                        aggKey, sampleRequest);
+                                        WindowBasedThresholdNotifier.Result result =
+                                                this.windowBasedThresholdNotifier.shouldNotify(
+                                                        aggKey, sampleMaliciousRequest);
 
                                         if (result.shouldNotify()) {
-                                            DetectedThreatAlert alert = new DetectedThreatAlert(
-                                                    groupKey,
-                                                    actor,
-                                                    System.currentTimeMillis() / 1000L,
-                                                    result.getBins());
+                                            DetectedThreatAlert alert =
+                                                    new DetectedThreatAlert(
+                                                            groupKey,
+                                                            actor,
+                                                            System.currentTimeMillis() / 1000L,
+                                                            result.getBins());
 
                                             DetectedThreatAlertDao.instance.insertOne(alert);
                                         }
@@ -157,12 +159,13 @@ public class HttpCallFilter {
                     },
                     apiInfoKey);
             String filterExecutionLogId = UUID.randomUUID().toString();
-            ValidationResult res = TestPlugin.validateFilter(
-                    apiFilter.getFilter().getNode(),
-                    rawApi,
-                    apiInfoKey,
-                    varMap,
-                    filterExecutionLogId);
+            ValidationResult res =
+                    TestPlugin.validateFilter(
+                            apiFilter.getFilter().getNode(),
+                            rawApi,
+                            apiInfoKey,
+                            varMap,
+                            filterExecutionLogId);
 
             return res.getIsValid();
         } catch (Exception e) {
