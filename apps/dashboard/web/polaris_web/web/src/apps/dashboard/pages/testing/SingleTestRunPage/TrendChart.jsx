@@ -74,17 +74,17 @@ function TrendChart(props) {
         return [
             {
                 data: retH,
-                color: "var(--p-color-bg-critical-strong)",
+                color: "var(--p-color-bg-fill-critical)",
                 name: "High"
             },
             {
                 data: retM,
-                color: "var(--p-color-bg-critical)",
+                color: "var(--p-color-bg-fill-critical-secondary)",
                 name: "Medium"
             },
             {
                 data: retL,
-                color: "var(--p-color-bg-caution)",
+                color: "var(--p-color-bg-fill-caution-secondary)",
                 name: "Low"
             }
         ]

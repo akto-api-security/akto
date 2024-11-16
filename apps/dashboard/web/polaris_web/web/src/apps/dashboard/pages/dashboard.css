@@ -103,22 +103,22 @@
    --color-options: #0d5aa7 ;
    --white: #ffffff;
 
-    --p-color-bg-primary: var(--akto-primary) !important;
-    --p-color-bg-primary-hover: #5400CB !important;
-    --p-color-bg-primary-active: #4700AE !important;
-    --p-color-bg-primary-subdued-hover: #ECEBFF !important;
-    --p-color-bg-info-subdued-hover: #F2F7FE !important;
+    --p-color-bg-fill-brand: var(--akto-primary) !important;
+    --p-color-bg-fill-brand-hover: #5400CB !important;
+    --p-color-bg-fill-brand-active: #4700AE !important;
+    --p-color-bg-surface-brand-hover: #ECEBFF !important;
+    --p-color-bg-surface-info-hover: #F2F7FE !important;
 
-    --p-color-text-primary: var(--akto-primary) !important;
+    --p-color-text-brand: var(--akto-primary) !important;
     --p-color-text-success: var(--akto-primary) !important;
-    --p-color-text-primary-hover: var(--akto-primary) !important;
+    --p-color-text-brand-hover: var(--akto-primary) !important;
     
-    --p-color-icon-primary: var(--akto-primary) !important;
-    --p-color-bg-interactive-selected: #F6F6F7 !important;
+    --p-color-icon-brand: var(--akto-primary) !important;
+    --p-color-bg-surface-brand-selected: #F6F6F7 !important;
 
-    --p-color-bg-critical-subdued: #FED3D1 !important;
-    --p-color-bg-caution-subdued: #FFD79D !important;
-    --p-color-bg-info-subdued: #A4E8F2 !important;
+    --p-color-bg-surface-critical: #FED3D1 !important;
+    --p-color-bg-surface-caution: #FFD79D !important;
+    --p-color-bg-surface-info: #A4E8F2 !important;
 }
 
 .Polaris-Page{
