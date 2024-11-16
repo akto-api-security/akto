@@ -6,7 +6,7 @@ import java.util.Map;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.monitoring.FilterConfig;
-import com.akto.dto.threat_detection.SampleRequest;
+import com.akto.dto.threat_detection.SampleMaliciousRequest;
 import com.akto.filters.aggregators.window_based.WindowBasedThresholdNotifier.Result;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,6 +36,11 @@ class MemCache implements CounterCache {
     @Override
     public long get(String key) {
         return cache.getOrDefault(key, 0L);
+    }
+
+    @Override
+    public boolean exists(String key) {
+        return cache.containsKey(key);
     }
 
     public Map<String, Long> internalCache() {
@@ -70,8 +75,9 @@ public class WindowBasedThresholdNotifierTest {
     public void testShouldNotify() throws InterruptedException {
 
         MemCache cache = new MemCache();
-        WindowBasedThresholdNotifier notifier = new WindowBasedThresholdNotifier(
-                cache, new WindowBasedThresholdNotifier.Config(10, 1));
+        WindowBasedThresholdNotifier notifier =
+                new WindowBasedThresholdNotifier(
+                        cache, new WindowBasedThresholdNotifier.Config(10, 1));
 
         boolean shouldNotify = false;
         String ip = "192.168.0.1";
@@ -80,10 +86,11 @@ public class WindowBasedThresholdNotifierTest {
         filterConfig.setId("4XX_FILTER");
 
         for (int i = 0; i < 1000; i++) {
-            Result res = notifier.shouldNotify(
-                    ip + "|" + "4XX_FILTER",
-                    new SampleRequest(
-                            filterConfig, ip, generateResponseParamsForStatusCode(400)));
+            Result res =
+                    notifier.shouldNotify(
+                            ip + "|" + "4XX_FILTER",
+                            new SampleMaliciousRequest(
+                                    filterConfig, ip, generateResponseParamsForStatusCode(400)));
             shouldNotify = shouldNotify || res.shouldNotify();
         }
 
