@@ -180,9 +180,9 @@ function Integrations() {
       case 'ai':
         return aiItems;
       case 'cicd':
-        // if (func.checkLocal()) {
-        //   return emptyItem;
-        // }
+        if (func.checkLocal()) {
+          return emptyItem;
+        }
         return cicdItems;
       case 'sso':
         if (func.checkLocal()) {
