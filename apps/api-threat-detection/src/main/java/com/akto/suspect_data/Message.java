@@ -1,6 +1,6 @@
 package com.akto.suspect_data;
 
-import com.akto.dto.threat_detection.SampleRequest;
+import com.akto.dto.threat_detection.SampleMaliciousRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Optional;
@@ -8,14 +8,13 @@ import java.util.Optional;
 // Kafka Message Wrapper for suspect data
 public class Message {
     private String accountId;
-    private SampleRequest data;
+    private SampleMaliciousRequest data;
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    public Message() {
-    }
+    public Message() {}
 
-    public Message(String accountId, SampleRequest data) {
+    public Message(String accountId, SampleMaliciousRequest data) {
         this.accountId = accountId;
         this.data = data;
     }
@@ -28,11 +27,11 @@ public class Message {
         this.accountId = accountId;
     }
 
-    public SampleRequest getData() {
+    public SampleMaliciousRequest getData() {
         return data;
     }
 
-    public void setData(SampleRequest data) {
+    public void setData(SampleMaliciousRequest data) {
         this.data = data;
     }
 
