@@ -6,7 +6,7 @@ import func from "@/util/func"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import SampleData from '../../../components/shared/SampleData'
-import { DeleteMajor, CircleCancelMajor, CircleTickMajor } from "@shopify/polaris-icons"
+import { DeleteIcon, XCircleIcon, CheckCircleIcon } from "@shopify/polaris-icons";
 
 function AdvancedTrafficFilters() {
     function MainComp () {
@@ -169,7 +169,7 @@ function AdvancedTrafficFilters() {
                                     onClick={() => changeStateOfFilter()}
                                     variant="monochromePlain">
                                     <Tooltip content={tooltipText} dismissOnMouseOut>
-                                        <Box><Icon source={currentState ? CircleTickMajor : CircleCancelMajor} /></Box>
+                                        <Box><Icon source={currentState ? CheckCircleIcon : XCircleIcon} /></Box>
                                     </Tooltip>
                                 </Button>
                                 <Button
@@ -180,7 +180,7 @@ function AdvancedTrafficFilters() {
                                     variant="plain"
                                     tone="critical">
                                     <Tooltip content="Delete template" dismissOnMouseOut>
-                                        <Box><Icon source={DeleteMajor} /></Box>
+                                        <Box><Icon source={DeleteIcon} /></Box>
                                     </Tooltip>
                                 </Button>
                             </InlineStack>

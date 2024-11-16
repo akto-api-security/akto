@@ -12,7 +12,7 @@ import testingApi from "../testing/api"
 import PersistStore from '../../../main/PersistStore';
 import { DashboardBanner } from './components/DashboardBanner';
 import SummaryCard from './new_components/SummaryCard';
-import { ArrowUpMinor, ArrowDownMinor } from '@shopify/polaris-icons';
+import { ArrowUpIcon, ArrowDownIcon } from "@shopify/polaris-icons";
 import TestSummaryCardsList from './new_components/TestSummaryCardsList';
 import InfoCard from './new_components/InfoCard';
 import ProgressBarChart from './new_components/ProgressBarChart';
@@ -242,7 +242,7 @@ function HomeDashboard() {
 
     function generateChangeComponent(val, invertColor) {
         if (!val) return null
-        const source = val > 0 ? ArrowUpMinor : ArrowDownMinor
+        const source = val > 0 ? ArrowUpIcon : ArrowDownIcon
         if (val === 0) return null
         const color = !invertColor && val > 0 ? "success" : "critical"
         return (

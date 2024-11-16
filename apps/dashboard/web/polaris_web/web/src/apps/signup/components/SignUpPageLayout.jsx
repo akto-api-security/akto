@@ -14,7 +14,7 @@ function SignUpPageLayout({customComponent}) {
                   <BlockStack gap={8}>
                     <InlineStack align='center'>
                       <div className="akto-logo">
-                        <Avatar source="/public/akto_name_with_logo.svg" shape="round" size="xl" />
+                        <Avatar source="/public/akto_name_with_logo.svg" size="xl" />
                       </div>
                     </InlineStack>
                     {customComponent}

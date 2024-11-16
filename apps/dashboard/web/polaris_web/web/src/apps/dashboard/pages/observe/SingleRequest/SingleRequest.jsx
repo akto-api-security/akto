@@ -5,10 +5,7 @@ import { Button, Text, Box, Popover, ActionList, BlockStack, InlineStack, Icon }
 import api from "../api";
 import { useEffect, useState } from "react";
 import SampleDataList from "../../../components/shared/SampleDataList";
-import {
-    SearchMinor,
-    FraudProtectMinor
-  } from '@shopify/polaris-icons';
+import { SearchIcon, ShieldPersonIcon } from "@shopify/polaris-icons";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 
@@ -16,17 +13,17 @@ let headerDetails = [
     {
         text: "Collection",
         value: "collection",
-        icon: FraudProtectMinor,
+        icon: ShieldPersonIcon,
     },
     {
         text: "Discovered",
         value: "detected_timestamp",
-        icon: SearchMinor,
+        icon: SearchIcon,
     },
     {
         text: "Location",
         value: "location",
-        icon: SearchMinor,
+        icon: SearchIcon,
     },
   ]
 

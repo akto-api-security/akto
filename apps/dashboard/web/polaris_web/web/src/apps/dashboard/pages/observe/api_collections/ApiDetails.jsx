@@ -15,7 +15,7 @@ import RunTest from "./RunTest";
 import PersistStore from "../../../../main/PersistStore";
 import values from "@/util/values";
 
-import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
+import { MenuHorizontalIcon, FileIcon } from "@shopify/polaris-icons";
 
 function ApiDetails(props) {
 
@@ -250,7 +250,7 @@ function ApiDetails(props) {
                 />
                 <Box>
                     <Tooltip content="Open URL in test editor" dismissOnMouseOut>
-                        <Button  onClick={() => openTest()} icon={FileMinor} />
+                        <Button  onClick={() => openTest()} icon={FileIcon} />
                     </Tooltip>
                 </Box>
                 {
@@ -260,7 +260,7 @@ function ApiDetails(props) {
                             <Tooltip content="More actions" dismissOnMouseOut ><Button
 
 
-                                icon={HorizontalDotsMinor}
+                                icon={MenuHorizontalIcon}
                                 onClick={() => setShowMoreActions(!showMoreActions)}
                                 variant="monochromePlain" /></Tooltip>
                         }

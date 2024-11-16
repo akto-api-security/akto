@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Box, Button, Divider, InlineStack, Icon, Text, Tooltip, BlockStack } from "@shopify/polaris"
-import { InfoMinor, ClipboardMinor, CircleTickMinor, CircleCancelMinor } from "@shopify/polaris-icons"
+import { InfoIcon, ClipboardIcon, CheckCircleIcon, XCircleIcon } from "@shopify/polaris-icons";
 
 import Store from "../../../store";
 import TestEditorStore from "../testEditorStore";
@@ -149,14 +149,14 @@ const YamlEditor = ({ fetchAllTests }) => {
                         <Text variant="headingSm" as="h5" truncate>{selectedTest.label + '.yaml'}</Text>
                     </Tooltip>
                     <Tooltip content={`Last Updated ${testsObj.mapTestToData[selectedTest.label].lastUpdated}`} preferredPosition="below" dismissOnMouseOut>
-                        <Icon source={InfoMinor}/> 
+                        <Icon source={InfoIcon}/> 
                     </Tooltip>
                     <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="below">
-                        <Button icon={ClipboardMinor}  onClick={copyTestName} variant="plain" />
+                        <Button icon={ClipboardIcon}  onClick={copyTestName} variant="plain" />
                     </Tooltip>
                     <Tooltip content={`Set as ${selectedTest.inactive ? "active" : "inactive" }`} dismissOnMouseOut preferredPosition="below">
                         <Button
-                            icon={selectedTest.inactive ? CircleTickMinor : CircleCancelMinor}
+                            icon={selectedTest.inactive ? CheckCircleIcon : XCircleIcon}
 
                             onClick={setTestInactive}
                             variant="plain" />

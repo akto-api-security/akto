@@ -1,6 +1,6 @@
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import {Text,IndexFiltersMode, LegacyCard, InlineStack, Button, Collapsible, InlineGrid, Box, Divider} from '@shopify/polaris';
-import { ChevronDownMinor , ChevronUpMinor } from '@shopify/polaris-icons';
+import { ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import api from "../api";
 import { useEffect, useReducer, useState } from 'react';
 import transform from "../transform";
@@ -275,7 +275,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     },200)
 }
 
-const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
+const iconSource = collapsible ? ChevronUpIcon : ChevronDownIcon
 const SummaryCardComponent = () =>{
   let totalVulnerabilities = severityCountMap?.HIGH?.text + severityCountMap?.MEDIUM?.text +  severityCountMap?.LOW?.text 
   return (

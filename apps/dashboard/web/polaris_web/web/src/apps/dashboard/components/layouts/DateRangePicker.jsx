@@ -1,6 +1,6 @@
 import { Box, Button, ButtonGroup, DatePicker, InlineGrid, InlineStack, Icon, OptionList, Popover, Scrollable, Select, TextField, BlockStack, useBreakpoints } from "@shopify/polaris";
 import {useRef, useState } from "react";
-import { CalendarMinor, ArrowRightMinor } from "@shopify/polaris-icons"
+import { CalendarIcon, ArrowRightIcon } from "@shopify/polaris-icons";
 
 function DateRangePicker(props) {
       const { mdDown, lgUp } = useBreakpoints();
@@ -192,20 +192,20 @@ function DateRangePicker(props) {
                         role="combobox"
                         label={"Since"}
                         labelHidden
-                        prefix={<Icon source={CalendarMinor} />}
+                        prefix={<Icon source={CalendarIcon} />}
                         value={inputValues.since}
                         onChange={handleStartInputValueChange}
                         onBlur={handleInputBlur}
                         autoComplete="off"
                       />
                     </div>
-                    <Icon source={ArrowRightMinor} />
+                    <Icon source={ArrowRightIcon} />
                     <div style={{ flexGrow: 1 }}>
                       <TextField
                         role="combobox"
                         label={"Until"}
                         labelHidden
-                        prefix={<Icon source={CalendarMinor} />}
+                        prefix={<Icon source={CalendarIcon} />}
                         value={inputValues.until}
                         onChange={handleEndInputValueChange}
                         onBlur={handleInputBlur}

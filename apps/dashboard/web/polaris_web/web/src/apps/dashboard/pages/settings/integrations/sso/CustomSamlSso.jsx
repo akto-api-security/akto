@@ -7,7 +7,7 @@ import IntegrationsLayout from '../IntegrationsLayout';
 import DeleteModal from '../components/DeleteModal';
 import func from "@/util/func"
 import Details from '../components/Details';
-import { CancelMajor } from "@shopify/polaris-icons"
+import { XIcon } from "@shopify/polaris-icons";
 
 function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signinUrl, integrationSteps, cardContent, handleSubmitOutSide, handleDeleteOutside, samlUrlDocs, loading, showCustomInputs, certificateName}) {
     const [componentType, setComponentType] = useState(0) ;
@@ -63,7 +63,7 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
                                 <Tag>
                                     <InlineStack gap={1}>
                                         <Text variant="bodyMd" fontWeight="medium">{files.name}</Text>
-                                        <Button onClick={() => setFiles(null)}  icon={CancelMajor} variant="plain" />
+                                        <Button onClick={() => setFiles(null)}  icon={XIcon} variant="plain" />
                                     </InlineStack>
                                 </Tag>
                             : <Text variant="bodyLg" fontWeight="medium" color="subdued">{"Drop your " + certificateName + " file here."}</Text>}

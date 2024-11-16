@@ -1,9 +1,9 @@
 import { Box, Button, Collapsible, Divider, InlineStack, Icon, LegacyCard, Scrollable, Text, BlockStack } from '@shopify/polaris'
 import React, { useState } from 'react'
 import SpinnerCentered from '../../../components/progress/SpinnerCentered'
-import {ChevronDownMinor ,ChevronUpMinor} from '@shopify/polaris-icons';
+import { ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import SampleDataList from '../../../components/shared/SampleDataList';
-import { tokens } from "@shopify/polaris-tokens"
+import { useTheme } from "@shopify/polaris"
 import GithubCell from '../../../components/tables/cells/GithubCell';
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards';
 import func from  "@/util/func"
@@ -42,6 +42,7 @@ function MoreInformationComponent(props) {
   }
 
 function TestRunResultFull(props) {
+    const theme = useTheme();
 
     const { selectedTestRunResult, testingRunResult, loading, issueDetails ,getDescriptionText, infoState, headerDetails, createJiraTicket, jiraIssueUrl, hexId, source} = props
 
@@ -60,7 +61,7 @@ function TestRunResultFull(props) {
       )
 
       const [testLogsCollapsibleOpen, setTestLogsCollapsibleOpen] = useState(false)
-      const iconSource = testLogsCollapsibleOpen ? ChevronUpMinor : ChevronDownMinor
+      const iconSource = testLogsCollapsibleOpen ? ChevronUpIcon : ChevronDownIcon
       const testLogsComponent = (
         <LegacyCard key="testLogsComponent">
           <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued"></Text>}>
@@ -79,7 +80,7 @@ function TestRunResultFull(props) {
     
                 <Scrollable style={{maxHeight: '40vh'}}>
                   <BlockStack gap={1}>
-                    {testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].map((x) => <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
+                    {testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].map((x) => <div style={{fontFamily:theme.font["font-family-mono"], fontWeight: theme.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
                       {"[" + x["timestamp"] + "] [" + x["testLogType"] + "] " +x["message"]}
                       </div>)}
                   </BlockStack>

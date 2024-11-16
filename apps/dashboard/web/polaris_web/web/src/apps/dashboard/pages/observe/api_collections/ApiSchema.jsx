@@ -1,6 +1,6 @@
 import { BlockStack, Box, Button, ButtonGroup, InlineStack, Icon, Text, Collapsible, Scrollable, DataTable, Badge } from "@shopify/polaris"
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
+import { ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import func from "@/util/func"
 import transform from "../transform";
 import { useNavigate } from "react-router-dom";
@@ -105,7 +105,7 @@ function ApiSingleSchema(props) {
                         {title}
                     </Text>
                     <Box>
-                        <Icon source={open ? ChevronDownMinor : ChevronUpMinor} />
+                        <Icon source={open ? ChevronDownIcon : ChevronUpIcon} />
                     </Box>
                 </InlineStack>
             </Box>

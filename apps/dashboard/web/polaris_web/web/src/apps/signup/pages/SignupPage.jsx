@@ -30,7 +30,7 @@ function SignupPage() {
                 <SignUp />
             </div>
         </div>
-    );
+    )
 }
 
 export default SignupPage

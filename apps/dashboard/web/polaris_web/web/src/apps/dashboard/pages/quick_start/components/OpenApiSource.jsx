@@ -1,11 +1,10 @@
 import { InlineStack, Text, Badge, BlockStack, ButtonGroup, Button, Modal, DescriptionList, RadioButton, Icon, Tooltip } from "@shopify/polaris";
-import { CancelMajor } from "@shopify/polaris-icons"
+import { XIcon, QuestionCircleIcon } from "@shopify/polaris-icons";
 import { useState } from "react";
 import FileUpload from "../../../components/shared/FileUpload";
 import api from "../api";
 import func from "@/util/func";
-import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-import { QuestionMarkMinor } from "@shopify/polaris-icons"
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 
 function OpenApiSource() {
 
@@ -95,7 +94,7 @@ function OpenApiSource() {
                             <RadioButton id="forceImport" label="Force import all APIs" checked={importType === "ALL_APIS"} onChange={()=>toggleImport("ALL_APIS")} />
                             <div style={{margin: "auto 12px"}}>
                                 <Tooltip content={`We will import ${uploadObj.correctlyParsedApis + uploadObj.apisWithErrorsAndParsed} apis i.e. all the apis that have been correctly parsed and apis which have errors and can still be imported`} dismissOnMouseOut width="wide">
-                                    <Icon source={QuestionMarkMinor} tone="base" />
+                                    <Icon source={QuestionCircleIcon} tone="base" />
                                 </Tooltip>
                             </div>
                         </div>
@@ -103,7 +102,7 @@ function OpenApiSource() {
                             <RadioButton id="successFulApis" label="Import only correctly formatted APIs" checked={importType === "ONLY_SUCCESSFUL_APIS"} onChange={()=>toggleImport("ONLY_SUCCESSFUL_APIS")}/>
                             <div style={{margin: "auto 12px"}}>
                                 <Tooltip content={`We will import ${uploadObj.correctlyParsedApis} apis i.e. all the apis that have been correctly parsed only`} dismissOnMouseOut width="wide">
-                                    <Icon source={QuestionMarkMinor} tone="base" />
+                                    <Icon source={QuestionCircleIcon} tone="base" />
                                 </Tooltip>
                             </div>
                         </div>
@@ -150,7 +149,7 @@ function OpenApiSource() {
                 {files ?
                     <Badge size='medium' tone='success'>
                         {files.name}
-                        <Button icon={CancelMajor}  onClick={() => setFiles(null)} variant="plain" />
+                        <Button icon={XIcon}  onClick={() => setFiles(null)} variant="plain" />
                     </Badge>
                     : null}File:<FileUpload
                         fileType="file"

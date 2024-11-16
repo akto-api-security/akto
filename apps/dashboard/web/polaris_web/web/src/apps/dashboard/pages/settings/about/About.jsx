@@ -4,7 +4,7 @@ import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import settingRequests from '../api'
-import { DeleteMajor, FileFilledMinor } from "@shopify/polaris-icons"
+import { DeleteIcon, FileFilledIcon } from "@shopify/polaris-icons";
 import TooltipText from "../../../components/shared/TooltipText"
 import { isIP } from "is-ip"
 import isCidr from "is-cidr"
@@ -145,7 +145,7 @@ function About() {
                     disabled={window.USER_ROLE !== 'ADMIN'} 
                     connectedRight={(
                         <Tooltip content="Save account name" dismissOnMouseOut>
-                            <Button disabled={window.USER_ROLE !== 'ADMIN'} icon={FileFilledMinor} onClick={() => handleSaveSettings("name", accountName)} />
+                            <Button disabled={window.USER_ROLE !== 'ADMIN'} icon={FileFilledIcon} onClick={() => handleSaveSettings("name", accountName)} />
                         </Tooltip>
                     )} 
                     onChange={setAccountName} 
@@ -350,7 +350,7 @@ function About() {
                                 <TooltipText textProps={{variant:"bodyMd", color: "subdued"}} tooltip={trafficFiltersMap[key]} text={trafficFiltersMap[key]}/>
                                 <Button
 
-                                    icon={DeleteMajor}
+                                    icon={DeleteIcon}
                                     onClick={() => deleteFilterHeader(key)}
                                     variant="plain" />
                             </InlineGrid>
@@ -395,7 +395,7 @@ function About() {
                                 <TooltipText textProps={{variant:"bodyMd", color: "subdued"}} tooltip={newName} text={newName}/>
                                 <Button
 
-                                    icon={DeleteMajor}
+                                    icon={DeleteIcon}
                                     onClick={() => deleteApiCollectionNameMapper(regex)}
                                     variant="plain" />
                             </InlineGrid>

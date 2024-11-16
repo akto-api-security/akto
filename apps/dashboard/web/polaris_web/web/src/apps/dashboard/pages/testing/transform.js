@@ -1,15 +1,17 @@
 import func from "@/util/func";
 import api from "./api";
-import {ResourcesMajor,
-  CollectionsMajor,
-  CreditCardSecureMajor,
-  MarketingMajor,
-  FraudProtectMajor, RiskMajor,
-  CircleCancelMajor,
-  CalendarMinor,
-  ReplayMinor,
-  PlayMinor,
-} from '@shopify/polaris-icons';
+import {
+  EyeglassesIcon,
+  CollectionIcon,
+  CreditCardSecureIcon,
+  TargetIcon,
+  ShieldPersonIcon,
+  AlertTriangleIcon,
+  XCircleIcon,
+  CalendarIcon,
+  ReplayIcon,
+  PlayIcon,
+} from "@shopify/polaris-icons";
 import React from 'react'
 import { Text,InlineStack, Badge, Link, List, Box, Icon, Avatar, Tag, Tooltip} from '@shopify/polaris';
 import { history } from "@/util/history";
@@ -664,43 +666,43 @@ const transform = {
 getInfoSectionsHeaders(){
   let moreInfoSections = [
     {
-      icon: RiskMajor,
+      icon: AlertTriangleIcon,
       title: "Impact",
       content: "",
       tooltipContent: 'The impact of the test on apis in general scenario.'
     },
     {
-      icon: CollectionsMajor,
+      icon: CollectionIcon,
       title: "Tags",
       content: "",
       tooltipContent: 'Category info about the test.'
     },
     {
-      icon: CreditCardSecureMajor,
+      icon: CreditCardSecureIcon,
       title: "CWE",
       content: "",
       tooltipContent: "CWE tags associated with the test from akto's test library"
     },
     {
-      icon: FraudProtectMajor,
+      icon: ShieldPersonIcon,
       title: "CVE",
       content: "",
       tooltipContent: "CVE tags associated with the test from akto's test library"
     },
     {
-      icon: MarketingMajor,
+      icon: TargetIcon,
       title: "API endpoints affected",
       content: "",
       tooltipContent: "Affecting endpoints in your inventory for the same test"
     },
     {
-      icon: ResourcesMajor,
+      icon: EyeglassesIcon,
       title: "References",
       content: "",
       tooltipContent: "References for the above test."
     },
     {
-      icon: ResourcesMajor,
+      icon: EyeglassesIcon,
       title: "Jira",
       content: "",
       tooltipContent: "Jira ticket number attached to the testing run issue"
@@ -1011,27 +1013,27 @@ getActionsList(hexId){
   return [
   {
       content: 'Schedule test',
-      icon: CalendarMinor,
+      icon: CalendarIcon,
       onAction: () => {console.log("schedule test function")},
   },
   {
       content: 'Re-run',
-      icon: ReplayMinor,
+      icon: ReplayIcon,
       onAction: () => TestingStore.getState().setRerunModal(true),
   },
   {
       content: 'Add to CI/CD pipeline',
-      icon: PlayMinor,
+      icon: PlayIcon,
       onAction: () => {window.open('https://docs.akto.io/testing/run-tests-in-cicd', '_blank');},
   },
   {
       content: 'Stop',
-      icon: CircleCancelMajor,
+      icon: XCircleIcon,
       destructive:true,
       onAction: () => {this.stopTest(hexId || ""); window.location.reload();},
       disabled: true,
   }
-]},
+];},
 getActions(item){
   let arr = []
   let section1 = {title: 'Actions', items:[]}

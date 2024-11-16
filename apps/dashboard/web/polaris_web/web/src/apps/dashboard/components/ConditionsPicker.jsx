@@ -1,7 +1,7 @@
 import { Button, LegacyCard, BlockStack } from '@shopify/polaris'
 import React from 'react'
 import Dropdown from './layouts/Dropdown';
-import {DeleteMinor} from "@shopify/polaris-icons"
+import { DeleteIcon } from "@shopify/polaris-icons";
 import func from "@/util/func"
 import ConditionComponent from './ConditionComponent';
 import TitleWithInfo from './shared/TitleWithInfo';
@@ -52,7 +52,7 @@ function ConditionsPicker(props) {
                             dispatch={handleConditionDispatch}
                         />
                     </div>
-                    <Button id={`${id}-delete-button-${index}`} icon={DeleteMinor} onClick={() => handleDelete(index)} />
+                    <Button id={`${id}-delete-button-${index}`} icon={DeleteIcon} onClick={() => handleDelete(index)} />
                 </div>
             ))}
         </BlockStack>

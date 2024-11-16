@@ -19,13 +19,13 @@ import {
 } from '@shopify/polaris';
 
 import {
-  CircleInformationMajor,
-  ArchiveMinor,
-  PriceLookupMinor,
-  ReportMinor,
-  RefreshMajor,
-  CustomersMinor
-} from '@shopify/polaris-icons';
+  InfoIcon,
+  ArchiveIcon,
+  SearchListIcon,
+  SearchResourceIcon,
+  RefreshIcon,
+  PersonIcon,
+} from "@shopify/polaris-icons";
 import api from "../api";
 import func from '@/util/func';
 import { useParams } from 'react-router';
@@ -504,7 +504,7 @@ const runningTestsComp = useMemo(() => (
           <BlockStack gap={5}>
             <InlineStack align="center">
               <div style={{borderRadius: '50%', border: '6px solid white', padding: '4px', display: 'flex', alignItems: 'center', height: '50px', width: '50px'}}>
-                <Icon source={CircleInformationMajor} />
+                <Icon source={InfoIcon} />
               </div>
             </InlineStack>
             <BlockStack gap={2}>
@@ -549,24 +549,24 @@ const runningTestsComp = useMemo(() => (
               </Text>
             </Badge>
             )}
-          <Button   onClick={() => fetchData(true)} variant="monochromePlain"><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
+          <Button   onClick={() => fetchData(true)} variant="monochromePlain"><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshIcon} /></Tooltip></Button>
         </InlineStack>
         <InlineStack gap={"2"}>
           <InlineStack gap={"1"}>
-            <Box><Icon tone="subdued" source={CustomersMinor}/></Box>
+            <Box><Icon tone="subdued" source={PersonIcon}/></Box>
             <Text color="subdued" fontWeight="medium" variant="bodyMd">created by:</Text>
             <Text color="subdued" variant="bodyMd">{selectedTestRun.userEmail}</Text>
           </InlineStack>
           <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
           <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
             <InlineStack gap={"1"}>
-              <Box><Icon tone="subdued" source={ArchiveMinor}/></Box>
+              <Box><Icon tone="subdued" source={ArchiveIcon}/></Box>
               <Text color="subdued" variant="bodyMd">{collectionsMap[selectedTestRun?.apiCollectionId]}</Text>
             </InlineStack>
           </Link>
           <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
           <InlineStack gap={"1"}>
-            <Box><Icon tone="subdued" source={PriceLookupMinor}/></Box>
+            <Box><Icon tone="subdued" source={SearchListIcon}/></Box>
             <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
           </InlineStack>
         </InlineStack>
@@ -578,7 +578,7 @@ const runningTestsComp = useMemo(() => (
   moreActionsList.push({title: 'Export', items: [
     {
      content: 'Export vulnerability report', 
-     icon: ReportMinor, 
+     icon: SearchResourceIcon, 
      onAction: () => openVulnerabilityReport()
     }
   ]})

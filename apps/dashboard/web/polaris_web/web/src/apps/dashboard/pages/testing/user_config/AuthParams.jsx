@@ -1,5 +1,5 @@
 import { Button, Card, Divider, LegacyCard, TextField , Text} from "@shopify/polaris";
-import { DeleteMajor, CirclePlusMajor } from "@shopify/polaris-icons"
+import { DeleteIcon, PlusCircleIcon } from "@shopify/polaris-icons";
 import { useEffect } from "react";
 import Dropdown from "../../../components/layouts/Dropdown";
 import Store from "../../../store";
@@ -68,7 +68,7 @@ function AuthParams({ authParams, setAuthParams, hideTitle }) {
                                     <TextField id={`auth-param-value-${index}`} value={authParam.value} onChange={(value) => handleUpdate(index, "value", value)} />
                                     <Button
                                         id={`delete-auth-param-${index}`}
-                                        icon={DeleteMajor}
+                                        icon={DeleteIcon}
                                         onClick={() => handleRemove(index)}
 
                                         variant="plain" />
@@ -80,7 +80,7 @@ function AuthParams({ authParams, setAuthParams, hideTitle }) {
                 <br />
                 <Button
                     id={"add-auth-param"}
-                    icon={CirclePlusMajor}
+                    icon={PlusCircleIcon}
                     onClick={handleAdd}
 
                     variant="plain" />

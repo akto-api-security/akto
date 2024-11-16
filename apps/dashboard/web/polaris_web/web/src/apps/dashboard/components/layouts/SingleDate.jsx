@@ -1,6 +1,6 @@
 import { Box, Card, DatePicker, Popover, TextField, BlockStack, Icon } from "@shopify/polaris";
 import React, { useState, useEffect } from "react";
-import { CalendarMinor } from "@shopify/polaris-icons";
+import { CalendarIcon } from "@shopify/polaris-icons";
 
 function SingleDate(props) {
 
@@ -89,7 +89,7 @@ function SingleDate(props) {
             activator={
               <TextField
                 role="combobox"
-                prefix={<Icon source={CalendarMinor} />}
+                prefix={<Icon source={CalendarIcon} />}
                 value={inputValue}
                 onFocus={() => setPopoverActive(true)}
                 onChange={handleInputValueChange}

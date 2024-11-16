@@ -1,6 +1,6 @@
 import func from "@/util/func"
 import {Tooltip, Box, Icon, Text, InlineStack} from "@shopify/polaris"
-import {FolderMajor} from "@shopify/polaris-icons"
+import { FolderIcon } from "@shopify/polaris-icons";
 
 const convertFunc = {
     mapCategoryToSubcategory: function (categoriesArr) {
@@ -66,7 +66,7 @@ const convertFunc = {
                             <Tooltip content={testObj?.customTests[key][0]?.category} dismissOnMouseOut width="wide">
                                 <InlineStack gap="2">
                                     <Box>
-                                        <Icon source={FolderMajor} tone="base"/>
+                                        <Icon source={FolderIcon} tone="base"/>
                                     </Box>
                                     <Text truncate variant="bodyMd" as="h5">
                                         {testObj?.customTests[key][0]?.category}
@@ -96,7 +96,7 @@ const convertFunc = {
                             <Tooltip content={testObj?.aktoTests[key][0]?.category} dismissOnMouseOut width="wide">
                                 <InlineStack gap="2">
                                     <Box>
-                                        <Icon source={FolderMajor} tone="base"/>
+                                        <Icon source={FolderIcon} tone="base"/>
                                     </Box>
                                     <Text truncate variant="bodyMd" as="h5">
                                       {testObj?.aktoTests[key][0]?.category}

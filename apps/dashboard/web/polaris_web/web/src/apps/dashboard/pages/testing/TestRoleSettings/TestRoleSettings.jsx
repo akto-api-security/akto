@@ -9,7 +9,7 @@ import DetailsPage from '../../../components/DetailsPage';
 import {produce} from "immer"
 import HardCoded from '../user_config/HardCoded';
 import LoginStepBuilder from '../user_config/LoginStepBuilder';
-import { ChevronRightMinor, ChevronDownMinor, InfoMinor } from '@shopify/polaris-icons';
+import { ChevronRightIcon, ChevronDownIcon, InfoIcon } from "@shopify/polaris-icons";
 import ParamsCard from './ParamsCard';
 import JsonRecording from '../user_config/JsonRecording';
 import Dropdown from '../../../components/layouts/Dropdown';
@@ -348,7 +348,7 @@ function TestRoleSettings() {
                             id={"hardcoded-token-expand-button"}
                             onClick={handleToggleHardcodedOpen}
                             ariaExpanded={hardcodedOpen}
-                            icon={hardcodedOpen ? ChevronDownMinor : ChevronRightMinor}
+                            icon={hardcodedOpen ? ChevronDownIcon : ChevronRightIcon}
                             ariaControls="hardcoded"
                         >
                             Hard coded
@@ -368,7 +368,7 @@ function TestRoleSettings() {
                             id={"automated-token-expand-button"}
                             onClick={handleToggleHardcodedOpen}
                             ariaExpanded={!hardcodedOpen}
-                            icon={!hardcodedOpen ? ChevronDownMinor : ChevronRightMinor}
+                            icon={!hardcodedOpen ? ChevronDownIcon : ChevronRightIcon}
                             ariaControls="automated"
                         >
                             Automated
@@ -416,7 +416,7 @@ function TestRoleSettings() {
                                             <InlineStack gap="2">
                                                 <Text>Header key</Text>
                                                 <Tooltip content="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization" dismissOnMouseOut width="wide" preferredPosition="below">
-                                                    <Icon source={InfoMinor} tone="base" />
+                                                    <Icon source={InfoIcon} tone="base" />
                                                 </Tooltip>
                                             </InlineStack>
                                         )}
@@ -429,7 +429,7 @@ function TestRoleSettings() {
                                             <InlineStack gap="2">
                                                 <Text>Header value</Text>
                                                 <Tooltip content="Please enter the value of the auth token." dismissOnMouseOut width="wide" preferredPosition="below">
-                                                    <Icon source={InfoMinor} tone="base" />
+                                                    <Icon source={InfoIcon} tone="base" />
                                                 </Tooltip>
                                             </InlineStack>
                                         )}

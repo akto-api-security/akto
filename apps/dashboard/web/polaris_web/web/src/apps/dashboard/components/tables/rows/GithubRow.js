@@ -11,9 +11,7 @@ import {
     Box,
     Icon
 } from '@shopify/polaris';
-import {
-    HorizontalDotsMinor, ChevronDownMinor, ChevronUpMinor, ChevronRightMinor
-} from '@shopify/polaris-icons';
+import { MenuHorizontalIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon } from "@shopify/polaris-icons";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from 'react';
 import './row.css'
@@ -81,8 +79,7 @@ function GithubRow(props) {
     }, [dataObj,collapsibleActive])
 
     function OldCell(){
-        return (
-        <>
+        return <>
         <IndexTable.Cell>
             <div className='linkClass'>
                 <Link
@@ -130,7 +127,7 @@ function GithubRow(props) {
                             activator={<Button
                                 onClick={(e) => togglePopoverActive(e,data.id)}
 
-                                icon={HorizontalDotsMinor}
+                                icon={MenuHorizontalIcon}
                                 variant="plain" />}
                             autofocusTarget="first-node"
                             onClose={(e) => togglePopoverActive(e,popoverActive)}
@@ -144,7 +141,7 @@ function GithubRow(props) {
                 </InlineStack>
             </IndexTable.Cell>
         }
-    </>);
+    </>;
     }
 
     function LinkCell(cellData, header, cellWidth) {
@@ -182,7 +179,7 @@ function GithubRow(props) {
                             activator={<Button
                                 onClick={(e) => togglePopoverActive(e,data.id)}
 
-                                icon={HorizontalDotsMinor}
+                                icon={MenuHorizontalIcon}
                                 variant="plain" />}
                             autofocusTarget="first-node"
                             onClose={(e) => togglePopoverActive(e,popoverActive)}
@@ -199,9 +196,9 @@ function GithubRow(props) {
     }
 
     function CollapsibleCell(treeView, value) {
-        let iconSource = ChevronRightMinor
+        let iconSource = ChevronRightIcon
         if(collapsibleActive === data?.name){
-            iconSource = ChevronDownMinor
+            iconSource = ChevronDownIcon
         }
         return (
             <IndexTable.Cell key={"collapsible"}>

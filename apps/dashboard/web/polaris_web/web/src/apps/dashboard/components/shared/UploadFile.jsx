@@ -1,5 +1,5 @@
 import { Button, Tooltip } from "@shopify/polaris"
-import { UploadMajor } from '@shopify/polaris-icons';
+import { UploadIcon } from "@shopify/polaris-icons";
 import { useRef } from "react"
 
 

@@ -1,7 +1,7 @@
 import { Box, Link, InlineStack, Icon, Text, BlockStack } from '@shopify/polaris'
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRightMinor } from "@shopify/polaris-icons"
+import { ChevronRightIcon } from "@shopify/polaris-icons";
 
 function BannerRow(props) {
     const {title, icon, description, redirectUrl, showRedirect, newTab} = props.cardObj
@@ -10,7 +10,7 @@ function BannerRow(props) {
     const titleComp = (
         <InlineStack gap={1}>
             <Text fontWeight="semibold" color="subdued">{title}</Text>
-            {showRedirect ? <Box><Icon source={ChevronRightMinor} tone="subdued"/></Box> : null}
+            {showRedirect ? <Box><Icon source={ChevronRightIcon} tone="subdued"/></Box> : null}
         </InlineStack>
     )
     

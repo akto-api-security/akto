@@ -1,5 +1,5 @@
 import { Button, FormLayout, InlineStack, Icon, Text, TextField, Tooltip } from "@shopify/polaris"
-import { InfoMinor } from "@shopify/polaris-icons"
+import { InfoIcon } from "@shopify/polaris-icons";
 import { useState } from "react";
 import api from "../api"
 import Store from "../../../store";

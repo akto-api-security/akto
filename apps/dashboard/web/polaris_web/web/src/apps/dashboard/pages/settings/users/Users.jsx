@@ -1,5 +1,5 @@
 import { ActionList, Avatar, Banner, Box, Button, Icon, LegacyCard, Link, Modal, Page, Popover, ResourceItem, ResourceList, Text, TextField } from "@shopify/polaris"
-import { DeleteMajor, TickMinor, PasskeyMajor } from "@shopify/polaris-icons"
+import { DeleteIcon, CheckIcon, PasskeyIcon } from "@shopify/polaris-icons";
 import { useEffect, useRef, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
@@ -89,13 +89,13 @@ const Users = () => {
                     destructive: false,
                     content: 'Reset Password',
                     role: 'RESET_PASSWORD',
-                    icon: PasskeyMajor
+                    icon: PasskeyIcon
                 },
                 {
                     destructive: true,
                     content: 'Remove',
                     role: 'REMOVE',
-                    icon: DeleteMajor
+                    icon: DeleteIcon
                 }
             ]
         }
@@ -156,7 +156,7 @@ const Users = () => {
             ...section,
             items: section.items.filter((c) => roleHierarchy.includes(c.role)).map(item => ({
                 ...item,
-                prefix: item.role === "REMOVE"?  <Box><Icon source={DeleteMajor}/></Box> : item.role === "RESET_PASSWORD" ? <Box><Icon source={PasskeyMajor}/></Box> : item.role === currentRole ? <Box><Icon source={TickMinor}/></Box> : <div style={{padding: "10px"}}/>
+                prefix: item.role === "REMOVE"?  <Box><Icon source={DeleteIcon}/></Box> : item.role === "RESET_PASSWORD" ? <Box><Icon source={PasskeyIcon}/></Box> : item.role === currentRole ? <Box><Icon source={CheckIcon}/></Box> : <div style={{padding: "10px"}}/>
             }))
         }));
         return tempArr

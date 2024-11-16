@@ -8,7 +8,7 @@ import { Handle, Position } from 'react-flow-renderer';
 import PersistStore from '../../../../main/PersistStore';
 import TooltipText from '../../../components/shared/TooltipText';
 import StyledEndpoint from './component/StyledEndpoint';
-import { ArrowUpMinor } from "@shopify/polaris-icons"
+import { ArrowUpIcon } from "@shopify/polaris-icons";
 
 
 function ApiDependencyNode({ data }) {
@@ -34,7 +34,7 @@ function ApiDependencyNode({ data }) {
                                     {StyledEndpoint(methodPlusUrl, "12px", "bodySm")}
                                 </Box>
                                 <div style={{ transform: 'rotate(45deg)', width: "20px" }}>
-                                    {!isCurrentNode && <Icon source={ArrowUpMinor} tone="subdued" />}
+                                    {!isCurrentNode && <Icon source={ArrowUpIcon} tone="subdued" />}
                                 </div>
                             </InlineStack>
                         </BlockStack>

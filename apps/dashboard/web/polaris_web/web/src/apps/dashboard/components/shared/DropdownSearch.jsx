@@ -1,5 +1,5 @@
 import { Autocomplete, Avatar, Checkbox, Icon, TextContainer } from '@shopify/polaris';
-import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
+import { SearchIcon, ChevronDownIcon } from "@shopify/polaris-icons";
 import React, { useState, useCallback, useEffect } from 'react';
 import func from "@/util/func";
 function DropdownSearch(props) {
@@ -162,11 +162,11 @@ function DropdownSearch(props) {
             value={inputValue}
             prefix={
                 <div style={{display: 'flex', gap: '4px', alignItems: 'center'}}>
-                    <Icon source={SearchMinor} tone="base" />
+                    <Icon source={SearchIcon} tone="base" />
                     {avatarIcon && avatarIcon.length > 0 ? <Avatar customer size="xs" name={avatarIcon} source={avatarIcon}/> : null}
                 </div>
             }
-            suffix={<Icon source={ChevronDownMinor} tone="base" />}
+            suffix={<Icon source={ChevronDownIcon} tone="base" />}
             placeholder={placeholder}
             autoComplete="off"
             onFocus={handleFocusEvent}
@@ -178,7 +178,7 @@ function DropdownSearch(props) {
 
     const emptyState = (
         <React.Fragment>
-            <Icon source={SearchMinor} />
+            <Icon source={SearchIcon} />
             <div style={{ textAlign: 'center' }}>
                 <TextContainer>Could not find any results</TextContainer>
             </div>

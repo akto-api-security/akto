@@ -1,23 +1,41 @@
 import {
-  CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
-  EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
-  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor
-} from '@shopify/polaris-icons';
+  CalendarIcon,
+  ClockIcon,
+  AlertCircleIcon,
+  DatabaseIcon,
+  LockIcon,
+  KeyIcon,
+  ProfileIcon,
+  PasskeyIcon,
+  EmailIcon,
+  CreditCardIcon,
+  IdentityCardIcon,
+  LocationIcon,
+  PhoneIcon,
+  FileIcon,
+  ImageIcon,
+  BankIcon,
+  HashtagIcon,
+  ReceiptIcon,
+  MobileIcon,
+  CalendarTimeIcon,
+  IdentityCardFilledIcon,
+} from "@shopify/polaris-icons";
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
 import { isValidElement } from 'react';
 import Store from '../apps/dashboard/store';
 import { current } from 'immer';
 import homeFunctions from '../apps/dashboard/pages/home/module';
-import { tokens } from "@shopify/polaris-tokens" 
+import {themes} from '@shopify/polaris-tokens'; 
 import PersistStore from '../apps/main/PersistStore';
 
 import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
 
 const iconsUsedMap = {
-  CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
-  EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
-  ReceiptMajor, MobileMajor, CalendarTimeMinor,LocationMajor, IdentityCardFilledMajor, CalendarMajor
+  CalendarIcon,ClockIcon,AlertCircleIcon,DatabaseIcon, LockIcon, KeyIcon, ProfileIcon, PasskeyIcon,
+  EmailIcon, CreditCardIcon, IdentityCardIcon, LocationIcon,PhoneIcon, FileIcon, ImageIcon, BankIcon, HashtagIcon, 
+  ReceiptIcon, MobileIcon, CalendarTimeIcon,LocationIcon, IdentityCardFilledIcon, CalendarIcon
 }
 
 const func = {
@@ -250,24 +268,24 @@ prettifyEpoch(epoch) {
       case "RUNNING": 
         return {
           color: "subdued",
-          icon: ClockMinor,
+          icon: ClockIcon,
           tooltipContent: "Test is currently running"
-        }
+        };
 
       case "SCHEDULED": 
         return {
           color: "warning",
-          icon: CalendarMinor,
+          icon: CalendarIcon,
           tooltipContent: "Test is scheduled and will run in future."
-        }
+        };
 
       case "FAILED":
       case "FAIL":
-        return{
+        return {
           color: "critical",
-          icon: CircleAlertMajor,
+          icon: AlertCircleIcon,
           tooltipContent: "Error occurred while running the test."
-        }
+        };
 
       case "STOPPED":
         return{
@@ -280,11 +298,11 @@ prettifyEpoch(epoch) {
           icon: circle_tick_minor
         }
       default: 
-        return{
+        return {
           color: "critical",
-          icon: CircleAlertMajor,
+          icon: AlertCircleIcon,
           tooltipContent: "Unknown error occurred while running the test."
-        }
+        };
       }
   },
   getSeverity(countIssues) {
@@ -1283,11 +1301,11 @@ mapCollectionIdToHostName(apiCollections){
   getColorForCharts(key){
     switch(key){
       case "HIGH":
-        return tokens.color["color-icon-critical"]
+        return themes.color["color-icon-critical"]
       case "MEDIUM":
-        return tokens.color["color-icon-warning"]
+        return themes.color["color-icon-warning"]
       case "LOW":
-        return tokens.color["color-icon-info"]
+        return themes.color["color-icon-info"]
       case "BOLA":
         return "#800000"
       case "NO_AUTH":
@@ -1342,85 +1360,85 @@ mapCollectionIdToHostName(apiCollections){
     const key = data.toUpperCase().replace(/ /g, '_');
     switch (key) {
         case "DATABASE":
-          return DynamicSourceMinor;
+          return DatabaseIcon;
         case "SECRET":
-          return LockMinor;
+          return LockIcon;
         case "TOKEN":
-          return KeyMajor;
+          return KeyIcon;
         case "USERNAME":
-          return ProfileMinor;
+          return ProfileIcon;
         case "PASSWORD":
-          return PasskeyMinor;
+          return PasskeyIcon;
         case "JWT":
-          return KeyMajor;
+          return KeyIcon;
         case "EMAIL":
-          return EmailMajor;
+          return EmailIcon;
         case "CREDIT_CARD":
-          return CreditCardMajor;
+          return CreditCardIcon;
         case "SSN":
-          return IdentityCardMajor;
+          return IdentityCardIcon;
         case "ADDRESS":
-          return LocationsMinor;
+          return LocationIcon;
         case "IP_ADDRESS":
-          return LocationsMinor;
+          return LocationIcon;
         case "PHONE_NUMBER":
-          return PhoneMajor;
+          return PhoneIcon;
         case "UUID":
-          return IdentityCardMajor;
+          return IdentityCardIcon;
         case "DATA_FILE":
-          return FileMinor;
+          return FileIcon;
         case "IMAGE":
-          return ImageMajor;
+          return ImageIcon;
         case "US_ADDRESS":
-          return LocationsMinor;
+          return LocationIcon;
         case "IBAN_EUROPE":
-          return BankMajor;
+          return BankIcon;
         case "JAPANESE_SOCIAL_INSURANCE_NUMBER":
-          return HashtagMinor;
+          return HashtagIcon;
         case "GERMAN_INSURANCE_IDENTITY_NUMBER":
-          return IdentityCardMajor;
+          return IdentityCardIcon;
         case "CANADIAN_SOCIAL_IDENTITY_NUMBER":
-          return IdentityCardMajor;
+          return IdentityCardIcon;
         case "FINNISH_PERSONAL_IDENTITY_NUMBER":
-          return IdentityCardMajor;
+          return IdentityCardIcon;
         case "UK_NATIONAL_INSURANCE_NUMBER":
-          return HashtagMinor;
+          return HashtagIcon;
         case "INDIAN_UNIQUE_HEALTH_IDENTIFICATION":
-          return IdentityCardMajor;
+          return IdentityCardIcon;
         case "US_MEDICARE_HEALTH_INSURANCE_CLAIM_NUMBER":
-          return HashtagMinor;
+          return HashtagIcon;
         case "PAN_CARD":
-          return IdentityCardMajor;
+          return IdentityCardIcon;
         case "ENCRYPT":
-          return LockMinor;
+          return LockIcon;
         case "SESSIONID":
-          return KeyMajor;
+          return KeyIcon;
         case "INVOICE":
-          return ReceiptMajor;
+          return ReceiptIcon;
         case "EIN":
-          return IdentityCardMajor;
+          return IdentityCardIcon;
         case "PIN":
-          return LocationsMinor;
+          return LocationIcon;
         case "BANK":
-          return BankMajor;
+          return BankIcon;
         case "PASSPORT":
-          return IdentityCardMajor;
+          return IdentityCardIcon;
         case "LICENSE":
-          return IdentityCardMajor;
+          return IdentityCardIcon;
         case "STREETLINE":
-          return LocationsMinor;
+          return LocationIcon;
         case "ADDRESSKEY":
-          return LocationsMinor;
+          return LocationIcon;
         case "CONTACT":
-          return MobileMajor;
+          return MobileIcon;
         case "AUTH":
-          return LocationsMinor;
+          return LocationIcon;
         case "DOB":
-          return CalendarMinor;
+          return CalendarIcon;
         case "BIRTH":
-          return CalendarTimeMinor;
+          return CalendarTimeIcon;
         default: 
-          return KeyMajor;
+          return KeyIcon;
     }
   },
   getCollectionFilters(filters) {

@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import {
-    ClipboardMinor,ArrowDownMinor, ArrowUpMinor
-} from '@shopify/polaris-icons';
+import { ClipboardIcon, ArrowDownIcon, ArrowUpIcon } from "@shopify/polaris-icons";
 import {
     InlineStack, Box, LegacyCard,
     Button, Popover, ActionList, Icon, Text, Tooltip
@@ -219,7 +217,7 @@ function SampleDataComponent(props) {
                                         onClick={() => changeIndex("prev")}
                                         variant="monochromePlain">
                                         <Box padding="05" borderWidth="1" borderColor="border" borderRadius="1">
-                                            <Icon source={ArrowUpMinor} />
+                                            <Icon source={ArrowUpIcon} />
                                         </Box>
                                     </Button>
                                     <Button
@@ -229,7 +227,7 @@ function SampleDataComponent(props) {
                                         onClick={() => changeIndex("next")}
                                         variant="monochromePlain">
                                         <Box padding="05" borderWidth="1" borderColor="border" borderRadius="1">
-                                            <Icon source={ArrowDownMinor} />
+                                            <Icon source={ArrowDownIcon} />
                                         </Box>
                                     </Button>
                                 </InlineStack>
@@ -240,7 +238,7 @@ function SampleDataComponent(props) {
                                 zIndexOverride={"600"}
                                 active={popoverActive[type]}
                                 activator={<Button
-                                    icon={ClipboardMinor}
+                                    icon={ClipboardIcon}
 
                                     onClick={() => 
                                         setPopoverActive({ [type]: !popoverActive[type] })}

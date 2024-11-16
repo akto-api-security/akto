@@ -11,7 +11,15 @@ import {produce} from "immer"
 import DetailsPage from '../../../components/DetailsPage'
 import InformationBannerComponent from '../../quick_start/components/shared/InformationBannerComponent'
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
-import { EmailMajor, CreditCardMajor, IdentityCardFilledMajor, PhoneMajor, CalendarMajor, LocationMajor, KeyMajor } from "@shopify/polaris-icons"
+import {
+  EmailIcon,
+  CreditCardIcon,
+  IdentityCardFilledIcon,
+  PhoneIcon,
+  CalendarIcon,
+  LocationIcon,
+  KeyIcon,
+} from "@shopify/polaris-icons";
 
 const severitiesArr = func.getAktoSeverities()
 
@@ -95,7 +103,7 @@ const requestItems = [
   }
 ]
 
-const defaultIcons = [ EmailMajor, CreditCardMajor, IdentityCardFilledMajor, PhoneMajor, CalendarMajor, LocationMajor, KeyMajor]
+const defaultIcons = [ EmailIcon, CreditCardIcon, IdentityCardFilledIcon, PhoneIcon, CalendarIcon, LocationIcon, KeyIcon]
 
 function conditionStateReducer(draft, action) {
   try {

@@ -4,12 +4,11 @@ import Dropdown from '../../../components/layouts/Dropdown'
 import settingFunctions from '../../settings/module'
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import FileUpload from '../../../components/shared/FileUpload';
-import {CancelMajor} from "@shopify/polaris-icons"
+import { XIcon, QuestionCircleIcon } from "@shopify/polaris-icons";
 import api from '../api';
 import Store from '../../../store';
 import InformationBannerComponent from "./shared/InformationBannerComponent";
-import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-import { QuestionMarkMinor } from "@shopify/polaris-icons"
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 
 
 function PostmanSource() {
@@ -134,7 +133,7 @@ function PostmanSource() {
                     {files ? 
                         <Badge size='medium' tone='success'>
                             {files.name}
-                            <Button icon={CancelMajor}  onClick={() => setFiles(null)} variant="plain" />
+                            <Button icon={XIcon}  onClick={() => setFiles(null)} variant="plain" />
                         </Badge> 
                     : null}
                     <FileUpload fileType="file" acceptString=".json" setSelectedFile={setFilesCheck} allowMultiple={false} allowedSize={20*1024*1024}/>
@@ -229,7 +228,7 @@ function PostmanSource() {
                             <RadioButton id="forceImport" label="Force import all APIs" checked={importType === "ALL_APIS"} onChange={()=>toggleImport("ALL_APIS")} />
                             <div style={{margin: "auto 12px"}}>
                                 <Tooltip content={`We will import ${uploadObj.correctlyParsedApis + uploadObj.apisWithErrorsAndParsed} apis i.e. all the apis that have been correctly parsed and apis which have errors and can still be imported`} dismissOnMouseOut width="wide">
-                                    <Icon source={QuestionMarkMinor} tone="base" />
+                                    <Icon source={QuestionCircleIcon} tone="base" />
                                 </Tooltip>
                             </div>
                         </div>
@@ -237,7 +236,7 @@ function PostmanSource() {
                             <RadioButton id="successFulApis" label="Import only correctly formatted APIs" checked={importType === "ONLY_SUCCESSFUL_APIS"} onChange={()=>toggleImport("ONLY_SUCCESSFUL_APIS")}/>
                             <div style={{margin: "auto 12px"}}>
                                 <Tooltip content={`We will import ${uploadObj.correctlyParsedApis} apis i.e. all the apis that have been correctly parsed only`} dismissOnMouseOut width="wide">
-                                    <Icon source={QuestionMarkMinor} tone="base" />
+                                    <Icon source={QuestionCircleIcon} tone="base" />
                                 </Tooltip>
                             </div>
                         </div>

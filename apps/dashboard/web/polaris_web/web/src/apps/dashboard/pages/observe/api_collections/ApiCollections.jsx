@@ -1,11 +1,10 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, InlineStack, Icon} from "@shopify/polaris"
-import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
+import { HideIcon, ViewIcon, FileIcon, CheckCircleIcon } from "@shopify/polaris-icons";
 import api from "../api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
-import { CircleTickMajor } from '@shopify/polaris-icons';
 import ObserveStore from "../observeStore"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
@@ -160,9 +159,9 @@ function convertToCollectionData(c) {
     return {
         ...c,
         detected: func.prettifyEpoch(c.startTs),
-        icon: CircleTickMajor,
+        icon: CheckCircleIcon,
         nextUrl: "/dashboard/observe/inventory/"+ c.id
-    }    
+    };    
 }
 
 const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading) => {
@@ -568,7 +567,7 @@ function ApiCollections() {
                     <Popover.Section>
                         <Button   onClick={() =>exportCsv()} removeUnderline variant="monochromePlain">
                             <InlineStack gap={"2"}>
-                                <Box><Icon source={FileMinor} /></Box>
+                                <Box><Icon source={FileIcon} /></Box>
                                 <Text>Export as CSV</Text>
                             </InlineStack>
                         </Button>
@@ -581,7 +580,7 @@ function ApiCollections() {
                             removeUnderline
                             variant="monochromePlain">
                             <InlineStack gap={"2"}>
-                                <Box><Icon source={treeView ? HideMinor : ViewMinor} /></Box>
+                                <Box><Icon source={treeView ? HideIcon : ViewIcon} /></Box>
                                 <Text>{treeView ? "Hide tree view": "Display tree view"}</Text>
                             </InlineStack>
                         </Button>

@@ -5,11 +5,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Modal, Button, Box } from "@shopify/polaris";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import func from "@/util/func";
-import {
-    CustomersMinor,
-    ClockMinor,
-    CircleTickMajor
-  } from '@shopify/polaris-icons';
+import { PersonIcon, ClockIcon, CheckCircleIcon } from "@shopify/polaris-icons";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { AUTH_TYPES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 
@@ -24,19 +20,19 @@ function AuthTypes() {
             text: "Last updated",
             value: "updatedTimestamp",
             itemOrder: 3,
-            icon:ClockMinor
+            icon:ClockIcon
         },
         {
             text: "Created by",
             value: "createdBy",
             itemOrder: 3,
-            icon:CustomersMinor
+            icon:PersonIcon
         },
         {
             text: "",
             value: "isActive",
             itemOrder: 3,
-            icon:CircleTickMajor
+            icon:CheckCircleIcon
         },
     ]
 

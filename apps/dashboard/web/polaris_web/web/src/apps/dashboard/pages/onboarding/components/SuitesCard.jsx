@@ -1,5 +1,5 @@
 import { Box, Card, InlineStack, Icon, RadioButton, Text, Tooltip, BlockStack } from '@shopify/polaris'
-import { QuestionMarkMinor } from "@shopify/polaris-icons"
+import { QuestionCircleIcon } from "@shopify/polaris-icons";
 import React from 'react'
 import OnboardingStore from '../OnboardingStore'
 
@@ -19,7 +19,7 @@ function SuitesCard({cardObj}) {
                         </InlineStack>
                         <Tooltip content={cardObj?.description}>
                             <Box>
-                                <Icon tone="base" source={QuestionMarkMinor} />
+                                <Icon tone="base" source={QuestionCircleIcon} />
                             </Box>
                         </Tooltip>
                     </InlineStack>

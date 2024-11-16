@@ -1,5 +1,5 @@
 import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,InlineGrid, InlineStack, Link, BlockStack, Tooltip, Popover, ActionMenu, OptionList } from "@shopify/polaris";
-import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons"
+import { CheckIcon, XIcon, SearchIcon } from "@shopify/polaris-icons";
 import { useEffect, useRef, useState } from "react";
 import { default as observeApi } from "../api";
 import { default as testingApi } from "../../testing/api";
@@ -275,7 +275,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             <Text variant="headingMd" fontWeight="bold" color={category.name === testRun.selectedCategory ? "success" : ""}>{category.displayName}</Text>
                             <Text>{selected} out of {total} selected</Text>
                         </div>
-                        {selected > 0 && <Icon source={TickMinor} tone="base" />}
+                        {selected > 0 && <Icon source={CheckIcon} tone="base" />}
                     </div>
                 )];
             } else {
@@ -551,7 +551,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             </div>
 
                             <Button
-                                icon={CancelMajor}
+                                icon={XIcon}
 
                                 onClick={handleRemoveAll}
                                 disabled={checkRemoveAll()}
@@ -609,7 +609,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         {showSearch ? <TextField onChange={handleInputValue} value={searchValue} autoFocus
                                     focused /> : null}
                                         <Tooltip content={"Click to search"} dismissOnMouseOut>
-                                            <Button size="slim" icon={SearchMinor} onClick={() => setShowSearch(!showSearch)}/>
+                                            <Button size="slim" icon={SearchIcon} onClick={() => setShowSearch(!showSearch)}/>
                                         </Tooltip>
                                     </InlineStack>
                                 </div>

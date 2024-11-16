@@ -1,5 +1,5 @@
 import { Box, Button, Divider, Frame, InlineStack, LegacyTabs, Modal, Text, Tooltip} from "@shopify/polaris"
-import {ChevronUpMinor } from "@shopify/polaris-icons"
+import { ChevronUpIcon } from "@shopify/polaris-icons";
 
 import { useEffect, useState } from "react";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
@@ -228,7 +228,7 @@ const SampleApi = () => {
 
 
                 onClick={testResult ? showResults : () => {}}
-                icon={testResult ? ChevronUpMinor : undefined}
+                icon={testResult ? ChevronUpIcon : undefined}
                 variant="monochromePlain">
                 {getResultDescription()}
             </Button>

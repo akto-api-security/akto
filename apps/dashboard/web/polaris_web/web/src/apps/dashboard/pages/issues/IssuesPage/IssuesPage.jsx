@@ -4,7 +4,7 @@ import { useReducer, useState } from "react";
 import api from "../api"
 import Store from "../../../store";
 import func from "@/util/func";
-import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
+import { OrderFulfilledIcon, SearchResourceIcon, ExternalIcon } from "@shopify/polaris-icons";
 import PersistStore from "../../../../main/PersistStore";
 import { Button, InlineGrid, InlineStack, IndexFiltersMode } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
@@ -296,17 +296,17 @@ function IssuesPage() {
     const infoItems = [
         {
             title: "Triage",
-            icon: MarkFulfilledMinor,
+            icon: OrderFulfilledIcon,
             description: "Prioritize, assign them to team members and manage API issues effectively.",
         },
         {
             title: "Download vulnerability report",
-            icon: ReportMinor,
+            icon: SearchResourceIcon,
             description: "Export and share detailed report of vulnerabilities in your APIs.",
         },
         {
             title: "Send them to GitHub",
-            icon: ExternalMinor,
+            icon: ExternalIcon,
             description: "Integrate Akto with GitHub to send all issues to your developers on GitHub."
         }
     ]

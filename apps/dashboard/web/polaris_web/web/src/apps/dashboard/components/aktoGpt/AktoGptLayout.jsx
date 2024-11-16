@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Avatar, Box, Button, InlineStack, Icon, Scrollable, Spinner,Text,TextField, Tooltip, BlockStack } from "@shopify/polaris"
-import { SendMajor } from "@shopify/polaris-icons"
+import { SendIcon, ClipboardIcon } from "@shopify/polaris-icons";
 import PromptContainer from './PromptContainer'
 import "./style.css"
 import Store from '../../store'
@@ -9,7 +9,6 @@ import IntroComponent from './IntroComponent'
 import api from './api'
 import ResponseComponent from './ResponseComponent'
 import { useNavigate } from 'react-router-dom'
-import {ClipboardMinor} from '@shopify/polaris-icons';
 
 function AktoGptLayout({prompts,closeModal, runCustomTests}) {
 
@@ -168,7 +167,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
                                     <div ref={ref}/>
                                     <Tooltip content="Copy curl command">
-                                        <Button icon={ClipboardMinor} onClick={()=> func.copyToClipboard(response.responses[0].curl, ref)} />
+                                        <Button icon={ClipboardIcon} onClick={()=> func.copyToClipboard(response.responses[0].curl, ref)} />
                                     </Tooltip>
                                 </div>
                                 :null
@@ -188,7 +187,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
 
                                     disabled={checkQuery()}
                                     onClick={handleClick}
-                                    icon={SendMajor}
+                                    icon={SendIcon}
                                     variant="plain" />
                             </div>
                         } 

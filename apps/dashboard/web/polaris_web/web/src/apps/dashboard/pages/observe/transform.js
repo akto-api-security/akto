@@ -4,7 +4,20 @@ import PersistStore from "../../../main/PersistStore";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
 import CopyEndpoint from "./api_collections/component/CopyEndpoint"
-import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor, ArrowUpMinor, ArrowDownMinor } from "@shopify/polaris-icons"
+import {
+    SearchIcon,
+    InfoIcon,
+    LockIcon,
+    ClockIcon,
+    PasskeyIcon,
+    LinkIcon,
+    DatabaseIcon,
+    GlobeIcon,
+    LocationIcon,
+    SearchListIcon,
+    ArrowUpIcon,
+    ArrowDownIcon,
+} from "@shopify/polaris-icons";
 import api from "./api";
 import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
 
@@ -48,7 +61,7 @@ const apiDetailsHeaders = [
         text: 'Collection name',
         value: 'apiCollectionName',
         itemOrder: 3,
-        icon: DynamicSourceMinor,
+        icon: DatabaseIcon,
         iconTooltip: "Api collection name"
     },
     {
@@ -67,20 +80,20 @@ const apiDetailsHeaders = [
         text: 'hostname',
         itemOrder: 3,
         value: 'hostName',
-        icon: GlobeMinor,
+        icon: GlobeIcon,
         iconTooltip: "Hostname of the api collection"
     },
     {
         text: 'Last Seen',
         value: 'last_seen',
-        icon: SearchMinor,
+        icon: SearchIcon,
         itemOrder: 3,
         iconTooltip: "Last seen traffic"
     },
     {
         text: 'Access Type',
         value: 'access_type',
-        icon: InfoMinor,
+        icon: InfoIcon,
         itemOrder: 3,
         showFilter: true, 
         iconTooltip: "Access type of the API"
@@ -88,7 +101,7 @@ const apiDetailsHeaders = [
     {
         text: 'Auth Type',
         value: 'auth_type',
-        icon: LockMinor,
+        icon: LockIcon,
         itemOrder: 3,
         showFilter: true,
         iconTooltip: "Auth type of the API"
@@ -96,14 +109,14 @@ const apiDetailsHeaders = [
     {
         text: "Discovered",
         value: 'added',
-        icon: ClockMinor,
+        icon: ClockIcon,
         itemOrder: 3,
         iconTooltip: "Discovered time of API"
     },
     {
         text: 'Changes',
         value: 'changes',
-        icon: InfoMinor,
+        icon: InfoIcon,
         itemOrder: 3,
         iconTooltip: "Changes in API"
     },
@@ -129,13 +142,13 @@ const paramHeaders = [
     {
         text: 'Type',
         value: 'subType',
-        icon: PasskeyMinor,
+        icon: PasskeyIcon,
         itemOrder: 3
     },
     {
         text: 'Endpoint',
         value: 'endpoint',
-        icon: LinkMinor,
+        icon: LinkIcon,
         itemOrder: 3,
         sortKey: 'url',
         showFilterMenu: true
@@ -143,7 +156,7 @@ const paramHeaders = [
     {
         text: 'Collection',
         value: 'apiCollectionName',
-        icon: DynamicSourceMinor,
+        icon: DatabaseIcon,
         itemOrder: 3,
         sortKey: 'apiCollectionId',
         showFilterMenu: true
@@ -151,7 +164,7 @@ const paramHeaders = [
     {
         text: 'Method',
         value: 'method',
-        icon: GlobeMinor,
+        icon: GlobeIcon,
         itemOrder: 3,
         sortKey: 'method',
         showFilterMenu: true
@@ -159,7 +172,7 @@ const paramHeaders = [
     {
         text: 'Location',
         value: 'location',
-        icon: LocationsMinor,
+        icon: LocationIcon,
         itemOrder: 3,
         sortKey: 'isHeader',
         showFilterMenu: true
@@ -167,7 +180,7 @@ const paramHeaders = [
     {
         text: "Discovered",
         value: 'added',
-        icon: ClockMinor,
+        icon: ClockIcon,
         itemOrder: 3,
         sortKey: 'timestamp',
         showFilterMenu: true
@@ -175,7 +188,7 @@ const paramHeaders = [
     {
         text: 'Values',
         value: 'domain',
-        icon: PriceLookupMinor,
+        icon: SearchListIcon,
         itemOrder: 3,
         showFilterMenu: true
     }
@@ -645,7 +658,7 @@ const transform = {
         if (val === 0 ) {
             return <Text>No change in {time}</Text>
         }
-        const source = val > 0 ? ArrowUpMinor : ArrowDownMinor
+        const source = val > 0 ? ArrowUpIcon : ArrowDownIcon
         return (
             <InlineStack gap={1}>
                 <Box>

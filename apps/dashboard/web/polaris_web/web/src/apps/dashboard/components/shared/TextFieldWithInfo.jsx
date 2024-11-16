@@ -1,6 +1,6 @@
 import React from 'react'
 import { InlineStack, Text , Tooltip, Icon, TextField } from "@shopify/polaris"
-import { QuestionMarkMinor } from "@shopify/polaris-icons"
+import { QuestionCircleIcon } from "@shopify/polaris-icons";
 
 function TextFieldWithInfo({labelText, labelTextColor, labelTooltip, tooltipIconColor, value, placeholder, setValue }) {
 
@@ -11,7 +11,7 @@ function TextFieldWithInfo({labelText, labelTextColor, labelTooltip, tooltipIcon
         <InlineStack gap="2">
             <Text color={labelTextColorV}>{labelText}</Text>
             <Tooltip content={labelTooltip} dismissOnMouseOut width="wide">
-                <Icon source={QuestionMarkMinor} tone={tooltipIconColorV} />
+                <Icon source={QuestionCircleIcon} tone={tooltipIconColorV} />
             </Tooltip>
         </InlineStack>
     )

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 import { Badge, Box, Button, InlineStack, Icon, Navigation, Text, TextField, Tooltip, BlockStack } from "@shopify/polaris"
-import {ChevronDownMinor, ChevronRightMinor, SearchMinor, CirclePlusMinor} from "@shopify/polaris-icons"
+import { ChevronDownIcon, ChevronRightIcon, SearchIcon, PlusCircleIcon } from "@shopify/polaris-icons";
 
 import TestEditorStore from "../testEditorStore"
 
@@ -130,7 +130,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
         const arr = aktoItems.map(obj => ({
             ...obj,
             selected: selectedCategory === (obj.key+obj.param),
-            icon: selectedCategory === (obj.key+obj.param) ? ChevronDownMinor : ChevronRightMinor,
+            icon: selectedCategory === (obj.key+obj.param) ? ChevronDownIcon : ChevronRightIcon,
             subNavigationItems: obj.subNavigationItems.map((item)=>{
                 return{
                     label: (
@@ -161,7 +161,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                 <BlockStack gap="4">
                     <TextField  
                         id={"test-search"}
-                        prefix={<Icon source={SearchMinor} />} 
+                        prefix={<Icon source={SearchIcon} />} 
                         onChange={searchResult} 
                         value={searchText}
                         placeholder={`Search for Tests`}
@@ -178,7 +178,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                             <InlineStack align="space-between">
                                 <InlineStack gap={"1"}>
                                     <Box>
-                                        <Icon source={showCustom ? ChevronDownMinor : ChevronRightMinor}/>
+                                        <Icon source={showCustom ? ChevronDownIcon : ChevronRightIcon}/>
                                     </Box>
                                     <TitleWithInfo 
                                         tooltipContent={"Custom tests"} 
@@ -208,7 +208,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                             <InlineStack align="space-between">
                                 <InlineStack gap="1">
                                     <Box>
-                                        <Icon source={showAkto ? ChevronDownMinor : ChevronRightMinor}/>
+                                        <Icon source={showAkto ? ChevronDownIcon : ChevronRightIcon}/>
                                     </Box>
                                     <TitleWithInfo 
                                         tooltipContent={"Akto's test library"} 

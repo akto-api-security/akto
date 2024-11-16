@@ -1,7 +1,5 @@
 import { Button, InlineStack, Text, BlockStack, Box, Spinner, Divider, Scrollable } from "@shopify/polaris"
-import {
-    CancelMajor
-} from '@shopify/polaris-icons';
+import { XIcon } from "@shopify/polaris-icons";
 import "./style.css"
 
 function FlyLayout(props) {
@@ -27,7 +25,7 @@ function FlyLayout(props) {
                                         {title}
                                     </Text>
                                 }
-                                <Button icon={CancelMajor} onClick={() => { handleExit()}}  variant="plain"></Button>
+                                <Button icon={XIcon} onClick={() => { handleExit()}}  variant="plain"></Button>
                             </InlineStack>
                         </Box>
                         <Scrollable style={{ height: "92vh" }} shadow>

@@ -1,6 +1,6 @@
 import { Autocomplete, Box, Icon } from '@shopify/polaris'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import {CircleRightMajor, ChevronDownMinor} from "@shopify/polaris-icons"
+import { CircleRightIcon, ChevronDownIcon } from "@shopify/polaris-icons";
 import func from "@/util/func"
 
 function Dropdown(props) {
@@ -61,7 +61,7 @@ function Dropdown(props) {
             {...props.label ? {label : props.label} : null}
             {...props.helpText ? {helpText : props.helpText} : null}
             {...props.placeHolder ? {placeholder : props.placeHolder} : null}
-            suffix={<Icon source={ChevronDownMinor} />}
+            suffix={<Icon source={ChevronDownIcon} />}
         />
 
     );
@@ -76,10 +76,10 @@ function Dropdown(props) {
                 content: props.subContent,
                 wrapOverflow: true,
                 onAction: props.subClick,
-                suffix: <Box><Icon source={CircleRightMajor}/></Box>
+                suffix: <Box><Icon source={CircleRightIcon}/></Box>
             }} : null}
         />
-    )
+    );
 }
 
 export default Dropdown

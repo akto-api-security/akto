@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import TableStore from '../../tables/TableStore'
-import { ChevronRightMinor, ChevronDownMinor } from "@shopify/polaris-icons"
+import { ChevronRightIcon, ChevronDownIcon } from "@shopify/polaris-icons";
 import { Badge, Box, Checkbox, InlineStack, Icon, Text, Tooltip } from '@shopify/polaris';
 
 function PrettifyDisplayName({name, level, isTerminal, isOpen, selectItems, collectionIds}) {
@@ -32,7 +32,7 @@ function PrettifyDisplayName({name, level, isTerminal, isOpen, selectItems, coll
     if(level !== undefined || level.length > 0){
         displayName = level.split("#")[len];
     }
-    const icon = isOpen ? ChevronDownMinor : ChevronRightMinor
+    const icon = isOpen ? ChevronDownIcon : ChevronRightIcon
     return (
         <Box width='230px'>
             <div className="styled-name">

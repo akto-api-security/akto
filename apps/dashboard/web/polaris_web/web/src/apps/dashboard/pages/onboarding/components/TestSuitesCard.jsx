@@ -1,7 +1,7 @@
 import { Badge, Box, Card, InlineStack, Icon, Text, Tooltip, BlockStack } from '@shopify/polaris'
 import React from 'react'
 import onFunc from '../transform'
-import { InfoMinor } from "@shopify/polaris-icons"
+import { InfoIcon } from "@shopify/polaris-icons";
 
 function TestSuitesCard({cardObj}) {
 
@@ -23,7 +23,7 @@ function TestSuitesCard({cardObj}) {
                     <Text variant='bodyLg' fontWeight="medium">{cardObj.vulnerability}</Text>
                     <Tooltip content={cardObj.testName}>
                         <Box>
-                            <Icon source = {InfoMinor} tone="base"/>
+                            <Icon source = {InfoIcon} tone="base"/>
                         </Box>
                     </Tooltip>
                 </InlineStack>

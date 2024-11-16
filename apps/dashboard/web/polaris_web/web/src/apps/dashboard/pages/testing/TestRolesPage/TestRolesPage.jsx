@@ -5,10 +5,7 @@ import api from "../api"
 import { Button } from "@shopify/polaris"
 import { useNavigate } from "react-router-dom"
 import func from "@/util/func"
-import {
-    ProfileMinor,
-    CalendarMinor
-  } from '@shopify/polaris-icons';
+import { ProfileIcon, CalendarIcon } from "@shopify/polaris-icons";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
 import { ROLES_PAGE_DOCS_URL } from "../../../../main/onboardingData"
 
@@ -22,13 +19,13 @@ const headers = [
         text:"Last updated",
         value:"timestamp",
         itemOrder: 3,
-        icon:CalendarMinor
+        icon:CalendarIcon
     },
     {
         text:"Created by",
         value:"createdBy",
         itemOrder: 3,
-        icon:ProfileMinor
+        icon:ProfileIcon
     }
 ]
 

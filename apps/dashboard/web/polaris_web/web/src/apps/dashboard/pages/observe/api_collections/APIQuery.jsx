@@ -7,7 +7,7 @@ import React, { useState, useReducer, useCallback, useMemo, useEffect } from 're
 import { produce } from "immer"
 import ApiEndpoints from "./ApiEndpoints";
 import api from "../api"
-import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
+import { ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import SaveAsCollectionModal from "./api_query_component/SaveAsCollectionModal";
 import { useSearchParams } from "react-router-dom";
@@ -183,7 +183,7 @@ function APIQuery() {
                         {endpointListFromConditions.data ? apiCount > 200 ? `Listing 200 sample endpoints out of total ` + apiCount + ` endpoints` : `Listing total ` + apiCount + ` endpoints` : "Select filters to see endpoints"}
                     </Text>
                     <Box>
-                        <Icon source={open ? ChevronDownMinor : ChevronUpMinor} />
+                        <Icon source={open ? ChevronDownIcon : ChevronUpIcon} />
                     </Box>
                 </InlineStack>
             </Box>

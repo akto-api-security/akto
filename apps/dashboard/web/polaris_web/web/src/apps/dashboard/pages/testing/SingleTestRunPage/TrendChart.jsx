@@ -17,7 +17,7 @@ import DateRangePicker from "../../../components/layouts/DateRangePicker"
 import func from '@/util/func';
 import { produce } from "immer"
 import "./style.css"
-import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
+import { ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import SummaryTable from "./SummaryTable";
 
 function TrendChart(props) {
@@ -297,7 +297,7 @@ function TrendChart(props) {
         return <></>
     }
 
-    const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
+    const iconSource = collapsible ? ChevronUpIcon : ChevronDownIcon
 
     return (
         <LegacyCard>

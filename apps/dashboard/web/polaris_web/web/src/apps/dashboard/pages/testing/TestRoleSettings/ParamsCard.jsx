@@ -1,7 +1,7 @@
 import { Box, Button, InlineStack, Text, BlockStack } from '@shopify/polaris'
 import React from 'react'
 import TooltipText from "../../../components/shared/TooltipText"
-import { DeleteMajor } from "@shopify/polaris-icons"
+import { DeleteIcon } from "@shopify/polaris-icons";
 
 function ParamsCard({dataObj, handleDelete, showEdit}) {
     const authMechanism = dataObj.authMechanism
@@ -65,7 +65,7 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
                     </BlockStack>
                 </BlockStack>
                 <InlineStack gap={"2"} align="end">
-                    <Button size="slim" onClick={handleDelete} icon={DeleteMajor}><div data-testid="delete_button">Delete</div></Button>
+                    <Button size="slim" onClick={handleDelete} icon={DeleteIcon}><div data-testid="delete_button">Delete</div></Button>
                     {authMechanism?.type?.toLowerCase() === 'hardcoded' ? <Button size="slim"  onClick={() => showEdit()} variant="primary">Edit</Button> : null}
                 </InlineStack>
             </BlockStack>

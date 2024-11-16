@@ -4,7 +4,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 import api from "../api";
-import { TickMinor, CancelMinor } from "@shopify/polaris-icons"
+import { CheckIcon, XIcon } from "@shopify/polaris-icons";
 import TableExpand from "./TableExpand";
 import func from "../../../../../util/func";
 import EditModal from "./EditModal";
@@ -146,9 +146,9 @@ function DependencyTable() {
             let runResult = runResults[key]
             if (runResult) {
                 if (runResult["success"]) {
-                    icon = <Icon source={TickMinor} tone="success" />
+                    icon = <Icon source={CheckIcon} tone="success" />
                 } else {
-                    icon = <Icon source={CancelMinor} tone="critical" />
+                    icon = <Icon source={XIcon} tone="critical" />
                 }
             }
 

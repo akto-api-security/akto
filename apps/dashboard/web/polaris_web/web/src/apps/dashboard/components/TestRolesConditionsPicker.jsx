@@ -2,7 +2,7 @@ import { Button, LegacyCard, BlockStack } from '@shopify/polaris'
 import React from 'react'
 import ConditionComponent from './ConditionComponent';
 import Dropdown from './layouts/Dropdown';
-import { DeleteMinor } from "@shopify/polaris-icons"
+import { DeleteIcon } from "@shopify/polaris-icons";
 import func from "@/util/func"
 
 function TestRolesConditionsPicker(props) {
@@ -47,7 +47,7 @@ function TestRolesConditionsPicker(props) {
                             dispatch={dispatch}
                         />
                     </div>
-                    <Button icon={DeleteMinor} onClick={() => handleDelete(index)} />
+                    <Button icon={DeleteIcon} onClick={() => handleDelete(index)} />
                 </div>
             ))}
         </BlockStack>

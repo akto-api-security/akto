@@ -1,6 +1,6 @@
 import { Avatar, Box, Button, Card, Divider, InlineStack, ProgressBar, Text, BlockStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
-import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
+import { ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import transform from '../transform';
@@ -90,7 +90,7 @@ function InitialSteps({initialSteps}) {
                             <Button
 
 
-                                icon={index === dropdownActive ? ChevronUpMinor : ChevronDownMinor}
+                                icon={index === dropdownActive ? ChevronUpIcon : ChevronDownIcon}
                                 onClick={()=> expandContent(index)}
                                 variant="monochromePlain" />
                         </InlineStack>

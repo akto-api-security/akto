@@ -3,7 +3,7 @@ import {Box, Button, Collapsible, Divider, InlineStack, Icon, LegacyCard, List, 
 import settingFunctions from '../module';
 import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
-import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
+import { ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import func from "@/util/func"
 
 function Jira() {
@@ -41,7 +41,7 @@ function Jira() {
                         variant="monochromePlain">
                         <InlineStack gap={"4"}>
                             <Text variant="headingSm">Found {Object.keys(projectIssueMap).length} projects out of {projId.split(',').length}</Text>
-                            <Box><Icon source={collapsibleOpen ? ChevronUpMinor : ChevronDownMinor} /></Box>
+                            <Box><Icon source={collapsibleOpen ? ChevronUpIcon : ChevronDownIcon} /></Box>
                         </InlineStack>
                     </Button>
                 </Box>

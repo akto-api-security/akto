@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 import { Box, Button, Frame, InlineGrid, InlineStack, TopBar } from "@shopify/polaris"
-import { ExitMajor } from "@shopify/polaris-icons"
+import { ExitIcon } from "@shopify/polaris-icons";
 
 import TestEditorFileExplorer from "./components/TestEditorFileExplorer"
 import YamlEditor from "./components/YamlEditor"
@@ -119,7 +119,7 @@ const TestEditor = () => {
     const headerComp = (
         <div className="header-css">
             <InlineStack gap="5">
-                <Button onClick={handleExit} icon={ExitMajor}  variant="plain" />
+                <Button onClick={handleExit} icon={ExitIcon}  variant="plain" />
                 <InlineStack gap={"2"}>
                     <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={"Test Editor"} />
                 </InlineStack>
