@@ -10,8 +10,8 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import com.akto.dao.threat_detection.SampleRequestDao;
-import com.akto.dto.threat_detection.SampleRequest;
+import com.akto.dao.threat_detection.SampleMaliciousRequestDao;
+import com.akto.dto.threat_detection.SampleMaliciousRequest;
 import com.mongodb.client.model.BulkWriteOptions;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -59,7 +59,7 @@ public class FlushMessagesTask {
     }
 
     public void processRecords(ConsumerRecords<String, String> records) {
-        Map<String, List<SampleRequest>> accWiseMessages = new HashMap<>();
+        Map<String, List<SampleMaliciousRequest>> accWiseMessages = new HashMap<>();
         for (ConsumerRecord<String, String> record : records) {
             String msgStr = record.value();
             Message.unmarshall(msgStr)
@@ -71,17 +71,17 @@ public class FlushMessagesTask {
                             });
         }
 
-        for (Map.Entry<String, List<SampleRequest>> entry : accWiseMessages.entrySet()) {
+        for (Map.Entry<String, List<SampleMaliciousRequest>> entry : accWiseMessages.entrySet()) {
             String accountId = entry.getKey();
-            List<SampleRequest> sampleDatas = entry.getValue();
+            List<SampleMaliciousRequest> sampleDatas = entry.getValue();
             Context.accountId.set(Integer.parseInt(accountId));
 
             try {
-                List<WriteModel<SampleRequest>> bulkUpdates = new ArrayList<>();
+                List<WriteModel<SampleMaliciousRequest>> bulkUpdates = new ArrayList<>();
                 sampleDatas.forEach(
                         sampleData -> bulkUpdates.add(new InsertOneModel<>(sampleData)));
 
-                SampleRequestDao.instance.bulkWrite(
+                SampleMaliciousRequestDao.instance.bulkWrite(
                         bulkUpdates, new BulkWriteOptions().ordered(false));
             } catch (Exception e) {
                 e.printStackTrace();
