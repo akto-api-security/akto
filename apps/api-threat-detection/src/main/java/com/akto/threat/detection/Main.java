@@ -1,6 +1,8 @@
 package com.akto.threat.detection;
 
 import java.util.*;
+
+import com.akto.suspect_data.CleanUpTask;
 import com.akto.suspect_data.FlushMessagesTask;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -43,6 +45,9 @@ public class Main {
 
         // Flush Messages task
         FlushMessagesTask.instance.init();
+
+        // Clean up sample requests for which no alert is generated
+        CleanUpTask.instance.init();
 
         String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         if (topicName == null) {
@@ -102,8 +107,8 @@ public class Main {
             Context.accountId.set(accountIdInt);
 
             if (!httpCallFilterMap.containsKey(accountId)) {
-                HttpCallFilter filter = new HttpCallFilter(redisClient, sync_threshold_count,
-                        sync_threshold_time);
+                HttpCallFilter filter =
+                        new HttpCallFilter(redisClient, sync_threshold_count, sync_threshold_time);
                 httpCallFilterMap.put(accountId, filter);
                 loggerMaker.infoAndAddToDb("New filter created for account: " + accountId);
             }
@@ -118,8 +123,12 @@ public class Main {
 
     public static RedisClient createRedisClient() {
         String host = System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_HOST", "localhost");
-        int port = Integer.parseInt(System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_PORT", "6379"));
-        int database = Integer.parseInt(System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_DB", "0"));
+        int port =
+                Integer.parseInt(
+                        System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_PORT", "6379"));
+        int database =
+                Integer.parseInt(
+                        System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_DB", "0"));
 
         return RedisClient.create("redis://" + host + ":" + port + "/" + database);
     }
