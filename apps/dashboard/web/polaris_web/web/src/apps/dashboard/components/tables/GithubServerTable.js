@@ -111,9 +111,9 @@ function GithubServerTable(props) {
     updateQueryParams("filters",tableFunc.getPrettifiedFilter(appliedFilters))
   },[appliedFilters])
 
-  async function fetchData(searchVal) {
-    let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
-    let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
+  async function fetchData(searchVal, argFilters = [], argSortSelected = []) {
+    let [sortKey, sortOrder] = argSortSelected.length === 0 ? sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ") : argSortSelected[0].split(" ");
+    let filters = argFilters.length === 0 ? props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {}) : argFilters
     appliedFilters.forEach((filter) => {
       filters[filter.key] = filter.value
     })
@@ -201,7 +201,17 @@ function GithubServerTable(props) {
   }, [appliedFilters, props.disambiguateLabel, handleRemoveAppliedFilter, setFiltersMap, currentPageKey, pageFiltersMap]);
 
   const debouncedSearch = debounce((searchQuery) => {
-      fetchData(searchQuery)
+    let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
+    const currentPageFilters = filtersMap[currentPageKey]
+    if(currentPageFilters && currentPageFilters.filters) {
+      currentPageFilters.filters.forEach(filter => {
+          if (filter.key && filters.hasOwnProperty(filter.key)) {
+              filters[filter.key] = filter.value;
+          }
+      })
+    }
+    
+    fetchData(searchQuery, filters, currentPageFilters.sort)
   }, 500);
 
   const handleFiltersQueryChange = useCallback((val) => {
